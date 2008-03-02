@@ -49,7 +49,11 @@ function binomialExpectation(n:longint;p:float):float;
 function binomialVariance(n:longint;p:float):float;
 function binomialDeviation(n:longint;p:float):float;
 function binomialProbability(n:longint;p:float;k:longint):float; //P(X = k)
+function binomialProbabilityGE(n:longint;p:float;k:longint):float; //P(X >= k)
+function binomialProbabilityLE(n:longint;p:float;k:longint):float; //P(X <= k)
+function binomialProbabilityDeviationOf(n:longint;p:float;dif:float):float; //P(X >= µ + d or X <= µ - d)
 function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
+function binomialZScore(n:longint;p:float;k:longint):float;
 
 //--------------------Time functions-----------------------------------
 {$IFDEF Win32}
@@ -375,15 +379,48 @@ begin
   result:=binomial(n,k)*intpower(p,k)*intpower(1-p,n-k);
 end;
 
+function binomialProbabilityGE(n: longint; p: float; k: longint): float;
+var i:longint;
+begin
+  result:=0;
+  for i:=k to n do
+    result+=binomialProbability(n,p,i);
+end;
+
+function binomialProbabilityLE(n: longint; p: float; k: longint): float;
+var i:longint;
+begin
+  result:=0;
+  for i:=0 to k do
+    result+=binomialProbability(n,p,i);
+end;
+
+function binomialProbabilityDeviationOf(n: longint; p: float; dif: float
+  ): float;
+var m: float;
+    i:longint;
+begin
+  m:=n*p;
+  result:=0;
+  for i:=max(1,ceil(m-dif)) to min(n-1,floor(m+dif)) do
+    result:=Result+binomialProbability(n,p,i);
+  result:=1-result;
+end;
+
 function binomialProbabilityApprox(n: longint; p: float; k: longint): float;
 var sigma:float;
 begin
   if (k<0)or(k>n) then exit(0);
   sigma:=binomialDeviation(n,p);
-  if sigma>3 then //Moivre and Laplace
+  if sigma>=3 then //Moivre and Laplace
     result:=1/(sigma*sqrt(2*pi)) * exp(sqr(k-n*p)/(2*sigma*sigma))
    else
     result:=intpower(n*p,k)/factorial(k) * exp(-n*p); //Poisson
+end;
+
+function binomialZScore(n: longint; p: float; k: longint): float;
+begin
+  result:=(k-binomialExpectation(n,p)) / binomialDeviation(n,p);
 end;
 
 
