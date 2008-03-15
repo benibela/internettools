@@ -28,6 +28,8 @@ function copyfrom(s:string; start:longint):string;inline;
 function rpos(c:char;s:string):longint;
 function strcopy2(first,last:pchar):string;
 
+function splitGet(const separator: string; var remainingPart: string):string;
+procedure split(out firstPart: string; const separator: string; var remainingPart: string);
 procedure splitStr(var splitted: TStringArray;s:string;c:char;includeEmpty:boolean=true);
 
 function changeEncoding(str: string; from,toe: TEncoding):string;
@@ -174,6 +176,19 @@ begin
   move(first^,result[1],length(result));
 end;
 
+function splitGet(const separator: string; var remainingPart: string): string;
+begin
+  split(result,separator,remainingPart);
+end;
+
+procedure split(out firstPart: string; const separator: string;
+  var remainingPart: string);
+var p:longint;
+begin
+  p:=pos(separator,remainingPart);
+  firstPart:=copy(remainingPart,1,p-1);
+  delete(remainingPart,1,p+length(separator)-1);
+end;
 
 procedure splitStr(var splitted: TStringArray; s: string; c: char;
   includeEmpty: boolean);
