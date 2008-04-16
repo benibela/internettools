@@ -10,11 +10,18 @@ uses
   , windows
   {$ENDIF};
 
+//-------------------------Array functions-----------------------------
+type
+  TStringArray=array of string;
+  TLongintArray =array of longint;
+
+function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //=> i with a[i]=e
+function arrayRemove(var a: TLongintArray;i: longint):longint; overload; //=> e=a[i], unsorted
+procedure arrayInvert(var a: TLongintArray);
 
 //Stringfunctions
 type
   TEncoding=(eUnknown,eWindows1252,eUTF8);
-  TStringArray=array of string;
 
 function strlmove(dest,source:pchar;destLen,sourceLen: longint):pchar;
 function widestrlmove(dest,source:pwidechar;destLen,sourceLen: longint):pwidechar;
@@ -57,6 +64,7 @@ function binomialProbabilityDeviationOf(n:longint;p:float;dif:float):float; //P(
 function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
 function binomialZScore(n:longint;p:float;k:longint):float;
 
+
 //--------------------Time functions-----------------------------------
 {$IFDEF Win32}
 function dateTimeToFileTime(const date: TDateTime): TFileTime;
@@ -65,6 +73,10 @@ function weekOfYear(const date:TDateTime):word;
 function parseDate(datestr,mask:string):longint;
 
 const WHITE_SPACE=[#9,#10,#13,' '];
+
+
+//----------------------------Templates-------------------------------
+
 
 type
 
@@ -86,6 +98,36 @@ public
 end;
 
 implementation
+
+//========================array functions========================
+
+function arrayAdd(var a: TLongintArray; e: longint): longint;
+begin
+  setlength(a,length(a)+1);
+  a[high(a)]:=e;
+  result:=high(a);
+end;
+
+function arrayRemove(var a: TLongintArray; i: longint): longint;
+begin
+  if (i<0) or (i>high(a)) then exit(0);
+  result:=a[i];
+  a[i]:=a[high(a)];
+  SetLength(a,high(a));
+end;
+
+procedure arrayInvert(var a: TLongintArray);
+var temp: TLongintArray;
+    i:longint;
+begin
+  temp:=a;
+  setlength(temp,length(temp));
+  for i:=0 to high(temp) do
+    a[high(a)-i]:=temp[i];
+end;
+
+
+//=========================String functions======================
 
 function strlmove(dest, source: pchar; destLen, sourceLen: longint): pchar;
 begin
@@ -111,24 +153,11 @@ begin
     end;
 end;
 function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
-var i:integer;
 begin
   result:=l1=l2;
   if not result then exit;
   result:=strlicomp(p1,p2,l1)=0;
-{
-  for i:=0 to l1-1 do
-    if p1[i]=p2[i] then continue
-    else if ((p1[i] in ['A'..'Z']) and (p2[i] in ['a'..'z'])) and
-            (p1[i]-'A'=p2[i]-'a') then continue
-    else if ((p1[i] in ['a'..'z']) and (p2[i] in ['A'..'Z'])) and
-            (p1[i]-'a'=p2[i]-'A') then continue
-    else begin
-      result:=false;
-      exit;
-    end;     }
 end;
-
 function strliequal(p: pchar; s:string;l: longint): boolean;
 begin
   result:=(l=length(s)) and (strlicomp(p,@s[1],l)=0);
@@ -351,7 +380,7 @@ var j:longint;
 begin
   if i<0 then exit(factorial(-i));
   result:=1;
-  for j:=2 to j do
+  for j:=2 to i do
     result*=j;
 end;
 function binomial(n,k: longint): float;
@@ -437,6 +466,7 @@ function binomialZScore(n: longint; p: float; k: longint): float;
 begin
   result:=(k-binomialExpectation(n,p)) / binomialDeviation(n,p);
 end;
+
 
 
 
