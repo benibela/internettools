@@ -1,0 +1,41 @@
+object ProgressBarDialog: TProgressBarDialog
+  Left = 290
+  Height = 62
+  Top = 186
+  Width = 383
+  HorzScrollBar.Page = 382
+  VertScrollBar.Page = 61
+  BorderIcons = []
+  BorderStyle = bsDialog
+  Caption = 'ProgressBarDialog'
+  ClientHeight = 62
+  ClientWidth = 383
+  FormStyle = fsStayOnTop
+  object Label1: TLabel
+    Left = 13
+    Height = 22
+    Top = 9
+    Width = 40
+    Color = clNone
+    ParentColor = False
+  end
+  object barLabel: TLabel
+    Left = 336
+    Height = 14
+    Top = 39
+    Width = 42
+    AutoSize = False
+    Caption = 'barLabel'
+    Color = clNone
+    ParentColor = False
+  end
+  object ProgressBar1: TProgressBar
+    Left = 8
+    Height = 20
+    Top = 36
+    Width = 320
+    Anchors = [akTop, akLeft, akRight]
+    Max = 100
+    Smooth = True
+  end
+end
