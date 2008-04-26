@@ -19,6 +19,13 @@ function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //=> i wit
 function arrayRemove(var a: TLongintArray;i: longint):longint; overload; //=> e=a[i], unsorted
 procedure arrayInvert(var a: TLongintArray);
 
+//-----------------------Flow control functions------------------------
+type TProcedureOfObject=procedure () of object;
+function procedureToMethod(proc: TProcedure): TMethod;
+procedure threadedCall(proc: TProcedureOfObject; finished: TNotifyEvent); overload;
+procedure threadedCall(proc: TProcedureOfObject; finished: TProcedureOfObject);overload;
+procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
+
 //Stringfunctions
 type
   TEncoding=(eUnknown,eWindows1252,eUTF8);
@@ -124,6 +131,58 @@ begin
   setlength(temp,length(temp));
   for i:=0 to high(temp) do
     a[high(a)-i]:=temp[i];
+end;
+
+//=========================Flow control functions======================
+
+type
+
+{ TThreadedCall }
+
+TThreadedCall = class(TThread)
+  proc: TProcedureOfObject;
+  procedure Execute; override;
+  constructor create(aproc: TProcedureOfObject;finished: TNotifyEvent);
+end;
+
+procedure TThreadedCall.Execute;
+begin
+  proc();
+end;
+
+constructor TThreadedCall.create(aproc: TProcedureOfObject;finished: TNotifyEvent);
+begin
+  self.proc:=aproc;
+  FreeOnTerminate:=true;
+  OnTerminate:=finished;
+  inherited create(false);
+end;
+
+function procedureToMethod(proc: TProcedure): TMethod;
+begin
+  result.code:=proc;
+  result.Data:=nil;
+end;
+
+procedure threadedCallBase(proc: TProcedureOfObject; finished: TNotifyEvent);
+var thread: TThreadedCall;
+begin
+  thread:=TThreadedCall.Create(proc,finished);
+end;
+
+procedure threadedCall(proc: TProcedureOfObject; finished: TNotifyEvent);
+begin
+  threadedCallBase(proc,finished);
+end;
+
+procedure threadedCall(proc: TProcedureOfObject; finished: TProcedureOfObject);
+begin
+  threadedCallBase(proc, TNotifyEvent(finished));
+end;
+
+procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);
+begin
+  threadedCallBase(TProcedureOfObject(procedureToMethod(proc)),TNotifyEvent(finished));
 end;
 
 
