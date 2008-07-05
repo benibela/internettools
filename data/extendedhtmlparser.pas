@@ -1,5 +1,5 @@
 unit extendedhtmlparser;
-
+{$DEFINE UNITTESTS}
 {$mode objfpc}{$H+}
 
 interface
@@ -7,7 +7,11 @@ interface
 uses
   Classes, SysUtils,simplehtmlparser,regexpr,bbutils;
 
-
+{
+TODO: - deepNodeText() auch erlauben, wenn andere Befehle vorkommen
+      - mÃ¶gliche Probleme mit leeren Anweisungen untersuchen (leere Datei, Befehle am Anfang/Ende...)
+      - Befehle direkt nach/vor einem loop-Befehl ermÃ¶glichen
+}
 
 
 type
@@ -23,12 +27,12 @@ type
   TTemplateElement= class
     typ: TTemplateElementType;
     closeTag: boolean;
-    text: string; //Name bzw. Inhalt für tetText
-    attributes: TStringList;  //nil für tetText
+    text: string; //Name bzw. Inhalt fÃ¼r tetText
+    attributes: TStringList;  //nil fÃ¼r tetText
     //children: TList;
-    reverse: TTemplateElement; //Schließen/Öffnen
+    reverse: TTemplateElement; //SchlieÃŸen/Ã–ffnen
     next,rnext: TTemplateElement;
-    id:longint; //Nur für debugging zwecke
+    id:longint; //Nur fÃ¼r debugging zwecke
     function toStr:string;
     procedure freeAll;
     destructor destroy;override;
@@ -59,7 +63,6 @@ type
 
   THtmlTemplateParser=class
   protected
-
     templateEncoding,htmlEncoding, outputEncoding: TEncoding;
     FTemplateCount:longint;
     FRootTemplate: TTemplateElement;
@@ -77,21 +80,23 @@ type
     function templateTextEvent(text: pchar; textLen: longint):boolean;
 
     FParsingCompleted: boolean;
-    FlastText:string;
+    FlastText,fdeepNodeText:string;
     //FCurrentStack: TStringList;
     FVariables,FNotifyFunctions,FVariableFunctions: TStringList;
     FOldProperties: THTMLProperties;
     FParsingAlternatives: TFPList;
     FAutoCloseTag: boolean;
+    FCollectDeepNodeText: boolean; //concat every read text block
     LastEventIsText:boolean;
 
     FOnEnterTag, FOnLeaveTag, FOnTextRead: TReadCallbackFunction;
     FOnVariableRead: TVariableCallbackFunction;
 
+    function elementIsOptional(element:TTemplateElement): boolean;
     procedure finishHtmlParsing(status:TParsingStatus);
-    function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
+    function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurÃ¼ck
     function parsePseudoXPath(str: string):string;
-    procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;beforeReading:boolean);
+    procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
     function leaveTag(tagName: pchar; tagNameLen: longint):boolean;
     function textEvent(text: pchar; textLen: longint):boolean;
@@ -149,7 +154,7 @@ begin
         executeTemplateCommand(status,lastElement,true);
     end;
                            ;
-  //  FlastText:='';//Letzten Text löschen
+  //  FlastText:='';//Letzten Text lÃ¶schen
 
     result:=true;
     lastElement:=nextElement;
@@ -240,7 +245,7 @@ var values: array[1..8] of string;
   end;
 var word:string;
 begin
-  //Möglichkeiten:
+  //MÃ¶glichkeiten:
   //func(<1>,<2>,<3>,...)
   //<1> [==,!=, =] <2>
   //@attrib
@@ -248,6 +253,7 @@ begin
   str:=trim(str);
   if str='' then exit('');
   if str='text()' then exit(FlastText);
+  if str='deepNodeText()' then exit(fdeepNodeText);
   currentValue:=1;
   currentAction:=1;
   actions[1]:=aNormal;
@@ -288,16 +294,19 @@ begin
           currentValue+=1;
           values[currentValue]:='';
           actions[currentAction]:=aNormal;
-        end else raiseParsingError('Komma außerhalb Funktionsparameter');
+        end else raiseParsingError('Komma auÃŸerhalb Funktionsparameter');
       end;
       ')': begin
         processValues;
         if actions[currentAction]=aConcat then currentAction-=1
-        else raiseParsingError('Schließende Klammer ohne Funktion');
+        else raiseParsingError('SchlieÃŸende Klammer ohne Funktion');
       end;
       else if SameText(word,'text') then begin
         expect('(');expect(')');
         readValue(FlastText);
+      end else if SameText(word,'deepNodeText') then begin
+        expect('(');expect(')');
+        readValue(fdeepNodeText);
       end else if SameText(word,'concat') then begin
         currentAction+=1;
         actions[currentAction]:=aConcat;
@@ -307,74 +316,59 @@ begin
   end;
   processValues;
   result:=values[1];
- { if str[1] = '@' then begin //Ausdruck beginnt mit Attribut
-    comparison:=pos('=',str);
-    if comparison<=0 then comparison:=pos('!',str);
-    if comparison<=0 then begin;
-    for i:=2 to length(str) do
-      if str[i] in
-  end;
- for i:=1 to str do
-  last:=@str[1];
-  while pos^<>#0 do begin
-    if pos^ in [' ','=','(']
-  end;
-  else
-  else if str[1]='@' then
-    exit()
-  else if str[1]='''' then
-    exit(copy(str,2,length(str)-2))
-  else if strlibeginswith(str,'concat') then begin
-    delete(str,1,pos('(',str));
-    result:='';
-    comma:=pos(',',str);
-    while comma>0 do begin
-      result+=parsePseudoXPath(copy(str,1,comma-1));
-      delete(str,1,comma);
-      comma:=pos(',',str);
-      if comma=0 then comma:=rpos(')',str);
-    end;
-  end else raise ETemplateParseException.Create('Ungültige Datenquelle '+str+' im Template');}
 end;
 
-procedure THtmlTemplateParser.executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;beforeReading:boolean);
-var text,condition:string;
+procedure THtmlTemplateParser.executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
+
+  procedure executeReadCommand;
+  var text,vari:string;
+    regexp: TRegExpr;
+  begin
+    FCollectDeepNodeText:=false;
+    text:=parsePseudoXPath(replaceVars(cmd.attributes.Values['source']));
+
+    if cmd.attributes.Values['regex']<>'' then begin
+      regexp:=TRegExpr.Create;
+      regexp.Expression:=cmd.attributes.Values['regex'];
+      regexp.Exec(text);
+      text:=regexp.Match[StrToIntDef(cmd.attributes.Values['submatch'],0)];
+      regexp.free;
+    end;
+
+    //Zeichensatz konvertierung
+    //(ohne Annahme template-ZS=html-ZS, es mÃ¼sste bereits frÃ¼her konvertiert werden)
+    if htmlEncoding<>outputEncoding then
+      if (htmlEncoding=eUTF8) and (outputEncoding=eWindows1252) then
+        text:=Utf8ToAnsi(text)
+       else if (htmlEncoding=eWindows1252) and (outputEncoding=eUTF8) then
+        text:=AnsiToUtf8(text);
+
+    vari:=replaceVars(cmd.attributes.Values['var']);
+    variables.Values[vari]:=text;
+    if Assigned(FOnVariableRead) then FOnVariableRead(vari,text);
+  end;
+
+var condition:string;
     comparisonPos:longint;
     equal:boolean;
-    regexp: TRegExpr;
     ls,rs:string;
 begin
-
-  if beforeReading then exit;begin
-    //Lesen muss nach dem nächsten Element ausgeführt werden,
-    //weil vorher der Text des aktuellen Elements nicht
-    //bekannt ist
+  //afterReading: the nextElement has been read
+  if afterReading then
     case cmd.typ of
-      tetCommandRead: begin
-        text:=parsePseudoXPath(replaceVars(cmd.attributes.Values['source']));
-
-        if cmd.attributes.Values['regex']<>'' then begin
-          regexp:=TRegExpr.Create;
-          regexp.Expression:=cmd.attributes.Values['regex'];
-          regexp.Exec(text);
-          text:=regexp.Match[StrToIntDef(cmd.attributes.Values['submatch'],0)];
-          regexp.free;
-        end;
-        
-        //Zeichensatz konvertierung
-        //(ohne Annahme template-ZS=html-ZS, es müsste bereits früher konvertiert werden)
-        if htmlEncoding<>outputEncoding then
-          if (htmlEncoding=eUTF8) and (outputEncoding=eWindows1252) then
-            text:=Utf8ToAnsi(text)
-           else if (htmlEncoding=eWindows1252) and (outputEncoding=eUTF8) then
-            text:=AnsiToUtf8(text);
-
-        variables.Values[cmd.attributes.Values['var']]:=text;
-        if Assigned(FOnVariableRead) then FOnVariableRead(cmd.attributes.Values['var'],text);
-      end;
-    end;
-//  end else begin
+      tetCommandRead:
+        if FCollectDeepNodeText then
+          executeReadCommand;
+  end else begin
+    //nextElement has not been read, but due to virtual empty texts the template
+    //element named in the file can be be read
     case cmd.typ of
+      tetCommandRead:
+        if pos('deepNodeText',cmd.attributes.Values['source'])>0 then begin
+          FCollectDeepNodeText:=true; //execute later, when more has been read
+          fdeepNodeText:=FlastText;
+         end else
+          executeReadCommand;
       tetCommandIf: if not cmd.closeTag then begin
         condition:=cmd.attributes.Values['test']; //TODO:'==' von == unterscheiden
 {        comparisonPos:=pos('==',condition);
@@ -421,7 +415,7 @@ begin
           status.lastElement:=cmd.reverse;
           status.nextElement:=cmd.reverse;
         end else begin
-          //In diesem Fall kann die Schleife auch kein mal ausgeführt werden
+          //In diesem Fall kann die Schleife auch kein mal ausgefÃ¼hrt werden
           FParsingAlternatives.add(TParsingStatus.Create);
           with TParsingStatus(FParsingAlternatives[FParsingAlternatives.count-1]) do begin
             lastElement:=cmd.reverse;
@@ -444,7 +438,7 @@ end;
 function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
   properties: THTMLProperties): boolean;
 
-  function fit(element:TTemplateElement):boolean;
+  function perfectFit(element:TTemplateElement):boolean;
   var i,j,found,ok:longint;
       Name:string;
   begin
@@ -453,8 +447,9 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
     if element.attributes=nil then
       exit(true);
     for i := 0 to element.attributes.Count-1 do begin
-      found:=-1;
       Name:=element.attributes.Names[i];
+      if strlibeginswith(name,'htmlparser') then continue;
+      found:=-1;
       for j:=0 to high(properties) do
         if strliequal(properties[j].name,name,properties[j].nameLen) then begin
           if strliequal(properties[j].value,element.attributes.ValueFromIndex[i],properties[j].valueLen) then
@@ -465,9 +460,11 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
     end;
     exit(true);
   end;
+  
 
 var i,j:longint;
     element: TTemplateElement;
+    jumpAbout: boolean;
 begin
   if FParsingAlternatives.Count=0 then exit(false);
 
@@ -488,11 +485,11 @@ begin
         htmlEncoding:=eUTF8
       else if (pos('charset=windows-1252',LowerCase(getProperty('content',properties)))>0) or
               (pos('charset=iso-8859-1',LowerCase(getProperty('content',properties)))>0) then
-        htmlEncoding:=eWindows1252; //ist für iso-8859-1 zwar falsch, aber nur für Kontrollzeichen
+        htmlEncoding:=eWindows1252; //ist fÃ¼r iso-8859-1 zwar falsch, aber nur fÃ¼r Kontrollzeichen
 
-      //Html und Template-Datei müssen den gleichen Zeichensatz verwenden
+      //Html und Template-Datei mÃ¼ssen den gleichen Zeichensatz verwenden
       if htmlEncoding<>templateEncoding then begin
-        //ändere Templatecodierung
+        //Ã¤ndere Templatecodierung
         element:=FRootTemplate;
         while element<>nil do begin
           if element.typ = tetText then begin
@@ -511,8 +508,10 @@ begin
         templateEncoding:=htmlEncoding;
       end;
     end;
-  FAutoCloseTag:=strliequal(tagName,'br',tagNameLen) or
+  FAutoCloseTag:=strliequal(tagName,'meta',tagNameLen) or
+                 strliequal(tagName,'br',tagNameLen) or
                  strliequal(tagName,'input',tagNameLen) or
+                 strliequal(tagName,'frame',tagNameLen) or
                  strliequal(tagName,'hr',tagNameLen)or
                  strliequal(tagName,'img',tagNameLen)or
                  strliequal(tagName,'p',tagNameLen);
@@ -520,17 +519,21 @@ begin
   result:=true;
   for i:=0 to FParsingAlternatives.Count-1 do
     with TParsingStatus(FParsingAlternatives[i]) do begin
-      if fit(nextElement) then begin
+      while (nextElement<>nil) and elementIsOptional(nextElement) and (not perfectFit(nextElement)) do begin
+        lastElement:=nextElement.reverse;
+        nextElement:=nextElement.reverse.rnext;
+      end;
+      if perfectFit(nextElement) then begin
         elementStack.AddObject(pcharToStringSimple(tagName,tagNameLen),nextElement);
         result:=readTemplateElement(TParsingStatus(FParsingAlternatives[i]));
         //if (lastElement<>nil) and  ((lastElement.next<>nextElement) or nextElementthen
         FOldProperties:=properties;
 
         //Ein passender Tag wird so interpretiert, das alles was nun folgt
-        //korrekt ist, und somit alle späteren Alternativen nicht mehr
-        //berücksichtigt werden müssen.
+        //korrekt ist, und somit alle spÃ¤teren Alternativen nicht mehr
+        //berÃ¼cksichtigt werden mÃ¼ssen.
         //Die kann fehlerhafte Ergebnisse geben, wenn diese Annahme falsch ist.
-        //Eigentlich müsste Backtracking benutzt werden, die HTML-Datei soll
+        //Eigentlich mÃ¼sste Backtracking benutzt werden, die HTML-Datei soll
         //jedoch nur einmal gelesen werden.
         for j:=i+1 to FParsingAlternatives.Count-1 do
           TParsingStatus(FParsingAlternatives[j]).free;
@@ -548,6 +551,7 @@ var alt:longint;
     i,j:longint;
     closed: longint; //Elementid im Stack, das geschlossen wird
 
+    debugelement: TTemplateElement;
 begin
   if FParsingAlternatives.Count=0 then exit;
 
@@ -568,35 +572,45 @@ begin
     with TParsingStatus(FParsingAlternatives[alt]) do begin
       //geschlossenes Element im Stack suchen
       closed:=-1;
-      for i:=elementStack.Count-1 downto 0 do
+     for i:=elementStack.Count-1 downto 0 do
         if strliequal(tagName,elementStack[i],tagNameLen) then begin
           closed:=i;
           break;
         end;
       //ist closed <> letztes Element wird ein Knoten verlassen, der nicht der aktive ist
-      //das Dokument ist also ungültig.
+      //das Dokument ist also ungÃ¼ltig.
       //Allerdings soll dieser Parser fehler korrigierend sein und sucht deshalb
-      //einen älteren Knoten
+      //einen Ã¤lteren Knoten
       //ist closed=-1 dann ignorieren
-      //TODO: Ähnlichkeit zu aktuellem Knoten suchen, um auf Tippfehler reagieren
+      //TODO: Ã„hnlichkeit zu aktuellem Knoten suchen, um auf Tippfehler reagieren
       if closed=-1 then
-        continue; //HTML-Datei ist ungültig
+        continue; //HTML-Datei ist ungÃ¼ltig
 
-      //überprüfen, ob das Element im Template
+      while (nextElement<>nil) and elementIsOptional(nextElement) and not nextElement.closeTag do begin
+        debugelement:=nextElement;
+        if (not nextElement.closeTag)and(nextElement.reverse<>nil) then begin
+          lastElement:=nextElement.reverse;
+          nextElement:=nextElement.reverse;
+        end;
+        readTemplateElement(TParsingStatus(FParsingAlternatives[alt]));
+      end;
+        debugelement:=nextElement;
+
+      //Ã¼berprÃ¼fen, ob das Element im Template
       if elementStack.Objects[closed]<>nil then
         if (nextElement.reverse<>elementStack.Objects[closed]) or (not nextElement.closeTag) then begin
-          //ungültiges Element gwschlossen
+          //ungÃ¼ltiges Element gwschlossen
           nextElement:=TTemplateElement(elementStack.Objects[closed]);
-          lastElement:=nextElement; //Verhindert erneutes ausführen der Befehle vor nextElement
-                                    //TODO: Überlegen, ob sie nicht doch ausgeführt werden sollen
+          lastElement:=nextElement; //Verhindert erneutes ausfÃ¼hren der Befehle vor nextElement
+                                    //TODO: Ãœberlegen, ob sie nicht doch ausgefÃ¼hrt werden sollen
         end else begin
-          //erwartetes Element geschlossen => Alle anderen Alternativen löschen
+          //erwartetes Element geschlossen => Alle anderen Alternativen lÃ¶schen
           for i:=FParsingAlternatives.Count-1 downto 0 do
             if i<>alt then begin
               TParsingStatus(FParsingAlternatives[i]).Free;
               FParsingAlternatives.Delete(i);
             end;
-          //geschlossenes Element löschen
+          //geschlossenes Element lÃ¶schen
           elementStack.Delete(closed);
           if not readTemplateElement(TParsingStatus(FParsingAlternatives[0])) then begin
             TParsingStatus(FParsingAlternatives[0]).free;
@@ -616,6 +630,7 @@ end;
 
 function THtmlTemplateParser.textEvent(text: pchar; textLen: longint): boolean;
 var alt,i: longint;
+  temp:string;
 begin
   if assigned(FOnTextRead) then FOnTextRead(text,textLen);
   result:=true;
@@ -625,21 +640,27 @@ begin
       FlastText:=trim(pcharToString(text+i,textlen-i));
       break;
     end;                                    }
-  FlastText:=trim(decodeHTMLEntities(text,textlen,htmlEncoding));
-  if FlastText='' then
-    FlastText:=decodeHTMLEntities(text,textlen,htmlEncoding);
+  FlastText:=decodeHTMLEntities(text,textlen,htmlEncoding);
 
-  for alt:=0 to FParsingAlternatives.count-1 do
-    with TParsingStatus(FParsingAlternatives[alt]) do begin
-      //if (lastElement<>nil) (*and (nextElement.{<>lastElement.next})*) then
-      //Text speichern
+  if FCollectDeepNodeText then
+    fdeepNodeText+=FlastText
+   else begin
+     temp:=Trim(FLasttext);
+     if temp<>'' then
+       FlastText:=temp;
 
-      while nextElement.typ=tetText do begin
-        if strlibeginswith(FlastText,nextElement.text) then
-          result:=readTemplateElement(TParsingStatus(FParsingAlternatives[alt]))
-         else break;
-      end;
-   end;
+      for alt:=0 to FParsingAlternatives.count-1 do
+        with TParsingStatus(FParsingAlternatives[alt]) do begin
+          //if (lastElement<>nil) (*and (nextElement.{<>lastElement.next})*) then
+          //Text speichern
+
+          while nextElement.typ=tetText do begin
+            if strlibeginswith(FlastText,nextElement.text) then
+              result:=readTemplateElement(TParsingStatus(FParsingAlternatives[alt]))
+             else break;
+          end;
+       end;
+  end;
 end;
 
 function THtmlTemplateParser.newTemplateElement(text: pchar; textLen: longint):TTemplateElement;
@@ -733,10 +754,10 @@ begin
       exit;
 
   if (FTemplateElementStack.Count = 0) then
-    raise Exception.Create('Nicht geöffneter Tag '+pcharToStringSimple(tagName,tagNameLen)+' wurde im Template geschlossen.');
+    raise Exception.Create('Nicht geÃ¶ffneter Tag '+pcharToStringSimple(tagName,tagNameLen)+' wurde im Template geschlossen.');
 
   if not strliequal(tagname,TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]).text,tagNameLen) then
-    raise Exception.Create('Der Tag '+pcharToStringSimple(tagName,tagNameLen)+' wurde im Template geschlossen, obwohl "'+TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]).text+'" dran wäre.');
+    raise Exception.Create('Der Tag '+pcharToStringSimple(tagName,tagNameLen)+' wurde im Template geschlossen, obwohl "'+TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]).text+'" dran wÃ¤re.');
 
   nte:=newTemplateElement(tagName,tagNameLen);
   nte.reverse:=TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]);
@@ -769,6 +790,16 @@ begin
   nte:=newTemplateElement(text,textLen);
   nte.typ:=tetText;
   rememberNewHTMLElement(nte);
+end;
+
+function THtmlTemplateParser.elementIsOptional(element: TTemplateElement
+  ): boolean;
+begin
+  if element=nil then exit(true);
+  if (element.typ=tetText) and (element.text='') then exit(true);
+  if (element.attributes=nil) then exit(false);
+  result:=(element.attributes.Values['htmlparser-optional']='true');
+
 end;
 
 procedure THtmlTemplateParser.finishHtmlParsing(status:TParsingStatus);
@@ -818,7 +849,7 @@ begin
   try
     simplehtmlparser.parseHTML(html,@enterTag,@leaveTag,@textEvent);
     if not FParsingCompleted then
-       raise EHTMLParseException.create('Die HTML Datei ist kürzer als das Template'#13#10+
+       raise EHTMLParseException.create('Die HTML Datei ist kÃ¼rzer als das Template'#13#10+
                                         'last: '+TParsingStatus(FParsingAlternatives[0]).lastElement.toStr+#13#10+
                                         'next: '+TParsingStatus(FParsingAlternatives[0]).nextElement.toStr+#13#10+
                                         'latest: '+TParsingStatus(FParsingAlternatives[0]).latestElement.toStr+#13#10+
@@ -847,10 +878,10 @@ begin
     templateEncoding:=eUTF8;
   end else if strbeginswith(template,#$fe#$ff) or strbeginswith(template,#$ff#$fe) or
     strbeginswith(template,#00#00#$fe#$ef) then
-    raise Exception.Create('Ungültiger Codierung BOM im Template');
+    raise Exception.Create('UngÃ¼ltiger Codierung BOM im Template');
   simplehtmlparser.parseHTML(template,@templateEnterTag,@templateLeaveTag,@templateTextEvent);
   if FRootTemplate = nil then
-    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
+    raise ETemplateParseException.Create('UngÃ¼ltiges/Leeres Template');
 end;
 
 procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
@@ -1006,37 +1037,37 @@ begin
       extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b></a>');
       extParser.parseHTML('<a><b>Dies wird Variable test</b></a>');
       if extParser.variables.Values['test']<>'Dies wird Variable test' then
-        raise Exception.create('ungültiges Ergebnis');
+        raise Exception.create('ungÃ¼ltiges Ergebnis: '+extParser.variables.Values['test']);
     end;
     2: begin
       extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b></a>');
       extParser.parseHTML('<a><b>Dies wird erneut Variable test</b><b>Nicht Test</b><b>Test</b></a>');
       if extParser.variables.Values['test']<>'Dies wird erneut Variable test' then
-        raise Exception.create('ungültiges Ergebnis');
+        raise Exception.create('ungÃ¼ltiges Ergebnis');
     end;
     3: begin
       extParser.parseTemplate('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>');
       extParser.parseHTML('<a><b>Nicht Test</b><b>Test:</b><b>Dies wird erneut Variable test2</b></a>');
       if extParser.variables.Values['test']<>'Dies wird erneut Variable test2' then
-        raise Exception.create('ungültiges Ergebnis');
+        raise Exception.create('ungÃ¼ltiges Ergebnis');
     end;
     4: begin
       extParser.parseTemplate('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>');
       extParser.parseHTML('<a><b>1</b><b>Test:</b><b>2</b><b>3</b></a>');
       if extParser.variables.Values['test']<>'2' then
-        raise Exception.create('ungültiges Ergebnis');
+        raise Exception.create('ungÃ¼ltiges Ergebnis');
     end;
     5: begin
       extParser.parseTemplate('<a><b><htmlparser:read source="@att" var="att-test"/></b></a>');
       extParser.parseHTML('<a><b att="HAllo Welt!"></b></a>');
       if extParser.variables.Values['att-test']<>'HAllo Welt!' then
-        raise Exception.create('ungültiges Ergebnis');
+        raise Exception.create('ungÃ¼ltiges Ergebnis');
     end;
     6: begin
       extParser.parseTemplate('<a><b><htmlparser:read source="@att" var="regex" regex="<\d*>"/></b></a>');
       extParser.parseHTML('<a><b att="Zahlencode: <675> abc"></b></a>');
       if extParser.variables.Values['regex']<>'<675>' then
-        raise Exception.create('ungültiges Ergebnis');
+        raise Exception.create('ungÃ¼ltiges Ergebnis');
     end;
     7: begin
       extParser.parseTemplate('<a><b><htmlparser:read source="@att" var="regex" regex="<(\d* \d*)>" submatch="1"/></b></a>');
@@ -1110,25 +1141,25 @@ begin
       if extParser.variables.Values['test']<>'123.jpg' then
         raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
     end;
-    18: begin //IF-Test (Bed. == erfüllt)
+    18: begin //IF-Test (Bed. == erfÃ¼llt)
       extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
       extParser.parseHTML('<a><b>abc</b><c>dies kommt raus</c></a>');
       if extParser.variables.Values['test']<>'dies kommt raus' then
         raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
     end;
-    19: begin //IF-Test (Bed. == nicht erfüllt)
+    19: begin //IF-Test (Bed. == nicht erfÃ¼llt)
       extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
       extParser.parseHTML('<a><b>abcd</b><c>dies kommt nicht raus</c></a>');
       if extParser.variables.Values['test']<>'abcd' then
         raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
     end;
-    20: begin //IF-Test (Bed. != erfüllt)
+    20: begin //IF-Test (Bed. != erfÃ¼llt)
       extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''!=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
       extParser.parseHTML('<a><b>abcd</b><c>dies kommt raus</c></a>');
       if extParser.variables.Values['test']<>'dies kommt raus' then
         raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
     end;
-    21: begin //IF-Test (Bed. != nicht erfüllt)
+    21: begin //IF-Test (Bed. != nicht erfÃ¼llt)
       extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''abc''!=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
       extParser.parseHTML('<a><b>abc</b><c>dies kommt nicht raus</c></a>');
       if extParser.variables.Values['test']<>'abc' then
@@ -1158,7 +1189,7 @@ begin
       if extParser.variables.Values['test']<>'abcd.png' then
         raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
     end;
-    26: begin //Schleifen Vollständigkeits test
+    26: begin //Schleifen VollstÃ¤ndigkeits test
       extParser.parseTemplate('<a><htmlparser:loop><b><htmlparser:read source="text()" var="test"/></b></htmlparser:loop></a>');
       extParser.parseHTML('<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>');
       if extParser.variables.Values['test']<>'5' then
@@ -1174,10 +1205,76 @@ begin
       extParser.parseTemplate('<a><ax><b>1</b></ax><ax><b><htmlparser:read source="text()" var="test"/></b></ax></a>');
       extParser.parseHTML('<a><ax>123124</ax><ax><b>525324</b></ax><ax><b>1</b></ax><ax><b>3</b></ax></a>');
       if extParser.variables.Values['test']<>'3' then
-        raise Exception.create('ergebnis ungültig');
+        raise Exception.create('ergebnis ungÃ¼ltig');
     end;
-    29: if FileExists('U:\components\pascal\html\tests\test8.template') then begin
-      //Sollte was Bücherintrotest sein
+    29: begin //optionale elemente
+      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>');
+      extParser.parseHTML('<a><xx></xx><c>!!!</c></a>');
+      if extParser.variables.Values['test']<>'!!!' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    30: begin
+      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>');
+      extParser.parseHTML('<a><c>???</c></a>');
+      if extParser.variables.Values['test']<>'???' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    31: begin
+      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>');
+      extParser.parseHTML('<a><b>1</b><c>2</c></a>');
+      if extParser.variables.Values['test']<>'2' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    32: begin
+      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></a>');
+      extParser.parseHTML('<a><b>1</b><c>2</c><b>3</b></a>');
+      if extParser.variables.Values['test']<>'3' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    33: begin
+      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><e htmlparser-optional="true"/></a>');
+      extParser.parseHTML('<a><b>1</b><c>2</c><b>test*test</b></a>');
+      if extParser.variables.Values['test']<>'test*test' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    34: begin
+      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><htmlparser:read source="text()" var="bla"/><e htmlparser-optional="true"/></a>');
+      extParser.parseHTML('<a><b>1</b><c>2</c><b>hallo</b>welt</a>');
+      if (extParser.variables.Values['test']<>'hallo') then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    35: begin //mehrfach loops+concat
+      extParser.parseTemplate('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></a>');
+      extParser.parseHTML('<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>');
+      if extParser.variables.Values['test']<>'los:123' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    36: begin
+      extParser.parseTemplate('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>');
+      extParser.parseHTML('<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>');
+      if extParser.variables.Values['test']<>'los:abc123ABC' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    37: begin //deepNodeText()
+      extParser.parseTemplate('<a><x><htmlparser:read source="deepNodeText()" var="test"/></x></a>');
+      extParser.parseHTML('<a><x>Test:<b>in b</b><c>in c</c>!</x></a>');
+      if extParser.variables.Values['test']<>'Test:in bin c!' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    38: begin //html script tags containing <
+      extParser.parseTemplate('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>');
+      extParser.parseHTML('<a><script>abc<def</script><b>test<b></a>');
+      if extParser.variables.Values['test']<>'test' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    39: begin //direct closed tags
+      extParser.parseTemplate('<a><br/><br/><htmlparser:read source="text()" var="test"/><br/></a>');
+      extParser.parseHTML('<a><br/><br   />abc<br /></a>');
+      if extParser.variables.Values['test']<>'abc' then
+        raise Exception.create('ergebnis ungÃ¼ltig');
+    end;
+    99: if FileExists('U:\components\pascal\html\tests\test8.template') then begin
+      //Sollte was BÃ¼cherintrotest sein
       sl:=TStringList.Create;
       sl.LoadFromFile('U:\components\pascal\html\tests\test8.template');
       extParser.parseTemplate(sl.text);
@@ -1190,9 +1287,9 @@ begin
       if sl.text<>logClass.text then
         raise Exception.Create('logs sind unterschiedlich');
       sl.free;
-    end else raise Exception.Create('Input für Test nicht vorhanden');
+    end ;//else raise Exception.Create('Input fÃ¼r Test nicht vorhanden');
 
-    30  : if FileExists('T:\test.template') then begin //Freier Test
+    100  : if FileExists('T:\test.template') then begin //Freier Test
       sl:=TStringList.Create;
       sl.LoadFromFile('T:\test.template');
       extParser.parseTemplate(sl.text);
@@ -1233,7 +1330,7 @@ begin
   extParser.onLeaveTag:=@log.lt;
   extParser.onTextRead:=@log.tr;
   extParser.onVariableRead:=@log.vr;
-  for i:=1 to 30 do begin
+  for i:=1 to 100 do begin
     try
       log.text:='';
       unitTest(extParser,i      ,log);
@@ -1258,4 +1355,6 @@ unitTests();
 
 
 end.
+
+
 

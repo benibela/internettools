@@ -17,7 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   unit w32InternetAccess;
 
 {$mode objfpc}{$H+}
-//{$define debug}Remove debug before publishing (write every opened page to the hard disk)
+//{$define debug}//7Remove debug before publishing (write every opened page to the hard disk)
 //{$define simulateInet} //read the files previously written on the hard disks
 interface
 
@@ -32,12 +32,15 @@ type
 
   { TInternetAccess }
 
+  { TW32InternetAccess }
+
   TW32InternetAccess=class(TInternetAccess)
   protected
     hSession,hLastConnection: hInternet;
     lastProtocol,lastHost:string;
     lastCompleteUrl: string;
     newConnectionOpened:boolean;
+    function transfer(protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
   public
     constructor create();virtual;
     destructor destroy;override;
@@ -47,7 +50,7 @@ type
     procedure closeOpenedConnections();override;
   end;
 
-const TEMPORARY_DIRECTORY='E:\temp\theInternet\';
+const TEMPORARY_DIRECTORY='T:\theInternet\';
 
 implementation
 uses bbdebugtools;
@@ -101,7 +104,7 @@ The locator type is unknown.}
     ERROR_INTERNET_OUT_OF_HANDLES:
       s:='Keine Internethandles mehr verfügbar.'#13#10'Bitte starten sie den Computer neu und versuchen es erneut';
     ERROR_INTERNET_TIMEOUT:
-      s:='Time out'#13#10'Verbindungsversuch vergeschlagen.';
+      s:='Time out, meine Verbindungsanfrage wurde nicht beantwortet'#13#10'Verbindungsversuch fehlgeschlagen.';
     ERROR_INTERNET_EXTENDED_ERROR: begin
       setlength(s,4096);
       temp2:=length(s);
@@ -210,21 +213,159 @@ procedure writeString(url,value: string);
 var tempdebug:TFileStream;
 begin
   saveAbleURL(url);
-  url:=copy(url,1,250);
+  url:=copy(url,1,200);
+  url:=TEMPORARY_DIRECTORY+url;
   try
-  if fileexists(TEMPORARY_DIRECTORY+url) then
-    tempdebug:=TFileStream.create(TEMPORARY_DIRECTORY+url+'_____'+inttostr(random(99999999)),fmCreate)
+  if fileexists(url) then
+    tempdebug:=TFileStream.create(url+'_____'+inttostr(random(99999999)),fmCreate)
    else
-    tempdebug:=TFileStream.create(TEMPORARY_DIRECTORY+url,fmCreate);
+    tempdebug:=TFileStream.create(Utf8ToAnsi(url),fmCreate);
   if value<>'' then
-    tempdebug.writebuffer(value[1],length(value));
+    tempdebug.writebuffer(value[1],length(value))
+   else
+    tempdebug.Write('empty',5);
   tempdebug.free;
   except
   end;
 end;
 {$endif}
+
+function TW32InternetAccess.transfer(protocol, host, url: string; data: string;
+  progressEvent: TProgressEvent): string;
+const postHeader='Content-Type: application/x-www-form-urlencoded';
+var
+  databuffer : array[0..4095] of char;
+  hfile: hInternet;
+  dwindex,dwcodelen,dwread,dwNumber,temp,dwContentLength: cardinal;
+  tempPort: word;
+  dwcode : array[1..20] of char;
+  res    : pchar;
+  cookiestr:string;
+  operation: string;
+  callResult: boolean;
+  htmlOpenTagRead: boolean; htmlClosingTagRead: boolean;
+  label getMore;
+begin
+  if data = '' then
+    operation:='GET'
+   else
+    operation:='POST';
+  {$ifdef debug}
+  writeString(host+'_'+url+'_pre',operation+#13#10+host+#13#10+url+#13#10+data);
+  {$endif}
+  {$ifdef simulateInet}
+  if data='' then
+    result:=readString(url)
+  else
+    result:=readString(url+'##DATA##'+data+'##DATA-END##');
+  exit;
+  {$endif}
+  
+  if not assigned(hSession) Then
+    raise EW32InternetException.create('No internet session created');
+
+  if (lastProtocol<>protocol) or (lastHost<>host) then begin
+    if hLastConnection<>nil then
+      InternetCloseHandle(hLastConnection);
+    lastProtocol:=protocol;
+    lastHost:=host;
+    if protocol='http' then begin
+      tempPort:=80;
+      temp:=INTERNET_SERVICE_HTTP;
+    end else if protocol='https' then begin
+      tempPort:=443;
+      temp:=INTERNET_SERVICE_HTTP;
+    end;
+    lastCompleteUrl:='';
+    hLastConnection:=InternetConnect(hSession,pchar(host),tempPort,'',nil,temp,0,0);
+    if hLastConnection=nil then
+      raise EW32InternetException.create();
+  end;
+
+  if protocol='https' then
+    hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or  INTERNET_FLAG_RELOAD or INTERNET_FLAG_SECURE, 0)
+   else
+    hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD, 0);
+
+  if not assigned(hfile) then
+    raise EW32InternetException.create();//'Can''t connect');
+
+  cookiestr:=makeCookieHeader;
+  if cookiestr<>'' then
+    HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+
+  if data='' then
+    callResult:= httpSendRequest(hfile, nil,0,nil,0)
+   else
+    callResult:= httpSendRequest(hfile, postHeader, Length(postHeader), @data[1], Length(data));
+  if not callResult then
+    raise EW32InternetException.create();
+      
+  lastCompleteUrl:=protocol+'://'+host+url;
+
+  dwIndex  := 0;
+  dwCodeLen := 10;
+  if not HttpQueryInfo(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, dwcodeLen, dwIndex) then
+    raise EW32InternetException.create();
+  res := pchar(@dwcode);
+
+  Result:='';
+  if (res ='200') or (res ='302') then begin
+    dwNumber := sizeof(databuffer)-1;
+    if HttpQueryInfo(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,dwNumber,dwindex) then
+      parseHeaderForCookies(databuffer);
+
+    if assigned(progressEvent) then begin
+      dwCodeLen := 15;
+      HttpQueryInfo(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, dwcodelen, dwIndex);
+      res := pchar(@dwcode);
+      dwContentLength:=StrToIntDef(res,1*1024*1024);
+      progressEvent(self,0,dwContentLength);
+    end;
+    dwRead:=0;
+    dwNumber := sizeof(databuffer)-1;
+    htmlOpenTagRead:=false;
+    htmlClosingTagRead:=false;
+    if (pos('abderos',host)>0) and (pos('GETLIST',url)>0)  then sleep(1000);
+   getMore:
+   SetLastError(0);
+    while (InternetReadfile(hfile,@databuffer,dwNumber,DwRead)) and (dwread>0) do begin
+      temp:=length(result);
+      setLength(result,temp+dwRead);
+      move(dataBuffer[0],result[temp+1],dwRead);
+      if temp=0 then
+        htmlOpenTagRead:=pos('<html',lowercase(databuffer))>0; //check if it is html file
+      if htmlOpenTagRead then
+        htmlClosingTagRead:=pos('</html',lowercase(databuffer))>0;
+      if assigned(progressEvent) then
+        progressEvent(self,length(result),dwContentLength);
+//      if length(result)<2*dwNumber;
+    end;
+    writeString('res_'+host+'_'+url,inttostr(GetTickCount)+': '+ inttostr(getlasterror));
+    if htmlOpenTagRead and not htmlClosingTagRead then begin
+      htmlOpenTagRead:=false;
+      sleep(1500);
+      goto getmore;
+    end;
+  end else if res='0' then
+    raise EW32InternetException.create('Internetverbindung fehlgeschlagen')
+   else
+    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+protocol+'://'+host+url);
+
+
+  InternetCloseHandle(hfile);
+
+  {$ifdef debug}
+  if data='' then
+    writeString(host+'_'+url,result)
+   else
+    writeString(host+'_'+url+'##DATA##'+data+'##DATA-END##',result);
+  {$endif}
+end;
+
 constructor TW32InternetAccess.create();
 var proxyStr:string;
+    timeout: longint;
 begin
   {$ifdef debug}randomize;{$endif}
   lastCompleteUrl:='';
@@ -268,6 +409,8 @@ begin
   hLastConnection:=nil;
   lastHost:='';
   newConnectionOpened:=false;
+  timeout:=2*60*1000;
+  InternetSetOption(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4)
 end;
 
 
@@ -280,192 +423,13 @@ begin
 end;
 
 function TW32InternetAccess.post(protocol,host,url: string;data:string):string;
-const postHeader='Content-Type: application/x-www-form-urlencoded';
-var
-  databuffer : array[0..4095] of char;
-  hfile: hInternet;
-  dwindex,dwcodelen,dwread,dwNumber,temp: cardinal;
-  tempPort:word;
-  dwcode : array[1..20] of char;
-  res    : pchar;
-  cookiestr:string;
 begin
-  {$ifdef simulateInet}
-  result:=readString(url+'##DATA##'+data+'##DATA-END##');
-  exit;
-  {$endif}
-
-  if not assigned(hSession) Then
-    raise EW32InternetException.create('No internet session created');
-
-  if (lastProtocol<>protocol) or (lastHost<>host) then begin
-    if hLastConnection<>nil then
-      InternetCloseHandle(hLastConnection);
-    lastProtocol:=protocol;
-    lastHost:=host;
-    if protocol='http' then begin
-      tempPort:=80;
-      temp:=INTERNET_SERVICE_HTTP;
-    end else if protocol='https' then begin
-      tempPort:=443;
-      temp:=INTERNET_SERVICE_HTTP;
-    end;
-    lastCompleteUrl:='';
-    hLastConnection:=InternetConnect(hSession,pchar(host),tempPort,'',nil,temp,0,0);
-    if hLastConnection=nil then
-      raise EW32InternetException.create();
-  end;
-
-
-  if protocol='https' then
-    hfile := HttpOpenRequest(hLastConnection, 'POST', pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or  INTERNET_FLAG_RELOAD or INTERNET_FLAG_SECURE, 0)
-   else
-    hfile := HttpOpenRequest(hLastConnection, 'POST', pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD, 0);
-
-
-  if not assigned(hfile) then
-    raise EW32InternetException.create();//'Can''t connect');
-
-  cookiestr:=makeCookieHeader;
-  if cookiestr<>'' then begin
-//    log('Send cookie:'+cookiestr);
-    HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
-  end;
-  //HttpAddRequestheaders(hfile, postHeader, Length(postHeader), HTTP_ADDREQ_FLAG_REPLACE Or HTTP_ADDREQ_FLAG_ADD);
-  //showmessage(data+'      ');
-  if not HttpSendRequest(hfile, postHeader, Length(postHeader), @data[1], Length(data)) then
-    raise EW32InternetException.create();//'Can''t connect');
-
-
-  lastCompleteUrl:=protocol+'://'+host+url;
-
-  dwIndex  := 0;
-  dwCodeLen := 10;
-  if not HttpQueryInfo(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, dwcodeLen, dwIndex) then
-    raise EW32InternetException.create();
-  res := pchar(@dwcode);
-  Result:='';
-  if (res ='200') or (res ='302') then begin
-    dwNumber := sizeof(databuffer)-1;
-    if HttpQueryInfo(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,dwNumber,dwindex) then
-      parseHeaderForCookies(databuffer);
-
-    dwNumber := sizeof(databuffer)-1;
-    dwRead:=0;
-    while (InternetReadfile(hfile,@databuffer,dwNumber,DwRead)) AND (dwRead <>0) do begin
-      {databuffer[dwread]:=#0;
-      Str := pchar(@databuffer);
-      Result := Result + Str;}
-      temp:=length(result);
-      setLength(result,temp+dwRead);
-      move(dataBuffer[0],result[temp+1],dwRead);
-    end;
-  end else
-    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+protocol+'://'+host+url);
-  InternetCloseHandle(hfile);
-
-  {$ifdef debug}
-  writeString(url+'##DATA##'+data+'##DATA-END##',result);
-  {$endif}
+  result:=transfer(protocol,host,url,data,nil);
 end;
 
 function TW32InternetAccess.get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;
-var
-  databuffer : array[0..4095] of char;
-  hfile: hInternet;
-  dwindex,dwcodelen,dwread,dwNumber,temp,dwContentLength: cardinal;
-  tempPort: word;
-  dwcode : array[1..20] of char;
-  res    : pchar;
-  cookiestr:string;
 begin
-  {$ifdef simulateInet}
-  result:=readString(url);
-  exit;
-  {$endif}
-
-  if not assigned(hSession) Then
-    raise EW32InternetException.create('No internet session created');
-
-  if (lastProtocol<>protocol) or (lastHost<>host) then begin
-    if hLastConnection<>nil then
-      InternetCloseHandle(hLastConnection);
-    lastProtocol:=protocol;
-    lastHost:=host;
-    if protocol='http' then begin
-      tempPort:=80;
-      temp:=INTERNET_SERVICE_HTTP;
-    end else if protocol='https' then begin
-      tempPort:=443;
-      temp:=INTERNET_SERVICE_HTTP;
-    end;
-    lastCompleteUrl:='';
-    hLastConnection:=InternetConnect(hSession,pchar(host),tempPort,'',nil,temp,0,0);
-    if hLastConnection=nil then
-      raise EW32InternetException.create();
-  end;
-
-  if protocol='https' then
-    hfile := HttpOpenRequest(hLastConnection, 'GET', pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or  INTERNET_FLAG_RELOAD or INTERNET_FLAG_SECURE, 0)
-   else
-    hfile := HttpOpenRequest(hLastConnection, 'GET', pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD, 0);
-
-  if not assigned(hfile) then
-    raise EW32InternetException.create();//'Can''t connect');
-
-  cookiestr:=makeCookieHeader;
-  if cookiestr<>'' then
-    HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
-
-  if not httpSendRequest(hfile, nil,0,nil,0) then
-    raise EW32InternetException.create();
-
-  lastCompleteUrl:=protocol+'://'+host+url;
-
- // hfile:=InternetOpenUrl(hsession,pchar(protocol+'://'+host+url), nil, 0, INTERNET_FLAG_RELOAD, 0);
-
-  dwIndex  := 0;
-  dwCodeLen := 10;
-  if not HttpQueryInfo(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, dwcodeLen, dwIndex) then
-    raise EW32InternetException.create();
-
-  res := pchar(@dwcode);
-
-  Result:='';
-  if (res ='200') or (res ='302') then begin
-    dwNumber := sizeof(databuffer)-1;
-    if HttpQueryInfo(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,dwNumber,dwindex) then
-      parseHeaderForCookies(databuffer);
-
-    dwRead:=0;
-    if assigned(progressEvent) then begin
-      dwCodeLen := 15;
-      HttpQueryInfo(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, dwcodelen, dwIndex);
-      res := pchar(@dwcode);
-      dwContentLength:=StrToIntDef(res,1*1024*1024);
-      progressEvent(self,0,dwContentLength);
-    end;
-    dwNumber := sizeof(databuffer)-1;
-    while (InternetReadfile(hfile,@databuffer,dwNumber,DwRead)) AND (dwRead <>0) do begin
-      {databuffer[dwread]:=#0;
-      Str := pchar(@databuffer);
-      Result := Result + Str;}
-      temp:=length(result);
-      setLength(result,temp+dwRead);
-      move(dataBuffer[0],result[temp+1],dwRead);
-      if assigned(progressEvent) then begin
-        progressEvent(self,length(result),dwContentLength);
-      end;
-    end;
-  end else if res='0' then
-    raise EW32InternetException.create('Internetverbindung fehlgeschlagen')
-   else
-    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+protocol+'://'+host+url);
-  InternetCloseHandle(hfile);
-  
-  {$ifdef debug}
-  writeString(url,result);
-  {$endif}
+  result:=transfer(protocol,host,url,'',progressEvent);
 end;
 
 function TW32InternetAccess.needConnection(): boolean;

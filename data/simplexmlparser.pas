@@ -23,6 +23,8 @@ procedure parseXML(xml:string; enterTag:TEnterTagEvent; leaveTag: TLeaveTagEvent
                    outputEncoding: TEncoding);
 
 function getProperty(propertyName: string; properties:TProperties):string;
+procedure addProperty(propertyName,value: string;var properties:TProperties);
+procedure setProperty(propertyName,value: string;var properties:TProperties);
 implementation
 type
 
@@ -111,6 +113,25 @@ begin
     if LowerCase(properties[i].name)=propertyName then
       exit(properties[i].value);
   result:='';
+end;
+
+procedure addProperty(propertyName, value: string; var properties: TProperties);
+begin
+  SetLength(properties,length(properties)+1);
+  properties[high(properties)].name:=propertyName;
+  properties[high(properties)].value:=value;
+end;
+
+procedure setProperty(propertyName, value: string; var properties: TProperties);
+var i:longint;
+begin
+  propertyName:=LowerCase(propertyName);
+  for i:=0 to high(properties) do
+    if LowerCase(properties[i].name)=propertyName then begin
+      properties[i].value:=value;
+      exit;
+    end;
+  addProperty(propertyName,value,properties);
 end;
 
 end.

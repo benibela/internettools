@@ -52,10 +52,12 @@ var pos,marker,htmlEnd: pchar;
     valueStart:char;
     tempLen:longint;
     properties:THTMLProperties;
+    inScriptTag: boolean; //no start tags allowed in script
 begin
   pos:=@html[1];
   htmlEnd:=@html[length(html)];
   marker:=pos;
+  inScriptTag:= false;
   while (pos<=htmlEnd) do begin
     case pos^ of
       '<': begin //Start or end of a tag
@@ -65,6 +67,7 @@ begin
         inc(pos);
         case pos^ of
           '!':begin //comment start
+            inScriptTag:=false;
             inc(pos);
             if (pos^='D') and ((pos+1)^='O') and ((pos+2)^='C') and
                ((pos+3)^='T') and ((pos+4)^='Y')and ((pos+5)^='P')and ((pos+6)^='E')  then begin//doctype
@@ -83,11 +86,13 @@ begin
             while (pos<=htmlEnd) and not (pos^ in [' ','>']) do inc(pos);
             if assigned(leaveTagEvent) then
               if not leaveTagEvent(marker,pos-marker) then exit;
+            if inScriptTag and (strliequal(marker,'script',pos-marker)) then
+              inScriptTag:=false;
             while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
             inc(pos);
             marker:=pos;
           end;
-          else begin //tag start
+          else if not inScriptTag  then begin //tag start
             marker:=pos;
             setlength(properties,0);
             while (pos<=htmlEnd) and not (pos^ in ['>',' ']) do
@@ -137,12 +142,15 @@ begin
                 end;
               end;
             end;
+            while (marker[tempLen-1] in ['/', ' ']) and (tempLen>0) do
+              dec(tempLen);
             if assigned(enterTagEvent) then
               if not enterTagEvent(marker,tempLen,properties) then exit;
-            if pos^ = '/' then begin
+            inScriptTag:=strliequal(marker,'script',tempLen);
+            if (pos^ = '/') or ((pos-1)^ = '/' ) then begin
               if assigned(leaveTagEvent) then
                 if not leaveTagEvent(marker,tempLen) then exit;
-              inc(pos);
+              if pos^ = '/'  then inc(pos);
             end;{ else if ((marker^ in ['b','B']) and
                           ((marker+1)^ in ['r','R'])) or
                         ((marker^ in ['m','M']) and

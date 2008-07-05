@@ -41,14 +41,41 @@ function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //=> i wit
 function arrayRemove(var a: TLongintArray;i: longint):longint; overload; //=> e=a[i], unsorted
 procedure arrayInvert(var a: TLongintArray);
 
-//-----------------------Flow control functions------------------------
+//-----------------------Flow/Thread control functions------------------------
 type TProcedureOfObject=procedure () of object;
 function procedureToMethod(proc: TProcedure): TMethod;
 procedure threadedCall(proc: TProcedureOfObject; finished: TNotifyEvent); overload;
 procedure threadedCall(proc: TProcedureOfObject; finished: TProcedureOfObject);overload;
 procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
 
-//Stringfunctions
+type
+
+{ TMessageSystem }
+
+TMessageSystem = class
+private
+  messageAccessSection: TRTLCriticalSection;
+  list: TFPList;
+public
+  //synchronized methodes
+  procedure storeMessage(mes: TObject);
+  function retrieveMessageOrNil:TObject; //returns nil if no message exists
+  function retrieveLatestMessageOrNil:TObject; //returns nil if no message exists
+  function waitForMessage:TObject;
+  function existsMessage: boolean;
+  
+  procedure removeAndFreeAll;
+
+  function openDirectMessageAccess: TFPList; //will block every access until close
+  procedure closeDirectMessageAccess(dlist: TFPList);
+
+
+  //not synchronized
+  constructor create;
+  destructor destroy;override;
+end;
+
+//------------------------------Stringfunctions--------------------------
 type
   TEncoding=(eUnknown,eWindows1252,eUTF8);
 
@@ -80,6 +107,7 @@ function loadFileToStr(filename:string):string;
 procedure saveFileFromStr(filename: string;str:string);
 
 //----------------Mathematical functions-------------------------------
+function ggT(a,b: cardinal): cardinal;
 function factorial(i:longint):float;
 function binomial(n,k: longint): float;
 //probability
@@ -126,6 +154,9 @@ public
   
 end;
 
+
+//----------------------------Others-----------------------------------
+procedure qsort(a,b: pointer; size: longint);
 implementation
 
 //========================array functions========================
@@ -205,6 +236,87 @@ end;
 procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);
 begin
   threadedCallBase(TProcedureOfObject(procedureToMethod(proc)),TNotifyEvent(finished));
+end;
+
+{ TMessageSystem }
+
+procedure TMessageSystem.storeMessage(mes: TObject);
+begin
+  if mes=nil then raise exception.Create('Tried to store not existing message in the message queue');
+  EnterCriticalSection(messageAccessSection);
+  list.add(mes);
+  LeaveCriticalSection(messageAccessSection);
+end;
+
+function TMessageSystem.retrieveMessageOrNil: TObject;
+begin
+  EnterCriticalSection(messageAccessSection);
+  if list.Count=0 then result:=nil
+  else begin
+    result:=tobject(list[0]);
+    list.delete(0);
+  end;
+  LeaveCriticalSection(messageAccessSection);
+end;
+
+function TMessageSystem.retrieveLatestMessageOrNil: TObject;
+begin
+  EnterCriticalSection(messageAccessSection);
+  if list.Count=0 then result:=nil
+  else begin
+    result:=tobject(list[list.count-1]);
+    list.delete(list.count-1);
+  end;
+  LeaveCriticalSection(messageAccessSection);
+end;
+
+function TMessageSystem.waitForMessage: TObject;
+begin
+  Result:=nil;
+  while result = nil do begin
+    while list.count=0 do sleep(5);
+    result:=retrieveMessageOrNil; //list.count=0 is possible
+  end;
+end;
+
+function TMessageSystem.existsMessage: boolean;
+begin
+  result:=list.Count>0; //no need to synchronize, reading only
+end;
+
+procedure TMessageSystem.removeAndFreeAll;
+var i:longint;
+begin
+  EnterCriticalSection(messageAccessSection);
+  for i:=0 to list.Count-1 do
+    tobject(list[i]).free;
+  list.clear;
+  LeaveCriticalSection(messageAccessSection);
+end;
+
+function TMessageSystem.openDirectMessageAccess: TFPList;
+begin
+  EnterCriticalSection(messageAccessSection);
+  Result:=list;
+end;
+
+procedure TMessageSystem.closeDirectMessageAccess(dlist: TFPList);
+begin
+  LeaveCriticalSection(messageAccessSection);
+  if self.list<>dlist then raise Exception.Create('Invalid List');
+end;
+
+constructor TMessageSystem.create;
+begin
+  InitCriticalSection(messageAccessSection);
+  list:=TFPList.Create;
+end;
+
+destructor TMessageSystem.destroy;
+begin
+  DoneCriticalsection(messageAccessSection);
+  list.free;
+  inherited destroy;
 end;
 
 
@@ -443,7 +555,8 @@ var f:TFileStream;
 begin
   f:=TFileStream.Create(filename,fmOpenRead);
   SetLength(result,f.Size);
-  f.Read(Result[1],length(result));
+  if f.size>0 then
+    f.Read(Result[1],length(result));
   f.Free;
 end;
 
@@ -451,8 +564,16 @@ procedure saveFileFromStr(filename: string;str:string);
 var f:TFileStream;
 begin
   f:=TFileStream.Create(filename,fmCreate);
-  f.Write(str[1],length(str));
+  if length(str)>0 then f.Write(str[1],length(str));
   f.Free;
+end;
+
+function ggT(a, b: cardinal): cardinal;
+begin
+  if b<a then exit(ggT(b,a));
+  if a=0 then exit(b);
+  if a=b then exit(1);
+  result:=ggt(b mod a, a);
 end;
 
 //========================mathematical functions========================
@@ -695,6 +816,7 @@ end;
 
 
 
+
 { TMap }
 
 function TMap.getKeyID(key: T_Key): longint;
@@ -737,6 +859,13 @@ begin
 end;
 
 
+//================================Others===================================
+procedure qsort(a, b: pointer; size: longint);
+
+begin
+  //TODO
+end;
+
 
 {$IFDEF UNITTESTS}
 procedure unitTests();
@@ -752,6 +881,7 @@ initialization
 
   unitTests();
 {$ENDIF}
+
 
 
 end.

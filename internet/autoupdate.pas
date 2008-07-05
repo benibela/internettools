@@ -181,7 +181,7 @@ begin
   fchangeLog:=loadValues(fchangelogURL);
   if fchangeLog=nil then
     raise exception.Create('ChangeLog konnte nicht geladen werden, das Update kann nicht automatisch heruntergeladen werden.'#13#10+
-                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es später nochmal.');
+                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es spÃ¤ter nochmal.');
 
 end;
 
@@ -237,9 +237,9 @@ begin
            changes+=xmlGetText(build.ChildNodes.Item[j])+#13#10
     end;;
   Result:='';
-  if changes<>'' then result+='==Änderungen=='#13#10+changes;
-  if adds<>'' then result+='==Hinzufügungen=='#13#10+adds;
-  if fixes<>'' then result+='==Gelöste Fehler=='#13#10+fixes;
+  if changes<>'' then result+='==Ã„nderungen=='#13#10+changes;
+  if adds<>'' then result+='==HinzufÃ¼gungen=='#13#10+adds;
+  if fixes<>'' then result+='==GelÃ¶ste Fehler=='#13#10+fixes;
 end;
 
 {function sayYes( Rec : pReportRec ) : Boolean;
@@ -263,25 +263,25 @@ begin
 
   changeLogNode:=xmlFindNode(fchangeLog.ChildNodes.Item[0],'changeLog');
   if changeLogNode = nil then
-    raise Exception.Create('Die ChangeLog xml-Datei ist ungültig.'#13#10+
+    raise Exception.Create('Die ChangeLog xml-Datei ist ungÃ¼ltig.'#13#10+
                            'Das Update kann momentan nicht automatisch heruntergeladen werden.'#13#10+
-                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es später nochmal.');
+                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es spÃ¤ter nochmal.');
 
   build:=xmlFindNode(changeLogNode,'build','version',fnewversionstr);
   if build = nil then
     raise Exception.Create('Build mit Versionnummer '+fnewversionstr+' konnte im ChangeLog nicht gefunden werden.'#13#10+
                            'Das Update kann momentan nicht automatisch heruntergeladen werden.'#13#10+
-                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es später nochmal.');
+                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es spÃ¤ter nochmal.');
   installerNode:=xmlFindNode(build,'installer');
   if installerNode=nil then
-    raise Exception.Create('Installer für Build mit Versionnummer '+fnewversionstr+' konnte im ChangeLog nicht gefunden werden.'#13#10+
+    raise Exception.Create('Installer fÃ¼r Build mit Versionnummer '+fnewversionstr+' konnte im ChangeLog nicht gefunden werden.'#13#10+
                            'Das Update kann momentan nicht automatisch heruntergeladen werden.'#13#10+
-                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es später nochmal.');
+                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es spÃ¤ter nochmal.');
 
   updateUrl:=xmlGetAttribute(installerNode,'url');
   if updateUrl='' then
     raise exception.Create('Die Internetadresse des Updates konnte leider nicht ermittelt werden.'#13#10+
-                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es später nochmal.');
+                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es spÃ¤ter nochmal.');
 
   ftempDir:=tempDir;
   if ftempDir='' then
@@ -295,11 +295,11 @@ begin
     mkdir(copy(ftempDir,1,length(ftempdir)-1));
   except
     if not DirectoryExists(copy(ftempDir,1,length(ftempdir)-1)) then
-      raise exception.create('Temporäres Verzeichnis '+ftempDir+' konnte nicht erstellt werden');
+      raise exception.create('TemporÃ¤res Verzeichnis '+ftempDir+' konnte nicht erstellt werden');
   end;
 
   {$IFDEF showProgress}
-    progress:=TProgressBarDialog.create('Update','Bitte warten Sie während das Update auf Version '+fnewversionstr+' geladen wird:');
+    progress:=TProgressBarDialog.create('Update','Bitte warten Sie wÃ¤hrend das Update auf Version '+fnewversionstr+' geladen wird:');
   {$ENDIF}
   update:=TFileStream.Create(ftempDir+'videlibriupdate.exe',fmCreate);
   try
@@ -322,7 +322,7 @@ begin
   ini:=TIniFile.Create(ftempDir+'_#_UPDATE_DETAILS_#_.ini');
 //  ini.SetStrings(sl);
   pack:=ini.ReadString(IntToStr(fnewversion),'package-url','');
-  if pack='' then raise Exception.Create('Detaillierte Updateinformationen sind nicht verfügbar');
+  if pack='' then raise Exception.Create('Detaillierte Updateinformationen sind nicht verfÃ¼gbar');
   ini.free;
 //  str.free;
   sl.free;
