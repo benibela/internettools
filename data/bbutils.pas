@@ -87,6 +87,7 @@ function strliequal(p:pchar;s:string;l: longint):boolean;
 function strbeginswith(str,start:string):boolean;
 function strlibeginswith(p:pchar;l: longint;s:string):boolean;
 function strlibeginswith(strToBeExaminated,expectedStart:string):boolean;
+function strliendswith(strToBeExaminated,expectedEnd:string):boolean;
 function copyfrom(s:string; start:longint):string;inline;
 function rpos(c:char;s:string):longint;
 function strcopy2(first,last:pchar):string;
@@ -375,6 +376,13 @@ function strlibeginswith(strToBeExaminated,expectedStart: string): boolean;
 begin
   if strToBeExaminated='' then exit(expectedStart='')
   else result:=strlibeginswith(@strToBeExaminated[1],length(strToBeExaminated),expectedStart);
+end;
+
+function strliendswith(strToBeExaminated, expectedEnd: string): boolean;
+begin
+  if length(strToBeExaminated)<Length(expectedEnd) then exit(false);
+  if strToBeExaminated='' then exit(expectedEnd='')
+  else result:=strliequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],expectedEnd,length(expectedEnd));
 end;
 
 function copyfrom(s: string; start: longint): string; inline;overload;
@@ -687,7 +695,7 @@ end;
 function weekOfYear(const date:TDateTime):word;
 //After Claus Tøndering
 
-var a,b,c,s,e,f,g,d,n: word;
+var a,b,c,s,e,f,g,d,n: longint;
     month, day, year: word;
     startOfYear: boolean;
 begin

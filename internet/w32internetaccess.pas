@@ -151,11 +151,11 @@ The locator type is unknown.}
     ERROR_INTERNET_ITEM_NOT_FOUND:
       s:='Internet_Item_Not_Found'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
     ERROR_INTERNET_CANNOT_CONNECT:
-      s:='Internetverbindung unterbrochen'#13#10'Bitte nochmal versuchen oder ignorieren';
+      s:='Internetverbindung konnte nicht hergestellt werden'#13#10'Bitte nochmal versuchen oder ignorieren';
     ERROR_INTERNET_CONNECTION_ABORTED:
       s:='Internetverbindung unterbrochen'#13#10'Bitte nochmal versuchen oder beenden';
     ERROR_INTERNET_CONNECTION_RESET:
-      s:='Internetverbindung unterbrochen'#13#10'Bitte nochmal versuchen oder ignorieren';
+      s:='Internetverbindung unterbrochen/reseted'#13#10'Bitte nochmal versuchen oder ignorieren';
     ERROR_INTERNET_FORCE_RETRY:
       s:='Windows fordert Wiederholung der Anforderung'#13#10'Kann wahrscheinlich wie die meisten Windowsfehler durch einen Neustart behoben werden';
     ERROR_INTERNET_MIXED_SECURITY:
@@ -341,7 +341,7 @@ begin
         progressEvent(self,length(result),dwContentLength);
 //      if length(result)<2*dwNumber;
     end;
-    writeString('res_'+host+'_'+url,inttostr(GetTickCount)+': '+ inttostr(getlasterror));
+    {$ifdef debug}writeString('res_'+host+'_'+url,inttostr(GetTickCount)+': '+ inttostr(getlasterror));{$endif}
     if htmlOpenTagRead and not htmlClosingTagRead then begin
       htmlOpenTagRead:=false;
       sleep(1500);

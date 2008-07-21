@@ -453,10 +453,13 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
       for j:=0 to high(properties) do
         if strliequal(properties[j].name,name,properties[j].nameLen) then begin
           if strliequal(properties[j].value,element.attributes.ValueFromIndex[i],properties[j].valueLen) then
-            found:=i;
+            found:=i
+           else found:=-2;
           break;
         end;
-      if found=-1 then exit(false);
+      if (element.attributes.ValueFromIndex[i]='') and (found=-1) then
+        continue; //a not existing property is interpreted as property="" TODO: test case
+      if found<0 then exit(false);
     end;
     exit(true);
   end;
