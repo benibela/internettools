@@ -1,5 +1,5 @@
 unit extendedhtmlparser;
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 {$mode objfpc}{$H+}
 
 interface
@@ -1030,6 +1030,8 @@ end;
 
 
 {$IFDEF UNITTESTS}
+{$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
+
 procedure unitTest(extParser: THtmlTemplateParser;testID:longint;logClass: TTemplateHTMLParserLogClass);
 var sl: TStringList;
 i:longint;
@@ -1333,21 +1335,24 @@ begin
   extParser.onLeaveTag:=@log.lt;
   extParser.onTextRead:=@log.tr;
   extParser.onVariableRead:=@log.vr;
-  for i:=1 to 100 do begin
-    try
-      log.text:='';
-      unitTest(extParser,i      ,log);
-      if log.text<>'' then sl.text:=log.text;
-    except on e:exception do begin
-      sl.Text:='Unit-Test '+inttostr(i)+' fehlgeschlagen: '#13#10+e.message+#13#10+log.text;
-      sl.SaveToFile('t:\extendedhtmlparser.log');
-      sl.Text:=log.printTemplate;
-      sl.SaveToFile('t:\extendedhtmlparser.log.template');
-      raise Exception.Create('Unit-Test '+inttostr(i)+' fehlgeschlagen: '#13#10+e.message+#13#10+log.text);
+  try
+    for i:=1 to 100 do begin
+      try
+        log.text:='';
+        unitTest(extParser,i      ,log);
+        if log.text<>'' then sl.text:=log.text;
+      except on e:exception do begin
+        sl.Text:='Unit-Test '+inttostr(i)+' fehlgeschlagen: '#13#10+e.message+#13#10+log.text;
+        sl.SaveToFile('t:\extendedhtmlparser.log');
+        sl.Text:=log.printTemplate;
+        sl.SaveToFile('t:\extendedhtmlparser.log.template');
+        raise Exception.Create('Unit-Test '+inttostr(i)+' fehlgeschlagen: '#13#10+e.message+#13#10+log.text);
+        end;
       end;
     end;
+    sl.SaveToFile('t:\extendedhtmlparser.last.log');
+  except
   end;
-  sl.SaveToFile('t:\extendedhtmlparser.last.log');
   log.free;  extParser.free; sl.free;
 end;
 
