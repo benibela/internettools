@@ -1,11 +1,40 @@
+{**
+  @abstract This units contains a template based html parser named THtmlTemplateParser
+
+  $Revision$
+  @lastmod $Date$
+  @author Benito van der Zander (http://www.benibela.de)
+*}
+
 unit extendedhtmlparser;
+{
+Copyright (C) 2008 Benito van der Zander (BeniBela)
+                   benito@benibela.de
+                   www.benibela.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+}
 //{$DEFINE UNITTESTS}
 {$mode objfpc}{$H+}
 
 interface
 
 uses
-  Classes, SysUtils,simplehtmlparser,regexpr,bbutils;
+  Classes, SysUtils,simplehtmlparser,
+    RegExpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com)
+    bbutils;
 
 {
 TODO: - deepNodeText() auch erlauben, wenn andere Befehle vorkommen
@@ -61,6 +90,47 @@ type
   
   { THtmlTemplateParser }
 
+  {**
+    @abstract This is the html parser class
+    You can use it simply by calling first parseTemplate to load a given template
+    and then parseHTML to parse the html data. @br
+    You can access the read variables with the property variables or the event onVariableRead. @br @br
+    A template file is just like a html file with special commands. The parser tries now to match every
+    text and tag of the template to text/tag in the html file, while ignoring every additional data. If no match is possible an exception is raised. @br
+    There are 4 special commands allowed:
+     @unorderedList(
+        @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)
+        @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>) @br Everything inside this tag is only used when the pseudo-XPath-expression in test equals to true)
+        @item(@code(<htmlparser:loop>  .. </htmlparser:loop>) @br Everything inside this tag is executed as long as possible (including never))
+        @item(@code(<htmlparser:read var="??" source="??" regex="??"/>) @br The pseudo-XPath-expression in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved)
+      )
+      @br @br
+
+
+      A pseudo-XPath-expression is like a XPath-expression, but much more simple. At first every occurrence of $variable; is replaced by the current value, independent of scope (so you can store a expression in a variable).
+      Then the remaining language elements are evaluated:
+      @unorderedList(
+        @item(@code('something') @br This gives the string 'something')
+        @item(@code(text()) @br This is the text of the current tag)
+        @item(@code(@@attrib) @br This is the value of the attribute attrib of the current tag)
+        @item(@code(concat(<string 1>, <string 2>, <string 3>, ...)) @br This is the concatenation of all the strings)
+        @item(@code(<string 1> = <string 2>) @br This is 'true' iff <string 1> is equal to <string 2> (you can also use ==))
+        @item(@code(<string 1> != <string 2>) @br This is 'true' iff <string 1> is not equal to <string 2>)
+        @item(@code(deepNodeText()) @br This is the plain text of the every tag inside the current text (this is the only expression, not compatible to XPath and you shouldn't use other commands around it))
+      )
+      @br @br
+
+      @br
+      Notes: The html file is read only once and interpreted at the same time. So that onVariableRead is called, doesn't mean the variable will later have the given value.
+      Example: Template: <a><htmlparser:read ...> TEXT</a> @br HTML: <body><a>something</a><a>text</a><a>something 2</a></body> @br
+      There onVariableRead is called twice, (for the first and for the second <a> tag), because the parser doesn't know that the text is wrong, when it enters the first <a> tag. @br
+      For the loop-command a heuristic is used. After the last tag in the loop-command is read the program looks for the next matching tag at the beginning of the loop-command as well as after it. If the parsers enters tag which fits inside the loop, the loop is considered to continue. If a tag is leaved, which is after the loop, the loop is considered to end.@br
+      Every if- and loop-command must be separated by at least one normal-tag!    @br
+      The output is always UTF-8 @br
+      See the unitTests at the end of extendehtmlparser.pas for examples.
+
+
+  }
   THtmlTemplateParser=class
   protected
     templateEncoding,htmlEncoding, outputEncoding: TEncoding;
@@ -104,19 +174,21 @@ type
     constructor create;
     destructor destroy; override;
 
-    procedure parseHTML(html: string);
-    procedure parseTemplate(template: string);
-    procedure parseTemplateFile(templatefilename: string);
-    procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
-    procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
 
+    procedure parseHTML(html: string); //**< parses the given data
+    procedure parseTemplate(template: string);//**< loads the given template
+    procedure parseTemplateFile(templatefilename: string);
+    //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
+    //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
+
+    //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
-    property variables: TStringList read Fvariables;
-    property onEnterTag: TReadCallbackFunction read FOnEnterTag write FOnEnterTag;
-    property onLeaveTag: TReadCallbackFunction read FOnLeaveTag write FOnLeaveTag;
-    property onTextRead: TReadCallbackFunction read FOnTextRead write FOnTextRead;
-    property onVariableRead: TVariableCallbackFunction read FOnVariableRead write FOnVariableRead;
+    property variables: TStringList read Fvariables;//**<List of all variables
+    property onEnterTag: TReadCallbackFunction read FOnEnterTag write FOnEnterTag; //**< is called when a tag is entered
+    property onLeaveTag: TReadCallbackFunction read FOnLeaveTag write FOnLeaveTag; //**< is called when a tag is leaved
+    property onTextRead: TReadCallbackFunction read FOnTextRead write FOnTextRead; //**< is called when text is read
+    property onVariableRead: TVariableCallbackFunction read FOnVariableRead write FOnVariableRead; //**< is called whenever a variable is read
   end;
 
 type
@@ -892,7 +964,7 @@ begin
   parseTemplate(loadFileToStr(templatefilename));
 end;
 
-procedure THtmlTemplateParser.addFunction(name: string;varCallFunc: TVariableCallbackFunction);
+{procedure THtmlTemplateParser.addFunction(name: string;varCallFunc: TVariableCallbackFunction);
 begin
   FVariableFunctions.AddObject(name,tobject(@varCallFunc));
 end;
@@ -900,7 +972,7 @@ end;
 procedure THtmlTemplateParser.addFunction(name: string;notifyCallFunc: TNotifyCallbackFunction);
 begin
   FNotifyFunctions.AddObject(name,tobject(@notifyCallFunc));
-end;
+end;}
 
 function THtmlTemplateParser.replaceVars(s: string;customReplace: TReplaceFunction=nil): string;
 var f,i:longint;

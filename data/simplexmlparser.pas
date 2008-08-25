@@ -1,5 +1,30 @@
-//*Kein* gültiger xml-Parser nach w3c Richtlinien
+{**
+  @abstract This file @bold(doesn't) contain a xml parser.@br
+  But you can use the procedure parseXML to parse a xml file stored in a string. (although you should not expect, that this can actually parse the xml data)
+
+  $Revision$
+  @lastmod $Date$
+  @author Benito van der Zander (http://www.benibela.de)
+*}
 unit simplexmlparser;
+{
+Copyright (C) 2008 Benito van der Zander (BeniBela)
+                   benito@benibela.de
+                   www.benibela.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+}
 
 {$mode objfpc}{$H+}
 
@@ -19,6 +44,12 @@ type
   TTextEvent=function (text: string):boolean of object;
 
 
+//**Perhaps this parses xml data, perhaps it doesn't. Who knows...
+//**@param xml The xml data
+//**@param enterTag Event to be called when a tag is entered
+//**@param leaveTag Event to be called when a tag is leaved
+//**@param textRead Event to be called when text between tags is read
+//**@param outputEncoding Encoding to be used in the parameters passed to the event
 procedure parseXML(xml:string; enterTag:TEnterTagEvent; leaveTag: TLeaveTagEvent; textRead: TTextEvent;
                    outputEncoding: TEncoding);
 

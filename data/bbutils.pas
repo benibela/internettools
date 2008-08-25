@@ -1,3 +1,8 @@
+{**
+  Version $Revision$
+  @lastmod $Date$
+  @author Benito van der Zander, http://www.benibela.de
+*}
 {
 A collection of often needed functions missing in FPC
 
