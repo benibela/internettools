@@ -89,6 +89,7 @@ function widestrlmove(dest,source:pwidechar;destLen,sourceLen: longint):pwidecha
 function strlequal(p1,p2:pchar;l1,l2: longint):boolean;
 function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
 function strliequal(p:pchar;s:string;l: longint):boolean;
+function striequal(s1,s2:string):boolean;
 function strbeginswith(str,start:string):boolean;
 function strlibeginswith(p:pchar;l: longint;s:string):boolean;
 function strlibeginswith(strToBeExaminated,expectedStart:string):boolean;
@@ -366,6 +367,11 @@ end;
 begin
   result:=(l1=l2) and strlicomp(p1,p2,l2);
 end;                                    }
+
+function striequal(s1, s2: string): boolean;
+begin
+  result:=CompareText(s1,s2)=0;
+end;
 
 function strbeginswith(str, start: string): boolean;
 begin
