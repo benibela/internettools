@@ -540,6 +540,7 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
 var i,j:longint;
     element: TTemplateElement;
     jumpAbout: boolean;
+    currentParsingStatus: TParsingStatus;
 begin
   if FParsingAlternatives.Count=0 then exit(false);
 
@@ -592,12 +593,17 @@ begin
                  strliequal(tagName,'p',tagNameLen);
 
   result:=true;
-  for i:=0 to FParsingAlternatives.Count-1 do
-    with TParsingStatus(FParsingAlternatives[i]) do begin
-      while (nextElement<>nil) and elementIsOptional(nextElement) and (not perfectFit(nextElement)) do begin
-        lastElement:=nextElement.reverse;
-        nextElement:=nextElement.reverse.rnext;
-      end;
+  for i:=0 to FParsingAlternatives.Count-1 do begin
+    currentParsingStatus:=TParsingStatus(FParsingAlternatives[i]);
+    with currentParsingStatus do begin
+      while (nextElement<>nil) and elementIsOptional(nextElement) and (nextElement.typ=tetHTML) and (not perfectFit(nextElement)) do
+        if nextElement.reverse<>nil then begin
+          lastElement:=nextElement.reverse;
+          nextElement:=nextElement.reverse.rnext;
+        end else begin
+          lastElement:=nextElement;
+          nextElement:=nextElement.rnext;
+        end;
       if perfectFit(nextElement) then begin
         elementStack.AddObject(pcharToStringSimple(tagName,tagNameLen),nextElement);
         result:=readTemplateElement(TParsingStatus(FParsingAlternatives[i]));
@@ -617,6 +623,7 @@ begin
       end else
         elementStack.AddObject(pcharToStringSimple(tagName,tagNameLen),nil);
     end;
+  end;
 end;
 
 function THtmlTemplateParser.leaveTag(tagName: pchar; tagNameLen: longint
@@ -1100,7 +1107,6 @@ begin
 end;
 
 
-
 {$IFDEF UNITTESTS}
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
@@ -1338,13 +1344,28 @@ begin
       if extParser.variables.Values['test']<>'Test:in bin c!' then
         raise Exception.create('ergebnis ungültig');
     end;
-    38: begin //html script tags containing <
+    38: begin //deepNodeText() mit optionalen
+      extParser.parseTemplate('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>');
+      extParser.parseHTML('<a><x>Test:<br><b>in b</b><c>in c</c>!</x></a>');
+      if (extParser.variables.Values['test1']<>'Test:') or
+         (extParser.variables.Values['test2']<>'in bin c!') then
+        raise Exception.create('ergebnis ungültig');
+    end;                                                        {
+    39: begin
+      extParser.variables.Values['test2']:='not called at all';
+      extParser.parseTemplate('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>');
+      extParser.parseHTML('<a><x>Test:<b>in b</b><c>in c</c>!</x></a>');
+      if (extParser.variables.Values['test1']<>'Test:') or
+         (extParser.variables.Values['test2']<>'not called at all')   then
+        raise Exception.create('ergebnis ungültig:'+extParser.variables.Values['test1']+'|'+extParser.variables.Values['test2']);
+    end;                                                       }
+    40: begin //html script tags containing <
       extParser.parseTemplate('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>');
       extParser.parseHTML('<a><script>abc<def</script><b>test<b></a>');
       if extParser.variables.Values['test']<>'test' then
         raise Exception.create('ergebnis ungültig');
     end;
-    39: begin //direct closed tags
+    41: begin //direct closed tags
       extParser.parseTemplate('<a><br/><br/><htmlparser:read source="text()" var="test"/><br/></a>');
       extParser.parseHTML('<a><br/><br   />abc<br /></a>');
       if extParser.variables.Values['test']<>'abc' then

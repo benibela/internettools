@@ -142,9 +142,9 @@ var i:longint;
 begin
   result:='';
   if length(cookies)=0 then exit;
-  result:='Cookie: ';
-  for i:=0 to high(cookies) do
-    result+=cookies[i].name+'='+cookies[i].value+'; ';
+  result:='Cookie: '+cookies[0].name+'='+cookies[0].value;
+  for i:=1 to high(cookies) do
+    result+='; '+cookies[i].name+'='+cookies[i].value;
   result+=#13#10;
 end;
 
