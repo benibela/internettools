@@ -80,8 +80,8 @@ end;
 
 function THTMLEventHandler.convToStr(p: pchar; l: longint): string;
 begin
-  result:=decodeHTMLEntities(p,l,fileEncoding);
-  result:=changeEncoding(result,fileEncoding,outputEncoding);
+  result:=strDecodeHTMLEntities(p,l,fileEncoding);
+  result:=strChangeEncoding(result,fileEncoding,outputEncoding);
 end;
 
 function THTMLEventHandler.enterTagEvent(tagName: pchar; tagNameLen: longint;
@@ -101,7 +101,7 @@ begin
   if not alreadyReadSomething then begin
     alreadyReadSomething:=true;
     if lowercase(tn)='?xml' then
-      fileEncoding:=nameToEncoding(getProperty('encoding',xmlProperties));
+      fileEncoding:=strEncodingFromName(getProperty('encoding',xmlProperties));
   end;
   result:=enterTag(tn,xmlProperties);
   

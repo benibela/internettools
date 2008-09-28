@@ -33,7 +33,7 @@ interface
 
 uses
   Classes, SysUtils,simplehtmlparser,
-    RegExpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com)
+    dRegExpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr)
     bbutils;
 
 {
@@ -338,7 +338,7 @@ begin
     if word='' then break;
     case word[1] of
       '''': readValue(copy(word,2,length(word)-2));
-      '@': readValue(getProperty(copyfrom(word,2),FOldProperties));
+      '@': readValue(getProperty(strcopy2(word,2),FOldProperties));
       '=': begin
         if pos^='=' then pos+=1; //auch == erlauben
         currentAction+=1;
@@ -605,7 +605,7 @@ begin
           nextElement:=nextElement.rnext;
         end;
       if perfectFit(nextElement) then begin
-        elementStack.AddObject(pcharToStringSimple(tagName,tagNameLen),nextElement);
+        elementStack.AddObject(strFromPchar(tagName,tagNameLen),nextElement);
         result:=readTemplateElement(TParsingStatus(FParsingAlternatives[i]));
         //if (lastElement<>nil) and  ((lastElement.next<>nextElement) or nextElementthen
         FOldProperties:=properties;
@@ -621,7 +621,7 @@ begin
         FParsingAlternatives.Count:=i+1;
         break;
       end else
-        elementStack.AddObject(pcharToStringSimple(tagName,tagNameLen),nil);
+        elementStack.AddObject(strFromPchar(tagName,tagNameLen),nil);
     end;
   end;
 end;
@@ -722,7 +722,7 @@ begin
       FlastText:=trim(pcharToString(text+i,textlen-i));
       break;
     end;                                    }
-  FlastText:=decodeHTMLEntities(text,textlen,htmlEncoding);
+  FlastText:=strDecodeHTMLEntities(text,textlen,htmlEncoding);
 
   if FCollectDeepNodeText then
     fdeepNodeText+=FlastText
@@ -754,7 +754,7 @@ begin
     FCurrentTemplateElement.next:=TTemplateElement.Create;
     FCurrentTemplateElement:=FCurrentTemplateElement.next;
   end;
-  FCurrentTemplateElement.text:=pcharToStringSimple(text,textLen);
+  FCurrentTemplateElement.text:=strFromPchar(text,textLen);
   FTemplateCount+=1;
   FCurrentTemplateElement.id:=FTemplateCount;
   Result:=FCurrentTemplateElement;
@@ -782,7 +782,7 @@ begin
     for Result:=low(COMMAND_STR) to high(COMMAND_STR) do
       if strliequal(tagName,COMMAND_STR[Result],tagNameLen) then
         exit();
-    raise ETemplateParseException.Create('Unbekannter Templatebefehl: htmlparser:'+pcharToStringSimple(tagName,tagNameLen))
+    raise ETemplateParseException.Create('Unbekannter Templatebefehl: htmlparser:'+strFromPchar(tagName,tagNameLen))
   end;
 end;
 
@@ -819,8 +819,8 @@ begin
     FCurrentTemplateElement.attributes:=TStringList.Create;
     for i:=0 to high(properties) do
       with properties[i] do
-        FCurrentTemplateElement.attributes.Add(trim(pcharToStringSimple(name,nameLen))+'='+
-                                               trim(pcharToStringSimple(value,valueLen)));
+        FCurrentTemplateElement.attributes.Add(trim(strFromPchar(name,nameLen))+'='+
+                                               trim(strFromPchar(value,valueLen)));
   end;
 
 end;
@@ -836,10 +836,10 @@ begin
       exit;
 
   if (FTemplateElementStack.Count = 0) then
-    raise Exception.Create('Nicht geöffneter Tag '+pcharToStringSimple(tagName,tagNameLen)+' wurde im Template geschlossen.');
+    raise Exception.Create('Nicht geöffneter Tag '+strFromPchar(tagName,tagNameLen)+' wurde im Template geschlossen.');
 
   if not strliequal(tagname,TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]).text,tagNameLen) then
-    raise Exception.Create('Der Tag '+pcharToStringSimple(tagName,tagNameLen)+' wurde im Template geschlossen, obwohl "'+TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]).text+'" dran wäre.');
+    raise Exception.Create('Der Tag '+strFromPchar(tagName,tagNameLen)+' wurde im Template geschlossen, obwohl "'+TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]).text+'" dran wäre.');
 
   nte:=newTemplateElement(tagName,tagNameLen);
   nte.reverse:=TTemplateElement(FTemplateElementStack[FTemplateElementStack.Count-1]);
@@ -968,7 +968,7 @@ end;
 
 procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
 begin
-  parseTemplate(loadFileToStr(templatefilename));
+  parseTemplate(strLoadFromFile(templatefilename));
 end;
 
 {procedure THtmlTemplateParser.addFunction(name: string;varCallFunc: TVariableCallbackFunction);
@@ -1075,7 +1075,7 @@ end;
 
 function TTemplateHTMLParserLogClass.conv(t: pchar; tl: longint): string;
 begin
-  result:=StringReplace(StringReplace(decodeHTMLEntities(t,tl,eWindows1252),#13,' ',[rfReplaceAll]),#10,' ',[rfReplaceAll]);
+  result:=StringReplace(StringReplace(strDecodeHTMLEntities(t,tl,eWindows1252),#13,' ',[rfReplaceAll]),#10,' ',[rfReplaceAll]);
 end;
 
 procedure TTemplateHTMLParserLogClass.et(read: pchar; readLen: longint);

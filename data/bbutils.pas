@@ -41,10 +41,14 @@ uses
 type
   TStringArray=array of string;
   TLongintArray =array of longint;
+  TLongwordArray =array of longword;
 
 function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //=> i with a[i]=e
 function arrayRemove(var a: TLongintArray;i: longint):longint; overload; //=> e=a[i], unsorted
-procedure arrayInvert(var a: TLongintArray);
+procedure arrayInvert(var a: TLongintArray);overload;
+function arrayAdd(var a: TLongwordArray;e: longint):longint; overload; //=> i with a[i]=e
+function arrayRemove(var a: TLongwordArray;i: longint):longint; overload; //=> e=a[i], unsorted
+procedure arrayInvert(var a: TLongwordArray);overload;
 
 //-----------------------Flow/Thread control functions------------------------
 type TProcedureOfObject=procedure () of object;
@@ -81,6 +85,7 @@ public
 end;
 
 //------------------------------Stringfunctions--------------------------
+//all of them start with 'str' or 'widestr' so can find them easily
 type
   TEncoding=(eUnknown,eWindows1252,eUTF8);
 
@@ -94,24 +99,25 @@ function strbeginswith(str,start:string):boolean;
 function strlibeginswith(p:pchar;l: longint;s:string):boolean;
 function strlibeginswith(strToBeExaminated,expectedStart:string):boolean;
 function strliendswith(strToBeExaminated,expectedEnd:string):boolean;
-function copyfrom(s:string; start:longint):string;inline;
-function rpos(c:char;s:string):longint;
+function strcopy2(s:string; start:longint):string;inline;
+function strrpos(c:char;s:string):longint;
 function strcopy2(first,last:pchar):string;
 
-function splitGet(const separator: string; var remainingPart: string):string;
-procedure split(out firstPart: string; const separator: string; var remainingPart: string);
-procedure splitStr(var splitted: TStringArray;s:string;c:char;includeEmpty:boolean=true);
-
-function changeEncoding(str: string; from,toe: TEncoding):string;
-function nameToEncoding(str:string):TEncoding;
-function decodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
-function pcharToStringSimple(p:pchar;l:longint):string;
-
+function strSplitGet(const separator: string; var remainingPart: string):string;overload;
+procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
+procedure strSplit(var splitted: TStringArray;s:string;c:char;includeEmpty:boolean=true);overload;
 
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
 
-function loadFileToStr(filename:string):string;
-procedure saveFileFromStr(filename: string;str:string);
+function strLoadFromFile(filename:string):string;
+procedure strSaveToFile(filename: string;str:string);
+function strFromSize(size: int64):string;
+
+
+function strChangeEncoding(str: string; from,toe: TEncoding):string;
+function strEncodingFromName(str:string):TEncoding;
+function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
+function strFromPchar(p:pchar;l:longint):string;
 
 //----------------Mathematical functions-------------------------------
 function ggT(a,b: cardinal): cardinal;
@@ -132,6 +138,7 @@ function binomialZScore(n:longint;p:float;k:longint):float;
 //--------------------Time functions-----------------------------------
 {$IFDEF Win32}
 function dateTimeToFileTime(const date: TDateTime): TFileTime;
+function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
 {$ENDIF}
 function weekOfYear(const date:TDateTime):word;
 function parseDate(datestr,mask:string):longint;
@@ -185,6 +192,31 @@ end;
 
 procedure arrayInvert(var a: TLongintArray);
 var temp: TLongintArray;
+    i:longint;
+begin
+  temp:=a;
+  setlength(temp,length(temp));
+  for i:=0 to high(temp) do
+    a[high(a)-i]:=temp[i];
+end;
+
+function arrayAdd(var a: TLongwordArray; e: longint): longint;
+begin
+  setlength(a,length(a)+1);
+  a[high(a)]:=e;
+  result:=high(a);
+end;
+
+function arrayRemove(var a: TLongwordArray; i: longint): longint;
+begin
+  if (i<0) or (i>high(a)) then exit(0);
+  result:=a[i];
+  a[i]:=a[high(a)];
+  SetLength(a,high(a));
+end;
+
+procedure arrayInvert(var a: TLongwordArray);
+var temp: TLongwordArray;
     i:longint;
 begin
   temp:=a;
@@ -396,12 +428,12 @@ begin
   else result:=strliequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],expectedEnd,length(expectedEnd));
 end;
 
-function copyfrom(s: string; start: longint): string; inline;overload;
+function strcopy2(s: string; start: longint): string; inline;overload;
 begin
   result:=copy(s,start,length(s)-start+1);
 end;
 
-function rpos(c: char; s: string): longint;
+function strrpos(c: char; s: string): longint;
 var i:longint;
 begin
   for i:=length(s) downto 1 do
@@ -417,12 +449,12 @@ begin
   move(first^,result[1],length(result));
 end;
 
-function splitGet(const separator: string; var remainingPart: string): string;
+function strSplitGet(const separator: string; var remainingPart: string): string;
 begin
-  split(result,separator,remainingPart);
+  strsplit(result,separator,remainingPart);
 end;
 
-procedure split(out firstPart: string; const separator: string;
+procedure strSplit(out firstPart: string; const separator: string;
   var remainingPart: string);
 var p:longint;
 begin
@@ -431,7 +463,7 @@ begin
   delete(remainingPart,1,p+length(separator)-1);
 end;
 
-procedure splitStr(var splitted: TStringArray; s: string; c: char;
+procedure strSplit(var splitted: TStringArray; s: string; c: char;
   includeEmpty: boolean);
 var p:longint;
     result:TStringArray;
@@ -462,7 +494,7 @@ begin
   splitted:=result;
 end;
 
-function changeEncoding(str: string; from, toe: TEncoding): string;
+function strChangeEncoding(str: string; from, toe: TEncoding): string;
 var utf8temp: UTF8String;
 begin
   if (from=toe) or (from=eUnknown) or (toe=eUnknown) then exit(str);
@@ -476,7 +508,7 @@ begin
   end;
 end;
 
-function nameToEncoding(str: string): TEncoding;
+function strEncodingFromName(str: string): TEncoding;
 begin
   str:=UpperCase(str);
   if (str='UTF-8') or (str='UTF8' {fehlerkorrigierend}) then result:=eUTF8
@@ -485,7 +517,7 @@ begin
 
 end;
 
-function decodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
+function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
 var resLen:integer;
     lastChar: pchar;
 begin
@@ -540,7 +572,7 @@ begin
     setLength(result,resLen);
 end;
 
-function pcharToStringSimple(p: pchar; l: longint): string;
+function strFromPchar(p: pchar; l: longint): string;
 begin
   if l=0 then exit('');
   setlength(result,l);
@@ -569,7 +601,7 @@ begin
 end;
 
 
-function loadFileToStr(filename: string): string;
+function strLoadFromFile(filename: string): string;
 var f:TFileStream;
 begin
   f:=TFileStream.Create(filename,fmOpenRead);
@@ -579,12 +611,27 @@ begin
   f.Free;
 end;
 
-procedure saveFileFromStr(filename: string;str:string);
+procedure strSaveToFile(filename: string;str:string);
 var f:TFileStream;
 begin
   f:=TFileStream.Create(filename,fmCreate);
   if length(str)>0 then f.Write(str[1],length(str));
   f.Free;
+end;
+
+function strFromSize(size: int64): string;
+const iec: string='KMGTPEZY';
+var res: int64;
+    i:longint;
+begin
+  i:=0;
+  while (i<=length(iec)) and (size>=2048) do begin
+    res:=size mod 1024;
+    size:=size div 1024;
+    inc(i);
+  end;
+  if i=0 then result:=IntToStr(size)+' B'
+  else result:=format('%4f ',[size+res/1024])+iec[i]+'iB';
 end;
 
 function ggT(a, b: cardinal): cardinal;
@@ -702,6 +749,16 @@ begin
   LocalFileTimeToFileTime(temp,result);
 end;
 {$ENDIF}
+
+function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
+var sysTime: TSystemTime;
+    localFileTime: tfiletime;
+begin
+  if convertTolocalTimeZone then FileTimeToLocalFileTime(filetime,localFileTime)
+  else localFileTime:=filetime;
+  FileTimeToSystemTime(localFileTime, sysTime);
+  result:=SystemTimeToDateTime(sysTime);
+end;
 
 function weekOfYear(const date:TDateTime):word;
 //After Claus Tøndering
