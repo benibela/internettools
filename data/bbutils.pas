@@ -100,8 +100,9 @@ function strlibeginswith(p:pchar;l: longint;s:string):boolean;
 function strlibeginswith(strToBeExaminated,expectedStart:string):boolean;
 function strliendswith(strToBeExaminated,expectedEnd:string):boolean;
 function strcopy2(s:string; start:longint):string;inline;
-function strrpos(c:char;s:string):longint;
 function strcopy2(first,last:pchar):string;
+function strcopy2(s:string; start,last:longint):string;
+function strrpos(c:char;s:string):longint;
 
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
 procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
@@ -431,6 +432,11 @@ end;
 function strcopy2(s: string; start: longint): string; inline;overload;
 begin
   result:=copy(s,start,length(s)-start+1);
+end;
+
+function strcopy2(s: string; start, last: longint): string;
+begin
+  result:=copy(s,start,last-start+1);
 end;
 
 function strrpos(c: char; s: string): longint;
