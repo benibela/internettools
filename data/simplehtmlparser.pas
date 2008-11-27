@@ -86,6 +86,7 @@ var pos,marker,htmlEnd: pchar;
     properties:THTMLProperties;
     inScriptTag: boolean; //no start tags allowed in script
 begin
+  if html='' then exit;
   pos:=@html[1];
   htmlEnd:=@html[length(html)];
   marker:=pos;

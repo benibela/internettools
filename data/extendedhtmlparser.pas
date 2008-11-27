@@ -26,7 +26,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
-//{$DEFINE UNITTESTS}
+{$DEFINE UNITTESTS}
 {$mode objfpc}{$H+}
 
 interface
@@ -104,7 +104,8 @@ type
         @item(@code(<htmlparser:loop>  .. </htmlparser:loop>) @br Everything inside this tag is executed as long as possible (including never))
         @item(@code(<htmlparser:read var="??" source="??" regex="??"/>) @br The pseudo-XPath-expression in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved)
       )
-      @br @br
+      @br
+      There exists on special attribute: htmlparser-optional="true", if this is set the file is read sucessesfully even if the tag doesn't exist.@br
 
 
       A pseudo-XPath-expression is like a XPath-expression, but much more simple. At first every occurrence of $variable; is replaced by the current value, independent of scope (so you can store a expression in a variable).
@@ -125,6 +126,7 @@ type
       Example: Template: <a><htmlparser:read ...> TEXT</a> @br HTML: <body><a>something</a><a>text</a><a>something 2</a></body> @br
       There onVariableRead is called twice, (for the first and for the second <a> tag), because the parser doesn't know that the text is wrong, when it enters the first <a> tag. @br
       For the loop-command a heuristic is used. After the last tag in the loop-command is read the program looks for the next matching tag at the beginning of the loop-command as well as after it. If the parsers enters tag which fits inside the loop, the loop is considered to continue. If a tag is leaved, which is after the loop, the loop is considered to end.@br
+      Optional elements are handled the same way: it is ignored if the containing tag is closed or a following tag is found, before a tag matching to the optional one is found.@br
       Every if- and loop-command must be separated by at least one normal-tag!    @br
       The output is always UTF-8 @br
       See the unitTests at the end of extendehtmlparser.pas for examples.
@@ -176,6 +178,7 @@ type
 
 
     procedure parseHTML(html: string); //**< parses the given data
+    procedure parseHTMLFile(htmlfilename: string); //**< parses the given file
     procedure parseTemplate(template: string);//**< loads the given template
     procedure parseTemplateFile(templatefilename: string);
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
@@ -207,7 +210,10 @@ TTemplateHTMLParserLogClass=class
   procedure vr(variable: string; value: string);
 end;
 
+procedure checkHTMLTemplate(templateFileName, inputFile: string);
+
 implementation
+
 
 
 
@@ -514,6 +520,7 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
   var i,j,found,ok:longint;
       Name:string;
   begin
+    if element=nil then result:=false;
     if not strliequal(tagName,element.text,tagNameLen) then
       exit(false);
     if element.attributes=nil then
@@ -596,14 +603,26 @@ begin
   for i:=0 to FParsingAlternatives.Count-1 do begin
     currentParsingStatus:=TParsingStatus(FParsingAlternatives[i]);
     with currentParsingStatus do begin
-      while (nextElement<>nil) and elementIsOptional(nextElement) and (nextElement.typ=tetHTML) and (not perfectFit(nextElement)) do
-        if nextElement.reverse<>nil then begin
-          lastElement:=nextElement.reverse;
-          nextElement:=nextElement.reverse.rnext;
-        end else begin
-          lastElement:=nextElement;
-          nextElement:=nextElement.rnext;
+      if elementIsOptional(nextElement) and not perfectFit(nextElement) then begin
+        //search a fitting element while jumping about every optional one
+        element:=nextElement;
+        while (element<>nil) and  elementIsOptional(element)  do begin
+          if element.reverse<>nil then begin
+            if perfectFit(element.reverse.rnext) then begin
+              lastElement:=nextElement.reverse;
+              nextElement:=nextElement.reverse.rnext;
+            end;
+            element:=element.reverse.rnext;
+          end else begin
+            if perfectFit(element.rnext) then begin
+              lastElement:=element;
+              nextElement:=element.rnext;
+              break;
+            end;
+            element:=element.rnext;
+          end;
         end;
+      end;
       if perfectFit(nextElement) then begin
         elementStack.AddObject(strFromPchar(tagName,tagNameLen),nextElement);
         result:=readTemplateElement(TParsingStatus(FParsingAlternatives[i]));
@@ -632,8 +651,6 @@ function THtmlTemplateParser.leaveTag(tagName: pchar; tagNameLen: longint
 var alt:longint;
     i,j:longint;
     closed: longint; //Elementid im Stack, das geschlossen wird
-
-    debugelement: TTemplateElement;
 begin
   if FParsingAlternatives.Count=0 then exit;
 
@@ -668,18 +685,15 @@ begin
       if closed=-1 then
         continue; //HTML-Datei ist ungültig
 
-      while (nextElement<>nil) and elementIsOptional(nextElement) and not nextElement.closeTag do begin
-        debugelement:=nextElement;
-        if (not nextElement.closeTag)and(nextElement.reverse<>nil) then begin
-          lastElement:=nextElement.reverse;
-          nextElement:=nextElement.reverse;
-        end;
-        readTemplateElement(TParsingStatus(FParsingAlternatives[alt]));
-      end;
-        debugelement:=nextElement;
-
       //überprüfen, ob das Element im Template
-      if elementStack.Objects[closed]<>nil then
+      if elementStack.Objects[closed]<>nil then begin
+        while (nextElement<>nil) and elementIsOptional(nextElement) and not nextElement.closeTag do begin
+          if (not nextElement.closeTag)and(nextElement.reverse<>nil) then begin
+            lastElement:=nextElement.reverse;
+            nextElement:=nextElement.reverse;
+          end;
+          readTemplateElement(TParsingStatus(FParsingAlternatives[alt]));
+        end;
         if (nextElement.reverse<>elementStack.Objects[closed]) or (not nextElement.closeTag) then begin
           //ungültiges Element gwschlossen
           nextElement:=TTemplateElement(elementStack.Objects[closed]);
@@ -701,6 +715,7 @@ begin
           end;
           break; //keine anderen Alternativen betrachten
         end;
+      end;
 
       //if strliequal(tagName,tagNameLen,FNextTemplateElement.text) then
       elementStack.Delete(closed);
@@ -944,6 +959,11 @@ begin
   end;
 end;
 
+procedure THtmlTemplateParser.parseHTMLFile(htmlfilename: string);
+begin
+  parseHTML(strLoadFromFile(htmlfilename));
+end;
+
 procedure THtmlTemplateParser.parseTemplate(template: string);
 begin
   //FVariables.clear;
@@ -1104,6 +1124,30 @@ destructor TParsingStatus.destroy;
 begin
   FreeAndNil(elementStack);
   inherited;
+end;
+
+
+procedure checkHTMLTemplate(templateFileName, inputFile: string);
+var parser:THtmlTemplateParser;
+    log: TTemplateHTMLParserLogClass;
+begin
+  parser:=THtmlTemplateParser.create;
+  log:=TTemplateHTMLParserLogClass.Create;
+  log.parser:=parser;
+  parser.onEnterTag:=@log.et;
+  parser.onLeaveTag:=@log.lt;
+  parser.onTextRead:=@log.tr;
+  parser.onVariableRead:=@log.vr;
+  parser.parseTemplateFile(templateFileName);
+  try
+    parser.parseHTMLFile(inputFile);
+  except
+    on e:exception do
+      log.text:='fehler: '+e.MESSAGe+#13#10#13#10+log.text;
+  end;
+  strSaveToFile(inputFile+'.out',log.text );
+  log.free;
+  parser.free;
 end;
 
 
@@ -1326,32 +1370,38 @@ begin
       if (extParser.variables.Values['test']<>'hallo') then
         raise Exception.create('ergebnis ungültig');
     end;
-    35: begin //mehrfach loops+concat
+    35: begin //verzögertes optionale element
+      extParser.parseTemplate('<a><x><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></x></a>');
+      extParser.parseHTML('<a><x>Hallo!<a></a><c></c><b>piquadrat</b>welt</x></a>');
+      if (extParser.variables.Values['test']<>'piquadrat') then
+        raise Exception.create('ergebnis ungültig');
+    end;
+    40: begin //mehrfach loops+concat
       extParser.parseTemplate('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></a>');
       extParser.parseHTML('<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>');
       if extParser.variables.Values['test']<>'los:123' then
         raise Exception.create('ergebnis ungültig');
     end;
-    36: begin
+    41: begin
       extParser.parseTemplate('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>');
       extParser.parseHTML('<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>');
       if extParser.variables.Values['test']<>'los:abc123ABC' then
         raise Exception.create('ergebnis ungültig');
     end;
-    37: begin //deepNodeText()
+    42: begin //deepNodeText()
       extParser.parseTemplate('<a><x><htmlparser:read source="deepNodeText()" var="test"/></x></a>');
       extParser.parseHTML('<a><x>Test:<b>in b</b><c>in c</c>!</x></a>');
       if extParser.variables.Values['test']<>'Test:in bin c!' then
         raise Exception.create('ergebnis ungültig');
     end;
-    38: begin //deepNodeText() mit optionalen
+    43: begin //deepNodeText() mit optionalen
       extParser.parseTemplate('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>');
       extParser.parseHTML('<a><x>Test:<br><b>in b</b><c>in c</c>!</x></a>');
       if (extParser.variables.Values['test1']<>'Test:') or
          (extParser.variables.Values['test2']<>'in bin c!') then
         raise Exception.create('ergebnis ungültig');
     end;                                                        {
-    39: begin
+    44: begin
       extParser.variables.Values['test2']:='not called at all';
       extParser.parseTemplate('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>');
       extParser.parseHTML('<a><x>Test:<b>in b</b><c>in c</c>!</x></a>');
@@ -1359,13 +1409,13 @@ begin
          (extParser.variables.Values['test2']<>'not called at all')   then
         raise Exception.create('ergebnis ungültig:'+extParser.variables.Values['test1']+'|'+extParser.variables.Values['test2']);
     end;                                                       }
-    40: begin //html script tags containing <
+    45: begin //html script tags containing <
       extParser.parseTemplate('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>');
       extParser.parseHTML('<a><script>abc<def</script><b>test<b></a>');
       if extParser.variables.Values['test']<>'test' then
         raise Exception.create('ergebnis ungültig');
     end;
-    41: begin //direct closed tags
+    46: begin //direct closed tags
       extParser.parseTemplate('<a><br/><br/><htmlparser:read source="text()" var="test"/><br/></a>');
       extParser.parseHTML('<a><br/><br   />abc<br /></a>');
       if extParser.variables.Values['test']<>'abc' then
