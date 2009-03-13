@@ -2,8 +2,6 @@
   @abstract This file @bold(doesn't) contain a xml parser.@br
   But you can use the procedure parseXML to parse a xml file stored in a string. (although you should not expect, that this can actually parse the xml data)
 
-  $Revision$
-  @lastmod $Date$
   @author Benito van der Zander (http://www.benibela.de)
 *}
 unit simplexmlparser;

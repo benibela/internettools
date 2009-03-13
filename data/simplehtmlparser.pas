@@ -1,8 +1,6 @@
 {**
   @abstract This is a simple html parser
 
-  $Revision$
-  @lastmod $Date$
   @author Benito van der Zander (http://www.benibela.de)
 *}
 unit simplehtmlparser;

@@ -1,6 +1,4 @@
 {**
-  Version $Revision$
-  @lastmod $Date$
   @author Benito van der Zander, http://www.benibela.de
 *}
 {

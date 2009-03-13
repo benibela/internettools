@@ -1,8 +1,6 @@
 {**
   @abstract This units contains a template based html parser named THtmlTemplateParser
 
-  $Revision$
-  @lastmod $Date$
   @author Benito van der Zander (http://www.benibela.de)
 *}
 
