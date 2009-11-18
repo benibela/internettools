@@ -59,7 +59,8 @@ type
     //children: TList;
     reverse: TTemplateElement; //Schließen/Öffnen
     next,rnext: TTemplateElement;
-    id:longint; //Nur für debugging zwecke
+
+    offset:longint; //für debugging, bytes between element in template and template start
     function toStr:string;
     procedure freeAll;
     destructor destroy;override;
@@ -151,6 +152,7 @@ type
 
     FParsingCompleted: boolean;
     FlastText,fdeepNodeText:string;
+    FCurrentTemplateName, FCurrentTemplate: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
     FVariables,FNotifyFunctions,FVariableFunctions: TStringList;
     FOldProperties: THTMLProperties;
@@ -170,6 +172,8 @@ type
     function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
     function leaveTag(tagName: pchar; tagNameLen: longint):boolean;
     function textEvent(text: pchar; textLen: longint):boolean;
+
+    function getTemplateElementDebugInfo(element: TTemplateElement): string;
   public
     constructor create;
     destructor destroy; override;
@@ -177,7 +181,7 @@ type
 
     procedure parseHTML(html: string); //**< parses the given data
     procedure parseHTMLFile(htmlfilename: string); //**< parses the given file
-    procedure parseTemplate(template: string);//**< loads the given template
+    procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string);
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
     //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
@@ -248,7 +252,7 @@ begin
       end;
     end;
     //debug history:
-    if (latestElement=nil) or ((nextElement<>nil) and (nextElement.id>latestElement.id)) then
+    if (latestElement=nil) or ((nextElement<>nil) and (nextElement.offset>latestElement.offset)) then
       latestElement:=nextElement;
     if (nextElement<>nil) and (nextElement.typ = tetHTML) and not nextElement.closeTag then
       lastopenedElement:=nextElement;
@@ -469,7 +473,8 @@ begin
           status.nextElement:=cmd.reverse;
           status.lastElement:=cmd.reverse;
           //debug history:
-          if (status.latestElement=nil) or ((status.nextElement<>nil) and (status.nextElement.id>status.latestElement.id)) then
+          if (status.latestElement=nil) or ((status.nextElement<>nil) and
+            (status.nextElement.offset>status.latestElement.offset)) then
             status.latestElement:=status.nextElement;
         end;
       end;
@@ -484,7 +489,8 @@ begin
             //debug history:
             latestElement:=status.latestElement;
             lastopenedElement:=status.lastopenedElement;
-            if (latestElement=nil) or ((nextElement<>nil) and (nextElement.id>latestElement.id)) then
+            if (latestElement=nil) or ((nextElement<>nil) and
+              (nextElement.offset>latestElement.offset)) then
               latestElement:=nextElement;
           end;
           //TODO: Dies funktioniert nicht, wenn cmd von einem Befehl gefolgt wird
@@ -501,7 +507,7 @@ begin
             //debug history:
             latestElement:=status.latestElement;
             lastopenedElement:=status.lastopenedElement;
-            if (latestElement=nil) or ((nextElement<>nil) and (nextElement.id>latestElement.id)) then
+            if (latestElement=nil) or ((nextElement<>nil) and (nextElement.offset>latestElement.offset)) then
               latestElement:=nextElement;
           end;
         end;
@@ -758,6 +764,17 @@ begin
   end;
 end;
 
+function THtmlTemplateParser.getTemplateElementDebugInfo(
+  element: TTemplateElement): string;
+begin
+  result:=element.toStr;
+  if element.offset =-1 then exit(result+' in unknown line');
+  if element.offset>length(FCurrentTemplate) then
+    exit(result+' in unknown line at offset '+IntToStr(element.offset));
+  result+=' in line '+IntToStr(1+strlcount(#13, @FCurrentTemplate[1], element.offset));
+  result+=' at offset '+IntToStr(element.offset);
+end;
+
 function THtmlTemplateParser.newTemplateElement(text: pchar; textLen: longint):TTemplateElement;
 begin
   if FRootTemplate=nil then begin
@@ -769,7 +786,9 @@ begin
   end;
   FCurrentTemplateElement.text:=strFromPchar(text,textLen);
   FTemplateCount+=1;
-  FCurrentTemplateElement.id:=FTemplateCount;
+  if textlen=0 then FCurrentTemplateElement.offset:=-1
+  else FCurrentTemplateElement.offset:=longint(text)-longint(@FCurrentTemplate[1]);
+  //FCurrentTemplateElement.id:=FTemplateCount;
   Result:=FCurrentTemplateElement;
   
 end;
@@ -944,11 +963,11 @@ begin
   try
     simplehtmlparser.parseHTML(html,@enterTag,@leaveTag,@textEvent);
     if not FParsingCompleted then
-       raise EHTMLParseException.create('Die HTML Datei ist kürzer als das Template'#13#10+
-                                        'last: '+TParsingStatus(FParsingAlternatives[0]).lastElement.toStr+#13#10+
-                                        'next: '+TParsingStatus(FParsingAlternatives[0]).nextElement.toStr+#13#10+
-                                        'latest: '+TParsingStatus(FParsingAlternatives[0]).latestElement.toStr+#13#10+
-                                        'lastopened: '+TParsingStatus(FParsingAlternatives[0]).lastopenedElement.toStr+#13#10+
+       raise EHTMLParseException.create('Die HTML Datei ist kürzer als das Template "'+FCurrentTemplateName+'"'#13#10+
+                                        'last: '+getTemplateElementDebugInfo(TParsingStatus(FParsingAlternatives[0]).lastElement)+#13#10+
+                                        'next: '+getTemplateElementDebugInfo(TParsingStatus(FParsingAlternatives[0]).nextElement)+#13#10+
+                                        'latest: '+getTemplateElementDebugInfo(TParsingStatus(FParsingAlternatives[0]).latestElement)+#13#10+
+                                        'lastopened: '+getTemplateElementDebugInfo(TParsingStatus(FParsingAlternatives[0]).lastopenedElement)+#13#10+
                                         'Zahl der Alternativen: '+IntToStr(FParsingAlternatives.Count));
   finally
     for i:=0 to FParsingAlternatives.count-1 do
@@ -962,7 +981,7 @@ begin
   parseHTML(strLoadFromFile(htmlfilename));
 end;
 
-procedure THtmlTemplateParser.parseTemplate(template: string);
+procedure THtmlTemplateParser.parseTemplate(template: string; templateName: string='<unknown>');
 begin
   //FVariables.clear;
   if template='' then
@@ -979,6 +998,8 @@ begin
   end else if strbeginswith(template,#$fe#$ff) or strbeginswith(template,#$ff#$fe) or
     strbeginswith(template,#00#00#$fe#$ef) then
     raise Exception.Create('Ungültiger Codierung BOM im Template');
+  FCurrentTemplate:=template;
+  FCurrentTemplateName:=templateName;
   simplehtmlparser.parseHTML(template,@templateEnterTag,@templateLeaveTag,@templateTextEvent);
   if FRootTemplate = nil then
     raise ETemplateParseException.Create('Ungültiges/Leeres Template');
@@ -986,7 +1007,7 @@ end;
 
 procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
 begin
-  parseTemplate(strLoadFromFile(templatefilename));
+  parseTemplate(strLoadFromFile(templatefilename),templatefilename);
 end;
 
 {procedure THtmlTemplateParser.addFunction(name: string;varCallFunc: TVariableCallbackFunction);
@@ -1025,8 +1046,9 @@ end;
 function TTemplateElement.toStr: string;
 begin
   if self=nil then exit('nil');
-  if closeTag then  result:='/'+text
-  else  result:=text;
+  if closeTag then  result:='</'+text+'> '
+  else if typ=tetText then result:=text
+  else result:='<'+text+'>';
   if attributes=nil then result+=':nil'
   else result+=attributes.Text;
 end;
@@ -1068,7 +1090,7 @@ begin
     if (el.text='htmlparser:read') or
        (el.text='htmlparser:notify') then result+='/';
     if el.typ<>tetText then result+='>';
-    result:=result+'<!--'+inttostr(el.id)+'-->'#13#10;
+    result:=result+'<!--'+inttostr(el.offset)+'-->'#13#10;
     if ((el.typ=tetHTML) or ((el.typ in TEMPLATE_COMMANDS) and (el.text='htmlparser:loop'))) and not el.closeTag then inc(deep,2);
 
 
@@ -1085,7 +1107,7 @@ begin
       if TParsingStatus(parser.FParsingAlternatives[i]).nextElement.closeTag then
         result+='/';
       result:=result+TParsingStatus(parser.FParsingAlternatives[i]).nextElement.text+','+
-              IntTostr(TParsingStatus(parser.FParsingAlternatives[i]).nextElement.id)+'; '
+              IntTostr(TParsingStatus(parser.FParsingAlternatives[i]).nextElement.offset)+'; '
     end else
       Result:=Result+'nil;';
 //  result+='   |'+parser.FlastText;

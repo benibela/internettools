@@ -45,7 +45,7 @@ type
     constructor create();virtual;
     destructor destroy;override;
     function post(protocol,host,url: string;data:string):string;override;
-    function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;override;
+    function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;override;overload;
     function needConnection():boolean;override;
     procedure closeOpenedConnections();override;
   end;
@@ -53,7 +53,7 @@ type
 const TEMPORARY_DIRECTORY='T:\theInternet\';
 
 implementation
-uses bbdebugtools;
+//uses bbdebugtools;
 
 
 constructor EW32InternetException.create();

@@ -101,10 +101,11 @@ function strcopy2(s:string; start:longint):string;inline;
 function strcopy2(first,last:pchar):string;
 function strcopy2(s:string; start,last:longint):string;
 function strrpos(c:char;s:string):longint;
+function strlcount(const search:char; const searchIn:pchar; const len: longint): longint;
 
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
 procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
-procedure strSplit(var splitted: TStringArray;s:string;c:char;includeEmpty:boolean=true);overload;
+procedure strSplit(out splitted: TStringArray;s:string;c:char;includeEmpty:boolean=true);overload;
 
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
 
@@ -167,9 +168,34 @@ public
   
 end;
 
+{ TSet }
 
+generic TSet<T_Value> = class(TObject)
+protected
+  reallength: longint;
+  data: array of T_Value;
+public
+  procedure clear();
+  procedure insert(v: T_Value);
+  //procedure insertAll(other: TObject);
+  procedure remove(v: T_Value);
+  //procedure removeAll(other:TObject);
+  function contains(v: T_Value):boolean;
+  function count:longint;
+end;
+
+TIntSet = specialize TSet <integer>;
+
+procedure setInsertAll(oldSet:TIntSet; insertedSet: TIntSet);
+procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);
 //----------------------------Others-----------------------------------
-procedure qsort(a,b: pointer; size: longint);
+//**Compare function to compare the two values where a and b points to, return -1 for a^<b^
+//**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
+//**so the function use the same call convention like a method
+type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
+//universal stabile sort function (using merge + insert sort in the moment)
+procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
+procedure stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
 implementation
 
 //========================array functions========================
@@ -446,6 +472,16 @@ begin
   exit(0);
 end;
 
+function strlcount(const search: char; const searchIn: pchar; const len: longint): longint;
+var
+  i: Integer;
+begin
+  result:=0;
+  for i:=0 to len-1 do
+    if searchIn[i]=search then
+      result+=1;
+end;
+
 function strcopy2(first, last: pchar): string;
 begin
   if first>last then exit;
@@ -467,7 +503,7 @@ begin
   delete(remainingPart,1,p+length(separator)-1);
 end;
 
-procedure strSplit(var splitted: TStringArray; s: string; c: char;
+procedure strSplit(out   splitted: TStringArray; s: string; c: char;
   includeEmpty: boolean);
 var p:longint;
     result:TStringArray;
@@ -935,32 +971,329 @@ end;
 
 function TMap.existsKey(key: T_Key): boolean;
 begin
-  result:=getKeyID(key)<>(0-1);
+  result:=getKeyID(key)<>(0-1); //WTF!
 end;
 
 
 //================================Others===================================
-procedure qsort(a, b: pointer; size: longint);
-
+//universal stabile sort function (using merge sort in the moment)
+procedure stableSort4r(a,b: PCardinal; compareFunction: TPointerCompareFunction; compareFunctionData: TObject; tempArray: array of cardinal);
+var length,i,j,mi: cardinal;
+    m,n,oldA:PCardinal;
+    tempItem: cardinal;
 begin
-  //TODO
+  //calculate length and check if the input (size) is possible
+  length:=b-a; //will be divided by pointer size automatically
+  if @a[length] <> b then
+    raise Exception.Create('Invalid size for sorting');
+  if b<=a then
+    exit(); //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
+  length+=1; //add 1 because a=b if there is exactly one element
+
+  //check for small input and use insertsort if small
+  if length<8 then begin
+    for i:=1 to length-1 do begin
+      j:=i;
+      //use place to insert
+      while (j>0) and (compareFunction(compareFunctionData, @a[j-1], @a[i]) > 0) do
+        j-=1;
+      if i<>j then begin
+        //save temporary in tempItem (size is checked) and move block forward
+        tempItem:=a[i];
+        move(a[j], a[j+1], sizeof(cardinal)*(i-j));
+        a[j]:=tempItem;
+      end;
+    end;
+    exit; //it is now sorted with insert sort
+  end;
+
+
+  //use merge sort
+  assert(length<=high(tempArray)+1);
+  //rec calls
+  mi:=length div 2;
+  m:=@a[mi];   //will stay constant during merge phase
+  n:=@a[mi+1]; //will be moved during merge phase
+  stableSort4r(a, m, compareFunction, compareFunctionData,tempArray);
+  stableSort4r(n, b, compareFunction, compareFunctionData,tempArray);
+
+  //merging
+  oldA:=a;
+  i:=0;
+  while (a <= m) and (n <= b) do begin
+    if compareFunction(compareFunctionData,a,n)<=0 then begin
+      tempArray[i]:=a^;
+      inc(a); //increase by pointer size
+    end else begin
+      tempArray[i]:=n^;
+      inc(n);
+    end;
+    inc(i);
+  end;
+  while a <= m do begin
+    tempArray[i]:=a^;
+    inc(a);
+    inc(i);
+  end;
+  while n <= b do begin
+    tempArray[i]:=n^;
+    inc(n);
+    inc(i);
+  end;
+
+  move(tempArray[0],oldA^,length*sizeof(cardinal));
+end;
+
+//just allocates the memory for the recursive stableSort4r
+//TODO: make it iterative => merge the two functions
+procedure stableSort4(a,b: PCardinal; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
+var tempArray: array of cardinal;
+    length:longint;
+begin
+  //calculate length and check if the input (size) is possible
+  length:=b-a; //will be divided by pointer size automatically
+  if @a[length] <> b then
+    raise Exception.Create('Invalid size for sorting');
+  if b<=a then
+    exit(); //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)y
+  length+=1; //add 1 because a=b if there is exactly one element
+  setlength(tempArray,length);
+  stableSort4r(a,b,compareFunction,compareFunctionData,tempArray);
+end;
+
+type TCompareFunctionWrapperData = record
+  realFunction: TPointerCompareFunction;
+  data: TObject;
+end;
+    PCompareFunctionWrapperData=^TCompareFunctionWrapperData;
+
+function compareFunctionWrapper(c:TObject; a,b:pointer):longint;
+var data: ^TCompareFunctionWrapperData;
+begin
+  data:=PCompareFunctionWrapperData(c);
+  result:=data^.realFunction(data^.data,ppointer(a)^,ppointer(b)^);
+end;
+
+procedure setInsertAll(oldSet: TIntSet; insertedSet: TIntSet);
+var
+  i: Integer;
+begin
+  for i:=0 to high(insertedSet.data) do
+    oldSet.insert(insertedSet.data[i]);
+end;
+
+procedure setRemoveAll(oldSet: TIntSet; removedSet: TIntSet);
+var
+  i: Integer;
+begin
+  for i:=high(removedSet.data) downto 0 do
+    oldSet.remove(removedSet.data[i]);
+end;
+
+procedure stableSort(a,b: pointer; size: longint;
+  compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
+var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(cardinal)
+    tempBackArray: array of longint;
+    length:longint;
+    data: TCompareFunctionWrapperData;
+    tempData: pbyte;
+    i: Integer;
+begin
+  if size=sizeof(cardinal) then begin
+    stableSort4(a,b,compareFunction,compareFunctionData);
+    exit;
+  end;
+  //use temporary array (merge sort will anyways use additional memory)
+  length:=(b-a) div size; //will be divided by pointer size automatically
+  if @PBYTE(a)[length*size] <> b then
+    raise Exception.Create('Invalid size for sorting');
+  length+=1;
+  setlength(tempArray,length);
+  if size < sizeof(cardinal) then begin
+    //copy the values in the temp array
+    for i:=0 to length-1 do
+      move(pbyte(a)[i*size], tempArray[i], size);
+    stableSort4(tempArray[0],tempArray[length-1], compareFunction,compareFunctionData);
+    for i:=0 to length-1 do
+      move(tempArray[i], pbyte(a)[i*size], size);
+  end else begin
+    //fill the temp array with pointer to the values
+    for i:=0 to length-1 do
+      tempArray[i]:=@PBYTE(a)[i*size];
+    //and then call with wrapper function
+    data.realFunction:=compareFunction;
+    data.data:=compareFunctionData;
+    stableSort4(@tempArray[0],@tempArray[length-1], @compareFunctionWrapper,TObject(@data));
+    //we now have a sorted pointer list
+    //create back map (hashmap pointer => index in tempArray)
+    setlength(tempBackArray,length);
+    for i:=0 to length-1 do
+      tempBackArray[(tempArray[i]-a) div size]:=i;
+    //move to every position the correct object and update pointer so they not point to garbage after every change
+    tempData:=getMem(size); //temporary object
+    for i:=0 to length-1 do begin
+      //swap
+      move(PBYTE(a)[i*size], tempData^, size);
+      move(tempArray[i]^,PBYTE(a)[i*size],size);
+      move(tempData^, tempArray[i]^, size);
+      //search pointer pointing to PBYTE(a)[i*size] and set to tempArray[i]
+      tempArray[tempBackArray[i]]:=tempArray[i];
+      tempBackArray[(tempArray[tempBackArray[i]]-a) div size]:=tempBackArray[i];
+    end;
+
+    FreeMem(tempData);
+  end;
+
+end;
+
+procedure stableSort(intArray: TLongintArray;
+  compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
+begin
+  if length(intArray)<=1  then exit;
+  stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
+end;
+
+{ TSet }
+
+procedure TSet.clear();
+begin
+  reallength:=0;
+  if length(data)>128 then setlength(data,4);
+end;
+
+procedure TSet.insert(v: T_Value);
+begin
+  if contains(v) then exit;
+  if reallength>=length(data) then
+    if length(data)=0 then setlength(data,4)
+    else if length(data)<=128 then setlength(data,length(data)*2)
+    else setlength(data,length(data)+256);
+  data[reallength]:=v;
+  reallength+=1;
+end;
+  {
+procedure TSet.insertAll(other: TObject);
+
+var
+  i: Integer;
+begin
+  if other is TSet then
+    for i:=0 to high(TSet(other).data) do
+      insert(TSet(other).data[i]);
+end;
+                           }
+procedure TSet.remove(v: T_Value);
+var i:longint;
+begin
+  if reallength<=0 then exit;
+  for i:=0 to reallength-1 do
+    if data[i]=v then begin
+      data[i]:=data[reallength-1];
+      reallength-=1;
+      if (length(data)>4) and (reallength < length(data) div 2) then
+        setlength(data,length(data) div 2);
+    end;
+end;
+         {
+procedure TSet.removeAll(other: TObject);
+var
+  i: Integer;
+begin
+  if other is TSet then
+    for i:=high(TSet(other).data) downto 0 do
+      remove(TSet(other).data[i]);
+end;    }
+
+
+function TSet.contains(v: T_Value):boolean;
+var i:longint;
+begin
+  result:=false;
+  for i:=0 to reallength-1 do
+    if data[i]=v then
+      exit(true);
 end;
 
 
+function TSet.count: longint;
+begin
+  result:=reallength;
+end;
+
+//{$DEFINE UNITTESTS}
 {$IFDEF UNITTESTS}
+function intCompareFunction(c:TObject; a,b:pointer):longint;
+begin
+  if pinteger(a)^<pinteger(b)^ then exit(-1)
+  else if pinteger(a)^>pinteger(b)^ then exit(1)
+  else exit(0);
+end;
+function int64CompareFunction(c:TObject; a,b:pointer):longint;
+begin
+  if pint64(a)^<pint64(b)^ then exit(-1)
+  else if pint64(a)^>pint64(b)^ then exit(1)
+  else exit(0);
+end;
 procedure unitTests();
 const strs: array[1..6,1..2] of string=(('05.10.1985','dd.mm.yyyy'),('11.7.2005','d.m.yyyy'),('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),('  11 MÃ¤r 1700',' dd mmm yyyy  '));
       dates: array[1..6, 1..3] of word = ((1985,10,5),(2005,7,11),(2000,1,16),(1989,6,17),(1953,9,29),(1700,3,11));
+
 var i:longint;
+
+var ar: array[0..100] of longint;
+    ar2: array[0..100] of int64;
+
 begin
+  //parse date function
   for i:=1 to high(strs) do
       if parseDate(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
-        raise Exception('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+DateToStr(parseDate(strs[i,1],strs[i,2])));
+        raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+DateToStr(parseDate(strs[i,1],strs[i,2])));
+
+  //stable sort
+  //test sub insert sort
+  ar[0]:=7; ar[1]:=4; ar[2]:=5; ar[3]:=9; ar[4]:=1; ar[5]:=2; ar[6]:=-8;
+  stableSort(@ar[0],@ar[6],sizeof(longint),@intCompareFunction,nil);
+  if ar[0]<>-8 then raise exception.create('Unit Test B:0 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar[1]<>1 then raise exception.create('Unit Test B:1 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar[2]<>2 then raise exception.create('Unit Test B:2 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar[3]<>4 then raise exception.create('Unit Test B:3 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar[4]<>5 then raise exception.create('Unit Test B:4 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar[5]<>7 then raise exception.create('Unit Test B:5 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar[6]<>9 then raise exception.create('Unit Test B:6 für stableSort  in Unit bbutils fehlgeschlagen');
+
+  //test merging
+  for i:=0 to 100 do //backward sorted
+    ar[i]:=1000 - i*10;
+  stableSort(@ar[0],@ar[100],sizeof(longint),@intCompareFunction,nil);
+  for i:=0 to 100 do
+    if ar[i]<>i*10 then
+      raise exception.create('Unit Test B:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
+
+  //test 64 bit
+  ar2[0]:=7; ar2[1]:=4; ar2[2]:=5; ar2[3]:=9; ar2[4]:=1; ar2[5]:=2; ar2[6]:=-8;
+  stableSort(@ar2[0],@ar2[6],sizeof(int64),@int64CompareFunction,nil);
+  if ar2[0]<>-8 then raise exception.create('Unit Test C:0 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar2[1]<>1 then raise exception.create('Unit Test C:1 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar2[2]<>2 then raise exception.create('Unit Test C:2 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar2[3]<>4 then raise exception.create('Unit Test C:3 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar2[4]<>5 then raise exception.create('Unit Test C:4 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar2[5]<>7 then raise exception.create('Unit Test C:5 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar2[6]<>9 then raise exception.create('Unit Test C:6 für stableSort  in Unit bbutils fehlgeschlagen');
+
+  //test merging
+  for i:=0 to 100 do //backward sorted
+    ar2[i]:=int64(1000 - i*10);
+  stableSort(@ar2[0],@ar2[100],sizeof(int64),@int64CompareFunction,nil);
+  for i:=0 to 100 do
+    if ar2[i]<>i*10 then
+      raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
 end;
+
 initialization
 
   unitTests();
 {$ENDIF}
+
 
 
 
