@@ -30,7 +30,7 @@ unit bbutils;
 interface
 
 uses
-  Classes, SysUtils,math
+  Classes, SysUtils,math,LCLProc
   {$IFDEF Win32}
   , windows
   {$ENDIF};
@@ -114,7 +114,9 @@ procedure strSaveToFile(filename: string;str:string);
 function strFromSize(size: int64):string;
 
 
-function strChangeEncoding(str: string; from,toe: TEncoding):string;
+function strConvertToUtf8(str: string; from: TEncoding): string;
+function strConvertFromUtf8(const str: string; toe: TEncoding): string;
+function strChangeEncoding(const str: string; from,toe: TEncoding):string;
 function strEncodingFromName(str:string):TEncoding;
 function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
 function strFromPchar(p:pchar;l:longint):string;
@@ -145,7 +147,7 @@ function parseDate(datestr,mask:string):longint;
 
 const WHITE_SPACE=[#9,#10,#13,' '];
 
-
+(*
 //----------------------------Templates-------------------------------
 
 
@@ -187,7 +189,7 @@ end;
 TIntSet = specialize TSet <integer>;
 
 procedure setInsertAll(oldSet:TIntSet; insertedSet: TIntSet);
-procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);
+procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //----------------------------Others-----------------------------------
 //**Compare function to compare the two values where a and b points to, return -1 for a^<b^
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
@@ -534,18 +536,91 @@ begin
   splitted:=result;
 end;
 
-function strChangeEncoding(str: string; from, toe: TEncoding): string;
+function strConvertToUtf8(str: string; from: TEncoding): string;
+var len: longint;
+    reslen: longint;
+    pos: longint;
+    i: Integer;
+begin
+  //use my own conversion, because i found no existing source which doesn't relies on iconv
+  //(AnsiToUtf8 doesn't work, since Ansi<>latin1)
+  //edit: okay, now i found lconvencoding, but i let this here, because i don't want to change it again
+  case from of
+    eUnknown, eUTF8: result:=str;
+    eWindows1252: begin //we actually use latin1, because unicode $00..$FF = latin-1 $00..$FF
+      len:=length(str); //character and byte length of latin1-str
+      //calculate length of resulting utf-8 string (gets larger)
+      reslen:=len;
+      for i:=1 to len do
+        if str[i] >= #$80 then reslen+=1;
+      //optimization
+      if reslen = len then
+        exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
+      //reserve string
+      SetLength(result, reslen);
+      pos:=1;
+      for i:=1 to len do begin
+        if str[i] < #$80 then
+          //below $80: utf-8 = latin-1
+          Result[pos]:=str[i]
+        else begin
+          //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
+          result[pos]:=chr($C0 or (ord(str[i]) shr 6));
+          pos+=1;
+          result[pos]:=chr($80 or (ord(str[i]) and $3F));
+        end;
+        pos+=1;
+      end;
+      assert(pos=reslen+1);
+    end;
+    else raise Exception.Create('Unknown encoding in strConvertToUtf8');
+  end;
+end;
+
+function strConvertFromUtf8(const str: string; toe: TEncoding): string;
+var len, reslen, i, pos: longint;
+begin
+  case toe of
+    eUnknown, eUTF8: result:=str;
+    eWindows1252: begin //actually latin-1
+      len:=length(str);//byte length
+      reslen:=UTF8Length(str);//character len = new byte length
+      //optimization
+      if reslen = len then
+        exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
+      //conversion
+      SetLength(result,reslen);
+      pos:=1;
+      for i:=1 to reslen do begin
+        //see strConvertToUtf8 for description
+        if str[pos] <= #$7F then result[i]:=str[pos]
+        else begin
+          //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
+          result[i] := chr((ord(str[pos]) shl 6) or (ord(str[pos+1]) and $3f));
+          pos+=1;
+        end;
+        pos+=1;
+      end ;
+    end;
+    else raise Exception.Create('Unknown encoding in strConvertFromUtf8');
+  end;
+end;
+
+function strChangeEncoding(const str: string; from, toe: TEncoding): string;
 var utf8temp: UTF8String;
 begin
   if (from=toe) or (from=eUnknown) or (toe=eUnknown) then exit(str);
-  case from of
-    eWindows1252: UTF8temp:=ansiToUtf8(str);
-    else utf8temp:=str;
-  end;
-  case toe of
-    eWindows1252: Result:=Utf8ToAnsi(utf8temp);
-    else result:=utf8temp;
-  end;
+  //two pass encoding: from -> utf8 -> to
+  utf8temp:=strConvertToUtf8(str, from);
+  result:=strConvertFromUtf8(utf8temp, toe);
+
+  {why did i use utf-8 as intermediate step (instead utf-16/ucs-2 like many others)?
+   - in many cases I have string just containing the English alphabet where latin1=utf8,
+     so this function will actually do nothing (except checking string lengths).
+     But utf-16 would require additional memory in any case
+   - I only convert between utf8-latin1 in the moment anyways, so just a single step is used
+   - utf-8 can store all unicode pages (unlike the often used ucs-2)
+  }
 end;
 
 function strEncodingFromName(str: string): TEncoding;
@@ -594,12 +669,12 @@ begin
           end;
           else//eWindows1252:
             case p^ of
-              'a': result[resLen]:='ä';
-              'o': result[resLen]:='ö';
-              'u': result[resLen]:='ü';
-              'A': result[reslen]:='Ä';
-              'O': result[reslen]:='Ö';
-              'U': result[reslen]:='Ü';
+              'a': result[resLen]:=#$E4;
+              'o': result[resLen]:=#$F6;
+              'u': result[resLen]:=#$FC;
+              'A': result[reslen]:=#$C4;
+              'O': result[reslen]:=#$D6;
+              'U': result[reslen]:=#$DC;
               else result[reslen]:='?'
             end;
         end;
@@ -788,7 +863,6 @@ begin
   SystemTimeToFileTime(sysTime,temp);
   LocalFileTimeToFileTime(temp,result);
 end;
-{$ENDIF}
 
 function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
 var sysTime: TSystemTime;
@@ -799,6 +873,7 @@ begin
   FileTimeToSystemTime(localFileTime, sysTime);
   result:=SystemTimeToDateTime(sysTime);
 end;
+{$ENDIF}
 
 function weekOfYear(const date:TDateTime):word;
 //After Claus Tøndering
@@ -932,7 +1007,7 @@ end;
 
 
 
-
+(*
 { TMap }
 
 function TMap.getKeyID(key: T_Key): longint;
@@ -973,14 +1048,16 @@ function TMap.existsKey(key: T_Key): boolean;
 begin
   result:=getKeyID(key)<>(0-1); //WTF!
 end;
-
+  *)
 
 //================================Others===================================
+type TSortData = Pointer;
+     PSortData = ^TSortData; //ppointer would be to confusing (and howfully there will be generics in the stable binaries soon)
 //universal stabile sort function (using merge sort in the moment)
-procedure stableSort4r(a,b: PCardinal; compareFunction: TPointerCompareFunction; compareFunctionData: TObject; tempArray: array of cardinal);
+procedure stableSortSDr(a,b: PSortData; compareFunction: TPointerCompareFunction; compareFunctionData: TObject; tempArray: array of TSortData);
 var length,i,j,mi: cardinal;
-    m,n,oldA:PCardinal;
-    tempItem: cardinal;
+    m,n,oldA:PSortData;
+    tempItem: TSortData;
 begin
   //calculate length and check if the input (size) is possible
   length:=b-a; //will be divided by pointer size automatically
@@ -1000,7 +1077,7 @@ begin
       if i<>j then begin
         //save temporary in tempItem (size is checked) and move block forward
         tempItem:=a[i];
-        move(a[j], a[j+1], sizeof(cardinal)*(i-j));
+        move(a[j], a[j+1], sizeof(TSortData)*(i-j));
         a[j]:=tempItem;
       end;
     end;
@@ -1014,8 +1091,8 @@ begin
   mi:=length div 2;
   m:=@a[mi];   //will stay constant during merge phase
   n:=@a[mi+1]; //will be moved during merge phase
-  stableSort4r(a, m, compareFunction, compareFunctionData,tempArray);
-  stableSort4r(n, b, compareFunction, compareFunctionData,tempArray);
+  stableSortSDr(a, m, compareFunction, compareFunctionData,tempArray);
+  stableSortSDr(n, b, compareFunction, compareFunctionData,tempArray);
 
   //merging
   oldA:=a;
@@ -1041,13 +1118,13 @@ begin
     inc(i);
   end;
 
-  move(tempArray[0],oldA^,length*sizeof(cardinal));
+  move(tempArray[0],oldA^,length*sizeof(TSortData));
 end;
 
 //just allocates the memory for the recursive stableSort4r
 //TODO: make it iterative => merge the two functions
-procedure stableSort4(a,b: PCardinal; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
-var tempArray: array of cardinal;
+procedure stableSortSD(a,b: PSortData; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
+var tempArray: array of TSortData;
     length:longint;
 begin
   //calculate length and check if the input (size) is possible
@@ -1058,7 +1135,7 @@ begin
     exit(); //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)y
   length+=1; //add 1 because a=b if there is exactly one element
   setlength(tempArray,length);
-  stableSort4r(a,b,compareFunction,compareFunctionData,tempArray);
+  stableSortSDr(a,b,compareFunction,compareFunctionData,tempArray);
 end;
 
 type TCompareFunctionWrapperData = record
@@ -1073,7 +1150,7 @@ begin
   data:=PCompareFunctionWrapperData(c);
   result:=data^.realFunction(data^.data,ppointer(a)^,ppointer(b)^);
 end;
-
+(*
 procedure setInsertAll(oldSet: TIntSet; insertedSet: TIntSet);
 var
   i: Integer;
@@ -1089,18 +1166,18 @@ begin
   for i:=high(removedSet.data) downto 0 do
     oldSet.remove(removedSet.data[i]);
 end;
-
+  *)
 procedure stableSort(a,b: pointer; size: longint;
   compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
-var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(cardinal)
+var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(TSortData)
     tempBackArray: array of longint;
     length:longint;
     data: TCompareFunctionWrapperData;
     tempData: pbyte;
     i: Integer;
 begin
-  if size=sizeof(cardinal) then begin
-    stableSort4(a,b,compareFunction,compareFunctionData);
+  if size=sizeof(TSortData) then begin
+    stableSortSD(a,b,compareFunction,compareFunctionData);
     exit;
   end;
   //use temporary array (merge sort will anyways use additional memory)
@@ -1109,11 +1186,11 @@ begin
     raise Exception.Create('Invalid size for sorting');
   length+=1;
   setlength(tempArray,length);
-  if size < sizeof(cardinal) then begin
+  if size < sizeof(TSortData) then begin
     //copy the values in the temp array
     for i:=0 to length-1 do
       move(pbyte(a)[i*size], tempArray[i], size);
-    stableSort4(tempArray[0],tempArray[length-1], compareFunction,compareFunctionData);
+    stableSortSD(@tempArray[0],@tempArray[length-1], compareFunction,compareFunctionData);
     for i:=0 to length-1 do
       move(tempArray[i], pbyte(a)[i*size], size);
   end else begin
@@ -1123,7 +1200,7 @@ begin
     //and then call with wrapper function
     data.realFunction:=compareFunction;
     data.data:=compareFunctionData;
-    stableSort4(@tempArray[0],@tempArray[length-1], @compareFunctionWrapper,TObject(@data));
+    stableSortSD(@tempArray[0],@tempArray[length-1], @compareFunctionWrapper,TObject(@data));
     //we now have a sorted pointer list
     //create back map (hashmap pointer => index in tempArray)
     setlength(tempBackArray,length);
@@ -1152,7 +1229,7 @@ begin
   if length(intArray)<=1  then exit;
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
-
+(*
 { TSet }
 
 procedure TSet.clear();
@@ -1219,9 +1296,15 @@ function TSet.count: longint;
 begin
   result:=reallength;
 end;
-
-//{$DEFINE UNITTESTS}
+  *)
+{$DEFINE UNITTESTS}
 {$IFDEF UNITTESTS}
+function shortintCompareFunction(c:TObject; a,b:pointer):longint;
+begin
+  if PShortInt(a)^<PShortInt(b)^ then exit(-1)
+  else if PShortInt(a)^>PShortInt(b)^ then exit(1)
+  else exit(0);
+end;
 function intCompareFunction(c:TObject; a,b:pointer):longint;
 begin
   if pinteger(a)^<pinteger(b)^ then exit(-1)
@@ -1240,8 +1323,9 @@ const strs: array[1..6,1..2] of string=(('05.10.1985','dd.mm.yyyy'),('11.7.2005'
 
 var i:longint;
 
-var ar: array[0..100] of longint;
-    ar2: array[0..100] of int64;
+var ar8: array[0..100] of shortint;
+    ar32: array[0..100] of longint;
+    ar64: array[0..100] of int64;
 
 begin
   //parse date function
@@ -1249,43 +1333,70 @@ begin
       if parseDate(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
         raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+DateToStr(parseDate(strs[i,1],strs[i,2])));
 
-  //stable sort
-  //test sub insert sort
-  ar[0]:=7; ar[1]:=4; ar[2]:=5; ar[3]:=9; ar[4]:=1; ar[5]:=2; ar[6]:=-8;
-  stableSort(@ar[0],@ar[6],sizeof(longint),@intCompareFunction,nil);
-  if ar[0]<>-8 then raise exception.create('Unit Test B:0 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar[1]<>1 then raise exception.create('Unit Test B:1 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar[2]<>2 then raise exception.create('Unit Test B:2 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar[3]<>4 then raise exception.create('Unit Test B:3 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar[4]<>5 then raise exception.create('Unit Test B:4 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar[5]<>7 then raise exception.create('Unit Test B:5 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar[6]<>9 then raise exception.create('Unit Test B:6 für stableSort  in Unit bbutils fehlgeschlagen');
+  //string conversion
+  if strConvertToUtf8('a?=ßä',eUTF8)<>'a?=ßä' then raise Exception.Create('Non conversion failed');
+  if strConvertFromUtf8('a?=ßä',eUTF8)<>'a?=ßä' then raise Exception.Create('Non conversion failed');
+  if strConvertToUtf8('abcdef',eWindows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
+  if strConvertFromUtf8('abcdef',eWindows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
+  if strConvertToUtf8('ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo',eWindows1252)<>'ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo' then
+     raise Exception.Create('conversion latin1->utf8 failed');
+  if strConvertFromUtf8('ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo',eWindows1252)<>'ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo' then
+     raise Exception.Create('conversion utf8->latin1 failed');
+
+  //html str decode
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;',36,eWindows1252) <> #$C4#$D6#$DC#$e4#$f6#$fc then
+    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen');
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;',36,eUTF8) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc then
+    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen');
+
+  //=========stable sort===============
+  //test 8 bit
+  ar8[0]:=7; ar8[1]:=4; ar8[2]:=5; ar8[3]:=9; ar8[4]:=1; ar8[5]:=2; ar8[6]:=-8;
+  stableSort(@ar8[0],@ar8[6],sizeof(byte),@shortintCompareFunction,nil);
+  if ar8[0]<>-8 then raise exception.create('Unit Test B:0 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[1]<>1 then raise exception.create('Unit Test B:1 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[2]<>2 then raise exception.create('Unit Test B:2 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[3]<>4 then raise exception.create('Unit Test B:3 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[4]<>5 then raise exception.create('Unit Test B:4 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[5]<>7 then raise exception.create('Unit Test B:5 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[6]<>9 then raise exception.create('Unit Test B:6 für stableSort  in Unit bbutils fehlgeschlagen');
+
+  //test 32 bit sort
+  ar32[0]:=7; ar32[1]:=4; ar32[2]:=5; ar32[3]:=9; ar32[4]:=1; ar32[5]:=2; ar32[6]:=-8;
+  stableSort(@ar32[0],@ar32[6],sizeof(longint),@intCompareFunction,nil);
+  if ar32[0]<>-8 then raise exception.create('Unit Test B:0 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[1]<>1 then raise exception.create('Unit Test B:1 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[2]<>2 then raise exception.create('Unit Test B:2 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[3]<>4 then raise exception.create('Unit Test B:3 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[4]<>5 then raise exception.create('Unit Test B:4 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[5]<>7 then raise exception.create('Unit Test B:5 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[6]<>9 then raise exception.create('Unit Test B:6 für stableSort  in Unit bbutils fehlgeschlagen');
 
   //test merging
-  for i:=0 to 100 do //backward sorted
-    ar[i]:=1000 - i*10;
-  stableSort(@ar[0],@ar[100],sizeof(longint),@intCompareFunction,nil);
+  for i:=0 to 100 do //backwar32d sorted
+    ar32[i]:=1000 - i*10;
+  stableSort(@ar32[0],@ar32[100],sizeof(longint),@intCompareFunction,nil);
   for i:=0 to 100 do
-    if ar[i]<>i*10 then
+    if ar32[i]<>i*10 then
       raise exception.create('Unit Test B:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
 
   //test 64 bit
-  ar2[0]:=7; ar2[1]:=4; ar2[2]:=5; ar2[3]:=9; ar2[4]:=1; ar2[5]:=2; ar2[6]:=-8;
-  stableSort(@ar2[0],@ar2[6],sizeof(int64),@int64CompareFunction,nil);
-  if ar2[0]<>-8 then raise exception.create('Unit Test C:0 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar2[1]<>1 then raise exception.create('Unit Test C:1 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar2[2]<>2 then raise exception.create('Unit Test C:2 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar2[3]<>4 then raise exception.create('Unit Test C:3 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar2[4]<>5 then raise exception.create('Unit Test C:4 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar2[5]<>7 then raise exception.create('Unit Test C:5 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar2[6]<>9 then raise exception.create('Unit Test C:6 für stableSort  in Unit bbutils fehlgeschlagen');
+  ar64[0]:=7; ar64[1]:=4; ar64[2]:=5; ar64[3]:=9; ar64[4]:=1; ar64[5]:=2; ar64[6]:=-8;
+  stableSort(@ar64[0],@ar64[6],sizeof(int64),@int64CompareFunction,nil);
+  if ar64[0]<>-8 then raise exception.create('Unit Test C:0 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[1]<>1 then raise exception.create('Unit Test C:1 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[2]<>2 then raise exception.create('Unit Test C:2 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[3]<>4 then raise exception.create('Unit Test C:3 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[4]<>5 then raise exception.create('Unit Test C:4 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[5]<>7 then raise exception.create('Unit Test C:5 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[6]<>9 then raise exception.create('Unit Test C:6 für stableSort  in Unit bbutils fehlgeschlagen');
 
   //test merging
   for i:=0 to 100 do //backward sorted
-    ar2[i]:=int64(1000 - i*10);
-  stableSort(@ar2[0],@ar2[100],sizeof(int64),@int64CompareFunction,nil);
+    ar64[i]:=int64(1000 - i*10);
+  stableSort(@ar64[0],@ar64[100],sizeof(int64),@int64CompareFunction,nil);
   for i:=0 to 100 do
-    if ar2[i]<>i*10 then
+    if ar64[i]<>i*10 then
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
 end;
 
