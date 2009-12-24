@@ -418,10 +418,7 @@ procedure THtmlTemplateParser.executeTemplateCommand(status:TParsingStatus;cmd: 
     //Zeichensatz konvertierung
     //(ohne Annahme template-ZS=html-ZS, es müsste bereits früher konvertiert werden)
     if htmlEncoding<>outputEncoding then
-      if (htmlEncoding=eUTF8) and (outputEncoding=eWindows1252) then
-        text:=Utf8ToAnsi(text)
-       else if (htmlEncoding=eWindows1252) and (outputEncoding=eUTF8) then
-        text:=AnsiToUtf8(text);
+      text:=strChangeEncoding(text, htmlEncoding, outputEncoding);
 
     vari:=replaceVars(cmd.attributes.Values['var']);
     variables.Values[vari]:=text;
@@ -581,14 +578,10 @@ begin
         while element<>nil do begin
           if element.typ = tetText then begin
             //gibt nur UTF8 und W1252
-            if htmlEncoding=eWindows1252 then element.text:=Utf8ToAnsi(element.text)
-            else if htmlEncoding=eUTF8 then element.text:=AnsiToUtf8(element.text)
-            else raise exception.Create('Unbekannte Codierung, kann nicht passieren');
+            element.text:=strChangeEncoding(element.text,templateEncoding,htmlEncoding);
           end else begin //HTML-Namen sind ASCII und deshalb in UTF-8 und W1252 gleich
             if element.attributes<>nil then
-              if htmlEncoding=eWindows1252 then element.attributes.text:=Utf8ToAnsi(element.attributes.text)
-              else if htmlEncoding=eUTF8 then element.attributes.text:=AnsiToUtf8(element.attributes.text)
-              else raise exception.Create('Unbekannte Codierung, kann nicht passieren');
+              element.attributes.text:=strChangeEncoding(element.attributes.text,templateEncoding, htmlEncoding);
           end;
           element:=element.next;
         end;
@@ -1177,6 +1170,7 @@ end;
 procedure unitTest(extParser: THtmlTemplateParser;testID:longint;logClass: TTemplateHTMLParserLogClass);
 var sl: TStringList;
 i:longint;
+temp:string;
 
 begin
   case testID of
@@ -1440,6 +1434,34 @@ begin
       extParser.parseHTML('<a><br/><br   />abc<br /></a>');
       if extParser.variables.Values['test']<>'abc' then
         raise Exception.create('ergebnis ungültig');
+    end;
+
+    80: begin //encoding detection
+      extParser.parseTemplate('<a><htmlparser:read source="text()" var="test"/></a>');
+      //no coding change utf-8 -> utf-8
+      extParser.outputEncoding:=eUTF8;
+      extParser.parseHTML('<meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>uu(bin:'#$C3#$84',ent:&Ouml;)uu</a></html>');
+      if extParser.variables.Values['test']<>'uu(bin:'#$C3#$84',ent:'#$C3#$96')uu' then //ÄÖ
+        raise Exception.create('ergebnis ungültig utf8->utf8');
+      //no coding change latin1 -> latin1
+      extParser.outputEncoding:=eWindows1252;
+      extParser.parseHTML('<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>ll(bin:'#$C4',ent:&Ouml;)ll</a></html>');
+      if extParser.variables.Values['test']<>'ll(bin:'#$C4',ent:'#$D6')ll' then
+        raise Exception.create('ergebnis ungültig latin1->latin1');
+      //coding change latin1 -> utf-8
+      extParser.outputEncoding:=eUTF8;
+      extParser.parseHTML('<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>lu(bin:'#$C4',ent:&Ouml;)lu</a></html>');
+      temp:=extParser.variables.Values['test'];
+      if extParser.variables.Values['test']<>'lu(bin:'#$C3#$84',ent:'#$C3#$96')lu' then
+        raise Exception.create('ergebnis ungültig latin1->utf8');
+      //coding change utf8 -> latin1
+      extParser.outputEncoding:=eWindows1252;
+      extParser.parseHTML('<meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>ul(bin:'#$C3#$84',ent:&Ouml;)ul</a></html>');
+      if extParser.variables.Values['test']<>'ul(bin:'#$C4',ent:'#$D6')ul' then
+        raise Exception.create('ergebnis ungültig utf8->latin1');
+
+      extParser.parseHTML('<meta http-equiv="Content-Type" content="text/html; charset=" /><a>bin:'#$C4#$D6',ent:&Ouml;</a></html>');
+      extParser.outputEncoding:=eUTF8;
     end;
     99: if FileExists('U:\components\pascal\html\tests\test8.template') then begin
       //Sollte was Bücherintrotest sein
