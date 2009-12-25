@@ -111,13 +111,13 @@ public
 end;
 const homepageAlternative='www.benibela.de';
 implementation
-uses w32internetaccess,(*unzip,ziptypes,*)windows;
 
 { TAutoUpdater }
 
 function TAutoUpdater.hasDirectoryWriteAccess: boolean;
 var f:THandle;
 begin
+  {$IFDEF WIN32}
   if Win32Platform=VER_PLATFORM_WIN32_WINDOWS then result:=true
   else if Win32Platform=VER_PLATFORM_WIN32_NT then begin
     f:=CreateFile(pchar(copy(finstallDir,1,length(finstallDir)-1) ),GENERIC_WRITE, FILE_SHARE_WRITE or FILE_SHARE_READ, nil,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL or FILE_FLAG_BACKUP_SEMANTICS,0);
@@ -127,6 +127,9 @@ begin
       closehandle(f);
     end;
   end else result:=false;
+  {$ELSE}
+  result:=true;//TODO
+  {$ENDIF}
 end;
 
 
@@ -199,7 +202,7 @@ end;
 procedure TAutoUpdater.needInternet; inline;
 begin
   if finternet=nil then
-    finternet:=TW32InternetAccess.create; //TODO: generic internet
+    finternet:=defaultInternetAccessClass.create; //TODO: generic internet
 end;
 
 constructor TAutoUpdater.create(currentVersion: TVersionNumber; installDir,
@@ -207,7 +210,7 @@ constructor TAutoUpdater.create(currentVersion: TVersionNumber; installDir,
 begin
   fcurrentVersion:=currentVersion;
   finstallDir:=installDir;
-  if finstallDir[length(finstallDir)]<>'\' then
+  if finstallDir[length(finstallDir)]<>DirectorySeparator then
     finstallDir:=ExtractFilePath(ParamStr(0));
   fversionsURL:=versionsURL;
   fchangelogURL:=changelogURL;
@@ -248,8 +251,8 @@ begin
   ftempDir:=tempDir;
   if ftempDir='' then
     ftempDir:=GetTempDir();
-  if ftempDir[length(ftempDir)]<>'\' then
-    ftempDir:=ftempDir+'\';
+  if ftempDir[length(ftempDir)]<>DirectorySeparator then
+    ftempDir:=ftempDir+DirectorySeparator;
   try
     //RemoveDir(copy(ftempDir,1,length(ftempdir)-1));
     mkdir(copy(ftempDir,1,length(ftempdir)-1));
@@ -282,7 +285,11 @@ end;
 procedure TAutoUpdater.installUpdate;
 begin
   //need win32, deprecated
+  {$IFDEF WIN32}
   WinExec(pchar('"'+ftempDir+'videlibriupdate.exe" /SP- /silent /noicons "/dir='+ExtractFilePath(ParamStr(0))+'"'),SW_SHOWNORMAL);
+  {$ELSE}
+  //TODO:
+  {$ENDIF}
 end;
 
 destructor TAutoUpdater.destroy;
