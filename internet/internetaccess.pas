@@ -48,7 +48,7 @@ type
     procedure parseHeaderForCookies(header: string);
     function makeCookieHeader:string;
   public
-    constructor create();
+    constructor create();virtual;
     function post(totalUrl: string;data:string):string;
     function post(protocol,host,url: string;data:string):string;virtual;abstract;
     procedure get(totalUrl: string;stream:TStream;progressEvent:TProgressEvent=nil);
@@ -66,6 +66,7 @@ type
   TInternetAccessClass=class of TInternetAccess;
 
 var defaultInternetConfiguration: TInternetConfig;
+    defaultInternetAccessClass:TInternetAccessClass;
 implementation
 uses bbutils,bbdebugtools;
 //==============================================================================

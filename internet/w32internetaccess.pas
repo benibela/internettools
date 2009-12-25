@@ -49,6 +49,7 @@ type
     function needConnection():boolean;override;
     procedure closeOpenedConnections();override;
   end;
+  TW32InternetAccessClass = class of TW32InternetAccess;
 
 const TEMPORARY_DIRECTORY='T:\theInternet\';
 
