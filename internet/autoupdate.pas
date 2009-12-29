@@ -202,7 +202,7 @@ end;
 procedure TAutoUpdater.needInternet; inline;
 begin
   if finternet=nil then
-    finternet:=defaultInternetAccessClass.create; //TODO: generic internet
+    finternet:=defaultInternetAccessClass.create;
 end;
 
 constructor TAutoUpdater.create(currentVersion: TVersionNumber; installDir,
@@ -300,4 +300,4 @@ begin
 end;
 
 end.
-
+
