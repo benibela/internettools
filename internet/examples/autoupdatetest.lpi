@@ -7,14 +7,12 @@
       <Flags>
         <LRSInOutputDirectory Value="False"/>
       </Flags>
+      <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
       <TargetFileExt Value=".exe"/>
-      <ActiveEditorIndexAtStart Value="9"/>
     </General>
     <VersionInfo>
       <ProjectVersion Value=""/>
-      <Language Value=""/>
-      <CharSet Value=""/>
     </VersionInfo>
     <PublishOptions>
       <Version Value="2"/>
@@ -33,12 +31,11 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="24">
+    <Units Count="3">
       <Unit0>
         <Filename Value="autoupdatetest.lpr"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="autoupdatetest"/>
-        <UsageCount Value="26"/>
       </Unit0>
       <Unit1>
         <Filename Value="autoupdateexu.pas"/>
@@ -46,337 +43,13 @@
         <ComponentName Value="Form1"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="autoupdateexu"/>
-        <ComponentState Value="1"/>
-        <CursorPos X="83" Y="104"/>
-        <TopLine Value="82"/>
-        <EditorIndex Value="0"/>
-        <UsageCount Value="26"/>
-        <Loaded Value="True"/>
       </Unit1>
       <Unit2>
-        <Filename Value="..\autoupdate.pas"/>
-        <UnitName Value="autoupdate"/>
-        <CursorPos X="1" Y="449"/>
-        <TopLine Value="433"/>
-        <EditorIndex Value="12"/>
-        <UsageCount Value="13"/>
-        <Bookmarks Count="2">
-          <Item0 X="27" Y="92" ID="2"/>
-          <Item1 X="103" Y="277" ID="3"/>
-        </Bookmarks>
-        <Loaded Value="True"/>
-      </Unit2>
-      <Unit3>
-        <Filename Value="..\..\data\bbutils.pas"/>
-        <UnitName Value="bbutils"/>
-        <CursorPos X="72" Y="31"/>
-        <TopLine Value="1"/>
-        <EditorIndex Value="20"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit3>
-      <Unit4>
-        <Filename Value="..\w32internetaccess.pas"/>
-        <UnitName Value="w32InternetAccess"/>
-        <CursorPos X="16" Y="303"/>
-        <TopLine Value="297"/>
-        <EditorIndex Value="10"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit4>
-      <Unit5>
-        <Filename Value="P:\programming\lazarus\fpc\2.2.1\source\packages\fcl-xml\src\xmlread.pp"/>
-        <UnitName Value="XMLRead"/>
-        <CursorPos X="3" Y="3179"/>
-        <TopLine Value="3177"/>
-        <UsageCount Value="10"/>
-      </Unit5>
-      <Unit6>
-        <Filename Value="P:\programming\lazarus\fpc\2.2.1\source\packages\fcl-xml\src\dom.pp"/>
-        <UnitName Value="DOM"/>
-        <CursorPos X="35" Y="840"/>
-        <TopLine Value="832"/>
-        <UsageCount Value="10"/>
-      </Unit6>
-      <Unit7>
-        <Filename Value="..\..\..\lazarus\dialogs\progressdialog.pas"/>
-        <ComponentName Value="ProgressBarDialog"/>
-        <HasResources Value="True"/>
-        <ResourceBaseClass Value="Form"/>
-        <UnitName Value="progressdialog"/>
-        <ComponentState Value="1"/>
-        <CursorPos X="14" Y="12"/>
-        <TopLine Value="1"/>
-        <EditorIndex Value="19"/>
-        <UsageCount Value="23"/>
-        <Loaded Value="True"/>
-      </Unit7>
-      <Unit8>
-        <Filename Value="..\..\data\simplexmlparser.pas"/>
-        <UnitName Value="simplexmlparser"/>
-        <CursorPos X="1" Y="1"/>
-        <TopLine Value="1"/>
-        <EditorIndex Value="18"/>
-        <UsageCount Value="12"/>
-        <Loaded Value="True"/>
-      </Unit8>
-      <Unit9>
         <Filename Value="..\synapseinternetaccess.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="synapseinternetaccess"/>
-        <CursorPos X="21" Y="78"/>
-        <TopLine Value="60"/>
-        <EditorIndex Value="9"/>
-        <UsageCount Value="22"/>
-        <Bookmarks Count="1">
-          <Item0 X="1" Y="100" ID="1"/>
-        </Bookmarks>
-        <Loaded Value="True"/>
-      </Unit9>
-      <Unit10>
-        <Filename Value="..\..\import\synapse\httpsend.pas"/>
-        <UnitName Value="httpsend"/>
-        <CursorPos X="21" Y="72"/>
-        <TopLine Value="57"/>
-        <EditorIndex Value="14"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
-      </Unit10>
-      <Unit11>
-        <Filename Value="..\..\import\synapse\synacode.pas"/>
-        <UnitName Value="synacode"/>
-        <CursorPos X="1" Y="1"/>
-        <TopLine Value="411"/>
-        <EditorIndex Value="16"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
-      </Unit11>
-      <Unit12>
-        <Filename Value="..\..\import\synapse\synamisc.pas"/>
-        <UnitName Value="synamisc"/>
-        <CursorPos X="1" Y="1"/>
-        <TopLine Value="311"/>
-        <EditorIndex Value="17"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
-      </Unit12>
-      <Unit13>
-        <Filename Value="..\internetaccess.pas"/>
-        <UnitName Value="internetAccess"/>
-        <CursorPos X="29" Y="39"/>
-        <TopLine Value="24"/>
-        <EditorIndex Value="11"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit13>
-      <Unit14>
-        <Filename Value="..\..\import\synapse\blcksock.pas"/>
-        <UnitName Value="blcksock"/>
-        <CursorPos X="3" Y="1394"/>
-        <TopLine Value="1377"/>
-        <EditorIndex Value="15"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit14>
-      <Unit15>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\control.inc"/>
-        <CursorPos X="1" Y="1656"/>
-        <TopLine Value="1641"/>
-        <EditorIndex Value="1"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit15>
-      <Unit16>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\buttoncontrol.inc"/>
-        <CursorPos X="1" Y="27"/>
-        <TopLine Value="12"/>
-        <EditorIndex Value="7"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit16>
-      <Unit17>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\buttons.inc"/>
-        <CursorPos X="1" Y="332"/>
-        <TopLine Value="305"/>
-        <EditorIndex Value="8"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit17>
-      <Unit18>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\wincontrol.inc"/>
-        <CursorPos X="1" Y="5109"/>
-        <TopLine Value="5093"/>
-        <EditorIndex Value="2"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit18>
-      <Unit19>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <UnitName Value="LCLMessageGlue"/>
-        <CursorPos X="1" Y="121"/>
-        <TopLine Value="106"/>
-        <EditorIndex Value="3"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit19>
-      <Unit20>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclclasses.pp"/>
-        <UnitName Value="LCLClasses"/>
-        <CursorPos X="1" Y="148"/>
-        <TopLine Value="133"/>
-        <EditorIndex Value="6"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit20>
-      <Unit21>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\interfaces\gtk2\gtk2wsstdctrls.pp"/>
-        <UnitName Value="Gtk2WSStdCtrls"/>
-        <CursorPos X="1" Y="1887"/>
-        <TopLine Value="1871"/>
-        <EditorIndex Value="4"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit21>
-      <Unit22>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\interfaces\gtk\gtkwidgetset.inc"/>
-        <CursorPos X="50" Y="1227"/>
-        <TopLine Value="1209"/>
-        <EditorIndex Value="5"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit22>
-      <Unit23>
-        <Filename Value="..\..\..\..\..\..\..\usr\share\fpcsrc\2.2.4\packages\fcl-process\src\process.pp"/>
-        <UnitName Value="process"/>
-        <CursorPos X="15" Y="119"/>
-        <TopLine Value="104"/>
-        <EditorIndex Value="13"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
-      </Unit23>
+      </Unit2>
     </Units>
-    <JumpHistory Count="30" HistoryIndex="29">
-      <Position1>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\control.inc"/>
-        <Caret Line="2290" Column="1" TopLine="2275"/>
-      </Position1>
-      <Position2>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\buttoncontrol.inc"/>
-        <Caret Line="73" Column="1" TopLine="57"/>
-      </Position2>
-      <Position3>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\buttons.inc"/>
-        <Caret Line="165" Column="1" TopLine="149"/>
-      </Position3>
-      <Position4>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\buttons.inc"/>
-        <Caret Line="332" Column="1" TopLine="306"/>
-      </Position4>
-      <Position5>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\buttoncontrol.inc"/>
-        <Caret Line="27" Column="1" TopLine="12"/>
-      </Position5>
-      <Position6>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\control.inc"/>
-        <Caret Line="1655" Column="1" TopLine="1640"/>
-      </Position6>
-      <Position7>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\control.inc"/>
-        <Caret Line="1656" Column="1" TopLine="1641"/>
-      </Position7>
-      <Position8>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\include\wincontrol.inc"/>
-        <Caret Line="5109" Column="1" TopLine="5093"/>
-      </Position8>
-      <Position9>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <Caret Line="109" Column="1" TopLine="93"/>
-      </Position9>
-      <Position10>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <Caret Line="104" Column="1" TopLine="89"/>
-      </Position10>
-      <Position11>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <Caret Line="117" Column="1" TopLine="102"/>
-      </Position11>
-      <Position12>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <Caret Line="118" Column="1" TopLine="103"/>
-      </Position12>
-      <Position13>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclclasses.pp"/>
-        <Caret Line="147" Column="1" TopLine="131"/>
-      </Position13>
-      <Position14>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclclasses.pp"/>
-        <Caret Line="148" Column="1" TopLine="133"/>
-      </Position14>
-      <Position15>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <Caret Line="104" Column="1" TopLine="89"/>
-      </Position15>
-      <Position16>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <Caret Line="120" Column="1" TopLine="105"/>
-      </Position16>
-      <Position17>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\lclmessageglue.pas"/>
-        <Caret Line="121" Column="1" TopLine="106"/>
-      </Position17>
-      <Position18>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\interfaces\gtk2\gtk2wsstdctrls.pp"/>
-        <Caret Line="1887" Column="1" TopLine="1871"/>
-      </Position18>
-      <Position19>
-        <Filename Value="..\..\..\..\..\..\..\opt\lazarus\lcl\interfaces\gtk\gtkwidgetset.inc"/>
-        <Caret Line="1293" Column="13" TopLine="1276"/>
-      </Position19>
-      <Position20>
-        <Filename Value="autoupdateexu.pas"/>
-        <Caret Line="87" Column="1" TopLine="72"/>
-      </Position20>
-      <Position21>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="445" Column="48" TopLine="427"/>
-      </Position21>
-      <Position22>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="182" Column="40" TopLine="160"/>
-      </Position22>
-      <Position23>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="302" Column="1" TopLine="290"/>
-      </Position23>
-      <Position24>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="276" Column="31" TopLine="257"/>
-      </Position24>
-      <Position25>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="420" Column="32" TopLine="405"/>
-      </Position25>
-      <Position26>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="434" Column="12" TopLine="419"/>
-      </Position26>
-      <Position27>
-        <Filename Value="autoupdateexu.pas"/>
-        <Caret Line="104" Column="83" TopLine="82"/>
-      </Position27>
-      <Position28>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="408" Column="100" TopLine="387"/>
-      </Position28>
-      <Position29>
-        <Filename Value="..\autoupdate.pas"/>
-        <Caret Line="449" Column="1" TopLine="433"/>
-      </Position29>
-      <Position30>
-        <Filename Value="..\synapseinternetaccess.pas"/>
-        <Caret Line="66" Column="52" TopLine="61"/>
-      </Position30>
-    </JumpHistory>
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="8"/>
@@ -384,36 +57,14 @@
     <SearchPaths>
       <OtherUnitFiles Value="U:\components\pascal\data\;..\..\import\synapse\;U:\components\pascal\internet\;U:\components\lazarus\dialogs\;U:\components\pascal\system\;\home\benito\hg\components\pascal\data\;\home\benito\hg\components\pascal\internet\;\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\system\"/>
       <SrcPath Value="\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\import\synapse\;..\..\import\synapse\"/>
+      <LCLWidgetType Value="win32"/>
     </SearchPaths>
+    <CodeGeneration>
+      <TargetCPU Value="i386"/>
+      <TargetOS Value="Win32"/>
+    </CodeGeneration>
     <Other>
       <CompilerPath Value="$(CompPath)"/>
     </Other>
   </CompilerOptions>
-  <Debugging>
-    <BreakPoints Count="1">
-      <Item1>
-        <Source Value="..\autoupdate.pas"/>
-        <Line Value="449"/>
-      </Item1>
-    </BreakPoints>
-    <Watches Count="3">
-      <Item1>
-        <Expression Value="values[1]"/>
-      </Item1>
-      <Item2>
-        <Expression Value="values[2]"/>
-      </Item2>
-      <Item3>
-        <Expression Value="values[3]"/>
-      </Item3>
-    </Watches>
-    <Exceptions Count="2">
-      <Item1>
-        <Name Value="EAbortException"/>
-      </Item1>
-      <Item2>
-        <Name Value="EAbort"/>
-      </Item2>
-    </Exceptions>
-  </Debugging>
 </CONFIG>

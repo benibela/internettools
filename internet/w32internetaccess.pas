@@ -42,7 +42,7 @@ type
     newConnectionOpened:boolean;
     function transfer(protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
   public
-    constructor create();virtual;
+    constructor create();override;
     destructor destroy;override;
     function post(protocol,host,url: string;data:string):string;override;
     function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;override;overload;
@@ -453,4 +453,4 @@ end;
 
 
 end.
-
+

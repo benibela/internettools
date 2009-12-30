@@ -3,7 +3,7 @@
   <changelog program="auto update example*">
   <build version="1000" date="2009-12-30">
     <download url="http://benibela.de/updates/autoupdateexample/linux.sh" platform="LINUX" execute="sh &quote;$DOWNLOAD&quote; &quote;--installpath=$INSTALLPATH&quote; &quote;--oldpath=$OLDPATH&quote; &quote;--oldversion=$OLDVERSION&quote; &quote;--oldfile=$OLDFILE&quote;" restart="false"/>
-    <download url="http://benibela.de/updates/autoupdateexample/windows.bat" platform="WINDOWS" execute="cmd &quote;$DOWNLOAD&quote; &quote;--installpath=$INSTALLPATH&quote; &quote;--oldpath=$OLDPATH&quote; &quote;--oldversion=$OLDVERSION&quote; &quote;--oldfile=$OLDFILE&quote;" restart="false"/>
+    <download url="http://benibela.de/updates/autoupdateexample/windows.vbs" platform="WINDOWS" execute="cscript &quote;$DOWNLOAD&quote; &quote;--installpath=$INSTALLPATH&quote; &quote;--oldpath=$OLDPATH&quote; &quote;--oldversion=$OLDVERSION&quote; &quote;--oldfile=$OLDFILE&quote;" restart="false"/>
 
     <fix level="minor">example of an minor fix</fix>
     <fix level="major">eoa major fix</fix>
