@@ -1,0 +1,16 @@
+  <?xml version="1.0" encoding="UTF-8"?>
+  <?xml-stylesheet type="text/xsl" href="../changelog.xsl"?>
+  <changelog program="auto update example*">
+  <build version="1000" date="2009-12-30">
+    <download url="http://benibela.de/updates/autoupdateexample/linux.sh" platform="LINUX" execute="sh &quote;$DOWNLOAD&quote; &quote;--installpath=$INSTALLPATH&quote; &quote;--oldpath=$OLDPATH&quote; &quote;--oldversion=$OLDVERSION&quote; &quote;--oldfile=$OLDFILE&quote;" restart="false"/>
+    <download url="http://benibela.de/updates/autoupdateexample/windows.bat" platform="WINDOWS" execute="cmd &quote;$DOWNLOAD&quote; &quote;--installpath=$INSTALLPATH&quote; &quote;--oldpath=$OLDPATH&quote; &quote;--oldversion=$OLDVERSION&quote; &quote;--oldfile=$OLDFILE&quote;" restart="false"/>
+
+    <fix level="minor">example of an minor fix</fix>
+    <fix level="major">eoa major fix</fix>
+    <fix level="critical">eoa critical fix</fix>
+    
+    <add level="minor">example of a minor add</add>
+    
+    <change level="major">example of a major change</change>    
+  </build>
+  </changelog>

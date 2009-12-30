@@ -1,4 +1,4 @@
-unit progressDialog;
+unit progressdialog;
 
 {$mode objfpc}{$H+}
 
@@ -71,4 +71,4 @@ initialization
   {$I progressdialog.lrs}
 
 end.
-
+

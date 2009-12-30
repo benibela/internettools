@@ -1,0 +1,2 @@
+#/bin/sh
+zenity --info --text "Bash script update has been downloaded and successfully started \nUpdate als Bashskript heruntergeladen und gestartet.\nParameters are: $*" || xmessage "Bash script update has been downloaded and successfully started.\n Parameters are: $*"

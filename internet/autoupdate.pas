@@ -1,4 +1,4 @@
-{Copyright (C) 2006  Benito van der Zander
+{Copyright (C) 2006-9  Benito van der Zander
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -14,39 +14,93 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
-{
-How to use it:
-  1. create a new object with this options:
-       version:
-         Integer based incrementing version number
-         for example 1, next version, 2.
-         You cann't use 1.6, or 1.56, and 156>16
-       installDir:
-         Directory to the program files to be updated
-       versionURL:
-         URL containing a file containing only one number, the
-         currently newest version of the program. (don't even start a
-         new line at the end)
-       versionDetailsURL:
-         URL containing an ini file with details to the newest version.
-         In the current version of TAutoUpdater this file contains only
-         a section [version-number] with a string package-url containing 
-         the ZIP-archive to download. (there can be more, but it has no use)
-  2. call existsUpdate to compare the current version number with the one 
-     in the web
-     YOU NEED ACCESS TO VERSIONURL (= INTERNET).
-  3. call hasDirectoryWriteAccess to check, if you are allowed to change the
-     files in the program directory.
-     If not, you have to restart the whole process with changed rights (->admin)
-  4. call downloadUpdate(tempDir) to download the file to tempDir.
-     tempDir can be omitted.
-  5. call installUpdate to extract the zip archive and copy it to the program path
-     YOU NEED ACCESS TO THE PROGRAMPATH
-  6. call needRestart to check if the program must be restarted.
-     Changes to the executable itself will only be installed after restart. 
-     (using a batch file)
 
-  benito@benibela.de
+{**
+How to use it:
+@unorderedList(
+  @item(create a new object with this options:
+     @definitionList(
+       @itemLabel(version)
+       @item(Integer based incrementing version number
+
+         for example 1, next version, 2.
+         You cann't use 1.6, or 1.56, and 156>16)
+       @itemLabel(installDir)
+       @item(Directory to the program files which you want to update)
+       @itemLabel(versionURL)
+       @item(URL containing a file containing the most recent version number (see below for format))
+       @itemLabel(changelogURL)
+       @item(URL containing an xml file with details to the newest version. (see below))
+     ))
+  @item(call existsUpdate to compare the current version number with the one in the web
+
+     YOU NEED ACCESS TO VERSIONURL (= INTERNET))
+  @item(call hasDirectoryWriteAccess to check, if you are allowed to change the
+     files in the program directory.
+
+     If not, you can't call the install functions of step 4)
+  @item(call downloadUpdate(tempDir) to download the file to tempDir.
+
+      tempDir can be omitted.)
+  @item(call installUpdate to execute the downloaded installer)
+  @item(check needRestart to test if the program should be restarted.)
+
+  Version format:
+
+    @longCode(#
+    <?xml version="1.0" encoding="iso-8859-1"?>
+    <versions>
+      <stable value="an integer like describe above"/>
+    </versions>
+    #)
+
+
+
+  Changelog format:
+
+  @longCode(#
+  <?xml version="1.0" encoding="UTF-8"?>
+  <?xml-stylesheet type="text/xsl" href="changelog.xsl"?>
+  <changelog program="*Your program name here*">
+  <build version="*version number*" date="e.g. 2008-11-07">
+    <download url="*url to installer*" platform="..." execute="..." restart=".."/>
+    <download url="*url to installer*" platform="..." execute="..." restart=".."/>
+    ...
+    <fix level="minor">minor fix</fix>
+    <fix level="major">major fix</fix>
+    <fix level="critical">critical fix</fix>
+    ..
+    <add level="minor">minor fix</add>
+    ..
+    <change level="minor">minor fix</change>
+    ..
+  </build>
+   ...
+  </changelog>
+  #)
+
+  The file need a <build> with the same version as version given in the version file
+  and this build need at least one <download> with a given url and the same platform
+  this unit was compiled one.
+
+  platform can be LINUX, WINDOWS, LINUX32, LINUX64, WIN32, WIN64, BSD, BSD32 or BSD6 4
+  (if there are several downloads with a matching platform it is undefined which on will be
+   downloaded)
+
+  execute is the command line which should be executed after downloading the update (default '"$DOWNLOAD"').
+  $INSTALLPATH and $OLDVERSION will be replaced by the values passed to the constructor, $OLDPATH and $OLDFILE will be replaced by
+  the value of paramstr(0), $DOWNLOAD will be replaced by the file just downloaded@br
+  Set execute to   '' if the downloaded file is not executable@br
+  restart determines if the application   should restart after executing the installer (default true)
+
+  You can have multiple build, download, fix, add, change tags in a file
+  fix/add/change and the level-properties are only used to show details, but the
+  xsl will highlight it correspondly
+
+  Notice that these files will not be parsed with an xml parser, but with an html
+  parser. (=>no validation and cdata tags are unknown)
+
+  @author(Benito van der Zander - benito@benibela.de)
 }
 
 unit autoupdate;
@@ -56,13 +110,23 @@ unit autoupdate;
 interface
 {$DEFINE showProgress}
 uses
-  Classes, SysUtils,internetaccess,bbutils,simplexmlparser,  {$IFDEF showProgress}progressDialog{$ENDIF}
+  Classes, SysUtils, internetaccess,bbutils,simplexmlparser,  dialogs, {$IFDEF showProgress}progressdialog{$ENDIF}
   ;
+
+//**this is shown in the message notifying about a *failed* update as a alternative way to get the update
+const homepageAlternative:string='www.benibela.de';
+
 type
 
 { TAutoUpdater }
 
 TVersionNumber=longint;
+
+(**
+Installer class
+
+see unit documentation for usage explanation
+*)
 TAutoUpdater=class
 private
   finternet:TInternetAccess;
@@ -73,12 +137,16 @@ private
   ftempDir:string;
 
 
-
   fnewversion:TVersionNumber;
+  function getInstallerCommand: string;
+  function GetInstallerDownloadedFileName: string;
   function loadNewVersionEnterTag(tagName: string; properties: TProperties):boolean;
   procedure loadNewVersion(const url: string);
 
   finstallerurl,fallChanges,fallFixes,fallAdds:string;
+  finstallerBaseName: string; //installer url without path
+  finstallerParameters: string; //parameter to pass to the installer
+  finstallerNeedRestart: boolean; //if the programm have to be restarted after the installer is called (default: true)
   fbuildinfolastbuild: longint;
   fbuildinfolasttag:string;
   fupdatebuildversion:longint;
@@ -95,30 +163,84 @@ private
   function _needRestart:boolean;
 public
   constructor create(currentVersion:TVersionNumber;installDir,versionsURL,changelogURL: string);
+  (** check if the user can write in the application directory and is therefore able to install the update. *)
   function hasDirectoryWriteAccess:boolean;
+  (** checks if an update exists *)
   function existsUpdate:boolean;
-  (** downloads the update to $tempDir\$newVersion
-  *)
+  (** shows a message with the performed changes*)
   function listChanges:string;
+  (** download update to tempDir *)
   procedure downloadUpdate(tempDir:string='');
-  (** overwrites files and call additional rewrite process *)
+  (** call installer *)
   procedure installUpdate;
   
   destructor destroy;override;
   
   property newestVersion: TVersionNumber read fnewversion;
   property needRestart: boolean read _needRestart;
+  property installerCmd: string read getInstallerCommand;
+  property downloadedFileName: string read GetInstallerDownloadedFileName;
 end;
-const homepageAlternative='www.benibela.de';
 implementation
+
+uses FileUtil,process{$IFDEF UNIX},BaseUnix{$ENDIF};
+function isOurPlatform(p: string):boolean;
+begin
+  p:=UpperCase(p);
+  result:=false;
+  {$IFDEF WIN32}
+  result:=(p='WINDOWS')or(p='WIN32');
+  {$ENDIF}
+  {$IFDEF WIN64}
+  result:=(p='WINDOWS')or(p='WIN64');
+  {$ENDIF}
+
+  {$IFDEF LINUX}
+  if p='LINUX' then exit(true);
+  {$IFDEF CPU32}
+  result:=p='LINUX32';
+  {$ENDIF}
+  {$IFDEF CPU64}
+  result:=p='LINUX64';
+  {$ENDIF}
+  {$ENDIF}
+
+  {$IFDEF BSD}
+  if p='BSD' then exit(true);
+  {$IFDEF CPU32}
+  result:=p='BSD32';
+  {$ENDIF}
+  {$IFDEF CPU64}
+  result:=p='BSD64';
+  {$ENDIF}
+  {$ENDIF}
+end;
 
 { TAutoUpdater }
 
 function TAutoUpdater.hasDirectoryWriteAccess: boolean;
-var f:THandle;
+//var f:THandle;
+const testFileName='BeNiBeLa_ThIs_Is_A_StRaNgE_FiLeNaMe_YoU_BeTtEr_NeVeR_UsE.okay';
+var
+  actualFileName: String;
 begin
-  {$IFDEF WIN32}
-  if Win32Platform=VER_PLATFORM_WIN32_WINDOWS then result:=true
+  //write a file to test it
+  //TODO: Possible that this won't work on newer Windows, but I can't test it there
+  if finstallDir='' then exit(false);
+  try
+    actualFileName:=finstallDir+testFileName;
+    DeleteFileUTF8(actualFileName);
+    if FileExistsUTF8(actualFileName) then exit(false);
+    strSaveToFile(actualFileName,'test');
+    if not FileExistsUTF8(actualFileName) then exit(false);
+    DeleteFileUTF8(actualFileName);
+    if FileExistsUTF8(actualFileName) then exit(false);
+    exit(true);
+  except
+    result:=false;
+  end;
+  (*{$IFDEF WIN32}
+  if Win32Platform=VER_PLATFORM_WIN32_WINDOWS then result:=true //no file permissions exists on win98
   else if Win32Platform=VER_PLATFORM_WIN32_NT then begin
     f:=CreateFile(pchar(copy(finstallDir,1,length(finstallDir)-1) ),GENERIC_WRITE, FILE_SHARE_WRITE or FILE_SHARE_READ, nil,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL or FILE_FLAG_BACKUP_SEMANTICS,0);
     if f=INVALID_HANDLE_VALUE then result:=false
@@ -128,20 +250,35 @@ begin
     end;
   end else result:=false;
   {$ELSE}
-  result:=true;//TODO
-  {$ENDIF}
+  result:=false;
+  {$ENDIF}                             *)
 end;
 
 
 function TAutoUpdater.loadNewVersionEnterTag(tagName: string;
   properties: TProperties): boolean;
 begin
-  if striequal(tagName,'stabil') then begin
+  if striequal(tagName,'stable') then begin
     fnewversionstr:=getProperty('value',properties);
     fnewversion:=StrToIntDef(fnewversionstr,0);
     exit(false);
   end;
   Result:=true;
+end;
+
+function TAutoUpdater.GetInstallerDownloadedFileName: string;
+begin
+  result:=ftempDir+finstallerBaseName;
+end;
+
+function TAutoUpdater.getInstallerCommand: string;
+begin
+  Result:=finstallerParameters;
+  Result:=StringReplace(Result,'$DOWNLOAD',downloadedFileName,[rfReplaceAll,rfIgnoreCase]);
+  Result:=StringReplace(Result,'$INSTALLPATH',finstallDir,[rfReplaceAll,rfIgnoreCase]);
+  Result:=StringReplace(Result,'$OLDPATH',ExtractFilePath(ParamStr(0)),[rfReplaceAll,rfIgnoreCase]);
+  Result:=StringReplace(Result,'$OLDFILE',ParamStr(0),[rfReplaceAll,rfIgnoreCase]);
+  Result:=StringReplace(Result,'$OLDVERSION',INttostr(fcurrentVersion),[rfReplaceAll,rfIgnoreCase]);
 end;
 
 procedure TAutoUpdater.loadNewVersion(const url: string);
@@ -162,10 +299,13 @@ begin
     fbuildinfolastbuild:=StrToIntDef(getProperty('version',properties),0);
     if (fbuildinfolastbuild<=fnewversion) and (fbuildinfolastbuild>fupdatebuildversion) then
         fupdatebuildversion:=fbuildinfolastbuild;
-  end else if striequal(tagname,'installer') then
-    if fbuildinfolastbuild=fnewversion then
+  end else if striequal(tagname,'download') then
+    if (fbuildinfolastbuild=fnewversion) and (isOurPlatform(getProperty('platform',properties))) then begin
       finstallerurl:=getProperty('url',properties);
-
+      finstallerBaseName:=copy(finstallerurl,strrpos('/',finstallerurl)+1,length(finstallerurl));
+      finstallerParameters:=getProperty('execute',properties);
+      finstallerNeedRestart:=StrToBoolDef(getProperty('restart',properties),false);
+    end;
   fbuildinfolasttag:=tagName;
   result:=true;
 end;
@@ -191,6 +331,10 @@ begin
   fallChanges:='';
   fallFixes:='';
   finstallerurl:='';
+  finstallerBaseName:='update';
+  finstallerParameters:='"$DOWNLOAD"';
+  finstallerNeedRestart:=true;
+
   fupdatebuildversion:=0;
   parseXML(changelogXML,@needBuildInfoEnterTag,nil,@needBuildInfoTextRead,eUTF8);
   if fupdatebuildversion<>fnewversion then
@@ -210,8 +354,12 @@ constructor TAutoUpdater.create(currentVersion: TVersionNumber; installDir,
 begin
   fcurrentVersion:=currentVersion;
   finstallDir:=installDir;
+  if finstallDir='' then
+    finstallDir:=ExtractFilePath(paramstr(0));
   if finstallDir[length(finstallDir)]<>DirectorySeparator then
     finstallDir:=ExtractFilePath(ParamStr(0));
+  if finstallDir[length(finstallDir)]<>DirectorySeparator then
+    finstallDir:=finstallDir+DirectorySeparator;
   fversionsURL:=versionsURL;
   fchangelogURL:=changelogURL;
 end;
@@ -264,32 +412,48 @@ begin
   {$IFDEF showProgress}
     progress:=TProgressBarDialog.create('Update','Bitte warten Sie während das Update auf Version '+fnewversionstr+' geladen wird:');
   {$ENDIF}
-  update:=TFileStream.Create(ftempDir+'videlibriupdate.exe',fmCreate);
   try
-    finternet.get(updateUrl,update,@progress.progressEvent);
-    if update.Size=0 then Abort;
-    update.free;
-  except
-    raise EXCEPTION.Create('Das Update konnte nicht heruntergeladen werden');
-  end;
+    update:=TFileStream.Create(ftempDir+finstallerBaseName,fmCreate);
+    try
+      finternet.get(updateUrl,update,@progress.progressEvent);
+      if update.Size=0 then Abort;
+      update.free;
+    except on e: Exception do
+      raise EXCEPTION.Create('Das Update konnte nicht heruntergeladen werden:'#13#10+e.ClassName+':'+ e.Message);
+    end;
+    {$IFDEF UNIX}
+    if finstallerParameters<>'' then begin
+      //set file permissions
+      FpChmod(Utf8ToAnsi(ftempDir+finstallerBaseName), S_IRWXU or S_IRGRP or S_IXGRP or S_IROTH or S_IXOTH);
+    end;
+    {$ENDIF}
+  finally
   {$IFDEF showProgress}
     progress.free;
   {$ENDIF}
+  end;
 end;
 
 function TAutoUpdater._needRestart: boolean;
 begin
-  result:=true;
+  result:=(finstallerParameters<>'') and finstallerNeedRestart;
 end;
 
 procedure TAutoUpdater.installUpdate;
+var realParameter: string;
+    p:tprocess;
 begin
-  //need win32, deprecated
-  {$IFDEF WIN32}
-  WinExec(pchar('"'+ftempDir+'videlibriupdate.exe" /SP- /silent /noicons "/dir='+ExtractFilePath(ParamStr(0))+'"'),SW_SHOWNORMAL);
-  {$ELSE}
-  //TODO:
-  {$ENDIF}
+  if finstallerParameters='' then begin
+    ShowMessage('Sorry, I can''t install the update automatically.'#13#10'Please start the file '+downloadedFileName+' yourself.');
+    raise Exception.Create('Can''t start installer');
+  end;
+  p:=TProcess.Create(nil);
+  try
+    p.CommandLine:=getInstallerCommand;
+    p.Execute;
+  finally
+    p.free;
+  end;
 end;
 
 destructor TAutoUpdater.destroy;

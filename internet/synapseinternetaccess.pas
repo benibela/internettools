@@ -21,8 +21,9 @@ unit synapseinternetaccess;
 interface
 
 uses
-  Classes, SysUtils, internetAccess,
-  httpsend,
+  Classes, SysUtils, internetAccess,Dialogs,
+  httpsend,  //this is the synapse http unit
+  blcksock,
   ssl_openssl //needed for https
   ;
 
@@ -31,9 +32,13 @@ type
 { TSynapseInternetAccess }
 
 TSynapseInternetAccess=class(TInternetAccess)
+  procedure connectionStatus(Sender: TObject; Reason: THookSocketReason;
+    const Value: String);
 protected
   //synapse will automatically handle keep alive
   connection: THTTPSend;
+  lastProgressLength,contentLength:longint;
+  forwardProgressEvent: TProgressEvent;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
   function transfer(protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
@@ -53,6 +58,25 @@ uses synautil,ssl_openssl_lib;
 
 { TSynapseInternetAccess }
 
+procedure TSynapseInternetAccess.connectionStatus(Sender: TObject;
+  Reason: THookSocketReason; const Value: String);
+var
+  i: Integer;
+begin
+  if (forwardProgressEvent=nil) or (connection=nil) then exit;
+  if contentLength=-1 then begin
+    for i:=0 to connection.Headers.Count-1 do
+      if pos('content-length',lowercase(connection.Headers[i]))>0 then begin
+        contentLength:=StrToIntDef(copy(connection.Headers[i],pos(':',connection.Headers[i])+1,length(connection.Headers[i])),-1);
+        exit;
+      end;
+    if contentLength=-1 then exit;
+  end;
+  lastProgressLength:=connection.DownloadSize;
+  forwardProgressEvent(self, connection.DownloadSize, contentLength);
+end;
+
+
 function TSynapseInternetAccess.transfer(protocol, host, url: string;
   data: string; progressEvent: TProgressEvent): string;
 var operation: string;
@@ -69,11 +93,19 @@ begin
     if (not IsSSLloaded) then //check if ssl is actually loaded
        raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
 
-  if connection.HTTPMethod(operation,protocol+'://'+host+url) then
-    result:=ReadStrFromStream(connection.Document, connection.Document.Size)
-   else
+  contentLength:=-1;
+  lastProgressLength:=-1;
+  forwardProgressEvent:=progressEvent;
+
+  if connection.HTTPMethod(operation,protocol+'://'+host+url) and
+     ((connection.ResultCode = 200) or (connection.ResultCode = 302))then begin
+     result:=ReadStrFromStream(connection.Document, connection.Document.Size)
+   end else
     raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+protocol+'://'+host+url);
-  //TODO: test
+
+  if (progressEvent<>nil) and (lastProgressLength<connection.DownloadSize) then
+    if contentLength=-1 then progressEvent(self,connection.DownloadSize,connection.DownloadSize)
+    else progressEvent(self,connection.DownloadSize,contentLength);
 end;
 
 constructor TSynapseInternetAccess.create();
@@ -83,6 +115,7 @@ begin
     defaultInternetConfiguration.userAgent:='Mozilla 3.0 (compatible)';
 
   connection:=THTTPSend.Create;
+  connection.Sock.OnStatus:=@connectionStatus;
  //e connection.Sock.SSL.SSLType:=LT_SSLv3;
   connection.UserAgent:=defaultInternetConfiguration.userAgent;
   if defaultInternetConfiguration.useProxy then begin

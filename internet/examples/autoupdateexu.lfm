@@ -1,0 +1,134 @@
+object Form1: TForm1
+  Left = 436
+  Height = 405
+  Top = 169
+  Width = 637
+  HorzScrollBar.Page = 432
+  HorzScrollBar.Range = 259
+  VertScrollBar.Page = 404
+  VertScrollBar.Range = 121
+  ActiveControl = Edit1
+  Caption = 'Autoupdatechecker'
+  ClientHeight = 405
+  ClientWidth = 637
+  OnCreate = FormCreate
+  LCLVersion = '0.9.29'
+  object Label1: TLabel
+    Left = 16
+    Height = 20
+    Top = 16
+    Width = 87
+    Caption = 'Cur-Version:'
+    ParentColor = False
+  end
+  object Label2: TLabel
+    Left = 15
+    Height = 20
+    Top = 46
+    Width = 93
+    Caption = 'Version-URL:'
+    ParentColor = False
+  end
+  object Label3: TLabel
+    Left = 14
+    Height = 20
+    Top = 72
+    Width = 95
+    Caption = 'Change-URL:'
+    ParentColor = False
+  end
+  object Edit1: TEdit
+    Left = 96
+    Height = 29
+    Top = 13
+    Width = 533
+    Anchors = [akTop, akLeft, akRight]
+    TabOrder = 0
+    Text = '990'
+  end
+  object Edit2: TEdit
+    Left = 96
+    Height = 29
+    Top = 40
+    Width = 533
+    Anchors = [akTop, akLeft, akRight]
+    TabOrder = 1
+    Text = 'http://benibela.de/updates/autoupdateexample/version.xml'
+  end
+  object Edit3: TEdit
+    Left = 96
+    Height = 29
+    Top = 67
+    Width = 533
+    Anchors = [akTop, akLeft, akRight]
+    TabOrder = 2
+    Text = 'http://benibela.de/updates/autoupdateexample/changelog.xml'
+  end
+  object Button1: TButton
+    Left = 56
+    Height = 25
+    Top = 120
+    Width = 130
+    Caption = 'existsUpdate'
+    Enabled = False
+    OnClick = Button1Click
+    TabOrder = 3
+  end
+  object Button2: TButton
+    Left = 192
+    Height = 25
+    Top = 120
+    Width = 80
+    Caption = 'details'
+    Enabled = False
+    OnClick = Button2Click
+    TabOrder = 4
+  end
+  object Button3: TButton
+    Left = 280
+    Height = 25
+    Top = 120
+    Width = 96
+    Caption = 'download'
+    Enabled = False
+    OnClick = Button3Click
+    TabOrder = 5
+  end
+  object Memo1: TMemo
+    Left = 14
+    Height = 225
+    Top = 176
+    Width = 613
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    TabOrder = 6
+  end
+  object Button4: TButton
+    Left = 16
+    Height = 25
+    Top = 96
+    Width = 136
+    Caption = 'create updater'
+    OnClick = Button4Click
+    TabOrder = 7
+  end
+  object Button5: TButton
+    Left = 16
+    Height = 25
+    Top = 144
+    Width = 136
+    Caption = 'free updater'
+    Enabled = False
+    OnClick = Button5Click
+    TabOrder = 8
+  end
+  object Button6: TButton
+    Left = 382
+    Height = 25
+    Top = 120
+    Width = 75
+    Caption = 'install'
+    Enabled = False
+    OnClick = Button6Click
+    TabOrder = 9
+  end
+end
