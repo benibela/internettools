@@ -25,10 +25,8 @@ type
     constructor create(title,description:string;maxprogress:longint=100);
     procedure setProgress(progress:longint);
     procedure progressEvent(sender:TObject;progress,maxprogress:longint);
+    addUnit: string;
   end; 
-
-var
-  ProgressBarDialog: TProgressBarDialog;
 
 implementation
 
@@ -40,6 +38,7 @@ begin
   Caption:=title;
   Label1.Caption:=description;
   ProgressBar1.Max:=maxprogress;
+  setProgress(0);
   //BorderIcons:=[];
   //FormStyle:=fsStayOnTop;
   Show;
@@ -47,23 +46,22 @@ begin
 end;
 
 procedure TProgressBarDialog.setProgress(progress: longint);
+var
+  s: String;
 begin
   ProgressBar1.Position:=progress;
-  barLabel.Caption:=IntToStr(progress)+'/'+inttostr(ProgressBar1.max);
-  //barLabel.Left:=(ProgressBar1.Width-barLabel.Width) div 2 + ProgressBar1.Left;
-  //barLabel.left:=ClientWidth-barLabel.Width-10;
+  s:=IntToStr(progress)+addUnit+'/'+inttostr(ProgressBar1.max)+addUnit;
+  if ProgressBar1.max<>0 then s:=s+' ('+IntToStr(100*progress div ProgressBar1.max)+'%)';
+  barLabel.Caption:=s;
   Application.ProcessMessages;
 end;
 
 procedure TProgressBarDialog.progressEvent(sender: TObject; progress,
   maxprogress: longint);
 begin
-  if ProgressBar1.Max<>maxprogress then begin
-    barLabel.Width:=Canvas.TextWidth(IntToStr(maxprogress)+'/')*2;
-    barLabel.Left:=width-barLabel.Width;
-    ProgressBar1.Width:=barLabel.Left-ProgressBar1.Left-10;
+  if ProgressBar1.Max<>maxprogress then
     ProgressBar1.Max:=maxprogress;
-  end;
+
   setProgress(progress);
 end;
 
