@@ -31,7 +31,7 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="3">
+    <Units Count="2">
       <Unit0>
         <Filename Value="autoupdatetest.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -44,11 +44,6 @@
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="autoupdateexu"/>
       </Unit1>
-      <Unit2>
-        <Filename Value="..\synapseinternetaccess.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="synapseinternetaccess"/>
-      </Unit2>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

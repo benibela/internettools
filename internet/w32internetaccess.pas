@@ -14,7 +14,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
-  unit w32InternetAccess;
+{**This unit contains the wrapper for wininet}
+unit w32internetaccess;
 
 {$mode objfpc}{$H+}
 //{$define debug}//7Remove debug before publishing (write every opened page to the hard disk)
@@ -34,6 +35,11 @@ type
 
   { TW32InternetAccess }
 
+  //**@abstract(Internet access class using the wininet library)
+  //**Set defaultInternetAccessClass to TW32InternetAccess if
+  //**you want to use wininet to connect to internet@br
+  //**You probably need an additional wininet header (should be contained somewhere
+  //**in freepascal, if not you can use the Delphi unit)
   TW32InternetAccess=class(TInternetAccess)
   protected
     hSession,hLastConnection: hInternet;
@@ -453,4 +459,5 @@ end;
 
 
 end.
+
 

@@ -14,7 +14,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
-unit internetAccess;
+{** @abstract(You can use this unit to configure and create internet connections)
+
+    In the moment it only supports http/s connections, but perhaps this will change
+    in the future (e.g. to also support ftp)}
+unit internetaccess;
 
 {$mode objfpc}{$H+}
 
@@ -24,19 +28,27 @@ uses
   Classes, SysUtils; 
 type
   PInternetConfig=^TInternetConfig;
+  //**@abstract(Internet configuration)
+  //**You don't have to set it, but the user would prefer to have those options
   TInternetConfig=record
-    userAgent: string;
-    tryDefaultConfig, useProxy: boolean;
-    proxyHTTPName, proxyHTTPPort: string;
-    proxyHTTPSName, proxyHTTPSPort: string;
+    userAgent: string; //**< the user agent used when connecting
+    tryDefaultConfig: boolean; //**< should the system default configuration be used (not always supported, currently it only works with wininet)
+    useProxy: Boolean; //**< should a proxy be used
+    proxyHTTPName, proxyHTTPPort: string; //**< proxy used for http
+    proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for https (not always supported, currently only with wininet)
 
-    connectionCheckPage: string;
+    connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
   end;
   { TCustomInternetAccess }
 
   { TInternetAccess }
-
+  //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
+  //**@abstract(Abstract base class for connections)
+  //**There are two child classes TW32InternetAccess and TSynapseInternetAccess which
+  //**you should assign once to defaultInternetAccessClass and then use this class
+  //**variable@br
+  //**If a transfer fails it will raise a EInternetException
   TInternetAccess=class
 //  protected
   public
@@ -49,15 +61,27 @@ type
     function makeCookieHeader:string;
   public
     constructor create();virtual;
+    //**post the (url encoded) data to the given url and returns the resulting document
+    //**as string
     function post(totalUrl: string;data:string):string;
+    //**post the (url encoded) data to the url given as three parts and returns the page as string
+    //** (override this if you want to sub class it)
     function post(protocol,host,url: string;data:string):string;virtual;abstract;
+    //**get the url as stream and optionally monitors the progress with a progressEvent
     procedure get(totalUrl: string;stream:TStream;progressEvent:TProgressEvent=nil);
+    //**get the url as string and optionally monitors the progress with a progressEvent
     function get(totalUrl: string;progressEvent:TProgressEvent=nil):string;
+    //**get the url as stream and optionally monitors the progress with a progressEvent
     procedure get(protocol,host,url: string;stream:TStream;progressEvent:TProgressEvent=nil);
+    //**get the url as string and optionally monitors the progress with a progressEvent
     function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;virtual;abstract;
+    //**checks if an internet connection exists
     function existsConnection():boolean;virtual;
+    //**call this to open a connection (very unreliable). It will return true on success
     function needConnection():boolean;virtual;abstract;
+    //**Should close all connections (doesn't work)
     procedure closeOpenedConnections();virtual;abstract;
+    //**Encodes the passed string in the url encoded format
     function urlEncodeData(data: string): string;
   end;
   EInternetException=class(Exception)
@@ -65,10 +89,10 @@ type
   end;
   TInternetAccessClass=class of TInternetAccess;
 
-var defaultInternetConfiguration: TInternetConfig;
-    defaultInternetAccessClass:TInternetAccessClass;
+var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all our classes
+    defaultInternetAccessClass:TInternetAccessClass; //**< default internet access, here you can store which internet library the program should use
 implementation
-uses bbutils,bbdebugtools;
+uses bbutils;
 //==============================================================================
 //                            TInternetAccess
 //==============================================================================
@@ -224,4 +248,4 @@ begin
     result:=StringReplace(result,ENCODE_TABLE[i,0],ENCODE_TABLE[i,1],[rfReplaceAll]);
 end;
 end.
-
+

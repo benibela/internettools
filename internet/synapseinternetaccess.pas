@@ -14,6 +14,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
+{**This unit contains the wrapper for synapse}
 unit synapseinternetaccess;
 
 {$mode objfpc}{$H+}
@@ -30,7 +31,12 @@ uses
 type
 
 { TSynapseInternetAccess }
-
+//**@abstract(Internet access class using the synapse library)
+//**Set defaultInternetAccessClass to TSynapseInternetAccess if
+//**you want to use wininet to connect to internet@br
+//**You also have to install the synapse package@br
+//**In contrast to native synapse this will automatically load openssl
+//**if it is called for the https protocal
 TSynapseInternetAccess=class(TInternetAccess)
   procedure connectionStatus(Sender: TObject; Reason: THookSocketReason;
     const Value: String);

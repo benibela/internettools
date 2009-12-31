@@ -95,7 +95,15 @@ type
     and then parseHTML to parse the html data. @br
     You can access the read variables with the property variables or the event onVariableRead. @br @br
     A template file is just like a html file with special commands. The parser tries now to match every
-    text and tag of the template to text/tag in the html file, while ignoring every additional data. If no match is possible an exception is raised. @br
+    text and tag of the template to text/tag in the html file, while ignoring every additional data. If no match is possible an exception is raised. 
+    
+    Example:@br
+      Template: @code(<b><htmlparser:read var="test" source="text()"></b>)@br
+      Html-File: @code(<b>Hello World!</b>))
+ 
+    This will set the variable test to "Hello World!" @br
+    See the unit tests at the end of the file extendedhtmlparser.pas for more examples
+
     There are 4 special commands allowed:
      @unorderedList(
         @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)

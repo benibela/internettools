@@ -8,7 +8,7 @@ uses
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
   Forms
-  { you can add units after this }, autoupdateexu, synapseinternetaccess;
+  { you can add units after this }, autoupdateexu;
 
 begin
   Application.Initialize;

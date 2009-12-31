@@ -1,6 +1,3 @@
-{**
-  @author Benito van der Zander, http://www.benibela.de
-*}
 {
 A collection of often needed functions missing in FPC
 
@@ -20,6 +17,15 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+}
+{**
+  @abstract(This unit contains some basic functions I'm missing in fpc)
+
+  The str* functions work on pchar, so you can use them for latin1 and utf-8.
+  strl means the length is given, str?i means the function is case insensitive
+
+  @author Benito van der Zander, (http://www.benibela.de)
 
 }
 
@@ -42,23 +48,28 @@ type
   TLongwordArray =array of longword;
 
 function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //=> i with a[i]=e
+//**removes i from a (destroying the order of the elements)
 function arrayRemove(var a: TLongintArray;i: longint):longint; overload; //=> e=a[i], unsorted
 procedure arrayInvert(var a: TLongintArray);overload;
 function arrayAdd(var a: TLongwordArray;e: longint):longint; overload; //=> i with a[i]=e
+//**removes i from a (destroying the order of the elements)
 function arrayRemove(var a: TLongwordArray;i: longint):longint; overload; //=> e=a[i], unsorted
 procedure arrayInvert(var a: TLongwordArray);overload;
 
 //-----------------------Flow/Thread control functions------------------------
 type TProcedureOfObject=procedure () of object;
 function procedureToMethod(proc: TProcedure): TMethod;
+//**Calls proc in an new thread
 procedure threadedCall(proc: TProcedureOfObject; finished: TNotifyEvent); overload;
+//**Calls proc in an new thread
 procedure threadedCall(proc: TProcedureOfObject; finished: TProcedureOfObject);overload;
+//**Calls proc in an new thread
 procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
 
 type
 
 { TMessageSystem }
-
+//**don't use this
 TMessageSystem = class
 private
   messageAccessSection: TRTLCriticalSection;
@@ -103,14 +114,30 @@ function strcopy2(s:string; start,last:longint):string;
 function strrpos(c:char;s:string):longint;
 function strlcount(const search:char; const searchIn:pchar; const len: longint): longint;
 
+//**Splits the string remainingPart into two parts at the first position of separator, the
+//**first is returned as function result the second one is again assign to remainingPart
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
+//**Splits the string remainingPart into two parts at the first position of separator, the
+//**first is assign to firstPart, the second one is again assign to remainingPart
 procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
+//**Splits the string s into the array splitted at every occurence of c
 procedure strSplit(out splitted: TStringArray;s:string;c:char;includeEmpty:boolean=true);overload;
 
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
 
+//**loads a file as string. The filename is directly passed to fpc rtl and uses the system
+//**encoding @seealso(strLoadFromFileUTF8)
 function strLoadFromFile(filename:string):string;
+//**saves a string as file. The filename is directly passed to fpc rtl and uses the system
+//**encoding @seealso(strSaveToFileUTF8)
 procedure strSaveToFile(filename: string;str:string);
+//**loads a file as string. The filename should encoded in utf-8
+//**@seealso(strLoadFromFile)
+function strLoadFromFileUTF8(filename:string):string;
+//**saves a string as file. The filename should encoded in utf-8
+//**@seealso(strSaveToFile)
+procedure strSaveToFileUTF8(filename: string;str:string);
+//**converts a size (measured in bytes) to a string (e.g. 1025 -> 1 KiB)
 function strFromSize(size: int64):string;
 
 
@@ -118,7 +145,9 @@ function strConvertToUtf8(str: string; from: TEncoding): string;
 function strConvertFromUtf8(const str: string; toe: TEncoding): string;
 function strChangeEncoding(const str: string; from,toe: TEncoding):string;
 function strEncodingFromName(str:string):TEncoding;
+//**This will decode most html entities to the given encoding
 function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
+//**Returns the first l bytes of p
 function strFromPchar(p:pchar;l:longint):string;
 
 //----------------Mathematical functions-------------------------------
@@ -126,14 +155,25 @@ function ggT(a,b: cardinal): cardinal;
 function factorial(i:longint):float;
 function binomial(n,k: longint): float;
 //probability
+//**expectated value of a binomial distribution (exact value calculated
+//**with binomial coefficients, @seealso(binomialProbabilityApprox))
 function binomialExpectation(n:longint;p:float):float;
+//**variance of a binomial distribution
 function binomialVariance(n:longint;p:float):float;
+//**deviation(=sqrt(variance)) of a binomial distribution
 function binomialDeviation(n:longint;p:float):float;
+//**probability: P(X = k) where X is binomial distributed with n possible values
 function binomialProbability(n:longint;p:float;k:longint):float; //P(X = k)
+//**probability: P(X >= k) where X is binomial distributed with n possible values
 function binomialProbabilityGE(n:longint;p:float;k:longint):float; //P(X >= k)
+//**probability: P(X <= k) where X is binomial distributed with n possible values
 function binomialProbabilityLE(n:longint;p:float;k:longint):float; //P(X <= k)
+//**probability: P(X >= µ + d or X <= µ - d) where X is binomial distributed with n possible values
 function binomialProbabilityDeviationOf(n:longint;p:float;dif:float):float; //P(X >= µ + d or X <= µ - d)
+//**expectated value of a binomial distribution (approximas the value with either Poisson or
+//**Moivre and Laplace, depending on the variance of the distribution) @seealso(binomialProbability))
 function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
+//**Z-Score of the value k in a distribution with n outcomes
 function binomialZScore(n:longint;p:float;k:longint):float;
 
 
@@ -142,7 +182,12 @@ function binomialZScore(n:longint;p:float;k:longint):float;
 function dateTimeToFileTime(const date: TDateTime): TFileTime;
 function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
 {$ENDIF}
+//**Week of year
 function weekOfYear(const date:TDateTime):word;
+//**Fits a date string to the mask (d or dd for a numerical day, m or mm for a
+//**numerical month, mmm for a short month name, yy or yyyy for the year) @br
+//**Notice that it works if the string is latin-1 or utf-8, and it also uses the German month
+//**names
 function parseDate(datestr,mask:string):longint;
 
 const WHITE_SPACE=[#9,#10,#13,' '];
@@ -195,8 +240,9 @@ procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
 //**so the function use the same call convention like a method
 type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
-//universal stabile sort function (using merge + insert sort in the moment)
+//**general stable sort function (using merge + insert sort in the moment)
 procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
+//**general stable sort function (using merge + insert sort in the moment)
 procedure stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
 implementation
 
@@ -734,6 +780,16 @@ begin
   f.Free;
 end;
 
+function strLoadFromFileUTF8(filename: string): string;
+begin
+  result:=strLoadFromFile(Utf8ToAnsi(filename));
+end;
+
+procedure strSaveToFileUTF8(filename: string; str: string);
+begin
+  strSaveToFile(Utf8ToAnsi(filename),s);
+end;
+
 function strFromSize(size: int64): string;
 const iec: string='KMGTPEZY';
 var res: int64;
@@ -1086,7 +1142,7 @@ begin
 
 
   //use merge sort
-  assert(length<=high(tempArray)+1);
+  assert(length<=cardinal(high(tempArray)+1));
   //rec calls
   mi:=length div 2;
   m:=@a[mi];   //will stay constant during merge phase
@@ -1409,4 +1465,4 @@ initialization
 
 
 end.
-
+

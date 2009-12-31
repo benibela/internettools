@@ -15,9 +15,35 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
 
+{** This unit contains a class which can check online for an update, download and install it
+
+  @author(Benito van der Zander - benito@benibela.de)
+}
+
+unit autoupdate;
+
+{$mode objfpc}{$H+}
+
+interface
+{$DEFINE showProgress}
+uses
+  Classes, SysUtils, internetaccess,bbutils,simplexmlparser,  dialogs, {$IFDEF showProgress}progressdialog{$ENDIF}
+  ;
+
+//**this is shown in the message notifying about a *failed* update as a alternative way to get the update
+const homepageAlternative:string='www.benibela.de';
+
+type
+
+{ TAutoUpdater }
+
+TVersionNumber=longint;
+
 {**
+@abstract(auto update class)
+
 How to use it:
-@unorderedList(
+@unOrderedList(
   @item(create a new object with this options:
      @definitionList(
        @itemLabel(version)
@@ -43,11 +69,11 @@ How to use it:
 
       tempDir can be omitted.)
   @item(call installUpdate to execute the downloaded installer)
-  @item(check needRestart to test if the program should be restarted.)
+  @item(check needRestart to test if the program should be restarted.))
 
   Version format:
 
-    @longCode(#
+    @preformatted(#
     <?xml version="1.0" encoding="iso-8859-1"?>
     <versions>
       <stable value="an integer like describe above"/>
@@ -58,7 +84,7 @@ How to use it:
 
   Changelog format:
 
-  @longCode(#
+  @preformatted(#
   <?xml version="1.0" encoding="UTF-8"?>
   <?xml-stylesheet type="text/xsl" href="changelog.xsl"?>
   <changelog program="*Your program name here*">
@@ -79,7 +105,7 @@ How to use it:
   </changelog>
   #)
 
-  The file need a <build> with the same version as version given in the version file
+  The file need a <build> with the same version as the version given in the version file
   and this build need at least one <download> with a given url and the same platform
   this unit was compiled one.
 
@@ -100,33 +126,9 @@ How to use it:
   Notice that these files will not be parsed with an xml parser, but with an html
   parser. (=>no validation and cdata tags are unknown)
 
-  @author(Benito van der Zander - benito@benibela.de)
+  You have to set internetaccess.defaultInternetAccessClass to either TW32InternetAccess
+  or TSynapseInternetAccess
 }
-
-unit autoupdate;
-
-{$mode objfpc}{$H+}
-
-interface
-{$DEFINE showProgress}
-uses
-  Classes, SysUtils, internetaccess,bbutils,simplexmlparser,  dialogs, {$IFDEF showProgress}progressdialog{$ENDIF}
-  ;
-
-//**this is shown in the message notifying about a *failed* update as a alternative way to get the update
-const homepageAlternative:string='www.benibela.de';
-
-type
-
-{ TAutoUpdater }
-
-TVersionNumber=longint;
-
-(**
-Installer class
-
-see unit documentation for usage explanation
-*)
 TAutoUpdater=class
 private
   finternet:TInternetAccess;
@@ -155,23 +157,23 @@ private
   procedure needBuildInfo();//newversion,build
 
   procedure needInternet;inline;
-  (** can every old file be replaced
+  {** can every old file be replaced
      Result:
        true: yes, call installUpdate
        false: no, call installUpdate and RESTART program (you must restart)
-  *)
+  }
   function _needRestart:boolean;
 public
   constructor create(currentVersion:TVersionNumber;installDir,versionsURL,changelogURL: string);
-  (** check if the user can write in the application directory and is therefore able to install the update. *)
+  {** check if the user can write in the application directory and is therefore able to install the update. }
   function hasDirectoryWriteAccess:boolean;
-  (** checks if an update exists *)
+  {** checks if an update exists }
   function existsUpdate:boolean;
-  (** shows a message with the performed changes*)
+  {** returns a list of the performed changes}
   function listChanges:string;
-  (** download update to tempDir *)
+  {** download update to tempDir }
   procedure downloadUpdate(tempDir:string='');
-  (** call installer *)
+  {** call installer }
   procedure installUpdate;
   
   destructor destroy;override;
