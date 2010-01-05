@@ -787,7 +787,7 @@ end;
 
 procedure strSaveToFileUTF8(filename: string; str: string);
 begin
-  strSaveToFile(Utf8ToAnsi(filename),s);
+  strSaveToFile(Utf8ToAnsi(filename),str);
 end;
 
 function strFromSize(size: int64): string;
