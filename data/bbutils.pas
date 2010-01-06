@@ -1353,7 +1353,7 @@ begin
   result:=reallength;
 end;
   *)
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 {$IFDEF UNITTESTS}
 function shortintCompareFunction(c:TObject; a,b:pointer):longint;
 begin
