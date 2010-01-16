@@ -283,6 +283,11 @@ begin
       tempPort:=443;
       temp:=INTERNET_SERVICE_HTTP;
     end;
+    if pos(':',host)>0 then begin
+      tempPort:=inttostrdef(copy(host,pos(':',host)+1,length(host)),-1);
+      if tempPort=-1 then
+        raise EInternetException.create('Invalid port in url: '+protocol+host+url);
+    end;
     lastCompleteUrl:='';
     hLastConnection:=InternetConnect(hSession,pchar(host),tempPort,'',nil,temp,0,0);
     if hLastConnection=nil then

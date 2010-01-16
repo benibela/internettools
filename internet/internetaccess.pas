@@ -98,6 +98,7 @@ uses bbutils;
 //==============================================================================
 procedure decodeURL(const totalURL: string; out protocol, host, url: string);
 var slash,points: integer;
+    port:string;
 begin
   url:=totalURL;
   protocol:=copy(url,1,pos('://',totalURL)-1);
@@ -105,14 +106,20 @@ begin
   slash:=pos('/',url);
   points:=pos(':',url);
   if (points=0) or (points>slash) then points:=slash
-  else
-    case strToInt(copy(url,points+1,slash-points-1)) of
-      80: if protocol<>'http' then
-            raise EInternetException.create('Protocol value (80) doesn''t match protocol name ('+protocol+')'#13#10'URL: '+totalURL);
+  else begin
+    port:=copy(url,points+1,slash-points-1);
+    case strToInt(port) of
+      80,8080: begin
+        if protocol<>'http' then
+            raise EInternetException.create('Protocol value ('+port+') doesn''t match protocol name ('+protocol+')'#13#10'URL: '+totalURL);
+        if port<>'80' then
+            points:=slash; //keep non standard port
+      end;
       443: if protocol<>'https' then
             raise EInternetException.create('Protocol value (443) doesn''t match protocol name  ('+protocol+')'#13#10'URL: '+totalURL);
-      else raise EInternetException.create('Unknown protocol');
+      else raise EInternetException.create('Unknown port in '+totalURL);
     end;
+  end;
   host:=copy(url,1,points-1);
   delete(url,1,slash-1);
 end;
