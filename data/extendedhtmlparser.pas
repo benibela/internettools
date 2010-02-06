@@ -97,24 +97,46 @@ type
     You can access the read variables with the property variables or the event onVariableRead. @br @br
     A template file is just like a html file with special commands. The parser tries now to match every
     text and tag of the template to text/tag in the html file, while ignoring every additional data. If no match is possible an exception is raised. 
-    
-    Example:@br
+
+    @bold(Examples)
+
+    Example, how to read the first <b>-tag:@br
       Template: @code(<b><htmlparser:read var="test" source="text()"></b>)@br
-      Html-File: @code(<b>Hello World!</b>))
- 
+      Html-File: @code(<b>Hello World!</b>))@br
+
     This will set the variable test to "Hello World!" @br
+
+    Example, how to read all rows of a table:@br
+      Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readAnotherRow()" source="text()"> </td> </tr> </htmlparser:loop> </table>)@br
+      Html-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
+
+    This will read row after row, and call the @code(onVariableRead) event with the text of the first column in every row. (and additionally the last row will be stored in a variable called @code(readAnotherRow())) @br
+
     See the unit tests at the end of the file extendedhtmlparser.pas for more examples
+
+    @bold(Syntax of a template file)
+
+    Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file to parse. @br
+    A tag of the html file is considered as equal to an tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child tag of the tag in the template exists also in the html file (in the same order and nesting).@br
+    Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file.
+
+
 
     There are 4 special commands allowed:
      @unorderedList(
         @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)
-        @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>) @br Everything inside this tag is only used when the pseudo-XPath-expression in test equals to true)
+        @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>) @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
         @item(@code(<htmlparser:loop>  .. </htmlparser:loop>) @br Everything inside this tag is executed as long as possible (including never))
-        @item(@code(<htmlparser:read var="??" source="??" regex="??"/>) @br The pseudo-XPath-expression in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved)
+        @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>) @br The pseudo-XPath-expression in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)"))
       )
       @br
-      There exists on special attribute: htmlparser-optional="true", if this is set the file is read sucessesfully even if the tag doesn't exist.@br
+      There are two special attributes:
+      @unorderedList(
+        @item(@code(htmlparser-optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.)
+        @item(@code(htmlparser-condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
+      )
 
+      @bold(Syntax of the pseudo-XPath-expressions)
 
       A pseudo-XPath-expression is like a XPath-expression, but much more simple. At first every occurrence of $variable; is replaced by the current value, independent of scope (so you can store a expression in a variable).
       Then the remaining language elements are evaluated:
@@ -125,13 +147,14 @@ type
         @item(@code(concat(<string 1>, <string 2>, <string 3>, ...)) @br This is the concatenation of all the strings)
         @item(@code(<string 1> = <string 2>) @br This is 'true' iff <string 1> is equal to <string 2> (you can also use ==))
         @item(@code(<string 1> != <string 2>) @br This is 'true' iff <string 1> is not equal to <string 2>)
-        @item(@code(deepNodeText()) @br This is the plain text of the every tag inside the current text (this is the only expression, not compatible to XPath and you shouldn't use other commands around it))
-      )
+        @item(@code(deepNodeText()) @br This is the plain text of the every tag inside the current text)
+        @item(@code(filter(<string 1>,<string 2>[,<string 3>])) @br This will apply the regex <string 2> to <string 1> and returns only the matching part. <string 3> is actually a number, and if it is there, filter will return the <string 3>-th submatch. (like the regex and submatch attributes, but this can of course used within the pseudo XPath expression).
+      ))
       @br @br
 
       @br
       Notes: The html file is read only once and interpreted at the same time. So that onVariableRead is called, doesn't mean the variable will later have the given value.
-      Example: Template: <a><htmlparser:read ...> TEXT</a> @br HTML: <body><a>something</a><a>text</a><a>something 2</a></body> @br
+      Example for that: Template: <a><htmlparser:read ...> TEXT</a> @br HTML: <body><a>something</a><a>text</a><a>something 2</a></body> @br
       There onVariableRead is called twice, (for the first and for the second <a> tag), because the parser doesn't know that the text is wrong, when it enters the first <a> tag. @br
       For the loop-command a heuristic is used. After the last tag in the loop-command is read the program looks for the next matching tag at the beginning of the loop-command as well as after it. If the parsers enters tag which fits inside the loop, the loop is considered to continue. If a tag is leaved, which is after the loop, the loop is considered to end.@br
       Optional elements are handled the same way: it is ignored if the containing tag is closed or a following tag is found, before a tag matching to the optional one is found.@br
@@ -415,6 +438,7 @@ function THtmlTemplateParser.executePseudoXPath(str: string): string;
       word:string;
       tempTerm: PTerm;
   begin
+    if str='' then exit(newTerm(''));
     pos:=@str[1];
     resultTempTerm.typ:=tConcat;
     curTerms:=@resultTempTerm.children;
@@ -986,9 +1010,10 @@ var nte: TTemplateElement; //New Template ELement
     i:longint;
 begin
   if strliequal(tagName,'htmlparser:meta',tagNameLen) then begin
-    if getProperty('encoding',properties)='utf-8' then templateEncoding:=eUTF8
+    if (lowercase(getProperty('encoding',properties))='utf-8') or
+       (lowercase(getProperty('encoding',properties))='utf8') then templateEncoding:=eUTF8
     else templateEncoding:=eWindows1252;
-    exit;
+    exit(true);
   end;
   //workaround, htmlparser:read and if needs text
   if (strliequal(tagName,'htmlparser:read',tagNameLen)) or
@@ -1023,6 +1048,7 @@ function THtmlTemplateParser.templateLeaveTag(tagName: pchar; tagNameLen: longin
 var nte: TTemplateElement; //New Template ELement
     command: TTemplateElementType;
 begin
+  if strliequal(tagName,'htmlparser:meta',tagNameLen) then exit(true);
   Result:=true;
   command:=strToCommand(tagName,tagNameLen);
   if command in TEMPLATE_COMMANDS then
@@ -1673,8 +1699,9 @@ end;
 procedure unitTests();
 
 const
-      pseudoXpathTests: array[1..41] of array [1..2] of string = (
+      pseudoXpathTests: array[1..46] of array [1..2] of string = (
               //Basic test
+              ('',                          ''),
               ('''''',                      ''),
               ('''Test''',                  'Test'),
               (#9'   ''xyz''     '#13#10,   'xyz'),
@@ -1721,8 +1748,11 @@ const
               ('filter(''hallo'', ''x'') != ''''', 'false'),
               ('filter(@attrib1, ''[^ ]+'')', 'FIRST'),
               ('filter(@attrib2, ''[^ ]+'')', 'SECOND'),
-              ('filter(text(), ''[^:]+'')', 'test')
-      );
+              ('filter(text(), ''[^:]+'')', 'test'),
+              ('filter(''$testvar_t;'', ''$testvar_f;'' == ''true'') == ''true''', 'false'),
+              ('filter(''$testvar_t;'', ''$testvar_t;'' == ''true'') == ''true''', 'true'),
+              ('filter(''$testvar_f;'', ''$testvar_f;'' == ''true'') == ''true''', 'false'),
+              ('filter(''$testvar_f;'', ''$testvar_t;'' == ''true'') == ''true''', 'false')      );
 
 var i:longint;
     extParser:THtmlTemplateParser;
@@ -1741,6 +1771,8 @@ begin
   extParser.FOldProperties[1].value:='SECOND ATTRIBUTE';extParser.FOldProperties[1].valueLen:=6+10;
   extParser.FOldProperties[2].name:='attrib3';extParser.FOldProperties[2].nameLen:=7;
   extParser.FOldProperties[2].value:='THIRD ATTRIBUTE';extParser.FOldProperties[2].valueLen:=5+10;
+  extParser.variables.add('testvar_t=true');
+  extParser.variables.add('testvar_f=false');
 
   //execute xpath tests
   for i:=1 to high(pseudoXpathTests) do
