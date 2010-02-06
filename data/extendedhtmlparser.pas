@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 {$mode objfpc}{$H+}
+{$DEFINE UNITTESTS}
 
 interface
 
@@ -175,7 +176,7 @@ type
     function elementIsOptional(element:TTemplateElement): boolean;
     procedure finishHtmlParsing(status:TParsingStatus);
     function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    function parsePseudoXPath(str: string):string;
+    function executePseudoXPath(str: string):string;
     procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
     function leaveTag(tagName: pchar; tagNameLen: longint):boolean;
@@ -267,143 +268,292 @@ begin
   end;
 end;
 
-function THtmlTemplateParser.parsePseudoXPath(str: string): string;
-var comma,comparison:longint;
-    pos:pchar;
-  procedure raiseParsingError(s:string);
-  begin
-    raise Exception.Create(s+#13#10'in: '+strcopy2(@str[1],pos-1)+' [<- fehler] '+strcopy2(pos,@str[length(str)]));
-  end;
-  function nextToken:string;
-  const SYMBOLS = ['''','(','=','!','<','>',')',','];
-  var start:pchar;
-  begin
-    while pos^ in WHITE_SPACE do pos+=1;
-    if pos^ = #0 then exit('');
-    start:=pos;
-    if pos^='''' then begin
-      repeat
-        pos+=1;
-      until pos^ in ['''',#0];
-      pos+=1;
-    end else if pos^ in SYMBOLS then begin
-      pos+=1;
-      exit((pos-1)^);
-    end else begin
-      repeat
-        pos+=1;
-      until pos^ in SYMBOLS + WHITE_SPACE + [#0];
+function THtmlTemplateParser.executePseudoXPath(str: string): string;
+  //Some Options
+  const MAX_EXP_NESTING=16; //maximal nesting depth of the expressions
+  const MAX_TOTAL_EXPS=128; //maximal count of sub-expressions, if using static memory
+  {$DEFINE USED_STATIC_MEMORY} //static memory management, faster that dynamic, but limits number of possible sub-expressions
+
+
+  //Type definitions
+  type
+    TTermType=(tString,
+                tCompareEqual, tCompareUnequal,
+                tReadAttribute, tReadText, tReadDeepNodeText,
+                tConcat, tFilter);
+    PTerm = ^TTerm;
+    TTermArray = array of PTerm;
+    TTerm = record
+      typ: TTermType;
+      children: TTermArray;
+      value: string;
     end;
-    result:=strcopy2(start,pos-1);
-  end;
-  procedure expect(c:char);
+
+
+  //Memory management (creation,deletion,constructors for terms)
+  {$IFDEF USED_STATIC_MEMORY}
+  var
+    staticMemory: array[1..MAX_TOTAL_EXPS] of TTerm;
+    staticUsedExpressions: longint;
+  {$ENDIF}
+  function newTerm(): PTerm;overload;
   begin
-    while pos^ in WHITE_SPACE do pos+=1;
-    if pos^ <> c then
-      raise Exception.Create(c+' erwartet aber '+pos^+' gefunden'#13#10+strcopy2(@str[1],pos));
-    pos+=1;
+    {$IFDEF USED_STATIC_MEMORY}
+    staticUsedExpressions+=1;
+    if staticUsedExpressions>high(staticMemory) then
+      raise Exception.create('Maximal number of XPath-Expression used. Increase limit or switch to dynamic memory');
+    result:=@staticMemory[staticUsedExpressions];
+    {$ELSE}
+    new(result);
+    {$ENDIF}
   end;
-var values: array[1..8] of string;
-    actions: array[1..8] of (aNormal,aConcat,aCompareEqual,aCompareUnequal);
-    currentValue,currentAction: longint;
-  procedure processValues;
+  procedure disposeTerm(t:PTerm);
+  var
+    i: Integer;
   begin
-    while currentAction>1 do
-      case actions[currentAction] of
-        aNormal: currentAction-=1;
-        aConcat: begin
-          currentValue-=1;
-          values[currentValue]+=values[currentValue+1];
-          break;
+    {$IFNDEF USED_STATIC_MEMORY}
+    for i:=0 to high(t^.children) do
+      disposeTerm(t^.children[i]);
+    dispose(t);
+    {$ENDIF}
+  end;
+  function newTerm(const typ:TTermType; const value:string=''): PTerm;overload;
+  begin
+    result:=newTerm();
+    result^.typ:=typ;
+    result^.value:=value;
+  end;
+  function newTerm(const s:string): PTerm;overload;
+  begin
+    result:=newTerm();
+    result^.typ:=tString;
+    result^.value:=s;
+  end;
+
+  //Term parsing: converts flat term to term tree
+  function parseTerm(s:string): PTerm;
+  var pos:pchar;
+    procedure raiseParsingError(s:string);
+    begin
+      raise Exception.Create(s+#13#10'in: '+strcopy2(@str[1],pos-1)+' [<- fehler] '+strcopy2(pos,@str[length(str)]));
+    end;
+    //read the next token ('string', symbol, identifier)
+    function nextToken:string;
+    const SYMBOLS = ['''','(','=','!','<','>',')',','];
+    var start:pchar;
+    begin
+      while pos^ in WHITE_SPACE do pos+=1;
+      if pos^ = #0 then exit('');
+      start:=pos;
+      if pos^='''' then begin
+        repeat
+          pos+=1;
+        until pos^ in ['''',#0];
+        pos+=1;
+      end else if pos^ in SYMBOLS then begin
+        pos+=1;
+        exit((pos-1)^);
+      end else begin
+        repeat
+          pos+=1;
+        until pos^ in SYMBOLS + WHITE_SPACE + [#0];
+      end;
+      result:=strcopy2(start,pos-1);
+    end;
+    procedure expect(c:char);
+    begin
+      while pos^ in WHITE_SPACE do pos+=1;
+      if pos^ <> c then
+        raise Exception.Create(c+' erwartet aber '+pos^+' gefunden'#13#10+strcopy2(@str[1],pos));
+      pos+=1;
+    end;
+    var stackHierarchy: array[1..MAX_EXP_NESTING] of PTerm;
+        stackHierarchyLength: longint;
+        curTerms: ^TTermArray;
+        //Put the current stack on the stack stack and use the stack (children) of the
+        //first term of the old stack as new stack
+        procedure descendToChildrenStack();
+        begin
+          if length(curTerms^)=0 then
+            raiseParsingError('No term available (e.g. bracket opening without function call)');
+          stackHierarchyLength+=1;
+          stackHierarchy[stackHierarchyLength]:=curTerms^[high(curTerms^)];
+          curTerms:=@curTerms^[high(curTerms^)]^.children;
         end;
-        aCompareEqual, aCompareUnequal: begin
-          if SameText(values[currentValue-1],values[currentValue]) = (actions[currentAction]=aCompareEqual) then
-            values[currentValue-1]:='true'
-           else
-            values[currentValue-1]:='false';
-          currentValue-=1;
-          currentAction-=1;
+        procedure completeTerm();forward;
+        //Goes a level up in the tree, to use the children of the parent of the current element as new stack
+        procedure ascendToParentStack();
+        begin
+          if stackHierarchyLength<=1 then
+            raiseParsingError('No stack hierarchy available (e.g. closing bracket without function call)');
+          stackHierarchyLength-=1;
+          curTerms:=@stackHierarchy[stackHierarchyLength]^.children;
+          completeTerm();
+        end;
+        //Called if a term is completed, so that it can go a level upwards if we
+        //waited there for a second term of a binary operator
+        procedure completeTerm();
+        begin
+          if (stackHierarchy[stackHierarchyLength]^.typ in [tCompareEqual, tCompareUnequal])
+           and (length(curTerms^)=2) then //binary operation complete
+            ascendToParentStack();
+        end;
+        //pushs the term on the current stack/tree level
+        procedure pushTerm(const t:PTerm);
+        begin
+          setlength(curTerms^,length(curTerms^)+1);
+          curTerms^[high(curTerms^)]:=t;
+        end;
+        //push the term on the stack/tree level and mark as completed
+        procedure pushCompleteTerm(const t:PTerm);
+        begin
+          pushTerm(t);
+          completeTerm();
+        end;
+
+  var resultTempTerm: TTerm;
+      word:string;
+      tempTerm: PTerm;
+  begin
+    pos:=@str[1];
+    resultTempTerm.typ:=tConcat;
+    curTerms:=@resultTempTerm.children;
+    stackHierarchyLength:=1;
+    stackHierarchy[1]:=@resultTempTerm;
+    while pos^<>#0 do begin
+      word:=nextToken();
+      if word='' then break;
+      case word[1] of
+        '''': pushCompleteTerm(newTerm(copy(word,2,length(word)-2)));
+        '@':  pushCompleteTerm(newTerm(tReadAttribute, strcopy2(word,2)));
+        '=': begin
+          if pos^='=' then pos+=1; //auch == erlauben
+          if length(curTerms^) = 0 then raiseParsingError('No term before = found');
+          //insert compare term node as parent of the last term
+          tempTerm:=curTerms^[high(curTerms^)];
+          curTerms^[high(curTerms^)]:=newTerm(tCompareEqual);
+          descendToChildrenStack();
+          pushTerm(tempTerm);
+          assert(Length(curTerms^)=1);
+        end;
+        '!': begin
+          expect('=');
+          if length(curTerms^) = 0 then raiseParsingError('No term before != found');
+          //insert compare term node as parent of the last term
+          tempTerm:=curTerms^[high(curTerms^)];
+          curTerms^[high(curTerms^)]:=newTerm(tCompareUnequal);
+          descendToChildrenStack();
+          pushTerm(tempTerm);
+          assert(Length(curTerms^)=1);
+        end;
+        '(': descendToChildrenStack();
+        ',': ; //ignored
+               //TODO: check for commas between arguments
+        ')': ascendToParentStack();
+        else if SameText(word,'text') then begin
+          expect('(');expect(')');
+          pushTerm(newTerm(tReadText));
+        end else if SameText(word,'deepNodeText') then begin
+          expect('(');expect(')');
+          pushTerm(newTerm(tReadDeepNodeText));
+        end else if SameText(word,'concat') then
+          pushTerm(newTerm(tConcat))
+        else if SameText(word,'filter') then
+          pushTerm(newTerm(tFilter))
+        else
+          raise Exception.Create('Unbekannter Pseudo-XPath-Befehl: '+word+' in '#13#10+strcopy2(@str[1],pos));
+      end;
+    end;
+    if curTerms<>@resultTempTerm.children then raiseParsingError('Pseudo-XPath parsing ended on wrong level: at '+str);
+    if length(resultTempTerm.children)=0 then raiseParsingError('Pseudo-XPath is empty: '+str);
+    if length(resultTempTerm.children)>1 then raiseParsingError('Pseudo-XPath contains to many top level terms: '+IntToStr(length(resultTempTerm.children))+' in '+str);
+    result:=resultTempTerm.children[0];
+  end;
+
+  //Evaluates a term tree
+  function evaluateTerm(const term: TTerm): string;
+    procedure raiseEvaluationError(const term:TTerm; s:string);
+    begin
+      raise Exception.Create(s);
+    end;
+  var regEx:TRegExpr;
+      i: Integer;
+      temp: string;
+  begin
+    case term.typ of
+      tString: exit(replaceVars(term.value));
+      tReadAttribute: exit(getProperty(term.value,FOldProperties));
+      tReadText: exit(FlastText);
+      tReadDeepNodeText: exit(fdeepNodeText);
+      tCompareEqual, tCompareUnequal: begin
+        if length(term.children)<2 then raiseEvaluationError(term, 'Not enough subterms')
+        else if length(term.children)>2 then raiseEvaluationError(term, 'To many subterms');
+        if SameText(evaluateTerm(term.children[0]^), evaluateTerm(term.children[1]^) )
+           = (term.typ = tCompareEqual) then
+            exit('true')
+          else
+            exit('false');
+      end;
+      tConcat: begin
+        result:='';
+        for i:=0 to high(term.children) do result+=evaluateTerm(term.children[i]^);
+      end;
+      tFilter: begin
+        if length(term.children)<2 then raiseEvaluationError(term, 'Not enough arguments');
+        if length(term.children)>3 then raiseEvaluationError(term, 'To many arguments');
+        //TODO: cache regex
+        regEx:=TRegExpr.Create(evaluateTerm(term.children[1]^));
+        try
+          regEx.Exec(evaluateTerm(term.children[0]^));
+          if length(term.children) = 3 then begin
+            result:=regex.Match[StrToInt(evaluateTerm(term.children[2]^))];
+          end else
+            result:=regEx.Match[0];
+        finally
+          regEx.free;
         end;
       end;
+      else raiseEvaluationError(term,'Invalid term');
+    end;
   end;
-  procedure readValue(s:string);
-  begin
-    values[currentValue]:=s;
-//    processValues;
-  end;
-var word:string;
+
+var term:PTerm;
 begin
   //Möglichkeiten:
   //func(<1>,<2>,<3>,...)
   //<1> [==,!=, =] <2>
   //@attrib
   //'...'
-  str:=trim(str);
+
+  (*
+    a little bit more formal (anyone who knows a good pascal compiler compiler? i couldn't find one...):
+
+    SPACE = #9 #10 #13 #20
+    TERM = SPACE TERM SPACE | TERM BIN-OP TERM | FUNCTION-APPLICATION | DATA
+
+    FUNCTION-APPLICATION = FUNCTION PARAMETERS
+    PARAMETERS = () | TERM-LIST
+    TERM-LIST = TERM |  TERM , TERM-LIST
+
+    DATA = @attribute | 'string'
+    BIN-OP = == | != | =
+    FUNCTION = concat | text | deepNodeText | filter
+
+               concat(n) text()  deepNodeText()  filter(2|3)
+  *)
+
+  {$IFDEF USED_STATIC_MEMORY}staticUsedExpressions:=0;{$ENDIF}
+  {str:=trim(str);
   if str='' then exit('');
   if str='text()' then exit(FlastText);
-  if str='deepNodeText()' then exit(fdeepNodeText);
-  currentValue:=1;
-  currentAction:=1;
-  actions[1]:=aNormal;
-  values[1]:='';
+  if str='deepNodeText()' then exit(fdeepNodeText);}
 
-  pos:=@str[1];
-  
-  while pos^<>#0 do begin
-    word:=nextToken();
-    if word='' then break;
-    case word[1] of
-      '''': readValue(copy(word,2,length(word)-2));
-      '@': readValue(getProperty(strcopy2(word,2),FOldProperties));
-      '=': begin
-        if pos^='=' then pos+=1; //auch == erlauben
-        currentAction+=1;
-        currentValue+=1;
-        values[currentValue]:='';
-        actions[currentAction]:=aCompareEqual;
-      end;
-      '!': begin
-        expect('=');
-        currentAction+=1;
-        currentValue+=1;
-        values[currentValue]:='';
-        actions[currentAction]:=aCompareUnequal;
-      end;
-      '(': if actions[currentAction]=aConcat then begin
-        currentAction+=1;
-        currentValue+=1;
-        values[currentValue]:='';
-        actions[currentAction]:=aNormal;
-      end else raiseParsingError('Klammerung nicht implementiert');
-      ',': begin
-        processValues;
-        if actions[currentAction]=aConcat then begin
-          currentAction+=1;
-          currentValue+=1;
-          values[currentValue]:='';
-          actions[currentAction]:=aNormal;
-        end else raiseParsingError('Komma außerhalb Funktionsparameter');
-      end;
-      ')': begin
-        processValues;
-        if actions[currentAction]=aConcat then currentAction-=1
-        else raiseParsingError('Schließende Klammer ohne Funktion');
-      end;
-      else if SameText(word,'text') then begin
-        expect('(');expect(')');
-        readValue(FlastText);
-      end else if SameText(word,'deepNodeText') then begin
-        expect('(');expect(')');
-        readValue(fdeepNodeText);
-      end else if SameText(word,'concat') then begin
-        currentAction+=1;
-        actions[currentAction]:=aConcat;
-      end else
-        raise Exception.Create('Unbekannter Pseudo-XPath-Befehl: '+word+' in '#13#10+strcopy2(@str[1],pos));
-    end;
+  term:=parseTerm(str); //TODO: cache term tree
+  try
+    result:=evaluateTerm(term^);
+  finally
+    disposeTerm(term);
   end;
-  processValues;
-  result:=values[1];
 end;
 
 procedure THtmlTemplateParser.executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
@@ -413,7 +563,7 @@ procedure THtmlTemplateParser.executeTemplateCommand(status:TParsingStatus;cmd: 
     regexp: TRegExpr;
   begin
     FCollectDeepNodeText:=false;
-    text:=parsePseudoXPath(replaceVars(cmd.attributes.Values['source']));
+    text:=executePseudoXPath(replaceVars(cmd.attributes.Values['source']));
 
     if cmd.attributes.Values['regex']<>'' then begin
       regexp:=TRegExpr.Create;
@@ -472,7 +622,7 @@ begin
 
         equal:=(CompareText(ls,rs)=0) = equal;}
         
-        equal:=parsePseudoXPath(replaceVars(condition))='true';
+        equal:=executePseudoXPath(replaceVars(condition))='true';
         
         if not equal then begin
           status.nextElement:=cmd.reverse;
@@ -525,9 +675,11 @@ end;
 function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
   properties: THTMLProperties): boolean;
 
+  //check if the current tag is matched by element
   function perfectFit(element:TTemplateElement):boolean;
   var i,j,found,ok:longint;
       Name:string;
+      tempProperties:THTMLProperties;
   begin
     if element=nil then result:=false;
     if not strliequal(tagName,element.text,tagNameLen) then
@@ -548,6 +700,15 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
       if (element.attributes.ValueFromIndex[i]='') and (found=-1) then
         continue; //a not existing property is interpreted as property="" TODO: test case
       if found<0 then exit(false);
+    end;
+    //check for additional xpath conditions
+    name:=element.attributes.Values['htmlparser-condition'];
+    if name<>'' then begin
+      tempProperties:=FOldProperties;
+      FOldProperties:=properties;
+      result:=executePseudoXPath(name)='true';
+      FOldProperties:=tempProperties;
+      exit;
     end;
     exit(true);
   end;
@@ -1171,7 +1332,6 @@ begin
   parser.free;
 end;
 
-
 {$IFDEF UNITTESTS}
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
@@ -1443,6 +1603,12 @@ begin
       if extParser.variables.Values['test']<>'abc' then
         raise Exception.create('ergebnis ungültig');
     end;
+    47: begin //xpath conditions
+      extParser.parseTemplate('<html><a htmlparser-condition="filter(@cond, ''a+'') == ''aaa'' "><htmlparser:read source="text()" var="test"/></a></html>');
+      extParser.parseHTML('<html><a>a1</a><a cond="xyz">a2</a><a cond="a">a3</a><a cond="xaay">a4</a><a cond="aaaa">a5</a><a cond="xaaay">a6</a><a cond="xaaaay">a7</a><a cond="xaay">a8</a></html>');
+      if extParser.variables.Values['test']<>'a6' then
+        raise Exception.create('ergebnis ungültig');
+    end;
 
     80: begin //encoding detection
       extParser.parseTemplate('<a><htmlparser:read source="text()" var="test"/></a>');
@@ -1507,8 +1673,56 @@ end;
 procedure unitTests();
 
 const
-    pseudoXpathTests: array[1..16] of string = ('''Test''', '''a == b''', '''a'' == ''b''', '''abc'' == ''abc''',  '''123'' != ''abc''', 'concat(''a'',''b'',''c'')', 'concat(''one'')',   'concat(''hallo'', '' '', ''welt'') == ''hallo welt''', 'concat(''a'',''b'',concat(''c'',''d''))','concat(''a'',concat(''x'',''y'',''z''),''b'',''c'')', '''$test;''==''abc''', 'concat  (  ''a'',  ''b'',  ''c''  )', 'concat(''cond is '',''abc''==''abc'')', 'concat(''>'',''123''!=''test'',''<'')',   'concat(concat(''123'',''abc'')==''123abc'',''-#-'')',  'concat(''('',''abc''==concat(''a'',''b'',''c''),'')'')');
-    pseudoXpathResults: array[1..16] of string = ('Test',     'a == b',      'false',              'true',             'true',           'abc',                'one',                               'true',                                                  'abcd',                                        'axyzbc',                                      'false',                   'abc',                                'cond is true',                              '>true<',                                'true-#-',                                            '(true)');
+      pseudoXpathTests: array[1..41] of array [1..2] of string = (
+              //Basic test
+              ('''''',                      ''),
+              ('''Test''',                  'Test'),
+              (#9'   ''xyz''     '#13#10,   'xyz'),
+              (''''#9'xyz'#13'''',           #9'xyz'#13),
+              //XPath like HTML Reading
+              ('text()',                    'test:last text'),
+              ('deepNodeText()',            'test:deep node text'),
+              ('@attrib1',                  'FIRST ATTRIBUTE'),
+              ('@attrib2',                  'SECOND ATTRIBUTE'),
+              ('@attrib3',                  'THIRD ATTRIBUTE'),
+              //Comparison tests
+              ('''a == b''',                'a == b'),
+              ('''a'' == ''b''',            'false'),
+              ('''abc'' == ''abc''',        'true'),
+              ('''123'' != ''abc''',        'true'),
+              ('''$test;''==''abc''',       'false'),
+              //Concatenation tests
+              ('concat(''a'',''b'',''c'')', 'abc'),
+              ('concat(''one'')',           'one'),
+              ('concat(''hallo'', '' '', ''welt'') == ''hallo welt''',  'true'),
+              ('concat  (  ''a'',  ''b'',  ''c''  )',                   'abc'),
+              ('concat(''a'',''b'',concat(''c'',''d''))',               'abcd'),
+              ('concat(''a'',concat(''x'',''y'',''z''),''b'',''c'')',   'axyzbc'),
+              //Concatenation + Comparison tests (double as stack test)
+              ('concat(''cond is '',''abc''==''abc'')',                 'cond is true'),
+              ('concat(''>'',''123''!=''test'',''<'')',                 '>true<'),
+              ('concat(concat(''123'',''abc'')==''123abc'',''-#-'')',   'true-#-'),
+              ('concat(''('',''abc''==concat(''a'',''b'',''c''),'')'')','(true)'),
+              //Regex-Filter
+              ('filter(''modern'', ''oder'')',                 'oder'),
+              ('filter(''regex'', ''.g.'')',                   'ege'),
+              ('filter(''reg123ex'', ''[0-9]*'')',             ''),
+              ('filter(''reg123ex'', ''[0-9]+'')',             '123'),
+              ('filter(''regexREGEX'', ''.G.'')',              'EGE'),
+              ('filter(''abcdxabcdefx'', ''b[^x]*'')',         'bcd'),
+              ('filter(''hallo welt'', ''(.*) (.*)'')',        'hallo welt'),
+              ('filter(''hallo welt'', ''(.*) (.*)'', ''0'')', 'hallo welt'),
+              ('filter(''hallo welt'', ''(.*) (.*)'', ''1'')', 'hallo'),
+              ('filter(''hallo welt'', ''(.*) (.*)'', ''2'')', 'welt'),
+              //All together
+              ('filter(concat(''abc'', ''def''), concat(''[^a'',''d]+'' ))', 'bc'),
+              ('concat(''-->'', filter(''miauim'', ''i.*i'') , ''<--'')',   '-->iaui<--'),
+              ('filter(''hallo'', ''a'') == ''a''', 'true'),
+              ('filter(''hallo'', ''x'') != ''''', 'false'),
+              ('filter(@attrib1, ''[^ ]+'')', 'FIRST'),
+              ('filter(@attrib2, ''[^ ]+'')', 'SECOND'),
+              ('filter(text(), ''[^:]+'')', 'test')
+      );
 
 var i:longint;
     extParser:THtmlTemplateParser;
@@ -1516,10 +1730,22 @@ var i:longint;
     sl:TStringList;
 begin
   extParser:=THtmlTemplateParser.create;
-  
+
+  //simulate a html tag
+  extParser.FlastText:='test:last text';
+  extParser.fdeepNodeText:='test:deep node text';
+  setlength(extParser.FOldProperties,3);
+  extParser.FOldProperties[0].name:='attrib1';extParser.FOldProperties[0].nameLen:=7;
+  extParser.FOldProperties[0].value:='FIRST ATTRIBUTE';extParser.FOldProperties[0].valueLen:=5+10;
+  extParser.FOldProperties[1].name:='attrib2';extParser.FOldProperties[1].nameLen:=7;
+  extParser.FOldProperties[1].value:='SECOND ATTRIBUTE';extParser.FOldProperties[1].valueLen:=6+10;
+  extParser.FOldProperties[2].name:='attrib3';extParser.FOldProperties[2].nameLen:=7;
+  extParser.FOldProperties[2].value:='THIRD ATTRIBUTE';extParser.FOldProperties[2].valueLen:=5+10;
+
+  //execute xpath tests
   for i:=1 to high(pseudoXpathTests) do
-    if extParser.parsePseudoXPath(pseudoXpathTests[i])<>pseudoXpathResults[i] then
-      raise Exception.Create('XPath Test failed: '+IntToStr(i)+ #13#10+extParser.parsePseudoXPath(pseudoXpathTests[i]));
+    if extParser.executePseudoXPath(pseudoXpathTests[i,1])<>pseudoXpathTests[i,2] then
+      raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+pseudoXpathTests[i,1]+#13#10'got:'+extParser.executePseudoXPath(pseudoXpathTests[i,1]));
   
   sl:=TStringList.Create;
   log:=TTemplateHTMLParserLogClass.Create;
