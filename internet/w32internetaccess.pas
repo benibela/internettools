@@ -46,12 +46,10 @@ type
     lastProtocol,lastHost:string;
     lastCompleteUrl: string;
     newConnectionOpened:boolean;
-    function transfer(protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
+    function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;override;
   public
     constructor create();override;
     destructor destroy;override;
-    function post(protocol,host,url: string;data:string):string;override;
-    function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;override;overload;
     function needConnection():boolean;override;
     procedure closeOpenedConnections();override;
   end;
@@ -237,8 +235,7 @@ begin
 end;
 {$endif}
 
-function TW32InternetAccess.transfer(protocol, host, url: string; data: string;
-  progressEvent: TProgressEvent): string;
+function TW32InternetAccess.transfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
 var
   databuffer : array[0..4095] of char;
@@ -253,13 +250,11 @@ var
   htmlOpenTagRead: boolean; htmlClosingTagRead: boolean;
   label getMore;
 begin
-  if data = '' then
-    operation:='GET'
-   else
-    operation:='POST';
-  {$ifdef debug}
-  writeString(host+'_'+url+'_pre',operation+#13#10+host+#13#10+url+#13#10+data);
-  {$endif}
+  if method=hcmPost then operation:='POST'
+  else operation:='GET';
+//  {$ifdef debug}
+//  writeString(host+'_'+url+'_pre',operation+#13#10+host+#13#10+url+#13#10+data);
+//  {$endif}
   {$ifdef simulateInet}
   if data='' then
     result:=readString(url)
@@ -432,16 +427,6 @@ begin
     InternetCloseHandle(hLastConnection);
   InternetCloseHandle(hsession);
   inherited;
-end;
-
-function TW32InternetAccess.post(protocol,host,url: string;data:string):string;
-begin
-  result:=transfer(protocol,host,url,data,nil);
-end;
-
-function TW32InternetAccess.get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;
-begin
-  result:=transfer(protocol,host,url,'',progressEvent);
 end;
 
 function TW32InternetAccess.needConnection(): boolean;

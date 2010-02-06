@@ -38,6 +38,8 @@ type
     proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for https (not always supported, currently only with wininet)
 
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
+
+    logToPath: string;
   end;
   { TCustomInternetAccess }
 
@@ -49,7 +51,12 @@ type
   //**you should assign once to defaultInternetAccessClass and then use this class
   //**variable@br
   //**If a transfer fails it will raise a EInternetException
+  THTTPConnectMethod=(hcmGet, hcmPost);
   TInternetAccess=class
+  private
+    function transfer(method: THTTPConnectMethod; protocol,host,url, data:string;progressEvent: TProgressEvent=nil):string;
+  protected
+    function doTransfer(method: THTTPConnectMethod; protocol,host,url, data:string; progressEvent: TProgressEvent):string;virtual;abstract;
 //  protected
   public
     internetConfig: PInternetConfig;
@@ -66,7 +73,7 @@ type
     function post(totalUrl: string;data:string):string;
     //**post the (url encoded) data to the url given as three parts and returns the page as string
     //** (override this if you want to sub class it)
-    function post(protocol,host,url: string;data:string):string;virtual;abstract;
+    function post(protocol,host,url: string;data:string):string;
     //**get the url as stream and optionally monitors the progress with a progressEvent
     procedure get(totalUrl: string;stream:TStream;progressEvent:TProgressEvent=nil);
     //**get the url as string and optionally monitors the progress with a progressEvent
@@ -74,7 +81,7 @@ type
     //**get the url as stream and optionally monitors the progress with a progressEvent
     procedure get(protocol,host,url: string;stream:TStream;progressEvent:TProgressEvent=nil);
     //**get the url as string and optionally monitors the progress with a progressEvent
-    function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;virtual;abstract;
+    function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;
     //**checks if an internet connection exists
     function existsConnection():boolean;virtual;
     //**call this to open a connection (very unreliable). It will return true on success
@@ -123,6 +130,45 @@ begin
   host:=copy(url,1,points-1);
   delete(url,1,slash-1);
 end;
+
+procedure saveAbleURL(var url:string);
+var temp:integer;
+begin
+  for temp:=1 to length(url) do
+    if url[temp] in ['/','?','&',':','\','*','"','<','>','|'] then
+      url[temp]:='#';
+end;
+
+procedure writeString(dir,url,value: string);
+var tempdebug:TFileStream;
+begin
+  saveAbleURL(url);
+  url:=copy(url,1,200); //cut it of, or it won't work on old Windows with large data
+  url:=dir+url;
+  try
+  if fileexists(url) then
+    tempdebug:=TFileStream.create(url+'_____'+inttostr(random(99999999)),fmCreate)
+   else
+    tempdebug:=TFileStream.create(Utf8ToAnsi(url),fmCreate);
+  if value<>'' then
+    tempdebug.writebuffer(value[1],length(value))
+   else
+    tempdebug.Write('empty',5);
+  tempdebug.free;
+  except
+  end;
+end;
+
+
+function TInternetAccess.transfer(method: THTTPConnectMethod; protocol, host, url, data: string;
+  progressEvent: TProgressEvent):string;
+begin
+  if internetConfig=nil then raise Exception.create('No internet configuration set');
+  result:=doTransfer(method,protocol,host,url,data,progressEvent);
+  if internetConfig^.logToPath<>'' then
+    writeString(internetConfig^.logToPath, protocol+'://'+host+url+'<-DATA:'+data,result);
+end;
+
 
 procedure TInternetAccess.setCookie(name, value: string);
 var i:longint;
@@ -192,6 +238,12 @@ begin
   result:=post(protocol,host,url,data);
 end;
 
+function TInternetAccess.post(protocol, host, url: string; data: string
+  ): string;
+begin
+  result:=transfer(hcmPost,protocol,host,url,data);
+end;
+
 procedure TInternetAccess.get(totalUrl: string; stream: TStream;progressEvent:TProgressEvent=nil);
 var buffer:string;
 begin
@@ -213,6 +265,12 @@ begin
   assert(stream<>nil);
   buffer:=get(protocol,host,url,progressEvent);
   stream.WriteBuffer(buffer[1],sizeof(buffer[1])*length(buffer));
+end;
+
+function TInternetAccess.get(protocol, host, url: string;
+  progressEvent: TProgressEvent): string;
+begin
+  result:=transfer(hcmGet, protocol, host, url, '', progressEvent);
 end;
 
 

@@ -47,12 +47,10 @@ protected
   forwardProgressEvent: TProgressEvent;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  function transfer(protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
+  function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;override;
 public
   constructor create();override;
   destructor destroy;override;
-  function post(protocol,host,url: string;data:string):string;override;
-  function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;override;overload;
   function needConnection():boolean;override;
   procedure closeOpenedConnections();override;
 end;
@@ -83,15 +81,15 @@ begin
 end;
 
 
-function TSynapseInternetAccess.transfer(protocol, host, url: string;
+function TSynapseInternetAccess.doTransfer(method:THTTPConnectMethod;protocol, host, url: string;
   data: string; progressEvent: TProgressEvent): string;
 var operation: string;
 begin
   result:='';
   connection.Clear;
-  if data = '' then operation:='GET'
-  else begin
-    operation:='POST';
+  if method=hcmPost then operation:='POST'
+  else operation:='GET';
+  if data <> '' then begin
     WriteStrToStream(connection.Document, data);
     connection.MimeType := 'application/x-www-form-urlencoded';
   end;
@@ -103,11 +101,13 @@ begin
   lastProgressLength:=-1;
   forwardProgressEvent:=progressEvent;
 
-  if connection.HTTPMethod(operation,protocol+'://'+host+url) and
-     ((connection.ResultCode = 200) or (connection.ResultCode = 302))then begin
-     result:=ReadStrFromStream(connection.Document, connection.Document.Size)
-   end else
-    raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+protocol+'://'+host+url);
+  if connection.HTTPMethod(operation,protocol+'://'+host+url) then begin
+     if (connection.ResultCode = 200) or (connection.ResultCode = 302) then
+       result:=ReadStrFromStream(connection.Document, connection.Document.Size)
+      else
+       raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+protocol+'://'+host+url);
+  end else
+    raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+protocol+'://'+host+url);
 
   if (progressEvent<>nil) and (lastProgressLength<connection.DownloadSize) then
     if contentLength=-1 then progressEvent(self,connection.DownloadSize,connection.DownloadSize)
@@ -137,18 +137,6 @@ destructor TSynapseInternetAccess.destroy;
 begin
   FreeAndNil(connection);
   inherited destroy;
-end;
-
-function TSynapseInternetAccess.post(protocol, host, url: string; data: string
-  ): string;
-begin
-  result:=transfer(protocol,host,url,data,nil);
-end;
-
-function TSynapseInternetAccess.get(protocol, host, url: string;
-  progressEvent: TProgressEvent): string;
-begin
-  result:=transfer(protocol,host,url,'',progressEvent);
 end;
 
 function TSynapseInternetAccess.needConnection(): boolean;
