@@ -206,7 +206,7 @@ begin
         while not (header[i] in ['"', #0]) do i+=1;
         i+=1;
       end else
-        while not (header[i] in [';', #0]) do i+=1;
+        while not (header[i] in [';', #13, #10,#0]) do i+=1;
       value:=copy(header,mark,i-mark);
 
       setCookie(name,value);

@@ -282,6 +282,7 @@ begin
       tempPort:=inttostrdef(copy(host,pos(':',host)+1,length(host)),-1);
       if tempPort=-1 then
         raise EInternetException.create('Invalid port in url: '+protocol+host+url);
+      host:=copy(host,1,pos(':',host)-1);
     end;
     lastCompleteUrl:='';
     hLastConnection:=InternetConnect(hSession,pchar(host),tempPort,'',nil,temp,0,0);
