@@ -181,6 +181,7 @@ type
     function templateLeaveTag(tagName: pchar; tagNameLen: longint):boolean;
     function templateTextEvent(text: pchar; textLen: longint):boolean;
 
+  protected
     FParsingCompleted: boolean;
     FlastText,fdeepNodeText:string;
     FCurrentTemplateName, FCurrentTemplate: string; //currently loaded template, only needed for debugging (a little memory waste)

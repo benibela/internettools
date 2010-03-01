@@ -145,6 +145,7 @@ private
   function loadNewVersionEnterTag(tagName: string; properties: TProperties):boolean;
   procedure loadNewVersion(const url: string);
 
+private
   finstallerurl,fallChanges,fallFixes,fallAdds:string;
   finstallerBaseName: string; //installer url without path
   finstallerParameters: string; //parameter to pass to the installer

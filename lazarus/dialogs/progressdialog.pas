@@ -22,11 +22,11 @@ type
     { private declarations }
   public
     { public declarations }
+    addUnit: string;
     constructor create(title,description:string;maxprogress:longint=100);
     procedure setProgress(progress:longint);
     procedure progressEvent(sender:TObject;progress,maxprogress:longint);
-    addUnit: string;
-  end; 
+  end;
 
 implementation
 
