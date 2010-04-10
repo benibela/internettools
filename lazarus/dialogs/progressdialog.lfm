@@ -19,9 +19,9 @@ object ProgressBarDialog: TProgressBarDialog
   LCLVersion = '0.9.29'
   object Label1: TLabel
     Left = 9
-    Height = 18
+    Height = 19
     Top = 9
-    Width = 5
+    Width = 6
     BorderSpacing.Around = 6
     ParentColor = False
   end
@@ -31,10 +31,10 @@ object ProgressBarDialog: TProgressBarDialog
     AnchorSideTop.Control = ProgressBar1
     AnchorSideTop.Side = asrCenter
     AnchorSideRight.Side = asrBottom
-    Left = 448
-    Height = 20
-    Top = 35
-    Width = 53
+    Left = 453
+    Height = 18
+    Top = 37
+    Width = 48
     Anchors = [akTop, akRight]
     BorderSpacing.Around = 6
     Caption = '??? % '
@@ -48,8 +48,8 @@ object ProgressBarDialog: TProgressBarDialog
     AnchorSideRight.Control = barLabel
     Left = 8
     Height = 25
-    Top = 33
-    Width = 434
+    Top = 34
+    Width = 439
     Anchors = [akTop, akLeft, akRight]
     BorderSpacing.Around = 6
     Smooth = True
