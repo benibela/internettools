@@ -547,8 +547,13 @@ procedure strSplit(out firstPart: string; const separator: string;
 var p:longint;
 begin
   p:=pos(separator,remainingPart);
-  firstPart:=copy(remainingPart,1,p-1);
-  delete(remainingPart,1,p+length(separator)-1);
+  if p<=0 then begin
+    firstPart:=remainingPart;
+    remainingPart:='';
+  end else begin
+    firstPart:=copy(remainingPart,1,p-1);
+    delete(remainingPart,1,p+length(separator)-1);
+  end;
 end;
 
 procedure strSplit(out   splitted: TStringArray; s: string; c: char;
