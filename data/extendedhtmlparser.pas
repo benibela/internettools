@@ -4,7 +4,6 @@
   @author Benito van der Zander (http://www.benibela.de)
 *}
 
-unit extendedhtmlparser;
 {
 Copyright (C) 2008 Benito van der Zander (BeniBela)
                    benito@benibela.de
@@ -25,7 +24,254 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
+unit extendedhtmlparser;
+
 {$mode objfpc}{$H+}
+
+interface
+uses
+  Classes, SysUtils,simplehtmlparser,simplehtmltreeparser,pseudoxpath,
+    dRegExpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page dead, I create a mirror on benibela.de) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr)
+    bbutils;
+
+
+type
+TTemplateElementType=(tetHTML, tetCommandMeta, tetCommandRead,tetCommandLoop,tetCommandIf);
+
+TNotifyCallbackFunction = procedure () of object;
+TVariableCallbackFunction = procedure (variable: string; value: string) of object;
+TReadCallbackFunction = procedure (read: pchar; readLen:longint) of object;
+
+TReplaceFunction = procedure (variable: string; var value:string) of object;
+
+ETemplateParseException = Exception;
+
+{ TTemplateElement }
+
+TTemplateElement=class(TTreeElement)
+  templateType: TTemplateElementType;
+  function isOptional: boolean;
+  procedure initialized;override;
+end;
+
+{ THtmlTemplateParser }
+
+THtmlTemplateParser=class
+private
+  Fvariables: TStringList;
+  protected
+    templateEncoding,htmlEncoding, outputEncoding: TEncoding;
+
+    FTemplate, FHTML: TTreeParser;
+    FTemplateName: string;
+
+    FPseudoXPath: TPseudoXPathParser;
+  protected
+    FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
+    //FCurrentStack: TStringList;
+    FOnVariableRead: TVariableCallbackFunction;
+
+    //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
+    function executePseudoXPath(str: string; replaceVariables: boolean=true):string;
+    //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
+    //function getTemplateElementDebugInfo(element: TTemplateElement): string;
+  public
+    constructor create;
+    destructor destroy; override;
+
+
+    procedure parseHTML(html: string); //**< parses the given data
+    procedure parseHTMLFile(htmlfilename: string); //**< parses the given file
+    procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
+    procedure parseTemplateFile(templatefilename: string);
+    //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
+    //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
+
+    //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace
+    function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
+
+    property variables: TStringList read Fvariables;//**<List of all variables
+  end;
+
+implementation
+
+const TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIf];
+      COMMAND_CLOSED:array[tetCommandMeta..tetCommandIf] of boolean=(false,false,true,true);
+      COMMAND_STR:array[tetCommandMeta..tetCommandIf] of string=('meta','read','loop','if');
+
+{ TTemplateElement }
+
+function strToCommand(s:string): TTemplateElementType;
+var i:longint;
+    tag:pchar; taglen: integer;
+begin
+  Result:=tetHTML;
+  if strlibeginswith(s,'htmlparser:') then begin
+    tag:=@s[length('htmlparser:')];
+    taglen:=length(s)-length('htmlparser:');
+    for Result:=low(COMMAND_STR) to high(COMMAND_STR) do
+      if strliequal(tag,COMMAND_STR[Result],taglen) then
+        exit();
+    raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s)
+  end;
+end;
+
+function TTemplateElement.isOptional: boolean;
+begin
+  if (typ=tetText) and (value='') then exit(true);
+  if (attributes=nil) then exit(false);
+  result:=(attributes.Values['htmlparser-optional']='true');
+end;
+
+procedure TTemplateElement.initialized;
+begin
+  //inherited initialized;
+  if typ <> tetOpen then exit;
+  templateType:=strToCommand(value);
+end;
+
+procedure changeEncoding(tree:TTreeElement; from,toe: TEncoding);
+begin
+  if (from = toe) or (from = eUnknown) or (toe = eUnknown) then exit;
+  while tree <> nil do begin
+    if tree.typ = tetText then tree.value:=strChangeEncoding(tree.value, from, toe)
+    else if tree.attributes <> nil then tree.attributes.text:=strChangeEncoding(tree.attributes.text,from,toe);
+    //TODO: convert tree tag names (but this is not necessary as long as only latin1 and utf8 is supported)
+    tree := tree.next;
+  end;
+end;
+
+
+function THtmlTemplateParser.executePseudoXPath(str: string; replaceVariables: boolean): string;
+begin
+  if replaceVariables then str := replaceVars(str);
+  FPseudoXPath.parse(str);
+  result:=FPseudoXPath.evaluate();
+end;
+
+constructor THtmlTemplateParser.create;
+begin
+  FTemplate := TTreeParser.Create;
+  FTemplate.parsingModel:=pmStrict;
+  FHTML := TTreeParser.Create;
+  FHTML.parsingModel:=pmHTML;
+  FPseudoXPath := TPseudoXPathParser.Create;
+  outputEncoding:=eUTF8;
+end;
+
+destructor THtmlTemplateParser.destroy;
+begin
+  FTemplate.Free;
+  FHTML.Free;
+  FPseudoXPath.free;
+  inherited destroy;
+end;
+
+procedure THtmlTemplateParser.parseHTML(html: string);
+var
+  head: TTreeElement;
+  meta: TTreeElement;
+  encoding: string;
+begin
+  FHTML.parseTree(html);
+
+  //encoding trouble
+  htmlEncoding:=eUnknown;
+  encoding := lowercase(TPseudoXPathParser.Evaluate('head/meta[@http-equiv=''content-type'']/@content', FHTML.getTree));
+  if encoding <> '' then begin
+    if pos('charset=utf-8', encoding) > 0 then htmlEncoding:=eUTF8
+    else if (pos('charset=windows-1252',encoding) > 0) or
+            (pos('charset=iso-8859-1',encoding) > 0) then
+      htmlEncoding:=eWindows1252;
+  end;
+
+  changeEncoding(FHTML.getTree, htmlEncoding, outputEncoding);
+  changeEncoding(FHTML.getTree, templateEncoding, outputEncoding);
+end;
+
+procedure THtmlTemplateParser.parseHTMLFile(htmlfilename: string);
+begin
+  parseHTML(strLoadFromFile(htmlfilename));
+end;
+
+procedure THtmlTemplateParser.parseTemplate(template: string;
+  templateName: string);
+var el: TTemplateElement;
+begin
+  templateEncoding:=eUnknown;
+  if strbeginswith(template,#$ef#$bb#$bf) then begin
+    delete(template,1,3);
+    templateEncoding:=eUTF8;
+  end else if strbeginswith(template,#$fe#$ff) or strbeginswith(template,#$ff#$fe) or
+    strbeginswith(template,#00#00#$fe#$ef) then
+    raise Exception.Create('Ungültiger Codierung BOM im Template');
+
+  //read template
+  FTemplate.parseTree(template);
+  FTemplateName := templateName;
+
+  //evaluate meta
+  el := TTemplateElement(FTemplate.getTree);
+  while el <> nil do begin
+    if el.templateType = tetCommandMeta then begin
+      if el.attributes.Values['encoding'] <> '' then begin
+        if striequal(el.attributes.Values['encoding'],'utf8') or
+            striequal(el.attributes.Values['encoding'],'utf-8') then
+            templateEncoding:=eUTF8
+          else
+            templateEncoding:=eWindows1252;
+      end;
+    end;
+  end;
+end;
+
+procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
+begin
+  parseTemplate(strLoadFromFile(templatefilename),templatefilename);
+end;
+
+function THtmlTemplateParser.replaceVars(s: string; customReplace: TReplaceFunction): string;
+var f,i:longint;
+    temp,value:string;
+begin
+  Result:='';
+  i:=1;
+  while i<=length(s) do begin
+    if s[i]='$' then begin
+      f:=i+1;
+      while (i<=length(s)) and (s[i]<>';')  do inc(i);
+      temp:=copy(s,f,i-f);
+      value:=variables.Values[temp];
+      if assigned(customReplace) then customReplace(temp,value);
+    //  OutputDebugString(pchar(parser.variables.Text));
+      result+=value;
+    end else Result+=s[i];
+    i+=1;
+  end;
+end;
+
+
+
+end.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 interface
 
@@ -50,7 +296,6 @@ type
 
   { TTemplateElement }
 
-  TTemplateElementType=(tetCommandRead,tetCommandLoop,tetCommandIf, tetHTML,tetText);
   TTemplateElement= class
     typ: TTemplateElementType;
     closeTag: boolean;
@@ -60,15 +305,13 @@ type
     reverse: TTemplateElement; //Schließen/Öffnen
     next,rnext: TTemplateElement;
 
+
     offset:longint; //für debugging, bytes between element in template and template start
     function toStr:string;
     procedure freeAll;
     destructor destroy;override;
   end;
 
-const TEMPLATE_COMMANDS=[tetCommandRead..tetCommandIf];
-      COMMAND_CLOSED:array[tetCommandRead..tetCommandIf] of boolean=(false,true,true);
-      COMMAND_STR:array[tetCommandRead..tetCommandIf] of string=('read','loop','if');
 type
 
   { TParsingStatus }
@@ -81,12 +324,6 @@ type
     destructor destroy;override;
   end;
 
-  TNotifyCallbackFunction = procedure () of object;
-  TVariableCallbackFunction = procedure (variable: string; value: string) of object;
-  TReadCallbackFunction = procedure (read: pchar; readLen:longint) of object;
-
-  TReplaceFunction = procedure (variable: string; var value:string) of object;
-  
   { THtmlTemplateParser }
 
   {**
@@ -137,7 +374,7 @@ type
 
       @bold(Syntax of the pseudo-XPath-expressions)
 
-      A pseudo-XPath-expression is like a XPath-expression, but much more simple. At first every occurrence of $variable; is replaced by the current value, independent of scope (so you can store a expression in a variable).
+      A pseudo-XPath-expression is like a XPath-expression, but much more simple. At first every occurrence of $variable; is replaced by the current value, independent of scope (so you can store a expression in a variable, DEPRECATED, see below).
       Then the remaining language elements are evaluated:
       @unorderedList(
         @item(@code('something') @br This gives the string 'something')
@@ -151,17 +388,8 @@ type
       ))
       @br @br
 
-      @br
-      Notes: The html file is read only once and interpreted at the same time. So that onVariableRead is called, doesn't mean the variable will later have the given value.
-      Example for that: Template: <a><htmlparser:read ...> TEXT</a> @br HTML: <body><a>something</a><a>text</a><a>something 2</a></body> @br
-      There onVariableRead is called twice, (for the first and for the second <a> tag), because the parser doesn't know that the text is wrong, when it enters the first <a> tag. @br
-      For the loop-command a heuristic is used. After the last tag in the loop-command is read the program looks for the next matching tag at the beginning of the loop-command as well as after it. If the parsers enters tag which fits inside the loop, the loop is considered to continue. If a tag is leaved, which is after the loop, the loop is considered to end.@br
-      Optional elements are handled the same way: it is ignored if the containing tag is closed or a following tag is found, before a tag matching to the optional one is found.@br
-      Every if- and loop-command must be separated by at least one normal-tag!    @br
-      The output is always UTF-8 @br
-      See the unitTests at the end of extendehtmlparser.pas for examples.
-
-
+      @notice:
+      Planned changes: In the next version the variables will be replaced in the latest stage, so you shouldn't store expressions in them. (so the variables will be variables and not defines). But there will be an eval function
   }
   THtmlTemplateParser=class
   protected
@@ -291,294 +519,6 @@ begin
   end;
 end;
 
-function THtmlTemplateParser.executePseudoXPath(str: string): string;
-  //Some Options
-  const MAX_EXP_NESTING=16; //maximal nesting depth of the expressions
-  const MAX_TOTAL_EXPS=128; //maximal count of sub-expressions, if using static memory
-  {$DEFINE USED_STATIC_MEMORY} //static memory management, faster that dynamic, but limits number of possible sub-expressions
-
-
-  //Type definitions
-  type
-    TTermType=(tString,
-                tCompareEqual, tCompareUnequal,
-                tReadAttribute, tReadText, tReadDeepNodeText,
-                tConcat, tFilter);
-    PTerm = ^TTerm;
-    TTermArray = array of PTerm;
-    TTerm = record
-      typ: TTermType;
-      children: TTermArray;
-      value: string;
-    end;
-
-
-  //Memory management (creation,deletion,constructors for terms)
-  {$IFDEF USED_STATIC_MEMORY}
-  var
-    staticMemory: array[1..MAX_TOTAL_EXPS] of TTerm;
-    staticUsedExpressions: longint;
-  {$ENDIF}
-  function newTerm(): PTerm;overload;
-  begin
-    {$IFDEF USED_STATIC_MEMORY}
-    staticUsedExpressions+=1;
-    if staticUsedExpressions>high(staticMemory) then
-      raise Exception.create('Maximal number of XPath-Expression used. Increase limit or switch to dynamic memory');
-    result:=@staticMemory[staticUsedExpressions];
-    {$ELSE}
-    new(result);
-    {$ENDIF}
-  end;
-  procedure disposeTerm(t:PTerm);
-  var
-    i: Integer;
-  begin
-    {$IFNDEF USED_STATIC_MEMORY}
-    for i:=0 to high(t^.children) do
-      disposeTerm(t^.children[i]);
-    dispose(t);
-    {$ENDIF}
-  end;
-  function newTerm(const typ:TTermType; const value:string=''): PTerm;overload;
-  begin
-    result:=newTerm();
-    result^.typ:=typ;
-    result^.value:=value;
-  end;
-  function newTerm(const s:string): PTerm;overload;
-  begin
-    result:=newTerm();
-    result^.typ:=tString;
-    result^.value:=s;
-  end;
-
-  //Term parsing: converts flat term to term tree
-  function parseTerm(s:string): PTerm;
-  var pos:pchar;
-    procedure raiseParsingError(s:string);
-    begin
-      raise Exception.Create(s+#13#10'in: '+strcopy2(@str[1],pos-1)+' [<- fehler] '+strcopy2(pos,@str[length(str)]));
-    end;
-    //read the next token ('string', symbol, identifier)
-    function nextToken:string;
-    const SYMBOLS = ['''','(','=','!','<','>',')',','];
-    var start:pchar;
-    begin
-      while pos^ in WHITE_SPACE do pos+=1;
-      if pos^ = #0 then exit('');
-      start:=pos;
-      if pos^='''' then begin
-        repeat
-          pos+=1;
-        until pos^ in ['''',#0];
-        pos+=1;
-      end else if pos^ in SYMBOLS then begin
-        pos+=1;
-        exit((pos-1)^);
-      end else begin
-        repeat
-          pos+=1;
-        until pos^ in SYMBOLS + WHITE_SPACE + [#0];
-      end;
-      result:=strcopy2(start,pos-1);
-    end;
-    procedure expect(c:char);
-    begin
-      while pos^ in WHITE_SPACE do pos+=1;
-      if pos^ <> c then
-        raise Exception.Create(c+' erwartet aber '+pos^+' gefunden'#13#10+strcopy2(@str[1],pos));
-      pos+=1;
-    end;
-    var stackHierarchy: array[1..MAX_EXP_NESTING] of PTerm;
-        stackHierarchyLength: longint;
-        curTerms: ^TTermArray;
-        //Put the current stack on the stack stack and use the stack (children) of the
-        //first term of the old stack as new stack
-        procedure descendToChildrenStack();
-        begin
-          if length(curTerms^)=0 then
-            raiseParsingError('No term available (e.g. bracket opening without function call)');
-          stackHierarchyLength+=1;
-          stackHierarchy[stackHierarchyLength]:=curTerms^[high(curTerms^)];
-          curTerms:=@curTerms^[high(curTerms^)]^.children;
-        end;
-        procedure completeTerm();forward;
-        //Goes a level up in the tree, to use the children of the parent of the current element as new stack
-        procedure ascendToParentStack();
-        begin
-          if stackHierarchyLength<=1 then
-            raiseParsingError('No stack hierarchy available (e.g. closing bracket without function call)');
-          stackHierarchyLength-=1;
-          curTerms:=@stackHierarchy[stackHierarchyLength]^.children;
-          completeTerm();
-        end;
-        //Called if a term is completed, so that it can go a level upwards if we
-        //waited there for a second term of a binary operator
-        procedure completeTerm();
-        begin
-          if (stackHierarchy[stackHierarchyLength]^.typ in [tCompareEqual, tCompareUnequal])
-           and (length(curTerms^)=2) then //binary operation complete
-            ascendToParentStack();
-        end;
-        //pushs the term on the current stack/tree level
-        procedure pushTerm(const t:PTerm);
-        begin
-          setlength(curTerms^,length(curTerms^)+1);
-          curTerms^[high(curTerms^)]:=t;
-        end;
-        //push the term on the stack/tree level and mark as completed
-        procedure pushCompleteTerm(const t:PTerm);
-        begin
-          pushTerm(t);
-          completeTerm();
-        end;
-
-  var resultTempTerm: TTerm;
-      word:string;
-      tempTerm: PTerm;
-  begin
-    if str='' then exit(newTerm(''));
-    pos:=@str[1];
-    resultTempTerm.typ:=tConcat;
-    curTerms:=@resultTempTerm.children;
-    stackHierarchyLength:=1;
-    stackHierarchy[1]:=@resultTempTerm;
-    while pos^<>#0 do begin
-      word:=nextToken();
-      if word='' then break;
-      case word[1] of
-        '''': pushCompleteTerm(newTerm(copy(word,2,length(word)-2)));
-        '@':  pushCompleteTerm(newTerm(tReadAttribute, strcopy2(word,2)));
-        '=': begin
-          if pos^='=' then pos+=1; //auch == erlauben
-          if length(curTerms^) = 0 then raiseParsingError('No term before = found');
-          //insert compare term node as parent of the last term
-          tempTerm:=curTerms^[high(curTerms^)];
-          curTerms^[high(curTerms^)]:=newTerm(tCompareEqual);
-          descendToChildrenStack();
-          pushTerm(tempTerm);
-          assert(Length(curTerms^)=1);
-        end;
-        '!': begin
-          expect('=');
-          if length(curTerms^) = 0 then raiseParsingError('No term before != found');
-          //insert compare term node as parent of the last term
-          tempTerm:=curTerms^[high(curTerms^)];
-          curTerms^[high(curTerms^)]:=newTerm(tCompareUnequal);
-          descendToChildrenStack();
-          pushTerm(tempTerm);
-          assert(Length(curTerms^)=1);
-        end;
-        '(': descendToChildrenStack();
-        ',': ; //ignored
-               //TODO: check for commas between arguments
-        ')': ascendToParentStack();
-        else if SameText(word,'text') then begin
-          expect('(');expect(')');
-          pushTerm(newTerm(tReadText));
-        end else if SameText(word,'deepNodeText') then begin
-          expect('(');expect(')');
-          pushTerm(newTerm(tReadDeepNodeText));
-        end else if SameText(word,'concat') then
-          pushTerm(newTerm(tConcat))
-        else if SameText(word,'filter') then
-          pushTerm(newTerm(tFilter))
-        else
-          raise Exception.Create('Unbekannter Pseudo-XPath-Befehl: '+word+' in '#13#10+strcopy2(@str[1],pos));
-      end;
-    end;
-    if curTerms<>@resultTempTerm.children then raiseParsingError('Pseudo-XPath parsing ended on wrong level: at '+str);
-    if length(resultTempTerm.children)=0 then raiseParsingError('Pseudo-XPath is empty: '+str);
-    if length(resultTempTerm.children)>1 then raiseParsingError('Pseudo-XPath contains to many top level terms: '+IntToStr(length(resultTempTerm.children))+' in '+str);
-    result:=resultTempTerm.children[0];
-  end;
-
-  //Evaluates a term tree
-  function evaluateTerm(const term: TTerm): string;
-    procedure raiseEvaluationError(const term:TTerm; s:string);
-    begin
-      raise Exception.Create(s);
-    end;
-  var regEx:TRegExpr;
-      i: Integer;
-      temp: string;
-  begin
-    case term.typ of
-      tString: exit(replaceVars(term.value));
-      tReadAttribute: exit(getProperty(term.value,FOldProperties));
-      tReadText: exit(FlastText);
-      tReadDeepNodeText: exit(fdeepNodeText);
-      tCompareEqual, tCompareUnequal: begin
-        if length(term.children)<2 then raiseEvaluationError(term, 'Not enough subterms')
-        else if length(term.children)>2 then raiseEvaluationError(term, 'To many subterms');
-        if SameText(evaluateTerm(term.children[0]^), evaluateTerm(term.children[1]^) )
-           = (term.typ = tCompareEqual) then
-            exit('true')
-          else
-            exit('false');
-      end;
-      tConcat: begin
-        result:='';
-        for i:=0 to high(term.children) do result+=evaluateTerm(term.children[i]^);
-      end;
-      tFilter: begin
-        if length(term.children)<2 then raiseEvaluationError(term, 'Not enough arguments');
-        if length(term.children)>3 then raiseEvaluationError(term, 'To many arguments');
-        //TODO: cache regex
-        regEx:=TRegExpr.Create(evaluateTerm(term.children[1]^));
-        try
-          regEx.Exec(evaluateTerm(term.children[0]^));
-          if length(term.children) = 3 then begin
-            result:=regex.Match[StrToInt(evaluateTerm(term.children[2]^))];
-          end else
-            result:=regEx.Match[0];
-        finally
-          regEx.free;
-        end;
-      end;
-      else raiseEvaluationError(term,'Invalid term');
-    end;
-  end;
-
-var term:PTerm;
-begin
-  //Möglichkeiten:
-  //func(<1>,<2>,<3>,...)
-  //<1> [==,!=, =] <2>
-  //@attrib
-  //'...'
-
-  (*
-    a little bit more formal (anyone who knows a good pascal compiler compiler? i couldn't find one...):
-
-    SPACE = #9 #10 #13 #20
-    TERM = SPACE TERM SPACE | TERM BIN-OP TERM | FUNCTION-APPLICATION | DATA
-
-    FUNCTION-APPLICATION = FUNCTION PARAMETERS
-    PARAMETERS = () | TERM-LIST
-    TERM-LIST = TERM |  TERM , TERM-LIST
-
-    DATA = @attribute | 'string'
-    BIN-OP = == | != | =
-    FUNCTION = concat | text | deepNodeText | filter
-
-               concat(n) text()  deepNodeText()  filter(2|3)
-  *)
-
-  {$IFDEF USED_STATIC_MEMORY}staticUsedExpressions:=0;{$ENDIF}
-  {str:=trim(str);
-  if str='' then exit('');
-  if str='text()' then exit(FlastText);
-  if str='deepNodeText()' then exit(fdeepNodeText);}
-
-  term:=parseTerm(str); //TODO: cache term tree
-  try
-    result:=evaluateTerm(term^);
-  finally
-    disposeTerm(term);
-  end;
-end;
 
 procedure THtmlTemplateParser.executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
 
@@ -730,7 +670,7 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
     if name<>'' then begin
       tempProperties:=FOldProperties;
       FOldProperties:=properties;
-      result:=executePseudoXPath(name)='true';
+      result:=executePseudoXPath(??name)='true';
       FOldProperties:=tempProperties;
       exit;
     end;
@@ -781,13 +721,6 @@ begin
         templateEncoding:=htmlEncoding;
       end;
     end;
-  FAutoCloseTag:=strliequal(tagName,'meta',tagNameLen) or
-                 strliequal(tagName,'br',tagNameLen) or
-                 strliequal(tagName,'input',tagNameLen) or
-                 strliequal(tagName,'frame',tagNameLen) or
-                 strliequal(tagName,'hr',tagNameLen)or
-                 strliequal(tagName,'img',tagNameLen)or
-                 strliequal(tagName,'p',tagNameLen);
 
   result:=true;
   for i:=0 to FParsingAlternatives.Count-1 do begin
@@ -989,20 +922,6 @@ begin
   FLastHTMLTemplateElement:=FCurrentTemplateElement;
 end;
 
-function THtmlTemplateParser.strToCommand(tagName: pchar; tagNameLen: longint
-  ): TTemplateElementType;
-var i:longint;
-begin
-  Result:=tetHTML;
-  if strlibeginswith(tagName,tagNameLen,'htmlparser:') then begin
-    tagName+=length('htmlparser:');
-    tagNameLen-=length('htmlparser:');
-    for Result:=low(COMMAND_STR) to high(COMMAND_STR) do
-      if strliequal(tagName,COMMAND_STR[Result],tagNameLen) then
-        exit();
-    raise ETemplateParseException.Create('Unbekannter Templatebefehl: htmlparser:'+strFromPchar(tagName,tagNameLen))
-  end;
-end;
 
 function THtmlTemplateParser.templateEnterTag(tagName: pchar;
   tagNameLen: longint; properties: THTMLProperties): boolean;
@@ -1015,14 +934,7 @@ begin
     else templateEncoding:=eWindows1252;
     exit(true);
   end;
-  //workaround, htmlparser:read and if needs text
-  if (strliequal(tagName,'htmlparser:read',tagNameLen)) or
-     (strliequal(tagName,'htmlparser:if',tagNameLen)) then
-    {if pos('text()',LowerCase(getProperty('source',properties)))>0 then }begin
-      nte:=newTemplateElement('',0);
-      nte.typ:=tetText;
-      rememberNewHTMLElement(nte);
-    end;
+
   Result:=true;
   nte:=newTemplateElement(tagName,tagNameLen);
   nte.typ:=strToCommand(tagName,tagNameLen);
@@ -1034,14 +946,6 @@ begin
     rememberNewHTMLElement(FCurrentTemplateElement);
     FTemplateElementStack.add(FCurrentTemplateElement);
   end;
-  if length(properties)>0 then begin
-    FCurrentTemplateElement.attributes:=TStringList.Create;
-    for i:=0 to high(properties) do
-      with properties[i] do
-        FCurrentTemplateElement.attributes.Add(trim(strFromPchar(name,nameLen))+'='+
-                                               trim(strFromPchar(value,valueLen)));
-  end;
-
 end;
 
 function THtmlTemplateParser.templateLeaveTag(tagName: pchar; tagNameLen: longint):boolean;
@@ -1092,16 +996,6 @@ begin
   nte:=newTemplateElement(text,textLen);
   nte.typ:=tetText;
   rememberNewHTMLElement(nte);
-end;
-
-function THtmlTemplateParser.elementIsOptional(element: TTemplateElement
-  ): boolean;
-begin
-  if element=nil then exit(true);
-  if (element.typ=tetText) and (element.text='') then exit(true);
-  if (element.attributes=nil) then exit(false);
-  result:=(element.attributes.Values['htmlparser-optional']='true');
-
 end;
 
 procedure THtmlTemplateParser.finishHtmlParsing(status:TParsingStatus);
@@ -1164,11 +1058,6 @@ begin
   end;
 end;
 
-procedure THtmlTemplateParser.parseHTMLFile(htmlfilename: string);
-begin
-  parseHTML(strLoadFromFile(htmlfilename));
-end;
-
 procedure THtmlTemplateParser.parseTemplate(template: string; templateName: string='<unknown>');
 begin
   //FVariables.clear;
@@ -1179,23 +1068,12 @@ begin
   FRootTemplate:=nil;
   FTemplateElementStack.Clear;
   FLastHTMLTemplateElement:=nil;
-  templateEncoding:=eWindows1252;
-  if strbeginswith(template,#$ef#$bb#$bf) then begin
-    delete(template,1,3);
-    templateEncoding:=eUTF8;
-  end else if strbeginswith(template,#$fe#$ff) or strbeginswith(template,#$ff#$fe) or
-    strbeginswith(template,#00#00#$fe#$ef) then
-    raise Exception.Create('Ungültiger Codierung BOM im Template');
+
   FCurrentTemplate:=template;
   FCurrentTemplateName:=templateName;
   simplehtmlparser.parseHTML(template,@templateEnterTag,@templateLeaveTag,@templateTextEvent);
   if FRootTemplate = nil then
     raise ETemplateParseException.Create('Ungültiges/Leeres Template');
-end;
-
-procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
-begin
-  parseTemplate(strLoadFromFile(templatefilename),templatefilename);
 end;
 
 {procedure THtmlTemplateParser.addFunction(name: string;varCallFunc: TVariableCallbackFunction);
@@ -1208,25 +1086,6 @@ begin
   FNotifyFunctions.AddObject(name,tobject(@notifyCallFunc));
 end;}
 
-function THtmlTemplateParser.replaceVars(s: string;customReplace: TReplaceFunction=nil): string;
-var f,i:longint;
-    temp,value:string;
-begin
-  Result:='';
-  i:=1;
-  while i<=length(s) do begin
-    if s[i]='$' then begin
-      f:=i+1;
-      while (i<=length(s)) and (s[i]<>';')  do inc(i);
-      temp:=copy(s,f,i-f);
-      value:=variables.Values[temp];
-      if assigned(customReplace) then customReplace(temp,value);
-    //  OutputDebugString(pchar(parser.variables.Text));
-      result+=value;
-    end else Result+=s[i];
-    i+=1;
-  end;
-end;
 
 
 { TTemplateElement }
@@ -1814,6 +1673,5 @@ unitTests();
 
 
 end.
-
 
 

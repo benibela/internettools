@@ -47,13 +47,13 @@ type
   TLongintArray =array of longint;
   TLongwordArray =array of longword;
 
-function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //=> i with a[i]=e
+function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //returns i with a[i]=e
 //**removes i from a (destroying the order of the elements)
-function arrayRemove(var a: TLongintArray;i: longint):longint; overload; //=> e=a[i], unsorted
+function arrayDelete(var a: TLongintArray;i: longint):longint; overload; //returns e=a[i], unsorted
 procedure arrayInvert(var a: TLongintArray);overload;
-function arrayAdd(var a: TLongwordArray;e: longint):longint; overload; //=> i with a[i]=e
+function arrayAdd(var a: TLongwordArray;e: longint):longint; overload; //returns i with a[i]=e
 //**removes i from a (destroying the order of the elements)
-function arrayRemove(var a: TLongwordArray;i: longint):longint; overload; //=> e=a[i], unsorted
+function arrayDelete(var a: TLongwordArray;i: longint):longint; overload; //returns e=a[i], unsorted
 procedure arrayInvert(var a: TLongwordArray);overload;
 
 //-----------------------Flow/Thread control functions------------------------
@@ -94,12 +94,22 @@ public
 end;
 
 //------------------------------Stringfunctions--------------------------
-//all of them start with 'str' or 'widestr' so can find them easily
+//All of them start with 'str' or 'widestr' so can find them easily
+//Naming scheme str <l> <i> <name>
+//L: use length (ignoring #0 characters, so the string must be at least length characters long)
+//I: case insensitive
+
 type
   TEncoding=(eUnknown,eWindows1252,eUTF8);
 
+//copy
 function strlmove(dest,source:pchar;destLen,sourceLen: longint):pchar;
 function widestrlmove(dest,source:pwidechar;destLen,sourceLen: longint):pwidechar;
+function strcopyfrom(s:string; start:longint):string;inline;
+function strslice(first,last:pchar):string;
+function strslice(s:string; start,last:longint):string;
+
+//comparison
 function strlequal(p1,p2:pchar;l1,l2: longint):boolean;
 function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
 function strliequal(p:pchar;s:string;l: longint):boolean;
@@ -108,11 +118,17 @@ function strbeginswith(str,start:string):boolean;
 function strlibeginswith(p:pchar;l: longint;s:string):boolean;
 function strlibeginswith(strToBeExaminated,expectedStart:string):boolean;
 function strliendswith(strToBeExaminated,expectedEnd:string):boolean;
-function strcopy2(s:string; start:longint):string;inline;
-function strcopy2(first,last:pchar):string;
-function strcopy2(s:string; start,last:longint):string;
+
+//search
 function strrpos(c:char;s:string):longint;
 function strlcount(const search:char; const searchIn:pchar; const len: longint): longint;
+
+//more specialized
+type TCharSet = set of char;
+//**remove all occurences of trimCharacter from the left/right side of the string
+procedure strlTrimLeft(var p: pchar; var l: integer; const trimCharacters: TCharSet = [' ']);
+procedure strlTrimRight(var p: pchar; var l: integer; const trimCharacters: TCharSet = [' ']);
+procedure strlTrim(var p: pchar; var l: integer; const trimCharacters: TCharSet = [' ']);
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is returned as function result the second one is again assign to remainingPart
@@ -255,7 +271,7 @@ begin
   result:=high(a);
 end;
 
-function arrayRemove(var a: TLongintArray; i: longint): longint;
+function arrayDelete(var a: TLongintArray; i: longint): longint;
 begin
   if (i<0) or (i>high(a)) then exit(0);
   result:=a[i];
@@ -280,7 +296,7 @@ begin
   result:=high(a);
 end;
 
-function arrayRemove(var a: TLongwordArray; i: longint): longint;
+function arrayDelete(var a: TLongwordArray; i: longint): longint;
 begin
   if (i<0) or (i>high(a)) then exit(0);
   result:=a[i];
@@ -330,9 +346,8 @@ begin
 end;
 
 procedure threadedCallBase(proc: TProcedureOfObject; finished: TNotifyEvent);
-var thread: TThreadedCall;
 begin
-  thread:=TThreadedCall.Create(proc,finished);
+  TThreadedCall.Create(proc,finished);
 end;
 
 procedure threadedCall(proc: TProcedureOfObject; finished: TNotifyEvent);
@@ -501,15 +516,16 @@ begin
   else result:=strliequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],expectedEnd,length(expectedEnd));
 end;
 
-function strcopy2(s: string; start: longint): string; inline;overload;
+function strcopyfrom(s: string; start: longint): string; inline;overload;
 begin
   result:=copy(s,start,length(s)-start+1);
 end;
 
-function strcopy2(s: string; start, last: longint): string;
+function strslice(s: string; start, last: longint): string;
 begin
   result:=copy(s,start,last-start+1);
 end;
+
 
 function strrpos(c: char; s: string): longint;
 var i:longint;
@@ -530,11 +546,31 @@ begin
       result+=1;
 end;
 
-function strcopy2(first, last: pchar): string;
+function strslice(first, last: pchar): string;
 begin
   if first>last then exit;
   SetLength(result,last-first+1);
   move(first^,result[1],length(result));
+end;
+
+procedure strlTrimLeft(var p: pchar; var l: integer; const trimCharacters: TCharSet);
+begin
+  while (l > 0) and (p^ in trimCharacters) do begin
+    inc(p);
+    dec(l);
+  end;
+end;
+
+procedure strlTrimRight(var p: pchar; var l: integer; const trimCharacters: TCharSet);
+begin
+  while (l > 0) and (p[l-1] in trimCharacters) do
+    dec(l);
+end;
+
+procedure strlTrim(var p: pchar; var l: integer; const trimCharacters: TCharSet);
+begin
+  strlTrimLeft(p,l,trimCharacters);
+  strlTrimRight(p,l,trimCharacters);
 end;
 
 function strSplitGet(const separator: string; var remainingPart: string): string;
