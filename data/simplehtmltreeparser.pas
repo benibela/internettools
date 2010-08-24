@@ -162,6 +162,7 @@ begin
     if cur.typ = tetText then result:=result+cur.value+separator;
     cur := cur.next;
   end;
+  if (result<>'') and (separator<>'') then setlength(result,length(result)-length(separator));
 end;
 
 function TTreeElement.getValue(): string;
@@ -223,18 +224,12 @@ end;
 function TTreeParser.newTreeElement(typ: TTreeElementType; s: string
   ): TTreeElement;
 begin
-  if FRootElement = nil then begin
-    FRootElement:=treeElementClass.create;
-    result:=FRootElement;
-  end else begin
-    result:=treeElementClass.Create;
-  end;
+  result:=treeElementClass.Create;
   result.typ := typ;
   result.value := s;
   FTemplateCount+=1;
 
-  if FCurrentElement <> nil then
-    FCurrentElement.next := result;
+  FCurrentElement.next := result;
   FCurrentElement := result;
   //FCurrentElement.id:=FTemplateCount;
 end;
@@ -405,7 +400,21 @@ begin
 
   FCurrentFile:=html;
   FAutoCloseTag:=false;
+
+  //initialize root element
+  FRootElement:=treeElementClass.create;
+  FRootElement.typ := tetOpen;
+  FCurrentElement:=FRootElement;
+  FElementStack.Clear;
+  FElementStack.Add(FCurrentElement);
+  FTemplateCount:=1;
+
+  //parse
   simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText);
+
+  //close root element
+  leaveTag('',0);
+
 
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');

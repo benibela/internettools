@@ -1557,62 +1557,6 @@ end;
 
 procedure unitTests();
 
-const
-      pseudoXpathTests: array[1..46] of array [1..2] of string = (
-              //Basic test
-              ('',                          ''),
-              ('''''',                      ''),
-              ('''Test''',                  'Test'),
-              (#9'   ''xyz''     '#13#10,   'xyz'),
-              (''''#9'xyz'#13'''',           #9'xyz'#13),
-              //XPath like HTML Reading
-              ('text()',                    'test:last text'),
-              ('deepNodeText()',            'test:deep node text'),
-              ('@attrib1',                  'FIRST ATTRIBUTE'),
-              ('@attrib2',                  'SECOND ATTRIBUTE'),
-              ('@attrib3',                  'THIRD ATTRIBUTE'),
-              //Comparison tests
-              ('''a == b''',                'a == b'),
-              ('''a'' == ''b''',            'false'),
-              ('''abc'' == ''abc''',        'true'),
-              ('''123'' != ''abc''',        'true'),
-              ('''$test;''==''abc''',       'false'),
-              //Concatenation tests
-              ('concat(''a'',''b'',''c'')', 'abc'),
-              ('concat(''one'')',           'one'),
-              ('concat(''hallo'', '' '', ''welt'') == ''hallo welt''',  'true'),
-              ('concat  (  ''a'',  ''b'',  ''c''  )',                   'abc'),
-              ('concat(''a'',''b'',concat(''c'',''d''))',               'abcd'),
-              ('concat(''a'',concat(''x'',''y'',''z''),''b'',''c'')',   'axyzbc'),
-              //Concatenation + Comparison tests (double as stack test)
-              ('concat(''cond is '',''abc''==''abc'')',                 'cond is true'),
-              ('concat(''>'',''123''!=''test'',''<'')',                 '>true<'),
-              ('concat(concat(''123'',''abc'')==''123abc'',''-#-'')',   'true-#-'),
-              ('concat(''('',''abc''==concat(''a'',''b'',''c''),'')'')','(true)'),
-              //Regex-Filter
-              ('filter(''modern'', ''oder'')',                 'oder'),
-              ('filter(''regex'', ''.g.'')',                   'ege'),
-              ('filter(''reg123ex'', ''[0-9]*'')',             ''),
-              ('filter(''reg123ex'', ''[0-9]+'')',             '123'),
-              ('filter(''regexREGEX'', ''.G.'')',              'EGE'),
-              ('filter(''abcdxabcdefx'', ''b[^x]*'')',         'bcd'),
-              ('filter(''hallo welt'', ''(.*) (.*)'')',        'hallo welt'),
-              ('filter(''hallo welt'', ''(.*) (.*)'', ''0'')', 'hallo welt'),
-              ('filter(''hallo welt'', ''(.*) (.*)'', ''1'')', 'hallo'),
-              ('filter(''hallo welt'', ''(.*) (.*)'', ''2'')', 'welt'),
-              //All together
-              ('filter(concat(''abc'', ''def''), concat(''[^a'',''d]+'' ))', 'bc'),
-              ('concat(''-->'', filter(''miauim'', ''i.*i'') , ''<--'')',   '-->iaui<--'),
-              ('filter(''hallo'', ''a'') == ''a''', 'true'),
-              ('filter(''hallo'', ''x'') != ''''', 'false'),
-              ('filter(@attrib1, ''[^ ]+'')', 'FIRST'),
-              ('filter(@attrib2, ''[^ ]+'')', 'SECOND'),
-              ('filter(text(), ''[^:]+'')', 'test'),
-              ('filter(''$testvar_t;'', ''$testvar_f;'' == ''true'') == ''true''', 'false'),
-              ('filter(''$testvar_t;'', ''$testvar_t;'' == ''true'') == ''true''', 'true'),
-              ('filter(''$testvar_f;'', ''$testvar_f;'' == ''true'') == ''true''', 'false'),
-              ('filter(''$testvar_f;'', ''$testvar_t;'' == ''true'') == ''true''', 'false')      );
-
 var i:longint;
     extParser:THtmlTemplateParser;
     log:TTemplateHTMLParserLogClass;
@@ -1633,11 +1577,7 @@ begin
   extParser.variables.add('testvar_t=true');
   extParser.variables.add('testvar_f=false');
 
-  //execute xpath tests
-  for i:=1 to high(pseudoXpathTests) do
-    if extParser.executePseudoXPath(pseudoXpathTests[i,1])<>pseudoXpathTests[i,2] then
-      raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+pseudoXpathTests[i,1]+#13#10'got:'+extParser.executePseudoXPath(pseudoXpathTests[i,1]));
-  
+
   sl:=TStringList.Create;
   log:=TTemplateHTMLParserLogClass.Create;
   log.parser:=extParser;

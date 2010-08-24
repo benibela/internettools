@@ -38,7 +38,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1"/>
         <CursorPos X="1" Y="1"/>
-        <UsageCount Value="59"/>
+        <UsageCount Value="61"/>
       </Unit0>
       <Unit1>
         <Filename Value="htmlparsergui.pas"/>
@@ -50,7 +50,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="65"/>
         <CursorPos X="14" Y="87"/>
-        <UsageCount Value="59"/>
+        <UsageCount Value="61"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
       </Unit1>
@@ -60,10 +60,10 @@
         <UnitName Value="extendedhtmlparser"/>
         <EditorIndex Value="10"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="282"/>
-        <CursorPos X="45" Y="309"/>
+        <TopLine Value="1541"/>
+        <CursorPos X="25" Y="1568"/>
         <ExtraEditorCount Value="1"/>
-        <UsageCount Value="58"/>
+        <UsageCount Value="60"/>
         <Bookmarks Count="2">
           <Item0 X="1" Y="524" ID="3"/>
           <Item1 X="70" Y="700" ID="6"/>
@@ -77,7 +77,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1054"/>
         <CursorPos X="85" Y="1071"/>
-        <UsageCount Value="28"/>
+        <UsageCount Value="29"/>
         <Loaded Value="True"/>
       </Unit3>
       <Unit4>
@@ -87,7 +87,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1"/>
         <CursorPos X="13" Y="33"/>
-        <UsageCount Value="28"/>
+        <UsageCount Value="29"/>
         <Loaded Value="True"/>
       </Unit4>
       <Unit5>
@@ -97,7 +97,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1"/>
         <CursorPos X="1" Y="1"/>
-        <UsageCount Value="28"/>
+        <UsageCount Value="29"/>
         <Loaded Value="True"/>
       </Unit5>
       <Unit6>
@@ -106,9 +106,9 @@
         <UnitName Value="simplehtmltreeparser"/>
         <EditorIndex Value="20"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="113"/>
-        <CursorPos X="1" Y="138"/>
-        <UsageCount Value="58"/>
+        <TopLine Value="382"/>
+        <CursorPos X="1" Y="417"/>
+        <UsageCount Value="60"/>
         <Loaded Value="True"/>
       </Unit6>
       <Unit7>
@@ -126,7 +126,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1"/>
         <CursorPos X="1" Y="1"/>
-        <UsageCount Value="22"/>
+        <UsageCount Value="23"/>
         <Loaded Value="True"/>
       </Unit8>
       <Unit9>
@@ -135,7 +135,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1146"/>
         <CursorPos X="39" Y="1161"/>
-        <UsageCount Value="22"/>
+        <UsageCount Value="23"/>
         <Loaded Value="True"/>
       </Unit9>
       <Unit10>
@@ -144,7 +144,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="509"/>
         <CursorPos X="14" Y="528"/>
-        <UsageCount Value="22"/>
+        <UsageCount Value="23"/>
         <Loaded Value="True"/>
       </Unit10>
       <Unit11>
@@ -154,7 +154,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="110"/>
         <CursorPos X="3" Y="131"/>
-        <UsageCount Value="22"/>
+        <UsageCount Value="23"/>
         <Loaded Value="True"/>
       </Unit11>
       <Unit12>
@@ -163,7 +163,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1"/>
         <CursorPos X="10" Y="6"/>
-        <UsageCount Value="21"/>
+        <UsageCount Value="22"/>
         <Loaded Value="True"/>
       </Unit12>
       <Unit13>
@@ -172,7 +172,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="35"/>
         <CursorPos X="5" Y="40"/>
-        <UsageCount Value="21"/>
+        <UsageCount Value="22"/>
         <Loaded Value="True"/>
       </Unit13>
       <Unit14>
@@ -206,9 +206,9 @@
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="11"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="276"/>
-        <CursorPos X="1" Y="302"/>
-        <UsageCount Value="36"/>
+        <TopLine Value="425"/>
+        <CursorPos X="151" Y="440"/>
+        <UsageCount Value="38"/>
         <Loaded Value="True"/>
       </Unit17>
       <Unit18>
@@ -217,7 +217,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="79"/>
         <CursorPos X="1" Y="104"/>
-        <UsageCount Value="13"/>
+        <UsageCount Value="14"/>
         <Loaded Value="True"/>
       </Unit18>
       <Unit19>
@@ -227,7 +227,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="36"/>
         <CursorPos X="1" Y="64"/>
-        <UsageCount Value="13"/>
+        <UsageCount Value="14"/>
         <Loaded Value="True"/>
       </Unit19>
       <Unit20>
@@ -236,7 +236,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="412"/>
         <CursorPos X="107" Y="436"/>
-        <UsageCount Value="13"/>
+        <UsageCount Value="14"/>
         <Loaded Value="True"/>
       </Unit20>
       <Unit21>
@@ -246,7 +246,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="49"/>
         <CursorPos X="47" Y="75"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit21>
       <Unit22>
@@ -263,7 +263,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1"/>
         <CursorPos X="1" Y="1"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit23>
       <Unit24>
@@ -273,7 +273,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="78"/>
         <CursorPos X="137" Y="95"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit24>
       <Unit25>
@@ -283,7 +283,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="385"/>
         <CursorPos X="56" Y="385"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit25>
       <Unit26>
@@ -292,7 +292,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="1"/>
         <CursorPos X="1" Y="1"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit26>
       <Unit27>
@@ -308,7 +308,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="7"/>
         <CursorPos X="56" Y="23"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit28>
       <Unit29>
@@ -317,130 +317,130 @@
         <WindowIndex Value="0"/>
         <TopLine Value="47"/>
         <CursorPos X="44" Y="85"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit29>
     </Units>
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="361" Column="1" TopLine="329"/>
+        <Caret Line="117" Column="1" TopLine="98"/>
       </Position1>
       <Position2>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="347" Column="1" TopLine="329"/>
+        <Caret Line="118" Column="1" TopLine="98"/>
       </Position2>
       <Position3>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="348" Column="1" TopLine="329"/>
+        <Caret Line="119" Column="1" TopLine="98"/>
       </Position3>
       <Position4>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="353" Column="1" TopLine="329"/>
+        <Caret Line="120" Column="1" TopLine="98"/>
       </Position4>
       <Position5>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="354" Column="1" TopLine="329"/>
+        <Caret Line="121" Column="1" TopLine="98"/>
       </Position5>
       <Position6>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="355" Column="1" TopLine="329"/>
+        <Caret Line="122" Column="1" TopLine="98"/>
       </Position6>
       <Position7>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="356" Column="1" TopLine="329"/>
+        <Caret Line="104" Column="1" TopLine="97"/>
       </Position7>
       <Position8>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="357" Column="1" TopLine="329"/>
+        <Caret Line="120" Column="16" TopLine="97"/>
       </Position8>
       <Position9>
-        <Filename Value="../simplehtmltreeparser.pas"/>
-        <Caret Line="124" Column="26" TopLine="113"/>
+        <Filename Value="../pseudoxpath.pas"/>
+        <Caret Line="254" Column="1" TopLine="229"/>
       </Position9>
       <Position10>
-        <Filename Value="../simplehtmltreeparser.pas"/>
-        <Caret Line="121" Column="1" TopLine="113"/>
+        <Filename Value="../pseudoxpath.pas"/>
+        <Caret Line="498" Column="1" TopLine="471"/>
       </Position10>
       <Position11>
-        <Filename Value="../simplehtmltreeparser.pas"/>
-        <Caret Line="128" Column="1" TopLine="113"/>
+        <Filename Value="../pseudoxpath.pas"/>
+        <Caret Line="499" Column="68" TopLine="471"/>
       </Position11>
       <Position12>
-        <Filename Value="../simplehtmltreeparser.pas"/>
-        <Caret Line="129" Column="1" TopLine="113"/>
+        <Filename Value="../pseudoxpath.pas"/>
+        <Caret Line="498" Column="1" TopLine="471"/>
       </Position12>
       <Position13>
-        <Filename Value="../simplehtmltreeparser.pas"/>
-        <Caret Line="138" Column="1" TopLine="113"/>
+        <Filename Value="../pseudoxpath.pas"/>
+        <Caret Line="499" Column="1" TopLine="471"/>
       </Position13>
       <Position14>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="335" Column="64" TopLine="313"/>
+        <Caret Line="97" Column="1" TopLine="78"/>
       </Position14>
       <Position15>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="1" Column="1" TopLine="1"/>
+        <Caret Line="98" Column="1" TopLine="78"/>
       </Position15>
       <Position16>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="217" Column="29" TopLine="198"/>
+        <Caret Line="99" Column="1" TopLine="78"/>
       </Position16>
       <Position17>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="233" Column="59" TopLine="217"/>
+        <Caret Line="255" Column="26" TopLine="235"/>
       </Position17>
       <Position18>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="300" Column="83" TopLine="291"/>
+        <Caret Line="498" Column="1" TopLine="473"/>
       </Position18>
       <Position19>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="286" Column="110" TopLine="272"/>
+        <Caret Line="499" Column="1" TopLine="473"/>
       </Position19>
       <Position20>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="300" Column="81" TopLine="272"/>
+        <Caret Line="500" Column="1" TopLine="473"/>
       </Position20>
       <Position21>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="221" Column="1" TopLine="202"/>
+        <Caret Line="501" Column="1" TopLine="473"/>
       </Position21>
       <Position22>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="222" Column="42" TopLine="202"/>
+        <Caret Line="497" Column="1" TopLine="473"/>
       </Position22>
       <Position23>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="224" Column="1" TopLine="202"/>
+        <Caret Line="498" Column="1" TopLine="473"/>
       </Position23>
       <Position24>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="225" Column="1" TopLine="202"/>
+        <Caret Line="499" Column="1" TopLine="473"/>
       </Position24>
       <Position25>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="219" Column="29" TopLine="202"/>
+        <Caret Line="500" Column="1" TopLine="473"/>
       </Position25>
       <Position26>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="234" Column="30" TopLine="202"/>
+        <Caret Line="501" Column="1" TopLine="473"/>
       </Position26>
       <Position27>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="293" Column="31" TopLine="274"/>
+        <Caret Line="497" Column="1" TopLine="473"/>
       </Position27>
       <Position28>
         <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="300" Column="28" TopLine="274"/>
+        <Caret Line="498" Column="1" TopLine="473"/>
       </Position28>
       <Position29>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="324" Column="63" TopLine="305"/>
+        <Filename Value="../extendedhtmlparser.pas"/>
+        <Caret Line="1568" Column="39" TopLine="1551"/>
       </Position29>
       <Position30>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="300" Column="9" TopLine="281"/>
+        <Filename Value="../extendedhtmlparser.pas"/>
+        <Caret Line="86" Column="1" TopLine="70"/>
       </Position30>
     </JumpHistory>
   </ProjectOptions>
