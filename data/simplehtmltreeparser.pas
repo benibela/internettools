@@ -19,14 +19,16 @@ TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensit
 //**∀a \in SO: a < a.reverse
 //**∀a,b \in SO: a < b < a.reverse => a < b.reverse < a.reverse
 TTreeElement = class
+//use the fields if you know what you're doing
   typ: TTreeElementType;
   value: string;
   attributes: TAttributeList;  //**<nil für tetText
   next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level) so elements form a linked list
   reverse: TTreeElement; //**<element paired by open/closing
 
-  offset: longint;
+  offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
+//otherwise use the functions
   procedure deleteNext();
   procedure deleteAll();
 
@@ -40,6 +42,7 @@ TTreeElement = class
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
 
   function getValue(): string;
+  function getAttribute(a: string):string;
   function toString(): string;
 
   constructor create();
@@ -165,6 +168,12 @@ function TTreeElement.getValue(): string;
 begin
   if self = nil then exit('');
   result := value;
+end;
+
+function TTreeElement.getAttribute(a: string):string;
+begin
+  if attributes = nil then exit('');
+  exit(attributes.Values[a]);
 end;
 
 function TTreeElement.toString(): string;
