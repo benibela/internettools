@@ -1,0 +1,166 @@
+object Form1: TForm1
+  Left = 432
+  Height = 461
+  Top = 230
+  Width = 560
+  ActiveControl = Panel1
+  Caption = 'Form1'
+  ClientHeight = 461
+  ClientWidth = 560
+  LCLVersion = '0.9.29'
+  object Panel1: TPanel
+    Left = 0
+    Height = 123
+    Top = 0
+    Width = 560
+    Align = alTop
+    Caption = 'Panel1'
+    ClientHeight = 123
+    ClientWidth = 560
+    TabOrder = 0
+    object Label1: TLabel
+      Left = 1
+      Height = 18
+      Top = 1
+      Width = 558
+      Align = alTop
+      Caption = 'Template:'
+      ParentColor = False
+    end
+    object Memo1: TMemo
+      Left = 1
+      Height = 103
+      Top = 19
+      Width = 558
+      Align = alClient
+      Lines.Strings = (
+        '<table id="right">'
+        '<htmlparser:loop>'
+        '<tr><td><htmlparser:read source="text()" var="col"></td></tr>'
+        '</htmlparser:loop>'
+        '</table>'
+      )
+      TabOrder = 0
+    end
+  end
+  object Panel2: TPanel
+    Left = 0
+    Height = 157
+    Top = 128
+    Width = 560
+    Align = alClient
+    Caption = 'Panel2'
+    ClientHeight = 157
+    ClientWidth = 560
+    TabOrder = 1
+    object Label2: TLabel
+      Left = 1
+      Height = 18
+      Top = 1
+      Width = 558
+      Align = alTop
+      Caption = 'HTML-File:'
+      ParentColor = False
+    end
+    object Memo2: TMemo
+      Left = 1
+      Height = 137
+      Top = 19
+      Width = 558
+      Align = alClient
+      Lines.Strings = (
+        '<html><body>'
+        '<table id="wrong">'
+        '<tr><td>Hallo</td></tr>'
+        '</table>'
+        '<table id="right">'
+        '<tr><td>123</td><td>other</td></tr>'
+        '<tr><td>foo</td><td>columns</td></tr>'
+        '<tr><td>bar</td><td>are</td></tr>'
+        '<tr><td>xyz</td><td>ignored</td></tr>'
+        '</table>'
+        '</html>'
+      )
+      TabOrder = 0
+    end
+  end
+  object Panel3: TPanel
+    Left = 0
+    Height = 96
+    Top = 365
+    Width = 560
+    Align = alBottom
+    Caption = 'Panel3'
+    ClientHeight = 96
+    ClientWidth = 560
+    TabOrder = 2
+    object Label3: TLabel
+      Left = 1
+      Height = 18
+      Top = 1
+      Width = 558
+      Align = alTop
+      Caption = 'Result:'
+      ParentColor = False
+    end
+    object Memo3: TMemo
+      Left = 1
+      Height = 76
+      Top = 19
+      Width = 558
+      Align = alClient
+      Lines.Strings = (
+        'Memo3'
+      )
+      TabOrder = 0
+    end
+  end
+  object Splitter1: TSplitter
+    Cursor = crVSplit
+    Left = 0
+    Height = 5
+    Top = 123
+    Width = 560
+    Align = alTop
+    ResizeAnchor = akTop
+  end
+  object Splitter2: TSplitter
+    Cursor = crVSplit
+    Left = 0
+    Height = 5
+    Top = 360
+    Width = 560
+    Align = alBottom
+    ResizeAnchor = akBottom
+  end
+  object Button1: TButton
+    Left = 0
+    Height = 25
+    Top = 285
+    Width = 560
+    Align = alBottom
+    Caption = 'GO'
+    OnClick = Button1Click
+    TabOrder = 5
+  end
+  object Button2: TButton
+    Left = 0
+    Height = 25
+    Top = 335
+    Width = 560
+    Align = alBottom
+    Caption = 'Show html tree parser result'
+    OnClick = Button2Click
+    TabOrder = 6
+  end
+  object Button3: TButton
+    Left = 0
+    Height = 25
+    Top = 310
+    Width = 560
+    Align = alBottom
+    Caption = 'Evaluate template as pseudo xpath'
+    OnClick = Button3Click
+    TabOrder = 7
+  end
+end

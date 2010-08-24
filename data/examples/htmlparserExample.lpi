@@ -1,0 +1,259 @@
+<?xml version="1.0"?>
+<CONFIG>
+  <ProjectOptions>
+    <Version Value="7"/>
+    <General>
+      <Flags>
+        <MainUnitHasCreateFormStatements Value="False"/>
+        <MainUnitHasTitleStatement Value="False"/>
+        <UseDefaultCompilerOptions Value="True"/>
+      </Flags>
+      <MainUnit Value="0"/>
+      <TargetFileExt Value=""/>
+      <Icon Value="0"/>
+      <UseXPManifest Value="True"/>
+      <ActiveEditorIndexAtStart Value="0"/>
+    </General>
+    <VersionInfo>
+      <ProjectVersion Value=""/>
+      <Language Value=""/>
+      <CharSet Value=""/>
+    </VersionInfo>
+    <PublishOptions>
+      <Version Value="2"/>
+      <IgnoreBinaries Value="False"/>
+      <IncludeFileFilter Value="*.(pas|pp|inc|lfm|lpr|lrs|lpi|lpk|sh|xml)"/>
+      <ExcludeFileFilter Value="*.(bak|ppu|ppw|o|so);*~;backup"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <FormatVersion Value="1"/>
+        <CommandLineParams Value="--template &quot;/home/benito/hg/programs/internet/VideLibri/data/libraries/templates/sisis/singleExtended&quot;  /tmp/res"/>
+        <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
+      </local>
+    </RunParams>
+    <RequiredPackages Count="1">
+      <Item1>
+        <PackageName Value="LCL"/>
+      </Item1>
+    </RequiredPackages>
+    <Units Count="7">
+      <Unit0>
+        <Filename Value="htmlparserExample.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="htmlparserExample"/>
+        <CursorPos X="21" Y="37"/>
+        <TopLine Value="9"/>
+        <EditorIndex Value="0"/>
+        <UsageCount Value="21"/>
+        <Loaded Value="True"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <UnitName Value="rcmdline"/>
+        <CursorPos X="19" Y="169"/>
+        <TopLine Value="155"/>
+        <EditorIndex Value="4"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="../extendedhtmlparser.pas"/>
+        <UnitName Value="extendedhtmlparser"/>
+        <CursorPos X="13" Y="35"/>
+        <TopLine Value="18"/>
+        <EditorIndex Value="1"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="../bbutils.pas"/>
+        <UnitName Value="bbutils"/>
+        <CursorPos X="30" Y="768"/>
+        <TopLine Value="751"/>
+        <EditorIndex Value="3"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="../../import/regexpr/Source/dRegExpr.pas"/>
+        <UnitName Value="dRegExpr"/>
+        <CursorPos X="15" Y="16"/>
+        <TopLine Value="1"/>
+        <EditorIndex Value="2"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="../../../../../../../usr/share/fpcsrc/2.2.4/rtl/objpas/objpas.pp"/>
+        <UnitName Value="objpas"/>
+        <CursorPos X="12" Y="199"/>
+        <TopLine Value="167"/>
+        <EditorIndex Value="5"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="../../../../../../../usr/share/fpcsrc/2.2.4/rtl/unix/sysunixh.inc"/>
+        <CursorPos X="5" Y="60"/>
+        <TopLine Value="38"/>
+        <EditorIndex Value="6"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit6>
+    </Units>
+    <JumpHistory Count="29" HistoryIndex="28">
+      <Position1>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="215" Column="1" TopLine="198"/>
+      </Position1>
+      <Position2>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="216" Column="1" TopLine="199"/>
+      </Position2>
+      <Position3>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="268" Column="1" TopLine="251"/>
+      </Position3>
+      <Position4>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="270" Column="1" TopLine="253"/>
+      </Position4>
+      <Position5>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="290" Column="1" TopLine="273"/>
+      </Position5>
+      <Position6>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="291" Column="1" TopLine="274"/>
+      </Position6>
+      <Position7>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="292" Column="1" TopLine="275"/>
+      </Position7>
+      <Position8>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="293" Column="1" TopLine="276"/>
+      </Position8>
+      <Position9>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="298" Column="1" TopLine="281"/>
+      </Position9>
+      <Position10>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="299" Column="1" TopLine="282"/>
+      </Position10>
+      <Position11>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="300" Column="1" TopLine="283"/>
+      </Position11>
+      <Position12>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="168" Column="3" TopLine="165"/>
+      </Position12>
+      <Position13>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="468" Column="27" TopLine="451"/>
+      </Position13>
+      <Position14>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="469" Column="12" TopLine="451"/>
+      </Position14>
+      <Position15>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="479" Column="10" TopLine="451"/>
+      </Position15>
+      <Position16>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="1" Column="1" TopLine="1"/>
+      </Position16>
+      <Position17>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="17" Column="14" TopLine="1"/>
+      </Position17>
+      <Position18>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="125" Column="27" TopLine="108"/>
+      </Position18>
+      <Position19>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="168" Column="25" TopLine="151"/>
+      </Position19>
+      <Position20>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="167" Column="25" TopLine="151"/>
+      </Position20>
+      <Position21>
+        <Filename Value="../../../../../../../usr/share/fpcsrc/2.2.4/rtl/objpas/objpas.pp"/>
+        <Caret Line="200" Column="14" TopLine="181"/>
+      </Position21>
+      <Position22>
+        <Filename Value="../../../../../../../usr/share/fpcsrc/2.2.4/rtl/objpas/objpas.pp"/>
+        <Caret Line="199" Column="12" TopLine="167"/>
+      </Position22>
+      <Position23>
+        <Filename Value="htmlparserExample.lpr"/>
+        <Caret Line="20" Column="16" TopLine="1"/>
+      </Position23>
+      <Position24>
+        <Filename Value="../../system/rcmdline.pas"/>
+        <Caret Line="172" Column="27" TopLine="165"/>
+      </Position24>
+      <Position25>
+        <Filename Value="htmlparserExample.lpr"/>
+        <Caret Line="20" Column="16" TopLine="1"/>
+      </Position25>
+      <Position26>
+        <Filename Value="htmlparserExample.lpr"/>
+        <Caret Line="17" Column="5" TopLine="1"/>
+      </Position26>
+      <Position27>
+        <Filename Value="htmlparserExample.lpr"/>
+        <Caret Line="21" Column="12" TopLine="2"/>
+      </Position27>
+      <Position28>
+        <Filename Value="htmlparserExample.lpr"/>
+        <Caret Line="33" Column="41" TopLine="2"/>
+      </Position28>
+      <Position29>
+        <Filename Value="htmlparserExample.lpr"/>
+        <Caret Line="35" Column="41" TopLine="2"/>
+      </Position29>
+    </JumpHistory>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="8"/>
+    <Target>
+      <Filename Value="htmlparserExample"/>
+    </Target>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir)/"/>
+      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;/home/benito/hg/components/pascal/internet/"/>
+      <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      <SrcPath Value="/home/benito/hg/components/pascal/import/synapse/;../../import/regexpr/Source/;/home/benito/hg/components/pascal/import/regexpr/Source/;/home/benito/hg/components/pascal/internet/"/>
+    </SearchPaths>
+    <Linking>
+      <Options>
+        <Win32>
+          <GraphicApplication Value="True"/>
+        </Win32>
+      </Options>
+    </Linking>
+    <Other>
+      <CompilerPath Value="$(CompPath)"/>
+    </Other>
+  </CompilerOptions>
+  <Debugging>
+    <Exceptions Count="3">
+      <Item1>
+        <Name Value="EAbort"/>
+      </Item1>
+      <Item2>
+        <Name Value="ECodetoolError"/>
+      </Item2>
+      <Item3>
+        <Name Value="EFOpenError"/>
+      </Item3>
+    </Exceptions>
+  </Debugging>
+</CONFIG>
