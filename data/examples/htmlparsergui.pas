@@ -48,17 +48,21 @@ uses simplehtmltreeparser,regExpr,pseudoxpath;
 { TForm1 }
 
 procedure TForm1.Button1Click(Sender: TObject);
-//var htmlparser: THtmlTemplateParser;
+var htmlparser: THtmlTemplateParser;
+  i: Integer;
 begin
-  {htmlparser := THtmlTemplateParser.create;
+  htmlparser := THtmlTemplateParser.create;
   try
     htmlparser.parseTemplate(memo1.Lines.Text);
     memo3.Clear;
-    htmlparser.onVariableRead:=@htmlparserVariableRead;
+    //htmlparser.onVariableRead:=@htmlparserVariableRead;
     htmlparser.parseHTML(memo2.Lines.Text);
+    memo3.Lines.Clear;
+    for i:=0 to htmlparser.variableChangeLog.Count-1 do
+      memo3.lines.Add(htmlparser.variableChangeLog[i]);
   finally
     htmlparser.Free;
-  end;}
+  end;
 end;
 
 procedure TForm1.Button2Click(Sender: TObject);

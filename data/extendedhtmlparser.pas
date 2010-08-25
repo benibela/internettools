@@ -36,7 +36,12 @@ uses
 
 
 type
-TTemplateElementType=(tetHTML, tetCommandMeta, tetCommandRead,tetCommandLoop,tetCommandIf);
+//duplicate open/close because this simplifies the switch statements
+TTemplateElementType=(tetIgnore,
+                      tetHTMLOpen, tetHTMLClose, tetHTMLText,
+                      tetCommandMeta, tetCommandRead,
+                      tetCommandLoopOpen,tetCommandLoopClose,
+                      tetCommandIfOpen, tetCommandIfClose);
 
 TNotifyCallbackFunction = procedure () of object;
 TVariableCallbackFunction = procedure (variable: string; value: string) of object;
@@ -57,8 +62,6 @@ end;
 { THtmlTemplateParser }
 
 THtmlTemplateParser=class
-private
-  Fvariables: TStringList;
   protected
     templateEncoding,htmlEncoding, outputEncoding: TEncoding;
 
@@ -66,15 +69,20 @@ private
     FTemplateName: string;
 
     FPseudoXPath: TPseudoXPathParser;
+
+    Fvariables, FVariableLog: TStringList;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
-    FOnVariableRead: TVariableCallbackFunction;
+    //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
     function executePseudoXPath(str: string; replaceVariables: boolean=true):string;
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
+
+    function templateElementFitHTMLOpen(html:TTreeElement; template: TTemplateElement): Boolean;
+    function matchTemplateTree(htmlStart, htmlEnd:TTreeElement; templateStart, templateEnd: TTemplateElement): boolean;
   public
     constructor create;
     destructor destroy; override;
@@ -91,28 +99,36 @@ private
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     property variables: TStringList read Fvariables;//**<List of all variables
+    property variableChangeLog: TStringList read FVariableLog;
   end;
 
 implementation
 
-const TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIf];
-      COMMAND_CLOSED:array[tetCommandMeta..tetCommandIf] of boolean=(false,false,true,true);
-      COMMAND_STR:array[tetCommandMeta..tetCommandIf] of string=('meta','read','loop','if');
+const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
+      COMMAND_CLOSED:array[tetCommandMeta..tetCommandIfClose] of longint=(0,0,1,2,1,2);
+      COMMAND_STR:array[tetCommandMeta..tetCommandIfClose] of string=('meta','read','loop','loop','if','if');
 
 { TTemplateElement }
 
-function strToCommand(s:string): TTemplateElementType;
-var i:longint;
-    tag:pchar; taglen: integer;
+function strToCommand(s:string; treeTyp: TTreeElementType): TTemplateElementType;
+var tag:pchar; taglen: integer;
+  t: TTemplateElementType;
 begin
-  Result:=tetHTML;
-  if strlibeginswith(s,'htmlparser:') then begin
-    tag:=@s[length('htmlparser:')];
+  if ((treeTyp = tetOpen) or (treeTyp = tetClose)) and (strlibeginswith(s,'htmlparser:')) then begin
+    tag:=@s[length('htmlparser:')+1];
     taglen:=length(s)-length('htmlparser:');
-    for Result:=low(COMMAND_STR) to high(COMMAND_STR) do
-      if strliequal(tag,COMMAND_STR[Result],taglen) then
-        exit();
+    for t:=low(COMMAND_STR) to high(COMMAND_STR) do
+      if strliequal(tag,COMMAND_STR[t],taglen) then begin
+        if treeTyp = tetOpen then exit(t)
+        else if COMMAND_CLOSED[t] = 0 then exit(tetIgnore)
+        else if COMMAND_CLOSED[t] = 2 then exit(t);
+      end;
     raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s)
+  end;
+  case treeTyp of
+    tetOpen: exit(tetHTMLOpen);
+    tetClose: exit(tetHTMLClose);
+    tetText: exit(tetHTMLText);
   end;
 end;
 
@@ -126,8 +142,7 @@ end;
 procedure TTemplateElement.initialized;
 begin
   //inherited initialized;
-  if typ <> tetOpen then exit;
-  templateType:=strToCommand(value);
+  templateType:=strToCommand(value, typ);
 end;
 
 procedure changeEncoding(tree:TTreeElement; from,toe: TEncoding);
@@ -149,10 +164,130 @@ begin
   result:=FPseudoXPath.evaluate();
 end;
 
+function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
+  template: TTemplateElement): Boolean;
+var
+  name: string;
+  condition: string;
+  i: Integer;
+begin
+  if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
+     (html.value <> template.value) then
+       exit(false);
+  if template.attributes = nil then
+    exit(true);
+  for i:=0 to template.attributes.Count-1 do begin
+    name := template.attributes.Names[i];
+    if strlibeginswith(name, 'htmlparser') then continue;
+    if html.attributes = nil then exit(false);
+    if html.attributes.Values[name] <> template.attributes.ValueFromIndex[i] then
+      exit(false);
+  end;
+  condition := template.attributes.Values['htmlparser-condition'];
+  if condition = '' then
+    exit(true);
+  FPseudoXPath.ParentElement := html;
+  exit(executePseudoXPath(condition)='true');
+end;
+
+function THtmlTemplateParser.matchTemplateTree(htmlStart, htmlEnd: TTreeElement;
+  templateStart, templateEnd: TTemplateElement): Boolean;
+
+var xpathParent: TTreeElement;
+
+  procedure HandleHTMLText;
+  begin
+    //if we find a text match we can assume it is a true match
+    if strlibeginswith(htmlStart.value, templateStart.value) then templateStart := TTemplateElement(templateStart.next);
+    htmlStart := htmlStart.next;
+  end;
+
+
+  procedure HandleHTMLOpen;
+  var matchVars: TStringList;
+  begin
+    //To check if a node matches a template node we have to check all children, if they don't match
+    //we have to test it with another node
+    //But once a element E match we can assume that there is no better match on the same level (e.g. a
+    //match F with E.parent = F.parent), because this is simple list matching
+    if (not templateElementFitHTMLOpen(htmlStart, templateStart)) or
+       (not matchTemplateTree(htmlStart, htmlStart.reverse, templateStart, TTemplateElement(templateStart.reverse))) then htmlStart:=htmlStart.next
+    else begin
+      htmlStart := htmlStart.reverse.next;
+      templateStart := TTemplateElement(templateStart.reverse.next);
+    end;
+  end;
+
+  {procedure HandleHTMLClose;
+  begin
+
+  end;}
+
+  procedure HandleCommandRead;
+  var text,vari:string;
+    regexp: TRegExpr;
+  begin
+    FPseudoXPath.ParentElement := xpathParent;
+    text:=executePseudoXPath(replaceVars(templateStart.attributes.Values['source']));
+
+    if templateStart.attributes.Values['regex']<>'' then begin
+      regexp:=TRegExpr.Create;
+      regexp.Expression:=templateStart.attributes.Values['regex'];
+      regexp.Exec(text);
+      text:=regexp.Match[StrToIntDef(templateStart.attributes.Values['submatch'],0)];
+      regexp.free;
+    end;
+
+    vari:=replaceVars(templateStart.attributes.Values['var']);
+
+    Fvariables.Values[vari] := text;
+    FVariableLog.Add(vari+'='+text);
+
+    templateStart := TTemplateElement(templateStart.next);
+  end;
+
+var logLength: longint;
+  vari: string;
+begin
+  if htmlStart = nil then exit(false);
+  if templateStart = nil then exit(false);
+  assert(templateStart <> templateEnd);
+  xpathParent := htmlStart;
+  htmlStart := htmlStart.next;
+  templateStart := TTemplateElement(templateStart.next);
+  logLength:=FVariableLog.Count;
+  while (htmlStart <> nil) and //don't check (htmlStart <> htmlEnd) , so it will execute template commands in empty tags
+        (templateStart <> nil) and (templateStart <> templateEnd) do begin
+            case templateStart.templateType of
+              tetHTMLText: HandleHTMLText;
+              tetHTMLOpen: HandleHTMLOpen;
+              tetHTMLClose: raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
+
+              tetCommandRead: HandleCommandRead;
+              tetCommandMeta: templateStart := TTemplateElement(templateStart.next);
+
+              tetIgnore: templateStart := TTemplateElement(templateStart.next);
+
+              else raise ETemplateParseException.Create('Unknown template element type - internal error');
+            end
+        end;
+
+  result := templateStart = templateEnd;
+  if not result then
+    while (FVariableLog.Count>logLength) do begin
+      vari := FVariableLog.Names[FVariableLog.Count-1];
+      FVariableLog.Delete(FVariableLog.Count-1);
+      Fvariables.Values[vari] := FVariableLog.Values[vari];
+    end;
+end;
+
 constructor THtmlTemplateParser.create;
 begin
+  Fvariables := TStringList.Create;
+  FVariableLog := TStringList.Create;
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
+  FTemplate.treeElementClass:=TTemplateElement;
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
   FPseudoXPath := TPseudoXPathParser.Create;
@@ -161,6 +296,8 @@ end;
 
 destructor THtmlTemplateParser.destroy;
 begin
+  Fvariables.Free;
+  FVariableLog.Free;
   FTemplate.Free;
   FHTML.Free;
   FPseudoXPath.free;
@@ -186,7 +323,11 @@ begin
   end;
 
   changeEncoding(FHTML.getTree, htmlEncoding, outputEncoding);
-  changeEncoding(FHTML.getTree, templateEncoding, outputEncoding);
+  changeEncoding(FTemplate.getTree, templateEncoding, outputEncoding);
+
+  FVariableLog.Clear;
+  Fvariables.Clear;
+  matchTemplateTree(FHTML.getTree, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree), TTemplateElement(FTemplate.getTree.reverse));
 end;
 
 procedure THtmlTemplateParser.parseHTMLFile(htmlfilename: string);
@@ -222,6 +363,7 @@ begin
             templateEncoding:=eWindows1252;
       end;
     end;
+    el := TTemplateElement(el.next);
   end;
 end;
 
@@ -504,30 +646,6 @@ end;
 
 procedure THtmlTemplateParser.executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
 
-  procedure executeReadCommand;
-  var text,vari:string;
-    regexp: TRegExpr;
-  begin
-    FCollectDeepNodeText:=false;
-    text:=executePseudoXPath(replaceVars(cmd.attributes.Values['source']));
-
-    if cmd.attributes.Values['regex']<>'' then begin
-      regexp:=TRegExpr.Create;
-      regexp.Expression:=cmd.attributes.Values['regex'];
-      regexp.Exec(text);
-      text:=regexp.Match[StrToIntDef(cmd.attributes.Values['submatch'],0)];
-      regexp.free;
-    end;
-
-    //Zeichensatz konvertierung
-    //(ohne Annahme template-ZS=html-ZS, es müsste bereits früher konvertiert werden)
-    if htmlEncoding<>outputEncoding then
-      text:=strChangeEncoding(text, htmlEncoding, outputEncoding);
-
-    vari:=replaceVars(cmd.attributes.Values['var']);
-    variables.Values[vari]:=text;
-    if Assigned(FOnVariableRead) then FOnVariableRead(vari,text);
-  end;
 
 var condition:string;
     comparisonPos:longint;
@@ -652,7 +770,7 @@ function THtmlTemplateParser.enterTag(tagName: pchar; tagNameLen: longint;
     if name<>'' then begin
       tempProperties:=FOldProperties;
       FOldProperties:=properties;
-      result:=executePseudoXPath(??name)='true';
+      result:=executePseudoXPath(name)='true';
       FOldProperties:=tempProperties;
       exit;
     end;
@@ -1200,6 +1318,11 @@ begin
 end;
 
 {$IFDEF UNITTESTS}
+
+var tests:array[] of array[1..3] of string=(
+('<table id="right"><tr><td><htmlparser:read source="text()" var="col"/></td></tr></table>', '<html><table id="right"><tr><td></td><td>other</td></tr></table></html>', 'col='),
+),
+)
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTest(extParser: THtmlTemplateParser;testID:longint;logClass: TTemplateHTMLParserLogClass);

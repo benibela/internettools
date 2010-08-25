@@ -36,7 +36,7 @@ object Form1: TForm1
       Lines.Strings = (
         '<table id="right">'
         '<htmlparser:loop>'
-        '<tr><td><htmlparser:read source="text()" var="col"></td></tr>'
+        '<tr><td><htmlparser:read source="text()" var="col"/></td></tr>'
         '</htmlparser:loop>'
         '</table>'
       )

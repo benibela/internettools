@@ -8,7 +8,10 @@ uses
   Classes, SysUtils, simplehtmlparser, bbutils;
 
 type
-TAttributeList = TStringList; //TODO: write my own
+
+{ TAttributeMap }
+
+TAttributeList = TStringList; //TODO: use a map
 
 TTreeElementType = (tetOpen, tetClose, tetText);
 TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensitive, tefoNoDescend);
@@ -299,7 +302,7 @@ begin
     FElementStack.Delete(FElementStack.Count-1);
     new.initialized;
   end else if FParsingModel = pmStrict then
-    raise TreeParseException.Create('The tag <'+new.value+'> was closed, but the latest opened was <'+last.value+'>')
+    raise TreeParseException.Create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but the latest opened was <'+last.value+'>')
   else if FParsingModel = pmHTML then begin
     //try to auto detect unclosed tags
     match:=-1;
