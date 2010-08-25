@@ -177,7 +177,7 @@ begin
 
   //encoding trouble
   htmlEncoding:=eUnknown;
-  encoding := lowercase(TPseudoXPathParser.Evaluate('head/meta[@http-equiv=''content-type'']/@content', FHTML.getTree));
+  encoding := lowercase(TPseudoXPathParser.Evaluate('html/head/meta[@http-equiv=''content-type'']/@content', FHTML.getTree));
   if encoding <> '' then begin
     if pos('charset=utf-8', encoding) > 0 then htmlEncoding:=eUTF8
     else if (pos('charset=windows-1252',encoding) > 0) or
@@ -372,24 +372,6 @@ type
         @item(@code(htmlparser-condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
       )
 
-      @bold(Syntax of the pseudo-XPath-expressions)
-
-      A pseudo-XPath-expression is like a XPath-expression, but much more simple. At first every occurrence of $variable; is replaced by the current value, independent of scope (so you can store a expression in a variable, DEPRECATED, see below).
-      Then the remaining language elements are evaluated:
-      @unorderedList(
-        @item(@code('something') @br This gives the string 'something')
-        @item(@code(text()) @br This is the text of the current tag)
-        @item(@code(@@attrib) @br This is the value of the attribute attrib of the current tag)
-        @item(@code(concat(<string 1>, <string 2>, <string 3>, ...)) @br This is the concatenation of all the strings)
-        @item(@code(<string 1> = <string 2>) @br This is 'true' iff <string 1> is equal to <string 2> (you can also use ==))
-        @item(@code(<string 1> != <string 2>) @br This is 'true' iff <string 1> is not equal to <string 2>)
-        @item(@code(deepNodeText()) @br This is the plain text of the every tag inside the current text)
-        @item(@code(filter(<string 1>,<string 2>[,<string 3>])) @br This will apply the regex <string 2> to <string 1> and returns only the matching part. <string 3> is actually a number, and if it is there, filter will return the <string 3>-th submatch. (like the regex and submatch attributes, but this can of course used within the pseudo XPath expression).
-      ))
-      @br @br
-
-      @notice:
-      Planned changes: In the next version the variables will be replaced in the latest stage, so you shouldn't store expressions in them. (so the variables will be variables and not defines). But there will be an eval function
   }
   THtmlTemplateParser=class
   protected

@@ -402,6 +402,10 @@ begin
   FAutoCloseTag:=false;
 
   //initialize root element
+  //there are two reasons for an empty root element which doesn't exists in the file
+  //1. it is necessary for the correct interpretion of xpath expressions html/... assumes
+  //   that the current element is a parent of html
+  //2. it serves as parent for multiple top level elements (althought they aren't allowed)
   FRootElement:=treeElementClass.create;
   FRootElement.typ := tetOpen;
   FCurrentElement:=FRootElement;

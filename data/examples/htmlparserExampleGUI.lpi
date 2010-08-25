@@ -3,10 +3,10 @@
   <ProjectOptions>
     <Version Value="9"/>
     <General>
+      <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
       <UseXPManifest Value="True"/>
       <Icon Value="0"/>
-      <ActiveWindowIndexAtStart Value="0"/>
     </General>
     <VersionInfo>
       <Language Value=""/>
@@ -30,15 +30,11 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="30">
+    <Units Count="5">
       <Unit0>
         <Filename Value="htmlparserExampleGUI.lpr"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="htmlparserExampleGUI"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="61"/>
       </Unit0>
       <Unit1>
         <Filename Value="htmlparsergui.pas"/>
@@ -46,403 +42,23 @@
         <ComponentName Value="Form1"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="htmlparsergui"/>
-        <EditorIndex Value="0"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="65"/>
-        <CursorPos X="14" Y="87"/>
-        <UsageCount Value="61"/>
-        <Loaded Value="True"/>
-        <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="../extendedhtmlparser.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="extendedhtmlparser"/>
-        <EditorIndex Value="10"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1541"/>
-        <CursorPos X="25" Y="1568"/>
-        <ExtraEditorCount Value="1"/>
-        <UsageCount Value="60"/>
-        <Bookmarks Count="2">
-          <Item0 X="1" Y="524" ID="3"/>
-          <Item1 X="70" Y="700" ID="6"/>
-        </Bookmarks>
-        <Loaded Value="True"/>
       </Unit2>
       <Unit3>
-        <Filename Value="../../import/regexpr/Source/dRegExpr.pas"/>
-        <UnitName Value="dRegExpr"/>
-        <EditorIndex Value="21"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1054"/>
-        <CursorPos X="85" Y="1071"/>
-        <UsageCount Value="29"/>
-        <Loaded Value="True"/>
-      </Unit3>
-      <Unit4>
-        <Filename Value="../simplehtmlparser.pas"/>
-        <UnitName Value="simplehtmlparser"/>
-        <EditorIndex Value="22"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="13" Y="33"/>
-        <UsageCount Value="29"/>
-        <Loaded Value="True"/>
-      </Unit4>
-      <Unit5>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/unix/classes.pp"/>
-        <UnitName Value="Classes"/>
-        <EditorIndex Value="9"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="29"/>
-        <Loaded Value="True"/>
-      </Unit5>
-      <Unit6>
         <Filename Value="../simplehtmltreeparser.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="simplehtmltreeparser"/>
-        <EditorIndex Value="20"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="382"/>
-        <CursorPos X="1" Y="417"/>
-        <UsageCount Value="60"/>
-        <Loaded Value="True"/>
-      </Unit6>
-      <Unit7>
-        <Filename Value="../extendedhtmlparser.pass"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="7"/>
-        <DefaultSyntaxHighlighter Value="None"/>
-      </Unit7>
-      <Unit8>
-        <Filename Value="../bbutils.pas"/>
-        <UnitName Value="bbutils"/>
-        <EditorIndex Value="4"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="23"/>
-        <Loaded Value="True"/>
-      </Unit8>
-      <Unit9>
-        <Filename Value="/opt/lazarus/lcl/interfaces/gtk2/gtk2callback.inc"/>
-        <EditorIndex Value="8"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1146"/>
-        <CursorPos X="39" Y="1161"/>
-        <UsageCount Value="23"/>
-        <Loaded Value="True"/>
-      </Unit9>
-      <Unit10>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/objpas/classes/classesh.inc"/>
-        <EditorIndex Value="5"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="509"/>
-        <CursorPos X="14" Y="528"/>
-        <UsageCount Value="23"/>
-        <Loaded Value="True"/>
-      </Unit10>
-      <Unit11>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/objpas/types.pp"/>
-        <UnitName Value="types"/>
-        <EditorIndex Value="7"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="110"/>
-        <CursorPos X="3" Y="131"/>
-        <UsageCount Value="23"/>
-        <Loaded Value="True"/>
-      </Unit11>
-      <Unit12>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/objpas/sysutils/sysunih.inc"/>
-        <EditorIndex Value="2"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="10" Y="6"/>
-        <UsageCount Value="22"/>
-        <Loaded Value="True"/>
-      </Unit12>
-      <Unit13>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/objpas/sysutils/sysuni.inc"/>
-        <EditorIndex Value="3"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="35"/>
-        <CursorPos X="5" Y="40"/>
-        <UsageCount Value="22"/>
-        <Loaded Value="True"/>
-      </Unit13>
-      <Unit14>
-        <Filename Value="../../import/regexpr/Help/TRegExpr_DE.hlp"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="797"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="8"/>
-        <DefaultSyntaxHighlighter Value="None"/>
-      </Unit14>
-      <Unit15>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/packages/regexpr/src/regexpr.pp"/>
-        <UnitName Value="RegExpr"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="11"/>
-        <CursorPos X="5" Y="24"/>
-        <UsageCount Value="8"/>
-      </Unit15>
-      <Unit16>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/packages/regexpr/src/regex.pp"/>
-        <UnitName Value="Regex"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="38"/>
-        <CursorPos X="42" Y="54"/>
-        <UsageCount Value="8"/>
-      </Unit16>
-      <Unit17>
+      </Unit3>
+      <Unit4>
         <Filename Value="../pseudoxpath.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="pseudoxpath"/>
-        <IsVisibleTab Value="True"/>
-        <EditorIndex Value="11"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="425"/>
-        <CursorPos X="151" Y="440"/>
-        <UsageCount Value="38"/>
-        <Loaded Value="True"/>
-      </Unit17>
-      <Unit18>
-        <Filename Value="/opt/lazarus/lcl/interfaces/gtk2/gtk2memostrings.inc"/>
-        <EditorIndex Value="1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="79"/>
-        <CursorPos X="1" Y="104"/>
-        <UsageCount Value="14"/>
-        <Loaded Value="True"/>
-      </Unit18>
-      <Unit19>
-        <Filename Value="/opt/lazarus/lcl/utrace.pp"/>
-        <UnitName Value="UTrace"/>
-        <EditorIndex Value="19"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="36"/>
-        <CursorPos X="1" Y="64"/>
-        <UsageCount Value="14"/>
-        <Loaded Value="True"/>
-      </Unit19>
-      <Unit20>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/objpas/classes/stringl.inc"/>
-        <EditorIndex Value="6"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="412"/>
-        <CursorPos X="107" Y="436"/>
-        <UsageCount Value="14"/>
-        <Loaded Value="True"/>
-      </Unit20>
-      <Unit21>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/strings.pp"/>
-        <UnitName Value="strings"/>
-        <EditorIndex Value="12"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="49"/>
-        <CursorPos X="47" Y="75"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit21>
-      <Unit22>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/astrings.inc"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="10"/>
-      </Unit22>
-      <Unit23>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/dynlibs.pas"/>
-        <UnitName Value="dynlibs"/>
-        <EditorIndex Value="13"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit23>
-      <Unit24>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/lstrings.pp"/>
-        <UnitName Value="lstrings"/>
-        <EditorIndex Value="14"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="78"/>
-        <CursorPos X="137" Y="95"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit24>
-      <Unit25>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/objects.pp"/>
-        <UnitName Value="Objects"/>
-        <EditorIndex Value="17"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="385"/>
-        <CursorPos X="56" Y="385"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit25>
-      <Unit26>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/sstrings.inc"/>
-        <EditorIndex Value="18"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="1" Y="1"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit26>
-      <Unit27>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/genstr.inc"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="140"/>
-        <CursorPos X="4" Y="146"/>
-        <UsageCount Value="10"/>
-      </Unit27>
-      <Unit28>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/inc/textrec.inc"/>
-        <EditorIndex Value="16"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="7"/>
-        <CursorPos X="56" Y="23"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit28>
-      <Unit29>
-        <Filename Value="/usr/share/fpcsrc/2.4.0/rtl/objpas/sysutils/syspch.inc"/>
-        <EditorIndex Value="15"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="47"/>
-        <CursorPos X="44" Y="85"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
-      </Unit29>
+      </Unit4>
     </Units>
-    <JumpHistory Count="30" HistoryIndex="29">
-      <Position1>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="117" Column="1" TopLine="98"/>
-      </Position1>
-      <Position2>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="118" Column="1" TopLine="98"/>
-      </Position2>
-      <Position3>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="119" Column="1" TopLine="98"/>
-      </Position3>
-      <Position4>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="120" Column="1" TopLine="98"/>
-      </Position4>
-      <Position5>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="121" Column="1" TopLine="98"/>
-      </Position5>
-      <Position6>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="122" Column="1" TopLine="98"/>
-      </Position6>
-      <Position7>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="104" Column="1" TopLine="97"/>
-      </Position7>
-      <Position8>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="120" Column="16" TopLine="97"/>
-      </Position8>
-      <Position9>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="254" Column="1" TopLine="229"/>
-      </Position9>
-      <Position10>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="498" Column="1" TopLine="471"/>
-      </Position10>
-      <Position11>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="499" Column="68" TopLine="471"/>
-      </Position11>
-      <Position12>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="498" Column="1" TopLine="471"/>
-      </Position12>
-      <Position13>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="499" Column="1" TopLine="471"/>
-      </Position13>
-      <Position14>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="97" Column="1" TopLine="78"/>
-      </Position14>
-      <Position15>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="98" Column="1" TopLine="78"/>
-      </Position15>
-      <Position16>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="99" Column="1" TopLine="78"/>
-      </Position16>
-      <Position17>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="255" Column="26" TopLine="235"/>
-      </Position17>
-      <Position18>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="498" Column="1" TopLine="473"/>
-      </Position18>
-      <Position19>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="499" Column="1" TopLine="473"/>
-      </Position19>
-      <Position20>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="500" Column="1" TopLine="473"/>
-      </Position20>
-      <Position21>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="501" Column="1" TopLine="473"/>
-      </Position21>
-      <Position22>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="497" Column="1" TopLine="473"/>
-      </Position22>
-      <Position23>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="498" Column="1" TopLine="473"/>
-      </Position23>
-      <Position24>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="499" Column="1" TopLine="473"/>
-      </Position24>
-      <Position25>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="500" Column="1" TopLine="473"/>
-      </Position25>
-      <Position26>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="501" Column="1" TopLine="473"/>
-      </Position26>
-      <Position27>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="497" Column="1" TopLine="473"/>
-      </Position27>
-      <Position28>
-        <Filename Value="../pseudoxpath.pas"/>
-        <Caret Line="498" Column="1" TopLine="473"/>
-      </Position28>
-      <Position29>
-        <Filename Value="../extendedhtmlparser.pas"/>
-        <Caret Line="1568" Column="39" TopLine="1551"/>
-      </Position29>
-      <Position30>
-        <Filename Value="../extendedhtmlparser.pas"/>
-        <Caret Line="86" Column="1" TopLine="70"/>
-      </Position30>
-    </JumpHistory>
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="9"/>
@@ -476,11 +92,6 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <Watches Count="1">
-      <Item1>
-        <Expression Value="$7FFFFFFFCA8C"/>
-      </Item1>
-    </Watches>
     <Exceptions Count="3">
       <Item1>
         <Name Value="EAbort"/>
