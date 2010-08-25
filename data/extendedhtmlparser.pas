@@ -82,7 +82,7 @@ THtmlTemplateParser=class
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
     function templateElementFitHTMLOpen(html:TTreeElement; template: TTemplateElement): Boolean;
-    function matchTemplateTree(htmlStart, htmlEnd:TTreeElement; templateStart, templateEnd: TTemplateElement): boolean;
+    function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeElement; templateStart, templateEnd: TTemplateElement): boolean;
   public
     constructor create;
     destructor destroy; override;
@@ -190,7 +190,7 @@ begin
   exit(executePseudoXPath(condition)='true');
 end;
 
-function THtmlTemplateParser.matchTemplateTree(htmlStart, htmlEnd: TTreeElement;
+function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeElement;
   templateStart, templateEnd: TTemplateElement): Boolean;
 
 var xpathParent: TTreeElement;
@@ -211,23 +211,18 @@ var xpathParent: TTreeElement;
     //But once a element E match we can assume that there is no better match on the same level (e.g. a
     //match F with E.parent = F.parent), because this is simple list matching
     if (not templateElementFitHTMLOpen(htmlStart, templateStart)) or
-       (not matchTemplateTree(htmlStart, htmlStart.reverse, templateStart, TTemplateElement(templateStart.reverse))) then htmlStart:=htmlStart.next
+       (not matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(templateStart.next), TTemplateElement(templateStart.reverse))) then htmlStart:=htmlStart.next
     else begin
       htmlStart := htmlStart.reverse.next;
       templateStart := TTemplateElement(templateStart.reverse.next);
     end;
   end;
 
-  {procedure HandleHTMLClose;
-  begin
-
-  end;}
-
   procedure HandleCommandRead;
   var text,vari:string;
     regexp: TRegExpr;
   begin
-    FPseudoXPath.ParentElement := xpathParent;
+    FPseudoXPath.ParentElement := htmlParent;
     text:=executePseudoXPath(replaceVars(templateStart.attributes.Values['source']));
 
     if templateStart.attributes.Values['regex']<>'' then begin
@@ -246,27 +241,55 @@ var xpathParent: TTreeElement;
     templateStart := TTemplateElement(templateStart.next);
   end;
 
+  procedure HandleCommandIf;
+  var
+    condition: string;
+    equal: Boolean;
+  begin
+    condition:=templateStart.attributes.Values['test'];
+
+    FPseudoXPath.ParentElement := htmlParent;
+    equal:=executePseudoXPath(replaceVars(condition))='true';
+
+    if not equal then
+      templateStart := TTemplateElement(templateStart.reverse) //skip if block
+     else
+      templateStart := TTemplateElement(templateStart.next); //continue
+  end;
+
+var previous: TTreeElement;
+  procedure HandleLoopClose;
+  var matchVars: TStringList;
+  begin
+    //Two possible cases:
+    //1. Template jumps to loop start (preferred of course)
+    //2. Ignore loop end
+    if matchTemplateTree(htmlParent, htmlStart, htmlEnd, TTemplateElement(templateStart.reverse), templateEnd) then templateStart := templateEnd
+    else templateStart := TTemplateElement(templateStart.next);
+  end;
+
 var logLength: longint;
   vari: string;
 begin
   if htmlStart = nil then exit(false);
   if templateStart = nil then exit(false);
-  assert(templateStart <> templateEnd);
-  xpathParent := htmlStart;
-  htmlStart := htmlStart.next;
-  templateStart := TTemplateElement(templateStart.next);
+ // assert(templateStart <> templateEnd);
   logLength:=FVariableLog.Count;
-  while (htmlStart <> nil) and //don't check (htmlStart <> htmlEnd) , so it will execute template commands in empty tags
-        (templateStart <> nil) and (templateStart <> templateEnd) do begin
+  while (htmlStart <> nil) and
+        (templateStart <> nil) and (templateStart <> templateEnd) and
+        ((htmlStart <> htmlEnd) or not (templateStart.templateType in [tetHTMLText, tetHTMLOpen, tetHTMLClose])) do begin
             case templateStart.templateType of
               tetHTMLText: HandleHTMLText;
               tetHTMLOpen: HandleHTMLOpen;
               tetHTMLClose: raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
 
               tetCommandRead: HandleCommandRead;
-              tetCommandMeta: templateStart := TTemplateElement(templateStart.next);
 
-              tetIgnore: templateStart := TTemplateElement(templateStart.next);
+              tetCommandIfOpen: HandleCommandIf;
+
+              tetCommandLoopClose: HandleLoopClose;
+
+              tetIgnore, tetCommandMeta, tetCommandLoopOpen, tetCommandIfClose: templateStart := TTemplateElement(templateStart.next);
 
               else raise ETemplateParseException.Create('Unknown template element type - internal error');
             end
@@ -327,7 +350,7 @@ begin
 
   FVariableLog.Clear;
   Fvariables.Clear;
-  matchTemplateTree(FHTML.getTree, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree), TTemplateElement(FTemplate.getTree.reverse));
+  matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
 end;
 
 procedure THtmlTemplateParser.parseHTMLFile(htmlfilename: string);
@@ -670,22 +693,7 @@ begin
           executeReadCommand;
       tetCommandIf: if not cmd.closeTag then begin
         condition:=cmd.attributes.Values['test']; //TODO:'==' von == unterscheiden
-{        comparisonPos:=pos('==',condition);
-        equal:=true;;
-        if comparisonPos=0 then begin
-          equal:=false;
-          comparisonPos:=pos('!=',condition);
-          if comparisonPos=0 then
-            raise Exception.Create('Vergleichsoperation '+condition+' kann nicht ausgewertet werden');
-        end;
-        
-        ls:=parsePseudoXPath(replaceVars(copy(condition,1,comparisonPos-1)));
-        rs:=parsePseudoXPath(replaceVars(copy(condition,comparisonPos+2,length(condition))));
-        if ls<>'' then rs:=trim(rs);
-        if rs<>'' then ls:=trim(ls);
 
-        equal:=(CompareText(ls,rs)=0) = equal;}
-        
         equal:=executePseudoXPath(replaceVars(condition))='true';
         
         if not equal then begin
@@ -1320,8 +1328,15 @@ end;
 {$IFDEF UNITTESTS}
 
 var tests:array[] of array[1..3] of string=(
+//simple read
 ('<table id="right"><tr><td><htmlparser:read source="text()" var="col"/></td></tr></table>', '<html><table id="right"><tr><td></td><td>other</td></tr></table></html>', 'col='),
-),
+//loop corner cases
+('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+('<table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=Hallo'),
+('<table></table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+('<tr/><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+('<table></table><table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+('<htmlparser:loop><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz')
 )
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
