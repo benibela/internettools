@@ -66,33 +66,6 @@ procedure threadedCall(proc: TProcedureOfObject; finished: TProcedureOfObject);o
 //**Calls proc in an new thread
 procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
 
-type
-
-{ TMessageSystem }
-//**don't use this
-TMessageSystem = class
-private
-  messageAccessSection: TRTLCriticalSection;
-  list: TFPList;
-public
-  //synchronized methodes
-  procedure storeMessage(mes: TObject);
-  function retrieveMessageOrNil:TObject; //returns nil if no message exists
-  function retrieveLatestMessageOrNil:TObject; //returns nil if no message exists
-  function waitForMessage:TObject;
-  function existsMessage: boolean;
-  
-  procedure removeAndFreeAll;
-
-  function openDirectMessageAccess: TFPList; //will block every access until close
-  procedure closeDirectMessageAccess(dlist: TFPList);
-
-
-  //not synchronized
-  constructor create;
-  destructor destroy;override;
-end;
-
 //------------------------------Stringfunctions--------------------------
 //All of them start with 'str' or 'widestr' so can find them easily
 //Naming scheme str <l> <i> <name>
@@ -161,8 +134,11 @@ function strConvertToUtf8(str: string; from: TEncoding): string;
 function strConvertFromUtf8(const str: string; toe: TEncoding): string;
 function strChangeEncoding(const str: string; from,toe: TEncoding):string;
 function strEncodingFromName(str:string):TEncoding;
-//**This will decode most html entities to the given encoding
-function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
+//**This will decode most html entities to the given encoding. If strict is not set
+//**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
+//**even if it remains rogue &).
+function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = true):string;
+function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = true):string;
 //**Returns the first l bytes of p
 function strFromPchar(p:pchar;l:longint):string;
 
@@ -363,87 +339,6 @@ end;
 procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);
 begin
   threadedCallBase(TProcedureOfObject(procedureToMethod(proc)),TNotifyEvent(finished));
-end;
-
-{ TMessageSystem }
-
-procedure TMessageSystem.storeMessage(mes: TObject);
-begin
-  if mes=nil then raise exception.Create('Tried to store not existing message in the message queue');
-  EnterCriticalSection(messageAccessSection);
-  list.add(mes);
-  LeaveCriticalSection(messageAccessSection);
-end;
-
-function TMessageSystem.retrieveMessageOrNil: TObject;
-begin
-  EnterCriticalSection(messageAccessSection);
-  if list.Count=0 then result:=nil
-  else begin
-    result:=tobject(list[0]);
-    list.delete(0);
-  end;
-  LeaveCriticalSection(messageAccessSection);
-end;
-
-function TMessageSystem.retrieveLatestMessageOrNil: TObject;
-begin
-  EnterCriticalSection(messageAccessSection);
-  if list.Count=0 then result:=nil
-  else begin
-    result:=tobject(list[list.count-1]);
-    list.delete(list.count-1);
-  end;
-  LeaveCriticalSection(messageAccessSection);
-end;
-
-function TMessageSystem.waitForMessage: TObject;
-begin
-  Result:=nil;
-  while result = nil do begin
-    while list.count=0 do sleep(5);
-    result:=retrieveMessageOrNil; //list.count=0 is possible
-  end;
-end;
-
-function TMessageSystem.existsMessage: boolean;
-begin
-  result:=list.Count>0; //no need to synchronize, reading only
-end;
-
-procedure TMessageSystem.removeAndFreeAll;
-var i:longint;
-begin
-  EnterCriticalSection(messageAccessSection);
-  for i:=0 to list.Count-1 do
-    tobject(list[i]).free;
-  list.clear;
-  LeaveCriticalSection(messageAccessSection);
-end;
-
-function TMessageSystem.openDirectMessageAccess: TFPList;
-begin
-  EnterCriticalSection(messageAccessSection);
-  Result:=list;
-end;
-
-procedure TMessageSystem.closeDirectMessageAccess(dlist: TFPList);
-begin
-  LeaveCriticalSection(messageAccessSection);
-  if self.list<>dlist then raise Exception.Create('Invalid List');
-end;
-
-constructor TMessageSystem.create;
-begin
-  InitCriticalSection(messageAccessSection);
-  list:=TFPList.Create;
-end;
-
-destructor TMessageSystem.destroy;
-begin
-  DoneCriticalsection(messageAccessSection);
-  list.free;
-  inherited destroy;
 end;
 
 
@@ -719,25 +614,30 @@ begin
 
 end;
 
-function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding):string;
+function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding;strict: boolean):string;
 var resLen:integer;
     lastChar: pchar;
+    entityReplaced: boolean;
 begin
   setLength(result,l);
   lastChar:=@p[l-1];
   ResLen:=0;
   while (p<=lastChar) do begin
     inc(resLen);
-    if (p^='&') and ((p+1)^<>' ') then begin
+    if (p^='&') and (strict or ((p+1)^<>' ')) then begin
       inc(p);
-      if (p^='l') and ((p+1)^='t') then result[resLen]:='<'
-      else if (p^='g') and ((p+1)^='t') then result[resLen]:='>'
-      else if (p^='a') and ((p+1)^='m') and ((p+2)^='p') then result[resLen]:='&'
-      else if (p^='a') and ((p+1)^='p') and ((p+2)^='o') and ((p+3)^='s') then result[resLen]:=''''
-      else if (p^='q') and ((p+1)^='u') and ((p+2)^='o') and ((p+3)^='t') then result[resLen]:='"'
-      else if (p^='s') and ((p+1)^='z') and ((p+2)^='l') and ((p+3)^='i') and ((p+4)^='g') then result[resLen]:='ß'
-      else if (p^='n') and ((p+1)^='b') and ((p+2)^='s') and ((p+3)^='p') then result[resLen]:=' '
-      else if ((p+1)^='u') and ((p+2)^='m') and ((p+3)^='l') then begin
+      entityReplaced:=true;
+      //Replace every entity char sequence with the correct character
+      //(On the first look this seems to crash at strings like '&qu', but it is actually
+      // safe because the pchar is/should be #0-terminated)
+      if      (p^='l') and ((p+1)^='t') and ((p+2)^=';')                                                    then result[resLen]:='<'
+      else if (p^='g') and ((p+1)^='t') and ((p+2)^=';')                                                    then result[resLen]:='>'
+      else if (p^='a') and ((p+1)^='m') and ((p+2)^='p') and ((p+3)^=';')                                   then result[resLen]:='&'
+      else if (p^='a') and ((p+1)^='p') and ((p+2)^='o') and ((p+3)^='s') and ((p+4)^=';')                  then result[resLen]:=''''
+      else if (p^='q') and ((p+1)^='u') and ((p+2)^='o') and ((p+3)^='t') and ((p+4)^=';')                  then result[resLen]:='"'
+      else if (p^='s') and ((p+1)^='z') and ((p+2)^='l') and ((p+3)^='i') and ((p+4)^='g') and ((p+5)^=';') then result[resLen]:='ß'
+      else if (p^='n') and ((p+1)^='b') and ((p+2)^='s') and ((p+3)^='p') and ((p+4)^=';')                  then result[resLen]:=' '
+      else if (p^<>#0) and ((p+1)^='u') and ((p+2)^='m') and ((p+3)^='l') and ((p+4)^=';')                  then begin
         case encoding of
           eUTF8: begin
             Result[resLen]:=#$c3;reslen+=1;
@@ -748,9 +648,13 @@ begin
               'A': result[reslen]:=#$84;
               'O': result[reslen]:=#$96;
               'U': result[reslen]:=#$9c;
-              else begin
+              else if strict then begin
                 reslen-=1;
                 result[reslen]:='?'
+              end else begin
+                result[reslen-1]:='&';
+                result[reslen] := p^;
+                entityReplaced:=false;
               end;
             end;
           end;
@@ -762,16 +666,35 @@ begin
               'A': result[reslen]:=#$C4;
               'O': result[reslen]:=#$D6;
               'U': result[reslen]:=#$DC;
-              else result[reslen]:='?'
+              else if strict then result[reslen]:='?'
+              else begin
+                result[reslen]:='&';
+                reslen+=1;
+                result[reslen]:=p^;
+                entityReplaced:=false;
+              end;
             end;
         end;
-      end else result[reslen]:='?';
-      while p^<>';' do inc(p);
+      end else if strict then result[reslen]:='?'
+      else begin
+        result[reslen]:='&';
+        reslen+=1;
+        result[reslen]:=p^;
+        entityReplaced:=false;
+      end;
+      if entityReplaced then  while p^<>';' do inc(p);
     end else Result[resLen]:=p^;
     inc(p);
   end;
   if resLen<>l then
     setLength(result,resLen);
+end;
+
+
+function strDecodeHTMLEntities(s: string; encoding: TEncoding; strict: boolean
+  ): string;
+begin
+  result:=strDecodeHTMLEntities(@s[1], length(s), encoding, strict);
 end;
 
 function strFromPchar(p: pchar; l: longint): string;

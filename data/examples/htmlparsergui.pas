@@ -42,7 +42,7 @@ var
 
 implementation
 
-uses simplehtmltreeparser,regExpr,pseudoxpath;
+uses simplehtmltreeparser,pseudoxpath;
 {$R *.lfm}
 
 { TForm1 }

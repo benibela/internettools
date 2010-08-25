@@ -34,6 +34,8 @@ TTreeElement = class
 //otherwise use the functions
   procedure deleteNext();
   procedure deleteAll();
+  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean);
+
 
   //**Complex search functions.
   //**Returns the element with the given type and text which occurs before sequenceEnd
@@ -59,12 +61,15 @@ TreeParseException = Exception;
 
 //**Parsing model used to interpret the document
 //**pmStrict: every tag must be closed explicitely (otherwise an exception is raised)
-//**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised)
+//**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised), detect encoding
 TParsingModel = (pmStrict, pmHTML);
 //**This parses a html/sgml/xml file to a tree like structure
 //**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree)
+//**After tree parsing the tree contains the text as byte strings, without encoding or entity conversions. But in case of html, the meta/http-equiv encoding is detected
+//**and you can call setEncoding to change the tree to the encoding you need. (this will also convert the entities)
 TTreeParser = class
 private
+  FConvertEntities: boolean;
   FRootElement: TTreeElement;
   FCurrentElement: TTreeElement;
   FTemplateCount: Integer;
@@ -73,6 +78,7 @@ private
   FCurrentFile: string;
   FParsingModel: TParsingModel;
   FTrimText: boolean;
+  FEncoding: TEncoding;
 
   function newTreeElement(typ:TTreeElementType; text: pchar; len:longint):TTreeElement;
   function newTreeElement(typ:TTreeElementType; s: string):TTreeElement;
@@ -95,12 +101,19 @@ public
 
   function getTree: TTreeElement;
 
+
+  function getEncoding: TEncoding;
+  //**Changes the tree encoding
+  //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
+  //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
+  procedure setEncoding(new: TEncoding; convertExistingTree: Boolean = true; convertEntities: boolean =true);
 published
   property parsingModel: TParsingModel read FParsingModel write FParsingModel;
   property trimText: boolean read FTrimText write FTrimText;
+  property convertEntities: boolean read FConvertEntities write FConvertEntities;
 end;
 implementation
-
+uses pseudoxpath;
 
 { TTreeElement }
 
@@ -119,6 +132,28 @@ begin
   if next <> nil then next.deleteAll();
   next:=nil;
   Free;
+end;
+
+procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: boolean);
+var tree: TTreeElement;
+  s: String;
+begin
+  if (from = eUnknown) or (toe = eUnknown) then exit;
+  if (from = toe) and not substituteEntities then exit;
+  tree := self;
+  while tree <> nil do begin
+    if tree.typ = tetText then begin
+      tree.value:=strChangeEncoding(tree.value, from, toe);
+      if substituteEntities then tree.value:=strDecodeHTMLEntities(tree.value, toe, false);
+    end
+    else if tree.attributes <> nil then begin
+      s :=strChangeEncoding(tree.attributes.text,from,toe);
+      if substituteEntities then s:=strDecodeHTMLEntities(s, toe, false);
+      tree.attributes.text:=s;
+    end;
+    //TODO: convert tree tag names (but this is not necessary as long as only latin1 and utf8 is supported)
+    tree := tree.next;
+  end;
 end;
 
 function TTreeElement.findNext(withTyp: TTreeElementType; withText: string; findOptions: TTreeElementFindOptions =[]; sequenceEnd: TTreeElement = nil): TTreeElement;
@@ -295,6 +330,7 @@ begin
   if last = nil then exit;
 
   if FAutoCloseTag and (not strliequal(tagName, last.value, tagNameLen)) then autoCloseLastTag();
+  FAutoCloseTag:=false;
 
   if (strliequal(tagName, last.value, tagNameLen)) then begin
     new := newTreeElement(tetClose, tagName, tagNameLen);
@@ -377,6 +413,7 @@ begin
   FElementStack := TList.Create;
   treeElementClass := TTreeElement;
   FTrimText:=true;
+  FConvertEntities := true;
 end;
 
 destructor TTreeParser.destroy;
@@ -396,6 +433,8 @@ end;
 
 
 procedure TTreeParser.parseTree(html: string);
+var
+  encoding: String;
 begin
   //FVariables.clear;
   clearTree;
@@ -422,7 +461,17 @@ begin
   //close root element
   leaveTag('',0);
 
+  if parsingModel = pmHTML then begin
+    FEncoding:=eUnknown;
+    encoding := lowercase(TPseudoXPathParser.Evaluate('html/head/meta[@http-equiv=''content-type'']/@content', FRootElement));
+    if encoding <> '' then begin
+      if pos('charset=utf-8', encoding) > 0 then FEncoding:=eUTF8
+      else if (pos('charset=windows-1252',encoding) > 0) or
+              (pos('charset=iso-8859-1',encoding) > 0) then
+        FEncoding:=eWindows1252;
+    end;
 
+  end;
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
 end;
@@ -430,6 +479,20 @@ end;
 function TTreeParser.getTree: TTreeElement;
 begin
   result := FRootElement;
+end;
+
+function TTreeParser.getEncoding: TEncoding;
+begin
+  exit(FEncoding);
+end;
+
+procedure TTreeParser.setEncoding(new: TEncoding; convertExistingTree,
+  convertEntities: boolean);
+begin
+  if FRootElement = nil then exit;
+  if (FEncoding = eUnknown) or not convertExistingTree then FEncoding:= new;
+  if convertExistingTree or convertEntities then FRootElement.changeEncoding(FEncoding, new, convertEntities);
+  FEncoding := new;
 end;
 
 end.
