@@ -28,7 +28,9 @@ unit extendedhtmlparser;
 
 {$mode objfpc}{$H+}
 
-{$DEFINE UNITTESTS}
+//{$IFDEF DEBUG}
+//{$DEFINE UNITTESTS}
+//{$ENDIF}
 
 interface
 uses
@@ -232,13 +234,14 @@ begin
   if condition = '' then
     exit(true);
   FPseudoXPath.ParentElement := html;
+  FPseudoXPath.TextElement := nil;
   exit(executePseudoXPath(condition)='true');
 end;
 
 function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeElement;
   templateStart, templateEnd: TTemplateElement): Boolean;
 
-var xpathParent: TTreeElement;
+var xpathText: TTreeElement;
 
   procedure HandleHTMLText;
   begin
@@ -280,6 +283,7 @@ var xpathParent: TTreeElement;
     regexp: TRegExpr;
   begin
     FPseudoXPath.ParentElement := htmlParent;
+    FPseudoXPath.TextElement := xpathText;
     text:=executePseudoXPath(replaceVars(templateStart.attributes.Values['source']));
 
     if templateStart.attributes.Values['regex']<>'' then begin
@@ -306,6 +310,7 @@ var xpathParent: TTreeElement;
     condition:=templateStart.attributes.Values['test'];
 
     FPseudoXPath.ParentElement := htmlParent;
+    FPseudoXPath.TextElement := xpathText;
     equal:=executePseudoXPath(replaceVars(condition))='true';
 
     if not equal then
@@ -314,15 +319,27 @@ var xpathParent: TTreeElement;
       templateStart := TTemplateElement(templateStart.next); //continue
   end;
 
-var previous: TTreeElement;
-  procedure HandleCommandLoop;
-  var matchVars: TStringList;
+  procedure HandleCommandLoopOpen;
   begin
     //Two possible cases:
     //1. Continue in loop (preferred of course)
     //2. Jump over loop
+    //if matchTemplateTree(htmlParent, htmlStart, htmlEnd, TTemplateElement(templateStart.next), templateEnd) then templateStart := templateEnd
     if matchTemplateTree(htmlParent, htmlStart, htmlEnd, TTemplateElement(templateStart.next), templateEnd) then templateStart := templateEnd
     else templateStart := TTemplateElement(templateStart.reverse.next);
+  end;
+
+var realHtmlStart: TTreeElement;
+  procedure HandleCommandLoopClose;
+  begin
+    //Jump to loop start if a html element was read in the loop
+    //The condition is necessary, because if the loop can be executed without
+    //reading a html element, it can be executed again, and again, and ... =>
+    //endless loop
+    if realHtmlStart <> htmlStart then
+      templateStart := TTemplateElement(templateStart.reverse) //jump to loop start
+     else
+      templateStart := TTemplateElement(templateStart.next);
   end;
 
 var logLength: longint;
@@ -330,11 +347,14 @@ var logLength: longint;
 begin
   if htmlStart = nil then exit(false);
   if templateStart = nil then exit(false);
+  realHtmlStart := htmlStart;
  // assert(templateStart <> templateEnd);
   logLength:=FVariableLog.Count;
+  xpathText := nil;
   while (htmlStart <> nil) and
         (templateStart <> nil) and (templateStart <> templateEnd) and
         ((htmlStart <> htmlEnd.next)) do begin
+            if htmlStart.typ = tetText then xpathText := htmlStart;
             case templateStart.templateType of
               tetHTMLText: HandleHTMLText;
               tetHTMLOpen: HandleHTMLOpen;
@@ -344,8 +364,8 @@ begin
 
               tetCommandIfOpen: HandleCommandIf;
 
-              tetCommandLoopOpen: HandleCommandLoop;
-              tetCommandLoopClose: templateStart := TTemplateElement(templateStart.reverse); //jump to loop start
+              tetCommandLoopOpen: HandleCommandLoopOpen;
+              tetCommandLoopClose: HandleCommandLoopClose;
 
               tetIgnore, tetCommandMeta, tetCommandIfClose: templateStart := TTemplateElement(templateStart.next);
 
@@ -386,10 +406,6 @@ begin
 end;
 
 procedure THtmlTemplateParser.parseHTML(html: string);
-var
-  head: TTreeElement;
-  meta: TTreeElement;
-  encoding: string;
 begin
   FHTML.parseTree(html);
 
@@ -468,341 +484,277 @@ end;
 
 {$IFDEF UNITTESTS}
 
-{var tests:array[] of array[1..3] of string=(
-//simple read
-('<table id="right"><tr><td><htmlparser:read source="text()" var="col"/></td></tr></table>', '<html><table id="right"><tr><td></td><td>other</td></tr></table></html>', 'col='),
-
-//loop corner cases
-('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-('<table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=Hallo'),
-('<table></table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-('<tr/><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop><tr/>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-('<table></table><table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-('<htmlparser:loop><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></htmlparser:loop>', '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>', 'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-
-//optional elements
-('<a>as<htmlparser:read source="text()" var="a"/></a><b htmlparser-optional="true"></b>', '<a>asx</a><x/>', 'a=asx'),
-('<a>as<htmlparser:read source="text()" var="a"/></a><b htmlparser-optional="true"></b>', '<a>asx</a>', 'a=asx')
-)
-
-
-}
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
-procedure unitTest(extParser: THtmlTemplateParser;testID:longint);
-var temp:string;
-begin
-  case testID of
-    1: begin //Verschiedene Lesetests
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b></a>');
-      extParser.parseHTML('<a><b>Dies wird Variable test</b></a>');
-      if extParser.variables.Values['test']<>'Dies wird Variable test' then
-        raise Exception.create('ungültiges Ergebnis: '+extParser.variables.Values['test']);
-    end;
-    2: begin
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b></a>');
-      extParser.parseHTML('<a><b>Dies wird erneut Variable test</b><b>Nicht Test</b><b>Test</b></a>');
-      if extParser.variables.Values['test']<>'Dies wird erneut Variable test' then
-        raise Exception.create('ungültiges Ergebnis');
-    end;
-    3: begin
-      extParser.parseTemplate('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>');
-      extParser.parseHTML('<a><b>Nicht Test</b><b>Test:</b><b>Dies wird erneut Variable test2</b></a>');
-      if extParser.variables.Values['test']<>'Dies wird erneut Variable test2' then
-        raise Exception.create('ungültiges Ergebnis');
-    end;
-    4: begin
-      extParser.parseTemplate('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>');
-      extParser.parseHTML('<a><b>1</b><b>Test:</b><b>2</b><b>3</b></a>');
-      if extParser.variables.Values['test']<>'2' then
-        raise Exception.create('ungültiges Ergebnis');
-    end;
-    5: begin
-      extParser.parseTemplate('<a><b><htmlparser:read source="@att" var="att-test"/></b></a>');
-      extParser.parseHTML('<a><b att="HAllo Welt!"></b></a>');
-      if extParser.variables.Values['att-test']<>'HAllo Welt!' then
-        raise Exception.create('ungültiges Ergebnis');
-    end;
-    6: begin
-      extParser.parseTemplate('<a><b><htmlparser:read source="@att" var="regex" regex="<\d*>"/></b></a>');
-      extParser.parseHTML('<a><b att="Zahlencode: <675> abc"></b></a>');
-      if extParser.variables.Values['regex']<>'<675>' then
-        raise Exception.create('ungültiges Ergebnis');
-    end;
-    7: begin
-      extParser.parseTemplate('<a><b><htmlparser:read source="@att" var="regex" regex="<(\d* \d*)>" submatch="1"/></b></a>');
-      extParser.parseHTML('<a><b att="Zahlencode: <123 543> abc"></b></a>');
-      if extParser.variables.Values['regex']<>'123 543' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser 5');
-    end;
-    8: begin
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b></a>');
-      extParser.parseHTML('<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>');
-      if extParser.variables.Values['test']<>'1' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser 6');
-    end;
-    9: begin //Lesen mit Teiltext
-      extParser.parseTemplate('<a><b>Nur diese: <htmlparser:read source="text()" var="test" regex="\d+"/></b></a>');
-      extParser.parseHTML('<a><b>1</b><b>2</b><b>Nur diese: 3</b><b>4</b><b>5</b></a>');
-      if extParser.variables.Values['test']<>'3' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    10: begin
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test" regex="\d+"/>Nur diese: </b></a>');
-      extParser.parseHTML('<a><b>1</b><b>Nur diese: 2</b><b>3</b><b>4</b><b>5</b></a>');
-      if extParser.variables.Values['test']<>'2' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    11: begin
-      extParser.parseTemplate('<b>Hier<htmlparser:read source="@v" var="test"/></b>');
-      extParser.parseHTML('<a><b v="abc">1</b><b v="def"></b>      <b>2</b><b>3</b><b v="ok">Hier</b><b v="!">5</b></a>');
-      if extParser.variables.Values['test']<>'ok' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    12: begin
-      extParser.parseTemplate('<b><htmlparser:read source="@v" var="test"/>Hier</b>');
-      extParser.parseHTML('<a><b v="abc">1</b><b v="def"></b><b>2</b><b>3</b><b v="ok">Hier</b><b v="!">5</b></a>');
-      if extParser.variables.Values['test']<>'ok' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    13: begin //Kein Lesen
-      extParser.parseTemplate('<a><b><htmlparser:read var="test" source=" ''Saga der sieben Sonnen''"/></b></a>');
-      extParser.parseHTML('<a><b>456</b></a>');
-      if extParser.variables.Values['test']<>'Saga der sieben Sonnen' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    14: begin //Lesen mit concat 2 Parameter
-      extParser.parseTemplate('<a><b><htmlparser:read var="test" source=" concat( ''123'', text() )"/></b></a>');
-      extParser.parseHTML('<a><b>456</b></a>');
-      if extParser.variables.Values['test']<>'123456' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    15: begin //Lesen mit concat 3 Parameter
-      extParser.parseTemplate('<a><b><htmlparser:read var="test" source=" concat( ''abc'', text() , ''ghi'' )"/></b></a>');
-      extParser.parseHTML('<a><b>def</b></a>');
-      if extParser.variables.Values['test']<>'abcdefghi' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-   { 16: begin //Nicht geschlossene HTML-Tags
-      extParser.parseTemplate('<a><p><htmlparser:read var="test" source="text()"/></p></a>');
-      extParser.parseHTML('<a><p>Offener Paragraph</a>');
-      if extParser.variables.Values['test']<>'Offener Paragraph' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;}
-    16: begin
-      extParser.parseTemplate('<a><img> <htmlparser:read var="test" source="@src"/> </img></a>');
-      extParser.parseHTML('<a><img src="abc.jpg"></a>');
-      if extParser.variables.Values['test']<>'abc.jpg' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    17: begin //mehrere davon
-      extParser.parseTemplate('<a><img width="100"> <htmlparser:read var="test" source="@src"/> </img></a>');
-      extParser.parseHTML('<a><img width=120 src="abc.jpg"><img width=320 src="def.jpg"><img width=100 src="123.jpg"><img width=500 src="baum.jpg"></a>');
-      if extParser.variables.Values['test']<>'123.jpg' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    18: begin //IF-Test (Bed. == erfüllt)
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
-      extParser.parseHTML('<a><b>abc</b><c>dies kommt raus</c></a>');
-      if extParser.variables.Values['test']<>'dies kommt raus' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    19: begin //IF-Test (Bed. == nicht erfüllt)
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
-      extParser.parseHTML('<a><b>abcd</b><c>dies kommt nicht raus</c></a>');
-      if extParser.variables.Values['test']<>'abcd' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    20: begin //IF-Test (Bed. != erfüllt)
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''!=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
-      extParser.parseHTML('<a><b>abcd</b><c>dies kommt raus</c></a>');
-      if extParser.variables.Values['test']<>'dies kommt raus' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    21: begin //IF-Test (Bed. != nicht erfüllt)
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''abc''!=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>');
-      extParser.parseHTML('<a><b>abc</b><c>dies kommt nicht raus</c></a>');
-      if extParser.variables.Values['test']<>'abc' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    22: begin //Text + If
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>');
-      extParser.parseHTML('<a><b>nicht ok<c>dies kommt nicht raus</c></b></a>');
-      if extParser.variables.Values['test']<>'nicht ok' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    23: begin //Text + If
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>');
-      extParser.parseHTML('<a><b>ok<c>dies kommt raus!</c></b></a>');
-      if extParser.variables.Values['test']<>'dies kommt raus!' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    24: begin //Text + If + ungeschlossen
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><img><htmlparser:read source="@src" var="test"/></img></htmlparser:if></b></a>');
-      extParser.parseHTML('<a><b>ok<img src="abc.png"></b></a>');
-      if extParser.variables.Values['test']<>'abc.png' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    25: begin //Text + If + ungeschlossen + Text
-      extParser.parseTemplate('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><img><htmlparser:read source="@src" var="test"/></img><htmlparser:read source="text()" var="ende"/></htmlparser:if></b></a>');
-      extParser.parseHTML('<a><b>ok<img src="abcd.png"></b></a>');
-      if extParser.variables.Values['test']<>'abcd.png' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser');
-    end;
-    26: begin //Schleifen Vollständigkeits test
-      extParser.parseTemplate('<a><htmlparser:loop><b><htmlparser:read source="text()" var="test"/></b></htmlparser:loop></a>');
-      extParser.parseHTML('<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>');
-      if extParser.variables.Values['test']<>'5' then
-        raise Exception.create(extParser.variables.Values['test']+'<>5');
-    end;
-    27: begin //Leerschleifentest
-      extParser.parseTemplate('<a><x><htmlparser:read source="text()" var="test"/></x><htmlparser:loop><b><htmlparser:read source="text()" var="test"/></b></htmlparser:loop></a>');
-      extParser.parseHTML('<a><x>abc</x></a>');
-      if extParser.variables.Values['test']<>'abc' then
-        raise Exception.create('Fehler bei Unit Test extendedhtmlparser 7');
-    end;
-    28: begin
-      extParser.parseTemplate('<a><ax><b>1</b></ax><ax><b><htmlparser:read source="text()" var="test"/></b></ax></a>');
-      extParser.parseHTML('<a><ax>123124</ax><ax><b>525324</b></ax><ax><b>1</b></ax><ax><b>3</b></ax></a>');
-      if extParser.variables.Values['test']<>'3' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    29: begin //optionale elemente
-      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>');
-      extParser.parseHTML('<a><xx></xx><c>!!!</c></a>');
-      if extParser.variables.Values['test']<>'!!!' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    30: begin
-      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>');
-      extParser.parseHTML('<a><c>???</c></a>');
-      if extParser.variables.Values['test']<>'???' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    31: begin
-      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>');
-      extParser.parseHTML('<a><b>1</b><c>2</c></a>');
-      if extParser.variables.Values['test']<>'2' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    32: begin
-      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></a>');
-      extParser.parseHTML('<a><b>1</b><c>2</c><b>3</b></a>');
-      if extParser.variables.Values['test']<>'3' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    33: begin
-      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><e htmlparser-optional="true"/></a>');
-      extParser.parseHTML('<a><b>1</b><c>2</c><b>test*test</b></a>');
-      if extParser.variables.Values['test']<>'test*test' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    34: begin
-      extParser.parseTemplate('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><htmlparser:read source="text()" var="bla"/><e htmlparser-optional="true"/></a>');
-      extParser.parseHTML('<a><b>1</b><c>2</c><b>hallo</b>welt</a>');
-      if (extParser.variables.Values['test']<>'hallo') then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    35: begin //verzögertes optionale element
-      extParser.parseTemplate('<a><x><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></x></a>');
-      extParser.parseHTML('<a><x>Hallo!<a></a><c></c><b>piquadrat</b>welt</x></a>');
-      if (extParser.variables.Values['test']<>'piquadrat') then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    40: begin //mehrfach loops+concat
-      extParser.parseTemplate('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></a>');
-      extParser.parseHTML('<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>');
-      if extParser.variables.Values['test']<>'los:123' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    41: begin
-      extParser.parseTemplate('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>');
-      extParser.parseHTML('<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>');
-      if extParser.variables.Values['test']<>'los:abc123ABC' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    42: begin //deepNodeText()
-      extParser.parseTemplate('<a><x><htmlparser:read source="deepNodeText()" var="test"/></x></a>');
-      extParser.parseHTML('<a><x>Test:<b>in b</b><c>in c</c>!</x></a>');
-      if extParser.variables.Values['test']<>'Test:in bin c!' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    43: begin //deepNodeText() mit optionalen
-      extParser.parseTemplate('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>');
-      extParser.parseHTML('<a><x>Test:<br><b>in b</b><c>in c</c>!</x></a>');
-      if (extParser.variables.Values['test1']<>'Test:') or
-         (extParser.variables.Values['test2']<>'Test:in bin c!') then
-        raise Exception.create('ergebnis ungültig');
-    end;                                                        {
-    44: begin
-      extParser.variables.Values['test2']:='not called at all';
-      extParser.parseTemplate('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>');
-      extParser.parseHTML('<a><x>Test:<b>in b</b><c>in c</c>!</x></a>');
-      if (extParser.variables.Values['test1']<>'Test:') or
-         (extParser.variables.Values['test2']<>'not called at all')   then
-        raise Exception.create('ergebnis ungültig:'+extParser.variables.Values['test1']+'|'+extParser.variables.Values['test2']);
-    end;                                                       }
-    45: begin //html script tags containing <
-      extParser.parseTemplate('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>');
-      extParser.parseHTML('<a><script>abc<def</script><b>test<b></a>');
-      if extParser.variables.Values['test']<>'test' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    46: begin //direct closed tags
-      extParser.parseTemplate('<a><br/><br/><htmlparser:read source="text()" var="test"/><br/></a>');
-      extParser.parseHTML('<a><br/><br   />abc<br /></a>');
-      if extParser.variables.Values['test']<>'abc' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-    47: begin //xpath conditions
-      extParser.parseTemplate('<html><a htmlparser-condition="filter(@cond, ''a+'') == ''aaa'' "><htmlparser:read source="text()" var="test"/></a></html>');
-      extParser.parseHTML('<html><a>a1</a><a cond="xyz">a2</a><a cond="a">a3</a><a cond="xaay">a4</a><a cond="aaaa">a5</a><a cond="xaaay">a6</a><a cond="xaaaay">a7</a><a cond="xaay">a8</a></html>');
-      if extParser.variables.Values['test']<>'a6' then
-        raise Exception.create('ergebnis ungültig');
-    end;
-
-    80: begin //encoding detection
-      extParser.parseTemplate('<a><htmlparser:read source="text()" var="test"/></a>');
-      //no coding change utf-8 -> utf-8
-      extParser.outputEncoding:=eUTF8;
-      extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>uu(bin:'#$C3#$84',ent:&Ouml;)uu</a></html>');
-      if extParser.variables.Values['test']<>'uu(bin:'#$C3#$84',ent:'#$C3#$96')uu' then //ÄÖ
-        raise Exception.create('ergebnis ungültig utf8->utf8');
-      //no coding change latin1 -> latin1
-      extParser.outputEncoding:=eWindows1252;
-      extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>ll(bin:'#$C4',ent:&Ouml;)ll</a></html>');
-      if extParser.variables.Values['test']<>'ll(bin:'#$C4',ent:'#$D6')ll' then
-        raise Exception.create('ergebnis ungültig latin1->latin1');
-      //coding change latin1 -> utf-8
-      extParser.outputEncoding:=eUTF8;
-      extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>lu(bin:'#$C4',ent:&Ouml;)lu</a></html>');
-      temp:=extParser.variables.Values['test'];
-      if extParser.variables.Values['test']<>'lu(bin:'#$C3#$84',ent:'#$C3#$96')lu' then
-        raise Exception.create('ergebnis ungültig latin1->utf8');
-      //coding change utf8 -> latin1
-      extParser.outputEncoding:=eWindows1252;
-      extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>ul(bin:'#$C3#$84',ent:&Ouml;)ul</a></html>');
-      if extParser.variables.Values['test']<>'ul(bin:'#$C4',ent:'#$D6')ul' then
-        raise Exception.create('ergebnis ungültig utf8->latin1');
-
-      extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=" /><a>bin:'#$C4#$D6',ent:&Ouml;</a></html>');
-      extParser.outputEncoding:=eUTF8;
-    end;
-  end;
-end;
-
 procedure unitTests();
+var data: array[1..58]of array[1..3] of string = (
+//---classic tests---
+ //simple reading
+ ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
+ '<a><b>Dies wird Variable test</b></a>',
+ 'test=Dies wird Variable test'),
+ ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
+ '<a><b>Dies wird erneut Variable test</b><b>Nicht Test</b><b>Test</b></a>',
+ 'test=Dies wird erneut Variable test'),
+ ('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>',
+ '<a><b>Nicht Test</b><b>Test:</b><b>Dies wird erneut Variable test2</b></a>',
+ 'test=Dies wird erneut Variable test2'),
+ ('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>',
+ '<a><b>1</b><b>Test:</b><b>2</b><b>3</b></a>',
+ 'test=2'),
+ ('<a><b><htmlparser:read source="@att" var="att-test"/></b></a>',
+ '<a><b att="HAllo Welt!"></b></a>',
+ 'att-test=HAllo Welt!'),
+ ('<a><b><htmlparser:read source="@att" var="regex" regex="<\d*>"/></b></a>',
+ '<a><b att="Zahlencode: <675> abc"></b></a>',
+ 'regex=<675>'),
+ ('<a><b><htmlparser:read source="@att" var="regex" regex="<(\d* \d*)>" submatch="1"/></b></a>',
+ '<a><b att="Zahlencode: <123 543> abc"></b></a>',
+ 'regex=123 543'),
+ ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
+ '<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
+ 'test=1'),
+ //reading with matching node text
+ ('<a><b>Nur diese: <htmlparser:read source="text()" var="test" regex="\d+"/></b></a>',
+ '<a><b>1</b><b>2</b><b>Nur diese: 3</b><b>4</b><b>5</b></a>',
+ 'test=3'),
+ ('<a><b><htmlparser:read source="text()" var="test" regex="\d+"/>Nur diese: </b></a>',
+ '<a><b>1</b><b>Nur diese: 2</b><b>3</b><b>4</b><b>5</b></a>',
+ 'test=2'),
+ ('<b>Hier<htmlparser:read source="@v" var="test"/></b>',
+ '<a><b v="abc">1</b><b v="def"></b>      <b>2</b><b>3</b><b v="ok">Hier</b><b v="!">5</b></a>',
+ 'test=ok'),
+ //look ahead testing
+ ('<b><htmlparser:read source="@v" var="test"/>Hier</b>',
+ '<a><b v="abc">1</b><b v="def"></b>      <b>2</b><b>3</b><b v="100101">Hier</b><b v="!">5</b></a>',
+ 'test=100101'),
+ //simple reading
+ ('<b><htmlparser:read source="@v" var="test"/>Hier</b>',
+ '<a><b v="abc">1</b><b v="def"></b><b>2</b><b>3</b><b v="ok">Hier</b><b v="!">5</b></a>',
+ 'test=ok'),
+ //No reading
+ ('<a><b><htmlparser:read var="test" source=" ''Saga der sieben Sonnen''"/></b></a>',
+ '<a><b>456</b></a>',
+ 'test=Saga der sieben Sonnen'),
+ //Reading concat 2-params
+ ('<a><b><htmlparser:read var="test" source=" concat( ''123'', text() )"/></b></a>',
+ '<a><b>456</b></a>',
+ 'test=123456'),
+ //Reading concat 3-params
+ ('<a><b><htmlparser:read var="test" source=" concat( ''abc'', text() , ''ghi'' )"/></b></a>',
+ '<a><b>def</b></a>',
+ 'test=abcdefghi'),
+ //non closed html tags
+ ('<a><p><htmlparser:read var="test" source="text()"/></p></a>',
+ '<a><p>Offener Paragraph</a>',
+ 'test=Offener Paragraph'),
+ ('<a><img> <htmlparser:read var="test" source="@src"/> </img></a>',
+ '<a><img src="abc.jpg"></a>',
+ 'test=abc.jpg'),
+ //several non closed
+ ('<a><img width="100"> <htmlparser:read var="test" source="@src"/> </img></a>',
+ '<a><img width=120 src="abc.jpg"><img width=320 src="def.jpg"><img width=100 src="123.jpg"><img width=500 src="baum.jpg"></a>',
+ 'test=123.jpg'),
+ //if tests (== strue)
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ '<a><b>abc</b><c>dies kommt raus</c></a>',
+ 'test=abc'#13#10'test=dies kommt raus'),
+ //if test (== false),
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+   '<a><b>abcd</b><c>dies kommt nicht raus</c></a>',
+   'test=abcd'),
+ //IF-Test (!= true)
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''!=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+  '<a><b>abcd</b><c>dies kommt raus</c></a>',
+  'test=abcd'#13#10'test=dies kommt raus'),
+ //IF-Test (!= false)
+  ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''abc''!=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+  '<a><b>abc</b><c>dies kommt nicht raus</c></a>',
+  'test=abc'),
+ //Text + If
+   ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+   '<a><b>nicht ok<c>dies kommt nicht raus</c></b></a>',
+   'test=nicht ok'),
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+   '<a><b>ok<c>dies kommt raus!</c></b></a>',
+   'test=ok'#13'test=dies kommt raus!'),
+  //text + if + not closed
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><img><htmlparser:read source="@src" var="test"/></img></htmlparser:if></b></a>',
+   '<a><b>ok<img src="abc.png"></b></a>',
+   'test=ok'#13'test=abc.png'),
+   //text + if + not closed + text
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><img><htmlparser:read source="@src" var="test"/></img><htmlparser:read source="text()" var="ende"/></htmlparser:if></b></a>',
+  '<a><b>ok<img src="abcd.png"></b></a>',
+  'test=ok'#13'test=abcd.png'#13'ende=ok'),
+  //text + if + not closed + text
+ ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''">  <img><htmlparser:read source="@src" var="test"/><htmlparser:read source="text()" var="ende"/></img>  </htmlparser:if></b></a>',
+ '<a><b>ok<img src="abcd.png"></b></a>',
+ 'test=ok'#13'test=abcd.png'#13'ende='),
+ //loop complete
+ ('<a><htmlparser:loop><b><htmlparser:read source="text()" var="test"/></b></htmlparser:loop></a>',
+ '<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
+ 'test=1'#13'test=2'#13'test=3'#13'test=4'#13'test=5'),
+ //loop empty
+ ('<a><x><htmlparser:read source="text()" var="test"/></x><htmlparser:loop><b><htmlparser:read source="text()" var="test"/></b></htmlparser:loop></a>',
+  '<a><x>abc</x></a>',
+  'test=abc'),
+  ('<a><ax><b>1</b></ax><ax><b><htmlparser:read source="text()" var="test"/></b></ax></a>',
+  '<a><ax>123124</ax><ax><b>525324</b></ax><ax><b>1</b></ax><ax><b>3</b></ax></a>',
+  'test=3'),
+ //optional elements
+  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>',
+  '<a><xx></xx><c>!!!</c></a>',
+  'test=!!!'),
+  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>',
+  '<a><c>???</c></a>',
+  'test=???'),
+  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>',
+  '<a><b>1</b><c>2</c></a>',
+  'test=1'#13'test=2'),
+  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></a>',
+   '<a><b>1</b><c>2</c><b>3</b></a>',
+   'test=1'#13'test=2'#13'test=3'),
+  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><e htmlparser-optional="true"/></a>',
+    '<a><b>1</b><c>2</c><b>test*test</b></a>',
+    'test=1'#13'test=2'#13'test=test*test'),
+  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><htmlparser:read source="text()" var="bla"/><e htmlparser-optional="true"/></a>',
+  '<a><b>1</b><c>2</c><b>hallo</b>welt</a>',
+  'test=1'#13'test=2'#13'test=hallo'#13'bla=welt'),
+ //delayed optional elements
+  ('<a><x><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></x></a>',
+   '<a><x>Hallo!<a></a><c></c><b>piquadrat</b>welt</x></a>',
+   'test=piquadrat'),
+ //multiple loops+concat
+  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></a>',
+   '<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>',
+   'test=los:'#13'test=los:1'#13'test=los:12'#13'test=los:123'),
+  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>',
+   '<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>',
+   'test=los:'#13'test=los:a'#13'test=los:ab'#13'test=los:abc'#13'test=los:abc1'#13'test=los:abc12'#13'test=los:abc123'#13'test=los:abc123A'#13'test=los:abc123AB'#13'test=los:abc123ABC'),
+ //deepNodeText()
+  ('<a><x><htmlparser:read source="deepNodeText()" var="test"/></x></a>',
+   '<a><x>Test:<b>in b</b><c>in c</c>!</x></a>',
+   'test=Test:in bin c!'),
+ //deepNodeText with optional element
+  ('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>',
+   '<a><x>Test:<br><b>in b</b><c>in c</c>!</x></a>',
+   'test1=Test:'#13'test2=Test:in bin c!'),
+  ('<a><pre><htmlparser:read source="text()" var="test2"/></pre><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>',
+   '<a><pre>not called at all</pre><x>Test:<b>in b</b><c>in c</c>!</x></a>',
+   'test2=not called at all'#13'test1=Test:'#13'test2=Test:in bin c!'),
+ //html script tags containing <
+   ('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>',
+   '<a><script>abc<def</script><b>test<b></a>',
+   'test=test'),
+ //direct closed tags
+   ('<a><br/><br/><htmlparser:read source="text()" var="test"/><br/></a>',
+   '<a><br/><br   />abc<br /></a>',
+   'test=abc'),
+ //xpath conditions
+   ('<html><a htmlparser-condition="filter(@cond, ''a+'') == ''aaa'' "><htmlparser:read source="text()" var="test"/></a></html>',
+   '<html><a>a1</a><a cond="xyz">a2</a><a cond="a">a3</a><a cond="xaay">a4</a><a cond="aaaa">a5</a><a cond="xaaay">a6</a><a cond="xaaaay">a7</a><a cond="xaay">a8</a></html>',
+   'test=a6'),
+
+
+//--new tests--
+   //simple read
+   ('<table id="right"><tr><td><htmlparser:read source="text()" var="col"/></td></tr></table>',
+    '<html><table id="right"><tr><td></td><td>other</td></tr></table></html>',
+    'col='),
+
+   //loop corner cases
+   ('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>',
+    '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
+    'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+   ('<table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>',
+    '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
+    'col=Hallo'),
+   ('<table></table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>',
+    '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
+    'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+   ('<tr/><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>',
+    '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
+    'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+   ('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop><tr/>',
+    '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
+    'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'),
+   ('<table></table><table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>',
+    '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
+     'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+   ('<htmlparser:loop><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></htmlparser:loop>',
+    '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
+    'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
+   ('<table><htmlparser:loop><tr><td><x htmlparser-optional="true"><htmlparser:read source="text()" var="k"/></x><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>',
+    '<html><body><table id="wrong"><tr><td><x>hallo</x>Hillo</td></tr><tr><td><x>hallo2</x>Hillo2</td></tr><tr><td><x>hallo3</x>Hallo3</td></tr><tr><td>we3</td></tr><tr><td><x>hallo4</x>Hallo4</td></tr></table></html>',
+    'k=hallo'#13'col=Hillo'#13'k=hallo2'#13'col=Hillo2'#13'k=hallo3'#13'col=Hallo3'#13'col=we3'#13'k=hallo4'#13'col=Hallo4'),
+
+
+
+
+   //optional elements
+   ('<a>as<htmlparser:read source="text()" var="a"/></a><b htmlparser-optional="true"></b>',
+    '<a>asx</a><x/>',
+    'a=asx'),
+   ('<a>as<htmlparser:read source="text()" var="a"/></a><b htmlparser-optional="true"></b>',
+    '<a>asx</a>',
+    'a=asx'),
+
+   //different text() interpretations
+   ('<a><htmlparser:read source="text()" var="A"/><x/><htmlparser:read source="text()" var="B"/></a>',
+    '<a>hallo<x></x>a</a>',
+    'A=hallo'#13'B=a')
+
+);
 
 var i:longint;
     extParser:THtmlTemplateParser;
     sl:TStringList;
+    j: Integer;
 begin
   extParser:=THtmlTemplateParser.create;
+  sl:=TStringList.Create;
+  for i:=low(data)to high(data) do begin
+      extParser.parseTemplate(data[i,1]);
+      extParser.parseHTML(data[i,2]);
+      sl.Text:=data[i,3];
+      //check lines to avoid line ending trouble with win/linux
+      if extParser.variableChangeLog.Count<>sl.Count then
+        raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+data[i,3]+'"');
+      for j:=0 to sl.count-1 do
+        if extParser.variableChangeLog[j]<>sl[j] then
+          raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+data[i,3]+'"');
+  end;
 
-  for i:=1 to 100 do
-     unitTest(extParser,i);
+  //---special encoding tests---
+  extParser.parseTemplate('<a><htmlparser:read source="text()" var="test"/></a>');
+  //no coding change utf-8 -> utf-8
+  extParser.outputEncoding:=eUTF8;
+  extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>uu(bin:'#$C3#$84',ent:&Ouml;)uu</a></html>');
+  if extParser.variables.Values['test']<>'uu(bin:'#$C3#$84',ent:'#$C3#$96')uu' then //ÄÖ
+    raise Exception.create('ergebnis ungültig utf8->utf8');
+  //no coding change latin1 -> latin1
+  extParser.outputEncoding:=eWindows1252;
+  extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>ll(bin:'#$C4',ent:&Ouml;)ll</a></html>');
+  if extParser.variables.Values['test']<>'ll(bin:'#$C4',ent:'#$D6')ll' then
+    raise Exception.create('ergebnis ungültig latin1->latin1');
+  //coding change latin1 -> utf-8
+  extParser.outputEncoding:=eUTF8;
+  extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>lu(bin:'#$C4',ent:&Ouml;)lu</a></html>');
+  if extParser.variables.Values['test']<>'lu(bin:'#$C3#$84',ent:'#$C3#$96')lu' then
+    raise Exception.create('ergebnis ungültig latin1->utf8');
+  //coding change utf8 -> latin1
+  extParser.outputEncoding:=eWindows1252;
+  extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>ul(bin:'#$C3#$84',ent:&Ouml;)ul</a></html>');
+  if extParser.variables.Values['test']<>'ul(bin:'#$C4',ent:'#$D6')ul' then
+    raise Exception.create('ergebnis ungültig utf8->latin1');
+
+  extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=" /><a>bin:'#$C4#$D6',ent:&Ouml;</a></html>');
+  extParser.outputEncoding:=eUTF8;
+
+
+
   extParser.free;
+  sl.Free;
 end;
 
 initialization

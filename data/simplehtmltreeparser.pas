@@ -48,6 +48,8 @@ TTreeElement = class
 
   function getValue(): string;
   function getAttribute(a: string):string;
+  function getParent(): TTreeElement; //**< searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+
   function toString(): string;
 
   constructor create();
@@ -213,6 +215,24 @@ function TTreeElement.getAttribute(a: string):string;
 begin
   if attributes = nil then exit('');
   exit(attributes.Values[a]);
+end;
+
+function TTreeElement.getParent(): TTreeElement;
+var
+  cur: TTreeElement;
+  open: longint;
+begin
+  cur := self;
+  open := 1;
+  while cur <> nil do begin
+    if cur.typ = tetOpen then open+=1
+    else if cur.typ = tetClose then begin
+      open-=1;
+      if open = 0 then exit(cur.reverse);
+    end;
+    cur := cur.next;
+  end;
+  exit(nil);
 end;
 
 function TTreeElement.toString(): string;

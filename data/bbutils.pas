@@ -114,6 +114,7 @@ procedure strSplit(out splitted: TStringArray;s:string;c:char;includeEmpty:boole
 
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
 
+
 //**loads a file as string. The filename is directly passed to fpc rtl and uses the system
 //**encoding @seealso(strLoadFromFileUTF8)
 function strLoadFromFile(filename:string):string;
@@ -141,6 +142,8 @@ function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boo
 function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = true):string;
 //**Returns the first l bytes of p
 function strFromPchar(p:pchar;l:longint):string;
+
+function strFromPtr(p: pointer): string;
 
 //----------------Mathematical functions-------------------------------
 function ggT(a,b: cardinal): cardinal;
@@ -369,19 +372,12 @@ begin
 end;
 function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
 begin
-  result:=l1=l2;
-  if not result then exit;
-  result:=strlicomp(p1,p2,l1)=0;
+  result:=(l1=l2) and (strlicomp(p1,p2,l1)=0);
 end;
 function strliequal(p: pchar; s:string;l: longint): boolean;
 begin
-  result:=(l=length(s)) and (strlicomp(p,@s[1],l)=0);
+  result:=(l=length(s)) and ((l =0) or (strlicomp(p,pchar(pointer(s)),l)=0));
 end;
-
-{function strliequal(p1, p2: pchar; l1, l2: longint): boolean;
-begin
-  result:=(l1=l2) and strlicomp(p1,p2,l2);
-end;                                    }
 
 function striequal(s1, s2: string): boolean;
 begin
@@ -395,7 +391,7 @@ end;
 
 function strlibeginswith(p: pchar; l: longint; s: string): boolean;
 begin
-  result:=(s='') or ((l>=length(s)) and (strlicomp(p,@s[1],length(s))=0));
+  result:=(s='') or ((l>=length(s)) and (strlicomp(p,pchar(pointer(s)),length(s))=0));
 end;
 
 function strlibeginswith(strToBeExaminated,expectedStart: string): boolean;
@@ -694,7 +690,7 @@ end;
 function strDecodeHTMLEntities(s: string; encoding: TEncoding; strict: boolean
   ): string;
 begin
-  result:=strDecodeHTMLEntities(@s[1], length(s), encoding, strict);
+  result:=strDecodeHTMLEntities(pchar(s), length(s), encoding, strict);
 end;
 
 function strFromPchar(p: pchar; l: longint): string;
@@ -767,6 +763,11 @@ begin
   end;
   if i=0 then result:=IntToStr(size)+' B'
   else result:=format('%4f ',[size+res/1024])+iec[i]+'iB';
+end;
+
+function strFromPtr(p: pointer): string;
+begin
+  result:=IntToHex(PtrUInt(p), 2*sizeof(Pointer));
 end;
 
 function ggT(a, b: cardinal): cardinal;
