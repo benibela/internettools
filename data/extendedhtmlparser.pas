@@ -29,7 +29,7 @@ unit extendedhtmlparser;
 {$mode objfpc}{$H+}
 
 //{$IFDEF DEBUG}
-//{$DEFINE UNITTESTS}
+{$DEFINE UNITTESTS}
 //{$ENDIF}
 
 interface
@@ -487,7 +487,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..58]of array[1..3] of string = (
+var data: array[1..59]of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -702,8 +702,10 @@ var data: array[1..58]of array[1..3] of string = (
    //different text() interpretations
    ('<a><htmlparser:read source="text()" var="A"/><x/><htmlparser:read source="text()" var="B"/></a>',
     '<a>hallo<x></x>a</a>',
-    'A=hallo'#13'B=a')
-
+    'A=hallo'#13'B=a'),
+   ('<table id="right"><htmlparser:loop><tr><td><htmlparser:read source="../text()" var="col"/></td></tr></htmlparser:loop></table>',
+    '<table id="right"><tr>pre<td>123</td><td>other</td></tr><tr>ff<td>foo</td><td>columns</td></tr><tr>gg<td>bar</td><td>are</td></tr><tr>hh<td>xyz</td><td>ignored</td></tr></table>',
+    'col=pre'#10'col=ff'#10'col=gg'#10'col=hh')
 );
 
 var i:longint;
@@ -763,9 +765,7 @@ unitTests();
 {$ENDIF}
 
 
-end.
-
-
+(*         deprecated things
 
 function THtmlTemplateParser.textEvent(text: pchar; textLen: longint): boolean;
 var alt,i: longint;
@@ -813,7 +813,7 @@ begin
   result+=' at offset '+IntToStr(element.offset);
 end;
 
-
+*)
 
 
 
