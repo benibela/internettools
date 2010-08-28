@@ -13,11 +13,15 @@ var mycmdLine: TCommandLineReader;
     files:TStringArray;
     i: Integer;
     j: Integer;
+
+{$R *.res}
+
 begin
   mycmdLine:=TCommandLineReader.create;
+  mycmdLine.declareFlag('no-header','Just prints the variables, not the file name');
   mycmdLine.declareFlag('immediate-vars','List the variable state after every file');
-  mycmdLine.declareFlag('immediate-var-changelog','List the variable changelog after every file');
-  mycmdLine.declareFlag('var-changelog','List the variable changelog after all files');
+  mycmdLine.declareFlag('immediate-vars-changelog','List the variable changelog after every file');
+  mycmdLine.declareFlag('vars','List the variable changelog after all files');
   mycmdLine.declareFlag('vars-changelog','List the variable changelog after all files');
   mycmdLine.declareString('template','Template file');
 
@@ -31,30 +35,26 @@ begin
 
   for i:=0 to high(files) do begin
     if files[i]='' then continue;
-    writeln('Parse file:'+files[i]);
+    if not mycmdLine.readFlag('no-header') then writeln('**** Parse file:'+files[i]+' ****');
     htmlparser.parseHtmlFile(files[i]);
 
     if mycmdLine.readFlag('immediate-vars') then begin
-      writeln(stderr,#9'Current variable state:');
-      for j:=0 to htmlparser.variables.count-1 do
-        writeln(#9#9,htmlparser.variables[j]);
+      if not mycmdLine.readFlag('no-header') then writeln(stderr,'** Current variable state: **');
+      for j:=0 to htmlparser.variables.count-1 do writeln(htmlparser.variables[j]);
     end;
 
-    if mycmdLine.readFlag('immediate-var-changelog') then begin
-      writeln(#9'Current variable changelog:');
-      for j:=0 to htmlparser.variableChangeLog.count-1 do
-        writeln(#9#9,htmlparser.variableChangeLog[j]);
+    if mycmdLine.readFlag('immediate-vars-changelog') then begin
+      if not mycmdLine.readFlag('no-header') then writeln('** Current variable changelog: **');
+      for j:=0 to htmlparser.variableChangeLog.count-1 do writeln(htmlparser.variableChangeLog[j]);
     end;
   end;
   if mycmdLine.readFlag('vars') and not mycmdLine.readFlag('immediate-vars') then begin
-    writeln(stderr,#9'Final variable state:');
-    for j:=0 to htmlparser.variables.count-1 do
-      writeln(#9#9,htmlparser.variables[j]);
+    if not mycmdLine.readFlag('no-header') then writeln(stderr,'** Final variable state: **');
+    for j:=0 to htmlparser.variables.count-1 do writeln(htmlparser.variables[j]);
   end;
-  if mycmdLine.readFlag('var-changelog') and not mycmdLine.readFlag('immediate-var-changelog') then begin
-    writeln(#9'Final variable changelog:');
-    for j:=0 to htmlparser.variableChangeLog.count-1 do
-      writeln(#9#9,htmlparser.variableChangeLog[j]);
+  if mycmdLine.readFlag('vars-changelog') and not mycmdLine.readFlag('immediate-vars-changelog') then begin
+    if not mycmdLine.readFlag('no-header') then writeln('** Final variable changelog: **' );
+    for j:=0 to htmlparser.variableChangeLog.count-1 do writeln(htmlparser.variableChangeLog[j]);
   end;
   htmlparser.free;
   mycmdLine.free;

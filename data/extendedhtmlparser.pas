@@ -54,11 +54,13 @@ TReadCallbackFunction = procedure (read: pchar; readLen:longint) of object;
 TReplaceFunction = procedure (variable: string; var value:string) of object;
 
 ETemplateParseException = Exception;
+EHTMLParseException = Exception;
 
 { TTemplateElement }
 
 TTemplateElement=class(TTreeElement)
   templateType: TTemplateElementType;
+  match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
   function isOptional: boolean;
   procedure setOptional(opt: boolean);
   procedure initialized;override;
@@ -70,9 +72,10 @@ end;
   @abstract This is the html parser class
   You can use it simply by calling first parseTemplate to load a given template
   and then parseHTML to parse the html data. @br
-  You can access the read variables with the property variables or the event onVariableRead. @br @br
-  A template file is just like a html file with special commands. The parser tries now to match every
-  text and tag of the template to text/tag in the html file, while ignoring every additional data. If no match is possible an exception is raised.
+  A template file is just like a html file with special commands. The parser than matches every text and tag
+  of the template to text/tag in the html file, while ignoring every additional data. If no match is possible an exception is raised.@br
+  The template can extract certain values from the html file into variables, and you can access the read variables with the property variables and variableChangeLog.
+  Former only contains the final value of the variables, latter records every assignment during the matching of the template.@br@br
 
   @bold(Examples)
 
@@ -93,8 +96,9 @@ end;
   @bold(Syntax of a template file)
 
   Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file to parse. @br
-  A tag of the html file is considered as equal to an tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child tag of the tag in the template exists also in the html file (in the same order and nesting).@br
-  Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file.
+  A tag of the html file is considered as equal to a tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child node of the tag in the template is also equal to a child node of the tag in the html file (in the same order and nesting).@br
+  Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
+  The matching occurs (in the latest version) with backtracking, so it will always find the first and longest match.
 
 
 
@@ -112,6 +116,13 @@ end;
       @item(@code(htmlparser-condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
     )
 
+
+
+    @notice(Important changes from previous version: (277:64e34593cd2c->344:c300977b4678):@br
+    The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the variables and variableChangeLog contains a complete history of the variables.@br
+    The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you use a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
+    The default encoding is now utf-8, so the read web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the htmlparser:meta tag.@br
+
 }
 THtmlTemplateParser=class
   protected
@@ -123,6 +134,7 @@ THtmlTemplateParser=class
     FPseudoXPath: TPseudoXPathParser;
 
     Fvariables, FVariableLog: TStringList;
+    FParsingExceptions: boolean;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -140,8 +152,8 @@ THtmlTemplateParser=class
     destructor destroy; override;
 
 
-    procedure parseHTML(html: string); //**< parses the given data
-    procedure parseHTMLFile(htmlfilename: string); //**< parses the given file
+    function parseHTML(html: string):boolean; //**< parses the given data
+    function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file
     procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string);
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
@@ -152,6 +164,7 @@ THtmlTemplateParser=class
 
     property variables: TStringList read Fvariables;//**<List of all variables
     property variableChangeLog: TStringList read FVariableLog;
+    property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions;
   end;
 
 implementation
@@ -219,7 +232,7 @@ var
   i: Integer;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
-     (html.value <> template.value) then
+     not striequal(html.value, template.value) then
        exit(false);
   if template.attributes = nil then
     exit(true);
@@ -227,7 +240,7 @@ begin
     name := template.attributes.Names[i];
     if strlibeginswith(name, 'htmlparser') then continue;
     if html.attributes = nil then exit(false);
-    if html.attributes.Values[name] <> template.attributes.ValueFromIndex[i] then
+    if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
       exit(false);
   end;
   condition := template.attributes.Values['htmlparser-condition'];
@@ -246,7 +259,10 @@ var xpathText: TTreeElement;
   procedure HandleHTMLText;
   begin
     //if we find a text match we can assume it is a true match
-    if strlibeginswith(htmlStart.value, templateStart.value) then templateStart := TTemplateElement(templateStart.next);
+    if strlibeginswith(htmlStart.value, templateStart.value) then begin
+      templateStart.match := htmlStart;
+      templateStart := TTemplateElement(templateStart.next);
+    end;
     htmlStart := htmlStart.next;
   end;
 
@@ -270,11 +286,14 @@ var xpathText: TTreeElement;
     //we have to test it with another node
     //But once a element E match we can assume that there is no better match on the same level (e.g. a
     //match F with E.parent = F.parent), because this is simple list matching
-    if (not templateElementFitHTMLOpen(htmlStart, templateStart)) or
-       (not matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(templateStart.next), TTemplateElement(templateStart.reverse))) then htmlStart:=htmlStart.next
+    if (not templateElementFitHTMLOpen(htmlStart, templateStart)) then htmlStart:=htmlStart.next
     else begin
-      htmlStart := htmlStart.reverse.next;
-      templateStart := TTemplateElement(templateStart.reverse.next);
+      templateStart.match := htmlStart;
+      if (not matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(templateStart.next), TTemplateElement(templateStart.reverse))) then htmlStart:=htmlStart.next
+      else begin
+        htmlStart := htmlStart.reverse.next;
+        templateStart := TTemplateElement(templateStart.reverse.next);
+      end;
     end;
   end;
 
@@ -315,8 +334,10 @@ var xpathText: TTreeElement;
 
     if not equal then
       templateStart := TTemplateElement(templateStart.reverse) //skip if block
-     else
+     else begin
+      TTemplateElement(templateStart).match := templateStart;
       templateStart := TTemplateElement(templateStart.next); //continue
+     end;
   end;
 
   procedure HandleCommandLoopOpen;
@@ -393,6 +414,7 @@ begin
   FHTML.parsingModel:=pmHTML;
   FPseudoXPath := TPseudoXPathParser.Create;
   outputEncoding:=eUTF8;
+  FParsingExceptions := true;
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -405,7 +427,8 @@ begin
   inherited destroy;
 end;
 
-procedure THtmlTemplateParser.parseHTML(html: string);
+function THtmlTemplateParser.parseHTML(html: string):boolean;
+var cur,last,realLast:TTreeElement;
 begin
   FHTML.parseTree(html);
 
@@ -413,19 +436,51 @@ begin
   FHTML.setEncoding(outputEncoding);
   FTemplate.setEncoding(outputEncoding);
 
+  if FParsingExceptions then begin
+    cur := FTemplate.getTree;
+    while cur <> nil do begin
+      TTemplateElement(cur).match := nil;
+      cur := cur.next;
+    end;
+  end;
+
   FVariableLog.Clear;
   Fvariables.Clear;
-  matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
+  result:=matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
+
+  if not result and FParsingExceptions then begin
+    cur := FTemplate.getTree;
+    realLast := cur;
+    last := cur;
+    while cur <> nil do begin
+      case TTemplateElement(cur).templateType of
+        tetHTMLOpen, tetHTMLText: begin
+          if TTemplateElement(cur).match = nil then
+            raise EHTMLParseException.create('Template matching failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+          last:=cur;
+        end;
+        tetCommandIfOpen: begin
+          if TTemplateElement(cur).match = nil then cur := cur.reverse;
+          last:=cur;
+        end;
+      end;
+
+      realLast := cur;
+      cur := cur.next;
+    end;
+    raise EHTMLParseException.create('Template matching failed. for an unknown reason');
+  end;
 end;
 
-procedure THtmlTemplateParser.parseHTMLFile(htmlfilename: string);
+function THtmlTemplateParser.parseHTMLFile(htmlfilename: string):boolean;
 begin
-  parseHTML(strLoadFromFile(htmlfilename));
+  result:=parseHTML(strLoadFromFile(htmlfilename));
 end;
 
 procedure THtmlTemplateParser.parseTemplate(template: string;
   templateName: string);
 var el: TTemplateElement;
+    encoding: string;
 begin
   FTemplate.setEncoding(eUnknown, false, false);
   if strbeginswith(template,#$ef#$bb#$bf) then begin
@@ -444,12 +499,19 @@ begin
   while el <> nil do begin
     if el.templateType = tetCommandMeta then begin
       if el.attributes.Values['encoding'] <> '' then begin
-        if striequal(el.attributes.Values['encoding'],'utf8') or
-            striequal(el.attributes.Values['encoding'],'utf-8') then
-            FTemplate.setEncoding(eUTF8, false, false)
-          else
-            FTemplate.setEncoding(eWindows1252, false, false);
-      end;
+        encoding:=el.attributes.Values['encoding'];
+        if striequal(encoding,'utf8') or striequal(encoding,'utf-8') then
+          FTemplate.setEncoding(eUTF8, false, false)
+        else if striequal(el.attributes.Values['encoding'],'latin1') or striequal(el.attributes.Values['encoding'],'iso88591') or
+                striequal(el.attributes.Values['encoding'],'iso-8859-1') or striequal(el.attributes.Values['encoding'],'windows1252') then
+          FTemplate.setEncoding(eWindows1252, false, false)
+        else
+         raise ETemplateParseException.create('Unknown/unsupported encoding: '+encoding);
+        if el.attributes.count > 1 then
+          raise ETemplateParseException.create('Additional attributes in meta-tag: '+el.tostring);
+      end else
+        raise ETemplateParseException.create('Empty/wrong meta-tag: '+el.tostring);
+
     end;
     el := TTemplateElement(el.next);
   end;
@@ -487,7 +549,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..59]of array[1..3] of string = (
+var data: array[1..62]of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -705,7 +767,18 @@ var data: array[1..59]of array[1..3] of string = (
     'A=hallo'#13'B=a'),
    ('<table id="right"><htmlparser:loop><tr><td><htmlparser:read source="../text()" var="col"/></td></tr></htmlparser:loop></table>',
     '<table id="right"><tr>pre<td>123</td><td>other</td></tr><tr>ff<td>foo</td><td>columns</td></tr><tr>gg<td>bar</td><td>are</td></tr><tr>hh<td>xyz</td><td>ignored</td></tr></table>',
-    'col=pre'#10'col=ff'#10'col=gg'#10'col=hh')
+    'col=pre'#10'col=ff'#10'col=gg'#10'col=hh'),
+
+    //case insensitiveness
+    ('<A><htmlparser:read source="text()" var="A"/><x/><htmlparser:read source="text()" var="B"/></A>',
+     '<a>hallo<x></x>a</a>',
+     'A=hallo'#13'B=a'),
+    ('<A att="HALLO"> <htmlparser:read source="@aTT" var="A"/></A>',
+     '<a ATT="hallo">xyz</a>',
+     'A=hallo'),
+    ('<a ATT="olP"> <htmlparser:read source="@aTT" var="A"/></A>',
+     '<A att="oLp">xyz</a>',
+     'A=oLp')
 );
 
 var i:longint;
@@ -790,7 +863,7 @@ begin
 
       for alt:=0 to FParsingAlternatives.count-1 do
         with TParsingStatus(FParsingAlternatives[alt]) do begin
-          //if (lastElement<>nil) (*and (nextElement.{<>lastElement.next})*) then
+          //if (lastElement<>nil) (and (nextElement.{<>lastElement.next})* then
           //Text speichern
 
           while nextElement.typ=tetText do begin

@@ -239,7 +239,7 @@ function TTreeElement.toString(): string;
 var
   i: Integer;
 begin
-  if self = nil then exit;
+  if self = nil then exit('');
   case typ of
     tetText: exit(value);
     tetClose: exit('</'+value+'>');
