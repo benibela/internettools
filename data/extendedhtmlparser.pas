@@ -121,6 +121,8 @@ end;
     @notice(Important changes from previous version: (277:64e34593cd2c->344:c300977b4678):@br
     The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the variables and variableChangeLog contains a complete history of the variables.@br
     The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you use a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
+    The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entitie less encoding (cdata is still not supported).@br
+    In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable state are cleared. The changelog is always removed.@br
     The default encoding is now utf-8, so the read web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the htmlparser:meta tag.@br
 
 }
@@ -152,7 +154,7 @@ THtmlTemplateParser=class
     destructor destroy; override;
 
 
-    function parseHTML(html: string):boolean; //**< parses the given data
+    function parseHTML(html: string; keepOldVariables: boolean=false):boolean; //**< parses the given data
     function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file
     procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string);
@@ -427,7 +429,7 @@ begin
   inherited destroy;
 end;
 
-function THtmlTemplateParser.parseHTML(html: string):boolean;
+function THtmlTemplateParser.parseHTML(html: string; keepOldVariables: boolean=false):boolean;
 var cur,last,realLast:TTreeElement;
 begin
   FHTML.parseTree(html);
@@ -445,7 +447,9 @@ begin
   end;
 
   FVariableLog.Clear;
-  Fvariables.Clear;
+  if not keepOldVariables then Fvariables.Clear
+  else FVariableLog.text := Fvariables.text;
+
   result:=matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
 
   if not result and FParsingExceptions then begin
@@ -781,23 +785,28 @@ var data: array[1..62]of array[1..3] of string = (
      'A=oLp')
 );
 
+
 var i:longint;
     extParser:THtmlTemplateParser;
     sl:TStringList;
-    j: Integer;
+  procedure checklog(s:string);
+  var j: Integer;
+  begin
+      sl.Text:=s;
+      //check lines to avoid line ending trouble with win/linux
+      if extParser.variableChangeLog.Count<>sl.Count then
+        raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+s+'"');
+      for j:=0 to sl.count-1 do
+        if extParser.variableChangeLog[j]<>sl[j] then
+          raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+s+'"');
+  end;
 begin
   extParser:=THtmlTemplateParser.create;
   sl:=TStringList.Create;
   for i:=low(data)to high(data) do begin
       extParser.parseTemplate(data[i,1]);
       extParser.parseHTML(data[i,2]);
-      sl.Text:=data[i,3];
-      //check lines to avoid line ending trouble with win/linux
-      if extParser.variableChangeLog.Count<>sl.Count then
-        raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+data[i,3]+'"');
-      for j:=0 to sl.count-1 do
-        if extParser.variableChangeLog[j]<>sl[j] then
-          raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+data[i,3]+'"');
+      checklog(data[i,3]);
   end;
 
   //---special encoding tests---
@@ -825,6 +834,27 @@ begin
 
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=" /><a>bin:'#$C4#$D6',ent:&Ouml;</a></html>');
   extParser.outputEncoding:=eUTF8;
+
+
+
+  //---special keep variables test---
+  i:=-2;
+  extParser.variables.Clear;
+  extParser.variables.values['Hallo']:='diego';
+  extParser.parseTemplate('<a><htmlparser:read source="text()" var="hello"/></a>');
+  extParser.parseHTML('<a>maus</a>',true);
+  if extParser.variables.Values['hello']<>'maus' then
+    raise Exception.Create('invalid var');
+  if extParser.variables.Values['Hallo']<>'diego' then
+    raise Exception.Create('invalid var');
+  checklog('Hallo=diego'#10'hello=maus');
+  extParser.parseTemplate('<a><htmlparser:read source="text()" var="Hallo"/></a>');
+  extParser.parseHTML('<a>maus</a>',true);
+  if extParser.variables.Values['hello']<>'maus' then
+    raise Exception.Create('invalid var');
+  if extParser.variables.Values['Hallo']<>'maus' then
+    raise Exception.Create('invalid var');
+  checklog('Hallo=diego'#10'hello=maus'#10'Hallo=maus');
 
 
 

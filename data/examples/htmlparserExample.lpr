@@ -4,7 +4,7 @@ program htmlparserExample;
 
 uses
   Classes,
-  extendedhtmlparser,
+  extendedhtmlparser, FileUtil,
   rcmdline //<< if you don't have this command line parser unit, you can download it from www.benibela.de
   { you can add units after this };
 
@@ -34,7 +34,8 @@ begin
   htmlparser.parseTemplateFile(mycmdLine.readString('template'));
 
   for i:=0 to high(files) do begin
-    if files[i]='' then continue;
+    if (files[i]='') or ((length(files[i]) < 2) and (not FileExistsUTF8(files[i]))) then continue;
+
     if not mycmdLine.readFlag('no-header') then writeln('**** Parse file:'+files[i]+' ****');
     htmlparser.parseHtmlFile(files[i]);
 
