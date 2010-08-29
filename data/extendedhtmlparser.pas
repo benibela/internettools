@@ -122,7 +122,7 @@ end;
     The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the variables and variableChangeLog contains a complete history of the variables.@br
     The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you use a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
     The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entitie less encoding (cdata is still not supported).@br
-    In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable state are cleared. The changelog is always removed.@br
+    In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable state are cleared. The changelog however is always removed..@br
     The default encoding is now utf-8, so the read web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the htmlparser:meta tag.@br
 
 }
@@ -154,8 +154,8 @@ THtmlTemplateParser=class
     destructor destroy; override;
 
 
-    function parseHTML(html: string; keepOldVariables: boolean=false):boolean; //**< parses the given data
-    function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file
+    function parseHTML(html: string; keepOldVariables: boolean=false):boolean; //**< parses the given data.
+    function parseHTMLFile(htmlfilename: string; keepOldVariables: boolean=false):boolean; //**< parses the given file
     procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string);
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
@@ -431,6 +431,8 @@ end;
 
 function THtmlTemplateParser.parseHTML(html: string; keepOldVariables: boolean=false):boolean;
 var cur,last,realLast:TTreeElement;
+  variableLogStart: LongInt;
+  i: Integer;
 begin
   FHTML.parseTree(html);
 
@@ -449,6 +451,7 @@ begin
   FVariableLog.Clear;
   if not keepOldVariables then Fvariables.Clear
   else FVariableLog.text := Fvariables.text;
+  variableLogStart := FVariableLog.Count;
 
   result:=matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
 
@@ -474,11 +477,12 @@ begin
     end;
     raise EHTMLParseException.create('Template matching failed. for an unknown reason');
   end;
+  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;
 
-function THtmlTemplateParser.parseHTMLFile(htmlfilename: string):boolean;
+function THtmlTemplateParser.parseHTMLFile(htmlfilename: string; keepOldVariables: boolean=false):boolean;
 begin
-  result:=parseHTML(strLoadFromFile(htmlfilename));
+  result:=parseHTML(strLoadFromFile(htmlfilename), keepOldVariables);
 end;
 
 procedure THtmlTemplateParser.parseTemplate(template: string;
@@ -847,14 +851,14 @@ begin
     raise Exception.Create('invalid var');
   if extParser.variables.Values['Hallo']<>'diego' then
     raise Exception.Create('invalid var');
-  checklog('Hallo=diego'#10'hello=maus');
+  checklog('hello=maus');
   extParser.parseTemplate('<a><htmlparser:read source="text()" var="Hallo"/></a>');
   extParser.parseHTML('<a>maus</a>',true);
   if extParser.variables.Values['hello']<>'maus' then
     raise Exception.Create('invalid var');
   if extParser.variables.Values['Hallo']<>'maus' then
     raise Exception.Create('invalid var');
-  checklog('Hallo=diego'#10'hello=maus'#10'Hallo=maus');
+  checklog('Hallo=maus');
 
 
 
