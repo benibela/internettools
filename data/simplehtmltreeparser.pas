@@ -1,3 +1,8 @@
+{**
+  @abstract This unit contains a html/xml -> tree converter
+
+  @author Benito van der Zander (http://www.benibela.de)
+}
 unit simplehtmltreeparser;
 
 {$mode objfpc} {$H+}
@@ -11,46 +16,57 @@ type
 
 { TAttributeMap }
 
+//**@abstract A list of attributes.
+//**Currently this is a simple string list, and you can get the values with the values property. (with c++ I would have used map<string, string> but this doesn't exist in Pascal)
 TAttributeList = TStringList; //TODO: use a map
 
+//**The type of a tree element. <Open>, text, or </close>
 TTreeElementType = (tetOpen, tetClose, tetText);
+//**Controls the search for a tree element.@br
+//**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
+//**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
 TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensitive, tefoNoDescend);
 
 { TTreeElement }
 
-//**Some invariants: (SO: set of opening tags in sequence)
-//**∀a \in SO: a < a.reverse
-//**∀a,b \in SO: a < b < a.reverse => a < b.reverse < a.reverse
+//**@abstract This class representates an element of the html file
+//**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
+//**There are functions (getNextSibling, getFirstChild, findNext, ...) to access it like a regular tree, but it is easier and faster to work directly with the list.@br
+//**Some invariants: (SO: set of opening tags in sequence)@br
+//**∀a \in SO: a < a.reverse@br
+//**∀a,b \in SO: a < b < a.reverse => a < b.reverse < a.reverse@br
 TTreeElement = class
 //use the fields if you know what you're doing
-  typ: TTreeElementType;
-  value: string;
+  typ: TTreeElementType; //**<open, close or text node
+  value: string; //**< tag name for open/close nodes, text for text nodes
   attributes: TAttributeList;  //**<nil für tetText
-  next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level) so elements form a linked list
+  next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   reverse: TTreeElement; //**<element paired by open/closing
 
   offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
 //otherwise use the functions
-  procedure deleteNext();
-  procedure deleteAll();
-  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean);
+  procedure deleteNext(); //**<delete the next node (you have to delete the reverse tag manually)
+  procedure deleteAll(); //**<deletes the tree
+  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
-  //**Complex search functions.
-  //**Returns the element with the given type and text which occurs before sequenceEnd
-  //**@notice this function is nil-safe, so if you call TTreeElement(nil).findNext(...) it will return nil
+  //Complex search functions.
+  //**Returns the element with the given type and text which occurs before sequenceEnd.@br
+  //**This function is nil-safe, so if you call TTreeElement(nil).findNext(...) it will return nil
   function findNext(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]; sequenceEnd: TTreeElement = nil):TTreeElement;
   //**Find a matching direct child (equivalent to findNext with certain parameters, but easier to use)
   function findChild(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]): TTreeElement;
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
 
-  function getValue(): string;
-  function getAttribute(a: string):string;
-  function getParent(): TTreeElement; //**< searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+  function getValue(): string; //**< get the value of this element
+  function getAttribute(a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exists
+  function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
+  function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
+  function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
 
-  function toString(): string;
+  function toString(): string; //**< converts the element to a string (not recursive)
 
   constructor create();
   destructor destroy();override;
@@ -65,13 +81,13 @@ TreeParseException = Exception;
 //**pmStrict: every tag must be closed explicitely (otherwise an exception is raised)
 //**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised), detect encoding
 TParsingModel = (pmStrict, pmHTML);
-//**This parses a html/sgml/xml file to a tree like structure
-//**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree)
-//**After tree parsing the tree contains the text as byte strings, without encoding or entity conversions. But in case of html, the meta/http-equiv encoding is detected
+//**@abstract This parses a html/sgml/xml file to a tree like structure
+//**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree).@br
+//**After tree parsing the tree contains the text as byte strings, without encoding or entity conversions. But in the case of html, the meta/http-equiv encoding is detected
 //**and you can call setEncoding to change the tree to the encoding you need. (this will also convert the entities)
 TTreeParser = class
 private
-  FConvertEntities: boolean;
+//  FConvertEntities: boolean;
   FRootElement: TTreeElement;
   FCurrentElement: TTreeElement;
   FTemplateCount: Integer;
@@ -94,25 +110,28 @@ private
   function htmlTagWeight(s:string): integer;
   function htmlTagAutoClosed(s:string): boolean;
 public
-  treeElementClass: TTreeElementClass;
+  treeElementClass: TTreeElementClass; //**< Class of the tree nodes. You can subclass TTreeElement if you need to store additional data at every node
 
   constructor Create;
   destructor destroy;override;
-  procedure clearTree;
-  procedure parseTree(html: string);
+  procedure clearTree; //**< Deletes the current tree
+  procedure parseTree(html: string); //**< Creates a new tree from a html file
 
-  function getTree: TTreeElement;
+  function getTree: TTreeElement; //**< Returns the current tree
 
 
+  //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
   function getEncoding: TEncoding;
   //**Changes the tree encoding
   //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
   //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
   procedure setEncoding(new: TEncoding; convertExistingTree: Boolean = true; convertEntities: boolean =true);
 published
+  //** Parsing model, see TParsingModel
   property parsingModel: TParsingModel read FParsingModel write FParsingModel;
+  //** If this is true (default), white space is removed from text node
   property trimText: boolean read FTrimText write FTrimText;
-  property convertEntities: boolean read FConvertEntities write FConvertEntities;
+//  property convertEntities: boolean read FConvertEntities write FConvertEntities;
 end;
 implementation
 uses pseudoxpath;
@@ -215,6 +234,23 @@ function TTreeElement.getAttribute(a: string):string;
 begin
   if attributes = nil then exit('');
   exit(attributes.Values[a]);
+end;
+
+function TTreeElement.getNextSibling(): TTreeElement;
+begin
+  case typ of
+    tetText: result:=next;
+    tetOpen: result:=reverse.next;
+    tetClose: result:=next;
+  end;
+  if result.typ = tetClose then exit(nil);
+end;
+
+function TTreeElement.getFirstChild(): TTreeElement;
+begin
+  if typ <> tetOpen then exit(nil);
+  if next = reverse then exit(nil);
+  exit(next);
 end;
 
 function TTreeElement.getParent(): TTreeElement;
@@ -433,7 +469,7 @@ begin
   FElementStack := TList.Create;
   treeElementClass := TTreeElement;
   FTrimText:=true;
-  FConvertEntities := true;
+  //FConvertEntities := true;
 end;
 
 destructor TTreeParser.destroy;

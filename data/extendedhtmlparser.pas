@@ -2,8 +2,8 @@
   @abstract This units contains a template based html parser named THtmlTemplateParser
 
   @author Benito van der Zander (http://www.benibela.de)
-*}
-
+}
+unit extendedhtmlparser;
 {
 Copyright (C) 2008 Benito van der Zander (BeniBela)
                    benito@benibela.de
@@ -24,8 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
-unit extendedhtmlparser;
-
 {$mode objfpc}{$H+}
 
 //{$IFDEF DEBUG}
@@ -40,6 +38,7 @@ uses
 
 
 type
+//**@abstract These are all possible template commands
 //duplicate open/close because this simplifies the switch statements
 TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose, tetHTMLText,
@@ -47,17 +46,18 @@ TTemplateElementType=(tetIgnore,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose);
 
-TNotifyCallbackFunction = procedure () of object;
+(*TNotifyCallbackFunction = procedure () of object;
 TVariableCallbackFunction = procedure (variable: string; value: string) of object;
-TReadCallbackFunction = procedure (read: pchar; readLen:longint) of object;
+TReadCallbackFunction = procedure (read: pchar; readLen:longint) of object;*)
 
+//**Possible callback for getting the value of a variable
 TReplaceFunction = procedure (variable: string; var value:string) of object;
 
 ETemplateParseException = Exception;
 EHTMLParseException = Exception;
 
 { TTemplateElement }
-
+//**@abstract Interally used template tree element @exclude
 TTemplateElement=class(TTreeElement)
   templateType: TTemplateElementType;
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
@@ -73,9 +73,9 @@ end;
   You can use it simply by calling first parseTemplate to load a given template
   and then parseHTML to parse the html data. @br
   A template file is just like a html file with special commands. The parser than matches every text and tag
-  of the template to text/tag in the html file, while ignoring every additional data. If no match is possible an exception is raised.@br
-  The template can extract certain values from the html file into variables, and you can access the read variables with the property variables and variableChangeLog.
-  Former only contains the final value of the variables, latter records every assignment during the matching of the template.@br@br
+  of the template to text/tag in the html file, while ignoring every additional data of latter file. If no match is possible an exception is raised.@br
+  The template can extract certain values from the html file into @noAutoLink(variables), and you can access these @noAutoLink(variables) with the property variables and variableChangeLog.
+  Former only contains the final value of the @noAutoLink(variables), latter records every assignment during the matching of the template.@br@br
 
   @bold(Examples)
 
@@ -85,29 +85,47 @@ end;
 
   This will set the variable test to "Hello World!" @br
 
-  Example, how to read all rows of a table:@br
-    Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readAnotherRow()" source="text()"> </td> </tr> </htmlparser:loop> </table>)@br
+  Example, how to read the first field of a every row of a table:@br
+    Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readField()" source="text()"> </td> </tr> </htmlparser:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
 
-  This will read row after row, and call the @code(onVariableRead) event with the text of the first column in every row. (and additionally the last row will be stored in a variable called @code(readAnotherRow())) @br
+    This will read row after row, and will write the first field to the change log of the variable readField() .@br
+
+    Example, how to read the several field of a every row of a table:@br
+
+    Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readField1()" source="text()"> </td> <td> <htmlparser:read var="readField2()" source="text()"> </td> <td> <htmlparser:read var="readField3()" source="text()"> </td> ... </tr> </htmlparser:loop> </table>)@br
+    Html-File: @code(<table> <tr> <td> a </td> <td> b </td> <td> c </td> </tr> ... </tr> </table>)@br
+
+    This will read readField1()=a, readField2()=b, readField3()=c...@br
+    Of you can use your own names instead of readFieldX() and they are independent of the html file. So such templates can convert several pages with different structures, to the same internal data layout of your application.
+
+  Example, how to read all rows of every table CSV like:@br
+  Template: @code(<htmlparser:loop> <tr>  <htmlparser:read var="readAnotherRow()" source="deepNodeText(',')"> </tr> </htmlparser:loop> )@br
+  Html-File: @code(... <tr> <td> a </td> <td> b </td> <td> c </td> </tr> <tr> <td> foo </td> <td> bar </td> </tr> ...)@br
+
+  This will read all rows, and write lines like a,b,c and foo,bar to the changelog.@br
+
+  Example, how to read the first list item starting with an unary prime number:@br
+  Template: @code(<li htmlparser-condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')"><htmlparser:read var="prime" source="text()"/></li>)@br
+  Html-File: @code(... <li>1111: this is 4</li><li>1:1 is no prime</li><li>1111111: here is 7</li><li>11111111: 8</li> ...)@br
+
+  This will return "1111111: here is 7", because 1111111 is the first prime in that list.@br@br
 
   See the unit tests at the end of the file extendedhtmlparser.pas for more examples
 
   @bold(Syntax of a template file)
 
-  Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file to parse. @br
+  Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file. @br
   A tag of the html file is considered as equal to a tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child node of the tag in the template is also equal to a child node of the tag in the html file (in the same order and nesting).@br
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
   The matching occurs (in the latest version) with backtracking, so it will always find the first and longest match.
-
-
 
   There are 4 special commands allowed:
    @unorderedList(
       @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)
       @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>) @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
       @item(@code(<htmlparser:loop>  .. </htmlparser:loop>) @br Everything inside this tag is executed as long as possible (including never))
-      @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>) @br The pseudo-XPath-expression in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)"))
+      @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>) @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)"))
     )
     @br
     There are two special attributes:
@@ -118,12 +136,12 @@ end;
 
 
 
-    @notice(Important changes from previous version: (277:64e34593cd2c->344:c300977b4678):@br
-    The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the variables and variableChangeLog contains a complete history of the variables.@br
-    The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you use a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
-    The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entitie less encoding (cdata is still not supported).@br
+    @bold(Important changes from previous version:) (277:64e34593cd2c->344:c300977b4678))@br
+    The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the @noAutolink(variables) and variableChangeLog contains a complete history of the @noAutolink(variables).@br
+    The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you used a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
+    The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entity less encoding (cdata is still not supported).@br
     In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable state are cleared. The changelog however is always removed..@br
-    The default encoding is now utf-8, so the read web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the htmlparser:meta tag.@br
+    The default encoding is now utf-8, so the parsed web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the htmlparser:meta tag. (if you use the meta tag, it will also be converted to utf8)@br
 
 }
 THtmlTemplateParser=class
@@ -157,7 +175,7 @@ THtmlTemplateParser=class
     function parseHTML(html: string; keepOldVariables: boolean=false):boolean; //**< parses the given data.
     function parseHTMLFile(htmlfilename: string; keepOldVariables: boolean=false):boolean; //**< parses the given file
     procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
-    procedure parseTemplateFile(templatefilename: string);
+    procedure parseTemplateFile(templatefilename: string); //**<loads a template from a file
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
     //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
 
@@ -165,8 +183,8 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     property variables: TStringList read Fvariables;//**<List of all variables
-    property variableChangeLog: TStringList read FVariableLog;
-    property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions;
+    property variableChangeLog: TStringList read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
+    property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
   end;
 
 implementation
@@ -463,7 +481,7 @@ begin
       case TTemplateElement(cur).templateType of
         tetHTMLOpen, tetHTMLText: begin
           if TTemplateElement(cur).match = nil then
-            raise EHTMLParseException.create('Template matching failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+            raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
           last:=cur;
         end;
         tetCommandIfOpen: begin
@@ -475,7 +493,7 @@ begin
       realLast := cur;
       cur := cur.next;
     end;
-    raise EHTMLParseException.create('Template matching failed. for an unknown reason');
+    raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed. for an unknown reason');
   end;
   for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;

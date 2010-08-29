@@ -2,7 +2,7 @@
   @abstract This is a simple html parser
 
   @author Benito van der Zander (http://www.benibela.de)
-*}
+}
 unit simplehtmlparser;
 
 {$mode objfpc}{$H+}
@@ -50,7 +50,7 @@ type
   //**@param enterTag Event to be called when a tag is entered
   //**@param leaveTag Event to be called when a tag is leaved
   //**@param textRead Event to be called when text between tags is read
-  //**@notice The parsing will stop as soon as one of the three callback functions returns false. Since this is the default return value, MAKE SURE THAT YOU'RE RETURNING TRUE on possible every branch!
+  //**@bold(Notice:) The parsing will stop as soon as one of the three callback functions returns false. Since this is the default return value, MAKE SURE THAT YOU'RE RETURNING TRUE on possible every branch!
   procedure parseHTML(const html:string;
                       enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                       textEvent: TTextEvent);
