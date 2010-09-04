@@ -134,6 +134,7 @@ function strFromSize(size: int64):string;
 function strConvertToUtf8(str: string; from: TEncoding): string;
 function strConvertFromUtf8(const str: string; toe: TEncoding): string;
 function strChangeEncoding(const str: string; from,toe: TEncoding):string;
+function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string;
 function strEncodingFromName(str:string):TEncoding;
 //**This will decode most html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -146,6 +147,7 @@ function strFromPchar(p:pchar;l:longint):string;
 function strFromPtr(p: pointer): string;
 
 //----------------Mathematical functions-------------------------------
+const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
 function ggT(a,b: cardinal): cardinal;
 function factorial(i:longint):float;
 function binomial(n,k: longint): float;
@@ -601,6 +603,12 @@ begin
   }
 end;
 
+function strGetUnicodeCharacter(const character: integer; encoding: TEncoding): string;
+begin
+  result:=UnicodeToUTF8(character);
+  if not (encoding in [eUnknown, eUTF8]) then result:=strConvertFromUtf8(result, encoding);
+end;
+
 function strEncodingFromName(str: string): TEncoding;
 begin
   str:=UpperCase(str);
@@ -610,81 +618,15 @@ begin
 
 end;
 
-function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding;strict: boolean):string;
-var resLen:integer;
-    lastChar: pchar;
-    entityReplaced: boolean;
+{$I bbutils_generated.inc}
+
+{$ifndef BBUTILS_INCLUDE_COMPLETE}
+function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = true):string;
 begin
-  setLength(result,l);
-  lastChar:=@p[l-1];
-  ResLen:=0;
-  while (p<=lastChar) do begin
-    inc(resLen);
-    if (p^='&') and (strict or ((p+1)^<>' ')) then begin
-      inc(p);
-      entityReplaced:=true;
-      //Replace every entity char sequence with the correct character
-      //(On the first look this seems to crash at strings like '&qu', but it is actually
-      // safe because the pchar is/should be #0-terminated)
-      if      (p^='l') and ((p+1)^='t') and ((p+2)^=';')                                                    then result[resLen]:='<'
-      else if (p^='g') and ((p+1)^='t') and ((p+2)^=';')                                                    then result[resLen]:='>'
-      else if (p^='a') and ((p+1)^='m') and ((p+2)^='p') and ((p+3)^=';')                                   then result[resLen]:='&'
-      else if (p^='a') and ((p+1)^='p') and ((p+2)^='o') and ((p+3)^='s') and ((p+4)^=';')                  then result[resLen]:=''''
-      else if (p^='q') and ((p+1)^='u') and ((p+2)^='o') and ((p+3)^='t') and ((p+4)^=';')                  then result[resLen]:='"'
-      else if (p^='s') and ((p+1)^='z') and ((p+2)^='l') and ((p+3)^='i') and ((p+4)^='g') and ((p+5)^=';') then result[resLen]:='ß'
-      else if (p^='n') and ((p+1)^='b') and ((p+2)^='s') and ((p+3)^='p') and ((p+4)^=';')                  then result[resLen]:=' '
-      else if (p^<>#0) and ((p+1)^='u') and ((p+2)^='m') and ((p+3)^='l') and ((p+4)^=';')                  then begin
-        case encoding of
-          eUTF8: begin
-            Result[resLen]:=#$c3;reslen+=1;
-            case p^ of
-              'a': result[resLen]:=#$a4;
-              'o': result[resLen]:=#$b6;
-              'u': result[resLen]:=#$bc;
-              'A': result[reslen]:=#$84;
-              'O': result[reslen]:=#$96;
-              'U': result[reslen]:=#$9c;
-              else if strict then begin
-                reslen-=1;
-                result[reslen]:='?'
-              end else begin
-                result[reslen-1]:='&';
-                result[reslen] := p^;
-                entityReplaced:=false;
-              end;
-            end;
-          end;
-          else//eWindows1252:
-            case p^ of
-              'a': result[resLen]:=#$E4;
-              'o': result[resLen]:=#$F6;
-              'u': result[resLen]:=#$FC;
-              'A': result[reslen]:=#$C4;
-              'O': result[reslen]:=#$D6;
-              'U': result[reslen]:=#$DC;
-              else if strict then result[reslen]:='?'
-              else begin
-                result[reslen]:='&';
-                reslen+=1;
-                result[reslen]:=p^;
-                entityReplaced:=false;
-              end;
-            end;
-        end;
-      end else if strict then result[reslen]:='?'
-      else begin
-        result[reslen]:='&';
-        reslen+=1;
-        result[reslen]:=p^;
-        entityReplaced:=false;
-      end;
-      if entityReplaced then  while p^<>';' do inc(p);
-    end else Result[resLen]:=p^;
-    inc(p);
-  end;
-  if resLen<>l then
-    setLength(result,resLen);
+  raise Exception.Create('bbutils include missing');
 end;
+
+{$endif}
 
 
 function strDecodeHTMLEntities(s: string; encoding: TEncoding; strict: boolean
