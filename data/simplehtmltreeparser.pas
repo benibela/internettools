@@ -452,6 +452,8 @@ begin
   if striequal(s, 'td') or striequal(s, 'ul') or striequal(s, 'ol') or striequal(s, 'dd') or striequal(s, 'dt') then exit(3);
   if striequal(s, 'tr') or striequal(s, 'li') or striequal(s, 'dl') then exit(4);
   if striequal(s, 'body') or striequal(s, 'html') or striequal(s, 'div') or striequal(s, 'table') then exit(5);
+
+  if striequal(s, '') then exit(100); //force closing of root element
 end;
 
 function TTreeParser.htmlTagAutoClosed(s: string): boolean;
