@@ -16,6 +16,7 @@ type
     Button1: TButton;
     Button2: TButton;
     Button3: TButton;
+    CheckBox1: TCheckBox;
     Label1: TLabel;
     Label2: TLabel;
     Label3: TLabel;
@@ -42,7 +43,7 @@ var
 
 implementation
 
-uses simplehtmltreeparser,pseudoxpath;
+uses simplehtmltreeparser,pseudoxpath,bbutils;
 {$R *.lfm}
 
 { TForm1 }
@@ -52,6 +53,7 @@ var htmlparser: THtmlTemplateParser;
   i: Integer;
 begin
   htmlparser := THtmlTemplateParser.create;
+  if not CheckBox1.Checked then htmlparser.OutputEncoding:=eUnknown;
   try
     htmlparser.parseTemplate(memo1.Lines.Text);
     memo3.Clear;

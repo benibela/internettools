@@ -146,7 +146,7 @@ end;
 }
 THtmlTemplateParser=class
   protected
-    outputEncoding: TEncoding;
+    FOutputEncoding: TEncoding;
 
     FTemplate, FHTML: TTreeParser;
     FTemplateName: string;
@@ -185,6 +185,7 @@ THtmlTemplateParser=class
     property variables: TStringList read Fvariables;//**<List of all variables
     property variableChangeLog: TStringList read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
+    property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding;
   end;
 
 implementation

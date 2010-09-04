@@ -45,12 +45,12 @@ object Form1: TForm1
   end
   object Panel2: TPanel
     Left = 0
-    Height = 177
+    Height = 155
     Top = 128
     Width = 560
     Align = alClient
     Caption = 'Panel2'
-    ClientHeight = 177
+    ClientHeight = 155
     ClientWidth = 560
     TabOrder = 1
     object Label2: TLabel
@@ -64,7 +64,7 @@ object Form1: TForm1
     end
     object Memo2: TMemo
       Left = 1
-      Height = 157
+      Height = 135
       Top = 19
       Width = 558
       Align = alClient
@@ -136,7 +136,7 @@ object Form1: TForm1
   object Button1: TButton
     Left = 0
     Height = 25
-    Top = 305
+    Top = 283
     Width = 560
     Align = alBottom
     Caption = 'GO'
@@ -162,5 +162,16 @@ object Form1: TForm1
     Caption = 'Evaluate template as pseudo xpath'
     OnClick = Button3Click
     TabOrder = 7
+  end
+  object CheckBox1: TCheckBox
+    Left = 0
+    Height = 22
+    Top = 308
+    Width = 560
+    Align = alBottom
+    Caption = 'convert encoding/entities'
+    Checked = True
+    State = cbChecked
+    TabOrder = 8
   end
 end

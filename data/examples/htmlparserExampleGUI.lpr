@@ -7,8 +7,7 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
-  Forms, htmlparsergui, extendedhtmlparser, simplehtmltreeparser, pseudoxpath
-  { you can add units after this };
+  Forms, htmlparsergui, extendedhtmlparser, simplehtmltreeparser, pseudoxpath;
 
 {$R *.res}
 
