@@ -87,10 +87,12 @@ function strlequal(p1,p2:pchar;l1,l2: longint):boolean;
 function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
 function strliequal(p:pchar;s:string;l: longint):boolean;
 function striequal(s1,s2:string):boolean;
-function strbeginswith(str,start:string):boolean;
+function strlbeginswith(p:pchar; l:longint; expectedStart:string):boolean;
 function strlibeginswith(p:pchar;l: longint;s:string):boolean;
-function strlibeginswith(strToBeExaminated,expectedStart:string):boolean;
-function strliendswith(strToBeExaminated,expectedEnd:string):boolean;
+function strbeginswith(p:pchar; expectedStart:string):boolean;
+function strbeginswith(str,start:string):boolean;
+function stribeginswith(strToBeExaminated,expectedStart:string):boolean;
+function striendswith(strToBeExaminated,expectedEnd:string):boolean;
 
 //search
 function strrpos(c:char;s:string):longint;
@@ -386,9 +388,9 @@ begin
   result:=CompareText(s1,s2)=0;
 end;
 
-function strbeginswith(str, start: string): boolean;
+function strlbeginswith(p: pchar; l: longint; expectedStart: string): boolean;
 begin
-  result:=copy(str,1,length(start))=start;
+  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlcomp(p,pchar(pointer(expectedStart)),length(expectedStart))=0));
 end;
 
 function strlibeginswith(p: pchar; l: longint; s: string): boolean;
@@ -396,13 +398,24 @@ begin
   result:=(s='') or ((l>=length(s)) and (strlicomp(p,pchar(pointer(s)),length(s))=0));
 end;
 
-function strlibeginswith(strToBeExaminated,expectedStart: string): boolean;
+function strbeginswith(p: pchar; expectedStart: string): boolean;
+begin
+  result:=(expectedStart='') or (strlcomp(p,pchar(pointer(expectedStart)),length(expectedStart))=0);
+end;
+
+function strbeginswith(str, start: string): boolean;
+begin
+  result:=copy(str,1,length(start))=start;
+end;
+
+
+function stribeginswith(strToBeExaminated,expectedStart: string): boolean;
 begin
   if strToBeExaminated='' then exit(expectedStart='')
   else result:=strlibeginswith(@strToBeExaminated[1],length(strToBeExaminated),expectedStart);
 end;
 
-function strliendswith(strToBeExaminated, expectedEnd: string): boolean;
+function striendswith(strToBeExaminated, expectedEnd: string): boolean;
 begin
   if length(strToBeExaminated)<Length(expectedEnd) then exit(false);
   if strToBeExaminated='' then exit(expectedEnd='')
