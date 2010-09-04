@@ -41,6 +41,8 @@ uses
   , windows
   {$ENDIF};
 
+//{$DEFINE UNITTESTS}
+
 //-------------------------Array functions-----------------------------
 type
   TStringArray=array of string;
@@ -141,8 +143,8 @@ function strEncodingFromName(str:string):TEncoding;
 //**This will decode most html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it remains rogue &).
-function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = true):string;
-function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = true):string;
+function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
+function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = false):string;
 //**Returns the first l bytes of p
 function strFromPchar(p:pchar;l:longint):string;
 
@@ -1273,7 +1275,7 @@ begin
   result:=reallength;
 end;
   *)
-//{$DEFINE UNITTESTS}
+
 {$IFDEF UNITTESTS}
 function shortintCompareFunction(c:TObject; a,b:pointer):longint;
 begin
@@ -1309,6 +1311,12 @@ begin
       if parseDate(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
         raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+DateToStr(parseDate(strs[i,1],strs[i,2])));
 
+  //basic string tests
+  if not strliequal('', '', 0) then raise Exception.Create('strliequal failed');
+  if not strliequal('abcd', 'abc', 3) then raise Exception.Create('strliequal failed');
+  if strliequal('', 'a', 1) then raise Exception.Create('strliequal failed');
+  if strliequal('abcd', 'abcd', 3) then raise Exception.Create('strliequal failed');
+
   //string conversion
   if strConvertToUtf8('a?=ßä',eUTF8)<>'a?=ßä' then raise Exception.Create('Non conversion failed');
   if strConvertFromUtf8('a?=ßä',eUTF8)<>'a?=ßä' then raise Exception.Create('Non conversion failed');
@@ -1320,9 +1328,13 @@ begin
      raise Exception.Create('conversion utf8->latin1 failed');
 
   //html str decode
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;',36,eWindows1252) <> #$C4#$D6#$DC#$e4#$f6#$fc then
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*',eUTF8,true) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*?z;*' then
+    raise Exception.Create('HTML Umlaut -> UTF-8-Konvertierung fehlgeschlagen'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*?z;*',eUTF8,true));
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;',eWindows1252,true) <> #$C4#$D6#$DC#$e4#$f6#$fc'?z;' then
+    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;?z;',eWindows1252,true));
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;',eWindows1252, false) <> #$C4#$D6#$DC#$e4#$f6#$fc'&xyz;' then
     raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen');
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;',36,eUTF8) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc then
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;',eUTF8,false) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;' then
     raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen');
 
   //=========stable sort===============
