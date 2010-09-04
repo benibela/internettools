@@ -200,7 +200,7 @@ function strToCommand(s:string; treeTyp: TTreeElementType): TTemplateElementType
 var tag:pchar; taglen: integer;
   t: TTemplateElementType;
 begin
-  if ((treeTyp = tetOpen) or (treeTyp = tetClose)) and (strlibeginswith(s,'htmlparser:')) then begin
+  if ((treeTyp = tetOpen) or (treeTyp = tetClose)) and (stribeginswith(s,'htmlparser:')) then begin
     tag:=@s[length('htmlparser:')+1];
     taglen:=length(s)-length('htmlparser:');
     for t:=low(COMMAND_STR) to high(COMMAND_STR) do
@@ -259,7 +259,7 @@ begin
     exit(true);
   for i:=0 to template.attributes.Count-1 do begin
     name := template.attributes.Names[i];
-    if strlibeginswith(name, 'htmlparser') then continue;
+    if stribeginswith(name, 'htmlparser') then continue;
     if html.attributes = nil then exit(false);
     if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
       exit(false);
@@ -280,7 +280,7 @@ var xpathText: TTreeElement;
   procedure HandleHTMLText;
   begin
     //if we find a text match we can assume it is a true match
-    if strlibeginswith(htmlStart.value, templateStart.value) then begin
+    if stribeginswith(htmlStart.value, templateStart.value) then begin
       templateStart.match := htmlStart;
       templateStart := TTemplateElement(templateStart.next);
     end;
