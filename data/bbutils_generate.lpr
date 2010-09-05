@@ -2292,16 +2292,18 @@ begin
   writeln('           while (p^ in [''0''..''9'']) or ((entityBase = 16) and (p^ in [''A''..''F'', ''a''..''z''])) do begin ');
   writeln('             entity := entity * entityBase;');
   writeln('             if p^ in [''0''..''9''] then entity := entity + ord(p^) - ord(''0'') ');
-  writeln('             else if p^ in [''A''..''F''] then entity := entity + ord(p^) - ord(''A'') ');
-  writeln('             else if p^ in [''a''..''f''] then entity := entity + ord(p^) - ord(''a'')');
+  writeln('             else if p^ in [''A''..''F''] then entity := entity + ord(p^) - ord(''A'') + 10');
+  writeln('             else if p^ in [''a''..''f''] then entity := entity + ord(p^) - ord(''a'') + 10');
   writeln('             else raise exception.create(''???'');');
+  writeln('             inc(p);');
   writeln('           end;');
   writeln('           entitys := strGetUnicodeCharacter(entity, encoding);');
   writeln('           for j:=1 to length(entitys) do begin');
   writeln('             result[reslen] := entitys[j];');
   writeln('             inc(reslen);');
   writeln('           end; dec(reslen);');
-  writeln('           if strict and (p^ <> '';'') then begin result[reslen] := ''?''; inc(reslen); end;');
+  writeln('           if p^ = '';'' then inc(p)');
+  writeln('           else if strict then begin result[reslen] := ''?''; inc(reslen); end;');
   writeln('         end else begin');
 
   writeln('           entity := -1; entityStart:=0; entityEnd := -1;');
@@ -2375,7 +2377,7 @@ begin
   try
   //readln(s);
   s:='&lt;&xyz;&gt;';
-  WriteLn(StdErr, strDecodeHTMLEntities('Hallo:&auml;&szlig;&nbsp; &lt; &gt;',eUTF8));
+  WriteLn(StdErr, strDecodeHTMLEntities('Hallo:&#x20;&#x3C;&auml;&szlig;&nbsp; &lt; &gt;',eUTF8));
   WriteLn(StdErr, strDecodeHTMLEntities(s,eUTF8));
   WriteLn(StdErr, strDecodeHTMLEntities(s,eUTF8,false));
   except
