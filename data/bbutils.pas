@@ -36,7 +36,7 @@ unit bbutils;
 interface
 
 uses
-  Classes, SysUtils,math,LCLProc
+  Classes, SysUtils,math//,LCLProc
   {$IFDEF Win32}
   , windows
   {$ENDIF};
@@ -50,13 +50,22 @@ type
   TLongwordArray =array of longword;
 
 function arrayAdd(var a: TLongintArray;e: longint):longint; overload; //returns i with a[i]=e
-//**removes i from a (destroying the order of the elements)
+//**Removes element at position i from a (destroying the order of the elements)
 function arrayDelete(var a: TLongintArray;i: longint):longint; overload; //returns e=a[i], unsorted
 procedure arrayInvert(var a: TLongintArray);overload;
 function arrayAdd(var a: TLongwordArray;e: longint):longint; overload; //returns i with a[i]=e
-//**removes i from a (destroying the order of the elements)
+//**Removes element at position i from a (destroying the order of the elements)
 function arrayDelete(var a: TLongwordArray;i: longint):longint; overload; //returns e=a[i], unsorted
 procedure arrayInvert(var a: TLongwordArray);overload;
+
+function arraySmallest(const a: array of longint): longint;
+
+
+//-----------------------Conditional additions------------------------
+function unequal(a, b: integer): boolean;
+function unequal(a, b, c: integer): boolean;
+function unequal(a: array of integer): boolean;
+
 
 //-----------------------Flow/Thread control functions------------------------
 type TProcedureOfObject=procedure () of object;
@@ -102,13 +111,13 @@ function strlcount(const search:char; const searchIn:pchar; const len: longint):
 
 //more specialized
 type TCharSet = set of char;
-//**remove all occurences of trimCharacter from the left/right side of the string
+//**removes all occurences of trimCharacter from the left/right side of the string
 procedure strlTrimLeft(var p: pchar; var l: integer; const trimCharacters: TCharSet = [' ']);
 procedure strlTrimRight(var p: pchar; var l: integer; const trimCharacters: TCharSet = [' ']);
 procedure strlTrim(var p: pchar; var l: integer; const trimCharacters: TCharSet = [' ']);
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
-//**first is returned as function result the second one is again assign to remainingPart
+//**first part is returned as function result, the second one is again assign to remainingPart
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is assign to firstPart, the second one is again assign to remainingPart
@@ -119,51 +128,64 @@ procedure strSplit(out splitted: TStringArray;s:string;c:char;includeEmpty:boole
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
 
 
-//**loads a file as string. The filename is directly passed to fpc rtl and uses the system
+//**loads a file as string. The filename is directly passed to the fpc rtl and uses the system
 //**encoding @seealso(strLoadFromFileUTF8)
 function strLoadFromFile(filename:string):string;
-//**saves a string as file. The filename is directly passed to fpc rtl and uses the system
+//**saves a string as file. The filename is directly passed to the fpc rtl and uses the system
 //**encoding @seealso(strSaveToFileUTF8)
 procedure strSaveToFile(filename: string;str:string);
-//**loads a file as string. The filename should encoded in utf-8
+//**loads a file as string. The filename should be encoded in utf-8
 //**@seealso(strLoadFromFile)
 function strLoadFromFileUTF8(filename:string):string;
-//**saves a string as file. The filename should encoded in utf-8
+//**saves a string as file. The filename should be encoded in utf-8
 //**@seealso(strSaveToFile)
 procedure strSaveToFileUTF8(filename: string;str:string);
 //**converts a size (measured in bytes) to a string (e.g. 1025 -> 1 KiB)
 function strFromSize(size: int64):string;
 
 
+//encoding things
+//**length of an utf8 string @br
+//**A similar function exists in lclproc, but this unit should be independent of the lcl to make it easier to compile with fpc on the command line@br
+//**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
+function strLengthUtf8(str: string): longint;
 function strConvertToUtf8(str: string; from: TEncoding): string;
 function strConvertFromUtf8(const str: string; toe: TEncoding): string;
 function strChangeEncoding(const str: string; from,toe: TEncoding):string;
 function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string;
 function strEncodingFromName(str:string):TEncoding;
-//**This will decode most html entities to the given encoding. If strict is not set
+//**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
-//**even if it remains rogue &).
+//**even if it contains rogue &).
 function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
 function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = false):string;
-//**Returns the first l bytes of p
+//**Returns the first l bytes of p (copies them so O(n))
 function strFromPchar(p:pchar;l:longint):string;
 
 function strFromPtr(p: pointer): string;
 
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
-function ggT(a,b: cardinal): cardinal;
+//**log 10 rounded down (= number of digits in base 10)
+function intLog10(i:longint):longint; overload;
+//**log_b n  rounded down (= number of digits of n in base b)
+function intLog(n,b: longint): longint; overload;
+//**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
+procedure intFactor(n,p: longint; out e, r:longint);
+
+function gcd(a,b: cardinal): cardinal;
+function coprime(a,b:cardinal): boolean;
 function factorial(i:longint):float;
 function binomial(n,k: longint): float;
 //probability
-//**expectated value of a binomial distribution (exact value calculated
-//**with binomial coefficients, @seealso(binomialProbabilityApprox))
+//**expectated value of a binomial distribution
 function binomialExpectation(n:longint;p:float):float;
 //**variance of a binomial distribution
 function binomialVariance(n:longint;p:float):float;
 //**deviation(=sqrt(variance)) of a binomial distribution
 function binomialDeviation(n:longint;p:float):float;
-//**probability: P(X = k) where X is binomial distributed with n possible values
+//**probability: P(X = k) where X is binomial distributed with n possible values (exact value calculated
+//**with binomial coefficients, @seealso(binomialProbabilityApprox))
 function binomialProbability(n:longint;p:float;k:longint):float; //P(X = k)
 //**probability: P(X >= k) where X is binomial distributed with n possible values
 function binomialProbabilityGE(n:longint;p:float;k:longint):float; //P(X >= k)
@@ -171,12 +193,16 @@ function binomialProbabilityGE(n:longint;p:float;k:longint):float; //P(X >= k)
 function binomialProbabilityLE(n:longint;p:float;k:longint):float; //P(X <= k)
 //**probability: P(X >= µ + d or X <= µ - d) where X is binomial distributed with n possible values
 function binomialProbabilityDeviationOf(n:longint;p:float;dif:float):float; //P(X >= µ + d or X <= µ - d)
-//**expectated value of a binomial distribution (approximas the value with either Poisson or
+//**expectated value of a binomial distribution (approximates the value with either Poisson or
 //**Moivre and Laplace, depending on the variance of the distribution) @seealso(binomialProbability))
 function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
 //**Z-Score of the value k in a distribution with n outcomes
 function binomialZScore(n:longint;p:float;k:longint):float;
 
+//**This calculates the euler phi function totient[i] := phi(i) = {1 <= j <= i | gcd(i,j) = 0} for all i <= n.@br
+//**It uses sieve approach and is quite fast (10^7 in 3s)@br
+//**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
+procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
 
 //--------------------Time functions-----------------------------------
 {$IFDEF Win32}
@@ -241,8 +267,11 @@ procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
 //**so the function use the same call convention like a method
 type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
-//**general stable sort function (using merge + insert sort in the moment)
-procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
+//**General stable sort function @br
+//**a is the first element in the array to sort, and b is the last. size is the size of every element@br
+//**compareFunction is a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers). @br
+//**Currently it uses a combination of merge and insert sort. Merge requires the allocation of additional memory.
+procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil);
 //**general stable sort function (using merge + insert sort in the moment)
 procedure stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
 implementation
@@ -297,6 +326,37 @@ begin
   setlength(temp,length(temp));
   for i:=0 to high(temp) do
     a[high(a)-i]:=temp[i];
+end;
+
+function arraySmallest(const a: array of longint): longint;
+var i:longint;
+begin
+  result:=0;
+  for i:=1 to high(a) do
+    if a[i] < a[result] then
+      result := i;
+end;
+
+
+//=========================Conditional additions======================
+function unequal(a, b: integer): boolean;
+begin
+  result := a <> b;
+end;
+
+function unequal(a, b, c: integer): boolean;
+begin
+  result := (a <> b) or (a <> c) or (b <> c);
+end;
+
+function unequal(a: array of integer): boolean;
+var
+  i,j: Integer;
+begin
+  for i:=0 to high(a) do
+    for j:=0 to i-1 do
+      if a[i] <> a[j] then exit(true);
+  exit(false);
 end;
 
 //=========================Flow control functions======================
@@ -531,6 +591,33 @@ begin
   splitted:=result;
 end;
 
+//based on wikipedia
+function strLengthUtf8(str: string): longint;
+var
+  i: Integer;
+begin
+  result := 0;
+  i := 1;
+  while i <= length(str) do begin
+    result+=1;
+    case ord(str[i]) of
+      $00..$7F: i+=1;
+      $80..$BF: begin //in multibyte character (should never appear)
+        i+=1;
+        result-=1;
+      end;
+      $C0..$C1: i+=2;  //invalid (two bytes used for single byte)
+      $C2..$DF: i+=2;
+      $E0..$EF: i+=3;
+      $F0..$F4: i+=4;
+      $F5..$F7: i+=4;  //not allowed after rfc3629
+      $F8..$FB: i+=5;  //"
+      $FC..$FD: i+=6;  //"
+      $FE..$FF: i+=1; //invalid
+    end;
+  end;
+end;
+
 function strConvertToUtf8(str: string; from: TEncoding): string;
 var len: longint;
     reslen: longint;
@@ -579,7 +666,7 @@ begin
     eUnknown, eUTF8: result:=str;
     eWindows1252: begin //actually latin-1
       len:=length(str);//byte length
-      reslen:=UTF8Length(str);//character len = new byte length
+      reslen:=strLengthUtf8(str);//character len = new byte length
       //optimization
       if reslen = len then
         exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
@@ -620,7 +707,13 @@ end;
 
 function strGetUnicodeCharacter(const character: integer; encoding: TEncoding): string;
 begin
-  result:=UnicodeToUTF8(character);
+  //result:=UnicodeToUTF8(character);
+  case character of
+       $00 ..    $7F: result:=chr(character);
+       $80 ..   $7FF: result:=chr($C0 or (character shr 6))  + chr($80 or (character and $3F));
+      $800 ..  $FFFF: result:=chr($E0 or (character shr 12)) + chr($80 or ((character shr 6) and $3F)) + chr($80 or (character and $3F));
+    $10000 ..$10FFFF: result:=chr($F0 or (character shr 18)) + chr($80 or ((character shr 12) and $3F)) + chr($80 or ((character shr 6) and $3F)) + chr($80 or (character and $3F));
+  end;
   if not (encoding in [eUnknown, eUTF8]) then result:=strConvertFromUtf8(result, encoding);
 end;
 
@@ -727,12 +820,55 @@ begin
   result:=IntToHex(PtrUInt(p), 2*sizeof(Pointer));
 end;
 
-function ggT(a, b: cardinal): cardinal;
+
+function intLog10(i: longint): longint;
 begin
-  if b<a then exit(ggT(b,a));
+  result:=0;
+  while i >=1 do begin
+    result+=1;
+    i:=i div 10;
+  end;
+end;
+
+function intLog(n, b: longint): longint;
+begin
+  result:=0;
+  while n >=1 do begin
+    result+=1;
+    b:=n div b;
+  end;
+end;
+
+procedure intFactor(n, p: longint; out e, r: longint);
+begin
+  r := n;
+  e := 0;
+  while r mod p = 0 do begin
+    r := r div p;
+    e += 1;
+  end;
+end;
+
+
+function gcd(a, b: cardinal): cardinal;
+begin
+  if b<a then exit(gcd(b,a));
   if a=0 then exit(b);
   if a=b then exit(1);
-  result:=ggt(b mod a, a);
+  result:=gcd(b mod a, a);
+end;
+
+function coprime(a,b:cardinal): boolean;
+var mi,i: Integer;
+begin
+  if a mod b = 0 then exit(false);
+  if b mod a = 0 then exit(false);
+  mi := a;
+  if b < mi then mi := b;
+  for i:=2 to mi do
+    if (a mod i = 0) and (b mod i = 0) then
+      exit(false);
+  result:=true;
 end;
 
 //========================mathematical functions========================
@@ -852,6 +988,26 @@ begin
   result:=SystemTimeToDateTime(sysTime);
 end;
 {$ENDIF}
+
+procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
+var
+  i,j,e,r: Integer;
+begin
+  setlength(totient, n+1);
+  totient[0] := 0;
+  for i:=1 to high(totient) do totient[i] := 1;
+  for i:=2 to high(totient) do begin
+    if totient[i] = 1 then begin
+      //prime
+      j := i;
+      while j <= high(totient) do begin
+        intFactor(j, i, e, r);
+        totient[j] := totient[r] * (i ** (e-1) ) * (i - 1);
+        j+=i;
+      end;
+    end;
+  end;
+end;
 
 function weekOfYear(const date:TDateTime):word;
 //After Claus Tøndering
@@ -1027,6 +1183,23 @@ begin
   result:=getKeyID(key)<>(0-1); //WTF!
 end;
   *)
+  (*
+  procedure setInsertAll(oldSet: TIntSet; insertedSet: TIntSet);
+  var
+    i: Integer;
+  begin
+    for i:=0 to high(insertedSet.data) do
+      oldSet.insert(insertedSet.data[i]);
+  end;
+
+  procedure setRemoveAll(oldSet: TIntSet; removedSet: TIntSet);
+  var
+    i: Integer;
+  begin
+    for i:=high(removedSet.data) downto 0 do
+      oldSet.remove(removedSet.data[i]);
+  end;
+    *)
 
 //================================Others===================================
 type TSortData = Pointer;
@@ -1128,23 +1301,23 @@ begin
   data:=PCompareFunctionWrapperData(c);
   result:=data^.realFunction(data^.data,ppointer(a)^,ppointer(b)^);
 end;
-(*
-procedure setInsertAll(oldSet: TIntSet; insertedSet: TIntSet);
-var
-  i: Integer;
+function compareRawMemory(c:TObject; a, b:pointer):longint;
+var size: integer;
+    ap, bp: pchar;
+    i: Integer;
 begin
-  for i:=0 to high(insertedSet.data) do
-    oldSet.insert(insertedSet.data[i]);
+  size := PtrInt(pointer(c));
+  ap := a;
+  bp := b;
+  for i:=1 to size do begin
+    if ap^ < bp^ then exit(-1);
+    if ap^ > bp^ then exit(1);
+    inc(ap);
+    inc(bp);
+  end;
+  exit(0);
 end;
 
-procedure setRemoveAll(oldSet: TIntSet; removedSet: TIntSet);
-var
-  i: Integer;
-begin
-  for i:=high(removedSet.data) downto 0 do
-    oldSet.remove(removedSet.data[i]);
-end;
-  *)
 procedure stableSort(a,b: pointer; size: longint;
   compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
 var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(TSortData)
@@ -1164,6 +1337,10 @@ begin
     raise Exception.Create('Invalid size for sorting');
   length+=1;
   setlength(tempArray,length);
+  if compareFunction = nil then begin
+    compareFunction:=@compareRawMemory; //todo: use different wrappers for the two if branches
+    compareFunctionData:=tobject(pointer(PtrInt(size)));
+  end;
   if size < sizeof(TSortData) then begin
     //copy the values in the temp array
     for i:=0 to length-1 do
@@ -1316,6 +1493,10 @@ begin
   if not strliequal('abcd', 'abc', 3) then raise Exception.Create('strliequal failed');
   if strliequal('', 'a', 1) then raise Exception.Create('strliequal failed');
   if strliequal('abcd', 'abcd', 3) then raise Exception.Create('strliequal failed');
+
+  if strLengthUtf8('hallo') <> 5 then raise Exception.Create('strLengthUtf8 failed, 1');
+  if strLengthUtf8('hallo'#$C3#$84'<<') <> 8 then raise Exception.Create('strLengthUtf8 failed, 2');
+  if strGetUnicodeCharacter($C4) <> #$C3#$84 then raise Exception.Create('strGetUnicodeCharacter failed, 1');
 
   //string conversion
   if strConvertToUtf8('a?=ßä',eUTF8)<>'a?=ßä' then raise Exception.Create('Non conversion failed');
