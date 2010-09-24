@@ -235,7 +235,7 @@ begin
 end;
 {$endif}
 
-function TW32InternetAccess.transfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
+function TW32InternetAccess.doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
 var
   databuffer : array[0..4095] of char;
@@ -279,7 +279,7 @@ begin
       temp:=INTERNET_SERVICE_HTTP;
     end;
     if pos(':',host)>0 then begin
-      tempPort:=inttostrdef(copy(host,pos(':',host)+1,length(host)),-1);
+      tempPort:=StrToIntDef(copy(host,pos(':',host)+1,length(host)),-1);
       if tempPort=-1 then
         raise EInternetException.create('Invalid port in url: '+protocol+host+url);
       host:=copy(host,1,pos(':',host)-1);
