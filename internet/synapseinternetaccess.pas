@@ -47,8 +47,11 @@ protected
   forwardProgressEvent: TProgressEvent;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
+  function doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent;redirectionCount:longint): string;
   function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;override;
 public
+  Referer: string;
+
   constructor create();override;
   destructor destroy;override;
   function needConnection():boolean;override;
@@ -58,7 +61,7 @@ TSynapseInternetAccessClass = class of TSynapseInternetAccess;
 
 implementation
 
-uses synautil,ssl_openssl_lib;
+uses synautil,ssl_openssl_lib,bbutils;
 
 { TSynapseInternetAccess }
 
@@ -81,18 +84,24 @@ begin
 end;
 
 
-function TSynapseInternetAccess.doTransfer(method:THTTPConnectMethod;protocol, host, url: string;
-  data: string; progressEvent: TProgressEvent): string;
-var operation: string;
+function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol, host, url: string;
+  data: string; progressEvent: TProgressEvent;redirectionCount:longint): string;
+var operation,newurl: string;
+  i: Integer;
 begin
   result:='';
   connection.Clear;
+  connection.AddPortNumberToHost:=false;
   if method=hcmPost then operation:='POST'
   else operation:='GET';
   if data <> '' then begin
     WriteStrToStream(connection.Document, data);
     connection.MimeType := 'application/x-www-form-urlencoded';
   end;
+  if Referer <> '' then
+    connection.Headers.Add('Referer: '+Referer);
+  connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml');;
+
   if (UpperCase(protocol)='HTTPS') then
     if (not IsSSLloaded) then //check if ssl is actually loaded
        raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
@@ -102,27 +111,47 @@ begin
   forwardProgressEvent:=progressEvent;
 
   if connection.HTTPMethod(operation,protocol+'://'+host+url) then begin
-     if (connection.ResultCode = 200) or (connection.ResultCode = 302) then
+    //for i:=0 to connection.Headers.Count-1 do
+    //  writeln(connection.Headers[i]);
+     if (connection.ResultCode = 200) or ((connection.ResultCode = 302) and (connection.document.Size > 512)) then
        result:=ReadStrFromStream(connection.Document, connection.Document.Size)
-      else
+      else begin
+       if ((connection.ResultCode = 301) or (connection.ResultCode = 302) or (connection.ResultCode = 303) or (connection.ResultCode = 307)) and (redirectionCount > 0) then
+         for i:=0 to connection.Headers.Count-1 do
+           if stribeginswith(connection.Headers[i], 'Location:') then begin
+             newurl := connection.Headers[i]; strSplitGet(':',newurl);
+             if (pos('://',newurl) > 0) then decodeURL(Trim(newurl), protocol, host, url)
+             else url := trim(newurl);
+             exit(doTransferRec(hcmGet, protocol, host, url, '', progressEvent, redirectionCount - 1));
+           end;
        raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+protocol+'://'+host+url);
+      end;
   end else
     raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+protocol+'://'+host+url);
+
+  Referer:=protocol+'://'+host+url;
 
   if (progressEvent<>nil) and (lastProgressLength<connection.DownloadSize) then
     if contentLength=-1 then progressEvent(self,connection.DownloadSize,connection.DownloadSize)
     else progressEvent(self,connection.DownloadSize,contentLength);
 end;
 
+function TSynapseInternetAccess.doTransfer(method:THTTPConnectMethod;protocol, host, url: string;
+  data: string; progressEvent: TProgressEvent): string;
+begin
+  result:=doTransferRec(method, protocol, host, url, data, progressEvent, 10);
+end;
+
 constructor TSynapseInternetAccess.create();
 begin
   internetConfig:=@defaultInternetConfiguration;
   if defaultInternetConfiguration.userAgent='' then
-    defaultInternetConfiguration.userAgent:='Mozilla 3.0 (compatible)';
+    defaultInternetConfiguration.userAgent:='Mozilla/3.0 (compatible)';
 
   connection:=THTTPSend.Create;
   connection.Sock.OnStatus:=@connectionStatus;
- //e connection.Sock.SSL.SSLType:=LT_SSLv3;
+ // connection.Sock.SSL.SSLType:=LT_SSLv3;
+
   connection.UserAgent:=defaultInternetConfiguration.userAgent;
   if defaultInternetConfiguration.useProxy then begin
     if defaultInternetConfiguration.proxyHTTPName<>'' then begin
