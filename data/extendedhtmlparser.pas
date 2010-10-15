@@ -130,7 +130,11 @@ end;
     @br
     There are two special attributes:
     @unorderedList(
-      @item(@code(htmlparser-optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.)
+      @item(@code(htmlparser-optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
+                                              Use this attribute very carefully, because it is not as intuitive as it may appear: The matcher still tries to match the tags in the order they appear in the template, and it will do everything to match a early optional tag, before it even looks at the later tags.@br
+                                              This means if you have three optional tags A, B and C in the template, and the html file has the tags B, C and A in this order, only the matches between the two As will be found. (Because it will match the As, then check for the Bs, but the html file does not contain additional tags after the A and since B and C are optional there is no need to backtrack).
+                                              This is not that surprising, since at least one match will fail in this situation, but it becomes surprising if these tags are in a loop. Then it will still not match the B and Cs, because it will match the As in the first iteration of the loop and then the html has reached its end. It does not look at the B and C to match them in the first iteration and the A in the second one. @br
+                                              This pitfall does not occur, if the optional tags have a parent within the loop, because then the loop iteration can not be skipped without losing the match of the parent. )
       @item(@code(htmlparser-condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
     )
 
