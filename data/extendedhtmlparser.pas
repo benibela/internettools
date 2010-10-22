@@ -580,7 +580,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..62]of array[1..3] of string = (
+var data: array[1..74]of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -791,6 +791,44 @@ var data: array[1..62]of array[1..3] of string = (
    ('<a>as<htmlparser:read source="text()" var="a"/></a><b htmlparser-optional="true"></b>',
     '<a>asx</a>',
     'a=asx'),
+   //optional elements: test that the first optional element has the highest priority
+   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+    '<a>asx</a>',
+    'a=asx'),
+   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+    '<a>asx</a><b/>',
+    'a=asx'#13'b=found'),
+   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+    '<a>asx</a><c/>',
+    'a=asx'#13'c=found'),
+   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+    '<a>asx</a><b/><c/>',
+    'a=asx'#13'b=found'#13'c=found'),
+   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+    '<a>asx</a><c/><b/><c/>',
+    'a=asx'#13'b=found'#13'c=found'),
+   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+    '<a>asx</a><c/><b/>',
+    'a=asx'#13'b=found'),
+    //optional elements: test that the first optional element has the highest priority even in loops
+    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+     '<a>asx</a><b>B1</b><b>B2</b><b>B3</b>',
+     'a=asx'#13'b=B1'#13'b=B2'#13'b=B3'),
+    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+     '<a>asx</a><c>C1</c><c>C2</c><c>C3</c>',
+     'a=asx'#13'c=C1'#13'c=C2'#13'c=C3'),
+    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+     '<a>asx</a><b>B1</b><b>B2</b><b>B3</b><c>C1</c><c>C2</c><c>C3</c>',
+     'a=asx'#13'b=B1'#13'c=C1'), //TODO: is this really the expected behaviour? it searches a <b> and then a <c>, and then the file reaches eof.
+    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+     '<a>asx</a><c>C1</c><c>C2</c><c>C3</c><b>B1</b><b>B2</b><b>B3</b>',
+     'a=asx'#13'b=B1'#13'b=B2'#13'b=B3'), //it searches a <b>, then a <c>, but after the <b> only <c>s are coming
+    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+     '<a>asx</a><b>B1</b><c>C1</c><b>B2</b><c>C2</c><b>B3</b><c>C3</c>',
+     'a=asx'#13'b=B1'#13'c=C1'#13'b=B2'#13'c=C2'#13'b=B3'#13'c=C3'),
+     ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+      '<a>asx</a><b>B1</b><c>C1</c><c>C2</c><b>B3</b><c>C3</c>',
+      'a=asx'#13'b=B1'#13'c=C1'#13'b=B3'#13'c=C3'),
 
    //different text() interpretations
    ('<a><htmlparser:read source="text()" var="A"/><x/><htmlparser:read source="text()" var="B"/></a>',
