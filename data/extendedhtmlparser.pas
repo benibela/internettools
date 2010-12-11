@@ -580,7 +580,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..74]of array[1..3] of string = (
+var data: array[1..77]of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -739,6 +739,9 @@ var data: array[1..74]of array[1..3] of string = (
    ('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>',
    '<a><script>abc<def</script><b>test<b></a>',
    'test=test'),
+   ('<a><script><htmlparser:read source="text()" var="sitself"/></script><b><htmlparser:read source="text()" var="test"/></b></a>',
+   '<a><script>abc<def</script><b>test<b></a>',
+   'sitself=abc<def'#13'test=test'),
  //direct closed tags
    ('<a><br/><br/><htmlparser:read source="text()" var="test"/><br/></a>',
    '<a><br/><br   />abc<br /></a>',
@@ -754,6 +757,12 @@ var data: array[1..74]of array[1..3] of string = (
    ('<table id="right"><tr><td><htmlparser:read source="text()" var="col"/></td></tr></table>',
     '<html><table id="right"><tr><td></td><td>other</td></tr></table></html>',
     'col='),
+   ('<html><script><htmlparser:read source="text()" var="col"/></script></html>',
+    '<html><script><!--abc--></script></html>',
+    'col=<!--abc-->'),
+   ('<html><script><htmlparser:read source="text()" var="col"/></script></html>',
+    '<html><script>--<!--a--b--c-->--</script></html>',
+    'col=--<!--a--b--c-->--'),
 
    //loop corner cases
    ('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>',

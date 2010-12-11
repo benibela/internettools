@@ -514,7 +514,8 @@ begin
   FTemplateCount:=1;
 
   //parse
-  simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText);
+  if FParsingModel = pmHTML then simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText)
+  else simplehtmlparser.parseML(FCurrentFile,[],@enterTag, @leaveTag, @readText);
 
   //close root element
   leaveTag('',0);

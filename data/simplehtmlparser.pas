@@ -33,6 +33,7 @@ uses
 
 
 type
+  TParsingOptions = set of (poScriptIsCDATA);
   THTMLProperty=record
     name, value: pchar;
     nameLen, valueLen: longint;
@@ -55,6 +56,15 @@ type
                       enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                       textEvent: TTextEvent);
 
+  //**This parses html/xml data
+  //**@param html Input
+  //**@param enterTag Event to be called when a tag is entered
+  //**@param leaveTag Event to be called when a tag is leaved
+  //**@param textRead Event to be called when text between tags is read
+  //**@bold(Notice:) The parsing will stop as soon as one of the three callback functions returns false. Since this is the default return value, MAKE SURE THAT YOU'RE RETURNING TRUE on possible every branch!
+  procedure parseML(const html:string; const options: TParsingOptions;
+                    enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
+                    textEvent: TTextEvent);
 
 
   function existPropertyWithValue(propertyName,propertyValue: string; properties:THTMLProperties):boolean;
@@ -73,23 +83,28 @@ begin
 end;
 
 
-
-
-
 procedure parseHTML(const html:string;
+                    enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
+                    textEvent: TTextEvent);
+begin
+  parseML(html, [poScriptIsCDATA], enterTagEvent, leaveTagEvent, textEvent);
+end;
+
+
+
+procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                     textEvent: TTextEvent);
 var pos,marker,htmlEnd: pchar;
     valueStart:char;
     tempLen:longint;
     properties:THTMLProperties;
-    inScriptTag: boolean; //no start tags allowed in script
+    cdataTag: boolean;
 begin
   if html='' then exit;
   pos:=@html[1];
   htmlEnd:=@html[length(html)];
   marker:=pos;
-  inScriptTag:= false;
   while (pos<=htmlEnd) do begin
     case pos^ of
       '<': begin //Start or end of a tag
@@ -99,7 +114,6 @@ begin
         inc(pos);
         case pos^ of
           '!':begin //comment start
-            inScriptTag:=false;
             inc(pos);
             if (pos^='D') and ((pos+1)^='O') and ((pos+2)^='C') and
                ((pos+3)^='T') and ((pos+4)^='Y')and ((pos+5)^='P')and ((pos+6)^='E')  then begin//doctype
@@ -118,13 +132,11 @@ begin
             while (pos<=htmlEnd) and not (pos^ in [' ','>']) do inc(pos);
             if assigned(leaveTagEvent) then
               if not leaveTagEvent(marker,pos-marker) then exit;
-            if inScriptTag and (strliequal(marker,'script',pos-marker)) then
-              inScriptTag:=false;
             while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
             inc(pos);
             marker:=pos;
           end;
-          else if not inScriptTag  then begin //tag start
+          else begin //tag start
             marker:=pos;
             setlength(properties,0);
             while (pos<=htmlEnd) and not (pos^ in ['>',' ']) do
@@ -178,20 +190,24 @@ begin
               dec(tempLen);
             if assigned(enterTagEvent) then
               if not enterTagEvent(marker,tempLen,properties) then exit;
-            inScriptTag:=strliequal(marker,'script',tempLen);
+
+            cdataTag:=false;
             if (pos^ = '/') or ((pos-1)^ = '/' ) then begin
               if assigned(leaveTagEvent) then
                 if not leaveTagEvent(marker,tempLen) then exit;
               if pos^ = '/'  then inc(pos);
-            end;{ else if ((marker^ in ['b','B']) and
-                          ((marker+1)^ in ['r','R'])) or
-                        ((marker^ in ['m','M']) and
-                          ((marker+1)^ in ['e','E']) and
-                          ((marker+2)^ in ['t','T']) and
-                          ((marker+3)^ in ['a','A'])) then
-              leaveTagEvent(marker,tempLen)};
+            end else if poScriptIsCDATA in options then
+              cdataTag:=strliequal(marker,'script',tempLen);
             if pos^='>' then inc(pos);
             marker:=pos;
+            //parse cdata script tag
+            if cdataTag then begin
+              while (pos+2<=htmlEnd) and ((pos^<>'<') or ((pos+1)^<>'/') or not ((pos+2)^ in ['a'..'z','A'..'Z'])) do
+                inc(pos);
+              if Assigned(textEvent) then
+                if not textEvent(marker, pos-marker) then exit;
+              marker:=pos;
+            end;
           end;
         end;
       end;
