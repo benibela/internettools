@@ -39,9 +39,10 @@ type
     nameLen, valueLen: longint;
   end;
   THTMLProperties=array of THTMLProperty;
-  TEnterTagEvent=function (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean of object;
-  TLeaveTagEvent=function (tagName: pchar; tagNameLen: longint):boolean of object;
-  TTextEvent=function (text: pchar; textLen: longint):boolean of object;
+  TParsingResult = (prContinue, prStop);
+  TEnterTagEvent=function (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult of object;
+  TLeaveTagEvent=function (tagName: pchar; tagNameLen: longint):TParsingResult of object;
+  TTextEvent=function (text: pchar; textLen: longint):TParsingResult of object;
 
   function pcharStartEqual(p1,p2:pchar;l1,l2: longint):boolean;
 
@@ -109,7 +110,8 @@ begin
     case pos^ of
       '<': begin //Start or end of a tag
         if (marker<>pos)and(assigned(textEvent)) then
-          if not textEvent(marker,pos-marker) then exit;
+          if textEvent(marker,pos-marker) = prStop then
+            exit;
 
         inc(pos);
         case pos^ of
@@ -131,7 +133,8 @@ begin
             marker:=pos;
             while (pos<=htmlEnd) and not (pos^ in [' ','>']) do inc(pos);
             if assigned(leaveTagEvent) then
-              if not leaveTagEvent(marker,pos-marker) then exit;
+              if leaveTagEvent(marker,pos-marker) = prStop then
+                exit;
             while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
             inc(pos);
             marker:=pos;
@@ -189,12 +192,14 @@ begin
             while (marker[tempLen-1] in ['/', ' ']) and (tempLen>0) do
               dec(tempLen);
             if assigned(enterTagEvent) then
-              if not enterTagEvent(marker,tempLen,properties) then exit;
+              if enterTagEvent(marker,tempLen,properties) = prStop then
+                exit;
 
             cdataTag:=false;
             if (pos^ = '/') or ((pos-1)^ = '/' ) then begin
               if assigned(leaveTagEvent) then
-                if not leaveTagEvent(marker,tempLen) then exit;
+                if leaveTagEvent(marker,tempLen) = prStop then
+                  exit;
               if pos^ = '/'  then inc(pos);
             end else if poScriptIsCDATA in options then
               cdataTag:=strliequal(marker,'script',tempLen);
@@ -205,7 +210,8 @@ begin
               while (pos+2<=htmlEnd) and ((pos^<>'<') or ((pos+1)^<>'/') or not ((pos+2)^ in ['a'..'z','A'..'Z'])) do
                 inc(pos);
               if Assigned(textEvent) then
-                if not textEvent(marker, pos-marker) then exit;
+                if textEvent(marker, pos-marker) = prStop then
+                  exit;
               marker:=pos;
             end;
           end;
@@ -244,15 +250,15 @@ type TTempSearchClassText=class
   lastLinkURL: THTMLProperty;
   lastLink: boolean;
   searchedText:string;
-  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
-  function readText(text: pchar; textLen: longint):boolean;
+  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
+  function readText(text: pchar; textLen: longint):TParsingResult;
 end;
 
 
-function TTempSearchClassText.enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
+function TTempSearchClassText.enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
 var i:integer;
 begin
-  result:=true;
+  result:=prContinue;
   if (tagNameLen=1) and (tagName^ in ['a','A']) then begin
     for i:=0 to high(properties) do
       with properties[i] do
@@ -264,13 +270,13 @@ begin
     lastLink:=false ;
   end else lastLink:=false;
 end;
-function TTempSearchClassText.readText(text: pchar; textLen: longint):boolean;
+function TTempSearchClassText.readText(text: pchar; textLen: longint):TParsingResult;
 begin
   if lastLink and strlequal(text,@searchedText[1],textLen,length(searchedText)) then begin
     setlength(self.result,lastLinkURL.valueLen);
     move(lastLinkURL.value[0],self.result[1],lastLinkURL.valueLen);
-    exit(false);
-  end else result:=true;
+    result := prStop;
+  end else result:= prContinue;
 end;
 
 function findLinkWithText(const html:string;text: string):string;
@@ -289,13 +295,13 @@ end;
 type TTempSearchClass=class
   result: string;
   tag,prop_to_get,prop_must_match,value: string;
-  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
+  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
 end;
 
-function TTempSearchClass.enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
+function TTempSearchClass.enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
 var i,j:integer;
 begin
-  result:=true;
+  result:=prContinue;
   if strliequal(tagName,@tag[1],tagNameLen,length(tag)) then begin
     //search property prop_must_match with value value
     for i:=0 to high(properties) do
@@ -307,7 +313,7 @@ begin
             //returns it value
             setlength(self.result,properties[j].valueLen);
             move(properties[j].value[0],self.result[1],properties[j].valueLen);
-            exit(false);
+            exit(prStop);
           end;
         break;
       end;

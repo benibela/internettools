@@ -102,9 +102,9 @@ private
   function newTreeElement(typ:TTreeElementType; s: string):TTreeElement;
   procedure autoCloseLastTag();
 
-  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
-  function leaveTag(tagName: pchar; tagNameLen: longint):boolean;
-  function readText(text: pchar; textLen: longint):boolean;
+  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
+  function leaveTag(tagName: pchar; tagNameLen: longint):TParsingResult;
+  function readText(text: pchar; textLen: longint):TParsingResult;
 
 
   function htmlTagWeight(s:string): integer;
@@ -348,12 +348,12 @@ begin
 end;
 
 function TTreeParser.enterTag(tagName: pchar; tagNameLen: longint;
-  properties: THTMLProperties): boolean;
+  properties: THTMLProperties): TParsingResult;
 var
   new: TTreeElement;
   i: Integer;
 begin
-  result:=true;
+  result:=prContinue;
 
   if FAutoCloseTag then autoCloseLastTag();
   new := newTreeElement(tetOpen, tagName, tagNameLen);
@@ -370,14 +370,14 @@ begin
   new.initialized;
 end;
 
-function TTreeParser.leaveTag(tagName: pchar; tagNameLen: longint): boolean;
+function TTreeParser.leaveTag(tagName: pchar; tagNameLen: longint): TParsingResult;
 var
   new,last: TTreeElement;
   match: longint;
   i: Integer;
   weight: LongInt;
 begin
-  result:=true;
+  result:=prContinue;
 
   last := TTreeElement(FElementStack.Last);
   if (FParsingModel = pmStrict) and (last = nil) then
@@ -420,9 +420,9 @@ begin
   end;
 end;
 
-function TTreeParser.readText(text: pchar; textLen: longint): boolean;
+function TTreeParser.readText(text: pchar; textLen: longint): TParsingResult;
 begin
-  result:=true;
+  result:=prContinue;
 
   if FAutoCloseTag then
     autoCloseLastTag();
