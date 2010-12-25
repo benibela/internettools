@@ -125,7 +125,7 @@ end;
       @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)
       @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>) @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
       @item(@code(<htmlparser:loop>  .. </htmlparser:loop>) @br Everything inside this tag is executed as long as possible (including never))
-      @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>) @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)"))
+      @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>) @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant) )
     )
     @br
     There are two special attributes:
@@ -165,12 +165,14 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    function executePseudoXPath(str: string; replaceVariables: boolean=true):string;
+    function executePseudoXPath(str: string):string;
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
     function templateElementFitHTMLOpen(html:TTreeElement; template: TTemplateElement): Boolean;
     function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeElement; templateStart, templateEnd: TTemplateElement): boolean;
+
+    procedure evaluateVariable(sender: TObject; const variable: string; var value: string);
   public
     constructor create;
     destructor destroy; override;
@@ -186,6 +188,7 @@ THtmlTemplateParser=class
     //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
+    //TODO: optimize variable storage
     property variables: TStringList read Fvariables;//**<List of all variables
     property variableChangeLog: TStringList read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
@@ -242,9 +245,9 @@ begin
   templateType:=strToCommand(value, typ);
 end;
 
-function THtmlTemplateParser.executePseudoXPath(str: string; replaceVariables: boolean): string;
+function THtmlTemplateParser.executePseudoXPath(str: string): string;
 begin
-  if replaceVariables then str := replaceVars(str);
+  str := replaceVars(str);
   FPseudoXPath.parse(str);
   result:=FPseudoXPath.evaluate();
 end;
@@ -428,6 +431,16 @@ begin
     end;
 end;
 
+procedure THtmlTemplateParser.evaluateVariable(sender: TObject;
+ const variable: string; var value: string);
+var
+ i: LongInt;
+begin
+  i:=variables.IndexOfName(variable);
+  if i <> -1 then
+    value := variables.ValueFromIndex[i];
+end;
+
 constructor THtmlTemplateParser.create;
 begin
   Fvariables := TStringList.Create;
@@ -438,6 +451,7 @@ begin
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
   FPseudoXPath := TPseudoXPathParser.Create;
+  FPseudoXPath.OnEvaluateVariable:=@evaluateVariable;
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
 end;
