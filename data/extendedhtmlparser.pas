@@ -144,7 +144,7 @@ end;
     The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the @noAutolink(variables) and variableChangeLog contains a complete history of the @noAutolink(variables).@br
     The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you used a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
     The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entity less encoding (cdata is still not supported).@br
-    In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable state are cleared. The changelog however is always removed..@br
+    In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable states are cleared. The changelog however is always removed..@br
     The default encoding is now utf-8, so the parsed web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the htmlparser:meta tag. (if you use the meta tag, it will also be converted to utf8)@br
 
 }

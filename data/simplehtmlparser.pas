@@ -52,20 +52,22 @@ type
   //**@param enterTag Event to be called when a tag is entered
   //**@param leaveTag Event to be called when a tag is leaved
   //**@param textRead Event to be called when text between tags is read
-  //**@bold(Notice:) The parsing will stop as soon as one of the three callback functions returns false. Since this is the default return value, MAKE SURE THAT YOU'RE RETURNING TRUE on possible every branch!
+  //**@bold(Notice:) You can pass nil for every callback function and if one of them returns prStop, the parsing is aborted.
   procedure parseHTML(const html:string;
                       enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                      textEvent: TTextEvent);
+                      textEvent: TTextEvent; commentEvent: TTextEvent = nil);
 
   //**This parses html/xml data
   //**@param html Input
+  //**@param options Set of options to modify the low-level parsing behaviour.  (Set it to [poScriptIsCDATA] for html and [] for xml)
   //**@param enterTag Event to be called when a tag is entered
   //**@param leaveTag Event to be called when a tag is leaved
   //**@param textRead Event to be called when text between tags is read
-  //**@bold(Notice:) The parsing will stop as soon as one of the three callback functions returns false. Since this is the default return value, MAKE SURE THAT YOU'RE RETURNING TRUE on possible every branch!
+  //**@param commentEvent Event to be called when a comment is read
+  //**@bold(Notice:) You can pass nil for every callback function and if one of them returns prStop, the parsing is aborted.
   procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent);
+                    textEvent: TTextEvent; commentEvent: TTextEvent = nil);
 
 
   function existPropertyWithValue(propertyName,propertyValue: string; properties:THTMLProperties):boolean;
@@ -86,16 +88,16 @@ end;
 
 procedure parseHTML(const html:string;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent);
+                    textEvent: TTextEvent; commentEvent: TTextEvent = nil);
 begin
-  parseML(html, [poScriptIsCDATA], enterTagEvent, leaveTagEvent, textEvent);
+  parseML(html, [poScriptIsCDATA], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
 end;
 
 
 
 procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent);
+                    textEvent: TTextEvent; commentEvent: TTextEvent = nil);
 var pos,marker,htmlEnd: pchar;
     valueStart:char;
     tempLen:longint;
@@ -122,8 +124,12 @@ begin
               while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
               inc(pos);
              end else begin
+              marker := pos;
+              if (pos^ = '-') and ((pos+1)^ = '-') then marker+=2; //don't pass -- at begin, but also pass <![endif]--> as comment
               while (pos<=htmlEnd) and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>')) do
                 inc(pos);
+              if assigned(commentEvent) and (commentEvent(marker, pos-marker) = prStop) then
+                exit;
               inc(pos,3);
              end;
              marker:=pos;

@@ -21,7 +21,7 @@ type
 TAttributeList = TStringList; //TODO: use a map
 
 //**The type of a tree element. <Open>, text, or </close>
-TTreeElementType = (tetOpen, tetClose, tetText);
+TTreeElementType = (tetOpen, tetClose, tetText, tetComment);
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
 //**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
@@ -37,8 +37,8 @@ TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensit
 //**∀a,b \in SO: a < b < a.reverse => a < b.reverse < a.reverse@br
 TTreeElement = class
 //use the fields if you know what you're doing
-  typ: TTreeElementType; //**<open, close or text node
-  value: string; //**< tag name for open/close nodes, text for text nodes
+  typ: TTreeElementType; //**<open, close, text or comment node
+  value: string; //**< tag name for open/close nodes, text for text/comment nodes
   attributes: TAttributeList;  //**<nil für tetText
   next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   reverse: TTreeElement; //**<element paired by open/closing
@@ -95,7 +95,7 @@ private
   FAutoCloseTag: boolean;
   FCurrentFile: string;
   FParsingModel: TParsingModel;
-  FTrimText: boolean;
+  FTrimText, FReadComments: boolean;
   FEncoding: TEncoding;
 
   function newTreeElement(typ:TTreeElementType; text: pchar; len:longint):TTreeElement;
@@ -105,6 +105,7 @@ private
   function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
   function leaveTag(tagName: pchar; tagNameLen: longint):TParsingResult;
   function readText(text: pchar; textLen: longint):TParsingResult;
+  function readComment(text: pchar; textLen: longint):TParsingResult;
 
 
   function htmlTagWeight(s:string): integer;
@@ -131,6 +132,8 @@ published
   property parsingModel: TParsingModel read FParsingModel write FParsingModel;
   //** If this is true (default), white space is removed from text node
   property trimText: boolean read FTrimText write FTrimText;
+  //** If this is true (default is false) comments are included in the generated tree
+  property readComments: boolean read FReadComments write FReadComments;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
 end;
 implementation
@@ -166,8 +169,9 @@ begin
     if tree.typ = tetText then begin
       tree.value:=strChangeEncoding(tree.value, from, toe);
       if substituteEntities then tree.value:=strDecodeHTMLEntities(tree.value, toe, false);
-    end
-    else if tree.attributes <> nil then begin
+    end else if tree.typ = tetComment then begin
+      tree.value:=strChangeEncoding(tree.value, from, toe);
+    end else if tree.attributes <> nil then begin
       s :=strChangeEncoding(tree.attributes.text,from,toe);
       if substituteEntities then s:=strDecodeHTMLEntities(s, toe, false);
       tree.attributes.text:=s;
@@ -239,9 +243,9 @@ end;
 function TTreeElement.getNextSibling(): TTreeElement;
 begin
   case typ of
-    tetText: result:=next;
     tetOpen: result:=reverse.next;
-    tetClose: result:=next;
+    tetText, tetClose, tetComment: result := next;
+    else raise Exception.Create('Invalid tree element type');
   end;
   if result.typ = tetClose then exit(nil);
 end;
@@ -286,6 +290,7 @@ begin
             result += ' '+attributes[i];
         result+='>';
     end;
+    tetComment: exit('<!--'+value+'-->');
   end;
 end;
 
@@ -436,6 +441,15 @@ begin
   newTreeElement(tetText, text, textLen).initialized;
 end;
 
+function TTreeParser.readComment(text: pchar; textLen: longint): TParsingResult;
+begin
+  if not FReadComments then
+    exit;
+  if textLen <= 0 then
+    exit;
+  newTreeElement(tetComment, text, textLen).initialized;
+end;
+
 function TTreeParser.htmlTagWeight(s: string): integer;
 begin
   result := 0;
@@ -471,6 +485,7 @@ begin
   FElementStack := TList.Create;
   treeElementClass := TTreeElement;
   FTrimText:=true;
+  FReadComments:=false;
   //FConvertEntities := true;
 end;
 
@@ -514,8 +529,8 @@ begin
   FTemplateCount:=1;
 
   //parse
-  if FParsingModel = pmHTML then simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText)
-  else simplehtmlparser.parseML(FCurrentFile,[],@enterTag, @leaveTag, @readText);
+  if FParsingModel = pmHTML then simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText, @readComment)
+  else simplehtmlparser.parseML(FCurrentFile,[],@enterTag, @leaveTag, @readText, @readComment);
 
   //close root element
   leaveTag('',0);
