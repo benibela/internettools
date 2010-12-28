@@ -450,6 +450,7 @@ begin
   FTemplate.treeElementClass:=TTemplateElement;
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
+  FHTML.readComments:=true;
   FPseudoXPath := TPseudoXPathParser.Create;
   FPseudoXPath.OnEvaluateVariable:=@evaluateVariable;
   outputEncoding:=eUTF8;
@@ -594,7 +595,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..77]of array[1..3] of string = (
+var data: array[1..78] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -621,6 +622,9 @@ var data: array[1..77]of array[1..3] of string = (
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
  '<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
  'test=1'),
+ ('<a><b><htmlparser:read source="comment()" var="test"/></b></a>',
+ '<a><b><!--cCc--></b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
+ 'test=cCc'),
  //reading with matching node text
  ('<a><b>Nur diese: <htmlparser:read source="text()" var="test" regex="\d+"/></b></a>',
  '<a><b>1</b><b>2</b><b>Nur diese: 3</b><b>4</b><b>5</b></a>',

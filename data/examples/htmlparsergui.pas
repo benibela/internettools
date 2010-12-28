@@ -92,6 +92,7 @@ begin
   try
     ppath.parse(memo1.Lines.text);
     tp := TTreeParser.Create;
+    tp.readComments:=true;
     tp.parsingModel:=pmHTML;
     tp.parseTree(memo2.Lines.Text);
     ppath.ParentElement := tp.getTree;
