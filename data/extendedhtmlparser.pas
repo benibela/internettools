@@ -44,7 +44,8 @@ TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose, tetHTMLText,
                       tetCommandMeta, tetCommandRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
-                      tetCommandIfOpen, tetCommandIfClose);
+                      tetCommandIfOpen, tetCommandIfClose,
+                      tetCommandSwitchOpen, tetCommandSwitchClose);
 
 (*TNotifyCallbackFunction = procedure () of object;
 TVariableCallbackFunction = procedure (variable: string; value: string) of object;
@@ -120,21 +121,24 @@ end;
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
   The matching occurs (in the latest version) with backtracking, so it will always find the first and longest match.
 
-  There are 4 special commands allowed:
+  There are 5 special commands allowed:
    @unorderedList(
       @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)
       @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>) @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
       @item(@code(<htmlparser:loop>  .. </htmlparser:loop>) @br Everything inside this tag is executed as long as possible (including never))
       @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>) @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant) )
+      @item(@code(<htmlparser:switch> ... </htmlparser:switch>)
+        @br This tag is matched to an html tag, iff one of its direct children can be matched to that html tag.
+        @br For example @code(<htmlparser:switch><a>..</a> <b>..</b></htmlparser:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first will be matched (if there is no loop around the switch tag).
+        @br Therefore it is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><htmlparser:read source="'true'" var="temp"/></a> <htmlparser:if test="$temp;!=true"> <b/> </htmlparser:if>).
+            The difference is that the switch-construct gives equal priority to a and b, but the excluding if-construct priorizes a, and will ignore any b followed by an a.
     )
     @br
-    There are two special attributes:
+    There are two special attributes allowed for html tags in the template file:
     @unorderedList(
       @item(@code(htmlparser-optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
-                                              Use this attribute very carefully, because it is not as intuitive as it may appear: The matcher still tries to match the tags in the order they appear in the template, and it will do everything to match a early optional tag, before it even looks at the later tags.@br
-                                              This means if you have three optional tags A, B and C in the template, and the html file has the tags B, C and A in this order, only the matches between the two As will be found. (Because it will match the As, then check for the Bs, but the html file does not contain additional tags after the A and since B and C are optional there is no need to backtrack).
-                                              This is not that surprising, since at least one match will fail in this situation, but it becomes surprising if these tags are in a loop. Then it will still not match the B and Cs, because it will match the As in the first iteration of the loop and then the html has reached its end. It does not look at the B and C to match them in the first iteration and the A in the second one. @br
-                                              This pitfall does not occur, if the optional tags have a parent within the loop, because then the loop iteration can not be skipped without losing the match of the parent. )
+                                               You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip any count of loop iterations if it can find a later match for the optional element.
+                                               But it is fine to use optional tags that have an non-optional parent tag within the loop. )
       @item(@code(htmlparser-condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
     )
 
@@ -198,8 +202,8 @@ THtmlTemplateParser=class
 implementation
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
-      COMMAND_CLOSED:array[tetCommandMeta..tetCommandIfClose] of longint=(0,0,1,2,1,2);
-      COMMAND_STR:array[tetCommandMeta..tetCommandIfClose] of string=('meta','read','loop','loop','if','if');
+      COMMAND_CLOSED:array[tetCommandMeta..tetCommandSwitchClose] of longint=(0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[tetCommandMeta..tetCommandSwitchClose] of string=('meta','read','loop','loop','if','if','switch','switch');
 
 { TTemplateElement }
 
@@ -378,6 +382,26 @@ var xpathText: TTreeElement;
     else templateStart := TTemplateElement(templateStart.reverse.next);
   end;
 
+  procedure HandleCommandSwitch;
+  var curChild: TTreeElement;
+  begin
+    curChild:=templateStart.getFirstChild();
+    templateStart.match := htmlStart;
+    while curChild <> nil do begin //enumerate all child tags
+      if templateElementFitHTMLOpen(htmlStart, TTemplateElement(curChild)) and
+          matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(curChild.next), TTemplateElement(curChild.reverse)) then begin
+        //found match
+        htmlStart := htmlStart.reverse.next;
+        templateStart := TTemplateElement(templateStart.reverse.next);
+        exit;
+      end;
+      //no match, try other matches
+      curChild := curChild.getNextSibling();
+    end;
+
+    htmlStart:=htmlStart.next; //no match
+  end;
+
 var realHtmlStart: TTreeElement;
   procedure HandleCommandLoopClose;
   begin
@@ -416,7 +440,9 @@ begin
               tetCommandLoopOpen: HandleCommandLoopOpen;
               tetCommandLoopClose: HandleCommandLoopClose;
 
-              tetIgnore, tetCommandMeta, tetCommandIfClose: templateStart := TTemplateElement(templateStart.next);
+              tetCommandSwitchOpen: HandleCommandSwitch;
+
+              tetIgnore, tetCommandMeta, tetCommandIfClose, tetCommandSwitchClose: templateStart := TTemplateElement(templateStart.next);
 
               else raise ETemplateParseException.Create('Unknown template element type - internal error');
             end
@@ -595,7 +621,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..78] of array[1..3] of string = (
+var data: array[1..85] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -856,6 +882,31 @@ var data: array[1..78] of array[1..3] of string = (
      ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
       '<a>asx</a><b>B1</b><c>C1</c><c>C2</c><b>B3</b><c>C3</c>',
       'a=asx'#13'b=B1'#13'c=C1'#13'b=B3'#13'c=C3'),
+
+     //switch
+     //trivial tests
+     ('<a><htmlparser:switch><b><htmlparser:read var="v" source="''bBb''"/></b><c><htmlparser:read var="v" source="''cCc''"/></c></htmlparser:switch></a>',
+      '<a><b></b></a>',
+      'v=bBb'),
+     ('<a><htmlparser:switch><b><htmlparser:read var="v" source="''bBb''"/></b><c><htmlparser:read var="v" source="''cCc''"/></c></htmlparser:switch></a>',
+      '<a><c></c></a>',
+      'v=cCc'),
+     ('<a><htmlparser:loop><htmlparser:switch><b><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
+      '<a><b>1</b><c>2</c><b>4</b><b>5</b><c>6</c><d>ign</d><b>7</b>bla<b>8</b>blub</a>',
+      'b=1'#13'c=2'#13'b=4'#13'b=5'#13'c=6'#13'b=7'#13'b=8'),
+     ('<a><htmlparser:loop><htmlparser:switch><b><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
+      '<a><b>1</b><nestene><c>rose</c><consciousness><b>obvious</b><b>ardi</b></consciousness><c>blub</c></nestene></a>',
+      'b=1'#13'c=rose'#13'b=obvious'#13'b=ardi'#13'c=blub'),
+     ('<a><htmlparser:loop><htmlparser:switch><b htmlparser-optional="true"><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
+      '<a><b>1</b><nestene><c>rose</c><consciousness><b>obvious</b><b>ardi</b></consciousness><c>blub</c></nestene></a>',
+      'b=1'#13'c=rose'#13'b=obvious'#13'b=ardi'#13'c=blub'),
+      //recursive
+      ('<a><htmlparser:loop><htmlparser:switch><b htmlparser-optional="true"><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
+       '<a><b><x>tx</x></b><n><b><y>ty</y></b>non<b>sense<ll><y>TY</y></ll></b></n><b><y>AY</y></b><c>dep</c><b><x>X</x></b></a>',
+       'bx=tx'#13'by=ty'#13'by=TY'#13'by=AY'#13'bx=X'),
+      ('<a><htmlparser:loop><htmlparser:switch><b htmlparser-optional="true"><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
+       '<a><b><x>tx</x><n><b><y>ty</y></b>non<b>sense<ll><y>TY</y></ll></b></n><b><y>AY</y></b><c>dep</c><b><x>X</x></b></b></a>',
+       'bx=tx'), //carefully: here the first </b> is missing/off
 
    //different text() interpretations
    ('<a><htmlparser:read source="text()" var="A"/><x/><htmlparser:read source="text()" var="B"/></a>',
