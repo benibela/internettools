@@ -124,20 +124,28 @@ end;
   There are 5 special commands allowed:
    @unorderedList(
       @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)
-      @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>) @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
-      @item(@code(<htmlparser:loop>  .. </htmlparser:loop>) @br Everything inside this tag is executed as long as possible (including never))
-      @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>) @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var. If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant) )
+      @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>)
+        @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
+      @item(@code(<htmlparser:loop>  .. </htmlparser:loop>)
+        @br Everything inside this tag is repeated as long as possible
+        @br E.g. if you write @code(<htmlparser:loop>  X </htmlparser:loop> ), it has the same effect as XXXXX with the largest possible count of X for a given html file.
+        @br If there is no possible match for the loop interior the loop is completely ignored. (if you want the empty loop to raise an error, you can create a temporary variable in the loop, and check for the existence of the variable after the loop.)
+      @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>)
+        @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
+        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
+        )
       @item(@code(<htmlparser:switch> ... </htmlparser:switch>)
         @br This tag is matched to an html tag, iff one of its direct children can be matched to that html tag.
-        @br For example @code(<htmlparser:switch><a>..</a> <b>..</b></htmlparser:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first will be matched (if there is no loop around the switch tag).
-        @br Therefore it is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><htmlparser:read source="'true'" var="temp"/></a> <htmlparser:if test="$temp;!=true"> <b/> </htmlparser:if>).
-            The difference is that the switch-construct gives equal priority to a and b, but the excluding if-construct priorizes a, and will ignore any b followed by an a.
+        @br For example @code(<htmlparser:switch><a>..</a> <b>..</b></htmlparser:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
+        @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><htmlparser:read source="'true'" var="temp"/></a> <htmlparser:if test="$temp;!=true"> <b/> </htmlparser:if>).
+            The difference is that the switch-construct gives equal priority to every of its children, but the excluding if-construct prioritizes a, and will ignore any b followed by an a.@br
+            These switch-constructs are mainly used within a loop to collect the values of different tags.)
     )
     @br
     There are two special attributes allowed for html tags in the template file:
     @unorderedList(
       @item(@code(htmlparser-optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
-                                               You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip any count of loop iterations if it can find a later match for the optional element.
+                                               You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
       @item(@code(htmlparser-condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
     )
@@ -388,6 +396,7 @@ var xpathText: TTreeElement;
     curChild:=templateStart.getFirstChild();
     templateStart.match := htmlStart;
     while curChild <> nil do begin //enumerate all child tags
+      if TTemplateElement(curChild).isOptional then raise ETemplateParseException.Create('A direct child of the htmlparser:switch construct may not have the attribute htmlparser-optional (it is optional anyways)');
       if templateElementFitHTMLOpen(htmlStart, TTemplateElement(curChild)) and
           matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(curChild.next), TTemplateElement(curChild.reverse)) then begin
         //found match
@@ -897,14 +906,14 @@ var data: array[1..85] of array[1..3] of string = (
      ('<a><htmlparser:loop><htmlparser:switch><b><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
       '<a><b>1</b><nestene><c>rose</c><consciousness><b>obvious</b><b>ardi</b></consciousness><c>blub</c></nestene></a>',
       'b=1'#13'c=rose'#13'b=obvious'#13'b=ardi'#13'c=blub'),
-     ('<a><htmlparser:loop><htmlparser:switch><b htmlparser-optional="true"><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
+     ('<a><htmlparser:loop><htmlparser:switch><b><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
       '<a><b>1</b><nestene><c>rose</c><consciousness><b>obvious</b><b>ardi</b></consciousness><c>blub</c></nestene></a>',
       'b=1'#13'c=rose'#13'b=obvious'#13'b=ardi'#13'c=blub'),
       //recursive
-      ('<a><htmlparser:loop><htmlparser:switch><b htmlparser-optional="true"><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
+      ('<a><htmlparser:loop><htmlparser:switch><b><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
        '<a><b><x>tx</x></b><n><b><y>ty</y></b>non<b>sense<ll><y>TY</y></ll></b></n><b><y>AY</y></b><c>dep</c><b><x>X</x></b></a>',
        'bx=tx'#13'by=ty'#13'by=TY'#13'by=AY'#13'bx=X'),
-      ('<a><htmlparser:loop><htmlparser:switch><b htmlparser-optional="true"><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
+      ('<a><htmlparser:loop><htmlparser:switch><b><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
        '<a><b><x>tx</x><n><b><y>ty</y></b>non<b>sense<ll><y>TY</y></ll></b></n><b><y>AY</y></b><c>dep</c><b><x>X</x></b></b></a>',
        'bx=tx'), //carefully: here the first </b> is missing/off
 
