@@ -148,27 +148,25 @@ begin
           else begin //tag start
             marker:=pos;
             setlength(properties,0);
-            while (pos<=htmlEnd) and not (pos^ in ['>',' ']) do
+            while (pos<=htmlEnd) and not (pos^ in ['/','>',' ']) do
               inc(pos);
             tempLen:=pos-marker;
             //read properties
-            while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do begin
-              while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
-              if pos^='>' then break;
+            while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
+            while (pos<=htmlEnd) and  not (pos^ in ['>','/']) do begin
               if pos>htmlEnd then exit;
               //new property
               setlength(properties,length(properties)+1);
               with properties[high(properties)] do begin
                 //search start of name
                 name:=pos;
-                while (pos<=htmlEnd) and not (pos^ in (WHITE_SPACE + ['=','>'])) do inc(pos);
+                while (pos<=htmlEnd) and not (pos^ in (WHITE_SPACE + ['=','/','>'])) do inc(pos);
                 nameLen:=pos-name;
                 //find value start
                 while (pos<=htmlEnd) and (pos^ in (WHITE_SPACE)) do inc(pos);
                 if pos^ <> '=' then begin
                    value:=name;
-                   valueLen:=0;
-                   dec(pos);
+                   valueLen:=0; //attribute without value
                 end else begin
                   inc(pos);
                   while (pos<=htmlEnd) and (pos^ in (WHITE_SPACE)) do inc(pos);
@@ -176,13 +174,9 @@ begin
                     //value not in ""
                     value:=pos;
                     while (pos<=htmlEnd) and not (pos^ in (WHITE_SPACE + ['>'])) do
-                      if (pos^<>'/') or ((pos+1)^<>'>') then inc(pos)
-                      else break;
+                      if (pos^='/') and ((pos+1)^='>') then break //it is possible to use unescaped slashs in html attributes
+                      else inc(pos);
                     valueLen:=pos-value;
-                   end else if pos^ = '>' then begin
-                     value:=name;
-                     valueLen:=0;
-                     break;
                    end else begin
                     //value in ""
                     valueStart:=pos^;
@@ -194,15 +188,16 @@ begin
                   end;
                 end;
               end;
+              while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
             end;
-            while (marker[tempLen-1] in ['/', ' ']) and (tempLen>0) do
-              dec(tempLen);
+            //while (marker[tempLen-1] in ['/', ' ']) and (tempLen>0) do
+            //  dec(tempLen);
             if assigned(enterTagEvent) then
               if enterTagEvent(marker,tempLen,properties) = prStop then
                 exit;
 
             cdataTag:=false;
-            if (pos^ = '/') or ((pos-1)^ = '/' ) then begin
+            if (pos^ = '/')  then begin
               if assigned(leaveTagEvent) then
                 if leaveTagEvent(marker,tempLen) = prStop then
                   exit;
