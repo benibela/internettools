@@ -80,19 +80,19 @@ end;
 
   @bold(Examples)
 
-  Example, how to read the first <b>-tag:@br
+  @italic(Example, how to read the first <b>-tag):@br
     Template: @code(<b><htmlparser:read var="test" source="text()"></b>)@br
     Html-File: @code(<b>Hello World!</b>))@br
 
   This will set the variable test to "Hello World!" @br
 
-  Example, how to read the first field of a every row of a table:@br
+  @italic(Example, how to read the first field of a every row of a table):@br
     Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readField()" source="text()"> </td> </tr> </htmlparser:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
 
     This will read row after row, and will write the first field to the change log of the variable readField() .@br
 
-    Example, how to read the several field of a every row of a table:@br
+  @italic(Example, how to read the several field of a every row of a table):@br
 
     Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readField1()" source="text()"> </td> <td> <htmlparser:read var="readField2()" source="text()"> </td> <td> <htmlparser:read var="readField3()" source="text()"> </td> ... </tr> </htmlparser:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> a </td> <td> b </td> <td> c </td> </tr> ... </tr> </table>)@br
@@ -100,17 +100,38 @@ end;
     This will read readField1()=a, readField2()=b, readField3()=c...@br
     Of you can use your own names instead of readFieldX() and they are independent of the html file. So such templates can convert several pages with different structures, to the same internal data layout of your application.
 
-  Example, how to read all rows of every table CSV like:@br
+  @italic(Example, how to read all rows of every table CSV like):@br
   Template: @code(<htmlparser:loop> <tr>  <htmlparser:read var="readAnotherRow()" source="deepNodeText(',')"> </tr> </htmlparser:loop> )@br
   Html-File: @code(... <tr> <td> a </td> <td> b </td> <td> c </td> </tr> <tr> <td> foo </td> <td> bar </td> </tr> ...)@br
 
   This will read all rows, and write lines like a,b,c and foo,bar to the changelog.@br
 
-  Example, how to read the first list item starting with an unary prime number:@br
+  @italic(Example, how to read the first list item starting with an unary prime number):@br
   Template: @code(<li htmlparser-condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')"><htmlparser:read var="prime" source="text()"/></li>)@br
   Html-File: @code(... <li>1111: this is 4</li><li>1:1 is no prime</li><li>1111111: here is 7</li><li>11111111: 8</li> ...)@br
 
   This will return "1111111: here is 7", because 1111111 is the first prime in that list.@br@br
+
+  @italic(Example, how to extract all elements of a html form):
+  @preformatted(<form>
+  <htmlparser:loop><htmlparser:switch>
+  <input type="checkbox" htmlparser-condition="exists(@checked)"><htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="radio" htmlparser-condition="exists(@checked)">   <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="hidden">                                          <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="password">                                        <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="text">                                            <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <select><htmlparser:read var="temp" source="@name"/><option htmlparser-optional="true" htmlparser-condition="exists(@selected)"><htmlparser:read var="post" source="concat($temp;,'=',@value)"/></option></select>
+  <textarea>                                                     <htmlparser:read var="post" source="concat(@name,'=',text())"/>  </textarea>
+  </htmlparser:switch></htmlparser:loop>
+</form>)
+
+  Html-File: any form @br
+
+  This example will extract from each relevant element in the form the name and value pair which is sent to the webserver.
+  It is very general, and will work with all forms, independent of things like nesting deep.
+  Therefore it is a little bit ugly; but if you create a template for a specific page, you usually know which elements you will find there, so the template becomes much simpler in practical cases.
+
+
 
   See the unit tests at the end of the file extendedhtmlparser.pas for more examples
 
@@ -130,6 +151,7 @@ end;
         @br Everything inside this tag is repeated as long as possible
         @br E.g. if you write @code(<htmlparser:loop>  X </htmlparser:loop> ), it has the same effect as XXXXX with the largest possible count of X for a given html file.
         @br If there is no possible match for the loop interior the loop is completely ignored. (if you want the empty loop to raise an error, you can create a temporary variable in the loop, and check for the existence of the variable after the loop.)
+        )
       @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>)
         @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
         @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
@@ -152,7 +174,8 @@ end;
 
 
 
-    @bold(Important changes from previous version:) (277:64e34593cd2c->344:c300977b4678))@br
+    @bold(Important changes from previous versions:)@br
+    Old changes:@br
     The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the @noAutolink(variables) and variableChangeLog contains a complete history of the @noAutolink(variables).@br
     The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you used a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
     The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entity less encoding (cdata is still not supported).@br
@@ -259,7 +282,7 @@ end;
 
 function THtmlTemplateParser.executePseudoXPath(str: string): string;
 begin
-  str := replaceVars(str);
+  //str := replaceVars(str);
   FPseudoXPath.parse(str);
   result:=FPseudoXPath.evaluate();
 end;
@@ -269,7 +292,7 @@ function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
 var
   name: string;
   condition: string;
-  i: Integer;
+  i,j: Integer;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
@@ -343,7 +366,7 @@ var xpathText: TTreeElement;
   begin
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
-    text:=executePseudoXPath(replaceVars(templateStart.attributes.Values['source']));
+    text:=executePseudoXPath(templateStart.attributes.Values['source']);
 
     if templateStart.attributes.Values['regex']<>'' then begin
       regexp:=TRegExpr.Create;
@@ -370,7 +393,7 @@ var xpathText: TTreeElement;
 
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
-    equal:=executePseudoXPath(replaceVars(condition))='true';
+    equal:=executePseudoXPath(condition)='true';
 
     if not equal then
       templateStart := TTemplateElement(templateStart.reverse) //skip if block
