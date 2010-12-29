@@ -61,7 +61,7 @@ TTreeElement = class
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
 
   function getValue(): string; //**< get the value of this element
-  function getAttribute(a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exists
+  function getAttribute(const a: string; const def: string=''):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exists
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
@@ -234,10 +234,13 @@ begin
   result := value;
 end;
 
-function TTreeElement.getAttribute(a: string):string;
+function TTreeElement.getAttribute(const a: string; const def: string=''):string;
+var i:integer;
 begin
-  if attributes = nil then exit('');
-  exit(attributes.Values[a]);
+  if attributes = nil then exit(def);
+  i := attributes.IndexOfName(a);
+  if i < 0 then exit(def);
+  exit(attributes.ValueFromIndex[i]);
 end;
 
 function TTreeElement.getNextSibling(): TTreeElement;
