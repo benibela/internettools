@@ -27,7 +27,7 @@ unit autoupdate;
 interface
 {$DEFINE showProgress}
 uses
-  Classes, SysUtils, internetaccess,bbutils,simplexmlparser,  dialogs, {$IFDEF showProgress}progressdialog{$ENDIF}
+  Classes, SysUtils, internetaccess,bbutils,simplehtmlparser, simplexmlparser,  dialogs, {$IFDEF showProgress}progressdialog{$ENDIF}
   ;
 
 //**this is shown in the message notifying about a *failed* update as a alternative way to get the update
@@ -142,7 +142,7 @@ private
   fnewversion:TVersionNumber;
   function getInstallerCommand: string;
   function GetInstallerDownloadedFileName: string;
-  function loadNewVersionEnterTag(tagName: string; properties: TProperties):boolean;
+  function loadNewVersionEnterTag(tagName: string; properties: TProperties):TParsingResult;
   procedure loadNewVersion(const url: string);
 
 private
@@ -153,8 +153,8 @@ private
   fbuildinfolastbuild: longint;
   fbuildinfolasttag:string;
   fupdatebuildversion:longint;
-  function needBuildInfoEnterTag(tagName: string; properties: TProperties):boolean;
-  function needBuildInfoTextRead(text: string):boolean;
+  function needBuildInfoEnterTag(tagName: string; properties: TProperties):TParsingResult;
+  function needBuildInfoTextRead(text: string):TParsingResult;
   procedure needBuildInfo();//newversion,build
 
   procedure needInternet;inline;
@@ -259,14 +259,14 @@ end;
 
 
 function TAutoUpdater.loadNewVersionEnterTag(tagName: string;
-  properties: TProperties): boolean;
+  properties: TProperties): TParsingResult;
 begin
   if striequal(tagName,'stable') then begin
     fnewversionstr:=getProperty('value',properties);
     fnewversion:=StrToIntDef(fnewversionstr,0);
-    exit(false);
+    exit(prStop);
   end;
-  Result:=true;
+  Result:=prContinue;
 end;
 
 function TAutoUpdater.GetInstallerDownloadedFileName: string;
@@ -296,7 +296,7 @@ begin
 end;
 
 function TAutoUpdater.needBuildInfoEnterTag(tagName: string;
-  properties: TProperties): boolean;
+  properties: TProperties): TParsingResult;
 begin
   if striequal(tagname,'build') then begin
     fbuildinfolastbuild:=StrToIntDef(getProperty('version',properties),0);
@@ -310,10 +310,10 @@ begin
       finstallerNeedRestart:=StrToBoolDef(getProperty('restart',properties),false);
     end;
   fbuildinfolasttag:=tagName;
-  result:=true;
+  result:=prContinue;
 end;
 
-function TAutoUpdater.needBuildInfoTextRead(text: string): boolean;
+function TAutoUpdater.needBuildInfoTextRead(text: string): TParsingResult;
 begin
   if (fbuildinfolastbuild<=fnewversion) and (fbuildinfolastbuild>fcurrentVersion) then begin
     if striequal(fbuildinfolasttag,'fix') then fallFixes+=text+LineEnding
@@ -321,7 +321,7 @@ begin
     else if striequal(fbuildinfolasttag,'change') then fallChanges+=text+LineEnding;
   end;
   fbuildinfolasttag:='';
-  result:=true;
+  result:=prContinue;
 end;
 
 procedure TAutoUpdater.needBuildInfo();

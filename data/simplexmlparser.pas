@@ -37,9 +37,9 @@ type
   end;
   TProperties=array of TProperty;
 
-  TEnterTagEvent=function (tagName: string; properties: TProperties):boolean of object;
-  TLeaveTagEvent=function (tagName: string):boolean of object;
-  TTextEvent=function (text: string):boolean of object;
+  TEnterTagEvent=function (tagName: string; properties: TProperties):TParsingResult of object;
+  TLeaveTagEvent=function (tagName: string):TParsingResult of object;
+  TTextEvent=function (text: string):TParsingResult of object;
 
 
 //**Perhaps this parses xml data, perhaps it doesn't. Who knows...
@@ -69,9 +69,9 @@ public
   textRead: TTextEvent;
   
   fileEncoding,outputEncoding: TEncoding;
-  function enterTagEvent (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):boolean;
-  function leaveTagEvent(tagName: pchar; tagNameLen: longint):boolean;
-  function textEvent(text: pchar; textLen: longint):boolean;
+  function enterTagEvent (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
+  function leaveTagEvent(tagName: pchar; tagNameLen: longint):TParsingResult;
+  function textEvent(text: pchar; textLen: longint):TParsingResult;
 end;
 
 { THTMLEventHandler }
@@ -83,13 +83,13 @@ begin
 end;
 
 function THTMLEventHandler.enterTagEvent(tagName: pchar; tagNameLen: longint;
-  properties: THTMLProperties): boolean;
+  properties: THTMLProperties): TParsingResult;
 var xmlProperties: TProperties;
     i:longint;
     tn:string;
 begin
-  result:=true;
-  if not assigned(enterTag) then exit(true);
+  result:=prContinue;
+  if not assigned(enterTag) then exit(prContinue);
   setlength(xmlProperties,Length(properties));
   for i := 0 to high(xmlProperties) do begin
     xmlProperties[i].name:=convToStr(properties[i].name,properties[i].nameLen);
@@ -106,16 +106,16 @@ begin
 end;
 
 function THTMLEventHandler.leaveTagEvent(tagName: pchar; tagNameLen: longint
-  ): boolean;
+  ): TParsingResult;
 begin
-  if not assigned(leaveTag) then exit(true);
+  if not assigned(leaveTag) then exit(prContinue);
   result:=leaveTag(convToStr(tagName,tagNameLen));
 end;
 
-function THTMLEventHandler.textEvent(text: pchar; textLen: longint): boolean;
+function THTMLEventHandler.textEvent(text: pchar; textLen: longint): TParsingResult;
 begin
-  result:=true;
-  if not assigned(textRead) then exit(true);
+  result:=prContinue;
+  if not assigned(textRead) then exit();
   result:=textRead(convToStr(text,textLen));
 end;
 
@@ -164,4 +164,4 @@ begin
 end;
 
 end.
-
+
