@@ -89,7 +89,7 @@ type
     //**Should close all connections (doesn't work)
     procedure closeOpenedConnections();virtual;abstract;
     //**Encodes the passed string in the url encoded format
-    function urlEncodeData(data: string): string;
+    class function urlEncodeData(data: string): string;
   end;
   EInternetException=class(Exception)
     details:string;
@@ -286,7 +286,7 @@ begin
   end;
 end;
 
-function TInternetAccess.urlEncodeData(data: string): string;
+class function TInternetAccess.urlEncodeData(data: string): string;
 const ENCODE_TABLE:array[1..19,0..1] of string=(('%','%25'),
                                                (#9,'%09'), //tab
                                                (#10,'%0A'),//new line and carriage return (13,10)
