@@ -211,10 +211,15 @@ function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: bo
 {$ENDIF}
 //**Week of year
 function weekOfYear(const date:TDateTime):word;
-//**Fits a date string to the mask (d or dd for a numerical day, m or mm for a
-//**numerical month, mmm for a short month name, yy or yyyy for the year) @br
-//**Notice that it works if the string is latin-1 or utf-8, and it also uses the German month
-//**names
+//**Reads a date string given a certain mask@br
+//**The uses the same mask types as FormateDate:@br
+//**d or dd for a numerical day  @br
+//**m or mm for a numerical month, mmm for a short month name@br
+//**yy, yyyy or [yy]yy for the year  @br
+//**The letter formats d/y matches one or two digits, the dd/mm/yy formats require exactly two.@br
+//**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4)@br
+//**Notice that [yy]yy may not touch any other format letter, so [yy]yymmdd is an invalid mask. (but [yy]yy.mmdd is fine).
+//**The function works if the string is latin-1 or utf-8, and it also supports German month names
 function parseDate(datestr,mask:string):longint;
 
 const WHITE_SPACE=[#9,#10,#13,' '];
@@ -1044,15 +1049,66 @@ end;
 
 
 function parseDate(datestr,mask:string):longint;
-  procedure invalidMask;
+  procedure matchFailed;
   begin
     raise Exception.Create('Das Datum '+datestr+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
                                    'Mögliche Ursachen: Beschädigung der Installation, Programmierfehler in VideLibri oder Änderung der Büchereiseite.'#13#10+
                                    'Mögliche Lösungen: Neuinstallation, auf Update warten.');
   end;
+  procedure invalidMask (reason:string);
+  begin
+    raise Exception.Create('The mask '+mask+' is invalid (noticed while matching against ' +datestr+') (reason:'+reason+')');
+  end;
 
 var mp,dp,day,month,year:longint;
     MMMstr:string;
+    openBracketCount: longint; //just needed to validate mask
+
+
+    minc, maxc: longint;
+    number: ^longint;
+
+//Reads (x*\[x*\]x*) with x\in{d,y}
+//(why didn't I use a regexp :-( )
+procedure readNumberBlockFromMask();
+var base: char;
+    bracketState: longint;
+begin
+  base:=mask[mp];
+  if mask[mp] = '[' then base:=mask[mp+1];
+  case base of
+    'd': number:=@day;
+    'y': number:=@year;
+    else invalidMask(base)
+  end;
+  minc:=0;
+  maxc:=0;
+  bracketState:=0;
+  while (mp <= length(mask)) and ((mask[mp] = base) or
+                                  ((mask[mp] = '[') and (bracketState=0)) or
+                                  ((mask[mp] = ']') and (bracketState=1))) do begin
+    if mask[mp] = base then begin
+      maxc+=1;
+      if bracketState<>1 then minc+=1;
+    end else bracketState+=1;
+    mp+=1;
+  end;
+  if bracketState=1 then invalidMask('missing ]');
+end;
+
+//Reads \d{minc,maxc}
+procedure readNumberFromDate();
+var read: longint;
+begin
+  read:=0;
+  while (dp <= length(datestr)) and (datestr[dp] in ['0'..'9']) and (read < maxc) do begin
+    number^:=number^*10+(ord(datestr[dp])-ord('0'));
+    read+=1;
+    dp+=1;
+  end;
+  if read < minc then matchFailed;
+end;
+
 begin
   datestr:=trim(datestr)+' ';
   mask:=trim(mask)+' '; //Das letzte Zeichen darf keine Steuerzeichen (d/m/z) sein
@@ -1060,24 +1116,17 @@ begin
   day:=0;
   month:=0;
   year:=0;
+  openBracketCount:=0;
   MMMstr:='';
 
   mp:=1;
   dp:=1;
   while mp<length(mask) do begin
     case mask[mp] of
-      'd': begin //Tag
-        day:=StrToInt(datestr[dp]);
-        dp+=1;
-        if mask[mp+1]='d' then begin
-          mp+=1;
-          day:=day*10+StrToInt(datestr[dp]);
-          dp+=1;
-        end else if datestr[dp] in ['0'..'9'] then begin
-          day:=day*10+StrToInt(datestr[dp]);
-          dp+=1;
-        end;
-        mp+=1;
+      'd', 'y', '[': begin
+        readNumberBlockFromMask();
+        if (number = @day) and (maxc = 1) then maxc:=2; //map 'd' to '[d]d'
+        readNumberFromDate();
       end;
       'm': begin //Monat
         if mask[mp+1] = 'm' then begin
@@ -1092,14 +1141,17 @@ begin
               dp+=1;
             end else if MMMstr='apr' then month:=4
             else if MMMstr='mai' then month:=5
+            else if MMMstr='may' then month:=5
             else if MMMstr='jun' then month:=6
             else if MMMstr='jul' then month:=7
             else if MMMstr='aug' then month:=8
             else if MMMstr='sep' then month:=9
             else if MMMstr='okt' then month:=10
+            else if MMMstr='oct' then month:=10
             else if MMMstr='nov' then month:=11
             else if MMMstr='dez' then month:=12
-            else invalidMask;
+            else if MMMstr='dec' then month:=12
+            else matchFailed;
             dp+=3;
             mp+=3;
           end else begin //mm
@@ -1117,13 +1169,9 @@ begin
           mp+=1;
         end;
       end;
-      'y': begin
-        year:=year*10+StrToInt(datestr[dp]);
-        mp+=1;
-        dp+=1;
-      end;
+      ']': invalidMask('missing [, you can use \] to escape ]');
       else if mask[mp]<>datestr[dp] then
-        invalidMask
+        matchFailed
        else begin
          mp+=1;
          dp+=1;
@@ -1473,8 +1521,8 @@ begin
   else exit(0);
 end;
 procedure unitTests();
-const strs: array[1..6,1..2] of string=(('05.10.1985','dd.mm.yyyy'),('11.7.2005','d.m.yyyy'),('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),('  11 MÃ¤r 1700',' dd mmm yyyy  '));
-      dates: array[1..6, 1..3] of word = ((1985,10,5),(2005,7,11),(2000,1,16),(1989,6,17),(1953,9,29),(1700,3,11));
+const strs: array[1..10,1..2] of string=(('05.10.1985','dd.mm.yyyy'),('05.10.1942','dd.mm.yy[yy]'),('05.10.42','dd.mm.yy[yy]'),('19.10-1942','dd.mm-[yy]yy'),('19.10-90','dd.mm-[yy]yy'), ('11.7.2005','d.m.yyyy'),('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),('  11 MÃ¤r 1700',' dd mmm yyyy  '));
+      dates: array[1..10, 1..3] of word = ((1985,10,5),(1942,10,5),(2042,10,5),(1942,10,19),(1990,10,19),(2005,7,11),(2000,1,16),(1989,6,17),(1953,9,29),(1700,3,11));
 
 var i:longint;
 
@@ -1486,7 +1534,7 @@ begin
   //parse date function
   for i:=1 to high(strs) do
       if parseDate(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
-        raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+DateToStr(parseDate(strs[i,1],strs[i,2])));
+        raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+FormatDateTime('yyyy-mm-dd', parseDate(strs[i,1],strs[i,2])) + ' expected '+FormatDateTime('yyyy-mm-dd',EncodeDate(dates[i,1],dates[i,2],dates[i,3])));
 
   //basic string tests
   if not strliequal('', '', 0) then raise Exception.Create('strliequal failed');
