@@ -104,6 +104,7 @@ function strbeginswith(p:pchar; expectedStart:string):boolean;
 function strbeginswith(str,start:string):boolean;
 function stribeginswith(strToBeExaminated,expectedStart:string):boolean;
 function striendswith(strToBeExaminated,expectedEnd:string):boolean;
+function strcontains(str,searched:string):boolean;
 
 //search
 function strrpos(c:char;s:string):longint;
@@ -124,6 +125,8 @@ function strSplitGet(const separator: string; var remainingPart: string):string;
 procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
 //**Splits the string s into the array splitted at every occurence of c
 procedure strSplit(out splitted: TStringArray;s:string;c:char;includeEmpty:boolean=true);overload;
+//**Splits the string s into the array splitted at every occurence of c
+function strSplit(s:string;c:char;includeEmpty:boolean=true):TStringArray;overload;
 
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
 
@@ -489,6 +492,11 @@ begin
   else result:=strliequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],expectedEnd,length(expectedEnd));
 end;
 
+function strcontains(str, searched: string): boolean;
+begin
+  result:=pos(searched, str) > 0;
+end;
+
 function strcopyfrom(s: string; start: longint): string; inline;overload;
 begin
   result:=copy(s,start,length(s)-start+1);
@@ -594,6 +602,11 @@ begin
     result[high(result)]:=s;
   end;
   splitted:=result;
+end;
+
+function strSplit(s: string; c: char; includeEmpty: boolean): TStringArray;
+begin
+  strSplit(result, s, c, includeEmpty);
 end;
 
 //based on wikipedia
