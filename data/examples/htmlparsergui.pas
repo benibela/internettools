@@ -96,6 +96,7 @@ begin
     tp.parsingModel:=pmHTML;
     tp.parseTree(memo2.Lines.Text);
     ppath.ParentElement := tp.getTree;
+    ppath.RootElement := tp.getTree;
     memo3.Lines.Text:=ppath.evaluate();
   finally
     ppath.Free;

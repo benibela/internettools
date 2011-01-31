@@ -549,6 +549,8 @@ begin
   else FVariableLog.text := Fvariables.text;
   variableLogStart := FVariableLog.Count;
 
+  FPseudoXPath.RootElement := FHTML.getTree;
+
   result:=matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
 
   if not result and FParsingExceptions then begin
@@ -653,7 +655,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..85] of array[1..3] of string = (
+var data: array[1..89] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -811,6 +813,20 @@ var data: array[1..85] of array[1..3] of string = (
   ('<a><pre><htmlparser:read source="text()" var="test2"/></pre><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>',
    '<a><pre>not called at all</pre><x>Test:<b>in b</b><c>in c</c>!</x></a>',
    'test2=not called at all'#13'test1=Test:'#13'test2=Test:in bin c!'),
+//root node()
+('<a><x htmlparser-optional="true"><htmlparser:read source="/a/lh/text()" var="test"/></x></a>',
+'<a><lb>ab</lb><x>mia</x><lh>xy</lh></a>',
+'test=xy'),
+('<a><x htmlparser-optional="true"><htmlparser:read source="/a/lh/text()" var="test"/></x></a>',
+'<a><lb>ab</lb><lh>xy</lh></a>',
+''),
+('<a><x htmlparser-optional="true"><htmlparser:read source="/a/lb/text()" var="test"/></x></a>',
+'<a><lb>ab</lb><x>mia</x><lh>xy</lh></a>',
+'test=ab'),
+//Search
+('<a><x><htmlparser:read source="//lh/text()" var="test"/></x></a>',
+'<a><lb>ab</lb><x>mia</x><lh>xy</lh></a>',
+'test=xy'),
  //html script tags containing <
    ('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>',
    '<a><script>abc<def</script><b>test<b></a>',
