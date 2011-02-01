@@ -25,7 +25,7 @@ TTreeElementType = (tetOpen, tetClose, tetText, tetComment);
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
 //**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
-TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensitive, tefoNoDescend);
+TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensitive, tefoNoChildren, tefoNoGrandChildren);
 
 { TTreeElement }
 
@@ -55,7 +55,9 @@ TTreeElement = class
   //**Returns the element with the given type and text which occurs before sequenceEnd.@br
   //**This function is nil-safe, so if you call TTreeElement(nil).findNext(...) it will return nil
   function findNext(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]; sequenceEnd: TTreeElement = nil):TTreeElement;
-  //**Find a matching direct child (equivalent to findNext with certain parameters, but easier to use)
+  //**Find a matching direct child (equivalent to findNext with certain parameters, but easier to use)@br
+  //**A direct child of X is a node Y with Y.parent = X. @br
+  //**The options tefoNoChildren, tefoNoGrandChildren have of course no effect. (former is set to false, latter to true)
   function findChild(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]): TTreeElement;
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
@@ -192,14 +194,15 @@ begin
       result := result.findNext(tetOpen, strSplitGet('/', withText), findOptions - [tefoSplitSlashes], result.reverse);
     exit();
   end;}
-  cur := self.next;
+  if (tefoNoChildren in findOptions) and (self.typ = tetOpen) then cur := self.reverse
+  else cur := self.next;
   while (cur <> nil) and (cur <> sequenceEnd) do begin
     if ((cur.typ = withTyp) or (tefoIgnoreType in findOptions)) and
        ((tefoIgnoreText in findOptions) or
            ( (tefoCaseSensitive in findOptions) and (cur.value = withText) ) or
            ( not (tefoCaseSensitive in findOptions) and (striequal(cur.value, withText) ) ) ) then
              exit(cur);
-    if (tefoNoDescend in findOptions) and (cur.typ = tetOpen) then cur := cur.reverse
+    if (tefoNoGrandChildren in findOptions) and (cur.typ = tetOpen) then cur := cur.reverse
     else cur := cur.next;
   end;
   result := nil;
@@ -212,7 +215,7 @@ begin
   if self = nil then exit;
   if typ <> tetOpen then exit;
   if reverse = nil then exit;
-  result:=findNext(withTyp, withText, findOptions + [tefoNoDescend], reverse);
+  result:=findNext(withTyp, withText, findOptions + [tefoNoGrandChildren] - [tefoNoChildren], reverse);
 end;
 
 function TTreeElement.deepNodeText(separator: string): string;
@@ -294,6 +297,7 @@ begin
         result+='>';
     end;
     tetComment: exit('<!--'+value+'-->');
+    else exit('??');
   end;
 end;
 
