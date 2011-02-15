@@ -128,6 +128,15 @@ procedure strSplit(out splitted: TStringArray;s:string;c:char;includeEmpty:boole
 //**Splits the string s into the array splitted at every occurence of c
 function strSplit(s:string;c:char;includeEmpty:boolean=true):TStringArray;overload;
 
+//**Joins all string list items to a single string separated by @code(sep).@br
+//**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
+//**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
+function strJoin(const sl: TStrings; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
+//**Joins all string list items to a single string separated by @code(sep).@br
+//**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
+//**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
+function strJoin(const sl: TStringArray; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
+
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
 
 
@@ -178,6 +187,7 @@ procedure intFactor(n,p: longint; out e, r:longint);
 
 function gcd(a,b: cardinal): cardinal;
 function coprime(a,b:cardinal): boolean;
+function modPow(i, e, m: int64): int64;
 function factorial(i:longint):float;
 function binomial(n,k: longint): float;
 //probability
@@ -194,8 +204,8 @@ function binomialProbability(n:longint;p:float;k:longint):float; //P(X = k)
 function binomialProbabilityGE(n:longint;p:float;k:longint):float; //P(X >= k)
 //**probability: P(X <= k) where X is binomial distributed with n possible values
 function binomialProbabilityLE(n:longint;p:float;k:longint):float; //P(X <= k)
-//**probability: P(X >= µ + d or X <= µ - d) where X is binomial distributed with n possible values
-function binomialProbabilityDeviationOf(n:longint;p:float;dif:float):float; //P(X >= µ + d or X <= µ - d)
+//**probability: P(X >= mu + d or X <= mu - d) where X is binomial distributed with n possible values
+function binomialProbabilityDeviationOf(n:longint;p:float;dif:float):float; //P(X >= ï¿½ + d or X <= ï¿½ - d)
 //**expectated value of a binomial distribution (approximates the value with either Poisson or
 //**Moivre and Laplace, depending on the variance of the distribution) @seealso(binomialProbability))
 function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
@@ -203,7 +213,7 @@ function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
 function binomialZScore(n:longint;p:float;k:longint):float;
 
 //**This calculates the euler phi function totient[i] := phi(i) = {1 <= j <= i | gcd(i,j) = 0} for all i <= n.@br
-//**It uses sieve approach and is quite fast (10^7 in 3s)@br
+//**It uses a sieve approach and is quite fast (10^7 in 3s)@br
 //**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
 procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
 
@@ -769,6 +779,52 @@ begin
 end;
 
 
+function strJoin(const sl: TStrings; const sep: string; limit: Integer=0; const limitStr: string='...'): string;
+var i:longint;
+begin
+  Result:='';
+  if sl.Count=0 then exit;
+  result:=sl[0];
+  if (limit = 0) or (sl.count <= abs(limit)) then begin
+    for i:=1 to sl.Count-1 do
+      result+=sep+sl[i];
+  end else if limit > 0 then begin
+    for i:=1 to limit-1 do
+      result+=sep+sl[i];
+    result+=limitStr;
+  end else begin
+    for i:=1 to (-limit-1) div 2 do
+      result+=sep+sl[i];
+    result+=sep+limitStr;
+    for i:=sl.Count - (-limit) div 2 to sl.Count-1 do
+      result+=sep+sl[i];
+  end;
+end;
+
+function strJoin(const sl: TStringArray; const sep: string; limit: Integer;
+ const limitStr: string): string;
+var i:longint;
+begin
+  Result:='';
+  if length(sl)=0 then exit;
+  result:=sl[0];
+  if (limit = 0) or (length(sl) <= abs(limit)) then begin
+    for i:=1 to high(sl) do
+      result+=sep+sl[i];
+  end else if limit > 0 then begin
+    for i:=1 to limit-1 do
+      result+=sep+sl[i];
+    result+=limitStr;
+  end else begin
+    for i:=1 to (-limit-1) div 2 do
+      result+=sep+sl[i];
+    result+=sep+limitStr;
+    for i:=length(sl) - (-limit) div 2 to high(sl) do
+      result+=sep+sl[i];
+  end;
+end;
+
+
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
 
 Var
@@ -842,7 +898,7 @@ end;
 function intLog10(i: longint): longint;
 begin
   result:=0;
-  while i >=1 do begin
+  while i >=10 do begin
     result+=1;
     i:=i div 10;
   end;
@@ -851,9 +907,9 @@ end;
 function intLog(n, b: longint): longint;
 begin
   result:=0;
-  while n >=1 do begin
+  while n >=b do begin
     result+=1;
-    b:=n div b;
+    n:=n div b;
   end;
 end;
 
@@ -887,6 +943,20 @@ begin
     if (a mod i = 0) and (b mod i = 0) then
       exit(false);
   result:=true;
+end;
+
+function modPow(i, e, m: int64): int64;
+var c,p: Int64;
+begin
+  c := i;
+  p := 1;
+  result := 1;
+  while p <= e do begin
+    if  (e and p) <> 0 then
+      Result := (Result*c) mod m;
+    p := 2*p;
+    c := (c*c) mod m;
+  end;
 end;
 
 //========================mathematical functions========================
@@ -1028,7 +1098,7 @@ begin
 end;
 
 function weekOfYear(const date:TDateTime):word;
-//After Claus Tøndering
+//After Claus Tï¿½ndering
 
 var a,b,c,s,e,f,g,d,n: longint;
     month, day, year: word;
@@ -1065,8 +1135,8 @@ function parseDate(datestr,mask:string):longint;
   procedure matchFailed;
   begin
     raise Exception.Create('Das Datum '+datestr+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
-                                   'Mögliche Ursachen: Beschädigung der Installation, Programmierfehler in VideLibri oder Änderung der Büchereiseite.'#13#10+
-                                   'Mögliche Lösungen: Neuinstallation, auf Update warten.');
+                                   'MÃ¶gliche Ursachen: BeschÃ¤digung der Installation, Programmierfehler in VideLibri oder Ã„nderung der BÃ¼chereiseite.'#13#10+
+                                   'MÃ¶gliche LÃ¶sungen: Neuinstallation, auf Update warten.');
   end;
   procedure invalidMask (reason:string);
   begin
@@ -1148,8 +1218,8 @@ begin
             if MMMstr='jan' then month:=1
             else if MMMstr='feb' then month:=2
             else if MMMstr='mar' then month:=3
-            else if MMMstr='mär' then month:=3
-            else if (MMMstr='mÃ¤') and (datestr[dp+3]='r') then begin
+            else if MMMstr='m'#$E4'r' then month:=3
+            else if (MMMstr='m'#$C3#$A4) and (datestr[dp+3]='r') then begin
               month:=3;
               dp+=1;
             end else if MMMstr='apr' then month:=4
@@ -1560,8 +1630,8 @@ begin
   if strGetUnicodeCharacter($C4) <> #$C3#$84 then raise Exception.Create('strGetUnicodeCharacter failed, 1');
 
   //string conversion
-  if strConvertToUtf8('a?=ßä',eUTF8)<>'a?=ßä' then raise Exception.Create('Non conversion failed');
-  if strConvertFromUtf8('a?=ßä',eUTF8)<>'a?=ßä' then raise Exception.Create('Non conversion failed');
+  if strConvertToUtf8('a?=ÃŸÃ¤'#$DF,eUTF8)<>'a?=ÃŸÃ¤'#$DF then raise Exception.Create('Non conversion failed');
+  if strConvertFromUtf8('a?=ÃŸÃ¤'#$DF,eUTF8)<>'a?=ÃŸÃ¤'#$DF then raise Exception.Create('Non conversion failed');
   if strConvertToUtf8('abcdef',eWindows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
   if strConvertFromUtf8('abcdef',eWindows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
   if strConvertToUtf8('ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo',eWindows1252)<>'ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo' then
@@ -1583,24 +1653,24 @@ begin
   //test 8 bit
   ar8[0]:=7; ar8[1]:=4; ar8[2]:=5; ar8[3]:=9; ar8[4]:=1; ar8[5]:=2; ar8[6]:=-8;
   stableSort(@ar8[0],@ar8[6],sizeof(byte),@shortintCompareFunction,nil);
-  if ar8[0]<>-8 then raise exception.create('Unit Test B:0 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar8[1]<>1 then raise exception.create('Unit Test B:1 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar8[2]<>2 then raise exception.create('Unit Test B:2 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar8[3]<>4 then raise exception.create('Unit Test B:3 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar8[4]<>5 then raise exception.create('Unit Test B:4 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar8[5]<>7 then raise exception.create('Unit Test B:5 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar8[6]<>9 then raise exception.create('Unit Test B:6 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[0]<>-8 then raise exception.create('Unit Test B:0 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[1]<>1 then raise exception.create('Unit Test B:1 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[2]<>2 then raise exception.create('Unit Test B:2 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[3]<>4 then raise exception.create('Unit Test B:3 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[4]<>5 then raise exception.create('Unit Test B:4 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[5]<>7 then raise exception.create('Unit Test B:5 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar8[6]<>9 then raise exception.create('Unit Test B:6 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
 
   //test 32 bit sort
   ar32[0]:=7; ar32[1]:=4; ar32[2]:=5; ar32[3]:=9; ar32[4]:=1; ar32[5]:=2; ar32[6]:=-8;
   stableSort(@ar32[0],@ar32[6],sizeof(longint),@intCompareFunction,nil);
-  if ar32[0]<>-8 then raise exception.create('Unit Test B:0 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar32[1]<>1 then raise exception.create('Unit Test B:1 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar32[2]<>2 then raise exception.create('Unit Test B:2 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar32[3]<>4 then raise exception.create('Unit Test B:3 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar32[4]<>5 then raise exception.create('Unit Test B:4 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar32[5]<>7 then raise exception.create('Unit Test B:5 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar32[6]<>9 then raise exception.create('Unit Test B:6 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[0]<>-8 then raise exception.create('Unit Test B:0 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[1]<>1 then raise exception.create('Unit Test B:1 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[2]<>2 then raise exception.create('Unit Test B:2 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[3]<>4 then raise exception.create('Unit Test B:3 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[4]<>5 then raise exception.create('Unit Test B:4 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[5]<>7 then raise exception.create('Unit Test B:5 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar32[6]<>9 then raise exception.create('Unit Test B:6 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
 
   //test merging
   for i:=0 to 100 do //backwar32d sorted
@@ -1608,18 +1678,18 @@ begin
   stableSort(@ar32[0],@ar32[100],sizeof(longint),@intCompareFunction,nil);
   for i:=0 to 100 do
     if ar32[i]<>i*10 then
-      raise exception.create('Unit Test B:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
+      raise exception.create('Unit Test B:'+inttostr(i)+' fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
 
   //test 64 bit
   ar64[0]:=7; ar64[1]:=4; ar64[2]:=5; ar64[3]:=9; ar64[4]:=1; ar64[5]:=2; ar64[6]:=-8;
   stableSort(@ar64[0],@ar64[6],sizeof(int64),@int64CompareFunction,nil);
-  if ar64[0]<>-8 then raise exception.create('Unit Test C:0 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar64[1]<>1 then raise exception.create('Unit Test C:1 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar64[2]<>2 then raise exception.create('Unit Test C:2 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar64[3]<>4 then raise exception.create('Unit Test C:3 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar64[4]<>5 then raise exception.create('Unit Test C:4 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar64[5]<>7 then raise exception.create('Unit Test C:5 für stableSort  in Unit bbutils fehlgeschlagen');
-  if ar64[6]<>9 then raise exception.create('Unit Test C:6 für stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[0]<>-8 then raise exception.create('Unit Test C:0 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[1]<>1 then raise exception.create('Unit Test C:1 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[2]<>2 then raise exception.create('Unit Test C:2 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[3]<>4 then raise exception.create('Unit Test C:3 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[4]<>5 then raise exception.create('Unit Test C:4 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[5]<>7 then raise exception.create('Unit Test C:5 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
+  if ar64[6]<>9 then raise exception.create('Unit Test C:6 fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
 
   //test merging
   for i:=0 to 100 do //backward sorted
@@ -1627,7 +1697,7 @@ begin
   stableSort(@ar64[0],@ar64[100],sizeof(int64),@int64CompareFunction,nil);
   for i:=0 to 100 do
     if ar64[i]<>i*10 then
-      raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
+      raise exception.create('Unit Test C:'+inttostr(i)+' fÃ¼r stableSort  in Unit bbutils fehlgeschlagen');
 end;
 
 initialization
