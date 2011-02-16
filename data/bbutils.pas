@@ -88,6 +88,8 @@ function arrayAddFast(var a: TStringArray; var len: longint; const e: string): l
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
 
+//**Find element e in the array/slice (see above)
+function arrayIndexOf(const a: TStringArray; const e: string; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
 function arrayIndexOfSmallest(const a: TStringArray; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
@@ -112,6 +114,8 @@ function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint):
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
 
+//**Find element e in the array/slice (see above)
+function arrayIndexOf(const a: TLongintArray; const e: longint; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
 function arrayIndexOfSmallest(const a: TLongintArray; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
@@ -136,6 +140,8 @@ function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
 
+//**Find element e in the array/slice (see above)
+function arrayIndexOf(const a: TLongwordArray; const e: longword; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
 function arrayIndexOfSmallest(const a: TLongwordArray; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
@@ -160,6 +166,8 @@ function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): lon
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
 
+//**Find element e in the array/slice (see above)
+function arrayIndexOf(const a: TInt64Array; const e: int64; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
 function arrayIndexOfSmallest(const a: TInt64Array; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
@@ -184,6 +192,8 @@ function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): lon
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
 
+//**Find element e in the array/slice (see above)
+function arrayIndexOf(const a: TFloatArray; const e: float; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
 function arrayIndexOfSmallest(const a: TFloatArray; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
@@ -557,6 +567,17 @@ begin
   end;
 end;
 
+function arrayIndexOf(const a: TStringArray; const e: string;
+ slice1: integer; slice2: integer): integer;
+var i:longint;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  for i:=slice1 to slice2 do
+    if a[i] = e then
+      exit(i);
+  result:=-1;
+end;
+
 function arrayIndexOfSmallest(const a: TStringArray; slice1, slice2: integer): integer;
 var i:longint;
 begin
@@ -645,6 +666,17 @@ begin
     slice2 := slice1;
     slice1 := 0;
   end;
+end;
+
+function arrayIndexOf(const a: TLongintArray; const e: longint;
+ slice1: integer; slice2: integer): integer;
+var i:longint;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  for i:=slice1 to slice2 do
+    if a[i] = e then
+      exit(i);
+  result:=-1;
 end;
 
 function arrayIndexOfSmallest(const a: TLongintArray; slice1, slice2: integer): integer;
@@ -737,6 +769,17 @@ begin
   end;
 end;
 
+function arrayIndexOf(const a: TLongwordArray; const e: longword;
+ slice1: integer; slice2: integer): integer;
+var i:longint;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  for i:=slice1 to slice2 do
+    if a[i] = e then
+      exit(i);
+  result:=-1;
+end;
+
 function arrayIndexOfSmallest(const a: TLongwordArray; slice1, slice2: integer): integer;
 var i:longint;
 begin
@@ -827,6 +870,17 @@ begin
   end;
 end;
 
+function arrayIndexOf(const a: TInt64Array; const e: int64;
+ slice1: integer; slice2: integer): integer;
+var i:longint;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  for i:=slice1 to slice2 do
+    if a[i] = e then
+      exit(i);
+  result:=-1;
+end;
+
 function arrayIndexOfSmallest(const a: TInt64Array; slice1, slice2: integer): integer;
 var i:longint;
 begin
@@ -915,6 +969,17 @@ begin
     slice2 := slice1;
     slice1 := 0;
   end;
+end;
+
+function arrayIndexOf(const a: TFloatArray; const e: float;
+ slice1: integer; slice2: integer): integer;
+var i:longint;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  for i:=slice1 to slice2 do
+    if a[i] = e then
+      exit(i);
+  result:=-1;
 end;
 
 function arrayIndexOfSmallest(const a: TFloatArray; slice1, slice2: integer): integer;
@@ -7113,6 +7178,12 @@ begin
   test(arrayIndexOfLargest(a) = 1);
   test(arrayIndexOfSmallest(a,0,1) = 0);
   test(arrayIndexOfLargest(a,0,0) = 0);
+  test(arrayIndexOf(a, 23) = 1);
+  test(arrayIndexOf(a, -42) = 2);
+  test(arrayIndexOf(a, 42) = -1);
+  test(arrayIndexOf(a, 17) = 0);
+  test(arrayIndexOf(a, 17, 1, 2) = -1);
+  test(arrayIndexOf(a, 23, 1, 2) = 1);
 
   arrayDelete(a, 0);
   test(length(a) =2); test(a[0] = -42); test(a[1] = 23);

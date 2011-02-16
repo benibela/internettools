@@ -105,6 +105,8 @@ function arrayAddFast(var a: T__ArrayType__; var len: longint; const e: T__Eleme
 //**Returns e=a[i]
 function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint):T__ElementType__; overload;
 
+//**Find element e in the array/slice (see above)
+function arrayIndexOf(const a: T__ArrayType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
 function arrayIndexOfSmallest(const a: T__ArrayType__; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
@@ -459,6 +461,17 @@ begin
     slice2 := slice1;
     slice1 := 0;
   end;
+end;
+
+function arrayIndexOf(const a: T__ArrayType__; const e: T__ElementType__;
+ slice1: integer; slice2: integer): integer;
+var i:longint;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  for i:=slice1 to slice2 do
+    if a[i] = e then
+      exit(i);
+  result:=-1;
 end;
 
 function arrayIndexOfSmallest(const a: T__ArrayType__; slice1, slice2: integer): integer;
@@ -1883,6 +1896,12 @@ begin
   test(arrayIndexOfLargest(a) = 1);
   test(arrayIndexOfSmallest(a,0,1) = 0);
   test(arrayIndexOfLargest(a,0,0) = 0);
+  test(arrayIndexOf(a, 23) = 1);
+  test(arrayIndexOf(a, -42) = 2);
+  test(arrayIndexOf(a, 42) = -1);
+  test(arrayIndexOf(a, 17) = 0);
+  test(arrayIndexOf(a, 17, 1, 2) = -1);
+  test(arrayIndexOf(a, 23, 1, 2) = 1);
 
   arrayDelete(a, 0);
   test(length(a) =2); test(a[0] = -42); test(a[1] = 23);
