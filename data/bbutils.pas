@@ -5,29 +5,45 @@ Copyright (C) 2008 Benito van der Zander (BeniBela)
                    benito@benibela.de
                    www.benibela.de
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+This file is distributed under under the same license as Lazarus and the LCL itself:
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+This file is distributed under the Library GNU General Public License
+with the following modification:
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent modules,
+and to copy and distribute the resulting executable under terms of your choice,
+provided that you also meet, for each linked independent module, the terms
+and conditions of the license of that module. An independent module is a
+module which is not derived from or based on this library. If you modify this
+library, you may extend this exception to your version of the library, but
+you are not obligated to do so. If you do not wish to do so, delete this
+exception statement from your version.
 
 }
-{**
-  @abstract(This unit contains some basic functions I'm missing in fpc)
 
-  The str* functions work on pchar, so you can use them for latin1 and utf-8.
-  strl means the length is given, str?i means the function is case insensitive
+(***
+  
+
+  @abstract(This unit contains some basic functions missing in fpc)@br
+
+  It uses the following naming convention:@br
+  @br
+  All functions starting with @code(str) are related to strings and work on ansistring or pchar,
+  so you can use them for latin1 and utf-8.@br
+  The prefix @code(strl) means the string length is given, @code(str?i) means the function is case insensitive@br
+  @br@br
+  The prefix @code(array) means the function works with dynamical arrays.@br
+  If the suffix @code(Fast) is given, the length of the array is different of the count of contained elements i.e.
+  the standard length is actually a capacity so you can resize it without reallocating the array.@br
+  Some array functions have two optional slice parameters: if you give none of them the function will affect the whole
+  array; if you give one of them, the function will affect elements in the inclusive interval [0, slice] and if you give both,
+  it will affect elements in the inclusive interval [slice1, slice2].
 
   @author Benito van der Zander, (http://www.benibela.de)
 
-}
+*)
 
 
 unit bbutils;
@@ -44,7 +60,7 @@ uses
   , windows
   {$ENDIF};
 
-//{$DEFINE UNITTESTS}
+{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
@@ -64,6 +80,7 @@ function arrayAdd(var a: TStringArray; const e: string):longint; overload;
 //**Returns e=a[i]
 function arrayDelete(var a: TStringArray; const i: longint):string; overload;
 
+//**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint;
@@ -87,6 +104,7 @@ function arrayAdd(var a: TLongintArray; const e: longint):longint; overload;
 //**Returns e=a[i]
 function arrayDelete(var a: TLongintArray; const i: longint):longint; overload;
 
+//**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TLongintArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint): longint;
@@ -110,6 +128,7 @@ function arrayAdd(var a: TLongwordArray; const e: longword):longint; overload;
 //**Returns e=a[i]
 function arrayDelete(var a: TLongwordArray; const i: longint):longword; overload;
 
+//**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TLongwordArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword): longint;
@@ -133,6 +152,7 @@ function arrayAdd(var a: TInt64Array; const e: int64):longint; overload;
 //**Returns e=a[i]
 function arrayDelete(var a: TInt64Array; const i: longint):int64; overload;
 
+//**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TInt64Array; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): longint;
@@ -156,6 +176,7 @@ function arrayAdd(var a: TFloatArray; const e: float):longint; overload;
 //**Returns e=a[i]
 function arrayDelete(var a: TFloatArray; const i: longint):float; overload;
 
+//**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TFloatArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): longint;
@@ -175,32 +196,32 @@ procedure arrayInvert(a: TFloatArray; slice1: integer = -1;slice2: integer = -1)
 
 //-----------------------Conditional additions------------------------
 
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b: integer): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b, c: integer): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a: array of integer): boolean;
 
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b: cardinal): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b, c: cardinal): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a: array of cardinal): boolean;
 
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b: string): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b, c: string): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a: array of string): boolean;
 
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b: int64): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b, c: int64): boolean;
-//**Checks if all elements are pairwise unequal
+//**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a: array of int64): boolean;
 
 
@@ -224,35 +245,66 @@ type
   TEncoding=(eUnknown,eWindows1252,eUTF8);
 
 //copy
+//**Copies min(sourceLen, destLen) characters from source to dest and returns dest
 function strlmove(dest,source:pchar;destLen,sourceLen: longint):pchar;
+//**Copies min(sourceLen, destLen) characters from source to dest and returns dest
 function widestrlmove(dest,source:pwidechar;destLen,sourceLen: longint):pwidechar;
-function strcopyfrom(s:string; start:longint):string;inline;
-function strslice(first,last:pchar):string;
-function strslice(s:string; start,last:longint):string;
+//**Returns the substring of s containing all characters after start (including s[start]
+function strCopyFrom(const s:string; start:longint):string;inline;
+//**Returns a string with all characters between first and last (including first, last)
+function strSlice(const first,last:pchar):string;
+//**Returns a string with all characters between start and last (including start, last)
+function strSlice(const s:string; start,last:longint):string;
 
 //comparison
-function strlequal(p1,p2:pchar;l1,l2: longint):boolean;
-function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
-function strliequal(p:pchar;s:string;l: longint):boolean;
-function striequal(s1,s2:string):boolean;
-function strlbeginswith(p:pchar; l:longint; expectedStart:string):boolean;
-function strlibeginswith(p:pchar;l: longint;s:string):boolean;
-function strbeginswith(p:pchar; expectedStart:string):boolean;
-function strbeginswith(str,start:string):boolean;
-function stribeginswith(strToBeExaminated,expectedStart:string):boolean;
-function striendswith(strToBeExaminated,expectedEnd:string):boolean;
-function strcontains(str,searched:string):boolean;
+
+//all pchar<->pchar comparisons are null-terminated (except strls.. functions with length-strict)
+//all pchar<->string comparisons are null-terminated iff the string doesn't contain #0 characters
+
+//length limited
+function strlEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strlsEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsiEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlEqual(p:pchar;const s:string; l: longint):boolean; //**< Tests if the strings are case-sensitive equal (same length and same characters)
+function strliEqual(p:pchar;const s:string;l: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters)
+function strlBeginsWith(const p:pchar; l:longint; const expectedStart:string):boolean; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-sensitive)
+function strliBeginsWith(const p:pchar;l: longint;const expectedStart:string):boolean; inline; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-insensitive)
+
+
+//not length limited
+function striEqual(const s1,s2:string):boolean; inline;//**< Tests if the strings are case-insensitive equal (same length and same characters)
+function strBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
+function striBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
+function strBeginsWith(const strToBeExaminated,expectedStart:string):boolean; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
+function striBeginsWith(const strToBeExaminated,expectedStart:string):boolean; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
+function strEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
+function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
 
 //search
-function strrpos(c:char;s:string):longint;
-function strlcount(const search:char; const searchIn:pchar; const len: longint): longint;
+//**Searchs the last index of c in s
+function strRpos(c:char;s:string):longint;
+//**Counts all occurences of search in searchIn (case sensitive, stops at #0)
+function strlCount(const search:char; const searchIn:pchar; const len: longint): longint;
+//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strIndexOf(const str,searched:string):longint; inline;
+//**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
+function striIndexOf(const str,searched:string):longint; inline;
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strContains(const str,searched:string):boolean; inline;
+//**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
+function striContains(const str,searched:string):boolean; inline;
 
 //more specialized
 type TCharSet = set of char;
 //**Removes all occurences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrimLeft(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+//**Removes all occurences of trimCharacter from the left/right side of the string@br
+//**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrimRight(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+//**Removes all occurences of trimCharacter from the left/right side of the string@br
+//**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrim(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
 
 //**Removes all occurences of trimCharacter from the left/right side of the string
@@ -280,8 +332,8 @@ function strJoin(const sl: TStrings; const sep: string = ', '; limit: Integer=0;
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
 function strJoin(const sl: TStringArray; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
 
-function StrToBoolDef(const S: string;const Def:Boolean): Boolean; //exists in FPC2.2
-
+//**Converts a str to a bool (for fpc versions previous 2.2)
+function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
 
 //**loads a file as string. The filename is directly passed to the fpc rtl and uses the system
 //**encoding @seealso(strLoadFromFileUTF8)
@@ -304,19 +356,23 @@ function strFromSIze(size: int64):string;
 //**A similar function exists in lclproc, but this unit should be independent of the lcl to make it easier to compile with fpc on the command line@br
 //**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
 function strLengthUtf8(str: string): longint;
-function strConvertToUtf8(str: string; from: TEncoding): string;
-function strConvertFromUtf8(const str: string; toe: TEncoding): string;
-function strChangeEncoding(const str: string; from,toe: TEncoding):string;
-function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string;
-function strEncodingFromName(str:string):TEncoding;
+function strConvertToUtf8(str: string; from: TEncoding): string; //**< Returns a utf-8 string from the string in encoding @code(from)
+function strConvertFromUtf8(const str: string; toe: TEncoding): string; //**< Converts a utf-8 string to the encoding @code(from)
+function strChangeEncoding(const str: string; from,toe: TEncoding):string; //**< Changes the string encoding from @code(from) to @code(toe)
+function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string; //**< Get unicode character @code(character) in a certain encoding
+function strEncodingFromName(str:string):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
 function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
+//**This decodes all html entities to the given encoding. If strict is not set
+//**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
+//**even if it contains rogue &).
 function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = false):string;
 //**Returns the first l bytes of p (copies them so O(n))
 function strFromPchar(p:pchar;l:longint):string;
 
+//**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
 
 //----------------Mathematical functions-------------------------------
@@ -328,15 +384,15 @@ function intLog(n,b: longint): longint; overload;
 //**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
 procedure intFactor(n,p: longint; out e, r:longint);
 
-function gcd(a,b: cardinal): cardinal;
-function coprime(a,b:cardinal): boolean;
+function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
+function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
 
-function modPow(i, e, m: longint): longint;
+function modPow(i, e, m: longint): longint; //**< Calculates i^e mod m in O(log(e)) and never exceeding m
 
-function modPow(i, e, m: int64): int64;
+function modPow(i, e, m: int64): int64; //**< Calculates i^e mod m in O(log(e)) and never exceeding m
 
-function factorial(i:longint):float;
-function binomial(n,k: longint): float;
+function factorial(i:longint):float; //**< Calculates i!
+function binomial(n,k: longint): float;//**< Calculates n|k = n!/k!(n-k)!
 //probability
 //**expectated value of a binomial distribution
 function binomialExpectation(n:longint;p:float):float;
@@ -1044,76 +1100,166 @@ begin
   result:=dest;
 end;
 
+//---------------------Comparison----------------------------
+//--Length-limited
+//Length limited && null terminated
+//equal comparison, case sensitive, stopping at #0-bytes
 function strlequal(p1,p2:pchar;l1,l2: longint):boolean;
+begin
+  result:=(l1=l2) and (strlcomp(p1, p2,l1) = 0);
+end;
+
+//equal comparison, case insensitive, stopping at #0-bytes
+function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
+begin
+  result:=(l1=l2) and (strlicomp(p1,p2,l1)=0);
+end;
+
+//equal comparison, case sensitive, ignoring #0-bytes
+function strlsequal(p1,p2:pchar;l1,l2: longint):boolean;
 var i:integer;
 begin
   result:=l1=l2;
   if not result then exit;
   for i:=0 to l1-1 do
-    if p1[i]<>p2[i] then begin
-      result:=false;
-      exit;
-    end;
-end;
-function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
-begin
-  result:=(l1=l2) and (strlicomp(p1,p2,l1)=0);
-end;
-function strliequal(p: pchar; s:string;l: longint): boolean;
-begin
-  result:=(l=length(s)) and ((l =0) or (strlicomp(p,pchar(pointer(s)),l)=0));
+    if p1[i]<>p2[i] then
+      exit(false);
 end;
 
-function striequal(s1, s2: string): boolean;
+//equal comparison, case insensitive, ignoring #0-bytes
+function strlsiequal(p1, p2: pchar; l1, l2: longint): boolean;
+var i:integer;
+begin
+  result:=l1=l2;
+  if not result then exit;
+  for i:=0 to l1-1 do
+    if upcase(p1[i])<>upCase(p2[i]) then
+      exit(false);
+end;
+
+
+//equal comparison, case sensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
+function strlnsequal(p1,p2:pchar;l2: longint):boolean;
+var i:integer;
+begin
+  for i:=0 to l2-1 do begin
+    if p1[i]<>p2[i] then
+      exit(false);
+    if p1[i]=#0 then
+      exit(i = l2-1)
+  end;
+  result:=true;
+end;
+
+//equal comparison, case insensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
+function strlnsiequal(p1,p2:pchar;l2: longint):boolean;
+var i:integer;
+begin
+  for i:=0 to l2-1 do begin
+    if upcase(p1[i])<>upcase(p2[i]) then
+      exit(false);
+    if p1[i]=#0 then
+      exit(i = l2-1)
+  end;
+  result:=true;
+end;
+
+
+function strlsequal(p: pchar; const s: string; l: longint): boolean;
+begin
+  result:=(l = length(s)) and ((l = 0) or (strlsequal(p, pchar(pointer(s)),l,l)));
+end;
+
+
+function strlequal(p: pchar; const s: string; l: longint): boolean;
+begin
+  result := (l = length(s)) and ( (l = 0) or strlsequal(p, pchar(pointer(s)), l, l));
+end;
+
+function strliequal(p: pchar; const s:string;l: longint): boolean;
+begin
+  result := (l = length(s)) and ( (l = 0) or strlsiequal(p, pchar(pointer(s)), l, l));
+end;
+
+
+
+
+function striequal(const s1, s2: string): boolean;
 begin
   result:=CompareText(s1,s2)=0;
 end;
 
-function strlbeginswith(p: pchar; l: longint; expectedStart: string): boolean;
+function strlbeginswith(const p: pchar; l: longint; const expectedStart: string): boolean;
 begin
-  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlcomp(p,pchar(pointer(expectedStart)),length(expectedStart))=0));
+  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsequal(p,pchar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
 end;
 
-function strlibeginswith(p: pchar; l: longint; s: string): boolean;
+function strlibeginswith(const p: pchar; l: longint; const expectedStart: string): boolean;
 begin
-  result:=(s='') or ((l>=length(s)) and (strlicomp(p,pchar(pointer(s)),length(s))=0));
-end;
-
-function strbeginswith(p: pchar; expectedStart: string): boolean;
-begin
-  result:=(expectedStart='') or (strlcomp(p,pchar(pointer(expectedStart)),length(expectedStart))=0);
-end;
-
-function strbeginswith(str, start: string): boolean;
-begin
-  result:=copy(str,1,length(start))=start;
+  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsiequal(p,pchar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
 end;
 
 
-function stribeginswith(strToBeExaminated,expectedStart: string): boolean;
+function strbeginswith(const p: pchar; const expectedStart: string): boolean;
 begin
-  if strToBeExaminated='' then exit(expectedStart='')
-  else result:=strlibeginswith(@strToBeExaminated[1],length(strToBeExaminated),expectedStart);
+  result:=(expectedStart='') or (strlnsequal(p, pchar(pointer(expectedStart)), length(expectedStart)));
 end;
 
-function striendswith(strToBeExaminated, expectedEnd: string): boolean;
+function stribeginswith(const p: pchar; const expectedStart: string): boolean;
 begin
-  if length(strToBeExaminated)<Length(expectedEnd) then exit(false);
-  if strToBeExaminated='' then exit(expectedEnd='')
-  else result:=strliequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],expectedEnd,length(expectedEnd));
+  result:=(expectedStart='') or (strlnsiequal(p, pchar(pointer(expectedStart)), length(expectedStart)));
 end;
 
-function strcontains(str, searched: string): boolean;
+function strbeginswith(const strToBeExaminated,expectedStart: string): boolean;
+begin
+  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsequal(pchar(pointer(strToBeExaminated)), pchar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
+end;
+
+function stribeginswith(const strToBeExaminated,expectedStart: string): boolean;
+begin
+  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsiequal(pchar(pointer(strToBeExaminated)), pchar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
+end;
+
+function strendswith(const strToBeExaminated, expectedEnd: string): boolean;
+begin
+  result := (length(strToBeExaminated)>=Length(expectedEnd)) and
+            ( (expectedEnd='') or
+              (strlsequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pchar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
+end;
+
+function striendswith(const strToBeExaminated, expectedEnd: string): boolean;
+begin
+  result := (length(strToBeExaminated)>=Length(expectedEnd)) and
+            ( (expectedEnd='') or
+              (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pchar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
+end;
+
+function strindexof(const str, searched: string): longint;
+begin
+  result := pos(searched, str);
+end;
+
+function striindexof(const str, searched: string): longint;
+begin
+  result:=pos(LowerCase(searched), LowerCase(str));
+end;
+
+function strcontains(const str, searched: string): boolean;
 begin
   result:=pos(searched, str) > 0;
 end;
 
-function strcopyfrom(s: string; start: longint): string; inline;overload;
+function stricontains(const str, searched: string): boolean;
+begin
+  result:=striindexof(str, searched) > 0;
+end;
+
+function strcopyfrom(const s: string; start: longint): string; inline;overload;
 begin
   result:=copy(s,start,length(s)-start+1);
 end;
 
-function strslice(s: string; start, last: longint): string;
+function strslice(const s: string; start, last: longint): string;
 begin
   result:=copy(s,start,last-start+1);
 end;
@@ -1133,12 +1279,15 @@ var
   i: Integer;
 begin
   result:=0;
-  for i:=0 to len-1 do
+  for i:=0 to len-1 do begin
     if searchIn[i]=search then
       result+=1;
+    if searchIn[i] = #0 then
+      exit;
+  end;
 end;
 
-function strslice(first, last: pchar): string;
+function strslice(const  first, last: pchar): string;
 begin
   if first>last then exit;
   SetLength(result,last-first+1);
@@ -3522,7 +3671,7 @@ const entityMap: array[1..2138] of array[TEncoding] of string=(
 ('nj;',#128,#226#128#140)
 );
 var code,j,resLen:integer;
-    op, lastChar: pchar;
+    lastChar: pchar;
     entity,entityStart, entityEnd, entityBase: longint;
     entitys: string;
 begin
@@ -6483,7 +6632,7 @@ function parseDate(datestr,mask:string):longint;
 
 var mp,dp,day,month,year:longint;
     MMMstr:string;
-    openBracketCount: longint; //just needed to validate mask
+//    openBracketCount: longint; //just needed to validate mask
 
 
     minc, maxc: longint;
@@ -6537,7 +6686,7 @@ begin
   day:=0;
   month:=0;
   year:=0;
-  openBracketCount:=0;
+//  openBracketCount:=0;
   MMMstr:='';
 
   mp:=1;
@@ -7016,6 +7165,125 @@ begin
 
 end;
 
+procedure stringUnitTests( );
+begin
+  test(strlequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);
+  test(strlequal(pchar('abcd'),pchar('abc'), 3, 2) = false);
+  test(strlequal(pchar('abc'),pchar('abc'), 3, 3) = true);
+  test(strlequal(pchar('abc'#0'x'),pchar('abc'#0'y'), 5, 5) = true);
+  test(strlequal(pchar('abc'#0'x'),pchar('abc0y'), 5, 5) = false);
+  test(strlequal(pchar('aBc'),pchar('abc'), 3, 3) = false);
+
+  test(strliequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);
+  test(strliequal(pchar('abcd'),pchar('abc'), 3, 2) = false);
+  test(strliequal(pchar('abc'),pchar('abc'), 3, 3) = true);
+
+  test(strliequal(pchar('aBCd'),pchar('abcx'), 3, 3) = true);
+  test(strliequal(pchar('aBCd'),pchar('abc'), 3, 2) = false);
+  test(strliequal(pchar('aBc'),pchar('abc'), 3, 3) = true);
+
+  test(strlsequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);
+  test(strlsequal(pchar('abcd'),pchar('abc'), 3, 2) = false);
+  test(strlsequal(pchar('abc'),pchar('abc'), 3, 3) = true);
+  test(strlsequal(pchar('abc'#0'x'),pchar('abc'#0'y'), 5, 5) = false);
+  test(strlsequal(pchar('abc'#0'x'),pchar('abc0y'), 5, 5) = false);
+  test(strlsequal(pchar('aBc'),pchar('abc'), 3, 3) = false);
+
+  test(strlsiequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);
+  test(strlsiequal(pchar('abcd'),pchar('abc'), 3, 2) = false);
+  test(strlsiequal(pchar('abc'),pchar('abc'), 3, 3) = true);
+
+  test(strlsiequal(pchar('aBCd'),pchar('abcx'), 3, 3) = true);
+  test(strlsiequal(pchar('aBCd'),pchar('abc'), 3, 2) = false);
+  test(strlsiequal(pchar('aBc'),pchar('abc'), 3, 3) = true);
+
+
+  test(strlequal(pchar('abc'), 'ab', 2) =  true);
+  test(strlequal(pchar('abc'), 'ab', 3) =  false);
+  test(strlequal(pchar('ab'#0'mi'), 'ab', 2));
+  test(strlequal(pchar('ab'#0'mi'), 'ab', 3) =  false);
+  test(strlequal(pchar('ab'#0'mi'), 'ab'#0'mi', 5) =  true);
+  test(strlequal(pchar('ab'#0'mi'), 'ab'#0'ma', 5) =  false);
+
+  test(strliequal(pchar('abc'), 'ab', 2) =  true);
+  test(strliequal(pchar('abc'), 'ab', 3) =  false);
+  test(strliequal(pchar('ab'#0'mi'), 'ab', 3) =  false);
+  test(strliequal(pchar('ab'#0'mi'), 'ab', 2) =  true);
+  test(strliequal(pchar('ab'#0'mi'), 'ab'#0'mi', 5) =  true);
+  test(strliequal(pchar('ab'#0'mi'), 'ab'#0'ma', 5) =  false);
+  test(strliequal(pchar('aBc'), 'ab', 2) =  true);
+  test(strliequal(pchar(nil), '', 0) =  true);
+  test(strliequal(pchar(nil), '', 2) =  false);
+
+  test(strlBeginsWith(pchar('abc'), 3, 'a'));
+  test(strlBeginsWith(pchar('abc'#0'maus'), 8, 'a'));
+  test(strlBeginsWith(pchar('abc'#0'maus'), 8, 'abc'#0'maus'));
+  test(strlBeginsWith(pchar('abc'#0'maus'), 8, 'abc'#0'ma'));
+  test(strlBeginsWith(pchar('abc'#0'maus'), 8, 'abc'#0'mavs') = false);
+
+  test(strliBeginsWith(pchar('aBc'), 3, 'a'));
+  test(strliBeginsWith(pchar('aBc'#0'maus'), 8, 'a'));
+  test(strliBeginsWith(pchar('aBc'#0'maus'), 8, 'abc'#0'maus'));
+  test(strliBeginsWith(pchar('aBc'#0'maus'), 8, 'abc'#0'ma'));
+  test(strliBeginsWith(pchar('aBc'#0'maus'), 8, 'abc'#0'mavs') = false);
+
+  test(striequal('',''));
+  test(striequal('abc','') = false);
+  test(striequal('abc','ABC') = true);
+
+  test(strbeginswith(pchar('hallo'), ''));
+  test(strbeginswith(pchar('hallo'), 'h'));
+  test(strbeginswith(pchar('hallo'), 'hallo'));
+  test(strbeginswith(pchar('hallo'#0), 'hallo'));
+  test(strbeginswith(pchar('hallo'#0'maus'), 'hallo'#0'maus') = false);
+
+  test(stribeginswith(pchar('hallo'), ''));
+  test(stribeginswith(pchar('hallo'), 'h'));
+  test(stribeginswith(pchar('hallo'), 'hallo'));
+  test(stribeginswith(pchar('hallo'#0), 'hallo'));
+  test(stribeginswith(pchar('hallo'#0'maus'), 'hallo'#0'maus') = false);
+
+  test(stribeginswith(pchar('haLlo'), ''));
+  test(stribeginswith(pchar('haLlo'), 'h'));
+  test(stribeginswith(pchar('haLlo'), 'hAllo'));
+  test(stribeginswith(pchar('haLlo'#0), 'hAllo'));
+  test(stribeginswith(pchar('haLlo'#0'maus'), 'hAllo'#0'maus') = false);
+
+  test(strbeginswith(('hallo'), ''));
+  test(strbeginswith(('hallo'), 'h'));
+  test(strbeginswith(('hallo'), 'hallo'));
+  test(strbeginswith(('hallo'#0), 'hallo'));
+  test(strbeginswith(('hallo'#0'maus'), 'hallo'#0'maus') = true);
+  test(strbeginswith(('hallo'#0'maus'), 'xhallo'#0'maus') = false);
+
+  test(stribeginswith(('hallo'), ''));
+  test(stribeginswith(('hallo'), 'h'));
+  test(stribeginswith(('hallo'), 'hallo'));
+  test(stribeginswith(('hallo'#0), 'hallo'));
+  test(stribeginswith(('hallo'#0'maus'), 'hallo'#0'maus') = true);
+
+  test(stribeginswith(('haLlo'), ''));
+  test(stribeginswith(('haLlo'), 'h'));
+  test(stribeginswith(('haLlo'), 'hAllo'));
+  test(stribeginswith(('haLlo'#0), 'hAllo'));
+  test(stribeginswith(('haLlo'#0'maus'), 'hAllo'#0'maus') = true);
+  test(stribeginswith(('haLlo'#0), 'xhAllo') = false);
+
+  test(strendswith('Hallo Welt', 'Welt'));
+  test(strendswith('Hallo Welt', 'Welx') = false);
+  test(strendswith('Hallo Welt', 'welt') = false);
+  test(strendswith('Hallo'#0'Welt', 'o'#0'Welt'));
+  test(strendswith('Hallo'#0'Welt', ''));
+  test(strendswith('', 'Welt')= false);
+
+  test(striendswith('Hallo Welt', 'Welt'));
+  test(striendswith('Hallo Welt', 'Welx') = false);
+  test(striendswith('Hallo Welt', 'welt'));
+  test(striendswith('Hallo'#0'Welt', 'o'#0'Welt'));
+  test(striendswith('Hallo'#0'Welt', ''));
+  test(striendswith('', 'Welt') = false);
+end;
+
 procedure unitTests();
 const strs: array[1..11,1..2] of string=(('05.10.1985','dd.mm.yyyy'),('05.10.1942','dd.mm.yy[yy]'),('05.10.42','dd.mm.yy[yy]'),('19.10-1942','dd.mm-[yy]yy'),('19.10-90','dd.mm-[yy]yy'), ('11.7.2005','d.m.yyyy'),('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),('  11 Mär 1700',' dd mmm yyyy  '),('  15 Mär 1200XXXXXXXXXXXXXX',' dd mmm yyyy  '));
       dates: array[1..11, 1..3] of word = ((1985,10,5),(1942,10,5),(2042,10,5),(1942,10,19),(1990,10,19),(2005,7,11),(2000,1,16),(1989,6,17),(1953,9,29),(1700,3,11),(1200,3,15));
@@ -7033,6 +7301,8 @@ begin
         raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+FormatDateTime('yyyy-mm-dd', parseDate(strs[i,1],strs[i,2])) + ' expected '+FormatDateTime('yyyy-mm-dd',EncodeDate(dates[i,1],dates[i,2],dates[i,3])));
 
   //basic string tests
+  stringUnitTests();
+
   if not strliequal('', '', 0) then raise Exception.Create('strliequal failed');
   if not strliequal('abcd', 'abc', 3) then raise Exception.Create('strliequal failed');
   if strliequal('', 'a', 1) then raise Exception.Create('strliequal failed');

@@ -1,3 +1,4 @@
+{** Simple pascal template }
 unit pastemplate;
 
 {$mode objfpc}{$H+}
@@ -9,6 +10,18 @@ uses
 
 type TSpecialCallBack = function (name: string): string;
 
+
+//**Parses a simple pascal template.@br@br@br
+//**It may contain the following commands:@br
+//**@code({%REPEAT x, [a, b, c, ..]} .. {%END-REPEAT}) @br
+//**Creates several copy of the text between REPEAT and END-REPEAT while replacing x by a in the first copy, x by b in the second, ...@br@br
+//**@code({%REPEAT (x, y), [(a1, a2), (b1, b2), ...]} .. {%END-REPEAT}) @br
+//**Creates several copy of the text between REPEAT and END-REPEAT while replacing x by a1 and y by a2 in the first copy, x by b1 and y by b2 in the second, ...@br@br
+//**@code({%REPEAT} .. {%END-REPEAT}) @br
+//**Removes the text between REPEAT and END-REPEAT (i.e. make exactly zero copies)@br@br
+//**@code({%SPECIAL:foobar}) @br
+//**Calls an external callback function with the value foobar
+//**}
 function convertTemplate(s: string; special: TSpecialCallBack): string;
 
 implementation
@@ -104,7 +117,7 @@ begin
       temp:=GetPart(['}'], ['{%END-REPEAT}'], s, true);
       delete(s, 1, length('{%END-REPEAT}'));
 
-      writeln(stderr, temp);
+//      writeln(stderr, temp);
       for i:=0 to high(repwith) do begin
         temp2:=temp;
         for j:=0 to high(replace) do

@@ -1,6 +1,13 @@
+{**
+  This program parses the bbutils_template.pas file and generates the
+  bbutils.pas file.@br@br
+
+}
+
 program bbutils_generate;
 
 {$mode objfpc}{$H+}
+
 
 uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
@@ -10,8 +17,8 @@ uses
   {Attention: Bootstraping! This program generates bbutils, but need bbutils to be compiled.
                             If you don't have bbutils, you can use bbutils_template instead
   }
-  ,  bbutils
-  //, bbutils_template
+//  ,  bbutils
+  , bbutils_template
   { you can add units after this };
 
 {$R *.res}
@@ -2192,7 +2199,7 @@ const SDHE_Header: string =
 
 procedure writeln_SDHE_Map();
 var
-  e: Integer;
+  //e: Integer;
   enc: TEncoding;
   ent: Integer;
   s: String;
@@ -2217,7 +2224,7 @@ end;
 
 const SDHE_Start: string =
 'var code,j,resLen:integer;'+LineEnding+
-'    op, lastChar: pchar;'+LineEnding+
+'    lastChar: pchar;'+LineEnding+
 '    entity,entityStart, entityEnd, entityBase: longint;'+LineEnding+
 '    entitys: string;'+LineEnding+
 'begin'+LineEnding+
@@ -2229,7 +2236,7 @@ const SDHE_Start: string =
 
 
 
-const MAX_NESTED_DEEP = 3;
+//const MAX_NESTED_DEEP = 3;
 {procedure write_SDHE_Trie(startSeq,indent: string; deep: longint);
 var i: longint;
   sl: TStringList;
@@ -2290,7 +2297,7 @@ procedure write_SDHE_For_Encoding();
 var i,curCode: longint;
   newCode: Integer;
   curEntityStart: Integer;
-  j: LongInt;
+  //j: LongInt;
 begin
   reswriteln('    while (p<=lastChar) do begin');
   reswriteln('      inc(resLen);');
@@ -2387,7 +2394,6 @@ end;
 
 var
   i: Integer;
-  s:string;
 begin
 
 
