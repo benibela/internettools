@@ -6,8 +6,12 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils,
-  bbutils
+  Classes, sysutils, pastemplate
+  {Attention: Bootstraping! This program generates bbutils, but need bbutils to be compiled.
+                            If you don't have bbutils, you can use bbutils_template instead
+  }
+  ,  bbutils
+  //, bbutils_template
   { you can add units after this };
 
 {$R *.res}
@@ -2178,6 +2182,9 @@ const entities: array[1..2138] of TEntity=(
 (s:'&zwj;';c:$0200D),
 (s:'&zwnj;';c:$0200C));
 
+function createEntityDecoder: string;
+
+var totalresult: string;
 
 //Template for the strDecodeHTMLEntities function
 const SDHE_Header: string =
@@ -2191,21 +2198,21 @@ var
   s: String;
   i: Integer;
 begin
-  writeln('const entityMap: array[',low(entities),'..',high(entities),'] of array[TEncoding] of string=(');
+  totalresult+=('const entityMap: array['+IntToStr(low(entities))+'..'+IntToStr(high(entities))+'] of array[TEncoding] of string=(')+LineEnding;
   for ent:=low(entities) to high(entities) do begin
-    write('(''',strcopyfrom(entities[ent].s,4),''',');
+    totalresult+=('('''+strcopyfrom(entities[ent].s,4)+''',');
     enc:=low(TEncoding);inc(enc);
     for enc:=enc to high(TEncoding) do begin
       s := strGetUnicodeCharacter(entities[ent].c, enc);
       for i:=1 to length(s) do
-        write('#'+IntToStr(ord(s[i])));
-      if enc <> high(TEncoding) then write(',');
+        totalresult+='#'+IntToStr(ord(s[i]));
+      if enc <> high(TEncoding) then totalresult+=',';
     end;
-    write(')');
-    if ent <> high(entities) then writeln(',')
-    else writeln;
+    totalresult+=(')');
+    if ent <> high(entities) then totalresult+=(',')+LineEnding
+    else totalresult+=LineEnding;
   end;
-  writeln(');');
+  totalresult+=(');')+LineEnding;
 end;
 
 const SDHE_Start: string =
@@ -2245,71 +2252,76 @@ begin
     raise Exception.Create('Non consecutive list');
 
   if ((j=-1) or (sl.Count>1)) and (deep < MAX_NESTED_DEEP) then begin
-    writeln(indent,'inc(p);');
-    writeln(indent,'case p^ of');
+    reswriteln(indent,'inc(p);');
+    reswriteln(indent,'case p^ of');
     lc := #0;
     for i:=0 to sl.Count-1 do begin
       if (length(sl[i]) > length(startSeq)) and (sl[i][length(startSeq)+1] <> lc) then begin
         lc := sl[i][length(startSeq)+1];
-        writeln(indent,'''',lc,''': begin');
-        write_SDHE_Trie( startSeq + lc,indent+'  ', deep+1);
-        writeln(indent,'end;');
+        reswriteln(indent,'''',lc,''': begin');
+        reswrite_SDHE_Trie( startSeq + lc,indent+'  ', deep+1);
+        reswriteln(indent,'end;');
       end;
     end;
     if j <> -1 then
-      writeln(indent, 'else entity := ',j,';');
+      reswriteln(indent, 'else entity := ',j,';');
 
-    writeln(indent,'end;');
+    reswriteln(indent,'end;');
   end else if deep >= MAX_NESTED_DEEP then begin//if sl.count = 1 then begin
-    writeln(indent, 'inc(p);');
+    reswriteln(indent, 'inc(p);');
     for i:=0 to sl.count-1 do begin
-      write(indent, '  ');
-      if i <> 0 then write('else ');
-      writeln('if strbeginswith(p, ''',strcopyfrom(sl[i], length(startSeq)+1),''') then begin entity:=',PtrUInt(pointer(sl.Objects[i])),'; inc(p, ',length(sl[i])-length(startSeq),'); end //',sl[i]);
+      reswrite(indent, '  ');
+      if i <> 0 then reswrite('else ');
+      reswriteln('if strbeginswith(p, ''',strcopyfrom(sl[i], length(startSeq)+1),''') then begin entity:=',PtrUInt(pointer(sl.Objects[i])),'; inc(p, ',length(sl[i])-length(startSeq),'); end //',sl[i]);
     end;
   end else begin
-    writeln(indent, 'inc(p);');
-    writeln(indent, 'entity := ',j,';');
+    reswriteln(indent, 'inc(p);');
+    reswriteln(indent, 'entity := ',j,';');
   end;
   sl.free;
 end;
 }
+procedure reswriteln(s:string);
+begin
+  totalresult+=s+LineEnding;
+end;
 procedure write_SDHE_For_Encoding();
+
 var i,curCode: longint;
   newCode: Integer;
   curEntityStart: Integer;
   j: LongInt;
 begin
-  writeln('    while (p<=lastChar) do begin');
-  writeln('      inc(resLen);');
-  writeln('      if (p^=''&'') and (strict or ((p+1)^<>'' '')) then begin');
-  writeln('         inc(p);');
-  writeln('         if p^ = #0 then break;');
-  writeln('         if p^ = ''#'' then begin');
-  writeln('           inc(p);');
-  writeln('           if p^ in [''x'', ''X''] then begin inc(p); entityBase := 16; end else entityBase:=10;');
-  writeln('           entity := 0; ');
-  writeln('           while (p^ in [''0''..''9'']) or ((entityBase = 16) and (p^ in [''A''..''F'', ''a''..''z''])) do begin ');
-  writeln('             entity := entity * entityBase;');
-  writeln('             if p^ in [''0''..''9''] then entity := entity + ord(p^) - ord(''0'') ');
-  writeln('             else if p^ in [''A''..''F''] then entity := entity + ord(p^) - ord(''A'') + 10');
-  writeln('             else if p^ in [''a''..''f''] then entity := entity + ord(p^) - ord(''a'') + 10');
-  writeln('             else raise exception.create(''???'');');
-  writeln('             inc(p);');
-  writeln('           end;');
-  writeln('           entitys := strGetUnicodeCharacter(entity, encoding);');
-  writeln('           for j:=1 to length(entitys) do begin');
-  writeln('             result[reslen] := entitys[j];');
-  writeln('             inc(reslen);');
-  writeln('           end; dec(reslen);');
-  writeln('           if p^ = '';'' then inc(p)');
-  writeln('           else if strict then begin result[reslen] := ''?''; inc(reslen); end;');
-  writeln('         end else begin');
+  reswriteln('    while (p<=lastChar) do begin');
+  reswriteln('      inc(resLen);');
+  reswriteln('      if (p^=''&'') and (strict or ((p+1)^<>'' '')) then begin');
+  reswriteln('         inc(p);');
+  reswriteln('         if p^ = #0 then break;');
+  reswriteln('         if p^ = ''#'' then begin');
+  reswriteln('           inc(p);');
+  reswriteln('           if p^ in [''x'', ''X''] then begin inc(p); entityBase := 16; end else entityBase:=10;');
+  reswriteln('           entity := 0; ');
+  reswriteln('           while (p^ in [''0''..''9'']) or ((entityBase = 16) and (p^ in [''A''..''F'', ''a''..''z''])) do begin ');
+  reswriteln('             entity := entity * entityBase;');
+  reswriteln('             if p^ in [''0''..''9''] then entity := entity + ord(p^) - ord(''0'') ');
+  reswriteln('             else if p^ in [''A''..''F''] then entity := entity + ord(p^) - ord(''A'') + 10');
+  reswriteln('             else if p^ in [''a''..''f''] then entity := entity + ord(p^) - ord(''a'') + 10');
+  reswriteln('             else raise exception.create(''???'');');
+  reswriteln('             inc(p);');
+  reswriteln('           end;');
+  reswriteln('           entitys := strGetUnicodeCharacter(entity, encoding);');
+  reswriteln('           for j:=1 to length(entitys) do begin');
+  reswriteln('             result[reslen] := entitys[j];');
+  reswriteln('             inc(reslen);');
+  reswriteln('           end; dec(reslen);');
+  reswriteln('           if p^ = '';'' then inc(p)');
+  reswriteln('           else if strict then begin result[reslen] := ''?''; inc(reslen); end;');
+  reswriteln('         end else begin');
 
-  writeln('           entity := -1; entityStart:=0; entityEnd := -1;');
-  writeln('           code := (ord(p^) shl 8) or ord((p+1)^);');
-  writeln('           inc(p,2);');
-  writeln('           case code of ');
+  reswriteln('           entity := -1; entityStart:=0; entityEnd := -1;');
+  reswriteln('           code := (ord(p^) shl 8) or ord((p+1)^);');
+  reswriteln('           inc(p,2);');
+  reswriteln('           case code of ');
 
   curCode:=-1;
   curEntityStart := 0;
@@ -2317,34 +2329,34 @@ begin
     newCode := (ord(entities[i].s[2]) shl 8) or ord(entities[i].s[3]);
     if newCode <> curCode then begin
       if curCode <> -1 then begin
-        writeln('               entityStart := ', curEntityStart,';');
-        writeln('               entityEnd := ', i-1,';');
-        writeln('             end;');
+        reswriteln('               entityStart := '+IntToStr(curEntityStart)+';');
+        reswriteln('               entityEnd := '+IntToStr( i-1)+';');
+        reswriteln('             end;');
       end;
-      writeln('             ', newCode, ': begin');
+      reswriteln('             '+IntToStr(newCode)+': begin');
       curCode:=newCode;
       curEntityStart:=i;
     end;
   end;
-  writeln('               entityStart := ', curEntityStart,';');
-  writeln('               entityEnd := ', high(entities),';');
-  writeln('             end;');
-  writeln('           end;');
+  reswriteln('               entityStart := ' + IntToStr( curEntityStart)+';');
+  reswriteln('               entityEnd := ' +  IntToStr(high(entities))+';');
+  reswriteln('             end;');
+  reswriteln('           end;');
 
-  writeln('           for j:=entityStart to entityEnd do ');
-  writeln('              if strbeginswith(p, entityMap[j][eUnknown]) then begin entity:=j; break;end;');
+  reswriteln('           for j:=entityStart to entityEnd do ');
+  reswriteln('              if strbeginswith(p, entityMap[j][eUnknown]) then begin entity:=j; break;end;');
 
-  writeln('           if (entity <> -1) then begin');
-  writeln('             inc(p, length(entityMap[entity][eUnknown]));');
-  writeln('             for j:=1 to length(entityMap[entity][encoding]) do begin');
-  writeln('               result[reslen] := entityMap[entity][encoding][j];');
-  writeln('               inc(reslen);');
-  writeln('             end; dec(reslen);');
-  writeln('           end else if strict then result[reslen] := ''?''');
-  writeln('           else begin result[reslen] := ''&''; dec(p,2); end;');
-  writeln('         end;');
-  writeln('      end else begin result[reslen]:=p^; inc(p); end;');
-  writeln('    end;');
+  reswriteln('           if (entity <> -1) then begin');
+  reswriteln('             inc(p, length(entityMap[entity][eUnknown]));');
+  reswriteln('             for j:=1 to length(entityMap[entity][encoding]) do begin');
+  reswriteln('               result[reslen] := entityMap[entity][encoding][j];');
+  reswriteln('               inc(reslen);');
+  reswriteln('             end; dec(reslen);');
+  reswriteln('           end else if strict then result[reslen] := ''?''');
+  reswriteln('           else begin result[reslen] := ''&''; dec(p,2); end;');
+  reswriteln('         end;');
+  reswriteln('      end else begin result[reslen]:=p^; inc(p); end;');
+  reswriteln('    end;');
 end;
 
 const SDHE_End: string =
@@ -2353,34 +2365,47 @@ const SDHE_End: string =
 
 
 
+begin
+  reswriteln(SDHE_Header);
+  writeln_SDHE_Map();
+  reswriteln(SDHE_Start);
+  write_SDHE_For_Encoding();
+  reswriteln(SDHE_End);
+
+  resWriteLn('');
+  reswriteln('{$DEFINE BBUTILS_INCLUDE_COMPLETE}');
+
+  Result:=totalresult;
+end;
+
+function special(name: string) : string;
+begin
+  if name = 'INCLUDE-ENTITY-DECODER' then
+    exit(createEntityDecoder);
+  raise Exception.Create('Invlaid special: '+name);
+end;
 
 var
   i: Integer;
   s:string;
 begin
+
+
   for i:=low(entities)+1 to high(entities) do begin
     if (entities[i-1].s > entities[i].s) and (entities[i-1].s <> entities[i].s+';') then raise Exception.Create('table not sorted: '+entities[i-1].s+' > '+entities[i].s);
     if length(entities[i].s) < 3 then raise Exception.Create('too short: '+entities[i].s);
   end;
 
+  WriteLn(convertTemplate(strLoadFromFile('bbutils_template.pas'), @special));
 
 
-  writeln(SDHE_Header);
-  writeln_SDHE_Map();
-  writeln(SDHE_Start);
-  write_SDHE_For_Encoding();
-  writeln(SDHE_End);
-
-  WriteLn();
-  writeln('{$DEFINE BBUTILS_INCLUDE_COMPLETE}');
-
-  try
+ { try
   //readln(s);
   s:='&lt;&xyz;&gt;';
   WriteLn(StdErr, strDecodeHTMLEntities('Hallo:&#x20;&#x3C;&auml;&szlig;&nbsp; &lt; &gt;',eUTF8));
   WriteLn(StdErr, strDecodeHTMLEntities(s,eUTF8));
   WriteLn(StdErr, strDecodeHTMLEntities(s,eUTF8,false));
   except
-  end;
+  end;         }
 end.
 

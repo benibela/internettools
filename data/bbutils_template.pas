@@ -44,7 +44,7 @@ uses
   , windows
   {$ENDIF};
 
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
@@ -232,7 +232,7 @@ procedure intFactor(n,p: longint; out e, r:longint);
 function gcd(a,b: cardinal): cardinal;
 function coprime(a,b:cardinal): boolean;
 {%REPEAT T__INT__NUMBER__, [longint, int64]}
-function modPow(i, e, m: int64): int64;
+function modPow(i, e, m: T__INT__NUMBER__): T__INT__NUMBER__;
 {%END-REPEAT}
 function factorial(i:longint):float;
 function binomial(n,k: longint): float;
@@ -342,6 +342,13 @@ implementation
 
 //========================array functions========================
 
+{%REPEAT (T__ArrayType__, T__ElementType__, __ELEMENT__DEFAULT__),
+         [(TStringArray, string, ''),
+          (TLongintArray, longint, 0),
+          (TLongwordArray, longword, 0),
+          (TInt64Array, int64, 0),
+          (TFloatArray, float, 0)]
+}
 
 function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__): longint;
 begin
@@ -431,6 +438,7 @@ begin
   end;
 end;
 
+{%END-REPEAT}
 
 //=========================Conditional additions======================
 {%REPEAT T__ElementType__, [integer, cardinal, string, int64]}
@@ -856,7 +864,7 @@ begin
 
 end;
 
-{%INCLUDE-DECODER}
+{%SPECIAL:INCLUDE-ENTITY-DECODER}
 
 
 {$ifndef BBUTILS_INCLUDE_COMPLETE}
@@ -1042,7 +1050,9 @@ begin
   result:=gcd(a,b) = 1;
 end;
 
-function modPow(i, e, m: longint): longint;
+
+{%REPEAT T__INT__NUMBER__, [longint, int64]}
+function modPow(i, e, m: T__INT__NUMBER__): T__INT__NUMBER__;
 var c,p: Int64;
 begin
   c := i;
@@ -1056,19 +1066,7 @@ begin
   end;
 end;
 
-function modPow(i, e, m: int64): int64;
-var c,p: Int64;
-begin
-  c := i;
-  p := 1;
-  result := 1;
-  while p <= e do begin
-    if  (e and p) <> 0 then
-      Result := (Result*c) mod m;
-    p := 2*p;
-    c := (c*c) mod m;
-  end;
-end;
+{%END-REPEAT}
 
 //========================mathematical functions========================
 function factorial(i: longint): float;
@@ -1835,6 +1833,7 @@ begin
   test(strTrim('xyxxxABCxDEFyx',['x','y']) = 'ABCxDEF');
 
 
+  {$ifdef BBUTILS_INCLUDE_COMPLETE}
   //html str decode
   if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*',eUTF8,true) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*?z;*' then
     raise Exception.Create('HTML Umlaut -> UTF-8-Konvertierung fehlgeschlagen'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*?z;*',eUTF8,true));
@@ -1844,6 +1843,7 @@ begin
     raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strConvertToUtf8(strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#xC4',eWindows1252, false),eWindows1252));
   if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78;&#xC4',eUTF8,false) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;'#78#$78#$C3#$84 then
     raise Exception.Create('HTML Umlaut -> UTF8-Konvertierung fehlgeschlagen : "'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78',eUTF8,false)+'"');
+  {$ENDIF}
 
   //========arrays=====
   arrayUnitTests();
