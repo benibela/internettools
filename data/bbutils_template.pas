@@ -106,15 +106,22 @@ function arrayAddFast(var a: T__ArrayType__; var len: longint; const e: T__Eleme
 function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint):T__ElementType__; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: T__ArrayType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: T__ArrayType__; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: T__ArrayType__; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: T__ArrayType__; slice1: integer = -1;slice2: integer = -1);overload;
 
+//**Extracts a array slice
+function arraySlice(a: array of T__ElementType__; slice1: integer = -1;slice2: integer = -1): T__ArrayType__;
+
+//**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
+function arrayCompare(a, b: array of T__ElementType__; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
+//**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
+function arrayEqual(a, b: array of T__ElementType__; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): boolean; overload;
 {%END-REPEAT}
 
 //-----------------------Conditional additions------------------------
@@ -456,7 +463,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: T__ArrayType__; var slice1, slice2: integer); overload;
+procedure arraySliceIndices(const a: array of T__ElementType__; var slice1, slice2: integer); overload;
 begin
   if (slice2 = -1) and (slice1 = -1) then begin
     slice2 := high(a);
@@ -467,7 +474,7 @@ begin
   end;
 end;
 
-function arrayIndexOf(const a: T__ArrayType__; const e: T__ElementType__;
+function arrayIndexOf(const a: array of T__ElementType__; const e: T__ElementType__;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
@@ -478,7 +485,18 @@ begin
   result:=-1;
 end;
 
-function arrayIndexOfSmallest(const a: T__ArrayType__; slice1, slice2: integer): integer;
+function arraySlice(a: array of T__ElementType__; slice1: integer; slice2: integer
+ ): T__ArrayType__;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  SetLength(result, slice2-slice1+1);
+  for i:=0 to high(result) do
+    result[i] := a[slice1+i];
+end;
+
+function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -488,7 +506,7 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: T__ArrayType__; slice1, slice2: integer): integer;
+function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -498,7 +516,7 @@ begin
        Result:=i;
 end;
 
-procedure arrayInvert(a: T__ArrayType__; slice1, slice2: integer);
+procedure arrayInvert(a: T__ArrayType__; slice1: integer; slice2: integer);
 var temp: T__ElementType__;
  i: Integer;
 begin
@@ -508,6 +526,27 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayCompare(a, b: array of T__ElementType__; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): longint;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1a, slice2a);
+  arraySliceIndices(b, slice1b, slice2b);
+  if slice2a - slice1a < slice2b - slice1b then exit(-1);
+  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  for i:=0 to slice1b - slice1a do
+    if a[slice1a+i] < b[slice1b+i] then exit(-1)
+    else if a[slice1a+i] > b[slice1b+i] then exit(1);
+  exit(0);
+end;
+
+function arrayEqual(a, b: array of T__ElementType__; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): boolean;
+begin
+  result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 {%END-REPEAT}
@@ -1964,6 +2003,14 @@ begin
   test(length(a) =2); test(a[0] = 17); test(a[1] = 23);
   arrayAdd(a, -42);
   test(length(a) =3); test(a[0] = 17); test(a[1] = 23); test(a[2] = -42);
+  test(arrayEqual(a, [longint(17),23,-42]));
+  test(arrayEqual(a, [longint(17),23,-42,0]) = false);
+  test(arrayEqual(a, [longint(17),23]) = false);
+  test(arrayEqual(a, [longint(17),23], 1));
+
+  test(arrayCompare([1,2,3], [longint(1),2,3]) = 0);
+  test(arrayCompare([1,2], [longint(1),2,3]) = -1);
+  test(arrayCompare([1,2,3], [longint(1),2]) = 1);
 
   test(arrayIndexOfSmallest(a) = 2);
   test(arrayIndexOfLargest(a) = 1);
@@ -1975,6 +2022,7 @@ begin
   test(arrayIndexOf(a, 17) = 0);
   test(arrayIndexOf(a, 17, 1, 2) = -1);
   test(arrayIndexOf(a, 23, 1, 2) = 1);
+
 
   arrayDelete(a, 0);
   test(length(a) =2); test(a[0] = -42); test(a[1] = 23);
@@ -2014,8 +2062,15 @@ begin
   arrayInvert(a, 1, 4);
   test((length(a) = 16) and (len=5) and (a[0]=19)and (a[1]=88)and (a[2]=17)and (a[3]=16)and (a[4]=18));
 
-  //fast allocation
-{  len:=0;
+  //tests
+  test(arrayEqual([longint(1),2,3,4,5], [3,4], 2, 1, 3));
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 1, 3));
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 2, 3) = false);
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 2, 4) );
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 0, 4, 2) );
+
+  //fast allocation  , it is a little bit slow
+ { len:=0;
   for i:=0 to 100000 do begin
     arrayAddFast(a, len, i);
 
@@ -2336,6 +2391,7 @@ begin
   for i:=0 to 100 do
     if ar64[i]<>i*10 then
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
+  writeln(stderr,'okidoki');
 end;
 
 initialization

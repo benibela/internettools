@@ -89,15 +89,22 @@ function arrayAddFast(var a: TStringArray; var len: longint; const e: string): l
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: TStringArray; const e: string; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: TStringArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: TStringArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TStringArray; slice1: integer = -1;slice2: integer = -1);overload;
 
+//**Extracts a array slice
+function arraySlice(a: array of string; slice1: integer = -1;slice2: integer = -1): TStringArray;
+
+//**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
+function arrayCompare(a, b: array of string; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
+//**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
+function arrayEqual(a, b: array of string; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): boolean; overload;
 
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
@@ -115,15 +122,22 @@ function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint):
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: TLongintArray; const e: longint; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: TLongintArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: TLongintArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongintArray; slice1: integer = -1;slice2: integer = -1);overload;
 
+//**Extracts a array slice
+function arraySlice(a: array of longint; slice1: integer = -1;slice2: integer = -1): TLongintArray;
+
+//**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
+function arrayCompare(a, b: array of longint; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
+//**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
+function arrayEqual(a, b: array of longint; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): boolean; overload;
 
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
@@ -141,15 +155,22 @@ function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: TLongwordArray; const e: longword; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: TLongwordArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: TLongwordArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongwordArray; slice1: integer = -1;slice2: integer = -1);overload;
 
+//**Extracts a array slice
+function arraySlice(a: array of longword; slice1: integer = -1;slice2: integer = -1): TLongwordArray;
+
+//**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
+function arrayCompare(a, b: array of longword; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
+//**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
+function arrayEqual(a, b: array of longword; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): boolean; overload;
 
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
@@ -167,15 +188,22 @@ function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): lon
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: TInt64Array; const e: int64; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: TInt64Array; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: TInt64Array; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TInt64Array; slice1: integer = -1;slice2: integer = -1);overload;
 
+//**Extracts a array slice
+function arraySlice(a: array of int64; slice1: integer = -1;slice2: integer = -1): TInt64Array;
+
+//**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
+function arrayCompare(a, b: array of int64; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
+//**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
+function arrayEqual(a, b: array of int64; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): boolean; overload;
 
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
@@ -193,15 +221,22 @@ function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): lon
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: TFloatArray; const e: float; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: TFloatArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: TFloatArray; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TFloatArray; slice1: integer = -1;slice2: integer = -1);overload;
 
+//**Extracts a array slice
+function arraySlice(a: array of float; slice1: integer = -1;slice2: integer = -1): TFloatArray;
+
+//**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
+function arrayCompare(a, b: array of float; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
+//**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
+function arrayEqual(a, b: array of float; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): boolean; overload;
 
 
 //-----------------------Conditional additions------------------------
@@ -296,14 +331,18 @@ function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**<
 function strRpos(c:char;s:string):longint;
 //**Counts all occurences of search in searchIn (case sensitive, stops at #0)
 function strlCount(const search:char; const searchIn:pchar; const len: longint): longint;
+//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+function strlsIndexOf(str,searched:pchar; l1, l2: longint): longint;
+//**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
+function strlsiIndexOf(str,searched:pchar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string):longint; inline;
+function strIndexOf(const str,searched:string; from: longint = 1):longint;inline;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string):longint; inline;
+function striIndexOf(const str,searched:string; from: longint = 1):longint; inline;
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strContains(const str,searched:string):boolean; inline;
+function strContains(const str,searched:string; from: longint = 1):boolean; inline;
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striContains(const str,searched:string):boolean; inline;
+function striContains(const str,searched:string; from: longint = 1):boolean; inline;
 
 //more specialized
 type TCharSet = set of char;
@@ -556,7 +595,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: TStringArray; var slice1, slice2: integer); overload;
+procedure arraySliceIndices(const a: array of string; var slice1, slice2: integer); overload;
 begin
   if (slice2 = -1) and (slice1 = -1) then begin
     slice2 := high(a);
@@ -567,7 +606,7 @@ begin
   end;
 end;
 
-function arrayIndexOf(const a: TStringArray; const e: string;
+function arrayIndexOf(const a: array of string; const e: string;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
@@ -578,7 +617,18 @@ begin
   result:=-1;
 end;
 
-function arrayIndexOfSmallest(const a: TStringArray; slice1, slice2: integer): integer;
+function arraySlice(a: array of string; slice1: integer; slice2: integer
+ ): TStringArray;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  SetLength(result, slice2-slice1+1);
+  for i:=0 to high(result) do
+    result[i] := a[slice1+i];
+end;
+
+function arrayIndexOfSmallest(const a: array of string; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -588,7 +638,7 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: TStringArray; slice1, slice2: integer): integer;
+function arrayIndexOfLargest(const a: array of string; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -598,7 +648,7 @@ begin
        Result:=i;
 end;
 
-procedure arrayInvert(a: TStringArray; slice1, slice2: integer);
+procedure arrayInvert(a: TStringArray; slice1: integer; slice2: integer);
 var temp: string;
  i: Integer;
 begin
@@ -608,6 +658,27 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayCompare(a, b: array of string; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): longint;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1a, slice2a);
+  arraySliceIndices(b, slice1b, slice2b);
+  if slice2a - slice1a < slice2b - slice1b then exit(-1);
+  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  for i:=0 to slice1b - slice1a do
+    if a[slice1a+i] < b[slice1b+i] then exit(-1)
+    else if a[slice1a+i] > b[slice1b+i] then exit(1);
+  exit(0);
+end;
+
+function arrayEqual(a, b: array of string; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): boolean;
+begin
+  result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
@@ -657,7 +728,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: TLongintArray; var slice1, slice2: integer); overload;
+procedure arraySliceIndices(const a: array of longint; var slice1, slice2: integer); overload;
 begin
   if (slice2 = -1) and (slice1 = -1) then begin
     slice2 := high(a);
@@ -668,7 +739,7 @@ begin
   end;
 end;
 
-function arrayIndexOf(const a: TLongintArray; const e: longint;
+function arrayIndexOf(const a: array of longint; const e: longint;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
@@ -679,7 +750,18 @@ begin
   result:=-1;
 end;
 
-function arrayIndexOfSmallest(const a: TLongintArray; slice1, slice2: integer): integer;
+function arraySlice(a: array of longint; slice1: integer; slice2: integer
+ ): TLongintArray;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  SetLength(result, slice2-slice1+1);
+  for i:=0 to high(result) do
+    result[i] := a[slice1+i];
+end;
+
+function arrayIndexOfSmallest(const a: array of longint; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -689,7 +771,7 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: TLongintArray; slice1, slice2: integer): integer;
+function arrayIndexOfLargest(const a: array of longint; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -699,7 +781,7 @@ begin
        Result:=i;
 end;
 
-procedure arrayInvert(a: TLongintArray; slice1, slice2: integer);
+procedure arrayInvert(a: TLongintArray; slice1: integer; slice2: integer);
 var temp: longint;
  i: Integer;
 begin
@@ -709,6 +791,27 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayCompare(a, b: array of longint; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): longint;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1a, slice2a);
+  arraySliceIndices(b, slice1b, slice2b);
+  if slice2a - slice1a < slice2b - slice1b then exit(-1);
+  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  for i:=0 to slice1b - slice1a do
+    if a[slice1a+i] < b[slice1b+i] then exit(-1)
+    else if a[slice1a+i] > b[slice1b+i] then exit(1);
+  exit(0);
+end;
+
+function arrayEqual(a, b: array of longint; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): boolean;
+begin
+  result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
@@ -758,7 +861,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: TLongwordArray; var slice1, slice2: integer); overload;
+procedure arraySliceIndices(const a: array of longword; var slice1, slice2: integer); overload;
 begin
   if (slice2 = -1) and (slice1 = -1) then begin
     slice2 := high(a);
@@ -769,7 +872,7 @@ begin
   end;
 end;
 
-function arrayIndexOf(const a: TLongwordArray; const e: longword;
+function arrayIndexOf(const a: array of longword; const e: longword;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
@@ -780,7 +883,18 @@ begin
   result:=-1;
 end;
 
-function arrayIndexOfSmallest(const a: TLongwordArray; slice1, slice2: integer): integer;
+function arraySlice(a: array of longword; slice1: integer; slice2: integer
+ ): TLongwordArray;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  SetLength(result, slice2-slice1+1);
+  for i:=0 to high(result) do
+    result[i] := a[slice1+i];
+end;
+
+function arrayIndexOfSmallest(const a: array of longword; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -790,7 +904,7 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: TLongwordArray; slice1, slice2: integer): integer;
+function arrayIndexOfLargest(const a: array of longword; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -800,7 +914,7 @@ begin
        Result:=i;
 end;
 
-procedure arrayInvert(a: TLongwordArray; slice1, slice2: integer);
+procedure arrayInvert(a: TLongwordArray; slice1: integer; slice2: integer);
 var temp: longword;
  i: Integer;
 begin
@@ -810,6 +924,27 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayCompare(a, b: array of longword; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): longint;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1a, slice2a);
+  arraySliceIndices(b, slice1b, slice2b);
+  if slice2a - slice1a < slice2b - slice1b then exit(-1);
+  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  for i:=0 to slice1b - slice1a do
+    if a[slice1a+i] < b[slice1b+i] then exit(-1)
+    else if a[slice1a+i] > b[slice1b+i] then exit(1);
+  exit(0);
+end;
+
+function arrayEqual(a, b: array of longword; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): boolean;
+begin
+  result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
@@ -859,7 +994,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: TInt64Array; var slice1, slice2: integer); overload;
+procedure arraySliceIndices(const a: array of int64; var slice1, slice2: integer); overload;
 begin
   if (slice2 = -1) and (slice1 = -1) then begin
     slice2 := high(a);
@@ -870,7 +1005,7 @@ begin
   end;
 end;
 
-function arrayIndexOf(const a: TInt64Array; const e: int64;
+function arrayIndexOf(const a: array of int64; const e: int64;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
@@ -881,7 +1016,18 @@ begin
   result:=-1;
 end;
 
-function arrayIndexOfSmallest(const a: TInt64Array; slice1, slice2: integer): integer;
+function arraySlice(a: array of int64; slice1: integer; slice2: integer
+ ): TInt64Array;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  SetLength(result, slice2-slice1+1);
+  for i:=0 to high(result) do
+    result[i] := a[slice1+i];
+end;
+
+function arrayIndexOfSmallest(const a: array of int64; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -891,7 +1037,7 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: TInt64Array; slice1, slice2: integer): integer;
+function arrayIndexOfLargest(const a: array of int64; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -901,7 +1047,7 @@ begin
        Result:=i;
 end;
 
-procedure arrayInvert(a: TInt64Array; slice1, slice2: integer);
+procedure arrayInvert(a: TInt64Array; slice1: integer; slice2: integer);
 var temp: int64;
  i: Integer;
 begin
@@ -911,6 +1057,27 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayCompare(a, b: array of int64; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): longint;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1a, slice2a);
+  arraySliceIndices(b, slice1b, slice2b);
+  if slice2a - slice1a < slice2b - slice1b then exit(-1);
+  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  for i:=0 to slice1b - slice1a do
+    if a[slice1a+i] < b[slice1b+i] then exit(-1)
+    else if a[slice1a+i] > b[slice1b+i] then exit(1);
+  exit(0);
+end;
+
+function arrayEqual(a, b: array of int64; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): boolean;
+begin
+  result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
@@ -960,7 +1127,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: TFloatArray; var slice1, slice2: integer); overload;
+procedure arraySliceIndices(const a: array of float; var slice1, slice2: integer); overload;
 begin
   if (slice2 = -1) and (slice1 = -1) then begin
     slice2 := high(a);
@@ -971,7 +1138,7 @@ begin
   end;
 end;
 
-function arrayIndexOf(const a: TFloatArray; const e: float;
+function arrayIndexOf(const a: array of float; const e: float;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
@@ -982,7 +1149,18 @@ begin
   result:=-1;
 end;
 
-function arrayIndexOfSmallest(const a: TFloatArray; slice1, slice2: integer): integer;
+function arraySlice(a: array of float; slice1: integer; slice2: integer
+ ): TFloatArray;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1, slice2);
+  SetLength(result, slice2-slice1+1);
+  for i:=0 to high(result) do
+    result[i] := a[slice1+i];
+end;
+
+function arrayIndexOfSmallest(const a: array of float; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -992,7 +1170,7 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: TFloatArray; slice1, slice2: integer): integer;
+function arrayIndexOfLargest(const a: array of float; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
   arraySliceIndices(a, slice1, slice2);
@@ -1002,7 +1180,7 @@ begin
        Result:=i;
 end;
 
-procedure arrayInvert(a: TFloatArray; slice1, slice2: integer);
+procedure arrayInvert(a: TFloatArray; slice1: integer; slice2: integer);
 var temp: float;
  i: Integer;
 begin
@@ -1012,6 +1190,27 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayCompare(a, b: array of float; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): longint;
+var
+ i: Integer;
+begin
+  arraySliceIndices(a, slice1a, slice2a);
+  arraySliceIndices(b, slice1b, slice2b);
+  if slice2a - slice1a < slice2b - slice1b then exit(-1);
+  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  for i:=0 to slice1b - slice1a do
+    if a[slice1a+i] < b[slice1b+i] then exit(-1)
+    else if a[slice1a+i] > b[slice1b+i] then exit(1);
+  exit(0);
+end;
+
+function arrayEqual(a, b: array of float; slice1a: integer; slice1b: integer;
+ slice2a: integer; slice2b: integer): boolean;
+begin
+  result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
@@ -1299,24 +1498,64 @@ begin
               (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pchar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
 end;
 
-function strindexof(const str, searched: string): longint;
+function strlsIndexOf(str, searched: pchar; l1, l2: longint): longint;
+var last: pchar;
 begin
-  result := pos(searched, str);
+  if l2<=0 then exit(0);
+  if l1<l2 then exit(-1);
+  last:=str+(l1-l2);
+  result:=0;
+  while str <= last do begin
+    if str^ = searched^ then
+      if strlsequal(str, searched, l2, l2) then
+        exit();
+    inc(str);
+    result+=1;
+  end;
+  result:=-1;
 end;
 
-function striindexof(const str, searched: string): longint;
+function strlsiIndexOf(str, searched: pchar; l1, l2: longint): longint;
+var last: pchar;
 begin
-  result:=pos(LowerCase(searched), LowerCase(str));
+  if l2<=0 then exit(0);
+  if l1<l2 then exit(-1);
+  last:=str+(l1-l2);
+  result:=0;
+  while str <= last do begin
+    if upcase(str^) = upcase(searched^) then
+      if strlsiequal(str+1, searched+1, l2-1, l2-1) then
+        exit();
+    inc(str);
+    result+=1;
+  end;
+  result:=-1;
 end;
 
-function strcontains(const str, searched: string): boolean;
+function strindexof(const str, searched: string; from: longint = 1): longint;
 begin
-  result:=pos(searched, str) > 0;
+  if from > length(str) then exit(0);
+  result := strlsIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
+  if result < 0 then exit(0);
+  result += from;
 end;
 
-function stricontains(const str, searched: string): boolean;
+function striindexof(const str, searched: string; from: longint = 1): longint;
 begin
-  result:=striindexof(str, searched) > 0;
+  if from > length(str) then exit(0);
+  result := strlsiIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
+  if result < 0 then exit(0);
+  result += from;
+end;
+
+function strcontains(const str, searched: string; from: longint = 1): boolean;
+begin
+  result:=strindexof(str, searched, from) > 0;
+end;
+
+function stricontains(const str, searched: string; from: longint = 1): boolean;
+begin
+  result:=striindexof(str, searched, from) > 0;
 end;
 
 function strcopyfrom(const s: string; start: longint): string; inline;overload;
@@ -1427,30 +1666,36 @@ begin
   end;
 end;
 
+
+
 procedure strSplit(out splitted: TStringArray; s, sep: string; includeEmpty: boolean);
 var p:longint;
+    m: longint;
+    reslen: longint;
 begin
   SetLength(splitted,0);
-  if s='' then
-    exit;
-  p:=pos(sep,s);
-  while p>0 do begin
-    if p=1 then begin
-      if includeEmpty then begin
-        setlength(splitted,length(splitted)+1);
-        splitted[high(splitted)]:='';
-      end;
-    end else begin
-      setlength(splitted,length(splitted)+1);
-      splitted[high(splitted)]:=copy(s,1,p-1);
+  reslen := 0;
+  if s='' then begin
+    if includeEmpty then begin
+      SetLength(splitted, 1);
+      splitted[0] := '';
     end;
-    delete(s,1,p+length(sep)-1);
-    p:=pos(sep,s);
+    exit;
   end;
-  if (s<>'') or includeEmpty then begin
-    SetLength(splitted,length(splitted)+1);
-    splitted[high(splitted)]:=s;
+  p:=pos(sep,s);
+  m:=1;
+  while p>0 do begin
+    if p=m then begin
+      if includeEmpty then
+        arrayAddFast(splitted, reslen, '');
+    end else
+      arrayAddFast(splitted, reslen, copy(s,m,p-m));
+    m:=p+length(sep);
+    p:=strindexof(s, sep, m);
   end;
+  if (m<>length(s)+1) or includeEmpty then
+    arrayAddFast(splitted, reslen, strcopyfrom(s,m));
+  SetLength(splitted, reslen);
 end;
 
 function strSplit(s, sep: string; includeEmpty: boolean): TStringArray;
@@ -7173,6 +7418,14 @@ begin
   test(length(a) =2); test(a[0] = 17); test(a[1] = 23);
   arrayAdd(a, -42);
   test(length(a) =3); test(a[0] = 17); test(a[1] = 23); test(a[2] = -42);
+  test(arrayEqual(a, [longint(17),23,-42]));
+  test(arrayEqual(a, [longint(17),23,-42,0]) = false);
+  test(arrayEqual(a, [longint(17),23]) = false);
+  test(arrayEqual(a, [longint(17),23], 1));
+
+  test(arrayCompare([1,2,3], [longint(1),2,3]) = 0);
+  test(arrayCompare([1,2], [longint(1),2,3]) = -1);
+  test(arrayCompare([1,2,3], [longint(1),2]) = 1);
 
   test(arrayIndexOfSmallest(a) = 2);
   test(arrayIndexOfLargest(a) = 1);
@@ -7184,6 +7437,7 @@ begin
   test(arrayIndexOf(a, 17) = 0);
   test(arrayIndexOf(a, 17, 1, 2) = -1);
   test(arrayIndexOf(a, 23, 1, 2) = 1);
+
 
   arrayDelete(a, 0);
   test(length(a) =2); test(a[0] = -42); test(a[1] = 23);
@@ -7223,8 +7477,15 @@ begin
   arrayInvert(a, 1, 4);
   test((length(a) = 16) and (len=5) and (a[0]=19)and (a[1]=88)and (a[2]=17)and (a[3]=16)and (a[4]=18));
 
-  //fast allocation
-{  len:=0;
+  //tests
+  test(arrayEqual([longint(1),2,3,4,5], [3,4], 2, 1, 3));
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 1, 3));
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 2, 3) = false);
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 2, 4) );
+  test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 0, 4, 2) );
+
+  //fast allocation  , it is a little bit slow
+ { len:=0;
   for i:=0 to 100000 do begin
     arrayAddFast(a, len, i);
 
@@ -7237,6 +7498,8 @@ begin
 end;
 
 procedure stringUnitTests( );
+var
+ sa: TStringArray;
 begin
   test(strlequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);
   test(strlequal(pchar('abcd'),pchar('abc'), 3, 2) = false);
@@ -7267,6 +7530,8 @@ begin
   test(strlsiequal(pchar('aBCd'),pchar('abcx'), 3, 3) = true);
   test(strlsiequal(pchar('aBCd'),pchar('abc'), 3, 2) = false);
   test(strlsiequal(pchar('aBc'),pchar('abc'), 3, 3) = true);
+  test(strlsiequal(pchar('xy'#0'XY'),pchar('XY'#0'xy'), 5, 5) = true);
+  test(strlsiequal(pchar('xy'#0'XZ'),pchar('XY'#0'xy'), 5, 5) = false);
 
 
   test(strlequal(pchar('abc'), 'ab', 2) =  true);
@@ -7353,6 +7618,77 @@ begin
   test(striendswith('Hallo'#0'Welt', 'o'#0'Welt'));
   test(striendswith('Hallo'#0'Welt', ''));
   test(striendswith('', 'Welt') = false);
+
+  test(strindexof('hausmaus','aus') = 2);
+  test(strindexof('hausmaus','aus', 2) = 2);
+  test(strindexof('hausmaus','aus', 3) = 6);
+  test(strindexof('abc'#0#1#2#3'def'#0#1#2#3#4,#0#1#2#3#4, 3) = 11);
+  test(strindexof('short', 'short') = 1);
+  test(strindexof('short', 'longcat') = 0);
+  test(striindexof('hAUSMAUS','aus') = 2);
+  test(striindexof('hAUSMAUS','aus', 2) = 2);
+  test(striindexof('hAUSMAUS','aus', 3) = 6);
+  test(striindexof('hAUSMAUS','auxs', 3) = 0);
+  test(striindexof('abc'#0#1#2#3'def'#0#1#2#3#4,#0#1#2#3#4, 3) = 11);
+  test(striindexof('maus', '') = 1);
+  test(striindexof('maus', '', 2) = 2);
+  test(striindexof('maus', '', 4) = 4);
+  test(striindexof('maus', '', 5) = 0);
+  test(striindexof('short', 'longcat') = 0);
+  test(striindexof('shOrt', 'short') = 1);
+  test(striindexof('short', 'short'#0) = 0);
+  test(striindexof('short'#0, 'short') = 1);
+
+  sa:=strSplit('',',');
+  test(length(sa) = 1);
+  test(sa[0] = '');
+  sa:=strSplit('',',',false);
+  test(length(sa) = 0);
+  sa:=strSplit('hallo',',');
+  test(length(sa) = 1);
+  test(sa[0] = 'hallo');
+  sa:=strSplit('hallo, welt',',');
+  test(length(sa) = 2);
+  test(sa[0] = 'hallo');
+  test(sa[1] = ' welt');
+  sa:=strSplit('hallo,,welt',',');
+  test(length(sa) = 3);
+  test(sa[0] = 'hallo');
+  test(sa[1] = '');
+  test(sa[2] = 'welt');
+  sa:=strSplit(',hallo,,welt,',',');
+  test(length(sa) = 5);
+  test(sa[0] = '');
+  test(sa[1] = 'hallo');
+  test(sa[2] = '');
+  test(sa[3] = 'welt');
+  test(sa[4] = '');
+  sa:=strSplit(',hallo,,welt,',',',false);
+  test(length(sa) = 2);
+  test(sa[0] = 'hallo');
+  test(sa[1] = 'welt');
+  sa:=strSplit('foo:-:bar:-:xyt',':-:',false);
+  test(length(sa) = 3);
+  test(sa[0] = 'foo');
+  test(sa[1] = 'bar');
+  test(sa[2] = 'xyt');
+  sa:=strSplit(':-:foo:-:bar:-:xyt',':-:',false);
+  test(length(sa) = 3);
+  test(sa[0] = 'foo');
+  test(sa[1] = 'bar');
+  test(sa[2] = 'xyt');
+  sa:=strSplit(':-:f'#0#0':-:bar:-:xyt:-:',':-:',false);
+  test(length(sa) = 3);
+  test(sa[0] = 'f'#0#0);
+  test(sa[1] = 'bar');
+  test(sa[2] = 'xyt');
+  sa:=strSplit(':-:f'#0#0':-:bar:-:xyt:-:',':-:',true);
+  test(length(sa) = 5);
+  test(sa[0] = '');
+  test(sa[1] = 'f'#0#0);
+  test(sa[2] = 'bar');
+  test(sa[3] = 'xyt');
+  test(sa[4] = '');
 end;
 
 procedure unitTests();
@@ -7470,6 +7806,7 @@ begin
   for i:=0 to 100 do
     if ar64[i]<>i*10 then
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
+  writeln(stderr,'okidoki');
 end;
 
 initialization
