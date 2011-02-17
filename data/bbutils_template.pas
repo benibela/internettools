@@ -188,14 +188,18 @@ function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**<
 function strRpos(c:char;s:string):longint;
 //**Counts all occurences of search in searchIn (case sensitive, stops at #0)
 function strlCount(const search:char; const searchIn:pchar; const len: longint): longint;
+//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+function strlsIndexOf(str,searched:pchar; l1, l2: longint): longint;
+//**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
+function strlsiIndexOf(str,searched:pchar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string):longint; inline;
+function strIndexOf(const str,searched:string; from: longint = 1):longint;inline;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string):longint; inline;
+function striIndexOf(const str,searched:string; from: longint = 1):longint; inline;
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strContains(const str,searched:string):boolean; inline;
+function strContains(const str,searched:string; from: longint = 1):boolean; inline;
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striContains(const str,searched:string):boolean; inline;
+function striContains(const str,searched:string; from: longint = 1):boolean; inline;
 
 //more specialized
 type TCharSet = set of char;
@@ -731,24 +735,64 @@ begin
               (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pchar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
 end;
 
-function strindexof(const str, searched: string): longint;
+function strlsIndexOf(str, searched: pchar; l1, l2: longint): longint;
+var last: pchar;
 begin
-  result := pos(searched, str);
+  if l2<=0 then exit(0);
+  if l1<l2 then exit(-1);
+  last:=str+(l1-l2);
+  result:=0;
+  while str <= last do begin
+    if str^ = searched^ then
+      if strlsequal(str, searched, l2, l2) then
+        exit();
+    inc(str);
+    result+=1;
+  end;
+  result:=-1;
 end;
 
-function striindexof(const str, searched: string): longint;
+function strlsiIndexOf(str, searched: pchar; l1, l2: longint): longint;
+var last: pchar;
 begin
-  result:=pos(LowerCase(searched), LowerCase(str));
+  if l2<=0 then exit(0);
+  if l1<l2 then exit(-1);
+  last:=str+(l1-l2);
+  result:=0;
+  while str <= last do begin
+    if upcase(str^) = upcase(searched^) then
+      if strlsiequal(str+1, searched+1, l2-1, l2-1) then
+        exit();
+    inc(str);
+    result+=1;
+  end;
+  result:=-1;
 end;
 
-function strcontains(const str, searched: string): boolean;
+function strindexof(const str, searched: string; from: longint = 1): longint;
 begin
-  result:=pos(searched, str) > 0;
+  if from > length(str) then exit(0);
+  result := strlsIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
+  if result < 0 then exit(0);
+  result += from;
 end;
 
-function stricontains(const str, searched: string): boolean;
+function striindexof(const str, searched: string; from: longint = 1): longint;
 begin
-  result:=striindexof(str, searched) > 0;
+  if from > length(str) then exit(0);
+  result := strlsiIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
+  if result < 0 then exit(0);
+  result += from;
+end;
+
+function strcontains(const str, searched: string; from: longint = 1): boolean;
+begin
+  result:=strindexof(str, searched, from) > 0;
+end;
+
+function stricontains(const str, searched: string; from: longint = 1): boolean;
+begin
+  result:=striindexof(str, searched, from) > 0;
 end;
 
 function strcopyfrom(const s: string; start: longint): string; inline;overload;
@@ -1985,6 +2029,8 @@ begin
   test(strlsiequal(pchar('aBCd'),pchar('abcx'), 3, 3) = true);
   test(strlsiequal(pchar('aBCd'),pchar('abc'), 3, 2) = false);
   test(strlsiequal(pchar('aBc'),pchar('abc'), 3, 3) = true);
+  test(strlsiequal(pchar('xy'#0'XY'),pchar('XY'#0'xy'), 5, 5) = true);
+  test(strlsiequal(pchar('xy'#0'XZ'),pchar('XY'#0'xy'), 5, 5) = false);
 
 
   test(strlequal(pchar('abc'), 'ab', 2) =  true);
@@ -2071,6 +2117,26 @@ begin
   test(striendswith('Hallo'#0'Welt', 'o'#0'Welt'));
   test(striendswith('Hallo'#0'Welt', ''));
   test(striendswith('', 'Welt') = false);
+
+  test(strindexof('hausmaus','aus') = 2);
+  test(strindexof('hausmaus','aus', 2) = 2);
+  test(strindexof('hausmaus','aus', 3) = 6);
+  test(strindexof('abc'#0#1#2#3'def'#0#1#2#3#4,#0#1#2#3#4, 3) = 11);
+  test(strindexof('short', 'short') = 1);
+  test(strindexof('short', 'longcat') = 0);
+  test(striindexof('hAUSMAUS','aus') = 2);
+  test(striindexof('hAUSMAUS','aus', 2) = 2);
+  test(striindexof('hAUSMAUS','aus', 3) = 6);
+  test(striindexof('hAUSMAUS','auxs', 3) = 0);
+  test(striindexof('abc'#0#1#2#3'def'#0#1#2#3#4,#0#1#2#3#4, 3) = 11);
+  test(striindexof('maus', '') = 1);
+  test(striindexof('maus', '', 2) = 2);
+  test(striindexof('maus', '', 4) = 4);
+  test(striindexof('maus', '', 5) = 0);
+  test(striindexof('short', 'longcat') = 0);
+  test(striindexof('shOrt', 'short') = 1);
+  test(striindexof('short', 'short'#0) = 0);
+  test(striindexof('short'#0, 'short') = 1);
 end;
 
 procedure unitTests();
