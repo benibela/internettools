@@ -903,30 +903,59 @@ begin
   end;
 end;
 
+{%REPEAT}
+//copied from bbutils, need this here
+procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
+begin
+  if reserveLength <= len then exit;
+  if reserveLength <= length(a) then exit;
+  if reserveLength <= 4  then SetLength(a, 4)
+  else if reserveLength <= 16 then SetLength(a, 16)
+  else if (len <= 1024) and (reserveLength <= 2*len) then SetLength(a, 2*len)
+  else if (length(a) <= 1024) and (reserveLength <= 2*length(a)) then SetLength(a, 2*length(a))
+  else if (reserveLength <= len+1024) then SetLength(a, len+1024)
+  else if (reserveLength <= length(a)+1024) then SetLength(a, length(a)+1024)
+  else SetLength(a, reserveLength);
+end;
+
+function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint;
+begin
+  if len >= length(a) then
+    arrayReserveFast(a, len, len+1);
+  result:=len;
+  len+=1;
+  a[result] := e;
+end;
+{%END-REPEAT}
+
 procedure strSplit(out splitted: TStringArray; s, sep: string; includeEmpty: boolean);
 var p:longint;
+    m: longint;
+    reslen: longint;
 begin
   SetLength(splitted,0);
-  if s='' then
-    exit;
-  p:=pos(sep,s);
-  while p>0 do begin
-    if p=1 then begin
-      if includeEmpty then begin
-        setlength(splitted,length(splitted)+1);
-        splitted[high(splitted)]:='';
-      end;
-    end else begin
-      setlength(splitted,length(splitted)+1);
-      splitted[high(splitted)]:=copy(s,1,p-1);
+  reslen := 0;
+  if s='' then begin
+    if includeEmpty then begin
+      SetLength(splitted, 1);
+      splitted[0] := '';
     end;
-    delete(s,1,p+length(sep)-1);
-    p:=pos(sep,s);
+    exit;
   end;
-  if (s<>'') or includeEmpty then begin
-    SetLength(splitted,length(splitted)+1);
-    splitted[high(splitted)]:=s;
+  p:=pos(sep,s);
+  m:=1;
+  while p>0 do begin
+    if p=m then begin
+      if includeEmpty then
+        arrayAddFast(splitted, reslen, '');
+    end else
+      arrayAddFast(splitted, reslen, copy(s,m,p-m));
+    m:=p+length(sep);
+    p:=strindexof(s, sep, m);
   end;
+  if (m<>length(s)+1) or includeEmpty then
+    arrayAddFast(splitted, reslen, strcopyfrom(s,m));
+  SetLength(splitted, reslen);
 end;
 
 function strSplit(s, sep: string; includeEmpty: boolean): TStringArray;
@@ -1999,6 +2028,8 @@ begin
 end;
 
 procedure stringUnitTests( );
+var
+ sa: TStringArray;
 begin
   test(strlequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);
   test(strlequal(pchar('abcd'),pchar('abc'), 3, 2) = false);
@@ -2137,6 +2168,57 @@ begin
   test(striindexof('shOrt', 'short') = 1);
   test(striindexof('short', 'short'#0) = 0);
   test(striindexof('short'#0, 'short') = 1);
+
+  sa:=strSplit('',',');
+  test(length(sa) = 1);
+  test(sa[0] = '');
+  sa:=strSplit('',',',false);
+  test(length(sa) = 0);
+  sa:=strSplit('hallo',',');
+  test(length(sa) = 1);
+  test(sa[0] = 'hallo');
+  sa:=strSplit('hallo, welt',',');
+  test(length(sa) = 2);
+  test(sa[0] = 'hallo');
+  test(sa[1] = ' welt');
+  sa:=strSplit('hallo,,welt',',');
+  test(length(sa) = 3);
+  test(sa[0] = 'hallo');
+  test(sa[1] = '');
+  test(sa[2] = 'welt');
+  sa:=strSplit(',hallo,,welt,',',');
+  test(length(sa) = 5);
+  test(sa[0] = '');
+  test(sa[1] = 'hallo');
+  test(sa[2] = '');
+  test(sa[3] = 'welt');
+  test(sa[4] = '');
+  sa:=strSplit(',hallo,,welt,',',',false);
+  test(length(sa) = 2);
+  test(sa[0] = 'hallo');
+  test(sa[1] = 'welt');
+  sa:=strSplit('foo:-:bar:-:xyt',':-:',false);
+  test(length(sa) = 3);
+  test(sa[0] = 'foo');
+  test(sa[1] = 'bar');
+  test(sa[2] = 'xyt');
+  sa:=strSplit(':-:foo:-:bar:-:xyt',':-:',false);
+  test(length(sa) = 3);
+  test(sa[0] = 'foo');
+  test(sa[1] = 'bar');
+  test(sa[2] = 'xyt');
+  sa:=strSplit(':-:f'#0#0':-:bar:-:xyt:-:',':-:',false);
+  test(length(sa) = 3);
+  test(sa[0] = 'f'#0#0);
+  test(sa[1] = 'bar');
+  test(sa[2] = 'xyt');
+  sa:=strSplit(':-:f'#0#0':-:bar:-:xyt:-:',':-:',true);
+  test(length(sa) = 5);
+  test(sa[0] = '');
+  test(sa[1] = 'f'#0#0);
+  test(sa[2] = 'bar');
+  test(sa[3] = 'xyt');
+  test(sa[4] = '');
 end;
 
 procedure unitTests();
