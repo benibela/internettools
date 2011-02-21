@@ -533,8 +533,8 @@ begin
   FHTML.parseTree(html);
 
   //encoding trouble
-  FHTML.setEncoding(outputEncoding);
-  FTemplate.setEncoding(outputEncoding);
+  FHTML.setEncoding(outputEncoding,true,true);
+  FTemplate.setEncoding(outputEncoding, true, true);
 
   if FParsingExceptions then begin
     cur := FTemplate.getTree;

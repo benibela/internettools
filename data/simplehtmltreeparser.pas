@@ -48,7 +48,7 @@ TTreeElement = class
 //otherwise use the functions
   procedure deleteNext(); //**<delete the next node (you have to delete the reverse tag manually)
   procedure deleteAll(); //**<deletes the tree
-  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
+  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
   //Complex search functions.
@@ -128,7 +128,7 @@ public
   //**Changes the tree encoding
   //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
   //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
-  procedure setEncoding(new: TEncoding; convertExistingTree: Boolean = true; convertEntities: boolean =true);
+  procedure setEncoding(new: TEncoding; convertExistingTree: Boolean; convertEntities: boolean);
 published
   //** Parsing model, see TParsingModel
   property parsingModel: TParsingModel read FParsingModel write FParsingModel;
@@ -160,7 +160,7 @@ begin
   Free;
 end;
 
-procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: boolean);
+procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
 var tree: TTreeElement;
   s: String;
 begin
@@ -171,11 +171,13 @@ begin
     if tree.typ = tetText then begin
       tree.value:=strChangeEncoding(tree.value, from, toe);
       if substituteEntities then tree.value:=strDecodeHTMLEntities(tree.value, toe, false);
+      if trimText then tree.value:=trim(tree.value); //retrim because &nbsp; replacements could have introduce new spaces
     end else if tree.typ = tetComment then begin
       tree.value:=strChangeEncoding(tree.value, from, toe);
     end else if tree.attributes <> nil then begin
       s :=strChangeEncoding(tree.attributes.text,from,toe);
       if substituteEntities then s:=strDecodeHTMLEntities(s, toe, false);
+      if trimText then s:=trim(s);
       tree.attributes.text:=s;
     end;
     //TODO: convert tree tag names (but this is not necessary as long as only latin1 and utf8 is supported)
@@ -567,12 +569,11 @@ begin
   exit(FEncoding);
 end;
 
-procedure TTreeParser.setEncoding(new: TEncoding; convertExistingTree,
-  convertEntities: boolean);
+procedure TTreeParser.setEncoding(new: TEncoding; convertExistingTree: Boolean; convertEntities: boolean);
 begin
   if FRootElement = nil then exit;
   if (FEncoding = eUnknown) or not convertExistingTree then FEncoding:= new;
-  if convertExistingTree or convertEntities then FRootElement.changeEncoding(FEncoding, new, convertEntities);
+  if convertExistingTree or convertEntities then FRootElement.changeEncoding(FEncoding, new, convertEntities, FTrimText);
   FEncoding := new;
 end;
 
