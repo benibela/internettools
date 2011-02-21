@@ -1476,8 +1476,8 @@ const entities: array[1..2138] of TEntity=(
 (s:'&natur;';c:$0266E),
 (s:'&natural;';c:$0266E),
 (s:'&naturals;';c:$02115),
-(s:'&nbsp;';c:$000A0),
-(s:'&nbsp';c:$000A0),
+(s:'&nbsp;';c:$00020),
+(s:'&nbsp';c:$00020),
 (s:'&ncap;';c:$02A43),
 (s:'&ncaron;';c:$00148),
 (s:'&ncedil;';c:$00146),
@@ -2399,6 +2399,7 @@ begin
 
   for i:=low(entities)+1 to high(entities) do begin
     if (entities[i-1].s > entities[i].s) and (entities[i-1].s <> entities[i].s+';') then raise Exception.Create('table not sorted: '+entities[i-1].s+' > '+entities[i].s);
+    if (entities[i-1].s='&nbsp;') and (entities[i-1].c<>$20) then raise Exception.Create('bad nbsp replacement');
     if length(entities[i].s) < 3 then raise Exception.Create('too short: '+entities[i].s);
   end;
 
