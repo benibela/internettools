@@ -101,6 +101,7 @@ begin
   if Referer <> '' then
     connection.Headers.Add('Referer: '+Referer);
   connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml');;
+  connection.Protocol:='1.1';
 
   if (UpperCase(protocol)='HTTPS') then
     if (not IsSSLloaded) then //check if ssl is actually loaded
