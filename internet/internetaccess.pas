@@ -287,7 +287,7 @@ begin
 end;
 
 class function TInternetAccess.urlEncodeData(data: string): string;
-const ENCODE_TABLE:array[1..19,0..1] of string=(('%','%25'),
+const ENCODE_TABLE:array[1..25,0..1] of string=(('%','%25'),
                                                (#9,'%09'), //tab
                                                (#10,'%0A'),//new line and carriage return (13,10)
                                                (#13,'%0D'),
@@ -306,8 +306,13 @@ const ENCODE_TABLE:array[1..19,0..1] of string=(('%','%25'),
                                                (';','%3B'),
                                                ('=','%3D'),
                                                ('?','%3F'),
-                                               ('@','%40')
-//                                               ('ü', '%FC')
+                                               ('@','%40'),
+                                               ('ü', '%FC'),
+                                               ('ö', '%F6'),
+                                               ('ä', '%E4'),
+                                               ('Ü', '%DC'),
+                                               ('Ö', '%D6'),
+                                               ('Ä', '%C4')
                                                );
 var i:integer;
 begin
