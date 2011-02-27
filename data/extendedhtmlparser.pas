@@ -144,7 +144,7 @@ end;
 
   There are 5 special commands allowed:
    @unorderedList(
-      @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding the template, only windows-1252 and utf-8 allowed)
+      @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding of the template, only windows-1252 and utf-8 allowed)
       @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>)
         @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
       @item(@code(<htmlparser:loop>  .. </htmlparser:loop>)
@@ -1114,4 +1114,4 @@ end;
 
 end.
 
-
+

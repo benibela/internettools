@@ -44,16 +44,21 @@ type
   { TCustomInternetAccess }
 
   { TInternetAccess }
+  THTTPConnectMethod=(hcmGet, hcmPost);
   //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
+  //**Event to intercept transfers end/start
+  TTransferStartEvent=procedure (sender: TObject; var method: THTTPConnectMethod; var protocol,host,url, data:string) of object;
+  TTransferEndEvent=procedure (sender: TObject; method: THTTPConnectMethod; protocol,host,url, data:string; var result: string) of object;
   //**@abstract(Abstract base class for connections)
   //**There are two child classes TW32InternetAccess and TSynapseInternetAccess which
   //**you should assign once to defaultInternetAccessClass and then use this class
   //**variable@br
   //**If a transfer fails it will raise a EInternetException
-  THTTPConnectMethod=(hcmGet, hcmPost);
   TInternetAccess=class
   private
+   FOnTransferEnd: TTransferEndEvent;
+   FOnTransferStart: TTransferStartEvent;
     function transfer(method: THTTPConnectMethod; protocol,host,url, data:string;progressEvent: TProgressEvent=nil):string;
   protected
     function doTransfer(method: THTTPConnectMethod; protocol,host,url, data:string; progressEvent: TProgressEvent):string;virtual;abstract;
@@ -90,6 +95,11 @@ type
     procedure closeOpenedConnections();virtual;abstract;
     //**Encodes the passed string in the url encoded format
     class function urlEncodeData(data: string): string;
+    //**Encodes all var=... pairs of data in the url encoded format
+    class function urlEncodeData(data: TStringList): string;
+  published
+    property OnTransferStart: TTransferStartEvent read FOnTransferStart write FOnTransferStart;
+    property OnTransferEnd: TTransferEndEvent read FOnTransferEnd write FOnTransferEnd;
   end;
   EInternetException=class(Exception)
     details:string;
@@ -164,9 +174,13 @@ function TInternetAccess.transfer(method: THTTPConnectMethod; protocol, host, ur
   progressEvent: TProgressEvent):string;
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
+  if assigned(FOnTransferStart) then
+    FOnTransferStart(self, method, protocol, host, url, data);
   result:=doTransfer(method,protocol,host,url,data,progressEvent);
   if internetConfig^.logToPath<>'' then
     writeString(internetConfig^.logToPath, protocol+'://'+host+url+'<-DATA:'+data,result);
+  if assigned(FOnTransferEnd) then
+    FOnTransferEnd(self, method, protocol, host, url, data, Result);
 end;
 
 
@@ -320,5 +334,17 @@ begin
   for i:=low(ENCODE_TABLE) to high(ENCODE_TABLE) do
     result:=StringReplace(result,ENCODE_TABLE[i,0],ENCODE_TABLE[i,1],[rfReplaceAll]);
 end;
+
+class function TInternetAccess.urlEncodeData(data: TStringList): string;
+var
+ i: Integer;
+begin
+  Result:='';
+  for i:=0 to data.Count-1 do begin
+    if result <> '' then result+='&';
+    result+=urlEncodeData(data.Names[i])+'='+urlEncodeData(data.ValueFromIndex[i]);
+  end;
+end;
+
 end.
 
