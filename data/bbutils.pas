@@ -60,7 +60,7 @@ uses
   , windows
   {$ENDIF};
 
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
@@ -426,9 +426,9 @@ function strFromPtr(p: pointer): string;
 
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
-//**log 10 rounded down (= number of digits in base 10)
+//**log 10 rounded down (= number of digits in base 10 - 1)
 function intLog10(i:longint):longint; overload;
-//**log_b n  rounded down (= number of digits of n in base b)
+//**log_b n  rounded down (= number of digits of n in base b - 1)
 function intLog(n,b: longint): longint; overload;
 //**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
 procedure intFactor(n,p: longint; out e, r:longint);
@@ -464,10 +464,13 @@ function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
 //**Z-Score of the value k in a distribution with n outcomes
 function binomialZScore(n:longint;p:float;k:longint):float;
 
-//**This calculates the euler phi function totient[i] := phi(i) = {1 <= j <= i | gcd(i,j) = 0} for all i <= n.@br
+//**This calculates the euler phi function totient[i] := phi(i) = |{1 <= j <= i | gcd(i,j) = 0}| for all i <= n.@br
 //**It uses a sieve approach and is quite fast (10^7 in 3s)@br
 //**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
 procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
+//**This calculates the number of divisors: divcount[i] := |{1 <= j <= i | i mod j = 0}| for all i <= n.@br
+//**Speed: 10^7 in 5s@br
+procedure divisorCountSieve(n: integer; var divcount: TLongintArray);
 
 //--------------------Time functions-----------------------------------
 {$IFDEF Win32}
@@ -6890,6 +6893,24 @@ begin
         totient[j] := totient[r] * (i ** (e-1) ) * (i - 1);
         j+=i;
       end;
+    end;
+  end;
+end;
+
+
+procedure divisorCountSieve(n: integer; var divcount: TLongintArray);
+var
+ i: Integer;
+ j: LongInt;
+begin
+  setlength(divcount, n+1);
+  divcount[0] := 0;
+  for i:=1 to high(divcount) do divcount[i] := 1;
+  for i:=2 to high(divcount) do begin
+    j:=i;
+    while j < length(divcount) do begin
+      divcount[j]+=1;
+      j+=i;
     end;
   end;
 end;
