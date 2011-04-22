@@ -349,14 +349,16 @@ var
 begin
   last := TTreeElement(FElementStack.Last);
   Assert(last<>nil);
-  new := newTreeElement(tetClose, last.value);
-  //new := treeElementClass.create();
-  //new.typ:=tetClose;
-  //new.value:=last.value;
-  new.offset:=last.offset;
-  //new.next:=last.next;
-  //last.next:=new;
-  last.reverse:=new; new.reverse:=last;
+  if last.typ = tetOpen then begin
+    new := newTreeElement(tetClose, last.value);
+    //new := treeElementClass.create();
+    //new.typ:=tetClose;
+    //new.value:=last.value;
+    new.offset:=last.offset;
+    //new.next:=last.next;
+    //last.next:=new;
+    last.reverse:=new; new.reverse:=last;
+  end;
   FElementStack.Delete(FElementStack.Count-1);
   FAutoCloseTag:=false;
 end;
@@ -364,15 +366,47 @@ end;
 function TTreeParser.enterTag(tagName: pchar; tagNameLen: longint;
   properties: THTMLProperties): TParsingResult;
 var
-  new: TTreeElement;
+  new,temp: TTreeElement;
   i: Integer;
+  j: Integer;
 begin
   result:=prContinue;
 
   if FAutoCloseTag then autoCloseLastTag();
+  if (FParsingModel = pmHTML) then begin
+    //table hack (don't allow two open td/tr unless separated by tr/table)
+    if strliEqual(tagName,'td',tagNameLen) then begin
+      for i:=FElementStack.Count-1 downto 0 do begin
+        temp :=TTreeElement(FElementStack[i]);
+        if not (temp.typ in  [tetOpen, tetClose]) then continue;
+        if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
+        if (temp.typ = tetClose) then break;
+        if (temp.typ = tetOpen) and (temp.value='td') then begin
+          for j:=FElementStack.count-1 downto i do
+            autoCloseLastTag();
+          break;
+        end;
+        (*if (temp.typ = [tetOpen]) and ((temp.value='tr') or (temp.value='table')) then *)break;
+      end;
+    end else if strliEqual(tagName,'tr',tagNameLen) then begin
+      for i:=FElementStack.Count-1 downto 0 do begin
+        temp :=TTreeElement(FElementStack[i]);
+        if not (temp.typ in  [tetOpen, tetClose]) then continue;
+        if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
+        if (temp.typ = tetClose) and ((temp.value='tr') or (temp.value='table')) then break;
+        if (temp.typ = tetOpen) and (temp.value='tr') then begin
+          for j:=FElementStack.count-1 downto i do
+            autoCloseLastTag();
+          break;
+        end;
+        if (temp.typ = tetOpen) and (temp.value='table') then break;
+      end;
+    end;
+  end;
   new := newTreeElement(tetOpen, tagName, tagNameLen);
-  if (FParsingModel = pmHTML) then
+  if (FParsingModel = pmHTML) then //normal auto close
     FAutoCloseTag:=htmlTagAutoClosed(new.value);
+
   FElementStack.Add(new);
   if length(properties)>0 then begin
     new.attributes:=TAttributeList.Create;
