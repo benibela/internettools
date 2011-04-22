@@ -137,7 +137,7 @@ begin
           '/': begin //tag end
             inc(pos);
             marker:=pos;
-            while (pos<=htmlEnd) and not (pos^ in [' ','>']) do inc(pos);
+            while (pos<=htmlEnd) and not (pos^ in (['>']+WHITE_SPACE)) do inc(pos);
             if assigned(leaveTagEvent) then
               if leaveTagEvent(marker,pos-marker) = prStop then
                 exit;
@@ -148,7 +148,7 @@ begin
           else begin //tag start
             marker:=pos;
             setlength(properties,0);
-            while (pos<=htmlEnd) and not (pos^ in ['/','>',' ']) do
+            while (pos<=htmlEnd) and not (pos^ in (['/','>']+WHITE_SPACE)) do
               inc(pos);
             tempLen:=pos-marker;
             //read properties
