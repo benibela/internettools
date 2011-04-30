@@ -655,7 +655,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..89] of array[1..3] of string = (
+var data: array[1..91] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -685,6 +685,12 @@ var data: array[1..89] of array[1..3] of string = (
  ('<a><b><htmlparser:read source="comment()" var="test"/></b></a>',
  '<a><b><!--cCc--></b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
  'test=cCc'),
+ ('<a><b><htmlparser:read'#9'source="text()"'#13'var="test"/></b></a>',
+ '<a><b>Dies wird'#9'Variable test</b></a>',
+ 'test=Dies wird'#9'Variable test'),
+ ('<a><b'#13'attrib'#10'='#9'"test"><htmlparser:read'#9'source="text()"'#13'var="test"/></b></a>',
+ '<a><b'#9'attrib           =         '#10'  test>Dies'#9'wird'#9'Variable test</b></a>',
+ 'test=Dies'#9'wird'#9'Variable test'),
  //reading with matching node text
  ('<a><b>Nur diese: <htmlparser:read source="text()" var="test" regex="\d+"/></b></a>',
  '<a><b>1</b><b>2</b><b>Nur diese: 3</b><b>4</b><b>5</b></a>',
@@ -1114,4 +1120,4 @@ end;
 
 end.
 
-
+
