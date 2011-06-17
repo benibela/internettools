@@ -63,7 +63,9 @@ TTreeElement = class
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
 
   function getValue(): string; //**< get the value of this element
-  function getAttribute(const a: string; const def: string=''):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exists
+  function getValueTry(var valueout:string): boolean; //**< get the value of this element if the element exists
+  function getAttribute(const a: string; const def: string=''):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
+  function getAttributeTry(const a: string; var valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
@@ -189,7 +191,7 @@ function TTreeElement.findNext(withTyp: TTreeElementType; withText: string; find
 var cur: TTreeElement;
   splitted: array of string;
 begin
-  if self = nil then exit;
+  if self = nil then exit(nil);
   {if (tefoSplitSlashes in findOptions) and not (tefoIgnoreType in findOptions) and not (tefoIgnoreText in findOptions) and (withTyp = tetOpen) and (pos('/'.withText) > 0) then begin
     result := findNext(tetOpen, strSplitGet('/', withText), findOptions - [tefoSplitSlashes], sequenceEnd);
     while (result <> nil) and (withText <> '') do
@@ -239,13 +241,27 @@ begin
   result := value;
 end;
 
+function TTreeElement.getValueTry(var valueout:string): boolean;
+begin
+  if self = nil then exit(false);
+  valueout := self.value;
+  result := true;
+end;
+
 function TTreeElement.getAttribute(const a: string; const def: string=''):string;
+begin
+  if not getAttributeTry(a, result) then
+    result:=def;
+end;
+
+function TTreeElement.getAttributeTry(const a: string; var valueout: string): boolean;
 var i:integer;
 begin
-  if attributes = nil then exit(def);
+  if (self = nil) or (attributes = nil) then exit(false);
   i := attributes.IndexOfName(a);
-  if i < 0 then exit(def);
-  exit(attributes.ValueFromIndex[i]);
+  if i < 0 then exit(false);
+  valueout := attributes.ValueFromIndex[i];
+  result := true;
 end;
 
 function TTreeElement.getNextSibling(): TTreeElement;
@@ -580,7 +596,7 @@ begin
 
   if parsingModel = pmHTML then begin
     FEncoding:=eUnknown;
-    encoding := lowercase(TPseudoXPathParser.Evaluate('html/head/meta[@http-equiv=''content-type'']/@content', FRootElement));
+    encoding := lowercase(TPseudoXPathParser.EvaluateToString('html/head/meta[@http-equiv=''content-type'']/@content', FRootElement));
     if encoding <> '' then begin
       if pos('charset=utf-8', encoding) > 0 then FEncoding:=eUTF8
       else if (pos('charset=windows-1252',encoding) > 0) or

@@ -192,7 +192,7 @@ THtmlTemplateParser=class
 
     FPseudoXPath: TPseudoXPathParser;
 
-    Fvariables, FVariableLog: TStringList;
+    FVariableLog: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
@@ -200,14 +200,12 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    function executePseudoXPath(str: string):string;
+    function executePseudoXPath(str: string):TPXPValue;
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
     function templateElementFitHTMLOpen(html:TTreeElement; template: TTemplateElement): Boolean;
     function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeElement; templateStart, templateEnd: TTemplateElement): boolean;
-
-    procedure evaluateVariable(sender: TObject; const variable: string; var value: string);
   public
     constructor create;
     destructor destroy; override;
@@ -224,8 +222,8 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     //TODO: optimize variable storage
-    property variables: TStringList read Fvariables;//**<List of all variables
-    property variableChangeLog: TStringList read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
+    //property variables: TStringList read Fvariables;//**<List of all variables
+    property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding;
   end;
@@ -280,7 +278,7 @@ begin
   templateType:=strToCommand(value, typ);
 end;
 
-function THtmlTemplateParser.executePseudoXPath(str: string): string;
+function THtmlTemplateParser.executePseudoXPath(str: string): TPXPValue;
 begin
   //str := replaceVars(str);
   FPseudoXPath.parse(str);
@@ -311,7 +309,7 @@ begin
     exit(true);
   FPseudoXPath.ParentElement := html;
   FPseudoXPath.TextElement := nil;
-  exit(executePseudoXPath(condition)='true');
+  exit(pxpvalueToBoolean(executePseudoXPath(condition)));
 end;
 
 function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeElement;
@@ -366,7 +364,7 @@ var xpathText: TTreeElement;
   begin
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
-    text:=executePseudoXPath(templateStart.attributes.Values['source']);
+    text:=pxpvalueToString(executePseudoXPath(templateStart.attributes.Values['source']));
 
     if templateStart.attributes.Values['regex']<>'' then begin
       regexp:=TRegExpr.Create;
@@ -378,8 +376,7 @@ var xpathText: TTreeElement;
 
     vari:=replaceVars(templateStart.attributes.Values['var']);
 
-    Fvariables.Values[vari] := text;
-    FVariableLog.Add(vari+'='+text);
+    FVariableLog.addVariable(vari, text);
 
     templateStart := TTemplateElement(templateStart.next);
   end;
@@ -393,7 +390,7 @@ var xpathText: TTreeElement;
 
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
-    equal:=executePseudoXPath(condition)='true';
+    equal:=pxpvalueToBoolean(executePseudoXPath(condition));
 
     if not equal then
       templateStart := TTemplateElement(templateStart.reverse) //skip if block
@@ -454,7 +451,7 @@ begin
   if templateStart = nil then exit(false);
   realHtmlStart := htmlStart;
  // assert(templateStart <> templateEnd);
-  logLength:=FVariableLog.Count;
+  FVariableLog.pushAll;
   xpathText := nil;
   while (htmlStart <> nil) and
         (templateStart <> nil) and (templateStart <> templateEnd) and
@@ -482,27 +479,12 @@ begin
 
   result := templateStart = templateEnd;
   if not result then
-    while (FVariableLog.Count>logLength) do begin
-      vari := FVariableLog.Names[FVariableLog.Count-1];
-      FVariableLog.Delete(FVariableLog.Count-1);
-      Fvariables.Values[vari] := FVariableLog.Values[vari];
-    end;
-end;
-
-procedure THtmlTemplateParser.evaluateVariable(sender: TObject;
- const variable: string; var value: string);
-var
- i: LongInt;
-begin
-  i:=variables.IndexOfName(variable);
-  if i <> -1 then
-    value := variables.ValueFromIndex[i];
+    FVariableLog.popAll;
 end;
 
 constructor THtmlTemplateParser.create;
 begin
-  Fvariables := TStringList.Create;
-  FVariableLog := TStringList.Create;
+  FVariableLog := TPXPVariableChangeLog.Create;
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
   FTemplate.treeElementClass:=TTemplateElement;
@@ -510,14 +492,13 @@ begin
   FHTML.parsingModel:=pmHTML;
   FHTML.readComments:=true;
   FPseudoXPath := TPseudoXPathParser.Create;
-  FPseudoXPath.OnEvaluateVariable:=@evaluateVariable;
+  FPseudoXPath.OnEvaluateVariable:=@FVariableLog.evaluateVariable;
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
 end;
 
 destructor THtmlTemplateParser.destroy;
 begin
-  Fvariables.Free;
   FVariableLog.Free;
   FTemplate.Free;
   FHTML.Free;
@@ -527,7 +508,6 @@ end;
 
 function THtmlTemplateParser.parseHTML(html: string; keepOldVariables: boolean=false):boolean;
 var cur,last,realLast:TTreeElement;
-  variableLogStart: LongInt;
   i: Integer;
 begin
   FHTML.parseTree(html);
@@ -544,10 +524,7 @@ begin
     end;
   end;
 
-  FVariableLog.Clear;
-  if not keepOldVariables then Fvariables.Clear
-  else FVariableLog.text := Fvariables.text;
-  variableLogStart := FVariableLog.Count;
+  if not keepOldVariables then FVariableLog.Clear;
 
   FPseudoXPath.RootElement := FHTML.getTree;
 
@@ -575,7 +552,7 @@ begin
     end;
     raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed. for an unknown reason');
   end;
-  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
+//TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;
 
 function THtmlTemplateParser.parseHTMLFile(htmlfilename: string; keepOldVariables: boolean=false):boolean;
@@ -639,7 +616,7 @@ begin
       f:=i+1;
       while (i<=length(s)) and (s[i]<>';')  do inc(i);
       temp:=copy(s,f,i-f);
-      value:=variables.Values[temp];
+      value:=pxpvalueToString(variableChangeLog.getVariableValue(temp));
       if assigned(customReplace) then customReplace(temp,value);
     //  OutputDebugString(pchar(parser.variables.Text));
       result+=value;
@@ -992,10 +969,11 @@ var i:longint;
       sl.Text:=s;
       //check lines to avoid line ending trouble with win/linux
       if extParser.variableChangeLog.Count<>sl.Count then
-        raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+s+'"');
+        raise Exception.Create('Test failed: '+inttostr(i)+': ' +' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
       for j:=0 to sl.count-1 do
-        if extParser.variableChangeLog[j]<>sl[j] then
-          raise Exception.Create('Test failed: '+inttostr(i)+' got: "'+extParser.variableChangeLog.Text+'" expected: "'+s+'"');
+        if (extParser.variableChangeLog.getVariableName(j)<>sl.Names[j]) or
+           (pxpvalueToString(extParser.variableChangeLog.getVariableValue(j))<>sl.ValueFromIndex[j])     then
+          raise Exception.Create('Test failed: '+ inttostr(i)+': '+data[i][1] + #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
   end;
 begin
   extParser:=THtmlTemplateParser.create;
@@ -1011,22 +989,22 @@ begin
   //no coding change utf-8 -> utf-8
   extParser.outputEncoding:=eUTF8;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>uu(bin:'#$C3#$84',ent:&Ouml;)uu</a></html>');
-  if extParser.variables.Values['test']<>'uu(bin:'#$C3#$84',ent:'#$C3#$96')uu' then //ÄÖ
+  if extParser.variableChangeLog.ValuesString['test']<>'uu(bin:'#$C3#$84',ent:'#$C3#$96')uu' then //ÄÖ
     raise Exception.create('ergebnis ungültig utf8->utf8');
   //no coding change latin1 -> latin1
   extParser.outputEncoding:=eWindows1252;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>ll(bin:'#$C4',ent:&Ouml;)ll</a></html>');
-  if extParser.variables.Values['test']<>'ll(bin:'#$C4',ent:'#$D6')ll' then
+  if extParser.variableChangeLog.ValuesString['test']<>'ll(bin:'#$C4',ent:'#$D6')ll' then
     raise Exception.create('ergebnis ungültig latin1->latin1');
   //coding change latin1 -> utf-8
   extParser.outputEncoding:=eUTF8;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>lu(bin:'#$C4',ent:&Ouml;)lu</a></html>');
-  if extParser.variables.Values['test']<>'lu(bin:'#$C3#$84',ent:'#$C3#$96')lu' then
+  if extParser.variableChangeLog.ValuesString['test']<>'lu(bin:'#$C3#$84',ent:'#$C3#$96')lu' then
     raise Exception.create('ergebnis ungültig latin1->utf8');
   //coding change utf8 -> latin1
   extParser.outputEncoding:=eWindows1252;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>ul(bin:'#$C3#$84',ent:&Ouml;)ul</a></html>');
-  if extParser.variables.Values['test']<>'ul(bin:'#$C4',ent:'#$D6')ul' then
+  if extParser.variableChangeLog.ValuesString['test']<>'ul(bin:'#$C4',ent:'#$D6')ul' then
     raise Exception.create('ergebnis ungültig utf8->latin1');
 
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=" /><a>bin:'#$C4#$D6',ent:&Ouml;</a></html>');
@@ -1036,22 +1014,22 @@ begin
 
   //---special keep variables test---
   i:=-2;
-  extParser.variables.Clear;
-  extParser.variables.values['Hallo']:='diego';
+  extParser.variableChangeLog.Clear;
+  extParser.variableChangeLog.ValuesString['Hallo']:='diego';
   extParser.parseTemplate('<a><htmlparser:read source="text()" var="hello"/></a>');
   extParser.parseHTML('<a>maus</a>',true);
-  if extParser.variables.Values['hello']<>'maus' then
+  if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
     raise Exception.Create('invalid var');
-  if extParser.variables.Values['Hallo']<>'diego' then
+  if extParser.variableChangeLog.ValuesString['Hallo']<>'diego' then
     raise Exception.Create('invalid var');
-  checklog('hello=maus');
+  checklog('Hallo=diego'#13'hello=maus');
   extParser.parseTemplate('<a><htmlparser:read source="text()" var="Hallo"/></a>');
   extParser.parseHTML('<a>maus</a>',true);
-  if extParser.variables.Values['hello']<>'maus' then
+  if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
     raise Exception.Create('invalid var');
-  if extParser.variables.Values['Hallo']<>'maus' then
+  if extParser.variableChangeLog.ValuesString['Hallo']<>'maus' then
     raise Exception.Create('invalid var');
-  checklog('Hallo=maus');
+  checklog('Hallo=diego'#13'hello=maus'#13'Hallo=maus');
 
 
 

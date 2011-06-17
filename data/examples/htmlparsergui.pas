@@ -59,9 +59,7 @@ begin
     memo3.Clear;
     //htmlparser.onVariableRead:=@htmlparserVariableRead;
     htmlparser.parseHTML(memo2.Lines.Text);
-    memo3.Lines.Clear;
-    for i:=0 to htmlparser.variableChangeLog.Count-1 do
-      memo3.lines.Add(htmlparser.variableChangeLog[i]);
+    memo3.Lines.Text:=htmlparser.variableChangeLog.debugTextRepresentation;
   finally
     htmlparser.Free;
   end;
@@ -97,7 +95,7 @@ begin
     tp.parseTree(memo2.Lines.Text);
     ppath.ParentElement := tp.getTree;
     ppath.RootElement := tp.getTree;
-    memo3.Lines.Text:=ppath.evaluate();
+    memo3.Lines.Text:=pxpvalueToString(ppath.evaluate());
   finally
     ppath.Free;
   end;
