@@ -63,9 +63,9 @@ TTreeElement = class
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
 
   function getValue(): string; //**< get the value of this element
-  function getValueTry(var valueout:string): boolean; //**< get the value of this element if the element exists
+  function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
   function getAttribute(const a: string; const def: string=''):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
-  function getAttributeTry(const a: string; var valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
+  function getAttributeTry(const a: string; out valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
@@ -189,7 +189,7 @@ end;
 
 function TTreeElement.findNext(withTyp: TTreeElementType; withText: string; findOptions: TTreeElementFindOptions =[]; sequenceEnd: TTreeElement = nil): TTreeElement;
 var cur: TTreeElement;
-  splitted: array of string;
+  //splitted: array of string;
 begin
   if self = nil then exit(nil);
   {if (tefoSplitSlashes in findOptions) and not (tefoIgnoreType in findOptions) and not (tefoIgnoreText in findOptions) and (withTyp = tetOpen) and (pos('/'.withText) > 0) then begin
@@ -241,7 +241,7 @@ begin
   result := value;
 end;
 
-function TTreeElement.getValueTry(var valueout:string): boolean;
+function TTreeElement.getValueTry(out valueout:string): boolean;
 begin
   if self = nil then exit(false);
   valueout := self.value;
@@ -254,7 +254,7 @@ begin
     result:=def;
 end;
 
-function TTreeElement.getAttributeTry(const a: string; var valueout: string): boolean;
+function TTreeElement.getAttributeTry(const a: string; out valueout: string): boolean;
 var i:integer;
 begin
   if (self = nil) or (attributes = nil) then exit(false);
@@ -502,6 +502,7 @@ end;
 
 function TTreeParser.readComment(text: pchar; textLen: longint): TParsingResult;
 begin
+  result:=prContinue;
   if not FReadComments then
     exit;
   if textLen <= 0 then
