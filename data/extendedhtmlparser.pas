@@ -710,11 +710,11 @@ var data: array[1..91] of array[1..3] of string = (
  '<a><img width=120 src="abc.jpg"><img width=320 src="def.jpg"><img width=100 src="123.jpg"><img width=500 src="baum.jpg"></a>',
  'test=123.jpg'),
  //if tests (== strue)
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
  '<a><b>abc</b><c>dies kommt raus</c></a>',
  'test=abc'#13#10'test=dies kommt raus'),
  //if test (== false),
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''==''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
    '<a><b>abcd</b><c>dies kommt nicht raus</c></a>',
    'test=abcd'),
  //IF-Test (!= true)
@@ -726,22 +726,22 @@ var data: array[1..91] of array[1..3] of string = (
   '<a><b>abc</b><c>dies kommt nicht raus</c></a>',
   'test=abc'),
  //Text + If
-   ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+   ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
    '<a><b>nicht ok<c>dies kommt nicht raus</c></b></a>',
    'test=nicht ok'),
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
    '<a><b>ok<c>dies kommt raus!</c></b></a>',
    'test=ok'#13'test=dies kommt raus!'),
   //text + if + not closed
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><img><htmlparser:read source="@src" var="test"/></img></htmlparser:if></b></a>',
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><img><htmlparser:read source="@src" var="test"/></img></htmlparser:if></b></a>',
    '<a><b>ok<img src="abc.png"></b></a>',
    'test=ok'#13'test=abc.png'),
    //text + if + not closed + text
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''"><img><htmlparser:read source="@src" var="test"/></img><htmlparser:read source="text()" var="ende"/></htmlparser:if></b></a>',
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><img><htmlparser:read source="@src" var="test"/></img><htmlparser:read source="text()" var="ende"/></htmlparser:if></b></a>',
   '<a><b>ok<img src="abcd.png"></b></a>',
   'test=ok'#13'test=abcd.png'#13'ende=ok'),
   //text + if + not closed + text
- ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''==''$test;''">  <img><htmlparser:read source="@src" var="test"/><htmlparser:read source="text()" var="ende"/></img>  </htmlparser:if></b></a>',
+ ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''">  <img><htmlparser:read source="@src" var="test"/><htmlparser:read source="text()" var="ende"/></img>  </htmlparser:if></b></a>',
  '<a><b>ok<img src="abcd.png"></b></a>',
  'test=ok'#13'test=abcd.png'#13'ende='),
  //loop complete
@@ -822,7 +822,7 @@ var data: array[1..91] of array[1..3] of string = (
    '<a><br/><br   />abc<br /></a>',
    'test=abc'),
  //xpath conditions
-   ('<html><a htmlparser-condition="filter(@cond, ''a+'') == ''aaa'' "><htmlparser:read source="text()" var="test"/></a></html>',
+   ('<html><a htmlparser-condition="filter(@cond, ''a+'') = ''aaa'' "><htmlparser:read source="text()" var="test"/></a></html>',
    '<html><a>a1</a><a cond="xyz">a2</a><a cond="a">a3</a><a cond="xaay">a4</a><a cond="aaaa">a5</a><a cond="xaaay">a6</a><a cond="xaaaay">a7</a><a cond="xaay">a8</a></html>',
    'test=a6'),
 
