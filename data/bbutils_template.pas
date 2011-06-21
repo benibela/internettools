@@ -289,6 +289,10 @@ function strFromPchar(p:pchar;l:longint):string;
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
 
+//**Case insensitive, clever comparison, that basically splits the string into
+//**lexicographical and numerical parts and compares them accordingly
+function striCompareClever(const s1, s2: string): integer;
+
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
 //**log 10 rounded down (= number of digits in base 10)
@@ -1293,6 +1297,60 @@ end;
 function strFromPtr(p: pointer): string;
 begin
   result:=IntToHex(PtrUInt(p), 2*sizeof(Pointer));
+end;
+
+function striCompareClever(const s1, s2: string): integer;
+var t1,t2:string; //lowercase text
+    i,j,ib,jb,p: longint;
+begin
+  t1:=lowercase(s1);
+  t2:=lowercase(s2);
+  i:=1;
+  j:=1;
+  while (i<=length(t1)) and (j<=length(t2)) do begin
+    if (t1[i] in ['0'..'9']) and (t2[j] in ['0'..'9']) then begin
+      ib:=i;
+      jb:=j;
+      while (t1[i] in ['0'..'9']) and (i<=length(t1)) do inc(i);
+      while (t2[j] in ['0'..'9']) and (j<=length(t2)) do inc(j);
+      if i-ib<j-jb then begin
+        result:=-1; //find longer number
+        exit;
+      end;
+      if i-ib>j-jb then begin
+        result:=1;
+        exit;
+      end;
+      for p:=0 to i-ib-1 do //numerical == lexical
+        if t1[ib+p]<t2[jb+p] then begin
+          result:=-1;
+          exit;
+        end else if t1[ib+p]>t2[jb+p] then begin
+          result:=1;
+          exit;
+        end;
+    end else begin
+      if t1[i]<t2[j] then begin
+        result:=-1;
+        exit;
+      end;
+      if t1[i]>t2[j] then begin
+        result:=1;
+        exit;
+      end;
+      inc(i);
+      inc(j);
+    end;
+  end;
+  if length(t1)<length(t2) then begin
+    result:=-1;
+    exit;
+  end;
+  if length(t1)>length(t2) then begin
+    result:=1;
+    exit;
+  end;
+  result:=0;
 end;
 
 
