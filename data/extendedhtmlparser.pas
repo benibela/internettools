@@ -101,7 +101,7 @@ end;
     Of you can use your own names instead of readFieldX() and they are independent of the html file. So such templates can convert several pages with different structures, to the same internal data layout of your application.
 
   @italic(Example, how to read all rows of every table CSV like):@br
-  Template: @code(<htmlparser:loop> <tr>  <htmlparser:read var="readAnotherRow()" source="deepNodeText(',')"> </tr> </htmlparser:loop> )@br
+  Template: @code(<htmlparser:loop> <tr>  <htmlparser:read var="readAnotherRow()" source="deep-text(',')"> </tr> </htmlparser:loop> )@br
   Html-File: @code(... <tr> <td> a </td> <td> b </td> <td> c </td> </tr> <tr> <td> foo </td> <td> bar </td> </tr> ...)@br
 
   This will read all rows, and write lines like a,b,c and foo,bar to the changelog.@br
@@ -785,15 +785,15 @@ var data: array[1..91] of array[1..3] of string = (
   ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>',
    '<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>',
    'test=los:'#13'test=los:a'#13'test=los:ab'#13'test=los:abc'#13'test=los:abc1'#13'test=los:abc12'#13'test=los:abc123'#13'test=los:abc123A'#13'test=los:abc123AB'#13'test=los:abc123ABC'),
- //deepNodeText()
-  ('<a><x><htmlparser:read source="deepNodeText()" var="test"/></x></a>',
+ //deep-ode-text()
+  ('<a><x><htmlparser:read source="deep-text()" var="test"/></x></a>',
    '<a><x>Test:<b>in b</b><c>in c</c>!</x></a>',
    'test=Test:in bin c!'),
  //deepNodeText with optional element
-  ('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>',
+  ('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deep-text()" var="test2"/></x></a>',
    '<a><x>Test:<br><b>in b</b><c>in c</c>!</x></a>',
    'test1=Test:'#13'test2=Test:in bin c!'),
-  ('<a><pre><htmlparser:read source="text()" var="test2"/></pre><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deepNodeText()" var="test2"/></x></a>',
+  ('<a><pre><htmlparser:read source="text()" var="test2"/></pre><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deep-text()" var="test2"/></x></a>',
    '<a><pre>not called at all</pre><x>Test:<b>in b</b><c>in c</c>!</x></a>',
    'test2=not called at all'#13'test1=Test:'#13'test2=Test:in bin c!'),
 //root node()
