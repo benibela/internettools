@@ -1656,15 +1656,19 @@ function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet
  ): string;
 var i,j: integer;
 begin
- result:=strTrim(s);
+ result:=strTrim(s,trimCharacters);
  j:=1;
  for i:=1 to length(result) do begin
-   if not (result[i] in trimCharacters) then begin
+   if not (result[i] in trimCharacters)  then begin
      result[j]:=result[i];
+     j+=1;
+   end else if result[j-1] <> ' ' then begin
+     result[j]:=' ';
      j+=1;
    end;
  end;
- if j <> length(result) then setlength(result,j);
+ if j -1 <> length(result) then
+   setlength(result,j-1);
 end;
 
 function strSplitGet(const separator: string; var remainingPart: string): string;
