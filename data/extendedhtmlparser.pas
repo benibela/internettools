@@ -710,38 +710,38 @@ var data: array[1..91] of array[1..3] of string = (
  '<a><img width=120 src="abc.jpg"><img width=320 src="def.jpg"><img width=100 src="123.jpg"><img width=500 src="baum.jpg"></a>',
  'test=123.jpg'),
  //if tests (== strue)
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"$test;"="abc"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
  '<a><b>abc</b><c>dies kommt raus</c></a>',
  'test=abc'#13#10'test=dies kommt raus'),
  //if test (== false),
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"$test;"="abc"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
    '<a><b>abcd</b><c>dies kommt nicht raus</c></a>',
    'test=abcd'),
  //IF-Test (!= true)
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''$test;''!=''abc''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"$test;"!="abc"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
   '<a><b>abcd</b><c>dies kommt raus</c></a>',
   'test=abcd'#13#10'test=dies kommt raus'),
  //IF-Test (!= false)
-  ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test="''abc''!=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+  ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"abc"!="$test;"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
   '<a><b>abc</b><c>dies kommt nicht raus</c></a>',
   'test=abc'),
  //Text + If
-   ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+   ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
    '<a><b>nicht ok<c>dies kommt nicht raus</c></b></a>',
    'test=nicht ok'),
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
    '<a><b>ok<c>dies kommt raus!</c></b></a>',
    'test=ok'#13'test=dies kommt raus!'),
   //text + if + not closed
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><img><htmlparser:read source="@src" var="test"/></img></htmlparser:if></b></a>',
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><img><htmlparser:read source="@src" var="test"/></img></htmlparser:if></b></a>',
    '<a><b>ok<img src="abc.png"></b></a>',
    'test=ok'#13'test=abc.png'),
    //text + if + not closed + text
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''"><img><htmlparser:read source="@src" var="test"/></img><htmlparser:read source="text()" var="ende"/></htmlparser:if></b></a>',
+  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><img><htmlparser:read source="@src" var="test"/></img><htmlparser:read source="text()" var="ende"/></htmlparser:if></b></a>',
   '<a><b>ok<img src="abcd.png"></b></a>',
   'test=ok'#13'test=abcd.png'#13'ende=ok'),
   //text + if + not closed + text
- ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test="''ok''=''$test;''">  <img><htmlparser:read source="@src" var="test"/><htmlparser:read source="text()" var="ende"/></img>  </htmlparser:if></b></a>',
+ ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''>  <img><htmlparser:read source="@src" var="test"/><htmlparser:read source="text()" var="ende"/></img>  </htmlparser:if></b></a>',
  '<a><b>ok<img src="abcd.png"></b></a>',
  'test=ok'#13'test=abcd.png'#13'ende='),
  //loop complete
@@ -779,10 +779,10 @@ var data: array[1..91] of array[1..3] of string = (
    '<a><x>Hallo!<a></a><c></c><b>piquadrat</b>welt</x></a>',
    'test=piquadrat'),
  //multiple loops+concat
-  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></a>',
+  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><b><htmlparser:read source="concat($test;,text())" var="test"/></b></htmlparser:loop></a>',
    '<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>',
    'test=los:'#13'test=los:1'#13'test=los:12'#13'test=los:123'),
-  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source="concat(''$test;'',text())" var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>',
+  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source=''concat("$test;",text())'' var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>',
    '<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>',
    'test=los:'#13'test=los:a'#13'test=los:ab'#13'test=los:abc'#13'test=los:abc1'#13'test=los:abc12'#13'test=los:abc123'#13'test=los:abc123A'#13'test=los:abc123AB'#13'test=los:abc123ABC'),
  //deep-ode-text()
