@@ -481,7 +481,7 @@ function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: bo
 {$ENDIF}
 //**Week of year
 function weekOfYear(const date:TDateTime):word;
-//**Reads a date string given a certain mask@br
+//**Reads a date string given a certain mask (case-sensitive)@br
 //**The uses the same mask types as FormateDate:@br
 //**d or dd for a numerical day  @br
 //**m or mm for a numerical month, mmm for a short month name@br
