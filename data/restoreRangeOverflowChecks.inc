@@ -1,0 +1,7 @@
+{$IFDEF R_OPT_WAS_ON}
+{$R+}
+{$ENDIF}
+{$IFDEF Q_OPT_WAS_ON}
+{$Q+}
+{$ENDIF}
+

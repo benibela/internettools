@@ -1,0 +1,8 @@
+{$IFOPT R+}
+{$DEFINE R_OPT_WAS_ON}
+{$ENDIF}
+{$IFOPT Q+}
+{$DEFINE Q_OPT_WAS_ON}
+{$ENDIF}
+{$R-}
+{$Q-}

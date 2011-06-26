@@ -1361,8 +1361,8 @@ begin
     if (t1[i] in ['0'..'9']) and (t2[j] in ['0'..'9']) then begin
       ib:=i;
       jb:=j;
-      while (t1[i] in ['0'..'9']) and (i<=length(t1)) do inc(i);
-      while (t2[j] in ['0'..'9']) and (j<=length(t2)) do inc(j);
+      while (i<=length(t1) and (t1[i] in ['0'..'9'])) do inc(i);
+      while (j<=length(t2) and (t2[j] in ['0'..'9'])) do inc(j);
       if i-ib<j-jb then begin
         result:=-1; //find longer number
         exit;
