@@ -274,6 +274,7 @@ function strConvertToUtf8(str: string; from: TEncoding): string; //**< Returns a
 function strConvertFromUtf8(const str: string; toe: TEncoding): string; //**< Converts a utf-8 string to the encoding @code(from)
 function strChangeEncoding(const str: string; from,toe: TEncoding):string; //**< Changes the string encoding from @code(from) to @code(toe)
 function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string; //**< Get unicode character @code(character) in a certain encoding
+function strDecodeUTF8Character(const str: string; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromName(str:string):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -1154,6 +1155,49 @@ begin
   end;
   if not (encoding in [eUnknown, eUTF8]) then result:=strConvertFromUtf8(result, encoding);
 end;
+
+function strDecodeUTF8Character(const str: string; var curpos: integer): integer;
+begin
+  if curpos > length(str) then exit(-2);
+  case ord(str[curpos]) of
+    $00..$7F: begin
+      result:=ord(str[curpos]);
+      curpos+=1;
+    end;
+    $80..$BF: begin //in multibyte character (should never appear)
+      result:=-1;
+      curpos+=1;
+    end;
+    $C0..$C1: begin //invalid (two bytes used for single byte)
+      result:=-1;
+      curpos+=2;
+    end;
+    $C2..$DF: begin
+      if curpos + 1  > length(str) then begin curpos+=2; exit(-2); end;
+      result := ((ord(str[curpos]) and not $C0) shl 6) or (ord(str[curpos+1]) and not $80);
+      curpos+=2;
+    end;
+    $E0..$EF: begin
+      if curpos + 2  > length(str) then begin curpos+=3; exit(-2); end;
+      result := ((ord(str[curpos]) and not $E0) shl 12) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80);
+      curpos+=3;
+    end;
+    $F0..$F4: begin
+      if curpos + 3  > length(str) then begin curpos+=4; exit(-2); end;
+      result := ((ord(str[curpos]) and not $F0) shl 18) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80) or (ord(str[curpos+3]) and not $80);
+      curpos+=4;
+    end;
+    else begin
+      result:=-1;
+      curpos+=1;
+    end;
+    (*$F5..$F7: i+=4;  //not allowed after rfc3629
+    $F8..$FB: i+=5;  //"
+    $FC..$FD: i+=6;  //"
+    $FE..$FF: i+=1; //invalid*)
+  end;
+end;
+
 
 function strEncodingFromName(str: string): TEncoding;
 begin
