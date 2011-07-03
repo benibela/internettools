@@ -75,6 +75,9 @@ TTreeElement = class
   constructor create();
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
+
+
+  class function compareInDocumentOrder(p1, p2: Pointer): integer;
 end;
 TTreeElementClass = class of TTreeElement;
 
@@ -140,6 +143,8 @@ published
   property readComments: boolean read FReadComments write FReadComments;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
 end;
+
+
 implementation
 uses pseudoxpath;
 
@@ -333,6 +338,14 @@ end;
 procedure TTreeElement.initialized;
 begin
 
+end;
+
+class function TTreeElement.compareInDocumentOrder(p1, p2: Pointer): integer;
+begin
+  if TTreeElement(p1).offset < TTreeElement(p2).offset then exit(-1)
+  else if TTreeElement(p1).offset > TTreeElement(p2).offset then exit(1)
+  else if p1 = p2 then exit(0)
+  else raise Exception.Create('invalid comparison');
 end;
 
 
