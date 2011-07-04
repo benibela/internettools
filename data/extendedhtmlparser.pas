@@ -632,7 +632,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..91] of array[1..3] of string = (
+var data: array[1..101] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -957,6 +957,78 @@ var data: array[1..91] of array[1..3] of string = (
     ('<a ATT="olP"> <htmlparser:read source="@aTT" var="A"/></A>',
      '<A att="oLp">xyz</a>',
      'A=oLp')
+
+     //examples taken from http://msdn.microsoft.com/en-us/library/ms256086.aspx
+     ,('',
+      '<?xml version="1.0"?>'#13#10 +
+      '<?xml-stylesheet type="text/xsl" href="myfile.xsl" ?>'#13#10 +
+      '<bookstore specialty="novel">'#13#10 +
+      '  <book style="autobiography">'#13#10 +
+      '    <author>'#13#10 +
+      '      <first-name>Joe</first-name>'#13#10 +
+      '      <last-name>Bob</last-name>'#13#10 +
+      '      <award>Trenton Literary Review Honorable Mention</award>'#13#10 +
+      '    </author>'#13#10 +
+      '    <price>12</price>'#13#10 +
+      '  </book>'#13#10 +
+      '  <book style="textbook">'#13#10 +
+      '    <author>'#13#10 +
+      '      <first-name>Mary</first-name>'#13#10 +
+      '      <last-name>Bob</last-name>'#13#10 +
+      '      <publication>Selected Short Stories of'#13#10 +
+      '        <first-name>Mary</first-name>'#13#10 +
+      '        <last-name>Bob</last-name>'#13#10 +
+      '      </publication>'#13#10 +
+      '    </author>'#13#10 +
+      '    <editor>'#13#10 +
+      '      <first-name>Britney</first-name>'#13#10 +
+      '      <last-name>Bob</last-name>'#13#10 +
+      '    </editor>'#13#10 +
+      '    <price>55</price>'#13#10 +
+      '  </book>'#13#10 +
+      '  <magazine style="glossy" frequency="monthly">'#13#10 +
+      '    <price>2.50</price>'#13#10 +
+      '    <subscription price="24" per="year"/>'#13#10 +
+      '  </magazine>'#13#10 +
+      '  <book style="novel" id="myfave">'#13#10 +
+      '    <author>'#13#10 +
+      '      <first-name>Toni</first-name>'#13#10 +
+      '      <last-name>Bob</last-name>'#13#10 +
+      '      <degree from="Trenton U">B.A.</degree>'#13#10 +
+      '      <degree from="Harvard">Ph.D.</degree>'#13#10 +
+      '      <award>Pulitzer</award>'#13#10 +
+      '      <publication>Still in Trenton</publication>'#13#10 +
+      '      <publication>Trenton Forever</publication>'#13#10 +
+      '    </author>'#13#10 +
+      '    <price intl="Canada" exchange="0.7">6.50</price>'#13#10 +
+      '    <excerpt>'#13#10 +
+      '      <p>It was a dark and stormy night.</p>'#13#10 +
+      '      <p>But then all nights in Trenton seem dark and'#13#10 +
+      '      stormy to someone who has gone through what'#13#10 +
+      '      <emph>I</emph> have.</p>'#13#10 +
+      '      <definition-list>'#13#10 +
+      '        <my:title>additional title</my:title>'#13#10 +
+      '        <term>Trenton</term>'#13#10 +
+      '        <definition>misery</definition>'#13#10 +
+      '      </definition-list>'#13#10 +
+      '    </excerpt>'#13#10 +
+      '  </book>'#13#10 +
+      '  <my:book xmlns:my="uri:mynamespace" style="leather" price="29.50">'#13#10 +
+      '    <my:title>Who''s Who in Trenton</my:title>'#13#10 +
+      '    <my:author>Robert Bob</my:author>'#13#10 +
+      '  </my:book>'#13#10 +
+      '</bookstore>'#13#10
+     ,'')
+
+      ,('<book style="autobiography"><htmlparser:read source="./author" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><htmlparser:read source="author" var="test2"/></book>','','test2=JoeBobTrenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><htmlparser:read source="//author" var="test3"/></book>','','test3=JoeBobTrenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><htmlparser:read source="string-join(//author,'','')" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention,MaryBobSelected Short Stories ofMaryBob,ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
+      ,('<bookstore><htmlparser:read source="/bookstore/@specialty" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><htmlparser:read source="book[/bookstore/@specialty=@style]/@id" var="test"/></bookstore>','','test=myfave')
+      ,('<bookstore><book><htmlparser:read source="author/first-name" var="test"/></book></bookstore>','','test=Joe')
+      ,('<htmlparser:read source="string-join(bookstore//my:title,'','')" var="test"/>','','test=additional title,Who''s Who in Trenton')
+      ,('<htmlparser:read source="string-join( bookstore//book/excerpt//emph,'','')" var="test"/>','','test=I')
 );
 
 
@@ -975,14 +1047,20 @@ var i:longint;
            (pxpvalueToString(extParser.variableChangeLog.getVariableValue(j))<>sl.ValueFromIndex[j])     then
           raise Exception.Create('Test failed: '+ inttostr(i)+': '+data[i][1] + #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
   end;
+var previoushtml: string;
+    procedure performTest(const template, html, expected: string);
+    begin
+      if html<>'' then previoushtml:=html;
+      if template='' then exit;
+      extParser.parseTemplate(template);
+      extParser.parseHTML(previoushtml);
+      checklog(expected);
+    end;
+
 begin
   extParser:=THtmlTemplateParser.create;
   sl:=TStringList.Create;
-  for i:=low(data)to high(data) do begin
-      extParser.parseTemplate(data[i,1]);
-      extParser.parseHTML(data[i,2]);
-      checklog(data[i,3]);
-  end;
+  for i:=low(data)to high(data) do performTest(data[i,1],data[i,2],data[i,3]);
 
   //---special encoding tests---
   extParser.parseTemplate('<a><htmlparser:read source="text()" var="test"/></a>');

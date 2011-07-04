@@ -401,6 +401,8 @@ var
 begin
   result:=prContinue;
 
+  if tagName^ = '?' then exit; //processing instruction
+
   if FAutoCloseTag then autoCloseLastTag();
   if (FParsingModel = pmHTML) then begin
     //table hack (don't allow two open td/tr unless separated by tr/table)
