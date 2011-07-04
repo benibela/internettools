@@ -632,7 +632,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..101] of array[1..3] of string = (
+var data: array[1..144] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
@@ -1029,6 +1029,66 @@ var data: array[1..101] of array[1..3] of string = (
       ,('<bookstore><book><htmlparser:read source="author/first-name" var="test"/></book></bookstore>','','test=Joe')
       ,('<htmlparser:read source="string-join(bookstore//my:title,'','')" var="test"/>','','test=additional title,Who''s Who in Trenton')
       ,('<htmlparser:read source="string-join( bookstore//book/excerpt//emph,'','')" var="test"/>','','test=I')
+      ,('<bookstore><book><htmlparser:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
+      ,('<bookstore><book><htmlparser:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
+      ,('<bookstore><htmlparser:read source="string-join( book/*/last-name,'','')" var="test"/></bookstore>','','test=Bob,Bob,Bob,Bob')
+      ,('<bookstore><book style="textbook"><htmlparser:read source="string-join( */*,'','')" var="test"/></book></bookstore>','','test=Mary,Bob,Selected Short Stories ofMaryBob,Britney,Bob')
+      ,('<htmlparser:read source="string-join(*[@specialty]/node-name(.),'','')" var="test"/>','','test=bookstore')
+      ,('<bookstore><book><htmlparser:read source="@style" var="test"/></book></bookstore>','','test=autobiography')
+      ,('<bookstore><htmlparser:read source="//price/@exchange" var="test"/></bookstore>  ','','test=0.7')
+      ,('<bookstore><htmlparser:read source="//price/@exchange/total" var="test"/></bookstore>  ','','test=')
+      ,('<bookstore><htmlparser:read source="string-join(book[@style]/price/text(),'','')" var="test"/></bookstore>  ','','test=12,55,6.50')
+      ,('<bookstore><htmlparser:read source="string-join(book/@style,'','')" var="test"/></bookstore>  ','','test=autobiography,textbook,novel')
+      ,('<bookstore><htmlparser:read source="string-join(@*,'','')" var="test"/></bookstore>  ','','test=novel')
+      ,('<bookstore><book><author><htmlparser:read source="string-join( ./first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
+      ,('<bookstore><book><author><htmlparser:read source="string-join( first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
+      ,('<bookstore><book style="textbook"><htmlparser:read source="string-join( author[1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
+      ,('<bookstore><book style="textbook"><htmlparser:read source="string-join( author[first-name][1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
+      ,('<bookstore><htmlparser:read source="book[last()]//text()" var="test"/></bookstore>  ','','test=Toni')
+      ,('<bookstore><htmlparser:read source="string-join(book/author[last()]/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      ,('<bookstore><htmlparser:read source="string-join((book/author)[last()]/first-name,'','')" var="test"/></bookstore>','','test=Toni')
+      ,('<bookstore><htmlparser:read source="string-join( book[excerpt]/@style,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><htmlparser:read source="string-join( book[excerpt]/title,'','')" var="test"/></bookstore>','','test=')
+      ,('<bookstore><htmlparser:read source="string-join(  book[excerpt]/author[degree] ,'','')" var="test"/></bookstore>','','test=ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
+      ,('<bookstore><htmlparser:read source="string-join(   book[author/degree]/@style   ,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><htmlparser:read source="string-join( book/author[degree][award] /../@style   ,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><htmlparser:read source="string-join( book/author[degree and award]  /  ../@style   ,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><htmlparser:read source="string-join(book/author[(degree or award) and publication]/../@style,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><htmlparser:read source="string-join(book/author[degree and not(publication)]/../@style,'','')" var="test"/></bookstore>','','test=')
+      ,('<bookstore><htmlparser:read source="string-join(book/author[not(degree or award) and publication]/../@style,'','')" var="test"/></bookstore>','','test=textbook')
+      ,('<bookstore><htmlparser:read source="string-join(book/author[last-name = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      ,('<bookstore><htmlparser:read source="string-join(book/author[last-name[1] = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      ,('<bookstore><htmlparser:read source="string-join(book/author[last-name[position()=1] = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      //more skipped
+
+      //from wikipedia
+      ,('','<?xml version="1.0" encoding="utf-8" standalone="yes" ?>' +
+       '<dok>' +
+       '    <!-- ein XML-Dokument -->' +
+       '    <kap title="Nettes Kapitel">' +
+       '        <pa>Ein Absatz</pa>' +
+       '        <pa>Noch ein Absatz</pa>' +
+       '        <pa>Und noch ein Absatz</pa>' +
+       '        <pa>Nett, oder?</pa>' +
+       '    </kap>' +
+       '    <kap title="Zweites Kapitel">' +
+       '        <pa>Ein Absatz</pa>' +
+       '    </kap>' +
+       '</dok>','' )
+      ,('<dok><kap><htmlparser:read source="string-join( /dok ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
+      ,('<dok><kap><htmlparser:read source="string-join( /* ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
+      ,('<dok><kap><htmlparser:read source="string-join( //dok/kap ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?;Ein Absatz')
+      ,('<dok><kap><htmlparser:read source="string-join( //dok/kap[1] ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?')
+      ,('<dok><kap><htmlparser:read source="string-join( //pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?;Ein Absatz')
+      ,('<dok><kap><htmlparser:read source="string-join( //kap[@title=''Nettes Kapitel'']/pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+      ,('<dok><kap><htmlparser:read source="string-join( child::*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+      ,('<dok><kap><htmlparser:read source="string-join( child::pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+      ,('<dok><kap><htmlparser:read source="string-join( child::text(),'';'')" var="test"/></kap></dok>','','test=')
+      ,('<dok><kap><pa><htmlparser:read source="string-join( text(),'';'')" var="test"/></pa></kap></dok>','','test=Ein Absatz')
+      ,('<dok><kap><pa><htmlparser:read source="string-join( ./*,'';'')" var="test"/></pa></kap></dok>','','test=')
+      ,('<dok><kap><htmlparser:read source="string-join( ./*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+
+
 );
 
 
