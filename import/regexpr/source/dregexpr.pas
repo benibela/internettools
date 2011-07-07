@@ -1219,7 +1219,8 @@ procedure TRegExpr.SetExpression (const s : RegExprString);
       {$IFDEF UniCode}
       StrPCopy (fExpression, Copy (s, 1, Len)); //###0.950
       {$ELSE}
-      StrLCopy (fExpression, PRegExprChar (s), Len); //###0.950
+      if len <= 0 then fExpression^:=#0 //###benibela, strlcopy copies #0#0 for empty string and corrupts memory
+      else StrLCopy (fExpression, PRegExprChar (s), Len); //###0.950
       {$ENDIF UniCode}
 
       InvalidateProgramm; //###0.941
@@ -3594,7 +3595,8 @@ procedure TRegExpr.SetInputString (const AInputString : RegExprString);
   {$IFDEF UniCode}
   StrPCopy (fInputString, Copy (AInputString, 1, Len)); //###0.927
   {$ELSE}
-  StrLCopy (fInputString, PRegExprChar (AInputString), Len);
+  if len <= 0 then fInputString^ := #0 //###benibela, strlcopy copies #0#0 for empty string and corrupts memory
+  else StrLCopy (fInputString, PRegExprChar (AInputString), Len);
   {$ENDIF}
 
   {
