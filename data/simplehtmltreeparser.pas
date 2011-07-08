@@ -91,7 +91,8 @@ TParsingModel = (pmStrict, pmHTML);
 //**@abstract This parses a html/sgml/xml file to a tree like structure
 //**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree).@br
 //**After tree parsing the tree contains the text as byte strings, without encoding or entity conversions. But in the case of html, the meta/http-equiv encoding is detected
-//**and you can call setEncoding to change the tree to the encoding you need. (this will also convert the entities)
+//**and you can call setEncoding to change the tree to the encoding you need. (this will also convert the entities)@br
+//**You can change the class used for the elements in the tree with the field treeElementClass.
 TTreeParser = class
 private
 //  FConvertEntities: boolean;
