@@ -42,7 +42,7 @@ type
 //duplicate open/close because this simplifies the switch statements
 TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose, tetHTMLText,
-                      tetCommandMeta, tetCommandRead,
+                      tetCommandMeta, tetCommandRead, tetCommandShortRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
                       tetCommandSwitchOpen, tetCommandSwitchClose,
@@ -197,7 +197,7 @@ end;
 
 
 
-    @bold(Important changes from previous versions:)@br
+    @bold(Breaking changes from previous versions:)@br
     The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it
 
 
@@ -254,8 +254,8 @@ implementation
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetCommandMeta;
-      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
-      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('meta','read','loop','loop','if','if','switch','switch');
+      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('meta','read','s','loop','loop','if','if','switch','switch');
 
 { TTemplateElement }
 
@@ -424,27 +424,40 @@ var xpathText: TTreeElement;
     end;
   end;
 
-  procedure HandleCommandRead;
-  var text,vari:string;
-    regexp: TRegExpr;
+  procedure performRead(const varname, source: string; const regex:string=''; const submatch: integer = 0);
+  var
+   text: String;
+   regexp: TRegExpr;
   begin
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
-    text:=pxpvalueToString(executePseudoXPath(templateStart.templateAttributes.Values['source']));
+    text:=pxpvalueToString(executePseudoXPath(source));
 
-    if templateStart.templateAttributes.Values['regex']<>'' then begin
+    if regex<>'' then begin
       regexp:=TRegExpr.Create;
-      regexp.Expression:=templateStart.templateAttributes.Values['regex'];
+      regexp.Expression:=regex;
       regexp.Exec(text);
-      text:=regexp.Match[StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)];
+      text:=regexp.Match[submatch];
       regexp.free;
     end;
 
-    vari:=replaceVars(templateStart.templateAttributes.Values['var']);
+    FVariableLog.addVariable(varname, text);
 
-    FVariableLog.addVariable(vari, text);
+    templateStart := TTemplateElement(templateStart.reverse);
+  end;
 
-    templateStart := TTemplateElement(templateStart.next);
+  procedure HandleCommandRead;
+  begin
+    performRead(templateStart.templateAttributes.Values['var'],templateStart.templateAttributes.Values['source'],templateStart.templateAttributes.Values['regex'],StrToIntDef(templateStart.templateAttributes.Values['submatch'],0));
+  end;
+
+  procedure HandleCommandShortRead;
+  var command,varname: string;
+
+  begin
+    command := templateStart.deepNodeText();
+    varname := strSplitGet(':=',command);
+    performRead(varname,command);
   end;
 
   function HandleCommandPseudoIf: boolean;
@@ -524,7 +537,8 @@ begin
         (templateStart <> nil) and (templateStart <> templateEnd) and
         ((htmlStart <> htmlEnd.next)) do begin
             if htmlStart.typ = tetText then xpathText := htmlStart;
-            if (templateStart.templateAttributes <> nil) and (templateStart.templateAttributes.indexOfName('test') >= 0) then
+            if (templateStart.templateType >= firstRealTemplateType) and (templateStart.templateAttributes <> nil)
+                and (templateStart.templateAttributes.indexOfName('test') >= 0) then
               if not HandleCommandPseudoIf then continue;
             case templateStart.templateType of
               tetHTMLText: HandleHTMLText;
@@ -532,6 +546,7 @@ begin
               tetHTMLClose:  raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
 
               tetCommandRead: HandleCommandRead;
+              tetCommandShortRead: HandleCommandShortRead;
 
               tetCommandLoopOpen: HandleCommandLoopOpen;
               tetCommandLoopClose: HandleCommandLoopClose;
@@ -709,7 +724,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..156] of array[1..3] of string = (
+var data: array[1..157] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1179,6 +1194,9 @@ var data: array[1..156] of array[1..3] of string = (
       ,('<a><t:if test="text()=''hallo''"><t:read var="res" source="b/text()"/></t:if></a>', '<a>hallo2<b>gx</b></a>', '')
       ,('<a><t:read test="text()=''hallo''" var="res" source="b/text()"/></a>', '<a>hallo<b>gx</b></a>', 'res=gx')
       ,('<a><t:read test="text()=''hallo''" var="res" source="b/text()"/></a>', '<a>hallo2<b>gx</b></a>', '')
+
+      //short test
+      ,('<a><t:s>x:=text()</t:s></a>', '<a>hallo</a>', 'x=hallo')
 );
 
 
