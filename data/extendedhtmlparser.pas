@@ -430,20 +430,20 @@ var xpathText: TTreeElement;
 
   procedure performRead(const varname, source: string; const regex:string=''; const submatch: integer = 0);
   var
-   text: String;
+   value:TPXPValue;
    regexp: TRegExpr;
   begin
-    text:=pxpvalueToString(performPXPEvaluation(source));
+    value:=performPXPEvaluation(source);
 
     if regex<>'' then begin
       regexp:=TRegExpr.Create;
       regexp.Expression:=regex;
-      regexp.Exec(text);
-      text:=regexp.Match[submatch];
+      regexp.Exec(pxpvalueToString(value));
+      value:=pxpvalue(regexp.Match[submatch]);
       regexp.free;
     end;
 
-    FVariableLog.addVariable(varname, text);
+    FVariableLog.addVariable(varname, value);
 
     templateStart := TTemplateElement(templateStart.reverse);
   end;
@@ -652,6 +652,14 @@ function THtmlTemplateParser.parseHTML(html: string; keepOldVariables: boolean=f
 var cur,last,realLast:TTreeElement;
   i: Integer;
 begin
+  if not keepOldVariables then FVariableLog.Clear
+  else begin
+    //convert all node variables to string (because the nodes point to a tree which we will destroy soon)
+    for i:=0 to FVariableLog.count-1 do
+      if FVariableLog.getVariableValue(i)^.typ = pvtNode then
+        FVariableLog.getVariableValue(i)^ := pxpvalue(pxpvalueToString(FVariableLog.getVariableValue(i)^));
+  end;
+
   FHTML.parseTree(html);
 
   //encoding trouble
@@ -666,7 +674,6 @@ begin
     end;
   end;
 
-  if not keepOldVariables then FVariableLog.Clear;
 
   FPseudoXPath.RootElement := FHTML.getTree;
 
