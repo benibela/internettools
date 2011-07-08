@@ -616,7 +616,7 @@ begin
       f:=i+1;
       while (i<=length(s)) and (s[i]<>';')  do inc(i);
       temp:=copy(s,f,i-f);
-      value:=pxpvalueToString(variableChangeLog.getVariableValue(temp));
+      value:=variableChangeLog.getVariableValueString(temp);
       if assigned(customReplace) then customReplace(temp,value);
     //  OutputDebugString(pchar(parser.variables.Text));
       result+=value;
@@ -1104,7 +1104,7 @@ var i:longint;
         raise Exception.Create('Test failed: '+inttostr(i)+': ' +' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
       for j:=0 to sl.count-1 do
         if (extParser.variableChangeLog.getVariableName(j)<>sl.Names[j]) or
-           (pxpvalueToString(extParser.variableChangeLog.getVariableValue(j))<>sl.ValueFromIndex[j])     then
+           ((extParser.variableChangeLog.getVariableValueString(j))<>sl.ValueFromIndex[j])     then
           raise Exception.Create('Test failed: '+ inttostr(i)+': '+data[i][1] + #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
   end;
 var previoushtml: string;
