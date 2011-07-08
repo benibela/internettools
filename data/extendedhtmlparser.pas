@@ -511,6 +511,7 @@ var xpathText: TTreeElement;
         if myvalue = '' then exit(true);
         evaluatedvalue := performPXPEvaluation(myvalue);
         result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0);
+        pxpvalueDestroy(evaluatedvalue);
       end;
 
     begin
@@ -524,10 +525,12 @@ var xpathText: TTreeElement;
         if elementFit(TTemplateElement(curChild)) then begin
           templateStart := TTemplateElement(curChild);
           switchCommandAccepted:=true;
+          pxpvalueDestroy(value);
           exit;
         end else curChild := curChild.getNextSibling();
       end;
 
+      pxpvalueDestroy(value);
       templateStart:=TTemplateElement(templateStart.reverse);
     end;
 
@@ -553,6 +556,10 @@ var xpathText: TTreeElement;
   begin
     templateStart.match := htmlStart;
     curChild:=templateStart.getFirstChild();
+    if curChild = nil then  begin
+      templateStart:=TTemplateElement(templateStart.reverse);
+      exit;
+    end;
 
     if TTemplateElement(curChild).templateType >= firstRealTemplateType then switchTemplateCommand
     else switchHTML;
