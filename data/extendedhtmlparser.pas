@@ -45,8 +45,9 @@ TTemplateElementType=(tetIgnore,
                       tetCommandMeta, tetCommandRead, tetCommandShortRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
-                      tetCommandSwitchOpen, tetCommandSwitchClose,
-                      tetCommandCaseOpen, tetCommandCaseClose);
+                      tetCommandSwitchOpen, tetCommandSwitchClose);
+TTemplateElementFlag = (tefOptional, tefSwitchChild);
+TTemplateElementFlags = set of TTemplateElementFlag;
 
 (*TNotifyCallbackFunction = procedure () of object;
 TVariableCallbackFunction = procedure (variable: string; value: string) of object;
@@ -63,10 +64,9 @@ THtmlTemplateParser=class;
 //**@abstract Interally used template tree element @exclude
 TTemplateElement=class(TTreeElement)
   templateType: TTemplateElementType;
+  flags: TTemplateElementFlags;
   templateAttributes: TAttributeList;
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
-  function isOptional: boolean;
-  procedure setOptional(opt: boolean);
 
   procedure postprocess(parser: THtmlTemplateParser);
   destructor destroy;override;
@@ -168,9 +168,10 @@ end;
       This command can be used to match only one of several possibilities. It has two different forms:
       @orderedList(
        @item(Case 1: All direct child elements are template commands:@br
-          Then the switch statement will choose the first child command, whose pxp attribute @code(test) evaluates to true. @br
-          Additionally, if one of the child elements is a @code(template:case) command, the pxp attributes @code(value) of the @code(case) and the @code(switch) command are evaluated, and the case command is only choosen, if both @code(value) attributes are equal.@br
-          An element that has neither a @code(value) nor a @code(test) attribute is always choosen (if no element before it is choosen).
+          Then the switch statement will choose the first child command, whose pxp attribute @code(test) evaluates to true.
+          @br Additionally, if one of the child elements has an attributes @code(value), the pxp expressions of the switch and the child @code(value) attribute are evaluated, and the command is only choosen, if both expressions are equal.
+          @br An element that has neither a @code(value) nor a @code(test) attribute is always choosen (if no element before it is choosen).
+          @br If no child can be choosen at the current position in the html file, the complete switch statement will skipped.
        )
        @item(Case 2: All direct child elements are normal html tag:@br
         @br This tag is matched to an html tag, iff one of its direct children can be matched to that html tag.
@@ -178,9 +179,8 @@ end;
         @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><template:read source="'true'" var="temp"/></a> <template:if test="$temp;!=true"> <b/> </template:if>).
             The difference is that the switch-construct gives equal priority to every of its children, but the excluding if-construct prioritizes a, and will ignore any b followed by an a.@br
             These switch-constructs are mainly used within a loop to collect the values of different tags.)
+        @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
        ))
-      @item(@code(<template:case> ... </template:case>)@br
-        This is used as child in a @code(template:switch) command, see above.
       )
     )@br
     Each one of this command can also have a property @code(test="{pxp condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
@@ -286,27 +286,13 @@ begin
   end;
 end;
 
-function TTemplateElement.isOptional: boolean;
-begin
-  if (typ=tetText) and (value='') then exit(true);
-  if (templateAttributes=nil) then exit(false);
-  result:=(templateAttributes.Values['optional']='true');
-end;
-
-procedure TTemplateElement.setOptional(opt: boolean);
-begin
-  assert(templateAttributes<>nil);
-  if templateAttributes = nil then templateAttributes := TAttributeList.Create;
-  if opt then templateAttributes.Values['optional'] := 'true'
-  else templateAttributes.Values['optional'] := 'false';
-end;
-
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
  i: Integer;
  templateAttrib: boolean;
  namespaceended: integer;
  j: Integer;
+ curChild: TTreeElement;
 begin
   //inherited initialized;
   if attributes <> nil then
@@ -335,6 +321,17 @@ begin
       if namespaceended = -1 then templateAttributes.Add(attributes[i])
       else templateAttributes.Add(strcopyfrom(attributes.Names[i], namespaceended) +'='+ attributes.ValueFromIndex[i]);
       attributes.Delete(i);
+    end;
+  end;
+
+  if templateAttributes <> nil then
+    if templateAttributes.Values['optional'] = 'true' then flags+=[tefOptional];
+
+  if templateType = tetCommandSwitchOpen then begin
+    curChild := getFirstChild();
+    while curChild <> nil do begin
+      TTemplateElement(curChild).flags+=[tefSwitchChild];
+      curChild := curChild.getNextSibling();
     end;
   end;
 end;
@@ -400,10 +397,10 @@ var xpathText: TTreeElement;
     //If an element is option it can either be there (preferred) or not. Therefore we simple try both cases
     //Notice that this modifies the template, and it is NOT THREAD SAFE (so don't share
     //one instance, you can of course still use instances in different threads)
-    if templateStart.isOptional then begin
-      templateStart.setOptional(false);
+    if tefOptional in templateStart.flags then begin
+      Exclude(templateStart.flags, tefOptional);
       ok := matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart, templateEnd);
-      templateStart.setOptional(true);
+      Include(templateStart.flags, tefOptional);
       if ok then templateStart := templateEnd
       else templateStart := TTemplateElement(templateStart.reverse.next);
       exit;
@@ -424,14 +421,19 @@ var xpathText: TTreeElement;
     end;
   end;
 
+  function performPXPEvaluation(const pxp: string): TPXPValue;
+  begin
+    FPseudoXPath.ParentElement := htmlParent;
+    FPseudoXPath.TextElement := xpathText;
+    result:=executePseudoXPath(pxp);
+  end;
+
   procedure performRead(const varname, source: string; const regex:string=''; const submatch: integer = 0);
   var
    text: String;
    regexp: TRegExpr;
   begin
-    FPseudoXPath.ParentElement := htmlParent;
-    FPseudoXPath.TextElement := xpathText;
-    text:=pxpvalueToString(executePseudoXPath(source));
+    text:=pxpvalueToString(performPXPEvaluation(source));
 
     if regex<>'' then begin
       regexp:=TRegExpr.Create;
@@ -467,9 +469,7 @@ var xpathText: TTreeElement;
   begin
     condition:=templateStart.templateAttributes.Values['test'];
 
-    FPseudoXPath.ParentElement := htmlParent;
-    FPseudoXPath.TextElement := xpathText;
-    satisfied:=pxpvalueToBoolean(executePseudoXPath(condition));
+    satisfied:=pxpvalueToBoolean(performPXPEvaluation(condition));
 
     if not satisfied then begin
       templateStart := TTemplateElement(templateStart.reverse); //skip if block
@@ -490,25 +490,72 @@ var xpathText: TTreeElement;
     else templateStart := TTemplateElement(templateStart.reverse.next);
   end;
 
+  var switchCommandAccepted: boolean;
+
   procedure HandleCommandSwitch;
   var curChild: TTreeElement;
-  begin
-    curChild:=templateStart.getFirstChild();
-    templateStart.match := htmlStart;
-    while curChild <> nil do begin //enumerate all child tags
-      if TTemplateElement(curChild).isOptional then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
-      if templateElementFitHTMLOpen(htmlStart, TTemplateElement(curChild)) and
-          matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(curChild.next), TTemplateElement(curChild.reverse)) then begin
-        //found match
-        htmlStart := htmlStart.reverse.next;
-        templateStart := TTemplateElement(templateStart.reverse.next);
-        exit;
+
+    procedure switchTemplateCommand;
+    var value: TPXPValue;
+      function elementFit(e: TTemplateElement): boolean;
+      var test,myvalue: string;
+       evaluatedvalue: TPXPValue;
+      begin
+        if (e.templateAttributes = nil) or (e.templateAttributes.Count = 0) then exit(true);
+        test := e.templateAttributes.Values['test'];
+        if (test<>'') then begin
+          result := pxpvalueToBoolean(performPXPEvaluation(test));
+          if not result then exit();
+        end;
+        myvalue:=e.templateAttributes.Values['value'];
+        if myvalue = '' then exit(true);
+        evaluatedvalue := performPXPEvaluation(myvalue);
+        result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0);
       end;
-      //no match, try other matches
-      curChild := curChild.getNextSibling();
+
+    begin
+      value := pxpvalue();
+      if (TTemplateElement(templateStart).templateAttributes<>nil) then
+        value := performPXPEvaluation(TTemplateElement(templateStart).templateAttributes.Values['value']);
+
+      while curChild <> nil do begin //enumerate all child tags
+        if TTemplateElement(curChild).templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if TTemplateElement(curChild).templateType = tetCommandSwitchOpen then raise ETemplateParseException.Create('A switch command may not be a direct child of another switch command');
+        if elementFit(TTemplateElement(curChild)) then begin
+          templateStart := TTemplateElement(curChild);
+          switchCommandAccepted:=true;
+          exit;
+        end else curChild := curChild.getNextSibling();
+      end;
+
+      htmlStart:=nil;
     end;
 
-    htmlStart:=htmlStart.next; //no match
+    procedure switchHTML;
+    begin
+      while curChild <> nil do begin //enumerate all child tags
+        if tefOptional in TTemplateElement(curChild).flags then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
+        if TTemplateElement(curChild).templateType >= firstRealTemplateType then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if templateElementFitHTMLOpen(htmlStart, TTemplateElement(curChild)) and
+            matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(curChild.next), TTemplateElement(curChild.reverse)) then begin
+          //found match
+          htmlStart := htmlStart.reverse.next;
+          templateStart := TTemplateElement(templateStart.reverse.next);
+          exit;
+        end;
+        //no match, try other matches
+        curChild := curChild.getNextSibling();
+      end;
+
+      htmlStart:=htmlStart.next; //no match
+    end;
+
+  begin
+    templateStart.match := htmlStart;
+    curChild:=templateStart.getFirstChild();
+
+    if TTemplateElement(curChild).templateType >= firstRealTemplateType then switchTemplateCommand
+    else switchHTML;
   end;
 
 var realHtmlStart: TTreeElement;
@@ -533,13 +580,22 @@ begin
  // assert(templateStart <> templateEnd);
   FVariableLog.pushAll;
   xpathText := nil;
+  switchCommandAccepted:=false;
   while (htmlStart <> nil) and
         (templateStart <> nil) and (templateStart <> templateEnd) and
         ((htmlStart <> htmlEnd.next)) do begin
             if htmlStart.typ = tetText then xpathText := htmlStart;
-            if (templateStart.templateType >= firstRealTemplateType) and (templateStart.templateAttributes <> nil)
-                and (templateStart.templateAttributes.indexOfName('test') >= 0) then
-              if not HandleCommandPseudoIf then continue;
+            if not switchCommandAccepted and (templateStart.templateType >= firstRealTemplateType) and
+                (templateStart.templateAttributes <> nil) and (templateStart.templateAttributes.indexOfName('test') >= 0) then
+            if not HandleCommandPseudoIf then continue;
+            if tefSwitchChild in templateStart.flags then begin
+              if switchCommandAccepted then switchCommandAccepted:=false
+              else begin
+                if templateStart.typ = tetOpen then templateStart := TTemplateElement(templateStart.reverse.next)
+                else templateStart := TTemplateElement(templateStart.next);
+                continue;
+              end;
+            end;
             case templateStart.templateType of
               tetHTMLText: HandleHTMLText;
               tetHTMLOpen: HandleHTMLOpen;
@@ -724,7 +780,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..157] of array[1..3] of string = (
+var data: array[1..160] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1197,6 +1253,11 @@ var data: array[1..157] of array[1..3] of string = (
 
       //short test
       ,('<a><t:s>x:=text()</t:s></a>', '<a>hallo</a>', 'x=hallo')
+
+      //switch
+      ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="2">x:=20</t:s><t:s value="3">x:=30</t:s><t:s value="4">x:=40</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=30')
+      ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="3">x:="3a"</t:s><t:s value="3">x:="3b"</t:s><t:s value="3">x:="3c"</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=3a')
+      ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="3" test="false()">x:="3a"</t:s><t:s value="3" test="true()">x:="3b"</t:s><t:s value="3">x:="3c"</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=3b')
 );
 
 
