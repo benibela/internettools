@@ -198,7 +198,8 @@ end;
 
 
     @bold(Breaking changes from previous versions:)@br
-    The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it
+    The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it@br
+    All changes mentioned in pseudoxpath. Also text() doesn't match the next text element anymore, but the next text element of the current node. Use .//text() for the old behaviour
 
 
 *)
