@@ -707,6 +707,8 @@ begin
 
   if not result and FParsingExceptions then begin
     cur := FTemplate.getTree;
+    if cur = nil then raise EHTMLParseException.Create('No template');
+    cur := cur.next;
     realLast := cur;
     last := cur;
     while cur <> nil do begin
