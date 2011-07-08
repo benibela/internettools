@@ -45,7 +45,9 @@ TTemplateElementType=(tetIgnore,
                       tetCommandMeta, tetCommandRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
-                      tetCommandSwitchOpen, tetCommandSwitchClose);
+                      tetCommandSwitchOpen, tetCommandSwitchClose
+                      {tetCommandCaseOpen, tetCommandCaseClose,
+                      tetCommandElseOpen, tetCommandElseClose});
 
 (*TNotifyCallbackFunction = procedure () of object;
 TVariableCallbackFunction = procedure (variable: string; value: string) of object;
@@ -56,15 +58,19 @@ TReplaceFunction = procedure (variable: string; var value:string) of object;
 
 ETemplateParseException = Exception;
 EHTMLParseException = Exception;
+THtmlTemplateParser=class;
 
 { TTemplateElement }
 //**@abstract Interally used template tree element @exclude
 TTemplateElement=class(TTreeElement)
   templateType: TTemplateElementType;
+  templateAttributes: TAttributeList;
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
   function isOptional: boolean;
   procedure setOptional(opt: boolean);
-  procedure initialized;override;
+
+  procedure postprocess(parser: THtmlTemplateParser);
+  destructor destroy;override;
 end;
 
 { THtmlTemplateParser }
@@ -81,48 +87,48 @@ end;
   @bold(Examples)
 
   @italic(Example, how to read the first <b>-tag):@br
-    Template: @code(<b><htmlparser:read var="test" source="text()"></b>)@br
+    Template: @code(<b><template:read var="test" source="text()"></b>)@br
     Html-File: @code(<b>Hello World!</b>))@br
 
   This will set the variable test to "Hello World!" @br
 
   @italic(Example, how to read the first field of a every row of a table):@br
-    Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readField()" source="text()"> </td> </tr> </htmlparser:loop> </table>)@br
+    Template: @code(<table> <template:loop> <tr> <td> <template:read var="readField()" source="text()"> </td> </tr> </template:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
 
     This will read row after row, and will write the first field to the change log of the variable readField() .@br
 
   @italic(Example, how to read the several field of a every row of a table):@br
 
-    Template: @code(<table> <htmlparser:loop> <tr> <td> <htmlparser:read var="readField1()" source="text()"> </td> <td> <htmlparser:read var="readField2()" source="text()"> </td> <td> <htmlparser:read var="readField3()" source="text()"> </td> ... </tr> </htmlparser:loop> </table>)@br
+    Template: @code(<table> <template:loop> <tr> <td> <template:read var="readField1()" source="text()"> </td> <td> <template:read var="readField2()" source="text()"> </td> <td> <template:read var="readField3()" source="text()"> </td> ... </tr> </template:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> a </td> <td> b </td> <td> c </td> </tr> ... </tr> </table>)@br
 
     This will read readField1()=a, readField2()=b, readField3()=c...@br
     Of you can use your own names instead of readFieldX() and they are independent of the html file. So such templates can convert several pages with different structures, to the same internal data layout of your application.
 
   @italic(Example, how to read all rows of every table CSV like):@br
-  Template: @code(<htmlparser:loop> <tr>  <htmlparser:read var="readAnotherRow()" source="deep-text(',')"> </tr> </htmlparser:loop> )@br
+  Template: @code(<template:loop> <tr>  <template:read var="readAnotherRow()" source="deep-text(',')"> </tr> </template:loop> )@br
   Html-File: @code(... <tr> <td> a </td> <td> b </td> <td> c </td> </tr> <tr> <td> foo </td> <td> bar </td> </tr> ...)@br
 
   This will read all rows, and write lines like a,b,c and foo,bar to the changelog.@br
 
   @italic(Example, how to read the first list item starting with an unary prime number):@br
-  Template: @code(<li htmlparser-condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')"><htmlparser:read var="prime" source="text()"/></li>)@br
+  Template: @code(<li htmlparser-condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')"><template:read var="prime" source="text()"/></li>)@br
   Html-File: @code(... <li>1111: this is 4</li><li>1:1 is no prime</li><li>1111111: here is 7</li><li>11111111: 8</li> ...)@br
 
   This will return "1111111: here is 7", because 1111111 is the first prime in that list.@br@br
 
   @italic(Example, how to extract all elements of a html form):
   @preformatted(<form>
-  <htmlparser:loop><htmlparser:switch>
-  <input type="checkbox" htmlparser-condition="exists(@checked)"><htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="radio" htmlparser-condition="exists(@checked)">   <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="hidden">                                          <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="password">                                        <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="text">                                            <htmlparser:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <select><htmlparser:read var="temp" source="@name"/><option htmlparser-optional="true" htmlparser-condition="exists(@selected)"><htmlparser:read var="post" source="concat($temp;,'=',@value)"/></option></select>
-  <textarea>                                                     <htmlparser:read var="post" source="concat(@name,'=',text())"/>  </textarea>
-  </htmlparser:switch></htmlparser:loop>
+  <template:loop><template:switch>
+  <input type="checkbox" htmlparser-condition="exists(@checked)"><template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="radio" htmlparser-condition="exists(@checked)">   <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="hidden">                                          <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="password">                                        <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <input type="text">                                            <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+  <select><template:read var="temp" source="@name"/><option htmlparser-optional="true" htmlparser-condition="exists(@selected)"><template:read var="post" source="concat($temp;,'=',@value)"/></option></select>
+  <textarea>                                                     <template:read var="post" source="concat(@name,'=',text())"/>  </textarea>
+  </template:switch></template:loop>
 </form>)
 
   Html-File: any form @br
@@ -140,37 +146,39 @@ end;
   Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file. @br
   A tag of the html file is considered as equal to a tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child node of the tag in the template is also equal to a child node of the tag in the html file (in the same order and nesting).@br
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
-  The matching occurs (in the latest version) with backtracking, so it will always find the first and longest match.
+  The matching occurs (in the latest version, since the NFA became unmaintable) with backtracking, so it will always find the first and longest match.
 
   There are 5 special commands allowed:
    @unorderedList(
-      @item(@code(<htmlparser:meta encoding="??"/>) @br Specifies the encoding of the template, only windows-1252 and utf-8 allowed)
-      @item(@code(<htmlparser:if test="??"/>  .. </htmlparser:if>)
+      @item(@code(<template:meta encoding="??"/>) @br Specifies the encoding of the template, only windows-1252 and utf-8 allowed)
+      @item(@code(<template:if test="??"/>  .. </template:if>)
         @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
-      @item(@code(<htmlparser:loop>  .. </htmlparser:loop>)
+      @item(@code(<template:loop>  .. </template:loop>)
         @br Everything inside this tag is repeated as long as possible
-        @br E.g. if you write @code(<htmlparser:loop>  X </htmlparser:loop> ), it has the same effect as XXXXX with the largest possible count of X for a given html file.
+        @br E.g. if you write @code(<template:loop>  X </template:loop> ), it has the same effect as XXXXX with the largest possible count of X for a given html file.
         @br If there is no possible match for the loop interior the loop is completely ignored. (if you want the empty loop to raise an error, you can create a temporary variable in the loop, and check for the existence of the variable after the loop.)
         )
-      @item(@code(<htmlparser:read var="??" source="??" [regex="??" [submatch="??"]]/>)
+      @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
         @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
         @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
         )
-      @item(@code(<htmlparser:switch> ... </htmlparser:switch>)
+      @item(@code(<template:switch> ... </template:switch>)
         @br This tag is matched to an html tag, iff one of its direct children can be matched to that html tag.
-        @br For example @code(<htmlparser:switch><a>..</a> <b>..</b></htmlparser:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
-        @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><htmlparser:read source="'true'" var="temp"/></a> <htmlparser:if test="$temp;!=true"> <b/> </htmlparser:if>).
+        @br For example @code(<template:switch><a>..</a> <b>..</b></template:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
+        @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><template:read source="'true'" var="temp"/></a> <template:if test="$temp;!=true"> <b/> </template:if>).
             The difference is that the switch-construct gives equal priority to every of its children, but the excluding if-construct prioritizes a, and will ignore any b followed by an a.@br
             These switch-constructs are mainly used within a loop to collect the values of different tags.)
     )
     @br
     There are two special attributes allowed for html tags in the template file:
     @unorderedList(
-      @item(@code(htmlparser-optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
+      @item(@code(template:optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
-      @item(@code(htmlparser-condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
+      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
     )
+
+    The default prefixes for template commands are "template:" and "t:", you can change that with the templateNamespace-property or by defining a new namespace in the template like xmlns:yournamespace="http://www.benibela.de/2011/templateparser" . (only the xmlns:prefix form is supported, not xmlns without prefix)
 
 
 
@@ -180,12 +188,13 @@ end;
     The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you used a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
     The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entity less encoding (cdata is still not supported).@br
     In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable states are cleared. The changelog however is always removed..@br
-    The default encoding is now utf-8, so the parsed web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the htmlparser:meta tag. (if you use the meta tag, it will also be converted to utf8)@br
+    The default encoding is now utf-8, so the parsed web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the template:meta tag. (if you use the meta tag, it will also be converted to utf8)@br
 
 }
 THtmlTemplateParser=class
   protected
     FOutputEncoding: TEncoding;
+    FNamespaces: TStringList;
 
     FTemplate, FHTML: TTreeParser;
     FTemplateName: string;
@@ -221,35 +230,43 @@ THtmlTemplateParser=class
     //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
-    //TODO: optimize variable storage
     //property variables: TStringList read Fvariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
+
+    property templateNamespaces: TStringList read FNamespaces write FNamespaces;
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding;
   end;
 
+const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 implementation
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
-      COMMAND_CLOSED:array[tetCommandMeta..tetCommandSwitchClose] of longint=(0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
-      COMMAND_STR:array[tetCommandMeta..tetCommandSwitchClose] of string=('meta','read','loop','loop','if','if','switch','switch');
+      firstRealTemplateType = tetCommandMeta;
+      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('meta','read','loop','loop','if','if','switch','switch');
 
 { TTemplateElement }
 
-function strToCommand(s:string; treeTyp: TTreeElementType): TTemplateElementType;
+function strToCommand(s:string; treeTyp: TTreeElementType; commandnamespaces: TStringList): TTemplateElementType;
 var tag:pchar; taglen: integer;
   t: TTemplateElementType;
+  i: Integer;
 begin
-  if ((treeTyp = tetOpen) or (treeTyp = tetClose)) and (stribeginswith(s,'htmlparser:')) then begin
-    tag:=@s[length('htmlparser:')+1];
-    taglen:=length(s)-length('htmlparser:');
-    for t:=low(COMMAND_STR) to high(COMMAND_STR) do
-      if strliequal(tag,COMMAND_STR[t],taglen) then begin
-        if treeTyp = tetOpen then exit(t)
-        else if COMMAND_CLOSED[t] = 0 then exit(tetIgnore)
-        else if COMMAND_CLOSED[t] = 2 then exit(t);
+  if ((treeTyp = tetOpen) or (treeTyp = tetClose)) then begin
+    for i:=0 to commandnamespaces.Count - 1 do begin
+      if (stribeginswith(s,commandnamespaces[i])) then begin
+        tag:=@s[length(commandnamespaces[i])+1];
+        taglen:=length(s)-length(commandnamespaces[i]);
+        for t:=low(COMMAND_STR) to high(COMMAND_STR) do
+          if strliequal(tag,COMMAND_STR[t],taglen) then begin
+            if treeTyp = tetOpen then exit(t)
+            else if COMMAND_CLOSED[t] = 0 then exit(tetIgnore)
+            else if COMMAND_CLOSED[t] = 2 then exit(t);
+          end;
+        raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s)
       end;
-    raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s)
+    end;
   end;
   case treeTyp of
     tetOpen: exit(tetHTMLOpen);
@@ -261,21 +278,60 @@ end;
 function TTemplateElement.isOptional: boolean;
 begin
   if (typ=tetText) and (value='') then exit(true);
-  if (attributes=nil) then exit(false);
-  result:=(attributes.Values['htmlparser-optional']='true');
+  if (templateAttributes=nil) then exit(false);
+  result:=(templateAttributes.Values['optional']='true');
 end;
 
 procedure TTemplateElement.setOptional(opt: boolean);
 begin
-  assert(attributes<>nil);
-  if opt then attributes.Values['htmlparser-optional'] := 'true'
-  else attributes.Values['htmlparser-optional'] := 'false';
+  assert(templateAttributes<>nil);
+  if templateAttributes = nil then templateAttributes := TAttributeList.Create;
+  if opt then templateAttributes.Values['optional'] := 'true'
+  else templateAttributes.Values['optional'] := 'false';
 end;
 
-procedure TTemplateElement.initialized;
+procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
+var
+ i: Integer;
+ templateAttrib: boolean;
+ namespaceended: integer;
+ j: Integer;
 begin
   //inherited initialized;
-  templateType:=strToCommand(value, typ);
+  if attributes <> nil then
+  for i:=attributes.Count-1 downto 0 do
+    if strBeginsWith(attributes.Names[i], 'xmlns:') then begin
+      if (attributes.ValueFromIndex[i] = HTMLPARSER_NAMESPACE_URL) then
+        parser.FNamespaces.Add(strCopyFrom(attributes.Names[i], 7)+':');
+      attributes.Delete(i);
+    end;
+
+  templateType:=strToCommand(value, typ, parser.FNamespaces);
+
+  if attributes <> nil then
+  for i:=attributes.Count-1 downto 0 do begin
+    namespaceended:=-1;
+    templateAttrib:=false;
+    for j:=0 to parser.FNamespaces.Count-1 do
+      if strBeginsWith(attributes.Names[i], parser.FNamespaces[j]) then begin
+        templateAttrib:=true;
+        namespaceended:=length(parser.FNamespaces[j])+1;
+        break;
+      end;
+    templateAttrib:=templateAttrib or (templateType >= firstRealTemplateType);
+    if templateAttrib then begin;
+      if templateAttributes = nil then templateAttributes := TAttributeList.Create;
+      if namespaceended = -1 then templateAttributes.Add(attributes[i])
+      else templateAttributes.Add(strcopyfrom(attributes.Names[i], namespaceended) +'='+ attributes.ValueFromIndex[i]);
+      attributes.Delete(i);
+    end;
+  end;
+end;
+
+destructor TTemplateElement.destroy;
+begin
+  FreeAndNil(templateAttributes);
+  inherited destroy;
 end;
 
 function THtmlTemplateParser.executePseudoXPath(str: string): TPXPValue;
@@ -299,14 +355,13 @@ begin
     exit(true);
   for i:=0 to template.attributes.Count-1 do begin
     name := template.attributes.Names[i];
-    if stribeginswith(name, 'htmlparser') then continue;
     if html.attributes = nil then exit(false);
     if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
       exit(false);
   end;
-  condition := template.attributes.Values['htmlparser-condition'];
-  if condition = '' then
-    exit(true);
+  if template.templateAttributes = nil then exit(true);
+  condition := template.templateAttributes.Values['condition'];
+  if condition = '' then exit(true);
   FPseudoXPath.ParentElement := html;
   FPseudoXPath.TextElement := nil;
   exit(pxpvalueToBoolean(executePseudoXPath(condition)));
@@ -364,17 +419,17 @@ var xpathText: TTreeElement;
   begin
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
-    text:=pxpvalueToString(executePseudoXPath(templateStart.attributes.Values['source']));
+    text:=pxpvalueToString(executePseudoXPath(templateStart.templateAttributes.Values['source']));
 
-    if templateStart.attributes.Values['regex']<>'' then begin
+    if templateStart.templateAttributes.Values['regex']<>'' then begin
       regexp:=TRegExpr.Create;
-      regexp.Expression:=templateStart.attributes.Values['regex'];
+      regexp.Expression:=templateStart.templateAttributes.Values['regex'];
       regexp.Exec(text);
-      text:=regexp.Match[StrToIntDef(templateStart.attributes.Values['submatch'],0)];
+      text:=regexp.Match[StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)];
       regexp.free;
     end;
 
-    vari:=replaceVars(templateStart.attributes.Values['var']);
+    vari:=replaceVars(templateStart.templateAttributes.Values['var']);
 
     FVariableLog.addVariable(vari, text);
 
@@ -386,7 +441,7 @@ var xpathText: TTreeElement;
     condition: string;
     equal: Boolean;
   begin
-    condition:=templateStart.attributes.Values['test'];
+    condition:=templateStart.templateAttributes.Values['test'];
 
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
@@ -416,7 +471,7 @@ var xpathText: TTreeElement;
     curChild:=templateStart.getFirstChild();
     templateStart.match := htmlStart;
     while curChild <> nil do begin //enumerate all child tags
-      if TTemplateElement(curChild).isOptional then raise ETemplateParseException.Create('A direct child of the htmlparser:switch construct may not have the attribute htmlparser-optional (it is optional anyways)');
+      if TTemplateElement(curChild).isOptional then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
       if templateElementFitHTMLOpen(htmlStart, TTemplateElement(curChild)) and
           matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(curChild.next), TTemplateElement(curChild.reverse)) then begin
         //found match
@@ -493,12 +548,16 @@ begin
   FHTML.readComments:=true;
   FPseudoXPath := TPseudoXPathParser.Create;
   FPseudoXPath.OnEvaluateVariable:=@FVariableLog.evaluateVariable;
+  FNamespaces := TStringList.Create;
+  FNamespaces.Add('template:');
+  FNamespaces.Add('t:');
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
 end;
 
 destructor THtmlTemplateParser.destroy;
 begin
+  FNamespaces.Free;
   FVariableLog.Free;
   FTemplate.Free;
   FHTML.Free;
@@ -575,22 +634,28 @@ begin
 
   //read template
   FTemplate.parseTree(template);
+  el := TTemplateElement(FTemplate.getTree);
+  while el <> nil do begin
+    el.postprocess(self);
+    el := TTemplateElement(el.next);
+  end;
+
   FTemplateName := templateName;
 
   //evaluate meta
   el := TTemplateElement(FTemplate.getTree);
   while el <> nil do begin
     if el.templateType = tetCommandMeta then begin
-      if el.attributes.Values['encoding'] <> '' then begin
-        encoding:=el.attributes.Values['encoding'];
+      if el.templateAttributes.Values['encoding'] <> '' then begin
+        encoding:=el.templateAttributes.Values['encoding'];
         if striequal(encoding,'utf8') or striequal(encoding,'utf-8') then
           FTemplate.setEncoding(eUTF8, false, false)
-        else if striequal(el.attributes.Values['encoding'],'latin1') or striequal(el.attributes.Values['encoding'],'iso88591') or
-                striequal(el.attributes.Values['encoding'],'iso-8859-1') or striequal(el.attributes.Values['encoding'],'windows1252') then
+        else if striequal(el.templateAttributes.Values['encoding'],'latin1') or striequal(el.templateAttributes.Values['encoding'],'iso88591') or
+                striequal(el.templateAttributes.Values['encoding'],'iso-8859-1') or striequal(el.templateAttributes.Values['encoding'],'windows1252') then
           FTemplate.setEncoding(eWindows1252, false, false)
         else
          raise ETemplateParseException.create('Unknown/unsupported encoding: '+encoding);
-        if el.attributes.count > 1 then
+        if el.templateAttributes.count > 1 then
           raise ETemplateParseException.create('Additional attributes in meta-tag: '+el.tostring);
       end else
         raise ETemplateParseException.create('Empty/wrong meta-tag: '+el.tostring);
@@ -632,236 +697,236 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..144] of array[1..3] of string = (
+var data: array[1..152] of array[1..3] of string = (
 //---classic tests---
  //simple reading
- ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
+ ('<a><b><template:read source="text()" var="test"/></b></a>',
  '<a><b>Dies wird Variable test</b></a>',
  'test=Dies wird Variable test'),
- ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
+ ('<a><b><template:read source="text()" var="test"/></b></a>',
  '<a><b>Dies wird erneut Variable test</b><b>Nicht Test</b><b>Test</b></a>',
  'test=Dies wird erneut Variable test'),
- ('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>',
+ ('<a><b>Test:</b><b><template:read source="text()" var="test"/></b></a>',
  '<a><b>Nicht Test</b><b>Test:</b><b>Dies wird erneut Variable test2</b></a>',
  'test=Dies wird erneut Variable test2'),
- ('<a><b>Test:</b><b><htmlparser:read source="text()" var="test"/></b></a>',
+ ('<a><b>Test:</b><b><template:read source="text()" var="test"/></b></a>',
  '<a><b>1</b><b>Test:</b><b>2</b><b>3</b></a>',
  'test=2'),
- ('<a><b><htmlparser:read source="@att" var="att-test"/></b></a>',
+ ('<a><b><template:read source="@att" var="att-test"/></b></a>',
  '<a><b att="HAllo Welt!"></b></a>',
  'att-test=HAllo Welt!'),
- ('<a><b><htmlparser:read source="@att" var="regex" regex="<\d*>"/></b></a>',
+ ('<a><b><template:read source="@att" var="regex" regex="<\d*>"/></b></a>',
  '<a><b att="Zahlencode: <675> abc"></b></a>',
  'regex=<675>'),
- ('<a><b><htmlparser:read source="@att" var="regex" regex="<(\d* \d*)>" submatch="1"/></b></a>',
+ ('<a><b><template:read source="@att" var="regex" regex="<(\d* \d*)>" submatch="1"/></b></a>',
  '<a><b att="Zahlencode: <123 543> abc"></b></a>',
  'regex=123 543'),
- ('<a><b><htmlparser:read source="text()" var="test"/></b></a>',
+ ('<a><b><template:read source="text()" var="test"/></b></a>',
  '<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
  'test=1'),
- ('<a><b><htmlparser:read source="comment()" var="test"/></b></a>',
+ ('<a><b><template:read source="comment()" var="test"/></b></a>',
  '<a><b><!--cCc--></b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
  'test=cCc'),
- ('<a><b><htmlparser:read'#9'source="text()"'#13'var="test"/></b></a>',
+ ('<a><b><template:read'#9'source="text()"'#13'var="test"/></b></a>',
  '<a><b>Dies wird'#9'Variable test</b></a>',
  'test=Dies wird'#9'Variable test'),
- ('<a><b'#13'attrib'#10'='#9'"test"><htmlparser:read'#9'source="text()"'#13'var="test"/></b></a>',
+ ('<a><b'#13'attrib'#10'='#9'"test"><template:read'#9'source="text()"'#13'var="test"/></b></a>',
  '<a><b'#9'attrib           =         '#10'  test>Dies'#9'wird'#9'Variable test</b></a>',
  'test=Dies'#9'wird'#9'Variable test'),
  //reading with matching node text
- ('<a><b>Nur diese: <htmlparser:read source="text()" var="test" regex="\d+"/></b></a>',
+ ('<a><b>Nur diese: <template:read source="text()" var="test" regex="\d+"/></b></a>',
  '<a><b>1</b><b>2</b><b>Nur diese: 3</b><b>4</b><b>5</b></a>',
  'test=3'),
- ('<a><b><htmlparser:read source="text()" var="test" regex="\d+"/>Nur diese: </b></a>',
+ ('<a><b><template:read source="text()" var="test" regex="\d+"/>Nur diese: </b></a>',
  '<a><b>1</b><b>Nur diese: 2</b><b>3</b><b>4</b><b>5</b></a>',
  'test=2'),
- ('<b>Hier<htmlparser:read source="@v" var="test"/></b>',
+ ('<b>Hier<template:read source="@v" var="test"/></b>',
  '<a><b v="abc">1</b><b v="def"></b>      <b>2</b><b>3</b><b v="ok">Hier</b><b v="!">5</b></a>',
  'test=ok'),
  //look ahead testing
- ('<b><htmlparser:read source="@v" var="test"/>Hier</b>',
+ ('<b><template:read source="@v" var="test"/>Hier</b>',
  '<a><b v="abc">1</b><b v="def"></b>      <b>2</b><b>3</b><b v="100101">Hier</b><b v="!">5</b></a>',
  'test=100101'),
  //simple reading
- ('<b><htmlparser:read source="@v" var="test"/>Hier</b>',
+ ('<b><template:read source="@v" var="test"/>Hier</b>',
  '<a><b v="abc">1</b><b v="def"></b><b>2</b><b>3</b><b v="ok">Hier</b><b v="!">5</b></a>',
  'test=ok'),
  //No reading
- ('<a><b><htmlparser:read var="test" source=" ''Saga der sieben Sonnen''"/></b></a>',
+ ('<a><b><template:read var="test" source=" ''Saga der sieben Sonnen''"/></b></a>',
  '<a><b>456</b></a>',
  'test=Saga der sieben Sonnen'),
  //Reading concat 2-params
- ('<a><b><htmlparser:read var="test" source=" concat( ''123'', text() )"/></b></a>',
+ ('<a><b><template:read var="test" source=" concat( ''123'', text() )"/></b></a>',
  '<a><b>456</b></a>',
  'test=123456'),
  //Reading concat 3-params
- ('<a><b><htmlparser:read var="test" source=" concat( ''abc'', text() , ''ghi'' )"/></b></a>',
+ ('<a><b><template:read var="test" source=" concat( ''abc'', text() , ''ghi'' )"/></b></a>',
  '<a><b>def</b></a>',
  'test=abcdefghi'),
  //non closed html tags
- ('<a><p><htmlparser:read var="test" source="text()"/></p></a>',
+ ('<a><p><template:read var="test" source="text()"/></p></a>',
  '<a><p>Offener Paragraph</a>',
  'test=Offener Paragraph'),
- ('<a><img> <htmlparser:read var="test" source="@src"/> </img></a>',
+ ('<a><img> <template:read var="test" source="@src"/> </img></a>',
  '<a><img src="abc.jpg"></a>',
  'test=abc.jpg'),
  //several non closed
- ('<a><img width="100"> <htmlparser:read var="test" source="@src"/> </img></a>',
+ ('<a><img width="100"> <template:read var="test" source="@src"/> </img></a>',
  '<a><img width=120 src="abc.jpg"><img width=320 src="def.jpg"><img width=100 src="123.jpg"><img width=500 src="baum.jpg"></a>',
  'test=123.jpg'),
  //if tests (== strue)
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"$test;"="abc"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"$test;"="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
  '<a><b>abc</b><c>dies kommt raus</c></a>',
  'test=abc'#13#10'test=dies kommt raus'),
  //if test (== false),
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"$test;"="abc"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"$test;"="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
    '<a><b>abcd</b><c>dies kommt nicht raus</c></a>',
    'test=abcd'),
  //IF-Test (!= true)
- ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"$test;"!="abc"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+ ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"$test;"!="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
   '<a><b>abcd</b><c>dies kommt raus</c></a>',
   'test=abcd'#13#10'test=dies kommt raus'),
  //IF-Test (!= false)
-  ('<a><b><htmlparser:read source="text()" var="test"/></b><htmlparser:if test=''"abc"!="$test;"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></a>',
+  ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"abc"!="$test;"''><c><template:read source="text()" var="test"/></c></template:if></a>',
   '<a><b>abc</b><c>dies kommt nicht raus</c></a>',
   'test=abc'),
  //Text + If
-   ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+   ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><c><template:read source="text()" var="test"/></c></template:if></b></a>',
    '<a><b>nicht ok<c>dies kommt nicht raus</c></b></a>',
    'test=nicht ok'),
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><c><htmlparser:read source="text()" var="test"/></c></htmlparser:if></b></a>',
+  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><c><template:read source="text()" var="test"/></c></template:if></b></a>',
    '<a><b>ok<c>dies kommt raus!</c></b></a>',
    'test=ok'#13'test=dies kommt raus!'),
   //text + if + not closed
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><img><htmlparser:read source="@src" var="test"/></img></htmlparser:if></b></a>',
+  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><img><template:read source="@src" var="test"/></img></template:if></b></a>',
    '<a><b>ok<img src="abc.png"></b></a>',
    'test=ok'#13'test=abc.png'),
    //text + if + not closed + text
-  ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''><img><htmlparser:read source="@src" var="test"/></img><htmlparser:read source="text()" var="ende"/></htmlparser:if></b></a>',
+  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><img><template:read source="@src" var="test"/></img><template:read source="text()" var="ende"/></template:if></b></a>',
   '<a><b>ok<img src="abcd.png"></b></a>',
   'test=ok'#13'test=abcd.png'#13'ende=ok'),
   //text + if + not closed + text
- ('<a><b><htmlparser:read source="text()" var="test"/><htmlparser:if test=''"ok"="$test;"''>  <img><htmlparser:read source="@src" var="test"/><htmlparser:read source="text()" var="ende"/></img>  </htmlparser:if></b></a>',
+ ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''>  <img><template:read source="@src" var="test"/><template:read source="text()" var="ende"/></img>  </template:if></b></a>',
  '<a><b>ok<img src="abcd.png"></b></a>',
  'test=ok'#13'test=abcd.png'#13'ende='),
  //loop complete
- ('<a><htmlparser:loop><b><htmlparser:read source="text()" var="test"/></b></htmlparser:loop></a>',
+ ('<a><template:loop><b><template:read source="text()" var="test"/></b></template:loop></a>',
  '<a><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b></a>',
  'test=1'#13'test=2'#13'test=3'#13'test=4'#13'test=5'),
  //loop empty
- ('<a><x><htmlparser:read source="text()" var="test"/></x><htmlparser:loop><b><htmlparser:read source="text()" var="test"/></b></htmlparser:loop></a>',
+ ('<a><x><template:read source="text()" var="test"/></x><template:loop><b><template:read source="text()" var="test"/></b></template:loop></a>',
   '<a><x>abc</x></a>',
   'test=abc'),
-  ('<a><ax><b>1</b></ax><ax><b><htmlparser:read source="text()" var="test"/></b></ax></a>',
+  ('<a><ax><b>1</b></ax><ax><b><template:read source="text()" var="test"/></b></ax></a>',
   '<a><ax>123124</ax><ax><b>525324</b></ax><ax><b>1</b></ax><ax><b>3</b></ax></a>',
   'test=3'),
  //optional elements
-  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>',
+  ('<a><b template:optional="true"><template:read source="text()" var="test"/></b><c><template:read source="text()" var="test"/></c></a>',
   '<a><xx></xx><c>!!!</c></a>',
   'test=!!!'),
-  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>',
+  ('<a><b template:optional="true"><template:read source="text()" var="test"/></b><c><template:read source="text()" var="test"/></c></a>',
   '<a><c>???</c></a>',
   'test=???'),
-  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c></a>',
+  ('<a><b template:optional="true"><template:read source="text()" var="test"/></b><c><template:read source="text()" var="test"/></c></a>',
   '<a><b>1</b><c>2</c></a>',
   'test=1'#13'test=2'),
-  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></a>',
+  ('<a><b template:optional="true"><template:read source="text()" var="test"/></b><c><template:read source="text()" var="test"/></c><b template:optional="true"><template:read source="text()" var="test"/></b></a>',
    '<a><b>1</b><c>2</c><b>3</b></a>',
    'test=1'#13'test=2'#13'test=3'),
-  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><e htmlparser-optional="true"/></a>',
+  ('<a><b template:optional="true"><template:read source="text()" var="test"/></b><c><template:read source="text()" var="test"/></c><b template:optional="true">'+'<template:read source="text()" var="test"/></b><c template:optional="true"/><d template:optional="true"/><e template:optional="true"/></a>',
     '<a><b>1</b><c>2</c><b>test*test</b></a>',
     'test=1'#13'test=2'#13'test=test*test'),
-  ('<a><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b><c><htmlparser:read source="text()" var="test"/></c><b htmlparser-optional="true">'+'<htmlparser:read source="text()" var="test"/></b><c htmlparser-optional="true"/><d htmlparser-optional="true"/><htmlparser:read source="text()" var="bla"/><e htmlparser-optional="true"/></a>',
+  ('<a><b template:optional="true"><template:read source="text()" var="test"/></b><c><template:read source="text()" var="test"/></c><b template:optional="true">'+'<template:read source="text()" var="test"/></b><c template:optional="true"/><d template:optional="true"/><template:read source="text()" var="bla"/><e template:optional="true"/></a>',
   '<a><b>1</b><c>2</c><b>hallo</b>welt</a>',
   'test=1'#13'test=2'#13'test=hallo'#13'bla=welt'),
  //delayed optional elements
-  ('<a><x><b htmlparser-optional="true"><htmlparser:read source="text()" var="test"/></b></x></a>',
+  ('<a><x><b template:optional="true"><template:read source="text()" var="test"/></b></x></a>',
    '<a><x>Hallo!<a></a><c></c><b>piquadrat</b>welt</x></a>',
    'test=piquadrat'),
  //multiple loops+concat
-  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><b><htmlparser:read source="concat($test;,text())" var="test"/></b></htmlparser:loop></a>',
+  ('<a><s><template:read source="text()" var="test"/></s><template:loop><b><template:read source="concat($test;,text())" var="test"/></b></template:loop></a>',
    '<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>',
    'test=los:'#13'test=los:1'#13'test=los:12'#13'test=los:123'),
-  ('<a><s><htmlparser:read source="text()" var="test"/></s><htmlparser:loop><c><htmlparser:loop><b><htmlparser:read source=''concat("$test;",text())'' var="test"/></b></htmlparser:loop></c></htmlparser:loop></a>',
+  ('<a><s><template:read source="text()" var="test"/></s><template:loop><c><template:loop><b><template:read source=''concat("$test;",text())'' var="test"/></b></template:loop></c></template:loop></a>',
    '<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>',
    'test=los:'#13'test=los:a'#13'test=los:ab'#13'test=los:abc'#13'test=los:abc1'#13'test=los:abc12'#13'test=los:abc123'#13'test=los:abc123A'#13'test=los:abc123AB'#13'test=los:abc123ABC'),
  //deep-ode-text()
-  ('<a><x><htmlparser:read source="deep-text()" var="test"/></x></a>',
+  ('<a><x><template:read source="deep-text()" var="test"/></x></a>',
    '<a><x>Test:<b>in b</b><c>in c</c>!</x></a>',
    'test=Test:in bin c!'),
  //deepNodeText with optional element
-  ('<a><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deep-text()" var="test2"/></x></a>',
+  ('<a><x><template:read source="text()" var="test1"/><br template:optional="true"/><template:read source="deep-text()" var="test2"/></x></a>',
    '<a><x>Test:<br><b>in b</b><c>in c</c>!</x></a>',
    'test1=Test:'#13'test2=Test:in bin c!'),
-  ('<a><pre><htmlparser:read source="text()" var="test2"/></pre><x><htmlparser:read source="text()" var="test1"/><br htmlparser-optional="true"/><htmlparser:read source="deep-text()" var="test2"/></x></a>',
+  ('<a><pre><template:read source="text()" var="test2"/></pre><x><template:read source="text()" var="test1"/><br template:optional="true"/><template:read source="deep-text()" var="test2"/></x></a>',
    '<a><pre>not called at all</pre><x>Test:<b>in b</b><c>in c</c>!</x></a>',
    'test2=not called at all'#13'test1=Test:'#13'test2=Test:in bin c!'),
 //root node()
-('<a><x htmlparser-optional="true"><htmlparser:read source="/a/lh/text()" var="test"/></x></a>',
+('<a><x template:optional="true"><template:read source="/a/lh/text()" var="test"/></x></a>',
 '<a><lb>ab</lb><x>mia</x><lh>xy</lh></a>',
 'test=xy'),
-('<a><x htmlparser-optional="true"><htmlparser:read source="/a/lh/text()" var="test"/></x></a>',
+('<a><x template:optional="true"><template:read source="/a/lh/text()" var="test"/></x></a>',
 '<a><lb>ab</lb><lh>xy</lh></a>',
 ''),
-('<a><x htmlparser-optional="true"><htmlparser:read source="/a/lb/text()" var="test"/></x></a>',
+('<a><x template:optional="true"><template:read source="/a/lb/text()" var="test"/></x></a>',
 '<a><lb>ab</lb><x>mia</x><lh>xy</lh></a>',
 'test=ab'),
 //Search
-('<a><x><htmlparser:read source="//lh/text()" var="test"/></x></a>',
+('<a><x><template:read source="//lh/text()" var="test"/></x></a>',
 '<a><lb>ab</lb><x>mia</x><lh>xy</lh></a>',
 'test=xy'),
  //html script tags containing <
-   ('<a><script></script><b><htmlparser:read source="text()" var="test"/></b></a>',
+   ('<a><script></script><b><template:read source="text()" var="test"/></b></a>',
    '<a><script>abc<def</script><b>test<b></a>',
    'test=test'),
-   ('<a><script><htmlparser:read source="text()" var="sitself"/></script><b><htmlparser:read source="text()" var="test"/></b></a>',
+   ('<a><script><template:read source="text()" var="sitself"/></script><b><template:read source="text()" var="test"/></b></a>',
    '<a><script>abc<def</script><b>test<b></a>',
    'sitself=abc<def'#13'test=test'),
  //direct closed tags
-   ('<a><br/><br/><htmlparser:read source="text()" var="test"/><br/></a>',
+   ('<a><br/><br/><template:read source="text()" var="test"/><br/></a>',
    '<a><br/><br   />abc<br /></a>',
    'test=abc'),
  //xpath conditions
-   ('<html><a htmlparser-condition="filter(@cond, ''a+'') = ''aaa'' "><htmlparser:read source="text()" var="test"/></a></html>',
+   ('<html><a template:condition="filter(@cond, ''a+'') = ''aaa'' "><template:read source="text()" var="test"/></a></html>',
    '<html><a>a1</a><a cond="xyz">a2</a><a cond="a">a3</a><a cond="xaay">a4</a><a cond="aaaa">a5</a><a cond="xaaay">a6</a><a cond="xaaaay">a7</a><a cond="xaay">a8</a></html>',
    'test=a6'),
 
 
 //--new tests--
    //simple read
-   ('<table id="right"><tr><td><htmlparser:read source="text()" var="col"/></td></tr></table>',
+   ('<table id="right"><tr><td><template:read source="text()" var="col"/></td></tr></table>',
     '<html><table id="right"><tr><td></td><td>other</td></tr></table></html>',
     'col='),
-   ('<html><script><htmlparser:read source="text()" var="col"/></script></html>',
+   ('<html><script><template:read source="text()" var="col"/></script></html>',
     '<html><script><!--abc--></script></html>',
     'col=<!--abc-->'),
-   ('<html><script><htmlparser:read source="text()" var="col"/></script></html>',
+   ('<html><script><template:read source="text()" var="col"/></script></html>',
     '<html><script>--<!--a--b--c-->--</script></html>',
     'col=--<!--a--b--c-->--'),
 
    //loop corner cases
-   ('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>',
+   ('<template:loop><tr><td><template:read source="text()" var="col"/></td></tr></template:loop>',
     '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
     'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-   ('<table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>',
+   ('<table><template:loop><tr><td><template:read source="text()" var="col"/></td></tr></template:loop></table>',
     '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
     'col=Hallo'),
-   ('<table></table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>',
+   ('<table></table><template:loop><tr><td><template:read source="text()" var="col"/></td></tr></template:loop>',
     '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
     'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-   ('<tr/><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop>',
+   ('<tr/><template:loop><tr><td><template:read source="text()" var="col"/></td></tr></template:loop>',
     '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
     'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-   ('<htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop><tr/>',
+   ('<template:loop><tr><td><template:read source="text()" var="col"/></td></tr></template:loop><tr/>',
     '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
     'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'),
-   ('<table></table><table><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>',
+   ('<table></table><table><template:loop><tr><td><template:read source="text()" var="col"/></td></tr></template:loop></table>',
     '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
      'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-   ('<htmlparser:loop><htmlparser:loop><tr><td><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></htmlparser:loop>',
+   ('<template:loop><template:loop><tr><td><template:read source="text()" var="col"/></td></tr></template:loop></template:loop>',
     '<html><body><table id="wrong"><tr><td>Hallo</td></tr></table><table id="right"><tr><td>123</td><td>other</td></tr><tr><td>foo</td><td>columns</td></tr><tr><td>bar</td><td>are</td></tr><tr><td>xyz</td><td>ignored</td></tr></table></html>',
     'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
-   ('<table><htmlparser:loop><tr><td><x htmlparser-optional="true"><htmlparser:read source="text()" var="k"/></x><htmlparser:read source="text()" var="col"/></td></tr></htmlparser:loop></table>',
+   ('<table><template:loop><tr><td><x template:optional="true"><template:read source="text()" var="k"/></x><template:read source="text()" var="col"/></td></tr></template:loop></table>',
     '<html><body><table id="wrong"><tr><td><x>hallo</x>Hillo</td></tr><tr><td><x>hallo2</x>Hillo2</td></tr><tr><td><x>hallo3</x>Hallo3</td></tr><tr><td>we3</td></tr><tr><td><x>hallo4</x>Hallo4</td></tr></table></html>',
     'k=hallo'#13'col=Hillo'#13'k=hallo2'#13'col=Hillo2'#13'k=hallo3'#13'col=Hallo3'#13'col=we3'#13'k=hallo4'#13'col=Hallo4'),
 
@@ -869,92 +934,92 @@ var data: array[1..144] of array[1..3] of string = (
 
 
    //optional elements
-   ('<a>as<htmlparser:read source="text()" var="a"/></a><b htmlparser-optional="true"></b>',
+   ('<a>as<template:read source="text()" var="a"/></a><b template:optional="true"></b>',
     '<a>asx</a><x/>',
     'a=asx'),
-   ('<a>as<htmlparser:read source="text()" var="a"/></a><b htmlparser-optional="true"></b>',
+   ('<a>as<template:read source="text()" var="a"/></a><b template:optional="true"></b>',
     '<a>asx</a>',
     'a=asx'),
    //optional elements: test that the first optional element has the highest priority
-   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+   ('<a>as<template:read source="text()" var="a"/></a> <b template:optional="true"><template:read source="''found''" var="b"/></b>  <c template:optional="true"><template:read source="''found''" var="c"/></c>',
     '<a>asx</a>',
     'a=asx'),
-   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+   ('<a>as<template:read source="text()" var="a"/></a> <b template:optional="true"><template:read source="''found''" var="b"/></b>  <c template:optional="true"><template:read source="''found''" var="c"/></c>',
     '<a>asx</a><b/>',
     'a=asx'#13'b=found'),
-   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+   ('<a>as<template:read source="text()" var="a"/></a> <b template:optional="true"><template:read source="''found''" var="b"/></b>  <c template:optional="true"><template:read source="''found''" var="c"/></c>',
     '<a>asx</a><c/>',
     'a=asx'#13'c=found'),
-   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+   ('<a>as<template:read source="text()" var="a"/></a> <b template:optional="true"><template:read source="''found''" var="b"/></b>  <c template:optional="true"><template:read source="''found''" var="c"/></c>',
     '<a>asx</a><b/><c/>',
     'a=asx'#13'b=found'#13'c=found'),
-   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+   ('<a>as<template:read source="text()" var="a"/></a> <b template:optional="true"><template:read source="''found''" var="b"/></b>  <c template:optional="true"><template:read source="''found''" var="c"/></c>',
     '<a>asx</a><c/><b/><c/>',
     'a=asx'#13'b=found'#13'c=found'),
-   ('<a>as<htmlparser:read source="text()" var="a"/></a> <b htmlparser-optional="true"><htmlparser:read source="''found''" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="''found''" var="c"/></c>',
+   ('<a>as<template:read source="text()" var="a"/></a> <b template:optional="true"><template:read source="''found''" var="b"/></b>  <c template:optional="true"><template:read source="''found''" var="c"/></c>',
     '<a>asx</a><c/><b/>',
     'a=asx'#13'b=found'),
     //optional elements: test that the first optional element has the highest priority even in loops
-    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+    ('<a>as<template:read source="text()" var="a"/></a> <template:loop> <b template:optional="true"><template:read source="text()" var="b"/></b>  <c template:optional="true"><template:read source="text()" var="c"/></c> </template:loop>',
      '<a>asx</a><b>B1</b><b>B2</b><b>B3</b>',
      'a=asx'#13'b=B1'#13'b=B2'#13'b=B3'),
-    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+    ('<a>as<template:read source="text()" var="a"/></a> <template:loop> <b template:optional="true"><template:read source="text()" var="b"/></b>  <c template:optional="true"><template:read source="text()" var="c"/></c> </template:loop>',
      '<a>asx</a><c>C1</c><c>C2</c><c>C3</c>',
      'a=asx'#13'c=C1'#13'c=C2'#13'c=C3'),
-    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+    ('<a>as<template:read source="text()" var="a"/></a> <template:loop> <b template:optional="true"><template:read source="text()" var="b"/></b>  <c template:optional="true"><template:read source="text()" var="c"/></c> </template:loop>',
      '<a>asx</a><b>B1</b><b>B2</b><b>B3</b><c>C1</c><c>C2</c><c>C3</c>',
      'a=asx'#13'b=B1'#13'c=C1'), //TODO: is this really the expected behaviour? it searches a <b> and then a <c>, and then the file reaches eof.
-    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+    ('<a>as<template:read source="text()" var="a"/></a> <template:loop> <b template:optional="true"><template:read source="text()" var="b"/></b>  <c template:optional="true"><template:read source="text()" var="c"/></c> </template:loop>',
      '<a>asx</a><c>C1</c><c>C2</c><c>C3</c><b>B1</b><b>B2</b><b>B3</b>',
      'a=asx'#13'b=B1'#13'b=B2'#13'b=B3'), //it searches a <b>, then a <c>, but after the <b> only <c>s are coming
-    ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+    ('<a>as<template:read source="text()" var="a"/></a> <template:loop> <b template:optional="true"><template:read source="text()" var="b"/></b>  <c template:optional="true"><template:read source="text()" var="c"/></c> </template:loop>',
      '<a>asx</a><b>B1</b><c>C1</c><b>B2</b><c>C2</c><b>B3</b><c>C3</c>',
      'a=asx'#13'b=B1'#13'c=C1'#13'b=B2'#13'c=C2'#13'b=B3'#13'c=C3'),
-     ('<a>as<htmlparser:read source="text()" var="a"/></a> <htmlparser:loop> <b htmlparser-optional="true"><htmlparser:read source="text()" var="b"/></b>  <c htmlparser-optional="true"><htmlparser:read source="text()" var="c"/></c> </htmlparser:loop>',
+     ('<a>as<template:read source="text()" var="a"/></a> <template:loop> <b template:optional="true"><template:read source="text()" var="b"/></b>  <c template:optional="true"><template:read source="text()" var="c"/></c> </template:loop>',
       '<a>asx</a><b>B1</b><c>C1</c><c>C2</c><b>B3</b><c>C3</c>',
       'a=asx'#13'b=B1'#13'c=C1'#13'b=B3'#13'c=C3'),
 
      //switch
      //trivial tests
-     ('<a><htmlparser:switch><b><htmlparser:read var="v" source="''bBb''"/></b><c><htmlparser:read var="v" source="''cCc''"/></c></htmlparser:switch></a>',
+     ('<a><template:switch><b><template:read var="v" source="''bBb''"/></b><c><template:read var="v" source="''cCc''"/></c></template:switch></a>',
       '<a><b></b></a>',
       'v=bBb'),
-     ('<a><htmlparser:switch><b><htmlparser:read var="v" source="''bBb''"/></b><c><htmlparser:read var="v" source="''cCc''"/></c></htmlparser:switch></a>',
+     ('<a><template:switch><b><template:read var="v" source="''bBb''"/></b><c><template:read var="v" source="''cCc''"/></c></template:switch></a>',
       '<a><c></c></a>',
       'v=cCc'),
-     ('<a><htmlparser:loop><htmlparser:switch><b><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
+     ('<a><template:loop><template:switch><b><template:read var="b" source="text()"/></b><c><template:read var="c" source="text()"/></c></template:switch></template:loop></a>',
       '<a><b>1</b><c>2</c><b>4</b><b>5</b><c>6</c><d>ign</d><b>7</b>bla<b>8</b>blub</a>',
       'b=1'#13'c=2'#13'b=4'#13'b=5'#13'c=6'#13'b=7'#13'b=8'),
-     ('<a><htmlparser:loop><htmlparser:switch><b><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
+     ('<a><template:loop><template:switch><b><template:read var="b" source="text()"/></b><c><template:read var="c" source="text()"/></c></template:switch></template:loop></a>',
       '<a><b>1</b><nestene><c>rose</c><consciousness><b>obvious</b><b>ardi</b></consciousness><c>blub</c></nestene></a>',
       'b=1'#13'c=rose'#13'b=obvious'#13'b=ardi'#13'c=blub'),
-     ('<a><htmlparser:loop><htmlparser:switch><b><htmlparser:read var="b" source="text()"/></b><c><htmlparser:read var="c" source="text()"/></c></htmlparser:switch></htmlparser:loop></a>',
+     ('<a><template:loop><template:switch><b><template:read var="b" source="text()"/></b><c><template:read var="c" source="text()"/></c></template:switch></template:loop></a>',
       '<a><b>1</b><nestene><c>rose</c><consciousness><b>obvious</b><b>ardi</b></consciousness><c>blub</c></nestene></a>',
       'b=1'#13'c=rose'#13'b=obvious'#13'b=ardi'#13'c=blub'),
       //recursive
-      ('<a><htmlparser:loop><htmlparser:switch><b><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
+      ('<a><template:loop><template:switch><b><x><template:read var="bx" source="text()"/></x></b><b><y><template:read var="by" source="text()"/></y></b></template:switch></template:loop></a>',
        '<a><b><x>tx</x></b><n><b><y>ty</y></b>non<b>sense<ll><y>TY</y></ll></b></n><b><y>AY</y></b><c>dep</c><b><x>X</x></b></a>',
        'bx=tx'#13'by=ty'#13'by=TY'#13'by=AY'#13'bx=X'),
-      ('<a><htmlparser:loop><htmlparser:switch><b><x><htmlparser:read var="bx" source="text()"/></x></b><b><y><htmlparser:read var="by" source="text()"/></y></b></htmlparser:switch></htmlparser:loop></a>',
+      ('<a><template:loop><template:switch><b><x><template:read var="bx" source="text()"/></x></b><b><y><template:read var="by" source="text()"/></y></b></template:switch></template:loop></a>',
        '<a><b><x>tx</x><n><b><y>ty</y></b>non<b>sense<ll><y>TY</y></ll></b></n><b><y>AY</y></b><c>dep</c><b><x>X</x></b></b></a>',
        'bx=tx'), //carefully: here the first </b> is missing/off
 
    //different text() interpretations
-   ('<a><htmlparser:read source="text()" var="A"/><x/><htmlparser:read source="text()" var="B"/></a>',
+   ('<a><template:read source="text()" var="A"/><x/><template:read source="text()" var="B"/></a>',
     '<a>hallo<x></x>a</a>',
     'A=hallo'#13'B=a'),
-   ('<table id="right"><htmlparser:loop><tr><td><htmlparser:read source="../text()" var="col"/></td></tr></htmlparser:loop></table>',
+   ('<table id="right"><template:loop><tr><td><template:read source="../text()" var="col"/></td></tr></template:loop></table>',
     '<table id="right"><tr>pre<td>123</td><td>other</td></tr><tr>ff<td>foo</td><td>columns</td></tr><tr>gg<td>bar</td><td>are</td></tr><tr>hh<td>xyz</td><td>ignored</td></tr></table>',
     'col=pre'#10'col=ff'#10'col=gg'#10'col=hh'),
 
     //case insensitiveness
-    ('<A><htmlparser:read source="text()" var="A"/><x/><htmlparser:read source="text()" var="B"/></A>',
+    ('<A><template:read source="text()" var="A"/><x/><template:read source="text()" var="B"/></A>',
      '<a>hallo<x></x>a</a>',
      'A=hallo'#13'B=a'),
-    ('<A att="HALLO"> <htmlparser:read source="@aTT" var="A"/></A>',
+    ('<A att="HALLO"> <template:read source="@aTT" var="A"/></A>',
      '<a ATT="hallo">xyz</a>',
      'A=hallo'),
-    ('<a ATT="olP"> <htmlparser:read source="@aTT" var="A"/></A>',
+    ('<a ATT="olP"> <template:read source="@aTT" var="A"/></A>',
      '<A att="oLp">xyz</a>',
      'A=oLp')
 
@@ -1020,45 +1085,45 @@ var data: array[1..144] of array[1..3] of string = (
       '</bookstore>'#13#10
      ,'')
 
-      ,('<book style="autobiography"><htmlparser:read source="./author" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention')
-      ,('<book style="autobiography"><htmlparser:read source="author" var="test2"/></book>','','test2=JoeBobTrenton Literary Review Honorable Mention')
-      ,('<book style="autobiography"><htmlparser:read source="//author" var="test3"/></book>','','test3=JoeBobTrenton Literary Review Honorable Mention')
-      ,('<book style="autobiography"><htmlparser:read source="string-join(//author,'','')" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention,MaryBobSelected Short Stories ofMaryBob,ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
-      ,('<bookstore><htmlparser:read source="/bookstore/@specialty" var="test"/></bookstore>','','test=novel')
-      ,('<bookstore><htmlparser:read source="book[/bookstore/@specialty=@style]/@id" var="test"/></bookstore>','','test=myfave')
-      ,('<bookstore><book><htmlparser:read source="author/first-name" var="test"/></book></bookstore>','','test=Joe')
-      ,('<htmlparser:read source="string-join(bookstore//my:title,'','')" var="test"/>','','test=additional title,Who''s Who in Trenton')
-      ,('<htmlparser:read source="string-join( bookstore//book/excerpt//emph,'','')" var="test"/>','','test=I')
-      ,('<bookstore><book><htmlparser:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
-      ,('<bookstore><book><htmlparser:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
-      ,('<bookstore><htmlparser:read source="string-join( book/*/last-name,'','')" var="test"/></bookstore>','','test=Bob,Bob,Bob,Bob')
-      ,('<bookstore><book style="textbook"><htmlparser:read source="string-join( */*,'','')" var="test"/></book></bookstore>','','test=Mary,Bob,Selected Short Stories ofMaryBob,Britney,Bob')
-      ,('<htmlparser:read source="string-join(*[@specialty]/node-name(.),'','')" var="test"/>','','test=bookstore')
-      ,('<bookstore><book><htmlparser:read source="@style" var="test"/></book></bookstore>','','test=autobiography')
-      ,('<bookstore><htmlparser:read source="//price/@exchange" var="test"/></bookstore>  ','','test=0.7')
-      ,('<bookstore><htmlparser:read source="//price/@exchange/total" var="test"/></bookstore>  ','','test=')
-      ,('<bookstore><htmlparser:read source="string-join(book[@style]/price/text(),'','')" var="test"/></bookstore>  ','','test=12,55,6.50')
-      ,('<bookstore><htmlparser:read source="string-join(book/@style,'','')" var="test"/></bookstore>  ','','test=autobiography,textbook,novel')
-      ,('<bookstore><htmlparser:read source="string-join(@*,'','')" var="test"/></bookstore>  ','','test=novel')
-      ,('<bookstore><book><author><htmlparser:read source="string-join( ./first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
-      ,('<bookstore><book><author><htmlparser:read source="string-join( first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
-      ,('<bookstore><book style="textbook"><htmlparser:read source="string-join( author[1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
-      ,('<bookstore><book style="textbook"><htmlparser:read source="string-join( author[first-name][1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
-      ,('<bookstore><htmlparser:read source="book[last()]//text()" var="test"/></bookstore>  ','','test=Toni')
-      ,('<bookstore><htmlparser:read source="string-join(book/author[last()]/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
-      ,('<bookstore><htmlparser:read source="string-join((book/author)[last()]/first-name,'','')" var="test"/></bookstore>','','test=Toni')
-      ,('<bookstore><htmlparser:read source="string-join( book[excerpt]/@style,'','')" var="test"/></bookstore>','','test=novel')
-      ,('<bookstore><htmlparser:read source="string-join( book[excerpt]/title,'','')" var="test"/></bookstore>','','test=')
-      ,('<bookstore><htmlparser:read source="string-join(  book[excerpt]/author[degree] ,'','')" var="test"/></bookstore>','','test=ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
-      ,('<bookstore><htmlparser:read source="string-join(   book[author/degree]/@style   ,'','')" var="test"/></bookstore>','','test=novel')
-      ,('<bookstore><htmlparser:read source="string-join( book/author[degree][award] /../@style   ,'','')" var="test"/></bookstore>','','test=novel')
-      ,('<bookstore><htmlparser:read source="string-join( book/author[degree and award]  /  ../@style   ,'','')" var="test"/></bookstore>','','test=novel')
-      ,('<bookstore><htmlparser:read source="string-join(book/author[(degree or award) and publication]/../@style,'','')" var="test"/></bookstore>','','test=novel')
-      ,('<bookstore><htmlparser:read source="string-join(book/author[degree and not(publication)]/../@style,'','')" var="test"/></bookstore>','','test=')
-      ,('<bookstore><htmlparser:read source="string-join(book/author[not(degree or award) and publication]/../@style,'','')" var="test"/></bookstore>','','test=textbook')
-      ,('<bookstore><htmlparser:read source="string-join(book/author[last-name = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
-      ,('<bookstore><htmlparser:read source="string-join(book/author[last-name[1] = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
-      ,('<bookstore><htmlparser:read source="string-join(book/author[last-name[position()=1] = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      ,('<book style="autobiography"><template:read source="./author" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><template:read source="author" var="test2"/></book>','','test2=JoeBobTrenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><template:read source="//author" var="test3"/></book>','','test3=JoeBobTrenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><template:read source="string-join(//author,'','')" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention,MaryBobSelected Short Stories ofMaryBob,ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
+      ,('<bookstore><template:read source="/bookstore/@specialty" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><template:read source="book[/bookstore/@specialty=@style]/@id" var="test"/></bookstore>','','test=myfave')
+      ,('<bookstore><book><template:read source="author/first-name" var="test"/></book></bookstore>','','test=Joe')
+      ,('<template:read source="string-join(bookstore//my:title,'','')" var="test"/>','','test=additional title,Who''s Who in Trenton')
+      ,('<template:read source="string-join( bookstore//book/excerpt//emph,'','')" var="test"/>','','test=I')
+      ,('<bookstore><book><template:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
+      ,('<bookstore><book><template:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
+      ,('<bookstore><template:read source="string-join( book/*/last-name,'','')" var="test"/></bookstore>','','test=Bob,Bob,Bob,Bob')
+      ,('<bookstore><book style="textbook"><template:read source="string-join( */*,'','')" var="test"/></book></bookstore>','','test=Mary,Bob,Selected Short Stories ofMaryBob,Britney,Bob')
+      ,('<template:read source="string-join(*[@specialty]/node-name(.),'','')" var="test"/>','','test=bookstore')
+      ,('<bookstore><book><template:read source="@style" var="test"/></book></bookstore>','','test=autobiography')
+      ,('<bookstore><template:read source="//price/@exchange" var="test"/></bookstore>  ','','test=0.7')
+      ,('<bookstore><template:read source="//price/@exchange/total" var="test"/></bookstore>  ','','test=')
+      ,('<bookstore><template:read source="string-join(book[@style]/price/text(),'','')" var="test"/></bookstore>  ','','test=12,55,6.50')
+      ,('<bookstore><template:read source="string-join(book/@style,'','')" var="test"/></bookstore>  ','','test=autobiography,textbook,novel')
+      ,('<bookstore><template:read source="string-join(@*,'','')" var="test"/></bookstore>  ','','test=novel')
+      ,('<bookstore><book><author><template:read source="string-join( ./first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
+      ,('<bookstore><book><author><template:read source="string-join( first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
+      ,('<bookstore><book style="textbook"><template:read source="string-join( author[1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
+      ,('<bookstore><book style="textbook"><template:read source="string-join( author[first-name][1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
+      ,('<bookstore><template:read source="book[last()]//text()" var="test"/></bookstore>  ','','test=Toni')
+      ,('<bookstore><template:read source="string-join(book/author[last()]/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      ,('<bookstore><template:read source="string-join((book/author)[last()]/first-name,'','')" var="test"/></bookstore>','','test=Toni')
+      ,('<bookstore><template:read source="string-join( book[excerpt]/@style,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><template:read source="string-join( book[excerpt]/title,'','')" var="test"/></bookstore>','','test=')
+      ,('<bookstore><template:read source="string-join(  book[excerpt]/author[degree] ,'','')" var="test"/></bookstore>','','test=ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
+      ,('<bookstore><template:read source="string-join(   book[author/degree]/@style   ,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><template:read source="string-join( book/author[degree][award] /../@style   ,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><template:read source="string-join( book/author[degree and award]  /  ../@style   ,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><template:read source="string-join(book/author[(degree or award) and publication]/../@style,'','')" var="test"/></bookstore>','','test=novel')
+      ,('<bookstore><template:read source="string-join(book/author[degree and not(publication)]/../@style,'','')" var="test"/></bookstore>','','test=')
+      ,('<bookstore><template:read source="string-join(book/author[not(degree or award) and publication]/../@style,'','')" var="test"/></bookstore>','','test=textbook')
+      ,('<bookstore><template:read source="string-join(book/author[last-name = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      ,('<bookstore><template:read source="string-join(book/author[last-name[1] = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
+      ,('<bookstore><template:read source="string-join(book/author[last-name[position()=1] = ''Bob'']/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
       //more skipped
 
       //from wikipedia
@@ -1075,20 +1140,29 @@ var data: array[1..144] of array[1..3] of string = (
        '        <pa>Ein Absatz</pa>' +
        '    </kap>' +
        '</dok>','' )
-      ,('<dok><kap><htmlparser:read source="string-join( /dok ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
-      ,('<dok><kap><htmlparser:read source="string-join( /* ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
-      ,('<dok><kap><htmlparser:read source="string-join( //dok/kap ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?;Ein Absatz')
-      ,('<dok><kap><htmlparser:read source="string-join( //dok/kap[1] ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?')
-      ,('<dok><kap><htmlparser:read source="string-join( //pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?;Ein Absatz')
-      ,('<dok><kap><htmlparser:read source="string-join( //kap[@title=''Nettes Kapitel'']/pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
-      ,('<dok><kap><htmlparser:read source="string-join( child::*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
-      ,('<dok><kap><htmlparser:read source="string-join( child::pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
-      ,('<dok><kap><htmlparser:read source="string-join( child::text(),'';'')" var="test"/></kap></dok>','','test=')
-      ,('<dok><kap><pa><htmlparser:read source="string-join( text(),'';'')" var="test"/></pa></kap></dok>','','test=Ein Absatz')
-      ,('<dok><kap><pa><htmlparser:read source="string-join( ./*,'';'')" var="test"/></pa></kap></dok>','','test=')
-      ,('<dok><kap><htmlparser:read source="string-join( ./*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+      ,('<dok><kap><template:read source="string-join( /dok ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
+      ,('<dok><kap><template:read source="string-join( /* ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
+      ,('<dok><kap><template:read source="string-join( //dok/kap ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?;Ein Absatz')
+      ,('<dok><kap><template:read source="string-join( //dok/kap[1] ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?')
+      ,('<dok><kap><template:read source="string-join( //pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?;Ein Absatz')
+      ,('<dok><kap><template:read source="string-join( //kap[@title=''Nettes Kapitel'']/pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+      ,('<dok><kap><template:read source="string-join( child::*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+      ,('<dok><kap><template:read source="string-join( child::pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
+      ,('<dok><kap><template:read source="string-join( child::text(),'';'')" var="test"/></kap></dok>','','test=')
+      ,('<dok><kap><pa><template:read source="string-join( text(),'';'')" var="test"/></pa></kap></dok>','','test=Ein Absatz')
+      ,('<dok><kap><pa><template:read source="string-join( ./*,'';'')" var="test"/></pa></kap></dok>','','test=')
+      ,('<dok><kap><template:read source="string-join( ./*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
 
 
+      //namespaces
+      ,('<a>as<t:read source="text()" var="a"/></a><b template:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
+      ,('<a>as<t:read source="text()" var="a"/></a><b template:optional="true"></b>','<a>asx</a>','a=asx')
+      ,('<a>as<template:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
+      ,('<a>as<template:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a>','a=asx')
+      ,('<a>as<t:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
+      ,('<a>as<t:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a>','a=asx')
+      ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b bb:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
+      ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b bb:optional="true"></b>','<a>asx</a>','a=asx')
 );
 
 
@@ -1123,7 +1197,7 @@ begin
   for i:=low(data)to high(data) do performTest(data[i,1],data[i,2],data[i,3]);
 
   //---special encoding tests---
-  extParser.parseTemplate('<a><htmlparser:read source="text()" var="test"/></a>');
+  extParser.parseTemplate('<a><template:read source="text()" var="test"/></a>');
   //no coding change utf-8 -> utf-8
   extParser.outputEncoding:=eUTF8;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>uu(bin:'#$C3#$84',ent:&Ouml;)uu</a></html>');
@@ -1154,14 +1228,14 @@ begin
   i:=-2;
   extParser.variableChangeLog.Clear;
   extParser.variableChangeLog.ValuesString['Hallo']:='diego';
-  extParser.parseTemplate('<a><htmlparser:read source="text()" var="hello"/></a>');
+  extParser.parseTemplate('<a><template:read source="text()" var="hello"/></a>');
   extParser.parseHTML('<a>maus</a>',true);
   if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
     raise Exception.Create('invalid var');
   if extParser.variableChangeLog.ValuesString['Hallo']<>'diego' then
     raise Exception.Create('invalid var');
   checklog('Hallo=diego'#13'hello=maus');
-  extParser.parseTemplate('<a><htmlparser:read source="text()" var="Hallo"/></a>');
+  extParser.parseTemplate('<a><template:read source="text()" var="Hallo"/></a>');
   extParser.parseHTML('<a>maus</a>',true);
   if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
     raise Exception.Create('invalid var');
