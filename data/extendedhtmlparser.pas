@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {$mode objfpc}{$H+}
 
 //{$IFDEF DEBUG}
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 //{$ENDIF}
 
 interface
@@ -212,8 +212,10 @@ THtmlTemplateParser=class
 
     FPseudoXPath: TPseudoXPathParser;
 
-    FVariableLog: TPXPVariableChangeLog;
+    FVariables,FVariableLog: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
+
+    function GetVariables: TPXPVariableChangeLog;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -241,7 +243,7 @@ THtmlTemplateParser=class
     //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
-    //property variables: TStringList read Fvariables;//**<List of all variables
+    property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
 
     property templateNamespaces: TStringList read FNamespaces write FNamespaces;
@@ -340,6 +342,11 @@ destructor TTemplateElement.destroy;
 begin
   FreeAndNil(templateAttributes);
   inherited destroy;
+end;
+
+function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
+begin
+  FVariables := FVariableLog.finalValues();
 end;
 
 function THtmlTemplateParser.executePseudoXPath(str: string): TPXPValue;
@@ -648,6 +655,7 @@ end;
 destructor THtmlTemplateParser.destroy;
 begin
   FNamespaces.Free;
+  FreeAndNil(FVariables);
   FVariableLog.Free;
   FTemplate.Free;
   FHTML.Free;
@@ -659,6 +667,7 @@ function THtmlTemplateParser.parseHTML(html: string; keepOldVariables: boolean=f
 var cur,last,realLast:TTreeElement;
   i: Integer;
 begin
+  FreeAndNil(FVariables);
   if not keepOldVariables then FVariableLog.Clear
   else begin
     //convert all node variables to string (because the nodes point to a tree which we will destroy soon)
@@ -671,7 +680,16 @@ begin
 
   //encoding trouble
   FHTML.setEncoding(outputEncoding,true,true);
-  FTemplate.setEncoding(outputEncoding, true, true);
+  if (FTemplate.getTree <> nil)  and (FTemplate.getEncoding <> OutputEncoding) then begin
+    cur := FTemplate.getTree;
+    while cur <> nil do begin
+      if TTemplateElement(cur).templateAttributes<>nil then
+        TTemplateElement(cur).templateAttributes.text := trim(strDecodeHTMLEntities(strChangeEncoding(TTemplateElement(cur).templateAttributes.text,FTemplate.getEncoding,OutputEncoding), OutputEncoding, false));
+      cur := cur.next;
+    end;
+  end;
+  FTemplate.setEncoding(outputEncoding,true,true);
+
 
   if FParsingExceptions then begin
     cur := FTemplate.getTree;
