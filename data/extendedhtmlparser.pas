@@ -528,7 +528,7 @@ var xpathText: TTreeElement;
         end else curChild := curChild.getNextSibling();
       end;
 
-      htmlStart:=nil;
+      templateStart:=TTemplateElement(templateStart.reverse);
     end;
 
     procedure switchHTML;
@@ -787,7 +787,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..160] of array[1..3] of string = (
+var data: array[1..172] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1265,6 +1265,18 @@ var data: array[1..160] of array[1..3] of string = (
       ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="2">x:=20</t:s><t:s value="3">x:=30</t:s><t:s value="4">x:=40</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=30')
       ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="3">x:="3a"</t:s><t:s value="3">x:="3b"</t:s><t:s value="3">x:="3c"</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=3a')
       ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="3" test="false()">x:="3a"</t:s><t:s value="3" test="true()">x:="3b"</t:s><t:s value="3">x:="3c"</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=3b')
+      ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="3.0">x:="3a"</t:s><t:s value="3" test="true()">x:="3b"</t:s><t:s value="3">x:="3c"</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=3a')
+      ,('<a><t:switch value="10"><t:s value="1">x:=10</t:s><t:s value="3.0">x:="3a"</t:s><t:s value="3" test="true()">x:="3b"</t:s><t:s value="3">x:="3c"</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', '')
+      ,('<xx><t:switch value="3"><t:if value="1"><a><t:s>x:=text()</t:s></a></t:if><t:if value="2"><b><t:s>x:=text()</t:s></b></t:if><t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if></t:switch></xx>', '<xx><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=CC')
+      ,('<xx><t:switch value="@choose"><t:if value="1"><a><t:s>x:=text()</t:s></a></t:if><t:if value="2"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if></t:switch></xx>', '<xx choose=1><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=AA')
+      ,('<xx><t:switch value="@choose"><t:if value="1"><a><t:s>x:=text()</t:s></a></t:if><t:if value="2"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if></t:switch></xx>', '<xx choose=4><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=DD')
+      ,('<xx><t:switch value="@choose"><t:if value="1"><a><t:s>x:=text()</t:s></a></t:if><t:if value="2"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if></t:switch></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', '')
+      ,('<xx><t:switch value="@choose"><t:if value="1"><a><t:s>x:=text()</t:s></a></t:if><t:if value="2"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if><t:s>x:="not found"</t:s></t:switch></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=not found')
+      ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"><t:if value="1"><a><t:s>x:=text()</t:s></a></t:if><t:if value="2"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if><t:s>x:="not found"</t:s></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=not found'#13'x=post')
+      ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"><t:if value="1"><a><t:s>x:=text()</t:s></a></t:if><t:if value="2"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if><t:s>x:="not found"</t:s><t:s>x:=ignored</t:s></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=not found'#13'x=post')
+      ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"><t:if value="1 to 10"><a><t:s>x:=text()</t:s></a></t:if><t:if value="20 to 100"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if><t:s>x:="not found"</t:s><t:s>x:=ignored</t:s></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=BB'#13'x=post')
+      ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=post')
+      ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"><t:s>x:="always"</t:s></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=always'#13'x=post')
 );
 
 
@@ -1355,60 +1367,6 @@ initialization
 unitTests();
 
 {$ENDIF}
-
-
-(*         deprecated things
-
-function THtmlTemplateParser.textEvent(text: pchar; textLen: longint): boolean;
-var alt,i: longint;
-  temp:string;
-begin
-  if assigned(FOnTextRead) then FOnTextRead(text,textLen);
-  result:=true;
-  LastEventIsText:=true;
-{  for i:=0 to textLen-1 do
-    if not ((text+i)^ in WHITE_SPACE) then begin
-      FlastText:=trim(pcharToString(text+i,textlen-i));
-      break;
-    end;                                    }
-  FlastText:=strDecodeHTMLEntities(text,textlen,htmlEncoding);
-
-  if FCollectDeepNodeText then
-    fdeepNodeText+=FlastText
-   else begin
-     temp:=Trim(FLasttext);
-     if temp<>'' then
-       FlastText:=temp;
-
-      for alt:=0 to FParsingAlternatives.count-1 do
-        with TParsingStatus(FParsingAlternatives[alt]) do begin
-          //if (lastElement<>nil) (and (nextElement.{<>lastElement.next})* then
-          //Text speichern
-
-          while nextElement.typ=tetText do begin
-            if strlibeginswith(FlastText,nextElement.text) then
-              result:=readTemplateElement(TParsingStatus(FParsingAlternatives[alt]))
-             else break;
-          end;
-       end;
-  end;
-end;
-
-function THtmlTemplateParser.getTemplateElementDebugInfo(
-  element: TTemplateElement): string;
-begin
-  result:=element.toStr;
-  if element.offset =-1 then exit(result+' in unknown line');
-  if element.offset>length(FCurrentTemplate) then
-    exit(result+' in unknown line at offset '+IntToStr(element.offset));
-  result+=' in line '+IntToStr(1+strlcount(#13, @FCurrentTemplate[1], element.offset));
-  result+=' at offset '+IntToStr(element.offset);
-end;
-
-*)
-
-
-
 
 end.
 
