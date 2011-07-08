@@ -45,9 +45,8 @@ TTemplateElementType=(tetIgnore,
                       tetCommandMeta, tetCommandRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
-                      tetCommandSwitchOpen, tetCommandSwitchClose
-                      {tetCommandCaseOpen, tetCommandCaseClose,
-                      tetCommandElseOpen, tetCommandElseClose});
+                      tetCommandSwitchOpen, tetCommandSwitchClose,
+                      tetCommandCaseOpen, tetCommandCaseClose);
 
 (*TNotifyCallbackFunction = procedure () of object;
 TVariableCallbackFunction = procedure (variable: string; value: string) of object;
@@ -75,7 +74,7 @@ end;
 
 { THtmlTemplateParser }
 
-{**
+(***
   @abstract This is the html parser class
   You can use it simply by calling first parseTemplate to load a given template
   and then parseHTML to parse the html data. @br
@@ -148,9 +147,16 @@ end;
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
   The matching occurs (in the latest version, since the NFA became unmaintable) with backtracking, so it will always find the first and longest match.
 
-  There are 5 special commands allowed:
+  These template commands can be used:
    @unorderedList(
       @item(@code(<template:meta encoding="??"/>) @br Specifies the encoding of the template, only windows-1252 and utf-8 allowed)
+      @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
+        @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
+        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
+        )
+      @item(@code(<template:s>var:=source</template:s>)
+        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s).
+        )
       @item(@code(<template:if test="??"/>  .. </template:if>)
         @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
       @item(@code(<template:loop>  .. </template:loop>)
@@ -158,24 +164,33 @@ end;
         @br E.g. if you write @code(<template:loop>  X </template:loop> ), it has the same effect as XXXXX with the largest possible count of X for a given html file.
         @br If there is no possible match for the loop interior the loop is completely ignored. (if you want the empty loop to raise an error, you can create a temporary variable in the loop, and check for the existence of the variable after the loop.)
         )
-      @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
-        @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
-        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
-        )
-      @item(@code(<template:switch> ... </template:switch>)
+      @item(@code(<template:switch [value="??"]> ... </template:switch>)
+      This command can be used to match only one of several possibilities. It has two different forms:
+      @orderedList(
+       @item(Case 1: All direct child elements are template commands:@br
+          Then the switch statement will choose the first child command, whose pxp attribute @code(test) evaluates to true. @br
+          Additionally, if one of the child elements is a @code(template:case) command, the pxp attributes @code(value) of the @code(case) and the @code(switch) command are evaluated, and the case command is only choosen, if both @code(value) attributes are equal.@br
+          An element that has neither a @code(value) nor a @code(test) attribute is always choosen (if no element before it is choosen).
+       )
+       @item(Case 2: All direct child elements are normal html tag:@br
         @br This tag is matched to an html tag, iff one of its direct children can be matched to that html tag.
         @br For example @code(<template:switch><a>..</a> <b>..</b></template:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
         @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><template:read source="'true'" var="temp"/></a> <template:if test="$temp;!=true"> <b/> </template:if>).
             The difference is that the switch-construct gives equal priority to every of its children, but the excluding if-construct prioritizes a, and will ignore any b followed by an a.@br
             These switch-constructs are mainly used within a loop to collect the values of different tags.)
-    )
+       ))
+      @item(@code(<template:case> ... </template:case>)@br
+        This is used as child in a @code(template:switch) command, see above.
+      )
+    )@br
+    Each one of this command can also have a property @code(test="{pxp condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
     @br
     There are two special attributes allowed for html tags in the template file:
     @unorderedList(
       @item(@code(template:optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
-      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns 'true' (powerful, but slow))
+      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns true (powerful, but slow))
     )
 
     The default prefixes for template commands are "template:" and "t:", you can change that with the templateNamespace-property or by defining a new namespace in the template like xmlns:yournamespace="http://www.benibela.de/2011/templateparser" . (only the xmlns:prefix form is supported, not xmlns without prefix)
@@ -183,14 +198,10 @@ end;
 
 
     @bold(Important changes from previous versions:)@br
-    Old changes:@br
-    The interface has changed:  There are no callback events anymore, because they do not make sense with backtracking, where partly matching can be reverted. Instead the property variables returns the resulting value of the @noAutolink(variables) and variableChangeLog contains a complete history of the @noAutolink(variables).@br
-    The new parser is more reliable than the old. If it possible to match the template and the html file the new version will find this match. And if it does not find a match, you have a proof that no match exists. But if you used a template which relies on the fact that it is sometimes not matched, although it is possible, it will of course break in the new version.  @br
-    The validation of a template has been slightly changed: now every opened tag must be closed, but in contrast you are allowed to mix entities with entity less encoding (cdata is still not supported).@br
-    In the old version you could set variables before you call parseHtml, this is still possible, but you have to pass false as second parameter, or the variable states are cleared. The changelog however is always removed..@br
-    The default encoding is now utf-8, so the parsed web pages will be converted to utf-8, but it will break if your template is not utf-8 and didn't specifies an encoding with the template:meta tag. (if you use the meta tag, it will also be converted to utf8)@br
+    The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it
 
-}
+
+*)
 THtmlTemplateParser=class
   protected
     FOutputEncoding: TEncoding;
@@ -436,22 +447,23 @@ var xpathText: TTreeElement;
     templateStart := TTemplateElement(templateStart.next);
   end;
 
-  procedure HandleCommandIf;
+  function HandleCommandPseudoIf: boolean;
   var
     condition: string;
-    equal: Boolean;
+    satisfied: Boolean;
   begin
     condition:=templateStart.templateAttributes.Values['test'];
 
     FPseudoXPath.ParentElement := htmlParent;
     FPseudoXPath.TextElement := xpathText;
-    equal:=pxpvalueToBoolean(executePseudoXPath(condition));
+    satisfied:=pxpvalueToBoolean(executePseudoXPath(condition));
 
-    if not equal then
-      templateStart := TTemplateElement(templateStart.reverse) //skip if block
-     else begin
+    if not satisfied then begin
+      templateStart := TTemplateElement(templateStart.reverse); //skip if block
+      result := false;
+     end else begin
       TTemplateElement(templateStart).match := templateStart;
-      templateStart := TTemplateElement(templateStart.next); //continue
+      result := true;
      end;
   end;
 
@@ -512,6 +524,8 @@ begin
         (templateStart <> nil) and (templateStart <> templateEnd) and
         ((htmlStart <> htmlEnd.next)) do begin
             if htmlStart.typ = tetText then xpathText := htmlStart;
+            if (templateStart.templateAttributes <> nil) and (templateStart.templateAttributes.indexOfName('test') >= 0) then
+              if not HandleCommandPseudoIf then continue;
             case templateStart.templateType of
               tetHTMLText: HandleHTMLText;
               tetHTMLOpen: HandleHTMLOpen;
@@ -519,14 +533,12 @@ begin
 
               tetCommandRead: HandleCommandRead;
 
-              tetCommandIfOpen: HandleCommandIf;
-
               tetCommandLoopOpen: HandleCommandLoopOpen;
               tetCommandLoopClose: HandleCommandLoopClose;
 
               tetCommandSwitchOpen: HandleCommandSwitch;
 
-              tetIgnore, tetCommandMeta, tetCommandIfClose, tetCommandSwitchClose: templateStart := TTemplateElement(templateStart.next);
+              tetIgnore, tetCommandMeta, tetCommandIfOpen, tetCommandIfClose, tetCommandSwitchClose: templateStart := TTemplateElement(templateStart.next);
 
               else raise ETemplateParseException.Create('Unknown template element type - internal error');
             end
@@ -697,7 +709,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..152] of array[1..3] of string = (
+var data: array[1..156] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1019,9 +1031,7 @@ var data: array[1..152] of array[1..3] of string = (
     ('<A att="HALLO"> <template:read source="@aTT" var="A"/></A>',
      '<a ATT="hallo">xyz</a>',
      'A=hallo'),
-    ('<a ATT="olP"> <template:read source="@aTT" var="A"/></A>',
-     '<A att="oLp">xyz</a>',
-     'A=oLp')
+    ('<a ATT="olP"> <template:read source="@aTT" var="A"/></A>',  '<A att="oLp">xyz</a>',   'A=oLp')
 
      //examples taken from http://msdn.microsoft.com/en-us/library/ms256086.aspx
      ,('',
@@ -1163,6 +1173,12 @@ var data: array[1..152] of array[1..3] of string = (
       ,('<a>as<t:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a>','a=asx')
       ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b bb:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
       ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b bb:optional="true"></b>','<a>asx</a>','a=asx')
+
+      //test attribute
+      ,('<a><t:if test="text()=''hallo''"><t:read var="res" source="b/text()"/></t:if></a>', '<a>hallo<b>gx</b></a>', 'res=gx')
+      ,('<a><t:if test="text()=''hallo''"><t:read var="res" source="b/text()"/></t:if></a>', '<a>hallo2<b>gx</b></a>', '')
+      ,('<a><t:read test="text()=''hallo''" var="res" source="b/text()"/></a>', '<a>hallo<b>gx</b></a>', 'res=gx')
+      ,('<a><t:read test="text()=''hallo''" var="res" source="b/text()"/></a>', '<a>hallo2<b>gx</b></a>', '')
 );
 
 
