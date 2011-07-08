@@ -458,7 +458,7 @@ var xpathText: TTreeElement;
 
   procedure HandleCommandRead;
   begin
-    performRead(templateStart.templateAttributes.Values['var'],templateStart.templateAttributes.Values['source'],templateStart.templateAttributes.Values['regex'],StrToIntDef(templateStart.templateAttributes.Values['submatch'],0));
+    performRead(replaceVars(templateStart.templateAttributes.Values['var']),templateStart.templateAttributes.Values['source'],templateStart.templateAttributes.Values['regex'],StrToIntDef(templateStart.templateAttributes.Values['submatch'],0));
   end;
 
   procedure HandleCommandShortRead;
