@@ -155,7 +155,7 @@ end;
         @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
         )
       @item(@code(<template:s>var:=source</template:s>)
-        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s).
+        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several variables like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the pxp-syntax, so you can use much more complex expressions.)
         )
       @item(@code(<template:if test="??"/>  .. </template:if>)
         @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
@@ -468,12 +468,9 @@ var xpathText: TTreeElement;
   end;
 
   procedure HandleCommandShortRead;
-  var command,varname: string;
-
   begin
-    command := templateStart.deepNodeText();
-    varname := strSplitGet(':=',command);
-    performRead(varname,command);
+    performPXPEvaluation(templateStart.deepNodeText());
+    templateStart := TTemplateElement(templateStart.reverse);
   end;
 
   function HandleCommandPseudoIf: boolean;
@@ -652,6 +649,7 @@ begin
   FHTML.readComments:=true;
   FPseudoXPath := TPseudoXPathParser.Create;
   FPseudoXPath.OnEvaluateVariable:=@FVariableLog.evaluateVariable;
+  FPseudoXPath.OnDefineVariable:=@FVariableLog.defineVariable;
   FNamespaces := TStringList.Create;
   FNamespaces.Add('template:');
   FNamespaces.Add('t:');
