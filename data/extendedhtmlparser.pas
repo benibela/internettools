@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {$mode objfpc}{$H+}
 
 //{$IFDEF DEBUG}
-//{$DEFINE UNITTESTS}
+{$DEFINE UNITTESTS}
 //{$ENDIF}
 
 interface
@@ -347,6 +347,7 @@ end;
 
 function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
 begin
+  FreeAndNil(FVariables);
   FVariables := FVariableLog.finalValues();
 end;
 
