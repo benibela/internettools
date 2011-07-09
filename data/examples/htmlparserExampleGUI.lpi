@@ -75,15 +75,18 @@
     <Version Value="10"/>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="../../import/regexpr/Source"/>
+      <OtherUnitFiles Value="../../import/regexpr/Source;../../import"/>
     </SearchPaths>
     <Parsing>
       <SyntaxOptions>
+        <IncludeAssertionCode Value="True"/>
         <UseAnsiStrings Value="False"/>
       </SyntaxOptions>
     </Parsing>
     <CodeGeneration>
       <Checks>
+        <RangeChecks Value="True"/>
+        <OverflowChecks Value="True"/>
         <StackChecks Value="True"/>
       </Checks>
     </CodeGeneration>

@@ -3,6 +3,7 @@ program htmlparserExampleGUI;
 {$mode objfpc}{$H+}
 
 uses
+  bbheaptrc,
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
