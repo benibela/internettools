@@ -469,7 +469,7 @@ var xpathText: TTreeElement;
 
   procedure HandleCommandShortRead;
   begin
-    performPXPEvaluation(templateStart.deepNodeText());
+    pxpvalueDestroy(performPXPEvaluation(templateStart.deepNodeText()));
     templateStart := TTemplateElement(templateStart.reverse);
   end;
 
