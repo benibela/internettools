@@ -837,6 +837,7 @@ end;
 function THtmlTemplateParser.replaceVars(s: string; customReplace: TReplaceFunction): string;
 var f,i:longint;
     temp,value:string;
+    temppxpvalue: TPXPValue;
 begin
   Result:='';
   i:=1;
@@ -845,7 +846,9 @@ begin
       f:=i+1;
       while (i<=length(s)) and (s[i]<>';')  do inc(i);
       temp:=copy(s,f,i-f);
-      value:=variableChangeLog.getVariableValueString(temp);
+      temppxpvalue:=pxpvalue();
+      evaluatePXPVariable(self,temp,temppxpvalue);
+      value:=pxpvalueToString(temppxpvalue);
       if assigned(customReplace) then customReplace(temp,value);
     //  OutputDebugString(pchar(parser.variables.Text));
       result+=value;
