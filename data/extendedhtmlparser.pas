@@ -178,7 +178,7 @@ end;
         @br For example @code(<template:switch><a>..</a> <b>..</b></template:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
         @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><template:read source="'true'" var="temp"/></a> <template:if test="$temp;!=true"> <b/> </template:if>).
             The difference is that the switch-construct gives equal priority to every of its children, but the excluding if-construct prioritizes a, and will ignore any b followed by an a.@br
-            These switch-constructs are mainly used within a loop to collect the values of different tags.)
+            These switch-constructs are mainly used within a loop to collect the values of different tags.
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
        ))
       )
@@ -190,17 +190,21 @@ end;
       @item(@code(template:optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
-      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns true (powerful, but slow))
+      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns true (powerful, but slow)
+      )
     )
 
-    The default prefixes for template commands are "template:" and "t:", you can change that with the templateNamespace-property or by defining a new namespace in the template like xmlns:yournamespace="http://www.benibela.de/2011/templateparser" . (only the xmlns:prefix form is supported, not xmlns without prefix)
+    The default prefixes for template commands are "template:" and "t:", you can change that with the templateNamespace-property or by defining a new namespace in the template like @code(xmlns:yournamespace="http://www.benibela.de/2011/templateparser" ). (only the xmlns:prefix form is supported, not xmlns without prefix)
 
 
 
     @bold(Breaking changes from previous versions:)@br
-    The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it@br
-    All changes mentioned in pseudoxpath. Also text() doesn't match the next text element anymore, but the next text element of the current node. Use .//text() for the old behaviour
-
+    @unorderedList(
+    @item(The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it)
+    @item(All changes mentioned in pseudoxpath.)
+    @item(Also text() doesn't match the next text element anymore, but the next text element of the current node. Use .//text() for the old behaviour)
+    @item(All variable names in the pxp are now case-sensitive in the default mode. You can set variableChangeLog.caseSensitive to change it to the old behaviour (however, variables defined with in the pxp expression by @code(for/some/every) (but not by @code(:=) ) remain case sensitive))
+    )
 
 *)
 THtmlTemplateParser=class
@@ -349,6 +353,7 @@ function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
 begin
   FreeAndNil(FVariables);
   FVariables := FVariableLog.finalValues();
+  FVariables.readonly := true;
 end;
 
 function THtmlTemplateParser.executePseudoXPath(str: string): TPXPValue;
