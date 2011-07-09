@@ -85,9 +85,13 @@ end;
 procedure TForm1.Button3Click(Sender: TObject);
 var ppath: TPseudoXPathParser;
     tp: TTreeParser;
+    vars: TPXPVariableChangeLog;
 begin
   ppath := TPseudoXPathParser.Create;
+  vars := TPXPVariableChangeLog.create();
   try
+    ppath.OnEvaluateVariable:=@vars.evaluateVariable;
+    ppath.OnDefineVariable:=@vars.defineVariable;
     ppath.parse(memo1.Lines.text);
     tp := TTreeParser.Create;
     tp.readComments:=true;
