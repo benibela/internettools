@@ -819,7 +819,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..172] of array[1..3] of string = (
+var data: array[1..174] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1292,6 +1292,8 @@ var data: array[1..172] of array[1..3] of string = (
 
       //short test
       ,('<a><t:s>x:=text()</t:s></a>', '<a>hallo</a>', 'x=hallo')
+      ,('<a><t:s>x:=.</t:s></a>', '<a>hallo</a>', 'x=hallo')
+      ,('<a><xxx></xxx><b><t:s>x:=.</t:s></b><yyy></yyy></a>', '<a>adas<xxx>asfas</xxx><b>here</b><yyy>asas</yyy>asfasf</a>', 'x=here')
 
       //switch
       ,('<a><t:switch value="3"><t:s value="1">x:=10</t:s><t:s value="2">x:=20</t:s><t:s value="3">x:=30</t:s><t:s value="4">x:=40</t:s><t:s value="5">x:=50</t:s></t:switch></a>', '<a>hallo</a>', 'x=30')
