@@ -72,6 +72,13 @@ TTemplateElement=class(TTreeElement)
   destructor destroy;override;
 end;
 
+//** This specifies the handling of the variables read in the previous document @br@br
+//** kpvForget: Old variables are deleted @br
+//** kpvKeepValues: Old variables are moved from the property variableChangelog to the property oldVariableChangelog @br
+//** kpvKeepInNewChangeLog: Old variables stay where they are (i.e. in the variableChangelog property merged with the new ones)@br
+//** In every case all node variables are converted to strings (because the nodes point to elements of the previous document, but the previous document will be deleted)
+TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
+
 { THtmlTemplateParser }
 
 (***
@@ -204,12 +211,14 @@ end;
     @item(All changes mentioned in pseudoxpath.)
     @item(Also text() doesn't match the next text element anymore, but the next text element of the current node. Use .//text() for the old behaviour)
     @item(All variable names in the pxp are now case-sensitive in the default mode. You can set variableChangeLog.caseSensitive to change it to the old behaviour (however, variables defined with in the pxp expression by @code(for/some/every) (but not by @code(:=) ) remain case sensitive))
+    @item(There was always some confusion, if the old variable changelog should be deleted or merged with the new one, if you process several html documents. Therefore the old merging option was removed and replaced by the KeepPreviousVariables property.)
     )
 
 *)
 THtmlTemplateParser=class
   protected
     FOutputEncoding: TEncoding;
+    FKeepOldVariables: TKeepPreviousVariables;
     FNamespaces: TStringList;
 
     FTemplate, FHTML: TTreeParser;
@@ -217,7 +226,7 @@ THtmlTemplateParser=class
 
     FPseudoXPath: TPseudoXPathParser;
 
-    FVariables,FVariableLog: TPXPVariableChangeLog;
+    FVariables,FVariableLog,FOldVariableLog: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
 
     function GetVariables: TPXPVariableChangeLog;
@@ -228,6 +237,7 @@ THtmlTemplateParser=class
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
     function executePseudoXPath(str: string):TPXPValue;
+    procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
@@ -238,10 +248,10 @@ THtmlTemplateParser=class
     destructor destroy; override;
 
 
-    function parseHTML(html: string; keepOldVariables: boolean=false):boolean; //**< parses the given data.
-    function parseHTMLFile(htmlfilename: string; keepOldVariables: boolean=false):boolean; //**< parses the given file
     procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string); //**<loads a template from a file
+    function parseHTML(html: string):boolean; //**< parses the given data.
+    function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
     //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
 
@@ -250,10 +260,12 @@ THtmlTemplateParser=class
 
     property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
+    property oldVariableChangeLog: TPXPVariableChangeLog read FOldVariableLog;
 
-    property templateNamespaces: TStringList read FNamespaces write FNamespaces;
+    property templateNamespaces: TStringList read FNamespaces write FNamespaces; //**< Namespace prefixes which are recognized as template commands. Default is template: and t: @br Namespaces defined in a template with the xmlns: notation are automatically added to this property (actually added, so they will also recognized in later documents. Since this behaviour is a violation of the xml standard, it might change in future). @br Remark: This property contains the complete namespace prefix, including the final :
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
-    property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding;
+    property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
+    property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
   end;
 
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
@@ -361,6 +373,21 @@ begin
   //str := replaceVars(str);
   FPseudoXPath.parse(str);
   result:=FPseudoXPath.evaluate();
+end;
+
+procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
+var i:longint;
+begin
+  i := FVariableLog.getVariableIndex(variable);
+  if i = -1 then begin
+    i := FOldVariableLog.getVariableIndex(variable);
+    if i = -1 then exit;
+    pxpvalueDestroy(value);
+    value := FOldVariableLog.getVariableValueClone(i);
+    exit;
+  end;
+  pxpvalueDestroy(value);
+  value := FVariableLog.getVariableValueClone(i);
 end;
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
@@ -641,6 +668,7 @@ end;
 constructor THtmlTemplateParser.create;
 begin
   FVariableLog := TPXPVariableChangeLog.Create;
+  FOldVariableLog := TPXPVariableChangeLog.create;
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
   FTemplate.treeElementClass:=TTemplateElement;
@@ -648,13 +676,14 @@ begin
   FHTML.parsingModel:=pmHTML;
   FHTML.readComments:=true;
   FPseudoXPath := TPseudoXPathParser.Create;
-  FPseudoXPath.OnEvaluateVariable:=@FVariableLog.evaluateVariable;
+  FPseudoXPath.OnEvaluateVariable:= @evaluatePXPVariable;
   FPseudoXPath.OnDefineVariable:=@FVariableLog.defineVariable;
   FNamespaces := TStringList.Create;
   FNamespaces.Add('template:');
   FNamespaces.Add('t:');
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
+  FKeepOldVariables:=kpvForget;
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -662,23 +691,35 @@ begin
   FNamespaces.Free;
   FreeAndNil(FVariables);
   FVariableLog.Free;
+  FOldVariableLog.Free;
   FTemplate.Free;
   FHTML.Free;
   FPseudoXPath.free;
   inherited destroy;
 end;
 
-function THtmlTemplateParser.parseHTML(html: string; keepOldVariables: boolean=false):boolean;
+function THtmlTemplateParser.parseHTML(html: string):boolean;
 var cur,last,realLast:TTreeElement;
   i: Integer;
+  curValue: PPXPValue;
+  j: Integer;
 begin
   FreeAndNil(FVariables);
-  if not keepOldVariables then FVariableLog.Clear
+  if FKeepOldVariables = kpvForget then
+    FVariableLog.Clear
   else begin
     //convert all node variables to string (because the nodes point to a tree which we will destroy soon)
-    for i:=0 to FVariableLog.count-1 do
-      if FVariableLog.getVariableValue(i)^.typ = pvtNode then
-        FVariableLog.getVariableValue(i)^ := pxpvalue(pxpvalueToString(FVariableLog.getVariableValue(i)^));
+    for i:=0 to FVariableLog.count-1 do begin
+      curValue := FVariableLog.getVariableValue(i);
+      if curValue^.typ = pvtNode then
+        curValue^ := pxpvalue(pxpvalueToString(curValue^))
+      else if curValue^.typ = pvtSequence then
+        for j:=0 to curValue^.varseq.Count-1 do
+          if PPXPValue(curValue^.varseq[j])^.typ = pvtNode then
+            PPXPValue(curValue^.varseq[j])^ := pxpvalue(pxpvalueToString(PPXPValue(curValue^.varseq[j])^));
+    end;
+    if FKeepOldVariables = kpvKeepValues then
+      FOldVariableLog.takeFrom(FVariableLog);;
   end;
 
   FHTML.parseTree(html);
@@ -704,6 +745,7 @@ begin
     end;
   end;
 
+  FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
 
   FPseudoXPath.RootElement := FHTML.getTree;
 
@@ -736,9 +778,9 @@ begin
 //TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;
 
-function THtmlTemplateParser.parseHTMLFile(htmlfilename: string; keepOldVariables: boolean=false):boolean;
+function THtmlTemplateParser.parseHTMLFile(htmlfilename: string):boolean;
 begin
-  result:=parseHTML(strLoadFromFile(htmlfilename), keepOldVariables);
+  result:=parseHTML(strLoadFromFile(htmlfilename));
 end;
 
 procedure THtmlTemplateParser.parseTemplate(template: string;
@@ -1327,7 +1369,7 @@ var i:longint;
       for j:=0 to sl.count-1 do
         if (extParser.variableChangeLog.getVariableName(j)<>sl.Names[j]) or
            ((extParser.variableChangeLog.getVariableValueString(j))<>sl.ValueFromIndex[j])     then
-          raise Exception.Create('Test failed: '+ inttostr(i)+': '+data[i][1] + #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
+          raise Exception.Create('Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
   end;
 var previoushtml: string;
     procedure performTest(const template, html, expected: string);
@@ -1374,23 +1416,47 @@ begin
 
   //---special keep variables test---
   i:=-2;
+  //keep full
   extParser.variableChangeLog.Clear;
+  extParser.KeepPreviousVariables:=kpvKeepInNewChangeLog;
   extParser.variableChangeLog.ValuesString['Hallo']:='diego';
   extParser.parseTemplate('<a><template:read source="text()" var="hello"/></a>');
-  extParser.parseHTML('<a>maus</a>',true);
+  extParser.parseHTML('<a>maus</a>');
   if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
     raise Exception.Create('invalid var');
   if extParser.variableChangeLog.ValuesString['Hallo']<>'diego' then
     raise Exception.Create('invalid var');
   checklog('Hallo=diego'#13'hello=maus');
   extParser.parseTemplate('<a><template:read source="text()" var="Hallo"/></a>');
-  extParser.parseHTML('<a>maus</a>',true);
+  extParser.parseHTML('<a>maus</a>');
   if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
     raise Exception.Create('invalid var');
   if extParser.variableChangeLog.ValuesString['Hallo']<>'maus' then
     raise Exception.Create('invalid var');
   checklog('Hallo=diego'#13'hello=maus'#13'Hallo=maus');
+  extParser.parseTemplate('<a><template:read source="$Hallo" var="xy"/></a>');
+  extParser.parseHTML('<a>xxxx</a>');
+  checklog('Hallo=diego'#13'hello=maus'#13'Hallo=maus'#13'xy=maus');
 
+  //keep values
+  extParser.KeepPreviousVariables:=kpvKeepValues;
+  extParser.parseTemplate('<a><template:read source="$Hallo" var="xyz"/></a>');
+  extParser.parseHTML('<a>xxxx</a>');
+  checklog('xyz=maus');
+  extParser.parseTemplate('<a><template:read source="$Hallo" var="abc"/></a>');
+  extParser.parseHTML('<a>mxxxx</a>');
+  checklog('abc=maus');
+  extParser.parseTemplate('<a><template:read source="x" var="nodes"/><template:read source="string-join($nodes,'','')" var="joined"/><template:read source="type-of($nodes[1])" var="type"/></a>');
+  extParser.parseHTML('<a>yyyy<x>A1</x><x>B2</x><x>C3</x><x>D4</x>xxxx</a>');
+  checklog('nodes=A1'#13'joined=A1,B2,C3,D4'#13'type=node');
+  extParser.parseTemplate('<a><template:read source="$nodes" var="oldnodes"/>'+
+                             '<template:read source="$joined" var="oldjoined"/>'+
+                             '<template:read source="string-join($nodes,'','')" var="newjoinedold"/>'+
+                             '<template:read source="string-join($oldnodes,'','')" var="newjoinednew"/>'+
+                             '<template:read source="type-of($nodes[1])" var="newtype"/>'+
+                             '</a>');
+  extParser.parseHTML('<a>yyyy<x>A1</x><x>B2</x><x>C3</x><x>D4</x>xxxx</a>');
+  checklog('oldnodes=A1'#13'oldjoined=A1,B2,C3,D4'#13'newjoinedold=A1,B2,C3,D4'#13'newjoinednew=A1,B2,C3,D4'#13'newtype=string'); //test node to string reduction
 
 
   extParser.free;
@@ -1403,5 +1469,6 @@ unitTests();
 {$ENDIF}
 
 end.
+
 
 
