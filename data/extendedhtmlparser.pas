@@ -457,7 +457,7 @@ var xpathText: TTreeElement;
       regexp.free;
     end;
 
-    FVariableLog.addVariable(varname, value);
+    FVariableLog.addVariable(Trim(varname), value);
 
     templateStart := TTemplateElement(templateStart.reverse);
   end;
