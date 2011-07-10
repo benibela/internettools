@@ -89,6 +89,8 @@ TreeParseException = Exception;
 //**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised), detect encoding
 TParsingModel = (pmStrict, pmHTML);
 //**@abstract This parses a html/sgml/xml file to a tree like structure
+//**To use it, you have to call @code(parseTree) with a string containing the document. Afterwards you can call @code(getTree) to get the document root node.@br
+//**
 //**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree).@br
 //**After tree parsing the tree contains the text as byte strings, without encoding or entity conversions. But in the case of html, the meta/http-equiv encoding is detected
 //**and you can call setEncoding to change the tree to the encoding you need. (this will also convert the entities)@br

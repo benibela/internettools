@@ -38,8 +38,18 @@ uses
 
 
 type
-//**@abstract These are all possible template commands
-//duplicate open/close because this simplifies the switch statements
+//**@abstract These are all possible template commands, for internal use
+//**@value tetIgnore useless thing
+//**@value tetHTMLOpen normal html opening tag, searched in the processed document
+//**@value tetHTMLClose normal html closing tag, searched in the processed document
+//**@value tetHTMLText text node, , searched in the processed document
+//**@value tetCommandMeta <template:meta> command to specify encoding
+//**@value tetCommandRead <template:read> command to set a variable
+//**@value tetCommandShortRead <template:s> command to execute a pxp expression
+//**@value tetCommandLoopOpen <template:loop> command to repeat something as long as possible
+//**@value tetCommandIfOpen <template:if> command to skip something
+//**@value tetCommandSwitchOpen <template:switch> command to branch
+//duplicate open/close because this simplifies the case statements
 TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose, tetHTMLText,
                       tetCommandMeta, tetCommandRead, tetCommandShortRead,
@@ -73,18 +83,19 @@ TTemplateElement=class(TTreeElement)
 end;
 
 //** This specifies the handling of the variables read in the previous document @br@br
-//** kpvForget: Old variables are deleted @br
-//** kpvKeepValues: Old variables are moved from the property variableChangelog to the property oldVariableChangelog @br
-//** kpvKeepInNewChangeLog: Old variables stay where they are (i.e. in the variableChangelog property merged with the new ones)@br
+//** @value kpvForget Old variables are deleted @br
+//** @value kpvKeepValues Old variables are moved from the property variableChangelog to the property oldVariableChangelog @br
+//** @value kpvKeepInNewChangeLog Old variables stay where they are (i.e. in the variableChangelog property merged with the new ones)@br
 //** In every case all node variables are converted to strings (because the nodes point to elements of the previous document, but the previous document will be deleted)
 TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
 { THtmlTemplateParser }
 
 (***
-  @abstract This is the html parser class
-  You can use it simply by calling first parseTemplate to load a given template
-  and then parseHTML to parse the html data. @br
+  @abstract This is the template processor class which can apply a template to one or more html documents.
+
+  You can use it by calling the methods @code(parseTemplate) and @code(parseHTML). @code(parseTemplate) loads a certain template
+  and @code(parseHTML) matches the template to a html/xml file.@br
   A template file is just like a html file with special commands. The parser than matches every text and tag
   of the template to text/tag in the html file, while ignoring every additional data of latter file. If no match is possible an exception is raised.@br
   The template can extract certain values from the html file into @noAutoLink(variables), and you can access these @noAutoLink(variables) with the property variables and variableChangeLog.
@@ -92,58 +103,91 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
   @bold(Examples)
 
-  @italic(Example, how to read the first <b>-tag):@br
+  @definitionList(
+  @itemLabel(@italic(Example, how to read the first <b>-tag):)
+  @item(
     Template: @code(<b><template:read var="test" source="text()"></b>)@br
-    Html-File: @code(<b>Hello World!</b>))@br
+    Html-File: @code(<b>Hello World!</b>)@br
 
-  This will set the variable test to "Hello World!" @br
+  This will set the variable @code(test) to @code("Hello World!"))
 
-  @italic(Example, how to read the first field of a every row of a table):@br
+
+  @itemLabel(@italic(Example, how to read the first <b>-tag using the short template notation):)
+  @item(
+    Template: @code(<b><t:s>test:=.</t:s></b>)@br
+    Html-File: @code(<b>Hello World!</b>)@br
+
+  This will also set the variable @code(test) to @code("Hello World!" )
+  )
+
+  @itemLabel(@italic(Example, how to read all <b>-tags:))
+  @item(
+    Template: @code(<template:loop><b><t:s>test:=.</t:s></b></template:loop>)@br
+    Html-File: @code(<b>Hello World!</b>)@br
+
+  This will also set the variable @code(test) to @code("Hello World!" )
+  )
+
+  @itemLabel(@italic(Example, how to read the first field of a every row of a table):)
+  @item(
     Template: @code(<table> <template:loop> <tr> <td> <template:read var="readField()" source="text()"> </td> </tr> </template:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
 
-    This will read row after row, and will write the first field to the change log of the variable readField() .@br
+    This will read row after row, and will write each first field to the change log of the variable @code(readField()) .
+  )
 
-  @italic(Example, how to read the several field of a every row of a table):@br
-
+  @itemLabel(@italic(Example, how to read the several field of a every row of a table):)
+  @item(
     Template: @code(<table> <template:loop> <tr> <td> <template:read var="readField1()" source="text()"> </td> <td> <template:read var="readField2()" source="text()"> </td> <td> <template:read var="readField3()" source="text()"> </td> ... </tr> </template:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> a </td> <td> b </td> <td> c </td> </tr> ... </tr> </table>)@br
 
-    This will read readField1()=a, readField2()=b, readField3()=c...@br
-    Of you can use your own names instead of readFieldX() and they are independent of the html file. So such templates can convert several pages with different structures, to the same internal data layout of your application.
+    This will read @code(readField1()=a, readField2()=b, readField3()=c)...@br
+    Of you can use your own names instead of @code(readFieldX()) and they are independent of the html file. So such templates can convert several pages with different structures, to the same internal data layout of your application.
+  )
 
-  @italic(Example, how to read all rows of every table CSV like):@br
+  @itemLabel(@italic(Example, how to read all rows of every table CSV like):)
+  @item(
   Template: @code(<template:loop> <tr>  <template:read var="readAnotherRow()" source="deep-text(',')"> </tr> </template:loop> )@br
   Html-File: @code(... <tr> <td> a </td> <td> b </td> <td> c </td> </tr> <tr> <td> foo </td> <td> bar </td> </tr> ...)@br
 
-  This will read all rows, and write lines like a,b,c and foo,bar to the changelog.@br
+  This will read all rows, and write lines like @code(a,b,c) and @code(foo,bar) to the changelog.)
 
-  @italic(Example, how to read the first list item starting with an unary prime number):@br
-  Template: @code(<li htmlparser-condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')"><template:read var="prime" source="text()"/></li>)@br
+  @itemLabel(@italic(Example, how to read the first list item starting with an unary prime number):)
+  @item(
+  Template: @code(<li template:condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')"><template:read var="prime" source="text()"/></li>)@br
   Html-File: @code(... <li>1111: this is 4</li><li>1:1 is no prime</li><li>1111111: here is 7</li><li>11111111: 8</li> ...)@br
 
-  This will return "1111111: here is 7", because 1111111 is the first prime in that list.@br@br
+  This will return "1111111: here is 7", because 1111111 is the first prime in that list.)
 
-  @italic(Example, how to extract all elements of a html form):
-  @preformatted(<form>
+  @itemLabel(@italic(Example, how to extract all elements of a html form):)
+  @item(
+  Template: @preformatted(<form>
   <template:loop><template:switch>
-  <input type="checkbox" htmlparser-condition="exists(@checked)"><template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="radio" htmlparser-condition="exists(@checked)">   <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="hidden">                                          <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="password">                                        <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <input type="text">                                            <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-  <select><template:read var="temp" source="@name"/><option htmlparser-optional="true" htmlparser-condition="exists(@selected)"><template:read var="post" source="concat($temp;,'=',@value)"/></option></select>
-  <textarea>                                                     <template:read var="post" source="concat(@name,'=',text())"/>  </textarea>
+    <input type="checkbox" template:condition="exists(@checked)"><template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+    <input type="radio" template:condition="exists(@checked)">   <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+    <input type="hidden">                                        <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+    <input type="password">                                      <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+    <input type="text">                                          <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
+    <select><template:read var="temp" source="@name"/><option template:optional="true" template:condition="exists(@selected)"><template:read var="post" source="concat($temp;,'=',@value)"/></option></select>
+    <textarea>                                                     <template:read var="post" source="concat(@name,'=',text())"/>  </textarea>
   </template:switch></template:loop>
 </form>)
 
   Html-File: any form @br
+  @preformatted(<form>
+  <template:loop><template:switch>
+    <input template:condition="(@type = ('checkbox', 'radio') and exists(@checked)) or (@type = ('hidden', 'password', 'text'))"><t:s>post:=concat(@name,'=',@value)</t:s></input>
+    <select><t:s>temp:=@name</t:s><option t:optional="true" t:condition="exists(@selected)"><t:s>post:=concat($temp;,'=',@value)</t:s/></option></select>
+    <textarea><t:s>post:=concat(@name,'=',text())</t:s></textarea>
+  </template:switch></template:loop>
+<form>)
 
   This example will extract from each relevant element in the form the name and value pair which is sent to the webserver.
   It is very general, and will work with all forms, independent of things like nesting deep.
   Therefore it is a little bit ugly; but if you create a template for a specific page, you usually know which elements you will find there, so the template becomes much simpler in practical cases.
 
 
+  ))
 
   See the unit tests at the end of the file extendedhtmlparser.pas for more examples
 
@@ -152,7 +196,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file. @br
   A tag of the html file is considered as equal to a tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child node of the tag in the template is also equal to a child node of the tag in the html file (in the same order and nesting).@br
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
-  The matching occurs (in the latest version, since the NFA became unmaintable) with backtracking, so it will always find the first and longest match.
+  The matching occurs (in the latest version, since the NFA became unmaintenable) with backtracking, so it will always find the first and longest match.
 
   These template commands can be used:
    @unorderedList(
@@ -183,7 +227,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
        @item(Case 2: All direct child elements are normal html tag:@br
         @br This tag is matched to an html tag, iff one of its direct children can be matched to that html tag.
         @br For example @code(<template:switch><a>..</a> <b>..</b></template:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
-        @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a htmlparser-optional="true"/a> <b htmlparser-optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a htmlparser-optional="true"><template:read source="'true'" var="temp"/></a> <template:if test="$temp;!=true"> <b/> </template:if>).
+        @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a template:optional="true"/a> <b template:optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a template:optional="true"><template:read source="'true'" var="temp"/></a> <template:if test="$temp;!=true"> <b/> </template:if>).
             The difference is that the switch-construct gives equal priority to every of its children, but the excluding if-construct prioritizes a, and will ignore any b followed by an a.@br
             These switch-constructs are mainly used within a loop to collect the values of different tags.
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
@@ -194,7 +238,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
     @br
     There are two special attributes allowed for html tags in the template file:
     @unorderedList(
-      @item(@code(template:optional="true") @br if this is set the file is read sucessesfully even if the tag doesn't exist.@br
+      @item(@code(template:optional="true") @br if this is set the file is read successesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
       @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns true (powerful, but slow)
@@ -260,7 +304,7 @@ THtmlTemplateParser=class
 
     property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
-    property oldVariableChangeLog: TPXPVariableChangeLog read FOldVariableLog;
+    property oldVariableChangeLog: TPXPVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
 
     property templateNamespaces: TStringList read FNamespaces write FNamespaces; //**< Namespace prefixes which are recognized as template commands. Default is template: and t: @br Namespaces defined in a template with the xmlns: notation are automatically added to this property (actually added, so they will also recognized in later documents. Since this behaviour is a violation of the xml standard, it might change in future). @br Remark: This property contains the complete namespace prefix, including the final :
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
@@ -268,6 +312,7 @@ THtmlTemplateParser=class
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
   end;
 
+//** xml compatible namespace url to define new template prefixes
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 implementation
 
