@@ -329,7 +329,7 @@ function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**<
 //search
 //**Searchs the last index of c in s
 function strRpos(c:char;s:string):longint;
-//**Counts all occurences of search in searchIn (case sensitive, stops at #0)
+//**Counts all occurrences of search in searchIn (case sensitive, stops at #0)
 function strlCount(const search:char; const searchIn:pchar; const len: longint): longint;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
 function strlsIndexOf(str,searched:pchar; l1, l2: longint): longint;
@@ -346,17 +346,17 @@ function striContains(const str,searched:string; from: longint = 1):boolean; inl
 
 //more specialized
 type TCharSet = set of char;
-//**Removes all occurences of trimCharacter from the left/right side of the string@br
+//**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrimLeft(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
-//**Removes all occurences of trimCharacter from the left/right side of the string@br
+//**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrimRight(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
-//**Removes all occurences of trimCharacter from the left/right side of the string@br
+//**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrim(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
 
-//**Removes all occurences of trimCharacter from the left/right side of the string
+//**Removes all occurrences of trimCharacter from the left/right side of the string
 function strTrimLeft(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; inline;
 function strTrimRight(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; inline;
 function strTrim(const s: string; const trimCharacters: TCharSet = [#0..' ']):string; inline;
@@ -368,9 +368,9 @@ function strSplitGet(const separator: string; var remainingPart: string):string;
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is assign to firstPart, the second one is again assign to remainingPart
 procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
-//**Splits the string s into the array splitted at every occurence of sep
+//**Splits the string s into the array splitted at every occurrence of sep
 procedure strSplit(out splitted: TStringArray;s:string;sep:string=',';includeEmpty:boolean=true);overload;
-//**Splits the string s into the array splitted at every occurence of sep
+//**Splits the string s into the array splitted at every occurrence of sep
 function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArray;overload;
 
 //**Joins all string list items to a single string separated by @code(sep).@br
