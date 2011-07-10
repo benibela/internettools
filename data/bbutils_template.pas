@@ -296,9 +296,9 @@ function striCompareClever(const s1, s2: string): integer;
 
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
-//**log 10 rounded down (= number of digits in base 10)
+//**log 10 rounded down (= number of digits in base 10 - 1)
 function intLog10(i:longint):longint; overload;
-//**log_b n  rounded down (= number of digits of n in base b)
+//**log_b n  rounded down (= number of digits of n in base b - 1)
 function intLog(n,b: longint): longint; overload;
 //**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
 procedure intFactor(n,p: longint; out e, r:longint);
@@ -332,10 +332,13 @@ function binomialProbabilityApprox(n:longint;p:float;k:longint):float;
 //**Z-Score of the value k in a distribution with n outcomes
 function binomialZScore(n:longint;p:float;k:longint):float;
 
-//**This calculates the euler phi function totient[i] := phi(i) = {1 <= j <= i | gcd(i,j) = 0} for all i <= n.@br
+//**This calculates the euler phi function totient[i] := phi(i) = |{1 <= j <= i | gcd(i,j) = 0}| for all i <= n.@br
 //**It uses a sieve approach and is quite fast (10^7 in 3s)@br
 //**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
-procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
+procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
+//**This calculates the number of divisors: divcount[i] := |{1 <= j <= i | i mod j = 0}| for all i <= n.@br
+//**Speed: 10^7 in 5s@br
+procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
 
 //--------------------Time functions-----------------------------------
 {$IFDEF Win32}
@@ -344,7 +347,7 @@ function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: bo
 {$ENDIF}
 //**Week of year
 function weekOfYear(const date:TDateTime):word;
-//**Reads a date string given a certain mask@br
+//**Reads a date string given a certain mask (mask is case-sensitive)@br
 //**The uses the same mask types as FormateDate:@br
 //**d or dd for a numerical day  @br
 //**m or mm for a numerical month, mmm for a short month name@br
@@ -1349,6 +1352,7 @@ begin
   result:=IntToHex(PtrUInt(p), 2*sizeof(Pointer));
 end;
 
+//incase-sensitive, intelligent string compare (splits in text, number parts)
 function striCompareClever(const s1, s2: string): integer;
 var t1,t2:string; //lowercase text
     i,j,ib,jb,p: longint;
@@ -1361,8 +1365,8 @@ begin
     if (t1[i] in ['0'..'9']) and (t2[j] in ['0'..'9']) then begin
       ib:=i;
       jb:=j;
-      while (i<=length(t1) and (t1[i] in ['0'..'9'])) do inc(i);
-      while (j<=length(t2) and (t2[j] in ['0'..'9'])) do inc(j);
+      while (i<=length(t1)) and (t1[i] in ['0'..'9']) do inc(i);
+      while (j<=length(t2)) and (t2[j] in ['0'..'9']) do inc(j);
       if i-ib<j-jb then begin
         result:=-1; //find longer number
         exit;
@@ -1584,7 +1588,7 @@ begin
 end;
 {$ENDIF}
 
-procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
+procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
 var
   i,j,e,r: Integer;
 begin
@@ -1600,6 +1604,24 @@ begin
         totient[j] := totient[r] * (i ** (e-1) ) * (i - 1);
         j+=i;
       end;
+    end;
+  end;
+end;
+
+
+procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
+var
+ i: Integer;
+ j: LongInt;
+begin
+  setlength(divcount, n+1);
+  divcount[0] := 0;
+  for i:=1 to high(divcount) do divcount[i] := 1;
+  for i:=2 to high(divcount) do begin
+    j:=i;
+    while j < length(divcount) do begin
+      divcount[j]+=1;
+      j+=i;
     end;
   end;
 end;

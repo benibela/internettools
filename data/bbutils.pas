@@ -60,7 +60,7 @@ uses
   , windows
   {$ENDIF};
 
-//{$DEFINE UNITTESTS}
+{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
@@ -410,7 +410,7 @@ function strConvertToUtf8(str: string; from: TEncoding): string; //**< Returns a
 function strConvertFromUtf8(const str: string; toe: TEncoding): string; //**< Converts a utf-8 string to the encoding @code(from)
 function strChangeEncoding(const str: string; from,toe: TEncoding):string; //**< Changes the string encoding from @code(from) to @code(toe)
 function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string; //**< Get unicode character @code(character) in a certain encoding
-function strDecodeUTF8Character(const str: string; var curpos: integer): integer; //**< Get unicode character @code(character) in a certain encoding
+function strDecodeUTF8Character(const str: string; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromName(str:string):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -426,7 +426,10 @@ function strFromPchar(p:pchar;l:longint):string;
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
 
+//**Case insensitive, clever comparison, that basically splits the string into
+//**lexicographical and numerical parts and compares them accordingly
 function striCompareClever(const s1, s2: string): integer;
+
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
 //**log 10 rounded down (= number of digits in base 10 - 1)
@@ -470,10 +473,10 @@ function binomialZScore(n:longint;p:float;k:longint):float;
 //**This calculates the euler phi function totient[i] := phi(i) = |{1 <= j <= i | gcd(i,j) = 0}| for all i <= n.@br
 //**It uses a sieve approach and is quite fast (10^7 in 3s)@br
 //**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
-procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
+procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
 //**This calculates the number of divisors: divcount[i] := |{1 <= j <= i | i mod j = 0}| for all i <= n.@br
 //**Speed: 10^7 in 5s@br
-procedure divisorCountSieve(n: integer; var divcount: TLongintArray);
+procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
 
 //--------------------Time functions-----------------------------------
 {$IFDEF Win32}
@@ -482,7 +485,7 @@ function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: bo
 {$ENDIF}
 //**Week of year
 function weekOfYear(const date:TDateTime):word;
-//**Reads a date string given a certain mask (case-sensitive)@br
+//**Reads a date string given a certain mask (mask is case-sensitive)@br
 //**The uses the same mask types as FormateDate:@br
 //**d or dd for a numerical day  @br
 //**m or mm for a numerical month, mmm for a short month name@br
@@ -1653,6 +1656,7 @@ begin
   result:=strTrimCommon(s, trimCharacters, @strlTrim);
 end;
 
+
 function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet
  ): string;
 var i,j: integer;
@@ -1671,6 +1675,8 @@ begin
  if j -1 <> length(result) then
    setlength(result,j-1);
 end;
+
+
 
 function strSplitGet(const separator: string; var remainingPart: string): string;
 begin
@@ -1895,6 +1901,7 @@ begin
     $FE..$FF: i+=1; //invalid*)
   end;
 end;
+
 
 function strEncodingFromName(str: string): TEncoding;
 begin
@@ -6746,7 +6753,7 @@ begin
 end;
 
 //incase-sensitive, intelligent string compare (splits in text, number parts)
-function stricompareclever(const s1,s2: string):integer;
+function striCompareClever(const s1, s2: string): integer;
 var t1,t2:string; //lowercase text
     i,j,ib,jb,p: longint;
 begin
@@ -6996,7 +7003,7 @@ begin
 end;
 {$ENDIF}
 
-procedure eulerPhiSieve(n: integer; var totient: TLongintArray);
+procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
 var
   i,j,e,r: Integer;
 begin
@@ -7017,7 +7024,7 @@ begin
 end;
 
 
-procedure divisorCountSieve(n: integer; var divcount: TLongintArray);
+procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
 var
  i: Integer;
  j: LongInt;
