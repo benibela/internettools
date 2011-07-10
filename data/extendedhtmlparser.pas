@@ -408,9 +408,11 @@ end;
 
 function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
 begin
-  FreeAndNil(FVariables);
-  FVariables := FVariableLog.finalValues();
-  FVariables.readonly := true;
+  if FVariables = nil then begin
+    FVariables := FVariableLog.finalValues();
+    FVariables.readonly := true;
+  end;
+  result := FVariables;
 end;
 
 function THtmlTemplateParser.executePseudoXPath(str: string): TPXPValue;
@@ -440,7 +442,7 @@ function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
 var
   name: string;
   condition: string;
-  i,j: Integer;
+  i: Integer;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
@@ -661,8 +663,6 @@ var realHtmlStart: TTreeElement;
       templateStart := TTemplateElement(templateStart.next);
   end;
 
-var logLength: longint;
-  vari: string;
 begin
   if htmlStart = nil then exit(false);
   if templateStart = nil then exit(false);
@@ -1470,17 +1470,17 @@ begin
   extParser.variableChangeLog.ValuesString['Hallo']:='diego';
   extParser.parseTemplate('<a><template:read source="text()" var="hello"/></a>');
   extParser.parseHTML('<a>maus</a>');
-  if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
-    raise Exception.Create('invalid var');
-  if extParser.variableChangeLog.ValuesString['Hallo']<>'diego' then
-    raise Exception.Create('invalid var');
+  if extParser.variableChangeLog.ValuesString['hello']<>'maus' then raise Exception.Create('invalid var');
+  if extParser.variableChangeLog.ValuesString['Hallo']<>'diego' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['hello']<>'maus' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['Hallo']<>'diego' then raise Exception.Create('invalid var');
   checklog('Hallo=diego'#13'hello=maus');
   extParser.parseTemplate('<a><template:read source="text()" var="Hallo"/></a>');
   extParser.parseHTML('<a>maus</a>');
-  if extParser.variableChangeLog.ValuesString['hello']<>'maus' then
-    raise Exception.Create('invalid var');
-  if extParser.variableChangeLog.ValuesString['Hallo']<>'maus' then
-    raise Exception.Create('invalid var');
+  if extParser.variableChangeLog.ValuesString['hello']<>'maus' then raise Exception.Create('invalid var');
+  if extParser.variableChangeLog.ValuesString['Hallo']<>'maus' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['Hallo']<>'maus' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['Hallo']<>'maus' then raise Exception.Create('invalid var');
   checklog('Hallo=diego'#13'hello=maus'#13'Hallo=maus');
   extParser.parseTemplate('<a><template:read source="$Hallo" var="xy"/></a>');
   extParser.parseHTML('<a>xxxx</a>');
@@ -1491,12 +1491,17 @@ begin
   extParser.parseTemplate('<a><template:read source="$Hallo" var="xyz"/></a>');
   extParser.parseHTML('<a>xxxx</a>');
   checklog('xyz=maus');
+  if extParser.variables.ValuesString['xyz']<>'maus' then raise Exception.Create('invalid var');
   extParser.parseTemplate('<a><template:read source="$Hallo" var="abc"/></a>');
   extParser.parseHTML('<a>mxxxx</a>');
   checklog('abc=maus');
+  if extParser.variables.ValuesString['abc']<>'maus' then raise Exception.Create('invalid var');
   extParser.parseTemplate('<a><template:read source="x" var="nodes"/><template:read source="string-join($nodes,'','')" var="joined"/><template:read source="type-of($nodes[1])" var="type"/></a>');
   extParser.parseHTML('<a>yyyy<x>A1</x><x>B2</x><x>C3</x><x>D4</x>xxxx</a>');
   checklog('nodes=A1'#13'joined=A1,B2,C3,D4'#13'type=node');
+  if extParser.variables.ValuesString['nodes']<>'A1' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['joined']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['type']<>'node' then raise Exception.Create('invalid var');
   extParser.parseTemplate('<a><template:read source="$nodes" var="oldnodes"/>'+
                              '<template:read source="$joined" var="oldjoined"/>'+
                              '<template:read source="string-join($nodes,'','')" var="newjoinedold"/>'+
@@ -1505,6 +1510,10 @@ begin
                              '</a>');
   extParser.parseHTML('<a>yyyy<x>A1</x><x>B2</x><x>C3</x><x>D4</x>xxxx</a>');
   checklog('oldnodes=A1'#13'oldjoined=A1,B2,C3,D4'#13'newjoinedold=A1,B2,C3,D4'#13'newjoinednew=A1,B2,C3,D4'#13'newtype=string'); //test node to string reduction
+  if extParser.variables.ValuesString['oldnodes']<>'A1' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['newjoinedold']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['newjoinednew']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['newtype']<>'string' then raise Exception.Create('invalid var');
 
 
   extParser.free;
