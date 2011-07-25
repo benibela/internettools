@@ -47,6 +47,4 @@ A similar function, parseXML, exists for xml data in the unit simplexmlparser (i
 @item(The unit pastemplate implements a very simple template language for pascal units (such a template is used to generate bbutils) )
 )
 
-bbutils
-
 
