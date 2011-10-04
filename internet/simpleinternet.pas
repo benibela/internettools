@@ -58,7 +58,7 @@ data can be an url, or a html/xml file in a string.@br@br
 
 query can be a @link(pseudoxpath.TPseudoXPathParser PXPath expression), like in @code(process('http://www.google.de', '/html/head/title');). @br@br
 
-Or it can be a @link(extendedhtmlparser.THtmlTemplateParser html template) like @code(process('http://www.google.de', '<title><t:s>result:=text()</t:s></title>');)
+Or query can be a @link(extendedhtmlparser.THtmlTemplateParser html template) like @code(process('http://www.google.de', '<title><t:s>result:=text()</t:s></title>');)
 The advantage of such templates is that they can return several variables at once and a canonical representation of the same data on different web sites.
 To get a list of all variables of the last query you can use processedVariables.@br@br
 

@@ -5,7 +5,7 @@
 
 If you just want to download things, you can use the function @link(simpleinternet.retrieve retrieve) of the unit simpleinternet.@br@br
 
-You can also further process the data with the function (simpleinternet.process process) of the same unit.
+You can also further @noAutoLink(process) the data with the function @link(simpleinternet.process process) of the same unit.
 
 @section(1 AnchorNameXYZ Accessing the internet/downloading things)
 
