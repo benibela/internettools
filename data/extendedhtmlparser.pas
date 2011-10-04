@@ -260,6 +260,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
 *)
 THtmlTemplateParser=class
+private
   protected
     FOutputEncoding: TEncoding;
     FKeepOldVariables: TKeepPreviousVariables;
@@ -274,6 +275,8 @@ THtmlTemplateParser=class
     FParsingExceptions: boolean;
 
     function GetVariables: TPXPVariableChangeLog;
+    function getHTMLTree: TTreeElement;
+    function getTemplateTree: TTreeElement;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -303,13 +306,16 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
-    property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in certain line
+    property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
     property oldVariableChangeLog: TPXPVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
 
     property templateNamespaces: TStringList read FNamespaces write FNamespaces; //**< Namespace prefixes which are recognized as template commands. Default is template: and t: @br Namespaces defined in a template with the xmlns: notation are automatically added to this property (actually added, so they will also recognized in later documents. Since this behaviour is a violation of the xml standard, it might change in future). @br Remark: This property contains the complete namespace prefix, including the final :
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
+
+    property TemplateTree: TTreeElement read getTemplateTree; //A tree representation of the current template
+    property HTMLTree: TTreeElement read getHTMLTree; //A tree representation of the processed html file
   end;
 
 //** xml compatible namespace url to define new template prefixes
@@ -404,6 +410,18 @@ destructor TTemplateElement.destroy;
 begin
   FreeAndNil(templateAttributes);
   inherited destroy;
+end;
+
+function THtmlTemplateParser.getHTMLTree: TTreeElement;
+begin
+  if FHTML = nil then exit(FHTML);
+  result := FHTML.getTree;
+end;
+
+function THtmlTemplateParser.getTemplateTree: TTreeElement;
+begin
+  if FTemplate = nil then exit(FTemplate);
+  result := FTemplate.getTree;
 end;
 
 function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
