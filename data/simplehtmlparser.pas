@@ -119,8 +119,9 @@ begin
         case pos^ of
           '!':begin //comment start
             inc(pos);
-            if (pos^='D') and ((pos+1)^='O') and ((pos+2)^='C') and
-               ((pos+3)^='T') and ((pos+4)^='Y')and ((pos+5)^='P')and ((pos+6)^='E')  then begin//doctype
+            if (pos^ in ['D','d']) and ((pos+1)^ in ['O','o']) and ((pos+2)^ in ['C','c'])
+               and ((pos+3)^ in ['T','t']) and ((pos+4)^ in ['Y','y'])and ((pos+5)^ in ['P','p'])
+               and ((pos+6)^ in ['E','e'])  then begin//doctype
               while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
               inc(pos);
              end else begin
