@@ -17,6 +17,8 @@ interface
 uses
   Classes, SysUtils, pseudoxpath, internetaccess, simplehtmltreeparser;
 
+//Usually this unit uses synapse on linux and wininet on windows, but you can choose a certain wrapper below:
+
 //{$DEFINE USE_SYNAPSE_WRAPPER}
 //{$DEFINE USE_WININET_WRAPPER}
 //{$DEFINE USE_NO_WRAPPER}
@@ -25,7 +27,7 @@ uses
 (***
 Retrieve data from any url.@br@br
 
-It is really simple to use, you use pass the desired url as single parameter and get the data of the url.@br@br
+It is really simple to use, you  pass the desired url as single parameter and get the data of the url.@br@br
 
 It supports:
 
