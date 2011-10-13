@@ -414,13 +414,13 @@ end;
 
 function THtmlTemplateParser.getHTMLTree: TTreeElement;
 begin
-  if FHTML = nil then exit(FHTML);
+  if FHTML = nil then exit(nil);
   result := FHTML.getTree;
 end;
 
 function THtmlTemplateParser.getTemplateTree: TTreeElement;
 begin
-  if FTemplate = nil then exit(FTemplate);
+  if FTemplate = nil then exit(nil);
   result := FTemplate.getTree;
 end;
 
