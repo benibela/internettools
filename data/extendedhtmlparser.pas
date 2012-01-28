@@ -397,6 +397,14 @@ begin
   if templateAttributes <> nil then
     if templateAttributes.Values['optional'] = 'true' then flags+=[tefOptional];
 
+  if templateType = tetCommandShortRead then begin
+    curChild := getFirstChild();
+    while curChild <> nil do begin
+      TTemplateElement(curChild).templateType:=tetIgnore;
+      curChild := curChild.getNextSibling();
+    end;
+  end;
+
   if templateType = tetCommandSwitchOpen then begin
     curChild := getFirstChild();
     while curChild <> nil do begin
@@ -823,8 +831,9 @@ begin
     while cur <> nil do begin
       case TTemplateElement(cur).templateType of
         tetHTMLOpen, tetHTMLText: begin
-          if TTemplateElement(cur).match = nil then
+          if (TTemplateElement(cur).match = nil) and (TTemplateElement(cur).templateType<>tetIgnore) then begin
             raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+          end;
           last:=cur;
         end;
         tetCommandIfOpen: begin
@@ -864,7 +873,10 @@ begin
   el := TTemplateElement(FTemplate.getTree);
   while el <> nil do begin
     el.postprocess(self);
-    el := TTemplateElement(el.next);
+    if (el.typ = tetOpen) and (TTemplateElement(el).templateType = tetCommandShortRead) then
+      el := TTemplateElement(el.reverse)
+     else
+      el := TTemplateElement(el.next);
   end;
 
   FTemplateName := templateName;
