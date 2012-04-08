@@ -20,7 +20,7 @@ object Form1: TForm1
     TabOrder = 0
     object Label1: TLabel
       Left = 1
-      Height = 18
+      Height = 16
       Top = 1
       Width = 558
       Align = alTop
@@ -29,15 +29,15 @@ object Form1: TForm1
     end
     object Memo1: TMemo
       Left = 1
-      Height = 103
-      Top = 19
+      Height = 105
+      Top = 17
       Width = 558
       Align = alClient
       Lines.Strings = (
         '<table id="right">'
-        '<htmlparser:loop>'
-        '<tr><td><htmlparser:read source="text()" var="col"/></td></tr>'
-        '</htmlparser:loop>'
+        '<template:loop>'
+        '<tr><td><t:s>col:=text()</t:s></td></tr>'
+        '</template:loop>'
         '</table>'
       )
       TabOrder = 0
@@ -45,17 +45,17 @@ object Form1: TForm1
   end
   object Panel2: TPanel
     Left = 0
-    Height = 155
+    Height = 159
     Top = 128
     Width = 560
     Align = alClient
     Caption = 'Panel2'
-    ClientHeight = 155
+    ClientHeight = 159
     ClientWidth = 560
     TabOrder = 1
     object Label2: TLabel
       Left = 1
-      Height = 18
+      Height = 16
       Top = 1
       Width = 558
       Align = alTop
@@ -64,8 +64,8 @@ object Form1: TForm1
     end
     object Memo2: TMemo
       Left = 1
-      Height = 135
-      Top = 19
+      Height = 141
+      Top = 17
       Width = 558
       Align = alClient
       Lines.Strings = (
@@ -96,7 +96,7 @@ object Form1: TForm1
     TabOrder = 2
     object Label3: TLabel
       Left = 1
-      Height = 18
+      Height = 16
       Top = 1
       Width = 558
       Align = alTop
@@ -105,8 +105,8 @@ object Form1: TForm1
     end
     object Memo3: TMemo
       Left = 1
-      Height = 76
-      Top = 19
+      Height = 78
+      Top = 17
       Width = 558
       Align = alClient
       Lines.Strings = (
@@ -136,7 +136,7 @@ object Form1: TForm1
   object Button1: TButton
     Left = 0
     Height = 25
-    Top = 283
+    Top = 287
     Width = 560
     Align = alBottom
     Caption = 'GO'
@@ -165,8 +165,8 @@ object Form1: TForm1
   end
   object CheckBox1: TCheckBox
     Left = 0
-    Height = 22
-    Top = 308
+    Height = 18
+    Top = 312
     Width = 560
     Align = alBottom
     Caption = 'convert encoding/entities'
