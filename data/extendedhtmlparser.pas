@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 {$mode objfpc}{$H+}
 
-{$IFDEF DEBUG}
+//{$IFDEF DEBUG}
 {$DEFINE UNITTESTS}
-{$ENDIF}
+//{$ENDIF}
 
 interface
 uses
@@ -40,9 +40,9 @@ uses
 type
 //**@abstract These are all possible template commands, for internal use
 //**@value tetIgnore useless thing
-//**@value tetHTMLOpen normal html opening tag, searched in the processed document
-//**@value tetHTMLClose normal html closing tag, searched in the processed document
-//**@value tetHTMLText text node, , searched in the processed document
+//**@value tetMatchOpen normal html opening tag, searched in the processed document
+//**@value tetMatchClose normal html closing tag, searched in the processed document
+//**@value tetMatchText text node, , searched in the processed document
 //**@value tetCommandMeta <template:meta> command to specify encoding
 //**@value tetCommandRead <template:read> command to set a variable
 //**@value tetCommandShortRead <template:s> command to execute a pxp expression
@@ -51,7 +51,7 @@ type
 //**@value tetCommandSwitchOpen <template:switch> command to branch
 //duplicate open/close because this simplifies the case statements
 TTemplateElementType=(tetIgnore,
-                      tetHTMLOpen, tetHTMLClose, tetHTMLText,
+                      tetMatchOpen, tetMatchClose, tetMatchText,
                       tetCommandMeta, tetCommandRead, tetCommandShortRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
@@ -78,6 +78,8 @@ TTemplateElement=class(TTreeElement)
   templateAttributes: TAttributeList;
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
+  regexs: array of TRegExpr;
+
   procedure postprocess(parser: THtmlTemplateParser);
   destructor destroy;override;
 end;
@@ -97,9 +99,11 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   You can use it by calling the methods @code(parseTemplate) and @code(parseHTML). @code(parseTemplate) loads a certain template
   and @code(parseHTML) matches the template to a html/xml file.@br
   A template file is just like a html file with special commands. The parser than matches every text and tag
-  of the template to text/tag in the html file, while ignoring every additional data of latter file. If no match is possible an exception is raised.@br
+  of the template to text/tag in the html file, while ignoring every additional data in latter file. If no match is possible an exception is raised.@br
   The template can extract certain values from the html file into @noAutoLink(variables), and you can access these @noAutoLink(variables) with the property variables and variableChangeLog.
   Former only contains the final value of the @noAutoLink(variables), latter records every assignment during the matching of the template.@br@br
+
+  @bold(Getting started)
 
   @bold(Examples)
 
@@ -191,12 +195,15 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
   See the unit tests at the end of the file extendedhtmlparser.pas for more examples
 
+
+
+
   @bold(Syntax of a template file)
 
   Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file. @br
   A tag of the html file is considered as equal to a tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child node of the tag in the template is also equal to a child node of the tag in the html file (in the same order and nesting).@br
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
-  The matching occurs (in the latest version, since the NFA became unmaintenable) with backtracking, so it will always find the first and longest match.
+  The matching occurs with backtracking, so it will always find the first and longest match.
 
   These template commands can be used:
    @unorderedList(
@@ -224,24 +231,27 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
           @br An element that has neither a @code(value) nor a @code(test) attribute is always choosen (if no element before it is choosen).
           @br If no child can be choosen at the current position in the html file, the complete switch statement will skipped.
        )
-       @item(Case 2: All direct child elements are normal html tag:@br
+       @item(Case 2: All direct child elements are normal html tags:@br
         @br This tag is matched to an html tag, iff one of its direct children can be matched to that html tag.
         @br For example @code(<template:switch><a>..</a> <b>..</b></template:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
-        @br Therefore such a switch tag is obviously not the same as two optional elements (see below) like @code(<a template:optional="true"/a> <b template:optional="true"/>), but also not the same as an optional element which excludes the next element like @code(<a template:optional="true"><template:read source="'true'" var="temp"/></a> <template:if test="$temp;!=true"> <b/> </template:if>).
-            The difference is that the switch-construct gives equal priority to every of its children, but the excluding if-construct prioritizes a, and will ignore any b followed by an a.@br
-            These switch-constructs are mainly used within a loop to collect the values of different tags.
+            These switch-constructs are mainly used within a loop to collect the values of different tags, or to combine to different templates.
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
        ))
       )
+      @item(@code(<template:match-text [regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [case-sensitive=".."] [list-contains=".."]/>@br
+        Matches a text node and is more versatile than just including the text in the template.
+      )
+
     )@br
-    Each one of this command can also have a property @code(test="{pxp condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
+        Each of these commands can also have a property @code(test="{pxp condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
     @br
     There are two special attributes allowed for html tags in the template file:
     @unorderedList(
       @item(@code(template:optional="true") @br if this is set the file is read successesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
-      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns true (powerful, but slow)
+      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns true (powerful, but slow) @br
+                                                      (condition is not the same as test: if test evaluates to false, the template tag is ignored; if condition evaluates to false, the html tag )
       )
     )
 
@@ -350,9 +360,9 @@ begin
     end;
   end;
   case treeTyp of
-    tetOpen: exit(tetHTMLOpen);
-    tetClose: exit(tetHTMLClose);
-    tetText: exit(tetHTMLText);
+    tetOpen: exit(tetMatchOpen);
+    tetClose: exit(tetMatchClose);
+    tetText: exit(tetMatchText);
   end;
 end;
 
@@ -415,8 +425,11 @@ begin
 end;
 
 destructor TTemplateElement.destroy;
+var i: integer;
 begin
   FreeAndNil(templateAttributes);
+  for i:=0 to high(regexs) do
+    FreeAndNil(regexs[i]);
   inherited destroy;
 end;
 
@@ -470,7 +483,7 @@ var
   condition: string;
   i: Integer;
 begin
-  if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
+  if (html.typ <> tetOpen) or (template.templateType <> tetMatchOpen) or
      not striequal(html.value, template.value) then
        exit(false);
   if template.attributes = nil then
@@ -494,7 +507,7 @@ function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: T
 
 var xpathText: TTreeElement;
 
-  procedure HandleHTMLText;
+  procedure HandleMatchText;
   begin
     //if we find a text match we can assume it is a true match
     if stribeginswith(htmlStart.value, templateStart.value) then begin
@@ -505,7 +518,7 @@ var xpathText: TTreeElement;
   end;
 
 
-  procedure HandleHTMLOpen;
+  procedure HandleMatchOpen;
   var ok: boolean;
   begin
     //If an element is option it can either be there (preferred) or not. Therefore we simple try both cases
@@ -631,7 +644,7 @@ var xpathText: TTreeElement;
         value := performPXPEvaluation(TTemplateElement(templateStart).templateAttributes.Values['value']);
 
       while curChild <> nil do begin //enumerate all child tags
-        if TTemplateElement(curChild).templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if TTemplateElement(curChild).templateType in [tetMatchOpen,tetMatchClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
         if TTemplateElement(curChild).templateType = tetCommandSwitchOpen then raise ETemplateParseException.Create('A switch command may not be a direct child of another switch command');
         if elementFit(TTemplateElement(curChild)) then begin
           templateStart := TTemplateElement(curChild);
@@ -713,9 +726,9 @@ begin
               end;
             end;
             case templateStart.templateType of
-              tetHTMLText: HandleHTMLText;
-              tetHTMLOpen: HandleHTMLOpen;
-              tetHTMLClose:  raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
+              tetMatchText: HandleMatchText;
+              tetMatchOpen: HandleMatchOpen;
+              tetMatchClose:  raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
 
               tetCommandRead: HandleCommandRead;
               tetCommandShortRead: HandleCommandShortRead;
@@ -830,7 +843,7 @@ begin
     last := cur;
     while cur <> nil do begin
       case TTemplateElement(cur).templateType of
-        tetHTMLOpen, tetHTMLText: begin
+        tetMatchOpen, tetMatchText: begin
           if (TTemplateElement(cur).match = nil) and (TTemplateElement(cur).templateType<>tetIgnore) then begin
             raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
           end;
