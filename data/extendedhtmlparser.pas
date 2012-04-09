@@ -906,10 +906,10 @@ begin
   el := TTemplateElement(FTemplate.getTree);
   while el <> nil do begin
     el.postprocess(self);
-    if (el.typ = tetOpen) and (TTemplateElement(el).templateType = tetCommandShortRead) then
-      el := TTemplateElement(el.reverse)
+    if (el.typ = tetOpen) and (el.templateType = tetCommandShortRead) then
+      el := el.templateReverse
      else
-      el := TTemplateElement(el.next);
+      el := el.templateNext
   end;
 
   FTemplateName := templateName;
