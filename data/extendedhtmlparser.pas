@@ -40,9 +40,9 @@ uses
 type
 //**@abstract These are all possible template commands, for internal use
 //**@value tetIgnore useless thing
-//**@value tetMatchOpen normal html opening tag, searched in the processed document
-//**@value tetMatchClose normal html closing tag, searched in the processed document
-//**@value tetMatchText text node, , searched in the processed document
+//**@value tetHTMLOpen normal html opening tag, searched in the processed document
+//**@value tetHTMLClose normal html closing tag, searched in the processed document
+//**@value tetHTMLText text node, , searched in the processed document
 //**@value tetCommandMeta <template:meta> command to specify encoding
 //**@value tetCommandRead <template:read> command to set a variable
 //**@value tetCommandShortRead <template:s> command to execute a pxp expression
@@ -50,8 +50,10 @@ type
 //**@value tetCommandIfOpen <template:if> command to skip something
 //**@value tetCommandSwitchOpen <template:switch> command to branch
 //duplicate open/close because this simplifies the case statements
-TTemplateElementType=(tetIgnore,
-                      tetMatchOpen, tetMatchClose, tetMatchText,
+TTemplateElementType=(tetIgnore, tetPlainHTML,
+                      tetHTMLOpen, tetHTMLClose,
+                      tetHTMLText,
+                      tetMatchText,
                       tetCommandMeta, tetCommandRead, tetCommandShortRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
@@ -78,7 +80,12 @@ TTemplateElement=class(TTreeElement)
   templateAttributes: TAttributeList;
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
-  regexs: array of TRegExpr;
+  //"caches"
+  test, condition, source: TPseudoXPathParser;
+  textRegexs: array of TRegExpr;
+
+  function templateReverse: TTemplateElement inline;
+  function templateNext: TTemplateElement; inline;
 
   procedure postprocess(parser: THtmlTemplateParser);
   destructor destroy;override;
@@ -333,9 +340,9 @@ const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 implementation
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
-      firstRealTemplateType = tetCommandMeta;
-      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
-      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('meta','read','s','loop','loop','if','if','switch','switch');
+      firstRealTemplateType = tetMatchText;
+      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('match-text','meta','read','s','loop','loop','if','if','switch','switch');
 
 { TTemplateElement }
 
@@ -360,10 +367,20 @@ begin
     end;
   end;
   case treeTyp of
-    tetOpen: exit(tetMatchOpen);
-    tetClose: exit(tetMatchClose);
-    tetText: exit(tetMatchText);
+    tetOpen: exit(tetHTMLOpen);
+    tetClose: exit(tetHTMLClose);
+    tetText: exit(tetHTMLText);
   end;
+end;
+
+function TTemplateElement.templateReverse: TTemplateElement;
+begin
+ exit(TTemplateElement(reverse));
+end;
+
+function TTemplateElement.templateNext: TTemplateElement;
+begin
+  exit(TTemplateElement(next));
 end;
 
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
@@ -428,8 +445,11 @@ destructor TTemplateElement.destroy;
 var i: integer;
 begin
   FreeAndNil(templateAttributes);
-  for i:=0 to high(regexs) do
-    FreeAndNil(regexs[i]);
+  for i:=0 to high(textRegexs) do
+    FreeAndNil(textRegexs[i]);
+  test.Free;
+  condition.Free;
+  source.Free;
   inherited destroy;
 end;
 
@@ -483,7 +503,7 @@ var
   condition: string;
   i: Integer;
 begin
-  if (html.typ <> tetOpen) or (template.templateType <> tetMatchOpen) or
+  if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
        exit(false);
   if template.attributes = nil then
@@ -512,7 +532,7 @@ var xpathText: TTreeElement;
     //if we find a text match we can assume it is a true match
     if stribeginswith(htmlStart.value, templateStart.value) then begin
       templateStart.match := htmlStart;
-      templateStart := TTemplateElement(templateStart.next);
+      templateStart := templateStart.templateNext;
     end;
     htmlStart := htmlStart.next;
   end;
@@ -644,7 +664,7 @@ var xpathText: TTreeElement;
         value := performPXPEvaluation(TTemplateElement(templateStart).templateAttributes.Values['value']);
 
       while curChild <> nil do begin //enumerate all child tags
-        if TTemplateElement(curChild).templateType in [tetMatchOpen,tetMatchClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if TTemplateElement(curChild).templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
         if TTemplateElement(curChild).templateType = tetCommandSwitchOpen then raise ETemplateParseException.Create('A switch command may not be a direct child of another switch command');
         if elementFit(TTemplateElement(curChild)) then begin
           templateStart := TTemplateElement(curChild);
@@ -726,9 +746,9 @@ begin
               end;
             end;
             case templateStart.templateType of
-              tetMatchText: HandleMatchText;
-              tetMatchOpen: HandleMatchOpen;
-              tetMatchClose:  raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
+              tetHTMLText: HandleMatchText;
+              tetHTMLOpen: HandleMatchOpen;
+              tetHTMLClose:  raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
 
               tetCommandRead: HandleCommandRead;
               tetCommandShortRead: HandleCommandShortRead;
@@ -843,7 +863,7 @@ begin
     last := cur;
     while cur <> nil do begin
       case TTemplateElement(cur).templateType of
-        tetMatchOpen, tetMatchText: begin
+        tetHTMLOpen, tetHTMLText: begin
           if (TTemplateElement(cur).match = nil) and (TTemplateElement(cur).templateType<>tetIgnore) then begin
             raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
           end;
@@ -894,8 +914,9 @@ begin
 
   FTemplateName := templateName;
 
-  //evaluate meta
+  //evaluate meta encoding
   el := TTemplateElement(FTemplate.getTree);
+
   while el <> nil do begin
     if el.templateType = tetCommandMeta then begin
       if el.templateAttributes.Values['encoding'] <> '' then begin
@@ -915,6 +936,9 @@ begin
     end;
     el := TTemplateElement(el.next);
   end;
+
+
+
 end;
 
 procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
