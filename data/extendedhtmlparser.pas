@@ -81,13 +81,14 @@ TTemplateElement=class(TTreeElement)
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
-  test, condition, source: TPseudoXPathParser;
+  test, condition, valuepxp, source: TPseudoXPathParser;
   textRegexs: array of TRegExpr;
 
-  function templateReverse: TTemplateElement inline;
+  function templateReverse: TTemplateElement; inline;
   function templateNext: TTemplateElement; inline;
 
   procedure postprocess(parser: THtmlTemplateParser);
+  procedure initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   destructor destroy;override;
 end;
 
@@ -214,7 +215,6 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
   These template commands can be used:
    @unorderedList(
-      @item(@code(<template:meta encoding="??"/>) @br Specifies the encoding of the template, only windows-1252 and utf-8 allowed)
       @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
         @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
         @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
@@ -245,9 +245,14 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
        ))
       )
-      @item(@code(<template:match-text [regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [case-sensitive=".."] [list-contains=".."]/>@br
+      @item(@code(<template:match-text [regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [is=".."] [case-sensitive=".."] [list-contains=".."]/>@br
         Matches a text node and is more versatile than just including the text in the template.
       )
+      @item(@code(<template:meta [encoding="??"] [default-text-matching="??"] [default-case-sensitive="??"]/>) @br
+        Specifies meta information to change the template semantic:@br
+        @code(encoding): the encoding of the template, only windows-1252 and utf-8 are allowed@br
+        @code(default-text-matching): specifies how text node in the template are matched against html text nodes. You can set it to the allowed attributes of match-text. (default is "starts-with") @br
+        @code(default-text-case-sensitive): specifies if text nodes are matched case sensitive.
 
     )@br
         Each of these commands can also have a property @code(test="{pxp condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
@@ -286,8 +291,6 @@ private
     FTemplate, FHTML: TTreeParser;
     FTemplateName: string;
 
-    FPseudoXPath: TPseudoXPathParser;
-
     FVariables,FVariableLog,FOldVariableLog: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
 
@@ -300,7 +303,7 @@ private
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    function executePseudoXPath(str: string):TPXPValue;
+    function createPseudoXPathParser: TPseudoXPathParser;
     procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
@@ -441,6 +444,81 @@ begin
   end;
 end;
 
+procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
+  function cachePXP(name: string): TPseudoXPathParser;
+  var i: integer;
+  begin
+    if templateAttributes = nil then exit(nil);
+    i := templateAttributes.IndexOfName(name);
+    if i < 0 then exit(nil);
+    result := parser.createPseudoXPathParser;
+    result.parse(templateAttributes.ValueFromIndex[i]);
+    result.RootElement := parser.FHTML.getTree;
+  end;
+
+  procedure cacheRegExpr(name: string; prefix, suffix: string; escape: boolean);
+  var i: integer;
+   r: String;
+   cs: String;
+  begin
+    i := templateAttributes.IndexOfName(name);
+    if i < 0 then exit();
+    r := templateAttributes.ValueFromIndex[i];
+    if escape then r := prefix + strEscapeRegex(r) + suffix;
+    SetLength(textRegexs, length(textRegexs) + 1);
+    textRegexs[high(textRegexs)] := TRegExpr.Create(r);
+    i := templateAttributes.IndexOfName('case-sensitive');
+    if i < 0 then textRegexs[high(textRegexs)].ModifierI := true
+    else begin
+      cs := templateAttributes.ValueFromIndex[i];
+      textRegexs[high(textRegexs)].ModifierI := (cs = 'false') or (cs = 'case-insensitive') or (cs = 'insensitive') ;
+    end;
+  end;
+
+var
+ i: Integer;
+begin
+  if recreate then begin
+    for i:=0 to high(textRegexs) do
+      FreeAndNil(textRegexs[i]);
+    setlength(textRegexs, 0);
+    FreeAndNil(test);
+    FreeAndNil(condition);
+    FreeAndNil(valuepxp);
+    FreeAndNil(source);
+  end;
+
+  if test <> nil then test.RootElement := parser.FHTML.getTree;
+  if condition <> nil then condition.RootElement := parser.FHTML.getTree;
+  if valuepxp <> nil then valuepxp.RootElement := parser.FHTML.getTree;
+  if source <> nil then source.RootElement := parser.FHTML.getTree;
+
+  if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
+
+  if templateType = tetCommandShortRead then begin
+    source := parser.createPseudoXPathParser;
+    source.parse(deepNodeText());
+  end else source := cachePXP('source');
+
+  if templateAttributes= nil then exit;
+
+  test := cachePXP('test');
+  condition := cachePXP('condition');
+  valuepxp := cachePXP('value');
+
+  if (templateType = tetMatchText) then begin
+    //[regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [case-sensitive=".."] [list-contains=".."]
+    cacheRegExpr('regex', '', '', false);
+    cacheRegExpr('starts-with', '^', '.*$', true);
+    cacheRegExpr('ends-with', '^.*', '$', true);
+    cacheRegExpr('contains', '', '', true);
+    cacheRegExpr('is', '^', '$', true);
+    cacheRegExpr('list-contains', '(^|,) *', ' *(,|$)', true);
+  end else if (templateType = tetCommandRead) then begin
+    cacheRegExpr('regex', '', '', false);
+  end;
+end;
+
 destructor TTemplateElement.destroy;
 var i: integer;
 begin
@@ -450,6 +528,7 @@ begin
   test.Free;
   condition.Free;
   source.Free;
+  valuepxp.free;
   inherited destroy;
 end;
 
@@ -465,6 +544,13 @@ begin
   result := FTemplate.getTree;
 end;
 
+function THtmlTemplateParser.createPseudoXPathParser: TPseudoXPathParser;
+begin
+  result := TPseudoXPathParser.Create;
+  result.OnEvaluateVariable:= @evaluatePXPVariable;
+  result.OnDefineVariable:=@FVariableLog.defineVariable;
+end;
+
 function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
 begin
   if FVariables = nil then begin
@@ -472,13 +558,6 @@ begin
     FVariables.readonly := true;
   end;
   result := FVariables;
-end;
-
-function THtmlTemplateParser.executePseudoXPath(str: string): TPXPValue;
-begin
-  //str := replaceVars(str);
-  FPseudoXPath.parse(str);
-  result:=FPseudoXPath.evaluate();
 end;
 
 procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
@@ -515,11 +594,10 @@ begin
       exit(false);
   end;
   if template.templateAttributes = nil then exit(true);
-  condition := template.templateAttributes.Values['condition'];
-  if condition = '' then exit(true);
-  FPseudoXPath.ParentElement := html;
-  FPseudoXPath.TextElement := nil;
-  exit(pxpvalueToBoolean(executePseudoXPath(condition)));
+  if template.condition = nil then exit(true);
+  template.condition.ParentElement := html;
+  template.condition.TextElement := nil;
+  result := pxpvalueToBoolean(template.condition.evaluate());
 end;
 
 function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeElement;
@@ -527,10 +605,29 @@ function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: T
 
 var xpathText: TTreeElement;
 
+  function performPXPEvaluation(const pxp: TPseudoXPathParser): TPXPValue;
+  begin
+    if pxp = nil then exit(pxpvalue());
+    pxp.ParentElement := htmlParent;
+    pxp.TextElement := xpathText;
+    result:=pxp.evaluate;
+  end;
+
   procedure HandleMatchText;
+  var
+   i: Integer;
+   ok: Boolean;
   begin
     //if we find a text match we can assume it is a true match
-    if stribeginswith(htmlStart.value, templateStart.value) then begin
+    ok := true;
+    for i := 0 to high(templateStart.textRegexs) do
+      if not templateStart.textRegexs[i].Exec(htmlStart.value) then begin
+        ok := false;
+        break;
+      end;
+    if ok and (templateStart.condition <> nil) then
+      ok := pxpvalueToBoolean(performPXPEvaluation(templateStart.condition));
+    if ok then begin
       templateStart.match := htmlStart;
       templateStart := templateStart.templateNext;
     end;
@@ -568,14 +665,8 @@ var xpathText: TTreeElement;
     end;
   end;
 
-  function performPXPEvaluation(const pxp: string): TPXPValue;
-  begin
-    FPseudoXPath.ParentElement := htmlParent;
-    FPseudoXPath.TextElement := xpathText;
-    result:=executePseudoXPath(pxp);
-  end;
 
-  procedure performRead(const varname, source: string; const regex:string=''; const submatch: integer = 0);
+  procedure performRead(const varname: string; source: TPseudoXPathParser; const regex:string=''; const submatch: integer = 0);
   var
    value:TPXPValue;
    regexp: TRegExpr;
@@ -597,23 +688,20 @@ var xpathText: TTreeElement;
 
   procedure HandleCommandRead;
   begin
-    performRead(replaceVars(templateStart.templateAttributes.Values['var']),templateStart.templateAttributes.Values['source'],templateStart.templateAttributes.Values['regex'],StrToIntDef(templateStart.templateAttributes.Values['submatch'],0));
+    performRead(replaceVars(templateStart.templateAttributes.Values['var']),templateStart.source,templateStart.templateAttributes.Values['regex'],StrToIntDef(templateStart.templateAttributes.Values['submatch'],0));
   end;
 
   procedure HandleCommandShortRead;
   begin
-    pxpvalueDestroy(performPXPEvaluation(templateStart.deepNodeText()));
+    pxpvalueDestroy(performPXPEvaluation(templateStart.source));
     templateStart := templateStart.templateReverse;
   end;
 
   function HandleCommandPseudoIf: boolean;
   var
-    condition: string;
     satisfied: Boolean;
   begin
-    condition:=templateStart.templateAttributes.Values['test'];
-
-    satisfied:=pxpvalueToBoolean(performPXPEvaluation(condition));
+    satisfied:=(templateStart.test = nil) or  pxpvalueToBoolean(performPXPEvaluation(templateStart.test));
 
     if not satisfied then begin
       templateStart := templateStart.templateReverse; //skip if block
@@ -646,22 +734,18 @@ var xpathText: TTreeElement;
        evaluatedvalue: TPXPValue;
       begin
         if (e.templateAttributes = nil) or (e.templateAttributes.Count = 0) then exit(true);
-        test := e.templateAttributes.Values['test'];
-        if (test<>'') then begin
-          result := pxpvalueToBoolean(performPXPEvaluation(test));
-          if not result then exit();
-        end;
-        myvalue:=e.templateAttributes.Values['value'];
-        if myvalue = '' then exit(true);
-        evaluatedvalue := performPXPEvaluation(myvalue);
+        result := (e.test = nil) or pxpvalueToBoolean(performPXPEvaluation(e.test));
+        if not result then exit;
+        if e.valuepxp = nil then exit;
+        evaluatedvalue := performPXPEvaluation(e.valuepxp);
         result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0);
         pxpvalueDestroy(evaluatedvalue);
       end;
 
     begin
       value := pxpvalue();
-      if templateStart.templateAttributes<>nil then
-        value := performPXPEvaluation(templateStart.templateAttributes.Values['value']);
+      if templateStart.valuepxp <> nil then
+        value := performPXPEvaluation(templateStart.valuepxp);
 
       while curChild <> nil do begin //enumerate all child tags
         if curChild.templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
@@ -746,7 +830,8 @@ begin
               end;
             end;
             case templateStart.templateType of
-              tetHTMLText: HandleMatchText;
+              tetMatchText: HandleMatchText;
+              tetHTMLText: raise ETemplateParseException.Create('Assertion fail: Template text has been converted to text-match');
               tetHTMLOpen: HandleMatchOpen;
               tetHTMLClose:  raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
 
@@ -779,9 +864,6 @@ begin
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
   FHTML.readComments:=true;
-  FPseudoXPath := TPseudoXPathParser.Create;
-  FPseudoXPath.OnEvaluateVariable:= @evaluatePXPVariable;
-  FPseudoXPath.OnDefineVariable:=@FVariableLog.defineVariable;
   FNamespaces := TStringList.Create;
   FNamespaces.Add('template:');
   FNamespaces.Add('t:');
@@ -798,7 +880,6 @@ begin
   FOldVariableLog.Free;
   FTemplate.Free;
   FHTML.Free;
-  FPseudoXPath.free;
   inherited destroy;
 end;
 
@@ -830,12 +911,21 @@ begin
 
   //encoding trouble
   FHTML.setEncoding(outputEncoding,true,true);
-  if (FTemplate.getTree <> nil)  and (FTemplate.getEncoding <> OutputEncoding) then begin
-    cur := TTemplateElement(FTemplate.getTree);
-    while cur <> nil do begin
-      if cur.templateAttributes<>nil then
-        cur.templateAttributes.text := trim(strDecodeHTMLEntities(strChangeEncoding(cur.templateAttributes.text,FTemplate.getEncoding,OutputEncoding), OutputEncoding, false));
-      cur := cur.templateNext;
+  if FTemplate.getTree <> nil then begin
+    if (FTemplate.getEncoding <> OutputEncoding) then begin
+      cur := TTemplateElement(FTemplate.getTree);
+      while cur <> nil do begin
+        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+          cur.initializeCaches(self,true);
+        cur := cur.templateNext;
+      end;
+    end else begin
+      cur := TTemplateElement(FTemplate.getTree);
+      while cur <> nil do begin
+        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+          cur.initializeCaches(self);
+        cur := cur.templateNext;
+      end;
     end;
   end;
   FTemplate.setEncoding(outputEncoding,true,true);
@@ -850,8 +940,6 @@ begin
   end;
 
   FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
-
-  FPseudoXPath.RootElement := FHTML.getTree;
 
   result:=matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
 
@@ -892,6 +980,9 @@ procedure THtmlTemplateParser.parseTemplate(template: string;
   templateName: string);
 var el: TTemplateElement;
     encoding: string;
+    defaultTextMatching: String;
+    defaultCaseSensitive: string;
+    i: Integer;
 begin
   FTemplate.setEncoding(eUnknown, false, false);
   if strbeginswith(template,#$ef#$bb#$bf) then begin
@@ -914,7 +1005,7 @@ begin
 
   FTemplateName := templateName;
 
-  //evaluate meta encoding
+  //detect meta encoding (doesn't change encoding, just sets it)
   el := TTemplateElement(FTemplate.getTree);
 
   while el <> nil do begin
@@ -930,15 +1021,35 @@ begin
          raise ETemplateParseException.create('Unknown/unsupported encoding: '+encoding);
         if el.templateAttributes.count > 1 then
           raise ETemplateParseException.create('Additional attributes in meta-tag: '+el.tostring);
-      end else
-        raise ETemplateParseException.create('Empty/wrong meta-tag: '+el.tostring);
+      end; // else
+        //raise ETemplateParseException.create('Empty/wrong meta-tag: '+el.tostring);
 
     end;
-    el := TTemplateElement(el.next);
+    el := el.templateNext;
   end;
 
 
+  defaultTextMatching := 'starts-with';
+  defaultCaseSensitive := '';
 
+  el := TTemplateElement(FTemplate.getTree);
+  while el <> nil do begin
+    if el.templateType = tetCommandMeta then begin
+      if el.templateAttributes.Values['default-text-matching'] <> '' then defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
+      i := el.templateAttributes.IndexOfName('default-text-case-sensitive');
+      if i >= 0 then begin defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i]; if defaultCaseSensitive = '' then defaultCaseSensitive := 'true'; end;
+    end else if el.templateType = tetHTMLText then begin
+      el.templateType := tetMatchText;
+      if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
+      el.templateAttributes.Values[defaultTextMatching] := el.value;
+    end;
+    if (el.templateType = tetMatchText) and (defaultCaseSensitive <> '') then begin
+      if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
+      if el.templateAttributes.IndexOfName('case-sensitive') < 0 then
+        el.templateAttributes.Values['case-sensitive'] := defaultCaseSensitive;
+    end;
+    el := el.templateNext;
+  end;
 end;
 
 procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
@@ -976,7 +1087,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..174] of array[1..3] of string = (
+var data: array[1..209] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1468,6 +1579,46 @@ var data: array[1..174] of array[1..3] of string = (
       ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"><t:if value="1 to 10"><a><t:s>x:=text()</t:s></a></t:if><t:if value="20 to 100"><b><t:s>x:=text()</t:s></b></t:if>'+'<t:if value="3"><c><t:s>x:=text()</t:s></c></t:if><t:if value="4"><d><t:s>x:=text()</t:s></d></t:if><t:s>x:="not found"</t:s><t:s>x:=ignored</t:s></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=BB'#13'x=post')
       ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=post')
       ,('<xx><t:s>x:="pre"</t:s><t:switch value="@choose"><t:s>x:="always"</t:s></t:switch><t:s>x:="post"</t:s></xx>', '<xx choose=40><a>AA</a><b>BB</b><c>CC</c><d>DD</d></xx>', 'x=pre'#13'x=always'#13'x=post')
+
+
+      //directly used match-text command
+      ,('<a><t:match-text starts-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text starts-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abcd')
+      ,('<a><t:match-text starts-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
+      ,('<a><t:match-text starts-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>tABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text starts-with="abc" case-sensitive/><t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text ends-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text ends-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abc')
+      ,('<a><t:match-text ends-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a></m>', 'x=XXABC')
+      ,('<a><t:match-text contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abcd')
+      ,('<a><t:match-text contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a></m>', 'x=XXABC')
+      ,('<a><t:match-text contains="."/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a></m>', 'x=xx.xx')
+      ,('<a><t:match-text regex="."/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=XXABC')
+      ,('<a><t:match-text regex="^.$"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=t')
+      ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=abc')
+      ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC,abc</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=XXABC,abc')
+      ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC  ,   abc  , foobar</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=XXABC  ,   abc  , foobar')
+      ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a> abc  , foobar</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=abc  , foobar')
+      ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>   abc  </a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=abc')
+      ,('<a><t:match-text is="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text starts-with="abc" condition="@foo=''bar''"/><t:s>x:=text()</t:s></a>', '<m><a>abc</a><a>abc</a><a foo="bar">abcd</a></m>', 'x=abcd')
+      ,('<a><t:match-text starts-with="abc" ends-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abc')
+      ,('<a><t:match-text starts-with="abc" ends-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcdabc</a><a>abc</a></m>', 'x=abcdabc')
+
+      //change default text matching
+      ,('<a>abc<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a>abc<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abcd')
+      ,('<a>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
+      ,('<a>abc<t:s>x:=text()</t:s></a>', '<m><a>tABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:meta default-text-case-sensitive="sensitive"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:meta default-text-case-sensitive="false"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
+      ,('<a><t:meta default-text-case-sensitive="insensitive"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
+      ,('<a><t:meta default-text-case-sensitive="case-insensitive"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
+      ,('<a><t:meta default-text-matching="ends-with"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>aBc</a></m>', 'x=aBc')
+      ,('<a><t:meta default-text-matching="ends-with" default-text-case-sensitive/>abc<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>xxAbc</a><a>xxabc</a></m>', 'x=xxabc')
+      ,('<m><a>abc<t:s>x:=text()</t:s></a><a><t:meta default-text-matching="ends-with" default-case-sensitive/>abc<t:s>x:=text()</t:s></a></m>', '<m><a>ab</a><a>abcd</a><a>xxAbc</a><a>xxabc</a></m>', 'x=abcd'#13'x=xxAbc')
+      ,('<a><t:meta default-text-case-sensitive="ends-with"/><t:match-text starts-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
 );
 
 
@@ -1499,7 +1650,8 @@ var previoushtml: string;
 begin
   extParser:=THtmlTemplateParser.create;
   sl:=TStringList.Create;
-  for i:=low(data)to high(data) do performTest(data[i,1],data[i,2],data[i,3]);
+  for i:=low(data)to high(data) do
+    performTest(data[i,1],data[i,2],data[i,3]);
 
   //---special encoding tests---
   extParser.parseTemplate('<a><template:read source="text()" var="test"/></a>');
