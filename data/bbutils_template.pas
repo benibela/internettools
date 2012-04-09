@@ -280,6 +280,10 @@ function strEncodingFromName(str:string):TEncoding; //**< Gets the encoding from
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
 function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
+//**Replace all occurences of x \in toEscape with escapeChar + x
+function strEscape(const s:string; const toEscape: TCharSet; escapeChar: char = '\'): string;
+//**Returns a regex matching s
+function strEscapeRegex(const s:string): string;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
@@ -1120,7 +1124,7 @@ begin
         if str[pos] <= #$7F then result[i]:=str[pos]
         else begin
           //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
-          result[i] := chr((ord(str[pos]) shl 6) or (ord(str[pos+1]) and $3f));
+          result[i] := chr((ord((str[pos]) and $3) shl 6) or (ord(str[pos+1]) and $3f));
           pos+=1;
         end;
         pos+=1;
@@ -1222,6 +1226,21 @@ end;
 
 {$endif}
 
+function strEscape(const s: string; const toEscape: TCharSet; escapeChar: char): string;
+var
+ i: Integer;
+begin
+  if length(s) = 0 then exit('');
+  for i:=1 to length(s) do begin
+    if s[i] in toEscape then result += escapeChar;
+    result += s[i];
+  end;
+end;
+
+function strEscapeRegex(const s: string): string;
+begin
+  result := strEscape(s, ['(','|', '.', '*', '?', '^', '$', '-', '[', '{', '}', ']', ')', '\'], '\');
+end;
 
 function strDecodeHTMLEntities(s: string; encoding: TEncoding; strict: boolean
   ): string;
