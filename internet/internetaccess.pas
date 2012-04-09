@@ -97,6 +97,8 @@ type
     class function urlEncodeData(data: string): string;
     //**Encodes all var=... pairs of data in the url encoded format
     class function urlEncodeData(data: TStringList): string;
+
+    function internalHandle: TObject; virtual; abstract;
   published
     property OnTransferStart: TTransferStartEvent read FOnTransferStart write FOnTransferStart;
     property OnTransferEnd: TTransferEndEvent read FOnTransferEnd write FOnTransferEnd;

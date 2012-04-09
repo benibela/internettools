@@ -52,6 +52,8 @@ type
     destructor destroy;override;
     function needConnection():boolean;override;
     procedure closeOpenedConnections();override;
+
+    function internalHandle: TObject; override;
   end;
   TW32InternetAccessClass = class of TW32InternetAccess;
 
@@ -446,6 +448,11 @@ begin
   if newConnectionOpened then begin
     //todo: close inet con
   end;
+end;
+
+function TW32InternetAccess.internalHandle: TObject;
+begin
+  result:=tobject(hLastConnection);
 end;
 
 

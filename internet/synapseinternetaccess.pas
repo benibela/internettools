@@ -56,6 +56,8 @@ public
   destructor destroy;override;
   function needConnection():boolean;override;
   procedure closeOpenedConnections();override;
+
+  function internalHandle: TObject; override;
 end;
 TSynapseInternetAccessClass = class of TSynapseInternetAccess;
 
@@ -177,6 +179,11 @@ end;
 procedure TSynapseInternetAccess.closeOpenedConnections();
 begin
   //TODO
+end;
+
+function TSynapseInternetAccess.internalHandle: TObject;
+begin
+ result:=connection;
 end;
 
 end.
