@@ -549,7 +549,7 @@ var xpathText: TTreeElement;
       ok := matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart, templateEnd);
       Include(templateStart.flags, tefOptional);
       if ok then templateStart := templateEnd
-      else templateStart := TTemplateElement(templateStart.reverse.next);
+      else templateStart := templateStart.templateReverse.templateNext;
       exit;
     end;
 
@@ -560,10 +560,10 @@ var xpathText: TTreeElement;
     if (not templateElementFitHTMLOpen(htmlStart, templateStart)) then htmlStart:=htmlStart.next
     else begin
       templateStart.match := htmlStart;
-      if (not matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(templateStart.next), TTemplateElement(templateStart.reverse))) then htmlStart:=htmlStart.next
+      if (not matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, templateStart.templateNext, templateStart.templateReverse)) then htmlStart:=htmlStart.next
       else begin
         htmlStart := htmlStart.reverse.next;
-        templateStart := TTemplateElement(templateStart.reverse.next);
+        templateStart := templateStart.templateReverse.templateNext;
       end;
     end;
   end;
@@ -592,7 +592,7 @@ var xpathText: TTreeElement;
 
     FVariableLog.addVariable(Trim(varname), value);
 
-    templateStart := TTemplateElement(templateStart.reverse);
+    templateStart := templateStart.templateReverse;
   end;
 
   procedure HandleCommandRead;
@@ -603,7 +603,7 @@ var xpathText: TTreeElement;
   procedure HandleCommandShortRead;
   begin
     pxpvalueDestroy(performPXPEvaluation(templateStart.deepNodeText()));
-    templateStart := TTemplateElement(templateStart.reverse);
+    templateStart := templateStart.templateReverse;
   end;
 
   function HandleCommandPseudoIf: boolean;
@@ -616,10 +616,10 @@ var xpathText: TTreeElement;
     satisfied:=pxpvalueToBoolean(performPXPEvaluation(condition));
 
     if not satisfied then begin
-      templateStart := TTemplateElement(templateStart.reverse); //skip if block
+      templateStart := templateStart.templateReverse; //skip if block
       result := false;
      end else begin
-      TTemplateElement(templateStart).match := templateStart;
+      templateStart.match := templateStart;
       result := true;
      end;
   end;
@@ -630,14 +630,14 @@ var xpathText: TTreeElement;
     //1. Continue in loop (preferred of course)
     //2. Jump over loop
     //if matchTemplateTree(htmlParent, htmlStart, htmlEnd, TTemplateElement(templateStart.next), templateEnd) then templateStart := templateEnd
-    if matchTemplateTree(htmlParent, htmlStart, htmlEnd, TTemplateElement(templateStart.next), templateEnd) then templateStart := templateEnd
-    else templateStart := TTemplateElement(templateStart.reverse.next);
+    if matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart.templateNext, templateEnd) then templateStart := templateEnd
+    else templateStart := templateStart.templateReverse.templateNext;
   end;
 
   var switchCommandAccepted: boolean;
 
   procedure HandleCommandSwitch;
-  var curChild: TTreeElement;
+  var curChild: TTemplateElement;
 
     procedure switchTemplateCommand;
     var value: TPXPValue;
@@ -660,38 +660,38 @@ var xpathText: TTreeElement;
 
     begin
       value := pxpvalue();
-      if (TTemplateElement(templateStart).templateAttributes<>nil) then
-        value := performPXPEvaluation(TTemplateElement(templateStart).templateAttributes.Values['value']);
+      if templateStart.templateAttributes<>nil then
+        value := performPXPEvaluation(templateStart.templateAttributes.Values['value']);
 
       while curChild <> nil do begin //enumerate all child tags
-        if TTemplateElement(curChild).templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
-        if TTemplateElement(curChild).templateType = tetCommandSwitchOpen then raise ETemplateParseException.Create('A switch command may not be a direct child of another switch command');
-        if elementFit(TTemplateElement(curChild)) then begin
-          templateStart := TTemplateElement(curChild);
+        if curChild.templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if curChild.templateType = tetCommandSwitchOpen then raise ETemplateParseException.Create('A switch command may not be a direct child of another switch command');
+        if elementFit(curChild) then begin
+          templateStart := curChild;
           switchCommandAccepted:=true;
           pxpvalueDestroy(value);
           exit;
-        end else curChild := curChild.getNextSibling();
+        end else curChild := TTemplateElement(curChild.getNextSibling());
       end;
 
       pxpvalueDestroy(value);
-      templateStart:=TTemplateElement(templateStart.reverse);
+      templateStart:=templateStart.templateReverse;
     end;
 
     procedure switchHTML;
     begin
       while curChild <> nil do begin //enumerate all child tags
-        if tefOptional in TTemplateElement(curChild).flags then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
-        if TTemplateElement(curChild).templateType >= firstRealTemplateType then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
-        if templateElementFitHTMLOpen(htmlStart, TTemplateElement(curChild)) and
-            matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, TTemplateElement(curChild.next), TTemplateElement(curChild.reverse)) then begin
+        if tefOptional in curChild.flags then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
+        if curChild.templateType >= firstRealTemplateType then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if templateElementFitHTMLOpen(htmlStart, curChild) and
+            matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
           //found match
           htmlStart := htmlStart.reverse.next;
-          templateStart := TTemplateElement(templateStart.reverse.next);
+          templateStart := templateStart.templateReverse.templateNext;
           exit;
         end;
         //no match, try other matches
-        curChild := curChild.getNextSibling();
+        curChild := TTemplateElement(curChild.getNextSibling());
       end;
 
       htmlStart:=htmlStart.next; //no match
@@ -699,13 +699,13 @@ var xpathText: TTreeElement;
 
   begin
     templateStart.match := htmlStart;
-    curChild:=templateStart.getFirstChild();
+    curChild:=TTemplateElement(templateStart.getFirstChild());
     if curChild = nil then  begin
-      templateStart:=TTemplateElement(templateStart.reverse);
+      templateStart:=templateStart.templateReverse;
       exit;
     end;
 
-    if TTemplateElement(curChild).templateType >= firstRealTemplateType then switchTemplateCommand
+    if curChild.templateType >= firstRealTemplateType then switchTemplateCommand
     else switchHTML;
   end;
 
@@ -717,9 +717,9 @@ var realHtmlStart: TTreeElement;
     //reading a html element, it can be executed again, and again, and ... =>
     //endless loop
     if realHtmlStart <> htmlStart then
-      templateStart := TTemplateElement(templateStart.reverse) //jump to loop start
+      templateStart := templateStart.templateReverse //jump to loop start
      else
-      templateStart := TTemplateElement(templateStart.next);
+      templateStart := templateStart.templateNext;
   end;
 
 begin
@@ -740,8 +740,8 @@ begin
             if tefSwitchChild in templateStart.flags then begin
               if switchCommandAccepted then switchCommandAccepted:=false
               else begin
-                if templateStart.typ = tetOpen then templateStart := TTemplateElement(templateStart.reverse.next)
-                else templateStart := TTemplateElement(templateStart.next);
+                if templateStart.typ = tetOpen then templateStart := templateStart.templateReverse.templateNext
+                else templateStart := templateStart.templateNext;
                 continue;
               end;
             end;
@@ -758,7 +758,7 @@ begin
 
               tetCommandSwitchOpen: HandleCommandSwitch;
 
-              tetIgnore, tetCommandMeta, tetCommandIfOpen, tetCommandIfClose, tetCommandSwitchClose: templateStart := TTemplateElement(templateStart.next);
+              tetIgnore, tetCommandMeta, tetCommandIfOpen, tetCommandIfClose, tetCommandSwitchClose: templateStart := templateStart.templateNext;
 
               else raise ETemplateParseException.Create('Unknown template element type - internal error');
             end
@@ -803,7 +803,7 @@ begin
 end;
 
 function THtmlTemplateParser.parseHTML(html: string):boolean;
-var cur,last,realLast:TTreeElement;
+var cur,last,realLast:TTemplateElement;
   i: Integer;
   curValue: PPXPValue;
   j: Integer;
@@ -831,21 +831,21 @@ begin
   //encoding trouble
   FHTML.setEncoding(outputEncoding,true,true);
   if (FTemplate.getTree <> nil)  and (FTemplate.getEncoding <> OutputEncoding) then begin
-    cur := FTemplate.getTree;
+    cur := TTemplateElement(FTemplate.getTree);
     while cur <> nil do begin
-      if TTemplateElement(cur).templateAttributes<>nil then
-        TTemplateElement(cur).templateAttributes.text := trim(strDecodeHTMLEntities(strChangeEncoding(TTemplateElement(cur).templateAttributes.text,FTemplate.getEncoding,OutputEncoding), OutputEncoding, false));
-      cur := cur.next;
+      if cur.templateAttributes<>nil then
+        cur.templateAttributes.text := trim(strDecodeHTMLEntities(strChangeEncoding(cur.templateAttributes.text,FTemplate.getEncoding,OutputEncoding), OutputEncoding, false));
+      cur := cur.templateNext;
     end;
   end;
   FTemplate.setEncoding(outputEncoding,true,true);
 
 
   if FParsingExceptions then begin
-    cur := FTemplate.getTree;
+    cur := TTemplateElement(FTemplate.getTree);
     while cur <> nil do begin
-      TTemplateElement(cur).match := nil;
-      cur := cur.next;
+      cur.match := nil;
+      cur := cur.templateNext;
     end;
   end;
 
@@ -856,27 +856,27 @@ begin
   result:=matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
 
   if not result and FParsingExceptions then begin
-    cur := FTemplate.getTree;
+    cur := TTemplateElement(FTemplate.getTree);
     if cur = nil then raise EHTMLParseException.Create('No template');
-    cur := cur.next;
+    cur := cur.templateNext;
     realLast := cur;
     last := cur;
     while cur <> nil do begin
-      case TTemplateElement(cur).templateType of
+      case cur.templateType of
         tetHTMLOpen, tetHTMLText: begin
-          if (TTemplateElement(cur).match = nil) and (TTemplateElement(cur).templateType<>tetIgnore) then begin
+          if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
             raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
           end;
           last:=cur;
         end;
         tetCommandIfOpen: begin
-          if TTemplateElement(cur).match = nil then cur := cur.reverse;
+          if cur.match = nil then cur := cur.templateReverse;
           last:=cur;
         end;
       end;
 
       realLast := cur;
-      cur := cur.next;
+      cur := cur.templateNext;
     end;
     raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed. for an unknown reason');
   end;
