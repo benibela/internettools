@@ -1821,7 +1821,7 @@ begin
         if str[pos] <= #$7F then result[i]:=str[pos]
         else begin
           //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
-          result[i] := chr((ord(str[pos]) shl 6) or (ord(str[pos+1]) and $3f));
+          result[i] := chr(((ord(str[pos]) and $03) shl 6) or (ord(str[pos+1]) and $3f));
           pos+=1;
         end;
         pos+=1;
