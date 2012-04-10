@@ -91,6 +91,8 @@ TTemplateElement=class(TTreeElement)
   function templateReverse: TTemplateElement; inline;
   function templateNext: TTemplateElement; inline;
 
+  procedure setTemplateAttribute(name, avalue: string);
+
   constructor create;
   constructor create(attyp: TTemplateElementType);
   procedure postprocess(parser: THtmlTemplateParser);
@@ -181,29 +183,19 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   @itemLabel(@italic(Example, how to extract all elements of a html form):)
   @item(
   Template: @preformatted(<form>
-  <template:loop><template:switch>
-    <input type="checkbox" template:condition="exists(@checked)"><template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-    <input type="radio" template:condition="exists(@checked)">   <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-    <input type="hidden">                                        <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-    <input type="password">                                      <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-    <input type="text">                                          <template:read var="post" source="concat(@name,'=',@value)"/>  </input>
-    <select><template:read var="temp" source="@name"/><option template:optional="true" template:condition="exists(@selected)"><template:read var="post" source="concat($temp;,'=',@value)"/></option></select>
-    <textarea>                                                     <template:read var="post" source="concat(@name,'=',text())"/>  </textarea>
-  </template:switch></template:loop>
+  <template:switch>
+    <input t:condition="(@type = ('checkbox', 'radio') and exists(@checked)) or (@type = ('hidden', 'password', 'text'))">{post:=concat(@name,'=',@value)}</input>
+    <select>{temp:=@name}<option t:condition="exists(@selected)">{post:=concat($temp;,'=',@value)}</option>?</select>
+    <textarea>{post:=concat(@name,'=',text())}</textarea>
+  </template:switch>*
 </form>)
 
   Html-File: any form @br
-  @preformatted(<form>
-  <template:loop><template:switch>
-    <input template:condition="(@type = ('checkbox', 'radio') and exists(@checked)) or (@type = ('hidden', 'password', 'text'))"><t:s>post:=concat(@name,'=',@value)</t:s></input>
-    <select><t:s>temp:=@name</t:s><option t:optional="true" t:condition="exists(@selected)"><t:s>post:=concat($temp;,'=',@value)</t:s/></option></select>
-    <textarea><t:s>post:=concat(@name,'=',text())</t:s></textarea>
-  </template:switch></template:loop>
-<form>)
+
 
   This example will extract from each relevant element in the form the name and value pair which is sent to the webserver.
   It is very general, and will work with all forms, independent of things like nesting deep.
-  Therefore it is a little bit ugly; but if you create a template for a specific page, you usually know which elements you will find there, so the template becomes much simpler in practical cases.
+  Therefore it is a little bit ugly; but if you @noAutoLink(create) a template for a specific page, you usually know which elements you will find there, so the template becomes much simpler in practical cases.
 
 
   ))
@@ -220,14 +212,14 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
   The matching occurs with backtracking, so it will always find the first and longest match.
 
-  These template commands can be used:
+  The following template commands can be used:
    @unorderedList(
       @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
         @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
         @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
         )
       @item(@code(<template:s>var:=source</template:s>)
-        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several variables like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the pxp-syntax, so you can use much more complex expressions.)
+        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several @noAutoLink(variables) like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the pxp-syntax, so you can use much more complex expressions.)
         )
       @item(@code(<template:if test="??"/>  .. </template:if>)
         @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
@@ -251,21 +243,25 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br For example @code(<template:switch><a>..</a> <b>..</b></template:switch>) will match either @code(<a>..</a>) or @code(<b>..</b>), but not both. If there is an <a> and a <b> tag in the html file, only the first one will be matched (if there is no loop around the switch tag).
             These switch-constructs are mainly used within a loop to collect the values of different tags, or to combine to different templates.
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
-       ))
-      )
-      @item(@code(<template:match-text [regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [is=".."] [case-sensitive=".."] [list-contains=".."]/>@br
-        Matches a text node and is more versatile than just including the text in the template.
+       )
+      ))
+      @item(@code(<template:match-text [regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [is=".."] [case-sensitive=".."] [list-contains=".."]/>)@br
+        Matches a text node and is more versatile than just including the text in the template.@br
+        regex matches an arbitrary regular expression against the text node.@br
+        starts-with/ends-with/contains/is check the text verbatim against the text node, in the obvious way.@br
+        list-contains treats the text of the node as a comma separated list and tests if that list contains the attribute value .@br
+        case-sensitive enables case-sensitive comparisons.
       )
       @item(@code(<template:meta [encoding="??"] [default-text-matching="??"] [default-case-sensitive="??"]/>) @br
         Specifies meta information to change the template semantic:@br
         @code(encoding): the encoding of the template, only windows-1252 and utf-8 are allowed@br
         @code(default-text-matching): specifies how text node in the template are matched against html text nodes. You can set it to the allowed attributes of match-text. (default is "starts-with") @br
         @code(default-text-case-sensitive): specifies if text nodes are matched case sensitive.
-
+    )
     )@br
         Each of these commands can also have a property @code(test="{pxp condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
     @br
-    There are two special attributes allowed for html tags in the template file:
+    There are two special attributes allowed for html or matching tags in the template file:
     @unorderedList(
       @item(@code(template:optional="true") @br if this is set the file is read successesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
@@ -278,9 +274,21 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
     The default prefixes for template commands are "template:" and "t:", you can change that with the templateNamespace-property or by defining a new namespace in the template like @code(xmlns:yournamespace="http://www.benibela.de/2011/templateparser" ). (only the xmlns:prefix form is supported, not xmlns without prefix)
 
 
+    @bold(Short notation)
+
+    Commonly used commands can be abbreviated as textual symbols instead of xml tags. To avoid conflicts with text node matching, this short notation is only allowed at the beginning of template text nodes.
+
+    The short read tag @code(<t:s>foo:=..</t:s>) to read something in variable @code(foo) can be abbreviated as @code({foo:=..}).
+
+    Optional and repeated elements can be marked with ?, * or +; like @code(<a>?...</a>) or, equivalent, @code(<a>..</a>?). @br
+    An element marked with ? becomes optional, which has the same effect as adding the template:optional="true" attribute.@br
+    An element marked with * can be repeated any times, which has the same effect as surrounding it with a template:loop element.@br
+    An element marked with + has to be repeated at least once, which has the same effect as surrounding it with a template:loop element with attribute min=1.@br
+
 
     @bold(Breaking changes from previous versions:)@br
     @unorderedList(
+    @item(Adding the short notation breaks all templates that match text nodes starting with *, +, ? or {)
     @item(The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it)
     @item(All changes mentioned in pseudoxpath.)
     @item(Also text() doesn't match the next text element anymore, but the next text element of the current node. Use .//text() for the old behaviour)
@@ -290,7 +298,8 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
 *)
 THtmlTemplateParser=class
-private
+  private
+    FRepetitionRegEx: TRegExpr;
   protected
     FOutputEncoding: TEncoding;
     FKeepOldVariables: TKeepPreviousVariables;
@@ -392,6 +401,12 @@ end;
 function TTemplateElement.templateNext: TTemplateElement;
 begin
   exit(TTemplateElement(next));
+end;
+
+procedure TTemplateElement.setTemplateAttribute(name, avalue: string);
+begin
+ if templateAttributes = nil then templateAttributes := TStringList.Create;
+ templateAttributes.Values[name] := avalue;
 end;
 
 constructor TTemplateElement.create;
@@ -908,10 +923,12 @@ begin
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
+  FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *, *([0-9]+) *[}] *');
 end;
 
 destructor THtmlTemplateParser.destroy;
 begin
+  FRepetitionRegEx.Free;
   FNamespaces.Free;
   FreeAndNil(FVariables);
   FVariableLog.Free;
@@ -1022,6 +1039,8 @@ var el: TTemplateElement;
     defaultCaseSensitive: string;
     i: Integer;
     veryShortSyntax: Boolean;
+    looper: TTemplateElement;
+    temp: TTemplateElement;
 begin
   FTemplate.setEncoding(eUnknown, false, false);
   if strbeginswith(template,#$ef#$bb#$bf) then begin
@@ -1074,18 +1093,32 @@ begin
 
   el := TTemplateElement(FTemplate.getTree);
   while el <> nil do begin
-    if el.templateType = tetCommandMeta then begin
+    if (el.templateType = tetCommandMeta) and (el.templateAttributes<>nil) then begin
       if el.templateAttributes.Values['default-text-matching'] <> '' then defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
       i := el.templateAttributes.IndexOfName('default-text-case-sensitive');
       if i >= 0 then begin defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i]; if defaultCaseSensitive = '' then defaultCaseSensitive := 'true'; end;
     end else if el.templateType = tetHTMLText then begin
-      if veryShortSyntax then begin
-        if strBeginsWith(el.value, '*') then begin
+      if (veryShortSyntax) and (el.value <> '') then begin
+        if el.value[1] = '?' then begin
           delete(el.value,1,1);
-          TTemplateElement(el.getParent()).insertSurrounding(TTemplateElement.create(tetCommandLoopOpen), TTemplateElement.create(tetCommandLoopClose));
-          if el.value = '' then el.templateType := tetIgnore;
+          temp := TTemplateElement(el.getPrevious());
+          if temp.typ = tetClose then temp := temp.templateReverse;
+          temp.flags += [tefOptional];
         end;
-        if strBeginsWith(el.value, '{') then begin
+        if (el.value <> '') and ((el.value[1] in ['*', '+']) or ((el.value[1] = '{') and FRepetitionRegEx.Exec(el.value))) then begin
+          looper := TTemplateElement.create(tetCommandLoopOpen);
+          TTemplateElement(el.getPrevious()).insertSurrounding(looper, TTemplateElement.create(tetCommandLoopClose));
+          if el.value[1] <> '{' then begin
+            if el.value[1] = '+' then looper.setTemplateAttribute('min', '1');
+            delete(el.value,1,1);
+          end else begin
+            looper.setTemplateAttribute('min', FRepetitionRegEx.Match[1]);
+            looper.setTemplateAttribute('max', FRepetitionRegEx.Match[2]);
+            delete(el.value,1,FRepetitionRegEx.MatchLen[0]);
+          end;
+        end;
+        if el.value = '' then el.templateType := tetIgnore
+        else if el.value[1] = '{' then begin
           el.value[1] := ' ';
           el.value[length(el.value)] := ' ';
           el.insertSurrounding(TTemplateElement.create(tetCommandShortRead));
@@ -1142,7 +1175,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..221] of array[1..3] of string = (
+var data: array[1..236] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1691,6 +1724,21 @@ var data: array[1..221] of array[1..3] of string = (
       ,('<a>{x:=text()}</a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=ab')
       ,('<a>*<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=ab'#13'x=abc'#13'x=abcd')
       ,('<a>*{x:=text()}</a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=ab'#13'x=abc'#13'x=abcd')
+      ,('<a><b>*{x:=text()}</b></a>', '<a></a><a><b>1</b><b>2</b></a>', '')
+      ,('<a><b>+{x:=text()}</b></a>', '<a></a><a><b>1</b><b>2</b></a>', 'x=1'#13'x=2')
+      ,('<a><b>{x:=text()}</b>*</a>', '<a></a><a><b>1</b><b>2</b></a>', '')
+      ,('<a><b>{x:=text()}</b>+</a>', '<a></a><a><b>1</b><b>2</b></a>', 'x=1'#13'x=2')
+      ,('<a><b>{x:=text()}</b>?</a>', '<a></a><a><b>1</b><b>2</b></a>', '') //optional is local?
+      ,('<a><b>{x:=text()}</b>?</a>', '<a></a><a></a>', '')
+      ,('<a><b>?{x:=text()}</b></a>', '<a></a><a><b>1</b><b>2</b></a>', '') //optional is local?
+      ,('<a><b>?{x:=text()}</b></a>', '<a></a><a></a>', '')
+      ,('<a>?<b>{x:=text()}</b></a>', '<a></a><a><b>1</b><b>2</b></a>', 'x=1')
+      ,('<a>?<b>{x:=text()}</b></a>', '<a></a><a></a>', '')
+      ,('<a><b>{x:=text()}</b>{2,3}</a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=B1'#13'x=B2'#13'x=B3')
+      ,('<a><b>{2,3}{x:=text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=B1'#13'x=B2'#13'x=B3')
+      ,('<a><b>{x:=text()}</b>{1,2}</a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
+      ,('<a><b>{1,2}{x:=text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
+      ,('<a><b>{1,1}{x:=text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
 );
 
 
