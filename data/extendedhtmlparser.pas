@@ -87,6 +87,8 @@ TTemplateElement=class(TTreeElement)
   function templateReverse: TTemplateElement; inline;
   function templateNext: TTemplateElement; inline;
 
+  constructor create;
+  constructor create(attyp: TTemplateElementType);
   procedure postprocess(parser: THtmlTemplateParser);
   procedure initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   destructor destroy;override;
@@ -315,7 +317,7 @@ private
     destructor destroy; override;
 
 
-    procedure parseTemplate(template: string; templateName: string='<unknown>');//**< loads the given template, stores templateName for debugging issues
+    procedure parseTemplate(template: string; templateName: string = '<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string); //**<loads a template from a file
     function parseHTML(html: string):boolean; //**< parses the given data.
     function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file
@@ -384,6 +386,20 @@ end;
 function TTemplateElement.templateNext: TTemplateElement;
 begin
   exit(TTemplateElement(next));
+end;
+
+constructor TTemplateElement.create;
+begin
+
+end;
+
+constructor TTemplateElement.create(attyp: TTemplateElementType);
+begin
+  templateType:=attyp;
+  if attyp < firstRealTemplateType then raise Exception.Create('invalid type');
+  if COMMAND_CLOSED[attyp] = 2 then typ := tetClose
+  else typ := tetOpen;
+  value := COMMAND_STR[attyp];
 end;
 
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
@@ -983,6 +999,7 @@ var el: TTemplateElement;
     defaultTextMatching: String;
     defaultCaseSensitive: string;
     i: Integer;
+    veryShortSyntax: Boolean;
 begin
   FTemplate.setEncoding(eUnknown, false, false);
   if strbeginswith(template,#$ef#$bb#$bf) then begin
@@ -1031,6 +1048,7 @@ begin
 
   defaultTextMatching := 'starts-with';
   defaultCaseSensitive := '';
+  veryShortSyntax := true;
 
   el := TTemplateElement(FTemplate.getTree);
   while el <> nil do begin
@@ -1039,9 +1057,24 @@ begin
       i := el.templateAttributes.IndexOfName('default-text-case-sensitive');
       if i >= 0 then begin defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i]; if defaultCaseSensitive = '' then defaultCaseSensitive := 'true'; end;
     end else if el.templateType = tetHTMLText then begin
-      el.templateType := tetMatchText;
-      if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
-      el.templateAttributes.Values[defaultTextMatching] := el.value;
+      if veryShortSyntax then begin
+        if strBeginsWith(el.value, '*') then begin
+          delete(el.value,1,1);
+          TTemplateElement(el.getParent()).insertSurrounding(TTemplateElement.create(tetCommandLoopOpen), TTemplateElement.create(tetCommandLoopClose));
+          if el.value = '' then el.templateType := tetIgnore;
+        end;
+        if strBeginsWith(el.value, '{') then begin
+          el.value[1] := ' ';
+          el.value[length(el.value)] := ' ';
+          el.insertSurrounding(TTemplateElement.create(tetCommandShortRead));
+          el.templateType := tetIgnore;
+        end;
+      end;
+      if el.templateType = tetHTMLText then begin
+        el.templateType := tetMatchText;
+        if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
+        el.templateAttributes.Values[defaultTextMatching] := el.value;
+      end;
     end;
     if (el.templateType = tetMatchText) and (defaultCaseSensitive <> '') then begin
       if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
@@ -1087,7 +1120,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..209] of array[1..3] of string = (
+var data: array[1..213] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1619,6 +1652,13 @@ var data: array[1..209] of array[1..3] of string = (
       ,('<a><t:meta default-text-matching="ends-with" default-text-case-sensitive/>abc<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>xxAbc</a><a>xxabc</a></m>', 'x=xxabc')
       ,('<m><a>abc<t:s>x:=text()</t:s></a><a><t:meta default-text-matching="ends-with" default-case-sensitive/>abc<t:s>x:=text()</t:s></a></m>', '<m><a>ab</a><a>abcd</a><a>xxAbc</a><a>xxabc</a></m>', 'x=abcd'#13'x=xxAbc')
       ,('<a><t:meta default-text-case-sensitive="ends-with"/><t:match-text starts-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+
+
+      //very short syntax
+      ,('<a><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=ab')
+      ,('<a>{x:=text()}</a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=ab')
+      ,('<a>*<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=ab'#13'x=abc'#13'x=abcd')
+      ,('<a>*{x:=text()}</a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=ab'#13'x=abc'#13'x=abcd')
 );
 
 
