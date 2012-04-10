@@ -69,10 +69,17 @@ TTreeElement = class
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+  function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+
+
+  procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next, not reverse)
+  procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
+  procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
   function toString(): string; //**< converts the element to a string (not recursive)
 
   constructor create();
+  constructor create(atyp: TTreeElementType; avalue: string = '');
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
 
@@ -307,6 +314,53 @@ begin
   exit(nil);
 end;
 
+function TTreeElement.getPrevious: TTreeElement;
+var
+  parent: TTreeElement;
+  open: longint;
+  cur: TTreeElement;
+begin
+  parent := getParent();
+  if parent = nil then exit;
+  cur := parent;
+  while (cur <> nil) and (cur.next <> self) do cur := cur.next;
+  result := cur;
+end;
+
+procedure TTreeElement.insert(el: TTreeElement);
+begin
+  el.next := self.next;
+  self.next := el;
+  el.offset := offset;
+end;
+
+procedure TTreeElement.insertSurrounding(before, after: TTreeElement);
+var previous: TTreeElement;
+begin
+  if self = nil then exit;
+  if self.typ = tetClose then raise Exception.Create('Surrounding a closing tag makes no sense');
+  previous := getPrevious();
+  if previous = nil then exit;
+
+  previous.insert(before);
+
+  if self.typ = tetOpen then self.reverse.insert(after)
+  else self.insert(after);
+
+  before.reverse := after;
+  after.reverse := before;
+end;
+
+procedure TTreeElement.insertSurrounding(basetag: TTreeElement);
+var closing: TTreeElement;
+begin
+  if basetag.typ <> tetOpen then raise Exception.Create('Need an opening tag to surround another tag');
+  closing := TTreeElement(basetag.ClassType.Create);
+  closing.typ := tetClose;
+  closing.value := basetag.value;
+  insertSurrounding(basetag, closing);
+end;
+
 function TTreeElement.toString(): string;
 var
   i: Integer;
@@ -329,7 +383,12 @@ end;
 
 constructor TTreeElement.create();
 begin
+end;
 
+constructor TTreeElement.create(atyp: TTreeElementType; avalue: string);
+begin
+  self.typ := atyp;
+  self.value := avalue;
 end;
 
 destructor TTreeElement.destroy();
