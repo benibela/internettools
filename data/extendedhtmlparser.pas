@@ -75,13 +75,17 @@ THtmlTemplateParser=class;
 { TTemplateElement }
 //**@abstract Interally used template tree element @exclude
 TTemplateElement=class(TTreeElement)
+  //constant template
   templateType: TTemplateElementType;
   flags: TTemplateElementFlags;
   templateAttributes: TAttributeList;
+
+  //matching information
+  loopRepetitions: integer;
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
-  test, condition, valuepxp, source: TPseudoXPathParser;
+  test, condition, valuepxp, source, min, max: TPseudoXPathParser;
   textRegexs: array of TRegExpr;
 
   function templateReverse: TTemplateElement; inline;
@@ -91,6 +95,7 @@ TTemplateElement=class(TTreeElement)
   constructor create(attyp: TTemplateElementType);
   procedure postprocess(parser: THtmlTemplateParser);
   procedure initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
+  procedure freeCaches;
   destructor destroy;override;
 end;
 
@@ -208,7 +213,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
 
 
-  @bold(Syntax of a template file)
+  @bold(Template reference)
 
   Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file. @br
   A tag of the html file is considered as equal to a tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child node of the tag in the template is also equal to a child node of the tag in the html file (in the same order and nesting).@br
@@ -226,10 +231,11 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         )
       @item(@code(<template:if test="??"/>  .. </template:if>)
         @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
-      @item(@code(<template:loop>  .. </template:loop>)
-        @br Everything inside this tag is repeated as long as possible
-        @br E.g. if you write @code(<template:loop>  X </template:loop> ), it has the same effect as XXXXX with the largest possible count of X for a given html file.
-        @br If there is no possible match for the loop interior the loop is completely ignored. (if you want the empty loop to raise an error, you can create a temporary variable in the loop, and check for the existence of the variable after the loop.)
+      @item(@code(<template:loop [min="?"] [max="?"]>  .. </template:loop>)
+        @br Everything inside this tag is repeated between [min,max] times. (default min=0, max=infinity)
+        @br E.g. if you write @code(<template:loop>  X </template:loop> ), it has the same effect as XXXXX with the largest possible count of X <= max for a given html file.
+        @br If min=0 and there is no possible match for the loop interior the loop is completely ignored.
+        @br If there are more possible matches than max, they are ignored.
         )
       @item(@code(<template:switch [value="??"]> ... </template:switch>)
       This command can be used to match only one of several possibilities. It has two different forms:
@@ -494,15 +500,9 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
 var
  i: Integer;
 begin
-  if recreate then begin
-    for i:=0 to high(textRegexs) do
-      FreeAndNil(textRegexs[i]);
-    setlength(textRegexs, 0);
-    FreeAndNil(test);
-    FreeAndNil(condition);
-    FreeAndNil(valuepxp);
-    FreeAndNil(source);
-  end;
+  loopRepetitions := 0;
+
+  if recreate then freeCaches;
 
   if test <> nil then test.RootElement := parser.FHTML.getTree;
   if condition <> nil then condition.RootElement := parser.FHTML.getTree;
@@ -521,6 +521,8 @@ begin
   test := cachePXP('test');
   condition := cachePXP('condition');
   valuepxp := cachePXP('value');
+  min := cachePXP('min');
+  max := cachePXP('max');
 
   if (templateType = tetMatchText) then begin
     //[regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [case-sensitive=".."] [list-contains=".."]
@@ -535,16 +537,25 @@ begin
   end;
 end;
 
-destructor TTemplateElement.destroy;
-var i: integer;
+procedure TTemplateElement.freeCaches;
+var
+ i: Integer;
 begin
-  FreeAndNil(templateAttributes);
   for i:=0 to high(textRegexs) do
     FreeAndNil(textRegexs[i]);
-  test.Free;
-  condition.Free;
-  source.Free;
-  valuepxp.free;
+  setlength(textRegexs, 0);
+  FreeAndNil(test);
+  FreeAndNil(condition);
+  FreeAndNil(source);
+  FreeAndNil(valuepxp);
+  FreeAndNil(min);
+  FreeAndNil(max);
+end;
+
+destructor TTemplateElement.destroy;
+begin
+  FreeAndNil(templateAttributes);
+  freeCaches;
   inherited destroy;
 end;
 
@@ -731,12 +742,34 @@ var xpathText: TTreeElement;
   procedure HandleCommandLoopOpen;
   begin
     //Two possible cases:
-    //1. Continue in loop (preferred of course)
-    //2. Jump over loop
-    //if matchTemplateTree(htmlParent, htmlStart, htmlEnd, TTemplateElement(templateStart.next), templateEnd) then templateStart := templateEnd
-    if matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart.templateNext, templateEnd) then templateStart := templateEnd
-    else templateStart := templateStart.templateReverse.templateNext;
+    //1. Continued in loop (preferred of course)
+    //2. Jumped over loop
+    templateStart.loopRepetitions+=1;
+    if ((templateStart.max = nil) or (templateStart.loopRepetitions <= pxpvalueToInteger(performPXPEvaluation(templateStart.max))))
+       and matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart.templateNext, templateEnd) then begin
+      templateStart.loopRepetitions-=1;
+      templateStart := templateEnd;
+    end else begin
+      templateStart.loopRepetitions-=1;
+      if (templateStart.min = nil) or (pxpvalueToInteger(performPXPEvaluation(templateStart.min)) <= templateStart.loopRepetitions) then templateStart := templateStart.templateReverse.templateNext
+      else htmlStart := htmlStart.next;
+    end;
   end;
+
+
+  var realHtmlStart: TTreeElement;
+    procedure HandleCommandLoopClose;
+    begin
+      //Jump to loop start if a html element was read in the loop
+      //The condition is necessary, because if the loop is executed without
+      //reading a html element, it can be executed again, and again, and ... =>
+      //endless loop
+      if realHtmlStart <> htmlStart then
+        templateStart := templateStart.templateReverse //jump to loop start (will then call HandleCommandLoopOpen?)
+       else
+        templateStart := templateStart.templateNext
+    end;
+
 
   var switchCommandAccepted: boolean;
 
@@ -809,25 +842,14 @@ var xpathText: TTreeElement;
     else switchHTML;
   end;
 
-var realHtmlStart: TTreeElement;
-  procedure HandleCommandLoopClose;
-  begin
-    //Jump to loop start if a html element was read in the loop
-    //The condition is necessary, because if the loop can be executed without
-    //reading a html element, it can be executed again, and again, and ... =>
-    //endless loop
-    if realHtmlStart <> htmlStart then
-      templateStart := templateStart.templateReverse //jump to loop start
-     else
-      templateStart := templateStart.templateNext;
-  end;
-
+var level: integer;
 begin
   if htmlStart = nil then exit(false);
   if templateStart = nil then exit(false);
+
   realHtmlStart := htmlStart;
  // assert(templateStart <> templateEnd);
-  FVariableLog.pushAll;
+  level := FVariableLog.pushAll;
   xpathText := nil;
   switchCommandAccepted:=false;
   while (htmlStart <> nil) and
@@ -867,7 +889,7 @@ begin
 
   result := templateStart = templateEnd;
   if not result then
-    FVariableLog.popAll;
+    FVariableLog.popAll(level);
 end;
 
 constructor THtmlTemplateParser.create;
@@ -1120,7 +1142,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..213] of array[1..3] of string = (
+var data: array[1..221] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1351,13 +1373,23 @@ var data: array[1..213] of array[1..3] of string = (
     'col=Hallo'#13'col=123'#13'col=foo'#13'col=bar'#13'col=xyz'),
    ('<table><template:loop><tr><td><x template:optional="true"><template:read source="text()" var="k"/></x><template:read source="text()" var="col"/></td></tr></template:loop></table>',
     '<html><body><table id="wrong"><tr><td><x>hallo</x>Hillo</td></tr><tr><td><x>hallo2</x>Hillo2</td></tr><tr><td><x>hallo3</x>Hallo3</td></tr><tr><td>we3</td></tr><tr><td><x>hallo4</x>Hallo4</td></tr></table></html>',
-    'k=hallo'#13'col=Hillo'#13'k=hallo2'#13'col=Hillo2'#13'k=hallo3'#13'col=Hallo3'#13'col=we3'#13'k=hallo4'#13'col=Hallo4'),
+    'k=hallo'#13'col=Hillo'#13'k=hallo2'#13'col=Hillo2'#13'k=hallo3'#13'col=Hallo3'#13'col=we3'#13'k=hallo4'#13'col=Hallo4')
 
 
+   //loops with fixed length
+   , ('<m><t:loop><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>1</a><a>2</a><a>3</a><a>4</a><a>5</a></m>', 'a=1'#13'a=2'#13'a=3'#13'a=4'#13'a=5')
+   , ('<m><t:loop max="3"><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>1</a><a>2</a><a>3</a><a>4</a><a>5</a></m>', 'a=1'#13'a=2'#13'a=3')
+   , ('<m><t:loop max="99"><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>1</a><a>2</a><a>3</a><a>4</a><a>5</a></m>', 'a=1'#13'a=2'#13'a=3'#13'a=4'#13'a=5')
+   , ('<m><t:loop max="0"><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>1</a><a>2</a><a>3</a><a>4</a><a>5</a></m>', '')
+   , ('<m><t:loop><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>x1</a><a>x2</a><a>x3</a></m><m><a>y1</a><a>y2</a><a>y3</a><a>y4</a><a>y5</a></m>', 'a=x1'#13'a=x2'#13'a=x3')
+   , ('<m><t:loop min="3"><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>x1</a><a>x2</a><a>x3</a></m><m><a>y1</a><a>y2</a><a>y3</a><a>y4</a><a>y5</a></m>', 'a=x1'#13'a=x2'#13'a=x3')
+   , ('<m><t:loop min="4"><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>x1</a><a>x2</a><a>x3</a></m><m><a>y1</a><a>y2</a><a>y3</a><a>y4</a><a>y5</a></m>', 'a=y1'#13'a=y2'#13'a=y3'#13'a=y4'#13'a=y5')
+   , ('<m><t:loop min="4" max="4"><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>x1</a><a>x2</a><a>x3</a></m><m><a>y1</a><a>y2</a><a>y3</a><a>y4</a><a>y5</a></m>', 'a=y1'#13'a=y2'#13'a=y3'#13'a=y4')
+//   , ('<m><t:loop min="4" max="2"><a><t:read source="text()" var="a"/></a></t:loop></m>', '<m><a>x1</a><a>x2</a><a>x3</a></m><m><a>y1</a><a>y2</a><a>y3</a><a>y4</a><a>y5</a></m>', '')
 
 
    //optional elements
-   ('<a>as<template:read source="text()" var="a"/></a><b template:optional="true"></b>',
+   ,('<a>as<template:read source="text()" var="a"/></a><b template:optional="true"></b>',
     '<a>asx</a><x/>',
     'a=asx'),
    ('<a>as<template:read source="text()" var="a"/></a><b template:optional="true"></b>',
