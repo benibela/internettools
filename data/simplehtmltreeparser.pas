@@ -335,17 +335,18 @@ begin
 end;
 
 procedure TTreeElement.insertSurrounding(before, after: TTreeElement);
-var previous: TTreeElement;
+var surroundee, previous: TTreeElement;
 begin
   if self = nil then exit;
-  if self.typ = tetClose then raise Exception.Create('Surrounding a closing tag makes no sense');
-  previous := getPrevious();
+  if self.typ = tetClose then surroundee := reverse
+  else surroundee := self;
+  previous := surroundee.getPrevious();
   if previous = nil then exit;
 
   previous.insert(before);
 
-  if self.typ = tetOpen then self.reverse.insert(after)
-  else self.insert(after);
+  if surroundee.typ = tetOpen then surroundee.reverse.insert(after)
+  else surroundee.insert(after);
 
   before.reverse := after;
   after.reverse := before;
