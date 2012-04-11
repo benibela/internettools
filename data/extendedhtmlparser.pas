@@ -120,9 +120,43 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   The template can extract certain values from the html file into @noAutoLink(variables), and you can access these @noAutoLink(variables) with the property variables and variableChangeLog.
   Former only contains the final value of the @noAutoLink(variables), latter records every assignment during the matching of the template.@br@br
 
+
   @bold(Getting started)
 
-  @bold(Examples)
+
+  Creating a template to analyze a xml-file/webpage:
+
+  @orderedList(
+
+  @item(First, you should remove all things from the webpage that are uninteresting, dynamically generated or invalid xml (or alternatively start with an empty file as template).)
+
+  @item(Then, you should replace all parts that you want to extract with @code(<t:s>yourVariableName:=text()</t:s>).@br
+        This will write the value of the text node that contains the t:s tag in the variable yourVariableName.@br@br
+        Instead of the @code(t:s) tag, you can also use the short notation @code({yourVariableName:=text()}); and instead of
+        @code(text()) to read the text node, you can also use @code(@attrib) to read an attribute; or an arbitrary complex
+        @link(pseudoxpath.TPseudoXPathParser pseudo-xpath-expression))
+
+  @item(Then the template is finished, at least the trivial things)
+  )
+
+  If you want to read several elements like table rows, you need to surround the matching tags with template:loop, e.g. @code(<template:loop><tr>..</tr></template:loop>)
+  and the things between the loop-tags is repeated as long as possible. You can also use the short notation by adding a star like @code(<tr>..</tr>* ).@br
+
+
+  Using the template from Pascal:
+
+
+  @orderedList(
+  @item(First, create a new THtmlTemplateParser: @code(parser := THtmlTemplateParser.create()))
+  @item(Load the template with  @code(parser.parseTemplate('..template..')) or  @code(parser.parseTemplateFile('template-file')))
+  @item(Process the webpage with  @code(parser.parseHTML('..html..')) or  @code(parser.parseHTMLFile('html-file')))
+  @item(Read the result of variable yourVariableName through parser.variables.values['yourVariableName'])
+  )
+
+  If you used loops, only the last value of the variable is avaible in the variables property, the previous values can
+  be enumerated through variableChangelog.
+
+  @bold(Template examples)
 
   @definitionList(
   @itemLabel(@italic(Example, how to read the first <b>-tag):)
@@ -609,12 +643,10 @@ begin
   if i = -1 then begin
     i := FOldVariableLog.getVariableIndex(variable);
     if i = -1 then exit;
-    pxpvalueDestroy(value);
-    value := FOldVariableLog.getVariableValueClone(i);
+    pxpvalueAssign(value, FOldVariableLog.getVariableValueClone(i));
     exit;
   end;
-  pxpvalueDestroy(value);
-  value := FVariableLog.getVariableValueClone(i);
+  pxpvalueAssign(value, FVariableLog.getVariableValueClone(i));
 end;
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
@@ -639,7 +671,7 @@ begin
   if template.condition = nil then exit(true);
   template.condition.ParentElement := html;
   template.condition.TextElement := nil;
-  result := pxpvalueToBoolean(template.condition.evaluate());
+  result := template.condition.evaluate().toBoolean;
 end;
 
 function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeElement;
@@ -668,7 +700,7 @@ var xpathText: TTreeElement;
         break;
       end;
     if ok and (templateStart.condition <> nil) then
-      ok := pxpvalueToBoolean(performPXPEvaluation(templateStart.condition));
+      ok := performPXPEvaluation(templateStart.condition).toBoolean;
     if ok then begin
       templateStart.match := htmlStart;
       templateStart := templateStart.templateNext;
@@ -718,7 +750,7 @@ var xpathText: TTreeElement;
     if regex<>'' then begin
       regexp:=TRegExpr.Create;
       regexp.Expression:=regex;
-      regexp.Exec(pxpvalueToString(value));
+      regexp.Exec(value.toString);
       value:=pxpvalue(regexp.Match[submatch]);
       regexp.free;
     end;
@@ -735,7 +767,7 @@ var xpathText: TTreeElement;
 
   procedure HandleCommandShortRead;
   begin
-    pxpvalueDestroy(performPXPEvaluation(templateStart.source));
+    performPXPEvaluation(templateStart.source).Free;
     templateStart := templateStart.templateReverse;
   end;
 
@@ -743,7 +775,7 @@ var xpathText: TTreeElement;
   var
     satisfied: Boolean;
   begin
-    satisfied:=(templateStart.test = nil) or  pxpvalueToBoolean(performPXPEvaluation(templateStart.test));
+    satisfied:=(templateStart.test = nil) or  performPXPEvaluation(templateStart.test).toBoolean;
 
     if not satisfied then begin
       templateStart := templateStart.templateReverse; //skip if block
@@ -760,13 +792,13 @@ var xpathText: TTreeElement;
     //1. Continued in loop (preferred of course)
     //2. Jumped over loop
     templateStart.loopRepetitions+=1;
-    if ((templateStart.max = nil) or (templateStart.loopRepetitions <= pxpvalueToInteger(performPXPEvaluation(templateStart.max))))
+    if ((templateStart.max = nil) or (templateStart.loopRepetitions <= performPXPEvaluation(templateStart.max).toInteger))
        and matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart.templateNext, templateEnd) then begin
       templateStart.loopRepetitions-=1;
       templateStart := templateEnd;
     end else begin
       templateStart.loopRepetitions-=1;
-      if (templateStart.min = nil) or (pxpvalueToInteger(performPXPEvaluation(templateStart.min)) <= templateStart.loopRepetitions) then templateStart := templateStart.templateReverse.templateNext
+      if (templateStart.min = nil) or (performPXPEvaluation(templateStart.min).toInteger <= templateStart.loopRepetitions) then templateStart := templateStart.templateReverse.templateNext
       else htmlStart := htmlStart.next;
     end;
   end;
@@ -798,12 +830,12 @@ var xpathText: TTreeElement;
        evaluatedvalue: TPXPValue;
       begin
         if (e.templateAttributes = nil) or (e.templateAttributes.Count = 0) then exit(true);
-        result := (e.test = nil) or pxpvalueToBoolean(performPXPEvaluation(e.test));
+        result := (e.test = nil) or performPXPEvaluation(e.test).toBoolean;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
         result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0);
-        pxpvalueDestroy(evaluatedvalue);
+        evaluatedvalue.Free;
       end;
 
     begin
@@ -817,12 +849,12 @@ var xpathText: TTreeElement;
         if elementFit(curChild) then begin
           templateStart := curChild;
           switchCommandAccepted:=true;
-          pxpvalueDestroy(value);
+          value.Free;
           exit;
         end else curChild := TTemplateElement(curChild.getNextSibling());
       end;
 
-      pxpvalueDestroy(value);
+      value.Free;
       templateStart:=templateStart.templateReverse;
     end;
 
@@ -941,7 +973,7 @@ end;
 function THtmlTemplateParser.parseHTML(html: string):boolean;
 var cur,last,realLast:TTemplateElement;
   i: Integer;
-  curValue: PPXPValue;
+  curValue: TPXPValue;
   j: Integer;
 begin
   FreeAndNil(FVariables);
@@ -949,15 +981,7 @@ begin
     FVariableLog.Clear
   else begin
     //convert all node variables to string (because the nodes point to a tree which we will destroy soon)
-    for i:=0 to FVariableLog.count-1 do begin
-      curValue := FVariableLog.getVariableValue(i);
-      if curValue^.typ = pvtNode then
-        curValue^ := pxpvalue(pxpvalueToString(curValue^))
-      else if curValue^.typ = pvtSequence then
-        for j:=0 to curValue^.varseq.Count-1 do
-          if PPXPValue(curValue^.varseq[j])^.typ = pvtNode then
-            PPXPValue(curValue^.varseq[j])^ := pxpvalue(pxpvalueToString(PPXPValue(curValue^.varseq[j])^));
-    end;
+    FVariableLog.stringifyNodes;
     if FKeepOldVariables = kpvKeepValues then
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
@@ -1159,7 +1183,7 @@ begin
       temp:=copy(s,f,i-f);
       temppxpvalue:=pxpvalue();
       evaluatePXPVariable(self,temp,temppxpvalue);
-      value:=pxpvalueToString(temppxpvalue);
+      value:=temppxpvalue.toString;
       if assigned(customReplace) then customReplace(temp,value);
     //  OutputDebugString(pchar(parser.variables.Text));
       result+=value;
