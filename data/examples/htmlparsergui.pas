@@ -99,9 +99,11 @@ begin
     tp.parseTree(memo2.Lines.Text);
     ppath.ParentElement := tp.getTree;
     ppath.RootElement := tp.getTree;
-    memo3.Lines.Text:=pxpvalueToString(ppath.evaluate());
+    memo3.Lines.Text:=ppath.evaluate().toString;
   finally
+    tp.Free;
     ppath.Free;
+    vars.Free;
   end;
 end;
 
