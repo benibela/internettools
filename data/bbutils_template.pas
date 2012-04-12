@@ -182,11 +182,12 @@ function strliBeginsWith(const p:pchar;l: longint;const expectedStart:string):bo
 
 
 //not length limited
+function strEqual(const s1,s2:string):boolean; inline;//**< Tests if the strings are case-insensitive equal (same length and same characters)
 function striEqual(const s1,s2:string):boolean; inline;//**< Tests if the strings are case-insensitive equal (same length and same characters)
-function strBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
-function striBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
 function strBeginsWith(const strToBeExaminated,expectedStart:string):boolean; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
 function striBeginsWith(const strToBeExaminated,expectedStart:string):boolean; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
+function strBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
+function striBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
 function strEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
 function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
 
@@ -200,13 +201,21 @@ function strlsIndexOf(str,searched:pchar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
 function strlsiIndexOf(str,searched:pchar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string; from: longint = 1):longint;inline;
+function strIndexOf(const str,searched:string):longint;inline;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string; from: longint = 1):longint; inline;
+function striIndexOf(const str,searched:string):longint; inline;
+//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strIndexOf(const str,searched:string; from: longint):longint;inline;
+//**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
+function striIndexOf(const str,searched:string; from: longint):longint; inline;
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strContains(const str,searched:string; from: longint = 1):boolean; inline;
+function strContains(const str,searched:string):boolean; inline;
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striContains(const str,searched:string; from: longint = 1):boolean; inline;
+function striContains(const str,searched:string):boolean; inline;
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strContains(const str,searched:string; from: longint):boolean; inline;
+//**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
+function striContains(const str,searched:string; from: longint):boolean; inline;
 
 //more specialized
 type TCharSet = set of char;
@@ -294,9 +303,12 @@ function strFromPchar(p:pchar;l:longint):string;
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
 
+//**Case sensitive, clever comparison, that basically splits the string into
+//**lexicographical and numerical parts and compares them accordingly
+function strCompareClever(const s1, s2: string): integer;
 //**Case insensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
-function striCompareClever(const s1, s2: string): integer;
+function striCompareClever(const s1, s2: string): integer; inline;
 
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
@@ -736,6 +748,10 @@ end;
 
 
 
+function strEqual(const s1, s2: string): boolean;
+begin
+  result:=CompareStr(s1,s2)=0;
+end;
 
 function striequal(const s1, s2: string): boolean;
 begin
@@ -821,7 +837,17 @@ begin
   result:=-1;
 end;
 
-function strindexof(const str, searched: string; from: longint = 1): longint;
+function strIndexOf(const str, searched: string): longint;
+begin
+  result := strIndexOf(str, searched, 1);      //no default paramert, so you can take the address of both functions
+end;
+
+function striIndexOf(const str, searched: string): longint;
+begin
+  result := striIndexOf(str, searched, 1);
+end;
+
+function strindexof(const str, searched: string; from: longint): longint;
 begin
   if from > length(str) then exit(0);
   result := strlsIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
@@ -829,7 +855,7 @@ begin
   result += from;
 end;
 
-function striindexof(const str, searched: string; from: longint = 1): longint;
+function striindexof(const str, searched: string; from: longint): longint;
 begin
   if from > length(str) then exit(0);
   result := strlsiIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
@@ -837,12 +863,22 @@ begin
   result += from;
 end;
 
-function strcontains(const str, searched: string; from: longint = 1): boolean;
+function strContains(const str, searched: string): boolean;
+begin
+  result := strContains(str, searched, 1);
+end;
+
+function striContains(const str, searched: string): boolean;
+begin
+  result := striContains(str, searched, 1);
+end;
+
+function strcontains(const str, searched: string; from: longint): boolean;
 begin
   result:=strindexof(str, searched, from) > 0;
 end;
 
-function stricontains(const str, searched: string; from: longint = 1): boolean;
+function stricontains(const str, searched: string; from: longint): boolean;
 begin
   result:=striindexof(str, searched, from) > 0;
 end;
@@ -1124,7 +1160,7 @@ begin
         if str[pos] <= #$7F then result[i]:=str[pos]
         else begin
           //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
-          result[i] := chr((ord((str[pos]) and $3) shl 6) or (ord(str[pos+1]) and $3f));
+          result[i] := chr(((ord(str[pos]) and $3) shl 6) or (ord(str[pos+1]) and $3f));
           pos+=1;
         end;
         pos+=1;
@@ -1372,12 +1408,12 @@ begin
 end;
 
 //incase-sensitive, intelligent string compare (splits in text, number parts)
-function striCompareClever(const s1, s2: string): integer;
+function strCompareClever(const s1, s2: string): integer;
 var t1,t2:string; //lowercase text
     i,j,ib,jb,p: longint;
 begin
-  t1:=lowercase(s1);
-  t2:=lowercase(s2);
+  t1 := s1;
+  t2 := s2;
   i:=1;
   j:=1;
   while (i<=length(t1)) and (j<=length(t2)) do begin
@@ -1424,6 +1460,11 @@ begin
     exit;
   end;
   result:=0;
+end;
+
+function striCompareClever(const s1, s2: string): integer;
+begin
+  result := strCompareClever(lowercase(s1), lowercase(s2)); //todo optimize
 end;
 
 
