@@ -839,9 +839,8 @@ var xpathText: TTreeElement;
       end;
 
     begin
-      value := pxpvalue();
-      if templateStart.valuepxp <> nil then
-        value := performPXPEvaluation(templateStart.valuepxp);
+      if templateStart.valuepxp <> nil then value := performPXPEvaluation(templateStart.valuepxp)
+      else value := pxpvalue();
 
       while curChild <> nil do begin //enumerate all child tags
         if curChild.templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
