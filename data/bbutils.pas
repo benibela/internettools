@@ -76,6 +76,8 @@ type
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TStringArray; const e: string):longint; overload;
+//**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
+function arrayAdd(var a: TStringArray; const a2: TStringArray):longint; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDelete(var a: TStringArray; const i: longint):string; overload;
@@ -109,6 +111,8 @@ function arrayEqual(a, b: array of string; slice1a: integer = -1; slice1b: integ
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TLongintArray; const e: longint):longint; overload;
+//**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
+function arrayAdd(var a: TLongintArray; const a2: TLongintArray):longint; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongintArray; const i: longint):longint; overload;
@@ -142,6 +146,8 @@ function arrayEqual(a, b: array of longint; slice1a: integer = -1; slice1b: inte
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TLongwordArray; const e: longword):longint; overload;
+//**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
+function arrayAdd(var a: TLongwordArray; const a2: TLongwordArray):longint; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongwordArray; const i: longint):longword; overload;
@@ -175,6 +181,8 @@ function arrayEqual(a, b: array of longword; slice1a: integer = -1; slice1b: int
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TInt64Array; const e: int64):longint; overload;
+//**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
+function arrayAdd(var a: TInt64Array; const a2: TInt64Array):longint; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDelete(var a: TInt64Array; const i: longint):int64; overload;
@@ -208,6 +216,8 @@ function arrayEqual(a, b: array of int64; slice1a: integer = -1; slice1b: intege
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TFloatArray; const e: float):longint; overload;
+//**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
+function arrayAdd(var a: TFloatArray; const a2: TFloatArray):longint; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDelete(var a: TFloatArray; const i: longint):float; overload;
@@ -327,6 +337,14 @@ function striBeginsWith(const p:pchar; const expectedStart:string):boolean; inli
 function strEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
 function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
 
+
+//**Case sensitive, clever comparison, that basically splits the string into
+//**lexicographical and numerical parts and compares them accordingly
+function strCompareClever(const s1, s2: string): integer;
+//**Case insensitive, clever comparison, that basically splits the string into
+//**lexicographical and numerical parts and compares them accordingly
+function striCompareClever(const s1, s2: string): integer; inline;
+
 //search
 //**Searchs the last index of c in s
 function strRpos(c:char;s:string):longint;
@@ -442,13 +460,8 @@ function strFromPchar(p:pchar;l:longint):string;
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
 
-//**Case sensitive, clever comparison, that basically splits the string into
-//**lexicographical and numerical parts and compares them accordingly
-function strCompareClever(const s1, s2: string): integer;
-//**Case insensitive, clever comparison, that basically splits the string into
-//**lexicographical and numerical parts and compares them accordingly
-function striCompareClever(const s1, s2: string): integer; inline;
-
+//**Creates count copies of rep
+function strDup(const rep: string; const count: integer): string;
 
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
@@ -586,6 +599,16 @@ begin
   a[result]:=e;
 end;
 
+function arrayAdd(var a: TStringArray; const a2: TStringArray):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
+end;
+
 function arrayDelete(var a: TStringArray; const i: longint): string;
 begin
   if (i<0) or (i>high(a)) then exit('');
@@ -717,6 +740,16 @@ begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
+end;
+
+function arrayAdd(var a: TLongintArray; const a2: TLongintArray):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
 end;
 
 function arrayDelete(var a: TLongintArray; const i: longint): longint;
@@ -852,6 +885,16 @@ begin
   a[result]:=e;
 end;
 
+function arrayAdd(var a: TLongwordArray; const a2: TLongwordArray):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
+end;
+
 function arrayDelete(var a: TLongwordArray; const i: longint): longword;
 begin
   if (i<0) or (i>high(a)) then exit(0);
@@ -985,6 +1028,16 @@ begin
   a[result]:=e;
 end;
 
+function arrayAdd(var a: TInt64Array; const a2: TInt64Array):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
+end;
+
 function arrayDelete(var a: TInt64Array; const i: longint): int64;
 begin
   if (i<0) or (i>high(a)) then exit(0);
@@ -1116,6 +1169,16 @@ begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
+end;
+
+function arrayAdd(var a: TFloatArray; const a2: TFloatArray):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
 end;
 
 function arrayDelete(var a: TFloatArray; const i: longint): float;
@@ -1750,7 +1813,7 @@ begin
   lastTextStart:=1;
   lastBreakChance:=0;
   for i := 1 to length(line) do begin
-    if line[i+1] in BreakChars then begin
+    if (i < length(line)) and (line[i+1] in BreakChars) then begin
       lastBreakChance:=i+1;
       if lastTextStart = lastBreakChance then inc(lastTextStart); //merge seveal break characters into a single new line
     end;
@@ -6907,6 +6970,14 @@ begin
   result := strCompareClever(lowercase(s1), lowercase(s2)); //todo optimize
 end;
 
+function strDup(const rep: string; const count: integer): string;
+var
+  i: Integer;
+begin
+  result := '';
+  for i:=1 to count do
+    result := result + rep;
+end;
 
 function intLog10(i: longint): longint;
 begin

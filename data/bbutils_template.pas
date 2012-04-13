@@ -93,6 +93,8 @@ const __ELEMENT__DEFAULT__: T__ElementType__ = 0;
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__):longint; overload;
+//**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
+function arrayAdd(var a: T__ArrayType__; const a2: T__ArrayType__):longint; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDelete(var a: T__ArrayType__; const i: longint):T__ElementType__; overload;
@@ -190,6 +192,14 @@ function strBeginsWith(const p:pchar; const expectedStart:string):boolean; inlin
 function striBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
 function strEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
 function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
+
+
+//**Case sensitive, clever comparison, that basically splits the string into
+//**lexicographical and numerical parts and compares them accordingly
+function strCompareClever(const s1, s2: string): integer;
+//**Case insensitive, clever comparison, that basically splits the string into
+//**lexicographical and numerical parts and compares them accordingly
+function striCompareClever(const s1, s2: string): integer; inline;
 
 //search
 //**Searchs the last index of c in s
@@ -306,13 +316,8 @@ function strFromPchar(p:pchar;l:longint):string;
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
 
-//**Case sensitive, clever comparison, that basically splits the string into
-//**lexicographical and numerical parts and compares them accordingly
-function strCompareClever(const s1, s2: string): integer;
-//**Case insensitive, clever comparison, that basically splits the string into
-//**lexicographical and numerical parts and compares them accordingly
-function striCompareClever(const s1, s2: string): integer; inline;
-
+//**Creates count copies of rep
+function strDup(const rep: string; const count: integer): string;
 
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
@@ -452,6 +457,16 @@ begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
+end;
+
+function arrayAdd(var a: T__ArrayType__; const a2: T__ArrayType__):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
 end;
 
 function arrayDelete(var a: T__ArrayType__; const i: longint): T__ElementType__;
@@ -1026,7 +1041,7 @@ begin
   lastTextStart:=1;
   lastBreakChance:=0;
   for i := 1 to length(line) do begin
-    if line[i+1] in BreakChars then begin
+    if (i < length(line)) and (line[i+1] in BreakChars) then begin
       lastBreakChance:=i+1;
       if lastTextStart = lastBreakChance then inc(lastTextStart); //merge seveal break characters into a single new line
     end;
@@ -1507,6 +1522,14 @@ begin
   result := strCompareClever(lowercase(s1), lowercase(s2)); //todo optimize
 end;
 
+function strDup(const rep: string; const count: integer): string;
+var
+  i: Integer;
+begin
+  result := '';
+  for i:=1 to count do
+    result := result + rep;
+end;
 
 function intLog10(i: longint): longint;
 begin
