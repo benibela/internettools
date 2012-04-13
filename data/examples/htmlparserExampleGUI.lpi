@@ -93,7 +93,7 @@
     </CodeGeneration>
     <Other>
       <ConfigFile>
-        <StopAfterErrCount Value="1000"/>
+        <StopAfterErrCount Value="10"/>
       </ConfigFile>
       <CompilerMessages>
         <UseMsgFile Value="True"/>

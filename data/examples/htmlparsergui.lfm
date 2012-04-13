@@ -7,7 +7,7 @@ object Form1: TForm1
   Caption = 'Form1'
   ClientHeight = 481
   ClientWidth = 560
-  LCLVersion = '0.9.31'
+  LCLVersion = '1.1'
   object Panel1: TPanel
     Left = 0
     Height = 123
@@ -36,10 +36,11 @@ object Form1: TForm1
       Lines.Strings = (
         '<table id="right">'
         '<template:loop>'
-        '<tr><td><t:s>col:=text()</t:s></td></tr>'
+        '<tr><td>{col:=text()}</td></tr>'
         '</template:loop>'
         '</table>'
       )
+      ScrollBars = ssAutoBoth
       TabOrder = 0
     end
   end
@@ -81,6 +82,7 @@ object Form1: TForm1
         '</table>'
         '</html>'
       )
+      ScrollBars = ssAutoBoth
       TabOrder = 0
     end
   end
@@ -112,6 +114,7 @@ object Form1: TForm1
       Lines.Strings = (
         'Memo3'
       )
+      ScrollBars = ssAutoBoth
       TabOrder = 0
     end
   end
