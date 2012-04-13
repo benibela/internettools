@@ -110,7 +110,7 @@ private
   FTemplateCount: Integer;
   FElementStack: TList;
   FAutoCloseTag: boolean;
-  FCurrentFile: string;
+  FCurrentFile, FCurrentFileName: string;
   FParsingModel: TParsingModel;
   FTrimText, FReadComments: boolean;
   FEncoding: TEncoding;
@@ -133,7 +133,8 @@ public
   constructor Create;
   destructor destroy;override;
   procedure clearTree; //**< Deletes the current tree
-  procedure parseTree(html: string); //**< Creates a new tree from a html file
+  procedure parseTree(html: string; uri: string = ''); //**< Creates a new tree from a html document contained in html. The uri parameter is just stored and returned for you by baseURI, not actually used within this class.
+  procedure parseTreeFromFile(filename: string);
 
   function getTree: TTreeElement; //**< Returns the current tree
 
@@ -152,6 +153,7 @@ published
   //** If this is true (default is false) comments are included in the generated tree
   property readComments: boolean read FReadComments write FReadComments;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
+  property baseURI: string read FCurrentFileName;
 end;
 
 
@@ -643,12 +645,13 @@ begin
 end;
 
 
-procedure TTreeParser.parseTree(html: string);
+procedure TTreeParser.parseTree(html: string; uri: string);
 var
   encoding: String;
 begin
   //FVariables.clear;
   clearTree;
+  FCurrentFileName:=uri;
   if html='' then exit;
 
   FCurrentFile:=html;
@@ -686,6 +689,11 @@ begin
   end;
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
+end;
+
+procedure TTreeParser.parseTreeFromFile(filename: string);
+begin
+  parseTree(strLoadFromFile(filename), filename);
 end;
 
 function TTreeParser.getTree: TTreeElement;

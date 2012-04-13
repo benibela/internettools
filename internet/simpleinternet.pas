@@ -99,35 +99,56 @@ uses bbutils, extendedhtmlparser
 {$ENDIF}
 ;
 
+type TRetrieveType = (rtEmpty, rtHttp, rtFile, rtTag);
+
 var tree: TTreeParser = nil;
     templateParser: THtmlTemplateParser = nil;
+    pxpParser: TPseudoXPathParser = nil;
     lastQueryWasPXP: boolean = true;
+    lastRetrievedType: TRetrieveType;
 
 
 function retrieve(const data: string): string;
 var trimmed: string;
 begin
   trimmed:=TrimLeft(data);
+  lastRetrievedType:=rtEmpty;
   if trimmed = '' then exit('');
-  if strBeginsWith(trimmed, 'http://') or strBeginsWith(trimmed, 'https://') then exit(httpRequest(trimmed));
-  if strBeginsWith(trimmed, 'file://') then exit(strLoadFromFileUTF8(strCopyFrom(trimmed, length('file://')+1)));
-  if strBeginsWith(trimmed, '<') then exit(trimmed);
+  if strBeginsWith(trimmed, 'http://') or strBeginsWith(trimmed, 'https://') then begin
+    lastRetrievedType:=rtHttp;
+    exit(httpRequest(trimmed));
+  end;
+  if strBeginsWith(trimmed, 'file://') then begin
+    lastRetrievedType:=rtFile;
+    exit(strLoadFromFileUTF8(strCopyFrom(trimmed, length('file://')+1)));
+  end;
+  if strBeginsWith(trimmed, '<') then begin
+    lastRetrievedType:=rtTag;
+    exit(trimmed);
+  end;
+  lastRetrievedType:=rtFile;
   exit(strLoadFromFileUTF8(trimmed));
 end;
 
 function process(data: string; query: string): string;
+var dataFileName: string;
+  datain: String;
 begin
   result := '';
   if query = '' then exit;
 
+  datain := data;
+
   data := retrieve(data);
+
+  if lastRetrievedType <> rtTag then dataFileName:=datain;
 
   query := trim(query);
   if query[1] = '<' then begin
     lastQueryWasPXP := false;
     if templateParser = nil then templateParser := THtmlTemplateParser.create;
     templateParser.parseTemplate(query);
-    templateParser.parseHTML(data);
+    templateParser.parseHTML(data, dataFileName);
     if  templateParser.variableChangeLog.count > 0 then
       result := templateParser.variableChangeLog.getVariableValueString(templateParser.variableChangeLog.count-1);
   end else begin
@@ -136,8 +157,13 @@ begin
       tree := TTreeParser.Create;
       tree.parsingModel:=pmHTML;
     end;
-    tree.parseTree(data);
-    result:=TPseudoXPathParser.evaluateToString(query, tree.getTree);
+    tree.parseTree(data, dataFileName);
+    if pxpParser = nil then pxpParser := TPseudoXPathParser.create;
+    pxpParser.parse(query);
+    pxpparser.ParentElement := tree.getTree;
+    pxpparser.RootElement := tree.getTree;
+    pxpparser.StaticBaseUri:=dataFileName;
+    result := pxpParser.evaluate().toString;
   end;
 end;
 
@@ -191,7 +217,7 @@ begin
 end;
 
 finalization
-
+pxpParser.Free;
 defaultInternet.Free;
 templateParser.Free;
 tree.Free;

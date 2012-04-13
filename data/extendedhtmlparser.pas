@@ -340,7 +340,6 @@ THtmlTemplateParser=class
     FNamespaces: TStringList;
 
     FTemplate, FHTML: TTreeParser;
-    FTemplateName: string;
 
     FVariables,FVariableLog,FOldVariableLog: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
@@ -368,8 +367,8 @@ THtmlTemplateParser=class
 
     procedure parseTemplate(template: string; templateName: string = '<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string); //**<loads a template from a file
-    function parseHTML(html: string):boolean; //**< parses the given data.
-    function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file
+    function parseHTML(html: string; htmlFileName: string = ''):boolean; //**< parses the given data. htmlFileName is just for debugging issues
+    function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file.
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
     //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
 
@@ -516,6 +515,12 @@ begin
 end;
 
 procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
+  procedure updatePXP(pxp: TPseudoXPathParser);
+  begin
+    pxp.RootElement := parser.FHTML.getTree;
+    pxp.StaticBaseUri := parser.FHTML.baseURI;
+  end;
+
   function cachePXP(name: string): TPseudoXPathParser;
   var i: integer;
   begin
@@ -524,7 +529,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     if i < 0 then exit(nil);
     result := parser.createPseudoXPathParser;
     result.parse(templateAttributes.ValueFromIndex[i]);
-    result.RootElement := parser.FHTML.getTree;
+    updatePXP(result);
   end;
 
   procedure cacheRegExpr(name: string; prefix, suffix: string; escape: boolean);
@@ -553,16 +558,17 @@ begin
 
   if recreate then freeCaches;
 
-  if test <> nil then test.RootElement := parser.FHTML.getTree;
-  if condition <> nil then condition.RootElement := parser.FHTML.getTree;
-  if valuepxp <> nil then valuepxp.RootElement := parser.FHTML.getTree;
-  if source <> nil then source.RootElement := parser.FHTML.getTree;
+  if test <> nil then updatePXP(test);
+  if condition <> nil then updatePXP(condition);
+  if valuepxp <> nil then updatePXP(valuepxp);
+  if source <> nil then updatePXP(source);
 
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
   if templateType = tetCommandShortRead then begin
     source := parser.createPseudoXPathParser;
     source.parse(deepNodeText());
+    updatePXP(source);
   end else source := cachePXP('source');
 
   if templateAttributes= nil then exit;
@@ -969,7 +975,7 @@ begin
   inherited destroy;
 end;
 
-function THtmlTemplateParser.parseHTML(html: string):boolean;
+function THtmlTemplateParser.parseHTML(html, htmlfilename: string):boolean;
 var cur,last,realLast:TTemplateElement;
   i: Integer;
   curValue: TPXPValue;
@@ -985,7 +991,7 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
 
-  FHTML.parseTree(html);
+  FHTML.parseTree(html, htmlfilename);
 
   //encoding trouble
   FHTML.setEncoding(outputEncoding,true,true);
@@ -1031,7 +1037,7 @@ begin
       case cur.templateType of
         tetHTMLOpen, tetHTMLText: begin
           if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
-            raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+            raise EHTMLParseException.create('Matching of template '+ftemplate.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
           end;
           last:=cur;
         end;
@@ -1044,14 +1050,14 @@ begin
       realLast := cur;
       cur := cur.templateNext;
     end;
-    raise EHTMLParseException.create('Matching of template '+FTemplateName+' failed. for an unknown reason');
+    raise EHTMLParseException.create('Matching of template '+FTemplate.baseURI+' failed. for an unknown reason');
   end;
 //TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;
 
 function THtmlTemplateParser.parseHTMLFile(htmlfilename: string):boolean;
 begin
-  result:=parseHTML(strLoadFromFile(htmlfilename));
+  result:=parseHTML(strLoadFromFile(htmlfilename),htmlfilename);
 end;
 
 procedure THtmlTemplateParser.parseTemplate(template: string;
@@ -1074,7 +1080,7 @@ begin
     raise Exception.Create('Ungültiger Codierung BOM im Template');
 
   //read template
-  FTemplate.parseTree(template);
+  FTemplate.parseTree(template, templateName);
   el := TTemplateElement(FTemplate.getTree);
   while el <> nil do begin
     el.postprocess(self);
@@ -1084,7 +1090,6 @@ begin
       el := el.templateNext
   end;
 
-  FTemplateName := templateName;
 
   //detect meta encoding (doesn't change encoding, just sets it)
   el := TTemplateElement(FTemplate.getTree);
@@ -1198,7 +1203,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..236] of array[1..3] of string = (
+var data: array[1..238] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1762,6 +1767,8 @@ var data: array[1..236] of array[1..3] of string = (
       ,('<a><b>{x:=text()}</b>{1,2}</a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
       ,('<a><b>{1,2}{x:=text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
       ,('<a><b>{1,1}{x:=text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
+      ,('<a><b>{test:=/deep-text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=A1B1B2B3B4')
+      ,('<a><b>{test:=static-base-uri()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=unittest')
 );
 
 
@@ -1786,7 +1793,7 @@ var previoushtml: string;
       if html<>'' then previoushtml:=html;
       if template='' then exit;
       extParser.parseTemplate(template);
-      extParser.parseHTML(previoushtml);
+      extParser.parseHTML(previoushtml, 'unittest');
       checklog(expected);
     end;
 
