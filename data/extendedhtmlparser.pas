@@ -334,6 +334,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 THtmlTemplateParser=class
   private
     FRepetitionRegEx: TRegExpr;
+    FUnnamedVariableName: string;
   protected
     FOutputEncoding: TEncoding;
     FKeepOldVariables: TKeepPreviousVariables;
@@ -383,6 +384,7 @@ THtmlTemplateParser=class
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
+    property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
 
     property TemplateTree: TTreeElement read getTemplateTree; //A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //A tree representation of the processed html file
@@ -747,33 +749,53 @@ var xpathText: TTreeElement;
 
 
   procedure performRead(const varname: string; source: TPseudoXPathParser; const regex:string=''; const submatch: integer = 0);
+  begin
+  end;
+
+  procedure HandleCommandRead;
   var
    value:TPXPValue;
    regexp: TRegExpr;
+   oldvarcount: Integer;
+   varnameindex: Integer;
+   attribs: TAttributeList;
+   submatch: Integer;
+   regex: String;
   begin
-    value:=performPXPEvaluation(source);
+    attribs := templateStart.templateAttributes;
 
+    oldvarcount := FVariableLog.count;
+    value:=performPXPEvaluation(templateStart.source);
+
+    regex := attribs.Values['regex'];
     if regex<>'' then begin
       regexp:=TRegExpr.Create;
       regexp.Expression:=regex;
       regexp.Exec(value.toString);
+      submatch := StrToIntDef(templateStart.templateAttributes.Values['submatch'],0);
       value:=pxpvalue(regexp.Match[submatch]);
       regexp.free;
     end;
 
-    FVariableLog.addVariable(Trim(varname), value);
+    varnameindex := attribs.IndexOfName('var');
+    if varnameindex >= 0 then
+      FVariableLog.addVariable(Trim(replaceVars(attribs.Values['var'])), value)
+    else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
+      FVariableLog.addVariable(FUnnamedVariableName, value)
+    else
+      value.free;
 
     templateStart := templateStart.templateReverse;
   end;
 
-  procedure HandleCommandRead;
-  begin
-    performRead(replaceVars(templateStart.templateAttributes.Values['var']),templateStart.source,templateStart.templateAttributes.Values['regex'],StrToIntDef(templateStart.templateAttributes.Values['submatch'],0));
-  end;
-
   procedure HandleCommandShortRead;
+  var varcount: integer;
+    read: TPXPValue;
   begin
-    performPXPEvaluation(templateStart.source).Free;
+    varcount:=FVariableLog.count;
+    read := performPXPEvaluation(templateStart.source);
+    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then FVariableLog.addVariable(FUnnamedVariableName, read)
+    else read.free;
     templateStart := templateStart.templateReverse;
   end;
 
@@ -961,6 +983,7 @@ begin
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
   FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *, *([0-9]+) *[}] *');
+  FUnnamedVariableName:='_result';
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -975,7 +998,7 @@ begin
   inherited destroy;
 end;
 
-function THtmlTemplateParser.parseHTML(html, htmlfilename: string):boolean;
+function THtmlTemplateParser.parseHTML(html: string; htmlFileName: string): boolean;
 var cur,last,realLast:TTemplateElement;
   i: Integer;
   curValue: TPXPValue;
@@ -1203,7 +1226,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..238] of array[1..3] of string = (
+var data: array[1..243] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1769,6 +1792,13 @@ var data: array[1..238] of array[1..3] of string = (
       ,('<a><b>{1,1}{x:=text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
       ,('<a><b>{test:=/deep-text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=A1B1B2B3B4')
       ,('<a><b>{test:=static-base-uri()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=unittest')
+
+      //anonymouse variables
+      ,('<a>{text()}</a>', '<a>hallo</a>', '_result=hallo')
+      ,('<a>{t:=text()}</a>', '<a>hallo</a>', 't=hallo')
+      ,('<a><t:read var="u" source="text()"/></a>', '<a>hallo</a>', 'u=hallo')
+      ,('<a><t:read source="text()"/></a>', '<a>hallo</a>', '_result=hallo')
+      ,('<a><t:read var="" source="text()"/></a>', '<a>hallo</a>', '=hallo')
 );
 
 
