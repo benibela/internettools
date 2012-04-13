@@ -376,6 +376,8 @@ THtmlTemplateParser=class
     //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
+    function debugMatchings(const width: integer): string;
+
     property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
     property oldVariableChangeLog: TPXPVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
@@ -393,6 +395,8 @@ THtmlTemplateParser=class
 //** xml compatible namespace url to define new template prefixes
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 implementation
+
+uses math;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchText;
@@ -1217,6 +1221,72 @@ begin
     end else Result+=s[i];
     i+=1;
   end;
+end;
+
+function THtmlTemplateParser.debugMatchings(const width: integer): string;
+var res: TStringArray;
+    template: TTemplateElement;
+    html: TTreeElement;
+    LINK, NOLINK, EMPTY: String;
+    tsl, hsl: TStringArray;
+    templateIndent, htmlIndent: integer;
+    tempTemplateIndent, tempHTMLIndent: String;
+
+  procedure updateIndentation(element: TTreeElement; var count: integer; var cache: string);
+  begin
+    if element.typ = tetOpen then count+=1
+    else if element.typ = tetClose then count-=1;
+    cache := strDup(' ', min(width div 2, count));
+  end;
+
+  procedure printHTMLUntil(endElement: TTreeElement);
+  var
+    i: Integer;
+  begin
+    while (html <> nil) and (html <> endElement) do begin
+      hsl := strWrapSplit(html.toString(), width - length(tempHTMLIndent));
+      for i:=0 to high(hsl) do arrayAdd(res, EMPTY + tempHTMLIndent + hsl[i]);
+      updateIndentation(html, htmlIndent, tempHTMLIndent);
+      html := html.next;
+    end;
+  end;
+
+var i: Integer;
+
+begin
+  LINK :=   ' ----> ';
+  NOLINK := '       ';
+  EMPTY := strDup(' ', width) + NOLINK;
+
+  templateIndent:=0; htmlIndent:=0;
+
+  setlength(res, 0);
+  template := TTemplateElement(FTemplate.getTree);
+  if template <> nil then template := template.templateNext;
+  html := FHTML.getTree;
+  if html <> nil then html := html.next;
+  while template <> nil do begin
+    tsl := strWrapSplit(template.toString(), width - length(tempTemplateIndent));
+    if template.match = nil then begin
+      for i:=0 to high(tsl) do arrayAdd(res, tempTemplateIndent + tsl[i])
+    end else begin
+      if (html <> nil) and (template.match.offset > html.offset) then
+        printHTMLUntil(template.match);
+      if html = template.match then begin
+        hsl := strWrapSplit(html.toString(), width - length(tempHTMLIndent));
+        for i:=0 to min(high(hsl), high(tsl)) do arrayAdd(res, tempTemplateIndent + tsl[i] + strDup(' ', width - length(tsl[i])) + LINK + tempHTMLIndent + hsl[i]);
+        for i:=length(hsl) to high(tsl) do arrayAdd(res, tempTemplateIndent + tsl[i]);
+        for i:=length(tsl) to high(hsl) do arrayAdd(res, EMPTY + tempHTMLIndent + hsl[i]);
+        updateIndentation(html, htmlIndent, tempHTMLIndent);
+        html := html.next;
+      end;
+    end;
+    updateIndentation(template, templateIndent, tempTemplateIndent);
+    template := template.templateNext;
+  end;
+  arrayAdd(res, '<!--template end-->');
+  printHTMLUntil(nil);
+  result := strJoin(res, #13);
 end;
 
 

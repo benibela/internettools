@@ -376,7 +376,7 @@ begin
         result := '<'+value;
         if attributes <> nil then
           for i:=0 to attributes.Count-1 do
-            result += ' '+attributes[i];
+            result += ' '+attributes.Names[i] + '="'+attributes.ValueFromIndex[i]+'"';
         result+='>';
     end;
     tetComment: exit('<!--'+value+'-->');
