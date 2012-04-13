@@ -246,6 +246,9 @@ procedure strSplit(out splitted: TStringArray;s:string;sep:string=',';includeEmp
 //**Splits the string s into the array splitted at every occurrence of sep
 function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArray;overload;
 
+function strWrapSplit(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
+function strWrap(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): string;
+
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
@@ -309,6 +312,7 @@ function strCompareClever(const s1, s2: string): integer;
 //**Case insensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
 function striCompareClever(const s1, s2: string): integer; inline;
+
 
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
@@ -1013,6 +1017,41 @@ begin
   end;
 end;
 
+function strWrapSplit(const Line: string; MaxCol: Integer; const BreakChars: TCharSet): TStringArray;
+var i: integer;
+    lastTextStart, lastBreakChance: integer;
+    tempBreak: Integer;
+begin
+  setlength(result, 0);
+  lastTextStart:=1;
+  lastBreakChance:=0;
+  for i := 1 to length(line) do begin
+    if line[i+1] in BreakChars then begin
+      lastBreakChance:=i+1;
+      if lastTextStart = lastBreakChance then inc(lastTextStart); //merge seveal break characters into a single new line
+    end;
+    if i - lastTextStart + 1 >= MaxCol then begin
+      if lastBreakChance >= lastTextStart then begin
+        tempBreak := lastBreakChance;
+        while (tempBreak > 1) and  (line[tempBreak-1] in BreakChars) do tempBreak-=1; //remove spaces before line wrap
+        arrayAdd(result, copy(Line,lastTextStart,tempBreak-lastTextStart));
+        lastTextStart:=lastBreakChance+1;
+      end else begin
+        arrayAdd(result, copy(Line, lastTextStart, MaxCol));
+        lastTextStart:=i+1;
+      end;
+    end;
+  end;
+  if lastTextStart <= length(line) then arrayAdd(result, strcopyfrom(line, lastTextStart));
+  if length(result) = 0 then arrayAdd(result, '');
+end;
+
+function strWrap(const Line: string; MaxCol: Integer; const BreakChars: TCharSet): string;
+begin
+  result := strJoin(strWrapSplit(line, MaxCol, BreakChars), #13);
+end;
+
+
 {%REPEAT}
 //copied from bbutils, need this here
 procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
@@ -1318,6 +1357,7 @@ function strJoin(const sl: TStringArray; const sep: string; limit: Integer;
  const limitStr: string): string;
 var i:longint;
 begin
+  writeln(length(sl)); for i:= 0 to high(sl) do writeln('"'+sl[i]+'"');
   Result:='';
   if length(sl)=0 then exit;
   result:=sl[0];
@@ -2523,6 +2563,16 @@ begin
 
   //splitting
   test(strSplit('hallo,welt,maus')[1] = 'welt');
+
+  if strWrap('hallo', 3) <> 'hal'#13'lo' then raise Exception.Create('strWrap failed, 1');
+  if strWrap('ha llo', 3) <> 'ha'#13'llo' then raise Exception.Create('strWrap failed, 2');
+  if strWrap('ha llo    abcdef', 3) <> 'ha'#13'llo'#13'abc'#13'def' then raise Exception.Create('strWrap failed, 3');
+  if strWrap('ha llo    abcdef', 2) <> 'ha'#13'll'#13'o'#13'ab'#13'cd'#13'ef' then raise Exception.Create('strWrap failed, 4');
+  if strWrap('ha llo    abcdef', 5) <> 'ha'#13'llo'#13'abcde'#13'f' then raise Exception.Create('strWrap failed, 5');
+  if strWrap('ha llo    abcdef', 7) <> 'ha llo'#13'abcdef' then raise Exception.Create('strWrap failed, 6');
+  if strWrap('ha llo    abcdefghi', 7) <> 'ha llo'#13'abcdefg'#13'hi' then raise Exception.Create('strWrap failed, 7');
+  if strWrap('ha llo    ab cd ef ghi', 8) <> 'ha llo'#13'ab cd ef'#13'ghi' then raise Exception.Create('strWrap failed, 8');
+  if strWrap('ha llo    ab cd ef g hi', 8) <> 'ha llo'#13'ab cd ef'#13'g hi' then raise Exception.Create('strWrap failed, 9');
 
   //trimming
   test(strTrimLeft('  ABC  DEF '#9) = 'ABC  DEF '#9);
