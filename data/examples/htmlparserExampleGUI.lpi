@@ -43,6 +43,7 @@
         <Filename Value="htmlparsergui.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="Form1"/>
+        <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="htmlparsergui"/>
       </Unit1>
@@ -91,6 +92,9 @@
       </Checks>
     </CodeGeneration>
     <Other>
+      <ConfigFile>
+        <StopAfterErrCount Value="1000"/>
+      </ConfigFile>
       <CompilerMessages>
         <UseMsgFile Value="True"/>
       </CompilerMessages>
