@@ -58,7 +58,15 @@ begin
     htmlparser.parseTemplate(memo1.Lines.Text);
     memo3.Clear;
     //htmlparser.onVariableRead:=@htmlparserVariableRead;
-    htmlparser.parseHTML(memo2.Lines.Text);
+    try
+      htmlparser.parseHTML(memo2.Lines.Text);
+    except on e: EHTMLParseException do begin
+      Memo3.Lines.text:='Parser-Exception: ' + e.Message;
+      Memo3.Lines.add('Partial matches: ');
+      Memo3.Lines.add(htmlparser.debugMatchings(50));
+      raise;
+    end
+    end;
     memo3.Lines.Text:=htmlparser.variableChangeLog.debugTextRepresentation;
   finally
     htmlparser.Free;

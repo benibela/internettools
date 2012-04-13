@@ -1,38 +1,39 @@
 object Form1: TForm1
-  Left = 428
-  Height = 481
-  Top = 206
-  Width = 560
+  Left = 219
+  Height = 561
+  Top = 126
+  Width = 769
   ActiveControl = Panel1
   Caption = 'Form1'
-  ClientHeight = 481
-  ClientWidth = 560
+  ClientHeight = 561
+  ClientWidth = 769
   LCLVersion = '1.1'
   object Panel1: TPanel
     Left = 0
-    Height = 123
+    Height = 165
     Top = 0
-    Width = 560
+    Width = 769
     Align = alTop
     Caption = 'Panel1'
-    ClientHeight = 123
-    ClientWidth = 560
+    ClientHeight = 165
+    ClientWidth = 769
     TabOrder = 0
     object Label1: TLabel
       Left = 1
       Height = 16
       Top = 1
-      Width = 558
+      Width = 767
       Align = alTop
       Caption = 'Template:'
       ParentColor = False
     end
     object Memo1: TMemo
       Left = 1
-      Height = 105
+      Height = 147
       Top = 17
-      Width = 558
+      Width = 767
       Align = alClient
+      Font.Name = 'Monospace,Courier'
       Lines.Strings = (
         '<table id="right">'
         '<template:loop>'
@@ -40,35 +41,37 @@ object Form1: TForm1
         '</template:loop>'
         '</table>'
       )
+      ParentFont = False
       ScrollBars = ssAutoBoth
       TabOrder = 0
     end
   end
   object Panel2: TPanel
     Left = 0
-    Height = 159
-    Top = 128
-    Width = 560
+    Height = 135
+    Top = 170
+    Width = 769
     Align = alClient
     Caption = 'Panel2'
-    ClientHeight = 159
-    ClientWidth = 560
+    ClientHeight = 135
+    ClientWidth = 769
     TabOrder = 1
     object Label2: TLabel
       Left = 1
       Height = 16
       Top = 1
-      Width = 558
+      Width = 767
       Align = alTop
       Caption = 'HTML-File:'
       ParentColor = False
     end
     object Memo2: TMemo
       Left = 1
-      Height = 141
+      Height = 117
       Top = 17
-      Width = 558
+      Width = 767
       Align = alClient
+      Font.Name = 'Monospace,Courier'
       Lines.Strings = (
         '<html><body>'
         '<table id="wrong">'
@@ -82,38 +85,42 @@ object Form1: TForm1
         '</table>'
         '</html>'
       )
+      ParentFont = False
       ScrollBars = ssAutoBoth
       TabOrder = 0
     end
   end
   object Panel3: TPanel
     Left = 0
-    Height = 96
-    Top = 385
-    Width = 560
+    Height = 158
+    Top = 403
+    Width = 769
     Align = alBottom
     Caption = 'Panel3'
-    ClientHeight = 96
-    ClientWidth = 560
+    ClientHeight = 158
+    ClientWidth = 769
     TabOrder = 2
     object Label3: TLabel
       Left = 1
       Height = 16
       Top = 1
-      Width = 558
+      Width = 767
       Align = alTop
       Caption = 'Result:'
       ParentColor = False
     end
     object Memo3: TMemo
       Left = 1
-      Height = 78
+      Height = 140
       Top = 17
-      Width = 558
+      Width = 767
       Align = alClient
+      Font.Height = -13
+      Font.Name = 'Monospace,Courier'
       Lines.Strings = (
         'Memo3'
       )
+      ParentFont = False
       ScrollBars = ssAutoBoth
       TabOrder = 0
     end
@@ -122,8 +129,8 @@ object Form1: TForm1
     Cursor = crVSplit
     Left = 0
     Height = 5
-    Top = 123
-    Width = 560
+    Top = 165
+    Width = 769
     Align = alTop
     ResizeAnchor = akTop
   end
@@ -131,16 +138,16 @@ object Form1: TForm1
     Cursor = crVSplit
     Left = 0
     Height = 5
-    Top = 380
-    Width = 560
+    Top = 398
+    Width = 769
     Align = alBottom
     ResizeAnchor = akBottom
   end
   object Button1: TButton
     Left = 0
     Height = 25
-    Top = 287
-    Width = 560
+    Top = 305
+    Width = 769
     Align = alBottom
     Caption = 'GO'
     OnClick = Button1Click
@@ -149,8 +156,8 @@ object Form1: TForm1
   object Button2: TButton
     Left = 0
     Height = 25
-    Top = 355
-    Width = 560
+    Top = 373
+    Width = 769
     Align = alBottom
     Caption = 'Show html tree parser result'
     OnClick = Button2Click
@@ -159,8 +166,8 @@ object Form1: TForm1
   object Button3: TButton
     Left = 0
     Height = 25
-    Top = 330
-    Width = 560
+    Top = 348
+    Width = 769
     Align = alBottom
     Caption = 'Evaluate template as pseudo xpath'
     OnClick = Button3Click
@@ -169,8 +176,8 @@ object Form1: TForm1
   object CheckBox1: TCheckBox
     Left = 0
     Height = 18
-    Top = 312
-    Width = 560
+    Top = 330
+    Width = 769
     Align = alBottom
     Caption = 'convert encoding/entities'
     Checked = True
