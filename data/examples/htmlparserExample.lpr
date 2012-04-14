@@ -4,7 +4,7 @@ program htmlparserExample;
 
 uses
   Classes,
-  extendedhtmlparser, FileUtil,sysutils,
+  extendedhtmlparser, FileUtil,sysutils, bbutils,
   rcmdline //<< if you don't have this command line parser unit, you can download it from www.benibela.de
   { you can add units after this };
 
@@ -13,6 +13,7 @@ var mycmdLine: TCommandLineReader;
     files:TStringArray;
     i: Integer;
     j: Integer;
+    temp: TStringArray;
 
 {$R *.res}
 
@@ -40,6 +41,7 @@ begin
 
   htmlparser.parseTemplateFile(mycmdLine.readString('template'));
 
+
   for i:=0 to high(files) do begin
     if (files[i]='') or ((length(files[i]) < 5) and (not FileExistsUTF8(files[i]))) then continue;
 
@@ -50,11 +52,13 @@ begin
       writeln(stderr, 'Parsing error:');
       writeln(stderr, e.Message);
       writeln(stderr, 'Partial matching:');
-      writeln(stderr, htmlparser.debugMatchings(50));
+      temp := strSplit(htmlparser.debugMatchings(50), #13); //print line by line, or the output "disappears"
+      for j := 0 to high(temp) do  writeln(stderr, temp[j]);
 
       raise;
     end;
     end;
+
 
     if mycmdLine.readFlag('immediate-vars') then begin
       if not mycmdLine.readFlag('no-header') then writeln(stderr,'** Current variable state: **');
