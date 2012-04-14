@@ -1026,6 +1026,8 @@ begin
     if (FTemplate.getEncoding <> OutputEncoding) then begin
       cur := TTemplateElement(FTemplate.getTree);
       while cur <> nil do begin
+        if (cur.templateAttributes<>nil) then
+          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getEncoding, OutputEncoding);
         if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
           cur.initializeCaches(self,true);
         cur := cur.templateNext;
@@ -1296,7 +1298,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..243] of array[1..3] of string = (
+var data: array[1..244] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1830,6 +1832,7 @@ var data: array[1..243] of array[1..3] of string = (
       ,('<a>abc<t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abcd')
       ,('<a>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
       ,('<a>abc<t:s>x:=text()</t:s></a>', '<m><a>tABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a>äöü<t:s>x:=text()</t:s></a>', '<m><a>äö</a><a>äöü</a><a>äöüd</a></m>', 'x=äöü')
       ,('<a><t:meta default-text-case-sensitive="sensitive"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=abc')
       ,('<a><t:meta default-text-case-sensitive="false"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
       ,('<a><t:meta default-text-case-sensitive="insensitive"/>abc<t:s>x:=text()</t:s></a>', '<m><a>ABCXX</a><a>abc</a><a>abcd</a></m>', 'x=ABCXX')
