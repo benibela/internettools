@@ -1372,7 +1372,6 @@ function strJoin(const sl: TStringArray; const sep: string; limit: Integer;
  const limitStr: string): string;
 var i:longint;
 begin
-  writeln(length(sl)); for i:= 0 to high(sl) do writeln('"'+sl[i]+'"');
   Result:='';
   if length(sl)=0 then exit;
   result:=sl[0];
