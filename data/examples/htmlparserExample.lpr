@@ -35,15 +35,26 @@ begin
 
   files:=mycmdLine.readNamelessFiles();
 
+
   htmlparser:=THtmlTemplateParser.create;
 
   htmlparser.parseTemplateFile(mycmdLine.readString('template'));
 
   for i:=0 to high(files) do begin
-    if (files[i]='') or ((length(files[i]) < 2) and (not FileExistsUTF8(files[i]))) then continue;
+    if (files[i]='') or ((length(files[i]) < 5) and (not FileExistsUTF8(files[i]))) then continue;
 
     if not mycmdLine.readFlag('no-header') then writeln('**** Parse file:'+files[i]+' ****');
+    try
     htmlparser.parseHtmlFile(files[i]);
+    except on e: EHTMLParseException do begin
+      writeln(stderr, 'Parsing error:');
+      writeln(stderr, e.Message);
+      writeln(stderr, 'Partial matching:');
+      writeln(stderr, htmlparser.debugMatchings(50));
+
+      raise;
+    end;
+    end;
 
     if mycmdLine.readFlag('immediate-vars') then begin
       if not mycmdLine.readFlag('no-header') then writeln(stderr,'** Current variable state: **');
