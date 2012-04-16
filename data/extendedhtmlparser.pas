@@ -81,7 +81,7 @@ TTemplateElement=class(TTreeElement)
   templateAttributes: TAttributeList;
 
   //matching information
-  loopRepetitions: integer;
+  contentRepetitions: integer;
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
@@ -560,7 +560,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
 var
  i: Integer;
 begin
-  loopRepetitions := 0;
+  contentRepetitions := 0;
 
   if recreate then freeCaches;
 
@@ -823,14 +823,14 @@ var xpathText: TTreeElement;
     //Two possible cases:
     //1. Continued in loop (preferred of course)
     //2. Jumped over loop
-    templateStart.loopRepetitions+=1;
-    if ((templateStart.max = nil) or (templateStart.loopRepetitions <= performPXPEvaluation(templateStart.max).toInteger))
+    templateStart.contentRepetitions+=1;
+    if ((templateStart.max = nil) or (templateStart.contentRepetitions <= performPXPEvaluation(templateStart.max).toInteger))
        and matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart.templateNext, templateEnd) then begin
-      templateStart.loopRepetitions-=1;
+      templateStart.contentRepetitions-=1;
       templateStart := templateEnd;
     end else begin
-      templateStart.loopRepetitions-=1;
-      if (templateStart.min = nil) or (performPXPEvaluation(templateStart.min).toInteger <= templateStart.loopRepetitions) then templateStart := templateStart.templateReverse.templateNext
+      templateStart.contentRepetitions-=1;
+      if (templateStart.min = nil) or (performPXPEvaluation(templateStart.min).toInteger <= templateStart.contentRepetitions) then templateStart := templateStart.templateReverse.templateNext
       else htmlStart := htmlStart.next;
     end;
   end;
@@ -936,7 +936,7 @@ begin
             if htmlStart.typ = tetText then xpathText := htmlStart;
             if not switchCommandAccepted and (templateStart.templateType >= firstRealTemplateType) and
                 (templateStart.templateAttributes <> nil) and (templateStart.templateAttributes.indexOfName('test') >= 0) then
-            if not HandleCommandPseudoIf then continue;
+              if not HandleCommandPseudoIf then continue;
             if tefSwitchChild in templateStart.flags then begin
               if switchCommandAccepted then switchCommandAccepted:=false
               else begin
