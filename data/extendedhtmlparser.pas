@@ -51,7 +51,7 @@ type
 //**@value tetCommandElseOpen <template:else> command to skip something
 //**@value tetCommandSwitchOpen <template:switch> command to branch
 //duplicate open/close because this simplifies the case statements
-TTemplateElementType=(tetIgnore, tetPlainHTML,
+TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose,
                       tetHTMLText,
                       tetMatchText,
@@ -821,9 +821,9 @@ var xpathText: TTreeElement;
       templateStart.match := htmlStart
     else begin
        templateStart := templateStart.templateReverse; //skip block
+       assert(templateStart.typ = tetClose);
+       templateStart := templateStart.templateNext;    //skip block end
        if trueif then begin
-         Assert(templateStart.templateType in [tetCommandIfClose,tetCommandElseClose]);
-         templateStart := templateStart.templateNext;
          if (templateStart.templateType = tetCommandElseOpen) then
            if HandleCommandPseudoIf() then
              templateStart := templateStart.templateNext; //enter else, if "if" is not satisfied, but "else" is satisfied
@@ -959,8 +959,8 @@ begin
         (templateStart <> nil) and (templateStart <> templateEnd) and
         ((htmlStart <> htmlEnd.next)) do begin
             if htmlStart.typ = tetText then xpathText := htmlStart;
-            if not switchCommandAccepted and (templateStart.templateType >= firstRealTemplateType) and
-                (templateStart.templateAttributes <> nil) and (templateStart.templateAttributes.indexOfName('test') >= 0) then
+            if not switchCommandAccepted and (templateStart.templateType <> tetIgnore) and
+                (templateStart.test <> nil) then
               if not HandleCommandPseudoIf then continue;
             if tefSwitchChild in templateStart.flags then begin
               if switchCommandAccepted then switchCommandAccepted:=false
@@ -1327,8 +1327,8 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..255] of array[1..3] of string = (
-//---classic tests---
+var data: array[1..257] of array[1..3] of string = (
+//---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
  '<a><b>Dies wird Variable test</b></a>',
@@ -1915,6 +1915,9 @@ var data: array[1..255] of array[1..3] of string = (
       ,('<a>{var:=4}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else test="$var=3">{res:="gamma"}</t:else><t:else test="$var=4">{res:="delta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=4'#13'res=delta')
       ,('<a>{var:=5}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else test="$var=3">{res:="gamma"}</t:else><t:else test="$var=4">{res:="delta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=5'#13'res=omega')
 
+      //t:test with html
+      ,('<a>{go:="og"}<b t:test="$go=''og''">{text()}</b></a>', '<a><b>test</b></a>', 'go=og'#13'_result=test')
+      ,('<a>{go:="go"}<b t:test="$go=''og''">{text()}</b></a>', '<a><b>test</b></a>', 'go=go')
 );
 
 
