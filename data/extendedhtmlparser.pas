@@ -48,6 +48,7 @@ type
 //**@value tetCommandShortRead <template:s> command to execute a pxp expression
 //**@value tetCommandLoopOpen <template:loop> command to repeat something as long as possible
 //**@value tetCommandIfOpen <template:if> command to skip something
+//**@value tetCommandElseOpen <template:else> command to skip something
 //**@value tetCommandSwitchOpen <template:switch> command to branch
 //duplicate open/close because this simplifies the case statements
 TTemplateElementType=(tetIgnore, tetPlainHTML,
@@ -57,6 +58,7 @@ TTemplateElementType=(tetIgnore, tetPlainHTML,
                       tetCommandMeta, tetCommandRead, tetCommandShortRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
+                      tetCommandElseOpen, tetCommandElseClose,
                       tetCommandSwitchOpen, tetCommandSwitchClose);
 TTemplateElementFlag = (tefOptional, tefSwitchChild);
 TTemplateElementFlags = set of TTemplateElementFlag;
@@ -256,7 +258,12 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several @noAutoLink(variables) like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the pxp-syntax, so you can use much more complex expressions.)
         )
       @item(@code(<template:if test="??"/>  .. </template:if>)
-        @br Everything inside this tag is only used if the pseudo-XPath-expression in test equals to true)
+        @br Everything inside this tag is only used iff the pseudo-XPath-expression in test equals to true)
+      @item(@code(<template:else [test="??"]/>  .. </template:else>)
+        @br Everything inside this tag is only used iff the immediate previous if/else block was not executed. @br
+            You can chain several else blocks that have test attributes together after an starting if, to create an ifelse chain, in which
+            only one if or else block is used.@br
+            E.g.: @code(<template:if test="$condition">..</template:if><template:else test="$condition2;$>..</template:else><template:else>..</template:else>) )
       @item(@code(<template:loop [min="?"] [max="?"]>  .. </template:loop>)
         @br Everything inside this tag is repeated between [min,max] times. (default min=0, max=infinity)
         @br E.g. if you write @code(<template:loop>  X </template:loop> ), it has the same effect as XXXXX with the largest possible count of X <= max for a given html file.
@@ -400,8 +407,8 @@ uses math;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchText;
-      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,0,0,1,2,1,2,1,2); //0: no children, 1: open, 2: close
-      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('match-text','meta','read','s','loop','loop','if','if','switch','switch');
+      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,0,0,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('match-text','meta','read','s','loop','loop','if','if','else','else','switch','switch');
 
 { TTemplateElement }
 
@@ -805,17 +812,35 @@ var xpathText: TTreeElement;
 
   function HandleCommandPseudoIf: boolean;
   var
-    satisfied: Boolean;
+    trueif, satisfied: Boolean;
   begin
+    trueif := templateStart.templateType in [tetCommandIfOpen,tetCommandElseOpen];
     satisfied:=(templateStart.test = nil) or  performPXPEvaluation(templateStart.test).toBoolean;
 
-    if not satisfied then begin
-      templateStart := templateStart.templateReverse; //skip if block
-      result := false;
-     end else begin
-      templateStart.match := htmlStart;
-      result := true;
+    if satisfied then
+      templateStart.match := htmlStart
+    else begin
+       templateStart := templateStart.templateReverse; //skip block
+       if trueif then begin
+         Assert(templateStart.templateType in [tetCommandIfClose,tetCommandElseClose]);
+         templateStart := templateStart.templateNext;
+         if (templateStart.templateType = tetCommandElseOpen) then
+           if HandleCommandPseudoIf() then
+             templateStart := templateStart.templateNext; //enter else, if "if" is not satisfied, but "else" is satisfied
+           //else skip else block
+       end;
      end;
+     result := satisfied;
+  end;
+
+  procedure SkipFollowingElses;
+  begin
+    templateStart := templateStart.templateNext;
+    while templateStart.templateType = tetCommandElseOpen do begin
+      templateStart := templateStart.templateReverse;
+      assert(templateStart.templateType = tetCommandElseClose);
+      templateStart := templateStart.templateNext;
+    end;
   end;
 
   procedure HandleCommandLoopOpen;
@@ -959,7 +984,11 @@ begin
 
               tetCommandSwitchOpen: HandleCommandSwitch;
 
-              tetIgnore, tetCommandMeta, tetCommandIfOpen, tetCommandIfClose, tetCommandSwitchClose: templateStart := templateStart.templateNext;
+              tetIgnore, tetCommandMeta, tetCommandIfOpen, tetCommandSwitchClose: templateStart := templateStart.templateNext;
+
+              tetCommandIfClose, tetCommandElseClose: SkipFollowingElses;
+
+              tetCommandElseOpen: raise ETemplateParseException.Create('Found <else> tag without previous <if>');
 
               else raise ETemplateParseException.Create('Unknown template element type - internal error');
             end
@@ -1298,7 +1327,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..244] of array[1..3] of string = (
+var data: array[1..255] of array[1..3] of string = (
 //---classic tests---
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1872,6 +1901,20 @@ var data: array[1..244] of array[1..3] of string = (
       ,('<a><t:read var="u" source="text()"/></a>', '<a>hallo</a>', 'u=hallo')
       ,('<a><t:read source="text()"/></a>', '<a>hallo</a>', '_result=hallo')
       ,('<a><t:read var="" source="text()"/></a>', '<a>hallo</a>', '=hallo')
+
+      //else blocks
+      ,('<a>{var:=true()}<t:if test="$var">{res:="choose-if"}</t:if></a>', '<a>hallo</a>', 'var=true'#13'res=choose-if')
+      ,('<a>{var:=true()}<t:if test="$var">{res:="choose-if"}</t:if><t:else>{res:="choose-else"}</t:else></a>', '<a>hallo</a>', 'var=true'#13'res=choose-if')
+      ,('<a>{var:=false()}<t:if test="$var">{res:="choose-if"}</t:if><t:else>{res:="choose-else"}</t:else></a>', '<a>hallo</a>', 'var=false'#13'res=choose-else')
+      ,('<a>{var:=1}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=1'#13'res=alpha')
+      ,('<a>{var:=2}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=2'#13'res=beta')
+      ,('<a>{var:=3}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=3'#13'res=omega')
+      ,('<a>{var:=1}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else test="$var=3">{res:="gamma"}</t:else><t:else test="$var=4">{res:="delta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=1'#13'res=alpha')
+      ,('<a>{var:=2}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else test="$var=3">{res:="gamma"}</t:else><t:else test="$var=4">{res:="delta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=2'#13'res=beta')
+      ,('<a>{var:=3}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else test="$var=3">{res:="gamma"}</t:else><t:else test="$var=4">{res:="delta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=3'#13'res=gamma')
+      ,('<a>{var:=4}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else test="$var=3">{res:="gamma"}</t:else><t:else test="$var=4">{res:="delta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=4'#13'res=delta')
+      ,('<a>{var:=5}<t:if test="$var=1">{res:="alpha"}</t:if><t:else test="$var=2">{res:="beta"}</t:else><t:else test="$var=3">{res:="gamma"}</t:else><t:else test="$var=4">{res:="delta"}</t:else><t:else>{res:="omega"}</t:else></a>', '<a>hallo</a>', 'var=5'#13'res=omega')
+
 );
 
 
