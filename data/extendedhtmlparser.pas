@@ -813,7 +813,7 @@ var xpathText: TTreeElement;
       templateStart := templateStart.templateReverse; //skip if block
       result := false;
      end else begin
-      templateStart.match := templateStart;
+      templateStart.match := htmlStart;
       result := true;
      end;
   end;
