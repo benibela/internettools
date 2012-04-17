@@ -103,6 +103,14 @@ TTemplateElement=class(TTreeElement)
   destructor destroy;override;
 end;
 
+
+//** Specifies when the text of text nodes is trimmed. Each value removes strictly more whitespace than the previous ones.
+//** @value ttnNever never, all whitespace is kept
+//** @value ttnForMatching When comparing two text nodes, whitespace is ignored; but all whitespace will be returned when reading text
+//** @value ttnAfterReading The PXP-functions like ., text(), deep-text() return the text trimmed, but the whitespace is still stored in the tree (so deep-text returns whitespace between child nodes)
+//** @value ttnWhenLoading All starting/ending whitespace is unconditionally removed from all text nodes
+TTrimTextNodes = (ttnNever, ttnForMatching, ttnWhenLoadingEmptyOnly, ttnWhenLoading);
+
 //** This specifies the handling of the variables read in the previous document @br@br
 //** @value kpvForget Old variables are deleted @br
 //** @value kpvKeepValues Old variables are moved from the property variableChangelog to the property oldVariableChangelog @br
@@ -341,6 +349,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 THtmlTemplateParser=class
   private
     FRepetitionRegEx: TRegExpr;
+    FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
     FUnnamedVariableName: string;
   protected
     FOutputEncoding: TEncoding;
@@ -394,9 +403,10 @@ THtmlTemplateParser=class
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
     property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
+    property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.PXPGlobalTrimNodes which controls, how the values are returned.
 
-    property TemplateTree: TTreeElement read getTemplateTree; //A tree representation of the current template
-    property HTMLTree: TTreeElement read getHTMLTree; //A tree representation of the processed html file
+    property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
+    property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
   end;
 
 //** xml compatible namespace url to define new template prefixes
@@ -553,7 +563,12 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     i := templateAttributes.IndexOfName(name);
     if i < 0 then exit();
     r := templateAttributes.ValueFromIndex[i];
-    if escape then r := prefix + strEscapeRegex(r) + suffix;
+    if parser.FTrimTextNodes <> ttnNever then begin
+      prefix:=prefix+'\s*';
+      suffix:='\s*'+suffix;
+    end;
+    if escape then r := prefix + strEscapeRegex(r) + suffix
+    else r := prefix + r + suffix;
     SetLength(textRegexs, length(textRegexs) + 1);
     textRegexs[high(textRegexs)] := TRegExpr.Create(r);
     i := templateAttributes.IndexOfName('case-sensitive');
@@ -1017,6 +1032,7 @@ begin
   FKeepOldVariables:=kpvForget;
   FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *, *([0-9]+) *[}] *');
   FUnnamedVariableName:='_result';
+  FTrimTextNodes:=ttnWhenLoadingEmptyOnly;
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -1036,6 +1052,7 @@ var cur,last,realLast:TTemplateElement;
   i: Integer;
   curValue: TPXPValue;
   j: Integer;
+  temp: TTreeElement;
 begin
   FreeAndNil(FVariables);
   if FKeepOldVariables = kpvForget then
@@ -1047,10 +1064,15 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
 
+  FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
   FHTML.parseTree(html, htmlfilename);
 
   //encoding trouble
   FHTML.setEncoding(outputEncoding,true,true);
+
+  if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
+    FHTML.removeEmptyTextNodes(true);
+
   if FTemplate.getTree <> nil then begin
     if (FTemplate.getEncoding <> OutputEncoding) then begin
       cur := TTemplateElement(FTemplate.getTree);
@@ -1065,12 +1087,13 @@ begin
       cur := TTemplateElement(FTemplate.getTree);
       while cur <> nil do begin
         if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
-          cur.initializeCaches(self);
+          cur.initializeCaches(self,lastTrimTextNodes <> FTrimTextNodes);
         cur := cur.templateNext;
       end;
     end;
   end;
   FTemplate.setEncoding(outputEncoding,true,true);
+  lastTrimTextNodes := FTrimTextNodes;
 
 
   if FParsingExceptions then begin
@@ -1149,7 +1172,7 @@ begin
   end;
 
 
-  //detect meta encoding (doesn't change encoding, just sets it)
+  //detect meta encoding (doesn't change encoding; just sets it, so we can convert from it to another one later)
   el := TTemplateElement(FTemplate.getTree);
 
   while el <> nil do begin
@@ -1327,7 +1350,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..257] of array[1..3] of string = (
+var data: array[1..258] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1723,10 +1746,10 @@ var data: array[1..257] of array[1..3] of string = (
       '</bookstore>'#13#10
      ,'')
 
-      ,('<book style="autobiography"><template:read source="./author" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention')
-      ,('<book style="autobiography"><template:read source="author" var="test2"/></book>','','test2=JoeBobTrenton Literary Review Honorable Mention')
-      ,('<book style="autobiography"><template:read source="//author" var="test3"/></book>','','test3=JoeBobTrenton Literary Review Honorable Mention')
-      ,('<book style="autobiography"><template:read source="string-join(//author,'','')" var="test"/></book>','','test=JoeBobTrenton Literary Review Honorable Mention,MaryBobSelected Short Stories ofMaryBob,ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
+      ,('<book style="autobiography"><template:read source="./author" var="test"/></book>','','test=Joe[[#13]][[#10]]      Bob[[#13]][[#10]]      Trenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><template:read source="author" var="test2"/></book>','','test2=Joe[[#13]][[#10]]      Bob[[#13]][[#10]]      Trenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><template:read source="//author" var="test3"/></book>','','test3=Joe[[#13]][[#10]]      Bob[[#13]][[#10]]      Trenton Literary Review Honorable Mention')
+      ,('<book style="autobiography"><template:read source="string-join(//author,'','')" var="test"/></book>','','test=Joe[[#13]][[#10]]      Bob[[#13]][[#10]]      Trenton Literary Review Honorable Mention,Mary[[#13]][[#10]]      Bob[[#13]][[#10]]      Selected Short Stories of[[#13]][[#10]]        Mary[[#13]][[#10]]        Bob,Toni[[#13]][[#10]]      Bob[[#13]][[#10]]      B.A.[[#13]][[#10]]      Ph.D.[[#13]][[#10]]      Pulitzer[[#13]][[#10]]      Still in Trenton[[#13]][[#10]]      Trenton Forever')
       ,('<bookstore><template:read source="/bookstore/@specialty" var="test"/></bookstore>','','test=novel')
       ,('<bookstore><template:read source="book[/bookstore/@specialty=@style]/@id" var="test"/></bookstore>','','test=myfave')
       ,('<bookstore><book><template:read source="author/first-name" var="test"/></book></bookstore>','','test=Joe')
@@ -1735,7 +1758,7 @@ var data: array[1..257] of array[1..3] of string = (
       ,('<bookstore><book><template:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
       ,('<bookstore><book><template:read source="string-join( author/*,'','')" var="test"/></book></bookstore>','','test=Joe,Bob,Trenton Literary Review Honorable Mention')
       ,('<bookstore><template:read source="string-join( book/*/last-name,'','')" var="test"/></bookstore>','','test=Bob,Bob,Bob,Bob')
-      ,('<bookstore><book style="textbook"><template:read source="string-join( */*,'','')" var="test"/></book></bookstore>','','test=Mary,Bob,Selected Short Stories ofMaryBob,Britney,Bob')
+      ,('<bookstore><book style="textbook"><template:read source="string-join( */*,'','')" var="test"/></book></bookstore>','','test=Mary,Bob,Selected Short Stories of[[#13]][[#10]]        Mary[[#13]][[#10]]        Bob,Britney,Bob')
       ,('<template:read source="string-join(*[@specialty]/node-name(.),'','')" var="test"/>','','test=bookstore')
       ,('<bookstore><book><template:read source="@style" var="test"/></book></bookstore>','','test=autobiography')
       ,('<bookstore><template:read source="//price/@exchange" var="test"/></bookstore>  ','','test=0.7')
@@ -1745,14 +1768,14 @@ var data: array[1..257] of array[1..3] of string = (
       ,('<bookstore><template:read source="string-join(@*,'','')" var="test"/></bookstore>  ','','test=novel')
       ,('<bookstore><book><author><template:read source="string-join( ./first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
       ,('<bookstore><book><author><template:read source="string-join( first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe')
-      ,('<bookstore><book style="textbook"><template:read source="string-join( author[1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
-      ,('<bookstore><book style="textbook"><template:read source="string-join( author[first-name][1],'','')" var="test"/></book></bookstore>  ','','test=MaryBobSelected Short Stories ofMaryBob')
-      ,('<bookstore><template:read source="book[last()]//text()" var="test"/></bookstore>  ','','test=Toni')
+      ,('<bookstore><book style="textbook"><template:read source="string-join( author[1],'','')" var="test"/></book></bookstore>  ','','test=Mary[[#13]][[#10]]      Bob[[#13]][[#10]]      Selected Short Stories of[[#13]][[#10]]        Mary[[#13]][[#10]]        Bob')
+      ,('<bookstore><book style="textbook"><template:read source="string-join( author[first-name][1],'','')" var="test"/></book></bookstore>  ','','test=Mary[[#13]][[#10]]      Bob[[#13]][[#10]]      Selected Short Stories of[[#13]][[#10]]        Mary[[#13]][[#10]]        Bob')
+      ,('<bookstore><template:read source="book[last()]//text()" var="test"/></bookstore>  ','','test=')
       ,('<bookstore><template:read source="string-join(book/author[last()]/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni')
       ,('<bookstore><template:read source="string-join((book/author)[last()]/first-name,'','')" var="test"/></bookstore>','','test=Toni')
       ,('<bookstore><template:read source="string-join( book[excerpt]/@style,'','')" var="test"/></bookstore>','','test=novel')
       ,('<bookstore><template:read source="string-join( book[excerpt]/title,'','')" var="test"/></bookstore>','','test=')
-      ,('<bookstore><template:read source="string-join(  book[excerpt]/author[degree] ,'','')" var="test"/></bookstore>','','test=ToniBobB.A.Ph.D.PulitzerStill in TrentonTrenton Forever')
+      ,('<bookstore><template:read source="string-join(  book[excerpt]/author[degree] ,'','')" var="test"/></bookstore>','','test=Toni[[#13]][[#10]]      Bob[[#13]][[#10]]      B.A.[[#13]][[#10]]      Ph.D.[[#13]][[#10]]      Pulitzer[[#13]][[#10]]      Still in Trenton[[#13]][[#10]]      Trenton Forever')
       ,('<bookstore><template:read source="string-join(   book[author/degree]/@style   ,'','')" var="test"/></bookstore>','','test=novel')
       ,('<bookstore><template:read source="string-join( book/author[degree][award] /../@style   ,'','')" var="test"/></bookstore>','','test=novel')
       ,('<bookstore><template:read source="string-join( book/author[degree and award]  /  ../@style   ,'','')" var="test"/></bookstore>','','test=novel')
@@ -1778,15 +1801,15 @@ var data: array[1..257] of array[1..3] of string = (
        '        <pa>Ein Absatz</pa>' +
        '    </kap>' +
        '</dok>','' )
-      ,('<dok><kap><template:read source="string-join( /dok ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
-      ,('<dok><kap><template:read source="string-join( /* ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?Ein Absatz')
-      ,('<dok><kap><template:read source="string-join( //dok/kap ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?;Ein Absatz')
-      ,('<dok><kap><template:read source="string-join( //dok/kap[1] ,'';'')" var="test"/></kap></dok>','','test=Ein AbsatzNoch ein AbsatzUnd noch ein AbsatzNett, oder?')
+      ,('<dok><kap><template:read source="string-join( /dok ,'';'')" var="test"/></kap></dok>','','test=Ein Absatz        Noch ein Absatz        Und noch ein Absatz        Nett, oder?                Ein Absatz')
+      ,('<dok><kap><template:read source="string-join( /* ,'';'')" var="test"/></kap></dok>','','test=Ein Absatz        Noch ein Absatz        Und noch ein Absatz        Nett, oder?                Ein Absatz')
+      ,('<dok><kap><template:read source="string-join( //dok/kap ,'';'')" var="test"/></kap></dok>','','test=Ein Absatz        Noch ein Absatz        Und noch ein Absatz        Nett, oder?;Ein Absatz')
+      ,('<dok><kap><template:read source="string-join( //dok/kap[1] ,'';'')" var="test"/></kap></dok>','','test=Ein Absatz        Noch ein Absatz        Und noch ein Absatz        Nett, oder?')
       ,('<dok><kap><template:read source="string-join( //pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?;Ein Absatz')
       ,('<dok><kap><template:read source="string-join( //kap[@title=''Nettes Kapitel'']/pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
       ,('<dok><kap><template:read source="string-join( child::*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
       ,('<dok><kap><template:read source="string-join( child::pa,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
-      ,('<dok><kap><template:read source="string-join( child::text(),'';'')" var="test"/></kap></dok>','','test=')
+      ,('<dok><kap><template:read source="string-join( child::text(),'';'')" var="test"/></kap></dok>','','test=;;;;')
       ,('<dok><kap><pa><template:read source="string-join( text(),'';'')" var="test"/></pa></kap></dok>','','test=Ein Absatz')
       ,('<dok><kap><pa><template:read source="string-join( ./*,'';'')" var="test"/></pa></kap></dok>','','test=')
       ,('<dok><kap><template:read source="string-join( ./*,'';'')" var="test"/></kap></dok>','','test=Ein Absatz;Noch ein Absatz;Und noch ein Absatz;Nett, oder?')
@@ -1918,6 +1941,55 @@ var data: array[1..257] of array[1..3] of string = (
       //t:test with html
       ,('<a>{go:="og"}<b t:test="$go=''og''">{text()}</b></a>', '<a><b>test</b></a>', 'go=og'#13'_result=test')
       ,('<a>{go:="go"}<b t:test="$go=''og''">{text()}</b></a>', '<a><b>test</b></a>', 'go=go')
+
+      //whitespace
+      ,('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc1')
+);
+
+//test all possible (4*2) white space config options
+var whiteSpaceData: array[1..40] of array[0..3] of string = (
+//matching
+ ('0f', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc2')
+,('1f', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=  abc1')
+,('2f', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=  abc1')
+,('3f', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc1')
+,('0t', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc2')
+,('1t', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc1')
+,('2t', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc1')
+,('3t', '<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc1')
+//nodes in tree
+,('0f', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=  :   test     ;   ')
+,('1f', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=  :   test     ;   ')
+,('2f', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= :  test   ; ')
+,('3f', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=:test;')
+,('0t', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=:   test     ;')
+,('1t', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=:   test     ;')
+,('2t', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=:  test   ;')
+,('3t', '<a>{.}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=:test;')
+,('0f', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= test  ')
+,('1f', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= test  ')
+,('2f', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= test  ')
+,('3f', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=test')
+,('0t', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=test')
+,('1t', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=test')
+,('2t', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=test')
+,('3t', '<a><b>{.}</b></a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=test')
+,('0f', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= | |  |  ')
+,('1f', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= | |  |  ')
+,('2f', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('3f', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('0t', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=|||')
+,('1t', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=|||')
+,('2t', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('3t', '<a>{string-join(./text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('0f', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= ')
+,('1f', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result= ')
+,('2f', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('3f', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('0t', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('1t', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('2t', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
+,('3t', '<a>{string-join(text(), "|")}</a>', '<a> <x> : </x> <b> test  </b>  <x> ; </x>  </a>', '_result=')
 );
 
 
@@ -1926,15 +1998,22 @@ var i:longint;
     sl:TStringList;
   procedure checklog(s:string);
   var j: Integer;
+    errormsg: String;
   begin
       sl.Text:=s;
       //check lines to avoid line ending trouble with win/linux
-      if extParser.variableChangeLog.Count<>sl.Count then
-        raise Exception.Create('Test failed: '+inttostr(i)+': ' +' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
+      if extParser.variableChangeLog.Count<>sl.Count then begin
+        raise Exception.Create('Test failed (length): '+inttostr(i)+': ' +' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
+      end;
       for j:=0 to sl.count-1 do
         if (extParser.variableChangeLog.getVariableName(j)<>sl.Names[j]) or
-           ((extParser.variableChangeLog.getVariableValueString(j))<>sl.ValueFromIndex[j])     then
-          raise Exception.Create('Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
+           ((extParser.variableChangeLog.getVariableValueString(j))<>StringReplace(StringReplace(sl.ValueFromIndex[j], '[[#13]]', #13, [rfReplaceAll]), '[[#10]]', #10, [rfReplaceAll])  )     then begin
+             errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"';
+             //errormsg:= StringReplace(errormsg, #13, '#13', [rfReplaceAll]);
+             //errormsg:= StringReplace(errormsg, #10, '#10', [rfReplaceAll]);
+             WriteLn(errormsg);
+             raise ETemplateParseException.Create(errormsg);
+           end;
   end;
 var previoushtml: string;
     procedure performTest(const template, html, expected: string);
@@ -1951,6 +2030,12 @@ begin
   sl:=TStringList.Create;
   for i:=low(data)to high(data) do
     performTest(data[i,1],data[i,2],data[i,3]);
+  for i:=low(whiteSpaceData) to high(whiteSpaceData) do begin
+    extParser.trimTextNodes:=TTrimTextNodes(StrToInt(whiteSpaceData[i,0][1]));
+    PXPGlobalTrimNodes:=whiteSpaceData[i,0][2] <> 'f';
+    performTest(whiteSpaceData[i,1],whiteSpaceData[i,2],whiteSpaceData[i,3]);
+  end;
+  PXPGlobalTrimNodes:=true;
 
   //---special encoding tests---
   extParser.parseTemplate('<a><template:read source="text()" var="test"/></a>');

@@ -75,6 +75,7 @@ TTreeElement = class
   procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next, not reverse)
   procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
+  procedure removeAndFreeNext();
 
   function toString(): string; //**< converts the element to a string (not recursive)
 
@@ -145,10 +146,12 @@ public
   //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
   //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
   procedure setEncoding(new: TEncoding; convertExistingTree: Boolean; convertEntities: boolean);
+
+  procedure removeEmptyTextNodes(const whenTrimmed: boolean);
 published
   //** Parsing model, see TParsingModel
   property parsingModel: TParsingModel read FParsingModel write FParsingModel;
-  //** If this is true (default), white space is removed from text node
+  //** If this is true (default), white space is removed from text nodes
   property trimText: boolean read FTrimText write FTrimText;
   //** If this is true (default is false) comments are included in the generated tree
   property readComments: boolean read FReadComments write FReadComments;
@@ -190,7 +193,7 @@ begin
     if tree.typ = tetText then begin
       tree.value:=strChangeEncoding(tree.value, from, toe);
       if substituteEntities then tree.value:=strDecodeHTMLEntities(tree.value, toe, false);
-      if trimText then tree.value:=trim(tree.value); //retrim because &nbsp; replacements could have introduce new spaces
+      if trimText then tree.value:=trim(tree.value); //retrim because &nbsp; replacements could have introduced new spaces
     end else if tree.typ = tetComment then begin
       tree.value:=strChangeEncoding(tree.value, from, toe);
     end else if tree.attributes <> nil then begin
@@ -362,6 +365,28 @@ begin
   closing.typ := tetClose;
   closing.value := basetag.value;
   insertSurrounding(basetag, closing);
+end;
+
+procedure TTreeElement.removeAndFreeNext();
+var
+  toFree: TTreeElement;
+  temp: TTreeElement;
+begin
+  if (self = nil) or (next = nil) then exit;
+  toFree := next;
+  if toFree.typ = tetOpen then begin
+    temp := toFree.next;
+    next := toFree.reverse.next;
+    while temp <> toFree.next do begin //remove all between ]toFree, toFree.reverse] = ]toFree, toFree.next[
+      temp.free;
+      temp := temp.next;
+    end;
+  end else if toFree.typ = tetClose then
+    raise Exception.Create('Cannot remove single closing tag')
+  else
+    next := toFree.next;
+
+  tofree.free;
 end;
 
 function TTreeElement.toString(): string;
@@ -712,6 +737,28 @@ begin
   if (FEncoding = eUnknown) or not convertExistingTree then FEncoding:= new;
   if convertExistingTree or convertEntities then FRootElement.changeEncoding(FEncoding, new, convertEntities, FTrimText);
   FEncoding := new;
+end;
+
+procedure TTreeParser.removeEmptyTextNodes(const whenTrimmed: boolean);
+  function strIsEmpty(s: string): boolean;
+  var p: pchar; l: longint;
+  begin
+    p := pointer(s);
+    l := length(s);
+    strlTrimLeft(p, l);
+    result := l = 0;
+  end;
+
+var
+  temp: TTreeElement;
+begin
+  temp := getTree;
+  if temp = nil then exit;
+  while temp.next <> nil do begin
+    while (temp.next <> nil) and (temp.next.typ = tetText) and ( (temp.next.value = '') or (whenTrimmed and (strIsEmpty(temp.next.value)))) do
+      temp.removeAndFreeNext();
+    temp := temp.next;
+  end;
 end;
 
 end.
