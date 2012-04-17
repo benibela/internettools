@@ -2603,7 +2603,8 @@ begin
   test(strTrim('  ABC  DEF '#9) = 'ABC  DEF');
   test(strTrim('xyxxxABCxDEFyx',['x','y']) = 'ABCxDEF');
   for i:=0 to 3 do for j:= 0 to 3 do
-    if strTrim(strdup(' ', i) + 'abc1' + strdup(' ', j)) <> 'abc1' then raise Exception.Create('failed test: "'+strdup(' ', i) + 'abc1' + strdup(' ', j)+'"');
+    if strTrim(strdup(' ', i) + 'abc1' + strdup(' ', j)) <> 'abc1' then
+      raise Exception.Create('failed test: "'+strdup(' ', i) + 'abc1' + strdup(' ', j)+'"');
 
 
   {$ifdef BBUTILS_INCLUDE_COMPLETE}
