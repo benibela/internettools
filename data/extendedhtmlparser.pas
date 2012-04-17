@@ -1032,7 +1032,7 @@ begin
   FKeepOldVariables:=kpvForget;
   FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *, *([0-9]+) *[}] *');
   FUnnamedVariableName:='_result';
-  FTrimTextNodes:=ttnWhenLoadingEmptyOnly;
+  FTrimTextNodes:=ttnForMatching;
 end;
 
 destructor THtmlTemplateParser.destroy;
