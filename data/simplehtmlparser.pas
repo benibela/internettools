@@ -148,8 +148,9 @@ begin
           end;
           else begin //tag start
             marker:=pos;
+            inc(pos);
             setlength(properties,0);
-            while (pos<=htmlEnd) and not (pos^ in (['/','>']+WHITE_SPACE)) do
+            while (pos<=htmlEnd) and not (pos^ in (['/','>','?']+WHITE_SPACE)) do
               inc(pos);
             tempLen:=pos-marker;
             //read properties

@@ -506,10 +506,10 @@ begin
     if not FReadProcessingInstructions then exit;
     temp := newTreeElement(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
     if length(properties)>0 then begin
-      new.attributes:=TAttributeList.Create;
+      temp.attributes:=TAttributeList.Create;
       for i:=0 to high(properties) do
         with properties[i] do
-          new.attributes.Add(trim(strFromPchar(name,nameLen))+'='+trim(strFromPchar(value,valueLen)));
+          temp.attributes.Add(trim(strFromPchar(name,nameLen))+'='+trim(strFromPchar(value,valueLen)));
     end;
     temp.initialized;
     exit;

@@ -82,6 +82,7 @@ var
 begin
   tp := TTreeParser.Create;
   tp.readComments:=true;
+  tp.readProcessingInstructions:=true;
   tp.parsingModel:=pmHTML;
   tp.trimText := trimming.ItemIndex = 3;
   tp.parseTree(memo2.Lines.Text);
@@ -109,6 +110,7 @@ begin
     ppath.parse(memo1.Lines.text);
 
     tp.readComments:=true;
+    tp.readProcessingInstructions:=true;
     tp.parsingModel:=pmHTML;
     tp.trimText := trimming.ItemIndex = 3;
     tp.parseTree(memo2.Lines.Text);
