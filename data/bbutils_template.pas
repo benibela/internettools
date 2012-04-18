@@ -2678,7 +2678,7 @@ begin
     ar32[i]:=1000 - i*10;
   stableSort(@ar32[0],@ar32[100],sizeof(longint),@intCompareFunction,nil);
   for i:=0 to 100 do
-    if ar32[i]<>i*10 then
+    if ar32[i]<>i*10 then                                                                                                 c
       raise exception.create('Unit Test B:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
 
   //test 64 bit
