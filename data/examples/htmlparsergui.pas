@@ -17,6 +17,7 @@ type
     Button2: TButton;
     Button3: TButton;
     CheckBox1: TCheckBox;
+    trimming: TComboBox;
     Label1: TLabel;
     Label2: TLabel;
     Label3: TLabel;
@@ -56,6 +57,7 @@ begin
   if not CheckBox1.Checked then htmlparser.OutputEncoding:=eUnknown;
   try
     htmlparser.parseTemplate(memo1.Lines.Text);
+    htmlparser.trimTextNodes:=TTrimTextNodes(trimming.ItemIndex);
     memo3.Clear;
     //htmlparser.onVariableRead:=@htmlparserVariableRead;
     try
@@ -79,8 +81,11 @@ var
   cur: TTreeElement;
 begin
   tp := TTreeParser.Create;
+  tp.readComments:=true;
   tp.parsingModel:=pmHTML;
+  tp.trimText := trimming.ItemIndex = 3;
   tp.parseTree(memo2.Lines.Text);
+  if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
 
   cur := tp.getTree;
   memo3.Lines.Clear;
@@ -97,14 +102,19 @@ var ppath: TPseudoXPathParser;
 begin
   ppath := TPseudoXPathParser.Create;
   vars := TPXPVariableChangeLog.create();
+  tp := TTreeParser.Create;
   try
     ppath.OnEvaluateVariable:=@vars.evaluateVariable;
     ppath.OnDefineVariable:=@vars.defineVariable;
     ppath.parse(memo1.Lines.text);
-    tp := TTreeParser.Create;
+
     tp.readComments:=true;
     tp.parsingModel:=pmHTML;
+    tp.trimText := trimming.ItemIndex = 3;
     tp.parseTree(memo2.Lines.Text);
+    if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
+
+
     ppath.ParentElement := tp.getTree;
     ppath.RootElement := tp.getTree;
     memo3.Lines.Text:=ppath.evaluate().toString;

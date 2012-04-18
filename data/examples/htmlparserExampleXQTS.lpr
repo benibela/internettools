@@ -46,6 +46,7 @@ begin
   pxp.OnEvaluateVariable:=@wrap.eval;
   tree := TTreeParser.Create;
   tree.readComments:=true;
+  tree.trimText:=false;
 
   PXPGlobalTrimNodes:=false;
 
