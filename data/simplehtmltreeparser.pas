@@ -593,6 +593,12 @@ function TTreeParser.readText(text: pchar; textLen: longint): TParsingResult;
 begin
   result:=prContinue;
 
+  if (FParsingModel = pmStrict) and (FElementStack.Count < 2) then begin
+    strlTrimLeft(text, textLen);
+    if textLen = 0 then exit;
+    raise Exception.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
+  end;
+
   if FAutoCloseTag then
     autoCloseLastTag();
 
@@ -740,7 +746,7 @@ begin
 end;
 
 procedure TTreeParser.removeEmptyTextNodes(const whenTrimmed: boolean);
-  function strIsEmpty(s: string): boolean;
+  function strIsEmpty(const s: string): boolean;
   var p: pchar; l: longint;
   begin
     p := pointer(s);
