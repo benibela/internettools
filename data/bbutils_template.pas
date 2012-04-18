@@ -120,6 +120,13 @@ procedure arrayInvert(a: T__ArrayType__; slice1: integer = -1;slice2: integer = 
 //**Extracts a array slice
 function arraySlice(a: array of T__ElementType__; slice1: integer = -1;slice2: integer = -1): T__ArrayType__;
 
+//**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
+function arrayGet(a: array of T__ElementType__; const i: integer): T__ElementType__;
+//**Returns the last element of the array, raises exception, iff the array is empty
+function arrayLast(a: array of T__ElementType__): T__ElementType__;
+//**Returns the last element of the array, returns default, iff the array is empty
+function arrayLast(a: array of T__ElementType__; const default: T__ElementType__): T__ElementType__;
+
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of T__ElementType__; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
 //**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
@@ -570,6 +577,24 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayGet(a: array of T__ElementType__; const i: integer): T__ElementType__;
+begin
+  if i < 0 then result:=a[length(a) + i]
+  else result := a[i];
+end;
+
+function arrayLast(a: array of T__ElementType__): T__ElementType__;
+begin
+  if length(a) = 0 then raise Exception.Create('array empty');
+  result := a[high(a)];
+end;
+
+function arrayLast(a: array of T__ElementType__; const default: T__ElementType__): T__ElementType__;
+begin
+  if length(a) = 0 then exit(default);
+  result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of T__ElementType__; slice1a: integer; slice1b: integer;
@@ -2674,7 +2699,7 @@ begin
   for i:=0 to 100 do
     if ar64[i]<>i*10 then
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
-  writeln(stderr,'okidoki');
+//  writeln(stderr,'okidoki');
 end;
 
 initialization

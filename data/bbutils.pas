@@ -60,7 +60,7 @@ uses
   , windows
   {$ENDIF};
 
-//{$DEFINE UNITTESTS}
+{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
@@ -103,6 +103,13 @@ procedure arrayInvert(a: TStringArray; slice1: integer = -1;slice2: integer = -1
 //**Extracts a array slice
 function arraySlice(a: array of string; slice1: integer = -1;slice2: integer = -1): TStringArray;
 
+//**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
+function arrayGet(a: array of string; const i: integer): string;
+//**Returns the last element of the array, raises exception, iff the array is empty
+function arrayLast(a: array of string): string;
+//**Returns the last element of the array, returns default, iff the array is empty
+function arrayLast(a: array of string; const default: string): string;
+
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of string; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
 //**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
@@ -137,6 +144,13 @@ procedure arrayInvert(a: TLongintArray; slice1: integer = -1;slice2: integer = -
 
 //**Extracts a array slice
 function arraySlice(a: array of longint; slice1: integer = -1;slice2: integer = -1): TLongintArray;
+
+//**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
+function arrayGet(a: array of longint; const i: integer): longint;
+//**Returns the last element of the array, raises exception, iff the array is empty
+function arrayLast(a: array of longint): longint;
+//**Returns the last element of the array, returns default, iff the array is empty
+function arrayLast(a: array of longint; const default: longint): longint;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of longint; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
@@ -173,6 +187,13 @@ procedure arrayInvert(a: TLongwordArray; slice1: integer = -1;slice2: integer = 
 //**Extracts a array slice
 function arraySlice(a: array of longword; slice1: integer = -1;slice2: integer = -1): TLongwordArray;
 
+//**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
+function arrayGet(a: array of longword; const i: integer): longword;
+//**Returns the last element of the array, raises exception, iff the array is empty
+function arrayLast(a: array of longword): longword;
+//**Returns the last element of the array, returns default, iff the array is empty
+function arrayLast(a: array of longword; const default: longword): longword;
+
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of longword; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
 //**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
@@ -208,6 +229,13 @@ procedure arrayInvert(a: TInt64Array; slice1: integer = -1;slice2: integer = -1)
 //**Extracts a array slice
 function arraySlice(a: array of int64; slice1: integer = -1;slice2: integer = -1): TInt64Array;
 
+//**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
+function arrayGet(a: array of int64; const i: integer): int64;
+//**Returns the last element of the array, raises exception, iff the array is empty
+function arrayLast(a: array of int64): int64;
+//**Returns the last element of the array, returns default, iff the array is empty
+function arrayLast(a: array of int64; const default: int64): int64;
+
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of int64; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
 //**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
@@ -242,6 +270,13 @@ procedure arrayInvert(a: TFloatArray; slice1: integer = -1;slice2: integer = -1)
 
 //**Extracts a array slice
 function arraySlice(a: array of float; slice1: integer = -1;slice2: integer = -1): TFloatArray;
+
+//**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
+function arrayGet(a: array of float; const i: integer): float;
+//**Returns the last element of the array, raises exception, iff the array is empty
+function arrayLast(a: array of float): float;
+//**Returns the last element of the array, returns default, iff the array is empty
+function arrayLast(a: array of float; const default: float): float;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of float; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
@@ -712,6 +747,24 @@ begin
   end;
 end;
 
+function arrayGet(a: array of string; const i: integer): string;
+begin
+  if i < 0 then result:=a[length(a) + i]
+  else result := a[i];
+end;
+
+function arrayLast(a: array of string): string;
+begin
+  if length(a) = 0 then raise Exception.Create('array empty');
+  result := a[high(a)];
+end;
+
+function arrayLast(a: array of string; const default: string): string;
+begin
+  if length(a) = 0 then exit(default);
+  result := a[high(a)];
+end;
+
 function arrayCompare(a, b: array of string; slice1a: integer; slice1b: integer;
  slice2a: integer; slice2b: integer): longint;
 var
@@ -853,6 +906,24 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayGet(a: array of longint; const i: integer): longint;
+begin
+  if i < 0 then result:=a[length(a) + i]
+  else result := a[i];
+end;
+
+function arrayLast(a: array of longint): longint;
+begin
+  if length(a) = 0 then raise Exception.Create('array empty');
+  result := a[high(a)];
+end;
+
+function arrayLast(a: array of longint; const default: longint): longint;
+begin
+  if length(a) = 0 then exit(default);
+  result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of longint; slice1a: integer; slice1b: integer;
@@ -998,6 +1069,24 @@ begin
   end;
 end;
 
+function arrayGet(a: array of longword; const i: integer): longword;
+begin
+  if i < 0 then result:=a[length(a) + i]
+  else result := a[i];
+end;
+
+function arrayLast(a: array of longword): longword;
+begin
+  if length(a) = 0 then raise Exception.Create('array empty');
+  result := a[high(a)];
+end;
+
+function arrayLast(a: array of longword; const default: longword): longword;
+begin
+  if length(a) = 0 then exit(default);
+  result := a[high(a)];
+end;
+
 function arrayCompare(a, b: array of longword; slice1a: integer; slice1b: integer;
  slice2a: integer; slice2b: integer): longint;
 var
@@ -1141,6 +1230,24 @@ begin
   end;
 end;
 
+function arrayGet(a: array of int64; const i: integer): int64;
+begin
+  if i < 0 then result:=a[length(a) + i]
+  else result := a[i];
+end;
+
+function arrayLast(a: array of int64): int64;
+begin
+  if length(a) = 0 then raise Exception.Create('array empty');
+  result := a[high(a)];
+end;
+
+function arrayLast(a: array of int64; const default: int64): int64;
+begin
+  if length(a) = 0 then exit(default);
+  result := a[high(a)];
+end;
+
 function arrayCompare(a, b: array of int64; slice1a: integer; slice1b: integer;
  slice2a: integer; slice2b: integer): longint;
 var
@@ -1282,6 +1389,24 @@ begin
     a[slice1+i] := a[slice2-i];
     a[slice2-i]:=temp;
   end;
+end;
+
+function arrayGet(a: array of float; const i: integer): float;
+begin
+  if i < 0 then result:=a[length(a) + i]
+  else result := a[i];
+end;
+
+function arrayLast(a: array of float): float;
+begin
+  if length(a) = 0 then raise Exception.Create('array empty');
+  result := a[high(a)];
+end;
+
+function arrayLast(a: array of float; const default: float): float;
+begin
+  if length(a) = 0 then exit(default);
+  result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of float; slice1a: integer; slice1b: integer;
@@ -8066,7 +8191,8 @@ begin
   test(strTrim('  ABC  DEF '#9) = 'ABC  DEF');
   test(strTrim('xyxxxABCxDEFyx',['x','y']) = 'ABCxDEF');
   for i:=0 to 3 do for j:= 0 to 3 do
-    if strTrim(strdup(' ', i) + 'abc1' + strdup(' ', j)) <> 'abc1' then raise Exception.Create('failed test: "'+strdup(' ', i) + 'abc1' + strdup(' ', j)+'"');
+    if strTrim(strdup(' ', i) + 'abc1' + strdup(' ', j)) <> 'abc1' then
+      raise Exception.Create('failed test: "'+strdup(' ', i) + 'abc1' + strdup(' ', j)+'"');
 
 
   {$ifdef BBUTILS_INCLUDE_COMPLETE}
