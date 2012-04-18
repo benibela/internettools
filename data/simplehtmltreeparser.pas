@@ -21,7 +21,7 @@ type
 TAttributeList = TStringList; //TODO: use a map
 
 //**The type of a tree element. <Open>, text, or </close>
-TTreeElementType = (tetOpen, tetClose, tetText, tetComment);
+TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction);
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
 //**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
@@ -105,6 +105,7 @@ TParsingModel = (pmStrict, pmHTML);
 //**You can change the class used for the elements in the tree with the field treeElementClass.
 TTreeParser = class
 private
+  FReadProcessingInstructions: boolean;
 //  FConvertEntities: boolean;
   FRootElement: TTreeElement;
   FCurrentElement: TTreeElement;
@@ -155,6 +156,8 @@ published
   property trimText: boolean read FTrimText write FTrimText;
   //** If this is true (default is false) comments are included in the generated tree
   property readComments: boolean read FReadComments write FReadComments;
+  //** If this is true (default is false) processing instructions are included in the generated tree
+  property readProcessingInstructions: boolean read FReadProcessingInstructions write FReadProcessingInstructions;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
   property baseURI: string read FCurrentFileName;
 end;
@@ -488,10 +491,29 @@ var
   new,temp: TTreeElement;
   i: Integer;
   j: Integer;
+  enc: String;
 begin
   result:=prContinue;
 
-  if tagName^ = '?' then exit; //processing instruction
+  if tagName^ = '?' then begin //processing instruction
+    if strlEqual(tagName, '?xml', tagNameLen) then begin
+      enc := lowercase(getProperty('encoding', properties));
+      if enc = 'utf-8' then FEncoding:=eUTF8
+      else if (enc = 'windows-1252') or (enc = 'iso-8859-1') or (enc = 'iso-8859-15') or (enc = 'latin1') then
+        FEncoding:=eWindows1252;
+      exit;
+    end;
+    if not FReadProcessingInstructions then exit;
+    temp := newTreeElement(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
+    if length(properties)>0 then begin
+      new.attributes:=TAttributeList.Create;
+      for i:=0 to high(properties) do
+        with properties[i] do
+          new.attributes.Add(trim(strFromPchar(name,nameLen))+'='+trim(strFromPchar(value,valueLen)));
+    end;
+    temp.initialized;
+    exit;
+  end;
 
   if FAutoCloseTag then autoCloseLastTag();
   if (FParsingModel = pmHTML) then begin
@@ -657,6 +679,7 @@ begin
   treeElementClass := TTreeElement;
   FTrimText:=true;
   FReadComments:=false;
+  FReadProcessingInstructions:=false;
   //FConvertEntities := true;
 end;
 
@@ -713,7 +736,8 @@ begin
     if encoding <> '' then begin
       if pos('charset=utf-8', encoding) > 0 then FEncoding:=eUTF8
       else if (pos('charset=windows-1252',encoding) > 0) or
-              (pos('charset=iso-8859-1',encoding) > 0) then
+              (pos('charset=latin1',encoding) > 0) or
+              (pos('charset=iso-8859-1',encoding) > 0) then //also -15
         FEncoding:=eWindows1252;
     end;
 
