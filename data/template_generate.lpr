@@ -10,6 +10,7 @@ uses
   { you can add units after this };
 
 begin
+  if paramstr(1) = '' then exit;
   WriteLn(convertTemplate(strLoadFromFile(paramstr(1)), nil));
 end.
 
