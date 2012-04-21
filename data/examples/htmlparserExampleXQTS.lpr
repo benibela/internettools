@@ -9,7 +9,7 @@ uses
   Classes, extendedhtmlparser, simplehtmltreeparser, pseudoxpath, bbutils , sysutils
   { you can add units after this };
 
-const CATALOG_TEMPLATE = '<test-group><test-case is-XPath2="true" >{(path:=@FilePath,desc:=description,queryname:=query/@name,inputfile:=input-file,outputfile:=output-file,error:=expected-error, complete:="yes")}</test-case>*</test-group>';
+const CATALOG_TEMPLATE = '<test-group><test-case is-XPath2="true" >{(path:=@FilePath,desc:=description,queryname:=query/@name,inputfile:=input-file,inputfilevar:=input-file/@variable,outputfile:=output-file,error:=expected-error, complete:="yes")}</test-case>*</test-group>';
 var htp: THtmlTemplateParser;
     desc, queryname, inputfile, outputfile, error, path: string;
     i: Integer;
@@ -29,6 +29,7 @@ end;
 
 var wrap: twrapper;
   CAT: Integer;
+  inputfilevar: String;
 
 { twrapper }
 
@@ -62,6 +63,7 @@ begin
       else if htp.variableChangeLog.getVariableName(i) = 'outputfile' then outputfile := htp.variableChangeLog.getVariableValueString(i)
       else if htp.variableChangeLog.getVariableName(i) = 'error' then error := htp.variableChangeLog.getVariableValueString(i)
       else if htp.variableChangeLog.getVariableName(i) = 'path' then path := htp.variableChangeLog.getVariableValueString(i)
+      else if htp.variableChangeLog.getVariableName(i) = 'inputfilevar' then inputfilevar := htp.variableChangeLog.getVariableValueString(i)
       else if htp.variableChangeLog.getVariableName(i) = 'complete' then begin
         total += 1;
         if error <> '' then begin
@@ -71,13 +73,14 @@ begin
         query := strLoadFromFile('Queries/XQuery/'+path+'/'+queryname+'.xq');
         output := strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile);
         try
+          query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
+
           if inputfile = 'emptydoc' then myoutput := pxp.evaluate(query, nil).toString
           else begin
             pxp.RootElement:=tree.getTree;
 
             tree.parseTreeFromFile('TestSources/'+inputfile+'.xml');
-            query := StringReplace(query, 'declare variable $input-context external;', '', [rfReplaceAll]);
-            query := StringReplace(query, '$input-context', '.', [rfReplaceAll]);
+            query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
             myoutput := pxp.evaluate(query, tree.getTree).toString;
           end;
           if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))  then begin
@@ -87,7 +90,7 @@ begin
             wrong+=1;
             write('WRONG: ', copy(desc,1,30),queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
             writeln('       ', arrayGet(strSplit(query, #13),-2) );
-            writeln('      TestSources/'+inputfile+'.xml', '    |   ', 'ExpectedTestResults/'+path+'/'+outputfile); writeln;
+            writeln('      TestSources/'+inputfile+'.xml', '  |  ','Queries/XQuery/'+path+'/'+queryname+'.xq','    |   ', 'ExpectedTestResults/'+path+'/'+outputfile); writeln;
           end;
         except on e: sysutils.Exception do begin
           writeln(stderr, 'EXCEPTION: ',desc, queryname, ': ', e.message);
