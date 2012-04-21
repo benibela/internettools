@@ -77,7 +77,7 @@ TTreeElement = class
   procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
   procedure removeAndFreeNext();
 
-  function toString(): string; //**< converts the element to a string (not recursive)
+  function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
 
   constructor create();
   constructor create(atyp: TTreeElementType; avalue: string = '');
