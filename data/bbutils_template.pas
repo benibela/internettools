@@ -63,7 +63,7 @@ uses
   , windows
   {$ENDIF};
 
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
