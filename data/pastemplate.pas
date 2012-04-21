@@ -60,12 +60,13 @@ end;
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
 //the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
 //If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
-function strSplitGetBracketLike(const openBracket, closingBracket: string; var text: string; updateText: boolean): string;
+function strSplitGetUntilBracketClosing(const openBracket, closingBracket: string; var text: string; updateText: boolean): string;
 var pos: integer;
   opened: Integer;
 begin
   opened := 1;
-  while (pos < length(text)) and (opened >= 1) do begin
+  pos := 1;
+  while (pos <= length(text)) and (opened >= 1) do begin
     if strlcomp(@text[pos], @openBracket[1], length(openBracket)) = 0 then begin
       opened += 1;
       pos += length(openBracket);
@@ -84,6 +85,22 @@ begin
   end;
 end;
 
+function strSplitGetBetweenBrackets(const openBracket, closingBracket: string; var text: string; updateText: boolean): string;
+var
+  start: SizeInt;
+  temp: String;
+begin
+  start := pos(openBracket, text);
+  if start = 0 then exit('');
+  if updateText then begin
+    delete(text, 1, start + length(openBracket) - 1);
+    result := strSplitGetUntilBracketClosing(openBracket, closingBracket, text, updateText);
+  end else begin
+    temp := copy(text, start + length(openBracket), length(text));
+    result := strSplitGetUntilBracketClosing(openBracket, closingBracket, temp, updateText);
+  end;
+end;
+
 //expand one level
 function convertSingleTemplate(s: string; special: TSpecialCallBack): string;
 var cmdDef, cmdName, compareOp: string;
@@ -97,9 +114,9 @@ begin
  while s <> '' do begin
    result+=GetPart([], ['{%'], s);
    if s = '' then break;
-   cmdDef := GetPart([], ['}'], s);
-   delete(s,1,1);
-   delete(cmdDef, 1,2);
+   delete(s,1,2);
+   cmdDef := strSplitGetUntilBracketClosing('{', '}', s, true);
+//   writeln('  ',cmddef);
    if pos(' ', cmdDef) = 0 then begin
      if copy(UpperCase(cmdDef), 1, length('SPECIAL:')) = 'SPECIAL:' then begin
        //Handle callback command: {%SPECIAL:foobar}
@@ -118,7 +135,7 @@ begin
         else raise Exception.Create('No comparison operator in '+cmdDef);
         temp := GetPart([], [compareOp], cmdDef, true);
         delete(cmdDef, 1, length(compareOp));
-        temp2:=strSplitGetBracketLike('{%COMPARE ', '{%END-COMPARE}', s, true);
+        temp2:=strSplitGetUntilBracketClosing('{%COMPARE ', '{%END-COMPARE}', s, true);
 
         if (trim(temp) = trim(cmdDef)) = (compareOp = '=') then result += temp2;
         continue;
@@ -130,35 +147,36 @@ begin
         //Handle simple repeat command: {%REPEAT foo, [bar, a, b, ...]} ... {%END-REPEAT}
         SetLength(replace, 1);
         replace[0]:=GetPart([], [','], cmdDef);
-        strSplit(temparray, GetPart(['['], [']'], cmdDef), ',');
+        strSplit(temparray, strSplitGetBetweenBrackets('[', ']', cmdDef, false), ',');
         SetLength(repwith, length(temparray), 1);
         for i:=0 to high(temparray) do
           repwith[i,0] := temparray[i];
       end else begin
         //Handle tuple repeat command: {%REPEAT (foo, bar), [(a, b), (c,d), ...]} ... {%END-REPEAT}
         strSplit(replace, GetPart(['('], [')'], cmdDef), ',');
-        temp := GetPart(['['], [']'], cmdDef);
+        temp := strSplitGetBetweenBrackets('[', ']', cmdDef, false);
         SetLength(repwith, 0);
         temp:=TrimLeft(temp);
         while temp<>'' do begin
           if temp[1] <> '(' then raise Exception.Create('Invalid tuple: '+temp);
           setlength(repwith, length(repwith)+1);
-          strSplit(repwith[high(repwith)], GetPart(['('], [')'], temp), ',');
+          strSplit(repwith[high(repwith)], strSplitGetBetweenBrackets('(', ')', temp, true), ',');
           temp:=TrimLeft(temp);
-          if temp[1] = ']' then temp:=''
-          else temp:=trimleft(GetPart([','], [], temp));
+          temp:=trimleft(GetPart([','], [], temp));
         end;
       end;
 
       for i:=0 to high(replace) do
         replace[i]:=trim(replace[i]);
       for i:=0 to high(repwith) do begin
-        if length(repwith[i]) <> length(replace) then raise Exception.Create('Invalid tuple size: '+IntToStr(Length(repwith[i])));
+        if length(repwith[i]) <> length(replace) then
+          if length(repwith[i]) = 0 then raise Exception.Create('Invalid/empty tuple size: '+IntToStr(Length(repwith[i])) + ' in '+cmdDef )
+          else raise Exception.Create('Invalid tuple size: '+IntToStr(Length(repwith[i])) + ' @ ' +repwith[i,0]+':'+repwith[i,high(repwith[i])]+ ' in '+cmdDef );
         for j:=0 to high(repwith[i]) do
           repwith[i,j]:=trim(repwith[i,j]);
       end;
 
-      temp:=strSplitGetBracketLike('{%REPEAT', '{%END-REPEAT}', s, true);
+      temp:=strSplitGetUntilBracketClosing('{%REPEAT', '{%END-REPEAT}', s, true);
 
 //      writeln(stderr, temp);
       for i:=0 to high(repwith) do begin
@@ -184,7 +202,7 @@ end;
 
 {$ifdef unittests}
 
-var tests: array[1..24] of array[1..2] of string = (
+var tests: array[1..27] of array[1..2] of string = (
  ('abcdef'#13'ghi', 'abcdef'#13'ghi')
 ,('foo{%COMPARE abc = abc}::{%END-COMPARE}bar', 'foo::bar')
 ,('foo{%COMPARE abc <> abc}::{%END-COMPARE}bar', 'foobar')
@@ -209,12 +227,16 @@ var tests: array[1..24] of array[1..2] of string = (
 ,('foo{%REPEAT (_a, _b), [(x,l),(y,m),(z,n),(x,m),(y,n),(z,o)]}{%COMPARE _a = x}_a_bc{%END-COMPARE}{%END-REPEAT}bar', 'fooxlcxmcbar')
 ,('foo{%REPEAT (_a, _b), [(x,l),(y,m),(z,n),(x,m),(y,n),(z,o)]}{%COMPARE _a = x}_a_bc{%END-COMPARE}{%END-REPEAT}bar', 'fooxlcxmcbar')
 ,('foo{%REPEAT (_a, _b), [(x,l),(y,m),(z,n),(x,m),(y,n),(z,o)]}{%COMPARE _a = x}{%COMPARE _b = m}_a_bc{%END-COMPARE}{%END-COMPARE}{%END-REPEAT}bar', 'fooxmcbar')
+,('foo{%REPEAT a, [[], ()]}abc{%END-REPEAT}bar', 'foo[]bc()bcbar')
+,('foo{%REPEAT (a,b), [([],()), ((),[])]}abc{%END-REPEAT}bar', 'foo[]()c()[]cbar')
+,('foo{%REPEAT (a,b), [([],()), ((),{})]}abc{%END-REPEAT}bar', 'foo[]()c(){}cbar')
 //,('foo{%REPEAT a, [x,y,z]}:{%COMPARE a = y}abc{%END-COMPARE}:{%END-REPEAT}bar', 'foo:::ybc:::bar')
 );
 var i:integer;
 initialization
 
 for i:=low(tests) to high(tests) do begin
+//  writeln(stderr,i,tests[i][1]);
   if convertTemplate(convertTemplate(tests[i,1], nil), nil) <> tests[i,2] then
     raise Exception.Create('Test ' +inttostr(i)+ ' failed: '+tests[i,1] + LineEnding + convertTemplate(convertTemplate(tests[i,1], nil),nil) + ' <> ' + tests[i,2]) ;
 end;
