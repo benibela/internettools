@@ -49,6 +49,11 @@ begin
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
 
+  if paramstr(1) = '--simple' then begin
+    writeln(pxp.evaluate(paramstr(2),nil).toString);
+    exit;
+  end;
+
   skippedErrors := 0; correct := 0; wrong := 0; total := 0; exception:=0;
   PXPGlobalTrimNodes:=false;
   for CAT:=1 to Paramcount() do begin;
