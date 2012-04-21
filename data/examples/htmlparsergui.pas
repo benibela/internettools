@@ -113,6 +113,7 @@ begin
     tp.readProcessingInstructions:=true;
     tp.parsingModel:=pmHTML;
     tp.trimText := trimming.ItemIndex = 3;
+    tp.autoDetectHTMLEncoding:=false;
     tp.parseTree(memo2.Lines.Text);
     if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
 

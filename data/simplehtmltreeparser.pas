@@ -105,6 +105,7 @@ TParsingModel = (pmStrict, pmHTML);
 //**You can change the class used for the elements in the tree with the field treeElementClass.
 TTreeParser = class
 private
+  FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
 //  FConvertEntities: boolean;
   FRootElement: TTreeElement;
@@ -158,6 +159,7 @@ published
   property readComments: boolean read FReadComments write FReadComments;
   //** If this is true (default is false) processing instructions are included in the generated tree
   property readProcessingInstructions: boolean read FReadProcessingInstructions write FReadProcessingInstructions;
+  property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
   property baseURI: string read FCurrentFileName;
 end;
@@ -680,6 +682,7 @@ begin
   FTrimText:=true;
   FReadComments:=false;
   FReadProcessingInstructions:=false;
+  FAutoDetectHTMLEncoding:=true;
   //FConvertEntities := true;
 end;
 
@@ -730,7 +733,7 @@ begin
   //close root element
   leaveTag('',0);
 
-  if parsingModel = pmHTML then begin
+  if FAutoDetectHTMLEncoding and (parsingModel = pmHTML) then begin
     FEncoding:=eUnknown;
     encoding := lowercase(TPseudoXPathParser.EvaluateToString('html/head/meta[@http-equiv=''content-type'']/@content', FRootElement));
     if encoding <> '' then begin
