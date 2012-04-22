@@ -93,8 +93,8 @@ begin
             //writeln('PASS: ', copy(desc,1,30),queryname,' : got '  , myoutput);
           end else begin
             wrong+=1;
-            write('WRONG: ', copy(desc,1,60),' ',queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
-            writeln('       ', arrayGet(strSplit(query, #13),-2) );
+            write(stderr, 'WRONG: ', copy(desc,1,60),' ',queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
+            writeln(stderr, '       ', arrayGet(strSplit(query, #13),-2) );
             writeln('      TestSources/'+inputfile+'.xml', '  |  ','Queries/XQuery/'+path+'/'+queryname+'.xq','    |   ', 'ExpectedTestResults/'+path+'/'+outputfile); writeln;
           end;
         except on e: sysutils.Exception do begin

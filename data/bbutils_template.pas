@@ -407,6 +407,8 @@ procedure dateParseParts(input,mask:string; outYear, outMonth, outDay: PWord; ou
 //**Reads a date string given a certain mask (mask is case-sensitive)@br
 function dateParse(input,mask:string): longint;
 
+//TODO:: Negative Years and Milliseconds, optional text
+
 const WHITE_SPACE=[#9,#10,#13,' '];
 
 (*
