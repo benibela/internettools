@@ -551,18 +551,24 @@ procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
 function dateTimeToFileTime(const date: TDateTime): TFileTime;
 function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
 {$ENDIF}
+//**Returns a datetime from minutes
+function timeFromMinutes(const mins: integer): TTime;
 //**Week of year
-function weekOfYear(const date:TDateTime):word;
+function dateWeekOfYear(const date:TDateTime):word;
+type EDateParsingException = Exception;
 //**Reads a date string given a certain mask (mask is case-sensitive)@br
 //**The uses the same mask types as FormateDate:@br
 //**d or dd for a numerical day  @br
 //**m or mm for a numerical month, mmm for a short month name@br
 //**yy, yyyy or [yy]yy for the year  @br
+//**Z for the ISO time zone (Z | [+-]hh(:?mm)?)
 //**The letter formats d/y matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4)@br
 //**Notice that [yy]yy may not touch any other format letter, so [yy]yymmdd is an invalid mask. (but [yy]yy.mmdd is fine).
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names
-function parseDate(datestr,mask:string):longint;
+procedure dateParseParts(datestr,mask:string; out outYear, outMonth, outDay: word; outtimezone: PDateTime = nil);
+//**Reads a date string given a certain mask (mask is case-sensitive)@br
+function dateParse(datestr,mask:string): longint;
 
 const WHITE_SPACE=[#9,#10,#13,' '];
 
@@ -7336,7 +7342,12 @@ begin
   end;
 end;
 
-function weekOfYear(const date:TDateTime):word;
+function timeFromMinutes(const mins: integer): TTime;
+begin
+  result := mins / (24*60);
+end;
+
+function dateWeekOfYear(const date:TDateTime):word;
 //After Claus T�ndering
 
 var a,b,c,s,e,f,g,d,n: longint;
@@ -7369,86 +7380,101 @@ begin
   else result:=n div 7+1;
 end;
 
-
-function parseDate(datestr,mask:string):longint;
+procedure dateParseParts(datestr, mask: string; out outYear, outMonth, outDay: word; outTimezone: PDateTime);
   procedure matchFailed;
   begin
-    raise Exception.Create('Das Datum '+datestr+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
+    raise EDateParsingException.Create('Das Datum '+datestr+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
                                    'Mögliche Ursachen: Beschädigung der Installation, Programmierfehler in VideLibri oder Änderung der Büchereiseite.'#13#10+
                                    'Mögliche Lösungen: Neuinstallation, auf Update warten.');
   end;
   procedure invalidMask (reason:string);
   begin
-    raise Exception.Create('The mask '+mask+' is invalid (noticed while matching against ' +datestr+') (reason:'+reason+')');
+    raise EDateParsingException.Create('The mask '+mask+' is invalid (noticed while matching against ' +datestr+') (reason:'+reason+')');
   end;
 
-var mp,dp,day,month,year:longint;
-    MMMstr:string;
+var mp,dp,day,month,year,timeZone:longint;
+  MMMstr:string;
 //    openBracketCount: longint; //just needed to validate mask
 
 
-    minc, maxc: longint;
-    number: ^longint;
+  minc, maxc: longint;
+  number: ^longint;
+  positive: Boolean;
 
-//Reads (x*\[x*\]x*) with x\in{d,y}
-//(why didn't I use a regexp :-( )
-procedure readNumberBlockFromMask();
-var base: char;
+  //Reads (x*\[x*\]x*) with x\in{d,y}
+  //(why didn't I use a regexp :-(, because this unit shouldn't have dependencies! )
+  procedure readNumberBlockFromMask();
+  var base: char;
     bracketState: longint;
-begin
-  base:=mask[mp];
-  if mask[mp] = '[' then base:=mask[mp+1];
-  case base of
-    'd': number:=@day;
-    'y': number:=@year;
-    else invalidMask(base)
+  begin
+    base:=mask[mp];
+    if mask[mp] = '[' then base:=mask[mp+1];
+    case base of
+      'd': number:=@day;
+      'y': number:=@year;
+      'Z': number:=@timeZone;
+      else invalidMask(base)
+    end;
+    minc:=0;
+    maxc:=0;
+    bracketState:=0;
+    while (mp <= length(mask)) and ((mask[mp] = base) or
+                                    ((mask[mp] = '[') and (bracketState=0)) or
+                                    ((mask[mp] = ']') and (bracketState=1))) do begin
+      if mask[mp] = base then begin
+        maxc+=1;
+        if bracketState<>1 then minc+=1;
+      end else bracketState+=1;
+      mp+=1;
+    end;
+    if bracketState=1 then invalidMask('missing ]');
   end;
-  minc:=0;
-  maxc:=0;
-  bracketState:=0;
-  while (mp <= length(mask)) and ((mask[mp] = base) or
-                                  ((mask[mp] = '[') and (bracketState=0)) or
-                                  ((mask[mp] = ']') and (bracketState=1))) do begin
-    if mask[mp] = base then begin
-      maxc+=1;
-      if bracketState<>1 then minc+=1;
-    end else bracketState+=1;
-    mp+=1;
-  end;
-  if bracketState=1 then invalidMask('missing ]');
-end;
 
-//Reads \d{minc,maxc}
-procedure readNumberFromDate();
-var read: longint;
-begin
-  read:=0;
-  while (dp <= length(datestr)) and (datestr[dp] in ['0'..'9']) and (read < maxc) do begin
-    number^:=number^*10+(ord(datestr[dp])-ord('0'));
-    read+=1;
-    dp+=1;
+  //Reads \d{minc,maxc}
+  function readNumberFromDate(var number: integer; const minc, maxc: integer): integer;
+  begin
+    result:=0;
+    while (dp <= length(datestr)) and (datestr[dp] in ['0'..'9']) and (result < maxc) do begin
+      number:=number*10+(ord(datestr[dp])-ord('0'));
+      result+=1;
+      dp+=1;
+    end;
+    if result < minc then matchFailed;
   end;
-  if read < minc then matchFailed;
-end;
 
 begin
   datestr:=trim(datestr)+' ';
-  mask:=trim(mask)+' '; //Das letzte Zeichen darf keine Steuerzeichen (d/m/z) sein
-  
+  mask:=trim(mask)+' '; //Das letzte Zeichen darf kein Steuerzeichen (d/m/z) sein
+
   day:=0;
   month:=0;
-  year:=0;
-//  openBracketCount:=0;
+  year:=-99999;
+  timeZone:=-99999;
+  //  openBracketCount:=0;
   MMMstr:='';
 
   mp:=1;
   dp:=1;
   while mp<length(mask) do begin
     case mask[mp] of
-      'd', 'y', '[': begin
+      'd', 'y', 'Z', '[': begin
         readNumberBlockFromMask();
         if (number = @day) and (maxc = 1) then maxc:=2; //map 'd' to '[d]d'
-        readNumberFromDate();
+        number^ := 0;
+        if number <> @timeZone then readNumberFromDate(number^, minc, maxc)
+        else begin
+          if datestr[dp] = 'Z' then dp+=1 //timezone = utc
+          else begin
+            if not (datestr[dp] in ['-','+']) then matchFailed;
+            positive := datestr[dp] = '+';
+            dp+=1;
+            if readNumberFromDate(timeZone, 2, 4) = 2 then
+              if datestr[dp] = ':' then begin dp+=1; readNumberFromDate(timeZone, 2, 2); end
+              else timeZone*=100;
+            timeZone := (timeZone div 100) * 60 + (timeZone mod 100);
+            if not positive then timeZone := - timeZone;
+          end;
+        end;
       end;
       'm': begin //Monat
         if mask[mp+1] = 'm' then begin
@@ -7500,13 +7526,27 @@ begin
        end;
     end;
   end;
-  
-  if day=0 then raise Exception.Create('Konnte keinen Tag aus '+datestr+' im Format '+mask+' entnehmen');
-  if month=0 then raise Exception.Create('Konnte keinen Monat aus '+datestr+' im Format '+mask+' entnehmen');
-  if year<100 then
-    if year<90 then year+=2000
-    else year+=1900;
-  Result:=trunc(encodeDate(word(year),word(month),word(day)));
+
+  outDay:=day;
+  outMonth:=month;
+  if year = -99999 then outYear := 0
+  else if year>=100 then outYear := year
+  else if year < 90 then outYear := year + 2000
+  else outYear := year + 1900;
+  if assigned(outTimeZone) then
+    if timeZone = -99999 then outTimeZone^ := NaN
+    else outTimeZone^ := timeFromMinutes(timeZone);
+
+end;
+
+function dateParse(datestr, mask: string): longint;
+var y,m,d: word;
+begin
+  dateParseParts(datestr, mask, y, m, d);
+  if d=0 then raise Exception.Create('Konnte keinen Tag aus '+datestr+' im Format '+mask+' entnehmen');
+  if m=0 then raise Exception.Create('Konnte keinen Monat aus '+datestr+' im Format '+mask+' entnehmen');
+  if y= 0 then raise Exception.Create('Konnte keine Jahr aus '+datestr+' im Format '+mask+' entnehmen');
+  result := trunc(EncodeDate(y,m,d));
 end;
 
 
@@ -7846,6 +7886,18 @@ procedure test(condition: boolean; name: string='');
 begin
   if not condition then raise Exception.Create('test: '+name);
 end;
+procedure test(a, b: string; name: string = '');
+begin
+  if a <> b then raise Exception.Create('test: '+name+': '+a+' <> '+b);
+end;
+procedure test(a, b: integer; name: string = '');
+begin
+  if a <> b then raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
+end;
+procedure test(a, b: extended; name: string = '');
+begin
+  if abs(a-b) > 0.0000001 then raise Exception.Create('test: '+name+': '+FloatToStr (a)+' <> '+FloatToStr(b));
+end;
 
 procedure arrayUnitTests;
 var a: TLongintArray;
@@ -8143,12 +8195,21 @@ var ar8: array[0..100] of shortint;
     ar32: array[0..100] of longint;
     ar64: array[0..100] of int64;
     j: Integer;
-
+    y,m,d: word;
+    tz: TDateTime;
 begin
   //parse date function
   for i:=1 to high(strs) do
-      if parseDate(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
-        raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+FormatDateTime('yyyy-mm-dd', parseDate(strs[i,1],strs[i,2])) + ' expected '+FormatDateTime('yyyy-mm-dd',EncodeDate(dates[i,1],dates[i,2],dates[i,3])));
+      if dateParse(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
+        raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+FormatDateTime('yyyy-mm-dd', dateParse(strs[i,1],strs[i,2])) + ' expected '+FormatDateTime('yyyy-mm-dd',EncodeDate(dates[i,1],dates[i,2],dates[i,3])));
+
+  dateParseParts('2010-05-06Z','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
+  dateParseParts('2010-05-06+01','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
+  dateParseParts('2010-05-06-01','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1/24);
+  dateParseParts('2010-05-06+0130','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1.5/24);
+  dateParseParts('2010-05-06-0130','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1.5/24);
+  dateParseParts('2010-05-06+02:30','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 2.5/24);
+  dateParseParts('2010-05-06-02:30','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -2.5/24);
 
   //basic string tests
   stringUnitTests();
@@ -8262,7 +8323,7 @@ begin
   for i:=0 to 100 do
     if ar64[i]<>i*10 then
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
-  writeln(stderr,'okidoki');
+//  writeln(stderr,'okidoki');
 end;
 
 initialization
