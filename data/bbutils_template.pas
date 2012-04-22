@@ -381,9 +381,12 @@ function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: bo
 function timeFromMinutes(const mins: integer): TTime;
 //**Week of year
 function dateWeekOfYear(const date:TDateTime):word;
-type EDateParsingException = Exception;
-//**Reads a date string given a certain mask (mask is case-sensitive)@br
-//**The uses the same mask types as FormateDate:@br
+type EDateTimeParsingException = Exception;
+//**Reads a date time string given a certain mask (mask is case-sensitive)@br
+//**The uses the same mask types as FormatDate:@br
+//**s or ss for a second  @br
+//**n or nn for a minute  @br
+//**h or hh for a hour  @br
 //**d or dd for a numerical day  @br
 //**m or mm for a numerical month, mmm for a short month name@br
 //**yy, yyyy or [yy]yy for the year  @br
@@ -392,9 +395,15 @@ type EDateParsingException = Exception;
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4)@br
 //**Notice that [yy]yy may not touch any other format letter, so [yy]yymmdd is an invalid mask. (but [yy]yy.mmdd is fine).
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names
-procedure dateParseParts(datestr,mask:string; out outYear, outMonth, outDay: word; outtimezone: PDateTime = nil);
+procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PWord; outHour, outMinutes, outSeconds, outMilliSeconds: PWord; outtimezone: PDateTime = nil);
+//**Reads a time string given a certain mask (mask is case-sensitive)@br
+procedure timeParseParts(input,mask:string; outHour, outMinutes, outSeconds: PWord; outMilliSeconds: pword = nil; outtimezone: PDateTime = nil);
+//**Reads a time string given a certain mask (mask is case-sensitive)@br
+function timeParse(input,mask:string): TTime;
 //**Reads a date string given a certain mask (mask is case-sensitive)@br
-function dateParse(datestr,mask:string): longint;
+procedure dateParseParts(input,mask:string; outYear, outMonth, outDay: PWord; outtimezone: PDateTime = nil);
+//**Reads a date string given a certain mask (mask is case-sensitive)@br
+function dateParse(input,mask:string): longint;
 
 const WHITE_SPACE=[#9,#10,#13,' '];
 
@@ -1817,19 +1826,20 @@ begin
   else result:=n div 7+1;
 end;
 
-procedure dateParseParts(datestr, mask: string; out outYear, outMonth, outDay: word; outTimezone: PDateTime);
+procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PWord; outHour, outMinutes, outSeconds, outMilliSeconds: PWord; outtimezone: PDateTime = nil);
   procedure matchFailed;
   begin
-    raise EDateParsingException.Create('Das Datum '+datestr+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
+    raise EDateTimeParsingException.Create('Das Datum '+input+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
                                    'Mögliche Ursachen: Beschädigung der Installation, Programmierfehler in VideLibri oder Änderung der Büchereiseite.'#13#10+
                                    'Mögliche Lösungen: Neuinstallation, auf Update warten.');
   end;
   procedure invalidMask (reason:string);
   begin
-    raise EDateParsingException.Create('The mask '+mask+' is invalid (noticed while matching against ' +datestr+') (reason:'+reason+')');
+    raise EDateTimeParsingException.Create('The mask '+mask+' is invalid (noticed while matching against ' +input+') (reason:'+reason+')');
   end;
 
-var mp,dp,day,month,year,timeZone:longint;
+var mp,dp,day,month,year,hour,minute,second:longint;
+    timeZone:longint; //timeZone in minutes
   MMMstr:string;
 //    openBracketCount: longint; //just needed to validate mask
 
@@ -1847,6 +1857,9 @@ var mp,dp,day,month,year,timeZone:longint;
     base:=mask[mp];
     if mask[mp] = '[' then base:=mask[mp+1];
     case base of
+      'h': number:=@hour;
+      'n': number:=@minute;
+      's': number:=@second;
       'd': number:=@day;
       'y': number:=@year;
       'Z': number:=@timeZone;
@@ -1871,8 +1884,8 @@ var mp,dp,day,month,year,timeZone:longint;
   function readNumberFromDate(var number: integer; const minc, maxc: integer): integer;
   begin
     result:=0;
-    while (dp <= length(datestr)) and (datestr[dp] in ['0'..'9']) and (result < maxc) do begin
-      number:=number*10+(ord(datestr[dp])-ord('0'));
+    while (dp <= length(input)) and (input[dp] in ['0'..'9']) and (result < maxc) do begin
+      number:=number*10+(ord(input[dp])-ord('0'));
       result+=1;
       dp+=1;
     end;
@@ -1880,13 +1893,17 @@ var mp,dp,day,month,year,timeZone:longint;
   end;
 
 begin
-  datestr:=trim(datestr)+' ';
+  input:=trim(input)+' ';
   mask:=trim(mask)+' '; //Das letzte Zeichen darf kein Steuerzeichen (d/m/z) sein
 
-  day:=0;
-  month:=0;
-  year:=-99999;
-  timeZone:=-99999;
+  day:=$FFFF;
+  month:=$FFFF;
+  year:=$FFFF;
+  hour:=$FFFF;
+  minute:=$FFFF;
+  second:=$FFFF;
+  timeZone:=$FFFF;
+
   //  openBracketCount:=0;
   MMMstr:='';
 
@@ -1894,19 +1911,19 @@ begin
   dp:=1;
   while mp<length(mask) do begin
     case mask[mp] of
-      'd', 'y', 'Z', '[': begin
+      'h','n','s','d', 'y', 'Z', '[': begin
         readNumberBlockFromMask();
         if (number = @day) and (maxc = 1) then maxc:=2; //map 'd' to '[d]d'
         number^ := 0;
         if number <> @timeZone then readNumberFromDate(number^, minc, maxc)
         else begin
-          if datestr[dp] = 'Z' then dp+=1 //timezone = utc
+          if input[dp] = 'Z' then dp+=1 //timezone = utc
           else begin
-            if not (datestr[dp] in ['-','+']) then matchFailed;
-            positive := datestr[dp] = '+';
+            if not (input[dp] in ['-','+']) then matchFailed;
+            positive := input[dp] = '+';
             dp+=1;
             if readNumberFromDate(timeZone, 2, 4) = 2 then
-              if datestr[dp] = ':' then begin dp+=1; readNumberFromDate(timeZone, 2, 2); end
+              if input[dp] = ':' then begin dp+=1; readNumberFromDate(timeZone, 2, 2); end
               else timeZone*=100;
             timeZone := (timeZone div 100) * 60 + (timeZone mod 100);
             if not positive then timeZone := - timeZone;
@@ -1916,12 +1933,12 @@ begin
       'm': begin //Monat
         if mask[mp+1] = 'm' then begin
           if mask[mp+2] = 'm' then begin //mmm
-            MMMstr:=LowerCase(datestr[dp]+datestr[dp+1]+datestr[dp+2]);
+            MMMstr:=LowerCase(input[dp]+input[dp+1]+input[dp+2]);
             if MMMstr='jan' then month:=1
             else if MMMstr='feb' then month:=2
             else if MMMstr='mar' then month:=3
             else if MMMstr='m'#$E4'r' then month:=3
-            else if (MMMstr='m'#$C3#$A4) and (datestr[dp+3]='r') then begin
+            else if (MMMstr='m'#$C3#$A4) and (input[dp+3]='r') then begin
               month:=3;
               dp+=1;
             end else if MMMstr='apr' then month:=4
@@ -1940,22 +1957,22 @@ begin
             dp+=3;
             mp+=3;
           end else begin //mm
-            month:=StrToInt(datestr[dp])*10+StrToInt(datestr[dp+1]);
+            month:=StrToInt(input[dp])*10+StrToInt(input[dp+1]);
             dp+=2;
             mp+=2;
           end;
         end else begin //m
-          month:=StrToInt(datestr[dp]);
+          month:=StrToInt(input[dp]);
           dp+=1;
-          if datestr[dp] in ['0'..'9'] then begin
-            month:=month*10+StrToInt(datestr[dp]);
+          if input[dp] in ['0'..'9'] then begin
+            month:=month*10+StrToInt(input[dp]);
             dp+=1;
           end;
           mp+=1;
         end;
       end;
       ']': invalidMask('missing [, you can use \] to escape ]');
-      else if mask[mp]<>datestr[dp] then
+      else if mask[mp]<>input[dp] then
         matchFailed
        else begin
          mp+=1;
@@ -1964,25 +1981,52 @@ begin
     end;
   end;
 
-  outDay:=day;
-  outMonth:=month;
-  if year = -99999 then outYear := 0
-  else if year>=100 then outYear := year
-  else if year < 90 then outYear := year + 2000
-  else outYear := year + 1900;
-  if assigned(outTimeZone) then
-    if timeZone = -99999 then outTimeZone^ := NaN
+  if assigned(outMilliSeconds) then raise EDateTimeParsingException.Create('milliseconds not supported yet');
+  if assigned(outSeconds) then outSeconds^:=second;
+  if assigned(outMinutes) then outMinutes^:=minute;
+  if assigned(outHour) then outHour^:=hour;
+  if assigned(outDay) then outDay^:=day;
+  if assigned(outMonth) then outMonth^:=month;
+  if assigned(outYear) then
+    if year>=100 then outYear^ := year
+    else if year < 90 then outYear^ := year + 2000
+    else outYear^ := year + 1900;
+  if assigned(outTimeZone) then begin
+    if timeZone = $FFFF then outTimeZone^ := NaN
     else outTimeZone^ := timeFromMinutes(timeZone);
+  end;
 
 end;
 
-function dateParse(datestr, mask: string): longint;
+procedure timeParseParts(input, mask: string; outHour, outMinutes, outSeconds, outMilliSeconds: PWord; outtimezone: PDateTime);
+begin
+  dateTimeParseParts(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outMilliSeconds, outtimezone);
+end;
+
+function timeParse(input, mask: string): TTime;
+var
+  hour: Word;
+  minutes: Word;
+  seconds: Word;
+  timeZone: TDateTime;
+begin
+  timeParseParts(input,mask,@hour,@minutes,@seconds,nil,@timeZone);
+  result := EncodeTime(hour,minutes,seconds,0);
+  if not IsNan(timeZone) then result -= timeZone;
+end;
+
+procedure dateParseParts(input, mask: string; outYear, outMonth, outDay: PWord; outtimezone: PDateTime);
+begin
+  dateTimeParseParts(input, mask, outYear, outMonth, outDay, nil, nil, nil, nil, outtimezone);
+end;
+
+function dateParse(input, mask: string): longint;
 var y,m,d: word;
 begin
-  dateParseParts(datestr, mask, y, m, d);
-  if d=0 then raise Exception.Create('Konnte keinen Tag aus '+datestr+' im Format '+mask+' entnehmen');
-  if m=0 then raise Exception.Create('Konnte keinen Monat aus '+datestr+' im Format '+mask+' entnehmen');
-  if y= 0 then raise Exception.Create('Konnte keine Jahr aus '+datestr+' im Format '+mask+' entnehmen');
+  dateParseParts(input, mask, @y, @m, @d);
+  if d=$FFFF then raise Exception.Create('Konnte keinen Tag aus '+input+' im Format '+mask+' entnehmen');
+  if m=$FFFF then raise Exception.Create('Konnte keinen Monat aus '+input+' im Format '+mask+' entnehmen');
+  if y=$FFFF then raise Exception.Create('Konnte keine Jahr aus '+input+' im Format '+mask+' entnehmen');
   result := trunc(EncodeDate(y,m,d));
 end;
 
@@ -2640,13 +2684,14 @@ begin
       if dateParse(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
         raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+FormatDateTime('yyyy-mm-dd', dateParse(strs[i,1],strs[i,2])) + ' expected '+FormatDateTime('yyyy-mm-dd',EncodeDate(dates[i,1],dates[i,2],dates[i,3])));
 
-  dateParseParts('2010-05-06Z','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
-  dateParseParts('2010-05-06+01','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
-  dateParseParts('2010-05-06-01','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1/24);
-  dateParseParts('2010-05-06+0130','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1.5/24);
-  dateParseParts('2010-05-06-0130','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1.5/24);
-  dateParseParts('2010-05-06+02:30','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 2.5/24);
-  dateParseParts('2010-05-06-02:30','yyyy-mm-ddZ', y, m, d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -2.5/24);
+  dateParseParts('2010-05-06Z','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
+  dateParseParts('2010-05-06+01','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
+  dateParseParts('2010-05-06-01','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1/24);
+  dateParseParts('2010-05-06+0130','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1.5/24);
+  dateParseParts('2010-05-06-0130','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1.5/24);
+  dateParseParts('2010-05-06+02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 2.5/24);
+  dateParseParts('2010-05-06-02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -2.5/24);
+  timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d); test(y, 14); test(m, 30); test(d, 21);
 
   //basic string tests
   stringUnitTests();
