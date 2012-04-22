@@ -60,7 +60,7 @@ uses
   , windows
   {$ENDIF};
 
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
@@ -565,6 +565,7 @@ type EDateTimeParsingException = Exception;
 //**m or mm for a numerical month, mmm for a short month name@br
 //**yy, yyyy or [yy]yy for the year  @br
 //**Z for the ISO time zone (Z | [+-]hh(:?mm)?)
+//**$ at end for the end of the string (without $, additional characters are ignored)
 //**The letter formats d/y matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4)@br
 //**Notice that [yy]yy may not touch any other format letter, so [yy]yymmdd is an invalid mask. (but [yy]yy.mmdd is fine).
@@ -7432,12 +7433,13 @@ var mp,dp,day,month,year,hour,minute,second:longint;
     maxc:=0;
     bracketState:=0;
     while (mp <= length(mask)) and ((mask[mp] = base) or
-                                    ((mask[mp] = '[') and (bracketState=0)) or
+                                    ((mask[mp] = '[') and (bracketState=0) and (mask[mp+1]=base)) or
                                     ((mask[mp] = ']') and (bracketState=1))) do begin
       if mask[mp] = base then begin
         maxc+=1;
         if bracketState<>1 then minc+=1;
-      end else bracketState+=1;
+      end else if mask[mp] = '[' then bracketState+=1
+      else bracketState-=1;
       mp+=1;
     end;
     if bracketState=1 then invalidMask('missing ]');
@@ -7477,12 +7479,13 @@ begin
       'h','n','s','d', 'y', 'Z', '[': begin
         readNumberBlockFromMask();
         if (number = @day) and (maxc = 1) then maxc:=2; //map 'd' to '[d]d'
-        number^ := 0;
-        if number <> @timeZone then readNumberFromDate(number^, minc, maxc)
-        else begin
-          if input[dp] = 'Z' then dp+=1 //timezone = utc
-          else begin
-            if not (input[dp] in ['-','+']) then matchFailed;
+        if number <> @timeZone then begin
+          number^ := 0;
+          readNumberFromDate(number^, minc, maxc)
+        end else begin
+          if input[dp] = 'Z' then begin number^ := 0; dp+=1; end //timezone = utc
+          else if (input[dp] in ['-','+']) then begin
+            number^ := 0;
             positive := input[dp] = '+';
             dp+=1;
             if readNumberFromDate(timeZone, 2, 4) = 2 then
@@ -7490,7 +7493,7 @@ begin
               else timeZone*=100;
             timeZone := (timeZone div 100) * 60 + (timeZone mod 100);
             if not positive then timeZone := - timeZone;
-          end;
+          end else if minc > 0 then matchFailed;
         end;
       end;
       'm': begin //Monat
@@ -7535,7 +7538,10 @@ begin
         end;
       end;
       ']': invalidMask('missing [, you can use \] to escape ]');
-      else if mask[mp]<>input[dp] then
+      else if (mask[mp] = '$') and (mp + 1 = length(mask)) then begin
+        if dp  >= length(input) then break;
+        matchFailed;
+      end else if mask[mp]<>input[dp] then
         matchFailed
        else begin
          mp+=1;
@@ -7574,6 +7580,9 @@ var
   timeZone: TDateTime;
 begin
   timeParseParts(input,mask,@hour,@minutes,@seconds,nil,@timeZone);
+  if hour=$FFFF then raise EDateTimeParsingException.Create('Konnte keine Stunde aus '+input+' im Format '+mask+' entnehmen');
+  if minutes=$FFFF then raise EDateTimeParsingException.Create('Konnte keine Minuten aus '+input+' im Format '+mask+' entnehmen');
+  if seconds=$FFFF then raise EDateTimeParsingException.Create('Konnte keine Sekunden aus '+input+' im Format '+mask+' entnehmen');
   result := EncodeTime(hour,minutes,seconds,0);
   if not IsNan(timeZone) then result -= timeZone;
 end;
@@ -7587,9 +7596,9 @@ function dateParse(input, mask: string): longint;
 var y,m,d: word;
 begin
   dateParseParts(input, mask, @y, @m, @d);
-  if d=$FFFF then raise Exception.Create('Konnte keinen Tag aus '+input+' im Format '+mask+' entnehmen');
-  if m=$FFFF then raise Exception.Create('Konnte keinen Monat aus '+input+' im Format '+mask+' entnehmen');
-  if y=$FFFF then raise Exception.Create('Konnte keine Jahr aus '+input+' im Format '+mask+' entnehmen');
+  if d=$FFFF then raise EDateTimeParsingException.Create('Konnte keinen Tag aus '+input+' im Format '+mask+' entnehmen');
+  if m=$FFFF then raise EDateTimeParsingException.Create('Konnte keinen Monat aus '+input+' im Format '+mask+' entnehmen');
+  if y=$FFFF then raise EDateTimeParsingException.Create('Konnte kein Jahr aus '+input+' im Format '+mask+' entnehmen');
   result := trunc(EncodeDate(y,m,d));
 end;
 
@@ -8230,8 +8239,17 @@ begin
 end;
 
 procedure unitTests();
-const strs: array[1..11,1..2] of string=(('05.10.1985','dd.mm.yyyy'),('05.10.1942','dd.mm.yy[yy]'),('05.10.42','dd.mm.yy[yy]'),('19.10-1942','dd.mm-[yy]yy'),('19.10-90','dd.mm-[yy]yy'), ('11.7.2005','d.m.yyyy'),('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),('  11 Mär 1700',' dd mmm yyyy  '),('  15 Mär 1200XXXXXXXXXXXXXX',' dd mmm yyyy  '));
-      dates: array[1..11, 1..3] of word = ((1985,10,5),(1942,10,5),(2042,10,5),(1942,10,19),(1990,10,19),(2005,7,11),(2000,1,16),(1989,6,17),(1953,9,29),(1700,3,11),(1200,3,15));
+const strs: array[1..12,1..2] of string=(
+      ('05.10.1985','dd.mm.yyyy'),('05.10.1942','dd.mm.yy[yy]'),('05.10.42','dd.mm.yy[yy]'),
+      ('19.10-1942','dd.mm-[yy]yy'),('19.10-90','dd.mm-[yy]yy'), ('11.7.2005','d.m.yyyy'),
+      ('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),
+      ('  11 Mär 1700',' dd mmm yyyy  '),('  15 Mär 1200XXXXXXXXXXXXXX',' dd mmm yyyy  '), ('20121014', 'yyyymmdd')
+      );
+      dates: array[1..12, 1..3] of word = (
+      (1985,10,5),(1942,10,5),(2042,10,5),
+      (1942,10,19),(1990,10,19),(2005,7,11),
+      (2000,1,16),(1989,6,17),(1953,9,29),
+      (1700,3,11),(1200,3,15), (2012, 10, 14));
 
 var i:longint;
 
@@ -8254,6 +8272,12 @@ begin
   dateParseParts('2010-05-06-0130','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1.5/24);
   dateParseParts('2010-05-06+02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 2.5/24);
   dateParseParts('2010-05-06-02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -2.5/24);
+  dateParseParts('2010-05-06Z','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
+  dateParseParts('2010-05-06+01','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
+  dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); test(tz, NaN);
+  dateParseParts('---07','---dd', @y, @m, @d, @tz); test(d, 7);
+  dateParseParts('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
+  dateParseParts('---08Z','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
   timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d); test(y, 14); test(m, 30); test(d, 21);
 
   //basic string tests
