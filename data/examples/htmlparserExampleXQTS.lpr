@@ -100,7 +100,7 @@ begin
         except on e: sysutils.Exception do begin
           writeln(stderr, 'EXCEPTION: ',desc, queryname, ': ', e.message);
           writeln('       ', arrayGet(strSplit(strTrim(query), #13),-1) );
-          writeln('TestSources/'+inputfile+'.xml', '    |   ', 'ExpectedTestResults/'+path+'/'+outputfile);
+          writeln('      TestSources/'+inputfile+'.xml', '  |  ','Queries/XQuery/'+path+'/'+queryname+'.xq','    |   ', 'ExpectedTestResults/'+path+'/'+outputfile); writeln;
           exception+=1;
         end;
           //writeln;}
