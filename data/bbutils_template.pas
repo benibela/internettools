@@ -309,14 +309,16 @@ function strEncodingFromName(str:string):TEncoding; //**< Gets the encoding from
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
 function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
-//**Replace all occurences of x \in toEscape with escapeChar + x
-function strEscape(const s:string; const toEscape: TCharSet; escapeChar: char = '\'): string;
-//**Returns a regex matching s
-function strEscapeRegex(const s:string): string;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
 function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = false):string;
+//**Replace all occurences of x \in toEscape with escapeChar + x
+function strEscape(const s:string; const toEscape: TCharSet; escapeChar: char = '\'): string;
+//**Returns a regex matching s
+function strEscapeRegex(const s:string): string;
+function strDecodeHex(const s:string):string;
+function strEncodeHex(const s:string; const code: string = '0123456789ABCDEF'):string;
 //**Returns the first l bytes of p (copies them so O(n))
 function strFromPchar(p:pchar;l:longint):string;
 
@@ -1378,6 +1380,41 @@ begin
   result:=strDecodeHTMLEntities(pchar(s), length(s), encoding, strict);
 end;
 
+function strDecodeHex(const s: string): string;
+  function decodeSingleHex(const c: char): byte; inline;
+  begin
+    case c of
+      '0'..'9': result := ord(c) - ord('0') + $0;
+      'A'..'F': result := ord(c) - ord('A') + $A;
+      'a'..'f': result := ord(c) - ord('a') + $a;
+      else assert(false);
+    end;
+  end;
+var
+  i: Integer;
+begin
+  assert(length(s) and 1 = 0);
+  setlength(result, length(s) div 2);
+  for i:=1 to length(result) do
+    result[i] := chr((decodeSingleHex(s[2*i-1]) shl 4) or decodeSingleHex(s[2*i]));
+end;
+
+function strEncodeHex(const s: string; const code: string): string;
+var
+  o: Integer;
+  pcode: pchar;
+  i: Integer;
+begin
+  assert(length(code) = 16);
+  pcode := @code[1];
+  setlength(result, length(s) * 2);
+  for i:=1 to length(s) do begin
+    o := ord(s[i]);
+    result[2*i - 1] := pcode[o shr 4];
+    result[2*i    ] := pcode[o and $F];
+  end;
+end;
+
 function strFromPchar(p: pchar; l: longint): string;
 begin
   if l=0 then exit('');
@@ -1975,7 +2012,7 @@ begin
       end;
       ']': invalidMask('missing [, you can use \] to escape ]');
       else if (mask[mp] = '$') and (mp + 1 = length(mask)) then begin
-        if dp + 1 >= length(input) then break;
+        if dp = length(input) then break;
         matchFailed;
       end else if mask[mp]<>input[dp] then
         matchFailed
