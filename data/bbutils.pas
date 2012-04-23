@@ -60,7 +60,7 @@ uses
   , windows
   {$ENDIF};
 
-//{$DEFINE UNITTESTS}
+{$DEFINE UNITTESTS}
 
 //-------------------------Array functions-----------------------------
 type
@@ -496,6 +496,8 @@ function strFromPchar(p:pchar;l:longint):string;
 
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
+//**Creates a string to display an integer
+function strFromInt(i: int64; displayLength: longint): string;
 
 //**Creates count copies of rep
 function strDup(const rep: string; const count: integer): string;
@@ -553,11 +555,18 @@ procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
 function dateTimeToFileTime(const date: TDateTime): TFileTime;
 function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
 {$ENDIF}
+
+
+//**cumulative sum of month days (so. days in month i = dmdcs[i] - dmdcs[i-1])
+const DateMonthDaysCumSum: array[false..true,0..12] of Cardinal =
+     ((00, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365),
+     (00, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366));
+
 //**Returns a datetime from minutes
 function timeFromMinutes(const mins: integer): TTime;
 //**Week of year
 function dateWeekOfYear(const date:TDateTime):word;
-type EDateTimeParsingException = type Exception;
+type EDateTimeParsingException = class(Exception);
 //**Reads a date time string given a certain mask (mask is case-sensitive)@br
 //**The uses the same mask types as FormatDate:@br
 //**s or ss for a second  @br
@@ -566,12 +575,17 @@ type EDateTimeParsingException = type Exception;
 //**d or dd for a numerical day  @br
 //**m or mm for a numerical month, mmm for a short month name@br
 //**yy, yyyy or [yy]yy for the year  @br
-//**Z for the ISO time zone (Z | [+-]hh(:?mm)?)
+//**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with 6 digit precision)
+//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?')
 //**The letter formats d/y matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4)@br
 //**Notice that [yy]yy may not touch any other format letter, so [yy]yymmdd is an invalid mask. (but [yy]yy.mmdd is fine).
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names
 procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
+//**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParseParts)
+function dateTimeFormat(const mask: string; const y: integer; const m,d, h, n, s: word): string;
+//**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParseParts)
+function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
 //**Reads a time string given a certain mask (mask is case-sensitive)@br
 procedure timeParseParts(const input,mask:string; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads a time string given a certain mask (mask is case-sensitive)@br
@@ -580,6 +594,12 @@ function timeParse(const input,mask:string): TTime;
 procedure dateParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil);
 //**Reads a date string given a certain mask (mask is case-sensitive)@br
 function dateParse(const input,mask:string): longint;
+//**Encodes a date as datetime (supports negative years)
+function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
+//**Encodes a date as datetime (supports negative years)
+function dateEncode(year, month, day: integer): TDateTime;
+//**Encodes a date as datetime (supports negative years)
+procedure dateDecode(date: TDateTime; year, month, day: PInteger);
 
 //TODO:: Negative Years and Milliseconds, optional text
 
@@ -7088,6 +7108,13 @@ begin
   result:=IntToHex(PtrUInt(p), 2*sizeof(Pointer));
 end;
 
+function strFromInt(i: int64; displayLength: longint): string;
+begin
+  result := IntToStr(i);
+  if length(result) < (displayLength) then
+    result := strDup('0', (displayLength) - length(Result)) + result;
+end;
+
 //incase-sensitive, intelligent string compare (splits in text, number parts)
 function strCompareClever(const s1, s2: string): integer;
 var t1,t2:string; //lowercase text
@@ -7440,7 +7467,7 @@ procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PInte
     raise EDateTimeParsingException.Create('The mask '+mask+' is invalid (noticed while matching against ' +input+') (reason:'+reason+')');
   end;
 
-var mp,dp,day,month,year,hour,minute,second:longint;
+var mp,dp,day,month,year,hour,minute,second,milliseconds,millisecondsLength:longint;
     timeZone:longint; //timeZone in minutes
   MMMstr:string;
 //    openBracketCount: longint; //just needed to validate mask
@@ -7452,12 +7479,35 @@ var mp,dp,day,month,year,hour,minute,second:longint;
 
   //Reads (x*\[x*\]x*) with x\in{d,y}
   //(why didn't I use a regexp :-(, because this unit shouldn't have dependencies! )
-  procedure readNumberBlockFromMask();
+  function readNumberBlockFromMask(): boolean;
   var base: char;
     bracketState: longint;
   begin
     base:=mask[mp];
-    if mask[mp] = '[' then base:=mask[mp+1];
+    bracketState:=0;
+    if mask[mp] = '[' then begin
+      mp+=1;
+
+      if not (mask[mp] in ['h','n','s','d','y','Z','z']) then begin
+        if input[dp] <> mask[mp] then begin
+          while ( mp <= length(mask) ) and ( mask[mp] <> ']' ) do mp += 1;
+          if mp > length(mask) then invalidMask('No closing ]');
+          mp+=1;
+          exit(false);
+        end;
+        repeat
+          if input[dp] <> mask[mp] then matchFailed; //if the first char matches, all must match
+          mp+=1;
+          dp+=1;
+        until (mask[mp] in ['h','n','s','d','y','Z','z',']']);
+        if mask[mp] = ']' then begin
+          mp+=1;
+          exit(false);
+        end;
+      end;
+      base:=mask[mp];
+      bracketState:=1;
+    end;
     case base of
       'h': number:=@hour;
       'n': number:=@minute;
@@ -7465,13 +7515,12 @@ var mp,dp,day,month,year,hour,minute,second:longint;
       'd': number:=@day;
       'y': number:=@year;
       'Z': number:=@timeZone;
+      'z': number:=@milliseconds;
       else invalidMask(base)
     end;
     minc:=0;
     maxc:=0;
-    bracketState:=0;
     while (mp <= length(mask)) and ((mask[mp] = base) or
-                                    ((mask[mp] = '[') and (bracketState=0) and (mask[mp+1]=base)) or
                                     ((mask[mp] = ']') and (bracketState=1))) do begin
       if mask[mp] = base then begin
         maxc+=1;
@@ -7481,17 +7530,22 @@ var mp,dp,day,month,year,hour,minute,second:longint;
       mp+=1;
     end;
     if bracketState=1 then invalidMask('missing ]');
+    result := true;
   end;
 
   //Reads \d{minc,maxc}
   function readNumberFromDate(var number: integer; const minc, maxc: integer): integer;
+  var neg: boolean;
   begin
     result:=0;
+    neg := false;
+    if (@number = @year) and  (input[dp] = '-') and (input[dp+1] in ['0'..'9']) then begin dp+=1; neg := true; end;
     while (dp <= length(input)) and (input[dp] in ['0'..'9']) and (result < maxc) do begin
       number:=number*10+(ord(input[dp])-ord('0'));
       result+=1;
       dp+=1;
     end;
+    if neg then number*=-1;
     if result < minc then matchFailed;
   end;
 
@@ -7505,6 +7559,8 @@ begin
   hour:=high(hour);
   minute:=high(minute);
   second:=high(second);
+  milliseconds:=high(milliseconds);
+  millisecondsLength:=0;
   timeZone:=high(Integer);
 
   //  openBracketCount:=0;
@@ -7514,12 +7570,13 @@ begin
   dp:=1;
   while mp<length(mask) do begin
     case mask[mp] of
-      'h','n','s','d', 'y', 'Z', '[': begin
-        readNumberBlockFromMask();
+      'h','n','s','d', 'y', 'Z', 'z', '[': begin
+        if not readNumberBlockFromMask() then continue;
         if (number = @day) and (maxc = 1) then maxc:=2; //map 'd' to '[d]d'
         if number <> @timeZone then begin
-          number^ := 0;
-          readNumberFromDate(number^, minc, maxc)
+          if number^ = high(number^) then number^ := 0;
+          minc := readNumberFromDate(number^, minc, maxc);
+          if number = @milliseconds then millisecondsLength := minc;
         end else begin
           if input[dp] = 'Z' then begin number^ := 0; dp+=1; end //timezone = utc
           else if (input[dp] in ['-','+']) then begin
@@ -7588,7 +7645,9 @@ begin
     end;
   end;
 
-  if assigned(outMilliSeconds) then outMilliSeconds^:=nan; // raise EDateTimeParsingException.Create('milliseconds not supported yet');
+  if assigned(outMilliSeconds) then
+    if millisecondsLength = 0 then outMilliSeconds^:=nan
+    else outMilliSeconds^:=milliseconds * (1000 / Math.intpower(10, millisecondsLength));
   if assigned(outSeconds) then outSeconds^:=second;
   if assigned(outMinutes) then outMinutes^:=minute;
   if assigned(outHour) then outHour^:=hour;
@@ -7603,6 +7662,60 @@ begin
     else outTimeZone^ := timeFromMinutes(timeZone);
   end;
 
+end;
+
+function dateTimeFormat(const mask: string; const y: integer; const m, d, h, n, s: word): string;
+var mp: integer;
+  function nextMaskPart: string;
+  const SPECIAL_MASK_CHARS = ['y','m','d','h','n','s','z','Z'];
+  var
+    oldpos: Integer;
+  begin
+    while (mp <= length(mask)) and (mask[mp] = '[') do begin
+      while (mp <= length(mask)) and (mask[mp] <> ']') do
+        mp+=1;
+      mp+=1;
+    end;
+    if mp > length(mask) then exit;
+    if mask[mp] = '$' then begin mp+=1; exit(''); end;
+    oldpos := mp;
+    if mask[mp] in SPECIAL_MASK_CHARS then begin
+      while (mp <= length(mask)) and (mask[mp] in SPECIAL_MASK_CHARS) do mp+=1;
+    end else
+      while (mp <= length(mask)) and not (mask[mp] in SPECIAL_MASK_CHARS) do mp+=1;
+    result := copy(mask, oldpos, mp - oldpos);
+  end;
+
+var part: String;
+begin
+  mp := 1;
+  result := '';
+  while mp <= length(mask) do begin
+    part := nextMaskPart;
+    if length(part) = 0 then continue;
+    case part[1] of
+      'y': result += strFromInt(y, length(part));
+      'm': result += strFromInt(m, length(part));
+      'd': result += strFromInt(d, length(part));
+      'h': result += strFromInt(h, length(part));
+      'n': result += strFromInt(n, length(part));
+      's': result += strFromInt(s, length(part));
+      'z': result += strFromInt(0, length(part));
+      'Z': ; //no timezone
+      else result += part;
+    end;
+  end;
+end;
+
+function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
+var
+  y,m,d: Integer;
+  h,n,s,ms: word;
+  part: String;
+begin
+  dateDecode(dateTime, @y, @m, @d);
+  DecodeTime(dateTime, h, n, s, ms);
+  result := dateTimeFormat(mask, y, m, d, h, n, s);
 end;
 
 procedure timeParseParts(const input, mask: string; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble; outtimezone: PDateTime);
@@ -7638,6 +7751,75 @@ begin
   if m=high(m) then raise EDateTimeParsingException.Create('Konnte keinen Monat aus '+input+' im Format '+mask+' entnehmen');
   if y=high(y) then raise EDateTimeParsingException.Create('Konnte kein Jahr aus '+input+' im Format '+mask+' entnehmen');
   result := trunc(EncodeDate(y,m,d));
+end;
+
+function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
+var leap: boolean;
+    century, yearincent: int64;
+    centuryi: integer;
+begin
+  leap := (year mod 4 = 0) and ((year mod 100 <> 0) or (year mod 400 = 0));
+  result := (year <> 0) and //jumps from -1 to 1
+            (month >= 1) and (month <= 12) and (day >= 1) and (day<=MonthDays[leap,month]);
+  if not result then exit;
+  dt := - DateDelta; // -693594
+  if year > 0 then year -= 1;
+  //end else begin
+  //  dt := -  DateDelta; //not sure if this is correct, but it fits at the borders
+  //end;
+  century := year div 100;
+  yearincent := year - 100*century;
+  dt += (146097*century) div 4  + (1461* yearincent) div 4 +  DateMonthDaysCumSum[leap, month-1] + day;
+end;
+
+function dateEncode(year, month, day: integer): TDateTime;
+begin
+  if not dateEncodeTry(year, month, day, result) then
+    raise EDateTimeParsingException.Create('Invalid date: '+inttostr(year)+'-'+inttostr(month)+'-'+inttostr(day));
+end;
+
+procedure dateDecode(date: TDateTime; year, month, day: PInteger);
+var
+  datei: int64;
+  //century, yearincent: int64;
+  tempyear, tempmonth, tempday: integer;
+  temp: word;
+  leap: Boolean;
+begin
+  if year = nil then year := @tempyear;
+  if month = nil then month := @tempmonth;
+  if day = nil then day := @tempday;
+
+  year^ := 0;
+  month^ := 0;
+  day^ := 0;
+  datei := trunc(date) + DateDelta;
+  if datei > 146097 then begin // decode years over 65535?, 146097 days = 400 years so it is tested
+    DecodeDate(((146097 + datei - 365) mod 146097) - DateDelta + 365, PWord(year)^, PWord(month)^, PWord(day)^);
+    year^ += ((datei - 365) div 146097) * 400;
+  end else if datei  <= 0 then begin
+    datei := -DateDelta - datei + 1;
+    DecodeDate(datei, PWord(year)^, PWord(month)^, PWord(day)^);
+    year^ *= -1;
+    //year is correct, but days are inverted
+    leap := (year^ mod 4 = 0) and ((year^ mod 100 <> 0) or (year^ mod 400 = 0));
+    datei +=  DateMonthDaysCumSum[leap, 12] + 1 - 2 * (DateMonthDaysCumSum[leap,month^-1] + day^);
+    DecodeDate(datei, temp, PWord(month)^, PWord(day)^);
+  end else DecodeDate(date, PWord(year)^, PWord(month)^, PWord(day)^);
+                      {todo: implement own conversion?
+  datei := trunc(date);
+  if datei <= -DateDelta then begin
+
+  end else begin
+    datei := (datei + DateDelta) * 4;
+    century    := datei div 146097;  datei := datei - century    * 146097;
+    yearincent := datei div   1461 ; datei := datei - yearincent *   1461;
+    datei := datei div 4;
+
+    year^ := century * 100 + yearincent + 1;
+    leap := (year^ mod 4 = 0) and ((year^ mod 100 <> 0) or (year^ mod 400 = 0));
+    month^ := (datei - 5) div 30;
+  end;                   }
 end;
 
 
@@ -7990,6 +8172,9 @@ begin
   if abs(a-b) > 0.0000001 then raise Exception.Create('test: '+name+': '+FloatToStr (a)+' <> '+FloatToStr(b));
 end;
 
+
+
+{$IFNDEF NO_ARRAY_UNITTEST}
 procedure arrayUnitTests;
 var a: TLongintArray;
     len:longint;
@@ -8081,7 +8266,7 @@ begin
   end;}
 
 end;
-
+{$ENDIF}
 procedure stringUnitTests( );
 var
  sa: TStringArray;
@@ -8277,17 +8462,19 @@ begin
 end;
 
 procedure unitTests();
-const strs: array[1..12,1..2] of string=(
+const strs: array[1..14,1..2] of string=(
       ('05.10.1985','dd.mm.yyyy'),('05.10.1942','dd.mm.yy[yy]'),('05.10.42','dd.mm.yy[yy]'),
       ('19.10-1942','dd.mm-[yy]yy'),('19.10-90','dd.mm-[yy]yy'), ('11.7.2005','d.m.yyyy'),
       ('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),
-      ('  11 Mär 1700',' dd mmm yyyy  '),('  15 Mär 1200XXXXXXXXXXXXXX',' dd mmm yyyy  '), ('20121014', 'yyyymmdd')
+      ('  11 Mär 1700',' dd mmm yyyy  '),('  15 Mär 1200XXXXXXXXXXXXXX',' dd mmm yyyy  '), ('20121014', 'yyyymmdd'),
+      ('20000304', 'yyyy[FOOBAR]mmdd'),('2000FOOBAR0405', 'yyyy[FOOBAR]mmdd')
       );
-      dates: array[1..12, 1..3] of word = (
+      dates: array[1..14, 1..3] of word = (
       (1985,10,5),(1942,10,5),(2042,10,5),
       (1942,10,19),(1990,10,19),(2005,7,11),
       (2000,1,16),(1989,6,17),(1953,9,29),
-      (1700,3,11),(1200,3,15), (2012, 10, 14));
+      (1700,3,11),(1200,3,15), (2012, 10, 14),
+      (2000,03,04), (2000,04,05));
 
 var i:longint;
 
@@ -8295,7 +8482,8 @@ var ar8: array[0..100] of shortint;
     ar32: array[0..100] of longint;
     ar64: array[0..100] of int64;
     j: Integer;
-    y,m,d: word;
+    y,m,d: integer;
+    ms: double;
     tz: TDateTime;
 begin
   //parse date function
@@ -8312,11 +8500,55 @@ begin
   dateParseParts('2010-05-06-02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -2.5/24);
   dateParseParts('2010-05-06Z','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
   dateParseParts('2010-05-06+01','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
-  dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); test(tz, NaN);
+  dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan');
+  dateParseParts('-0753-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, -753); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan');
   dateParseParts('---07','---dd', @y, @m, @d, @tz); test(d, 7);
   dateParseParts('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
   dateParseParts('---08Z','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
   timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d); test(y, 14); test(m, 30); test(d, 21);
+  timeParseParts('12:13:14','hh:nn:ss[.zzz]', @y, @m, @d); test(y, 12); test(m, 13); test(d, 14);
+  timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d, @ms); test(y, 14); test(m, 30); test(d, 21);
+  timeParseParts('12:13:14','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14);
+  timeParseParts('12:13:14.1','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 100);
+  timeParseParts('12:13:14.02','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 20);
+  timeParseParts('12:13:14.004','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 4);
+  timeParseParts('12:13:14.1235','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123);
+  timeParseParts('12:13:14.1235','hh:nn:ss[.zzzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123.5);
+
+  test(dateEncode(1,1,1), EncodeDate(1,1,1));
+  test(dateEncode(2012,10,31), EncodeDate(2012,10,31));
+  test(dateEncode(-1,12,31), EncodeDate(1,1,1)-1,'a');
+  test(dateEncode(-1,1,1), EncodeDate(1,1,1)-365,'b');
+  test(dateEncode(-2,1,1), EncodeDate(1,1,1)-2*365,'c');
+  test(dateEncode(-3,1,1), EncodeDate(1,1,1)-3*365,'d');
+  test(dateEncode(-4,3,1), EncodeDate(1,3,1)-4*365,'e');//pre leap
+  test(dateEncode(-4,1,1), EncodeDate(1,1,1)-4*365-1,'f');//leap
+  test(dateEncode(-5,1,1), EncodeDate(1,1,1)-5*365-1,'g');
+ { for i:=1 to 2100 do begin
+    test(dateEncode(i,1,1), EncodeDate(i,1,1));
+    test(dateEncode(i,2,1), EncodeDate(i,2,1));
+    test(dateEncode(i,3,1), EncodeDate(i,3,1));
+    test(dateEncode(i,12,31), EncodeDate(i,12,31));
+  end;
+  ShortDateFormat:=LongDateFormat;
+  for i:=1 to 146097*20 do begin
+    dateDecode(i - DateDelta, @y, @m, @d);
+    temp := EncodeDate(y, m, d);
+    if (i - DateDelta) <> temp then
+      raise exception.create('Eerr  '+ DateToStr(temp) + ' <> ', y, ' ', m, ' ', d, '::',i-DateDelta,'<>',trunc(temp),datetostr(i-DateDelta));
+    //writeln(i - DateDelta, temp);
+  end;
+   for i:=-693594 downto -693594 - 146097*100 do begin
+    dateDecode( i, @y,@m,@d);
+    temp := dateEncode(y,m,d);
+    if (m=1) and (d=1) then writeln(y);
+    if temp <> i then begin
+      writeln('Eerr  ', DateToStr(temp) , ' <> ', y, ' ', m, ' ', d, '::',i,'<>',trunc(temp),' ',datetostr(i));
+      readln;
+    end;
+  end;
+  }
+
 
   //basic string tests
   stringUnitTests();
@@ -8376,7 +8608,7 @@ begin
   {$ENDIF}
 
   //========arrays=====
-  arrayUnitTests();
+  {$IFNDEF NO_ARRAY_UNITTEST}  arrayUnitTests(); {$ENDIF}
 
   //========math=======
   test(modPow(2, 50, 100) = 24);
