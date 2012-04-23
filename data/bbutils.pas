@@ -571,15 +571,17 @@ type EDateTimeParsingException = type Exception;
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4)@br
 //**Notice that [yy]yy may not touch any other format letter, so [yy]yymmdd is an invalid mask. (but [yy]yy.mmdd is fine).
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names
-procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PWord; outHour, outMinutes, outSeconds, outMilliSeconds: PWord; outtimezone: PDateTime = nil);
+procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads a time string given a certain mask (mask is case-sensitive)@br
-procedure timeParseParts(input,mask:string; outHour, outMinutes, outSeconds: PWord; outMilliSeconds: pword = nil; outtimezone: PDateTime = nil);
+procedure timeParseParts(const input,mask:string; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads a time string given a certain mask (mask is case-sensitive)@br
-function timeParse(input,mask:string): TTime;
+function timeParse(const input,mask:string): TTime;
 //**Reads a date string given a certain mask (mask is case-sensitive)@br
-procedure dateParseParts(input,mask:string; outYear, outMonth, outDay: PWord; outtimezone: PDateTime = nil);
+procedure dateParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil);
 //**Reads a date string given a certain mask (mask is case-sensitive)@br
-function dateParse(input,mask:string): longint;
+function dateParse(const input,mask:string): longint;
+
+//TODO:: Negative Years and Milliseconds, optional text
 
 const WHITE_SPACE=[#9,#10,#13,' '];
 
@@ -7426,7 +7428,7 @@ begin
   else result:=n div 7+1;
 end;
 
-procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PWord; outHour, outMinutes, outSeconds, outMilliSeconds: PWord; outtimezone: PDateTime = nil);
+procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
   procedure matchFailed;
   begin
     raise EDateTimeParsingException.Create('Das Datum '+input+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
@@ -7497,13 +7499,13 @@ begin
   input:=trim(input)+' ';
   mask:=trim(mask)+' '; //Das letzte Zeichen darf kein Steuerzeichen (d/m/z) sein
 
-  day:=$FFFF;
-  month:=$FFFF;
-  year:=$FFFF;
-  hour:=$FFFF;
-  minute:=$FFFF;
-  second:=$FFFF;
-  timeZone:=$FFFF;
+  day:=high(day);
+  month:=high(month);
+  year:=high(year);
+  hour:=high(hour);
+  minute:=high(minute);
+  second:=high(second);
+  timeZone:=high(Integer);
 
   //  openBracketCount:=0;
   MMMstr:='';
@@ -7586,55 +7588,55 @@ begin
     end;
   end;
 
-  if assigned(outMilliSeconds) then raise EDateTimeParsingException.Create('milliseconds not supported yet');
+  if assigned(outMilliSeconds) then outMilliSeconds^:=nan; // raise EDateTimeParsingException.Create('milliseconds not supported yet');
   if assigned(outSeconds) then outSeconds^:=second;
   if assigned(outMinutes) then outMinutes^:=minute;
   if assigned(outHour) then outHour^:=hour;
   if assigned(outDay) then outDay^:=day;
   if assigned(outMonth) then outMonth^:=month;
   if assigned(outYear) then
-    if year>=100 then outYear^ := year
+    if (year>=100) or (year < 0) then outYear^ := year
     else if year < 90 then outYear^ := year + 2000
     else outYear^ := year + 1900;
   if assigned(outTimeZone) then begin
-    if timeZone = $FFFF then outTimeZone^ := NaN
+    if timeZone = high(integer) then outTimeZone^ := NaN
     else outTimeZone^ := timeFromMinutes(timeZone);
   end;
 
 end;
 
-procedure timeParseParts(input, mask: string; outHour, outMinutes, outSeconds, outMilliSeconds: PWord; outtimezone: PDateTime);
+procedure timeParseParts(const input, mask: string; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble; outtimezone: PDateTime);
 begin
   dateTimeParseParts(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outMilliSeconds, outtimezone);
 end;
 
-function timeParse(input, mask: string): TTime;
+function timeParse(const input, mask: string): TTime;
 var
-  hour: Word;
-  minutes: Word;
-  seconds: Word;
+  hour, minutes, seconds: integer;
+  milliseconds: double;
   timeZone: TDateTime;
 begin
-  timeParseParts(input,mask,@hour,@minutes,@seconds,nil,@timeZone);
-  if hour=$FFFF then raise EDateTimeParsingException.Create('Konnte keine Stunde aus '+input+' im Format '+mask+' entnehmen');
-  if minutes=$FFFF then raise EDateTimeParsingException.Create('Konnte keine Minuten aus '+input+' im Format '+mask+' entnehmen');
-  if seconds=$FFFF then raise EDateTimeParsingException.Create('Konnte keine Sekunden aus '+input+' im Format '+mask+' entnehmen');
+  timeParseParts(input,mask,@hour,@minutes,@seconds,@milliseconds,@timeZone);
+  if hour=high(hour) then raise EDateTimeParsingException.Create('Konnte keine Stunde aus '+input+' im Format '+mask+' entnehmen');
+  if minutes=high(minutes) then raise EDateTimeParsingException.Create('Konnte keine Minuten aus '+input+' im Format '+mask+' entnehmen');
+  if seconds=high(seconds) then raise EDateTimeParsingException.Create('Konnte keine Sekunden aus '+input+' im Format '+mask+' entnehmen');
   result := EncodeTime(hour,minutes,seconds,0);
+  if not IsNan(milliseconds) then result += milliseconds / MSecsPerDay;
   if not IsNan(timeZone) then result -= timeZone;
 end;
 
-procedure dateParseParts(input, mask: string; outYear, outMonth, outDay: PWord; outtimezone: PDateTime);
+procedure dateParseParts(const input, mask: string; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime);
 begin
   dateTimeParseParts(input, mask, outYear, outMonth, outDay, nil, nil, nil, nil, outtimezone);
 end;
 
-function dateParse(input, mask: string): longint;
-var y,m,d: word;
+function dateParse(const input, mask: string): longint;
+var y,m,d: integer;
 begin
   dateParseParts(input, mask, @y, @m, @d);
-  if d=$FFFF then raise EDateTimeParsingException.Create('Konnte keinen Tag aus '+input+' im Format '+mask+' entnehmen');
-  if m=$FFFF then raise EDateTimeParsingException.Create('Konnte keinen Monat aus '+input+' im Format '+mask+' entnehmen');
-  if y=$FFFF then raise EDateTimeParsingException.Create('Konnte kein Jahr aus '+input+' im Format '+mask+' entnehmen');
+  if d=high(d) then raise EDateTimeParsingException.Create('Konnte keinen Tag aus '+input+' im Format '+mask+' entnehmen');
+  if m=high(m) then raise EDateTimeParsingException.Create('Konnte keinen Monat aus '+input+' im Format '+mask+' entnehmen');
+  if y=high(y) then raise EDateTimeParsingException.Create('Konnte kein Jahr aus '+input+' im Format '+mask+' entnehmen');
   result := trunc(EncodeDate(y,m,d));
 end;
 
