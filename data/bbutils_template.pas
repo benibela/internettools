@@ -266,6 +266,12 @@ function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArra
 function strWrapSplit(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
 function strWrap(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): string;
 
+//Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
+//the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
+//If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
+function strSplitGetUntilBracketClosing(const openBracket, closingBracket: string; var text: string; updateText: boolean): string;
+function strSplitGetBetweenBrackets(const openBracket, closingBracket: string; var text: string; updateText: boolean): string;
+
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
@@ -388,8 +394,6 @@ const DateMonthDaysCumSum: array[false..true,0..12] of Cardinal =
      ((00, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365),
      (00, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366));
 
-//**Returns a datetime from minutes
-function timeFromMinutes(const mins: integer): TTime;
 //**Week of year
 function dateWeekOfYear(const date:TDateTime):word;
 type EDateTimeParsingException = class(Exception);
@@ -404,21 +408,26 @@ type EDateTimeParsingException = class(Exception);
 //**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with 6 digit precision)
 //**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?')
 //**The letter formats d/y matches one or two digits, the dd/mm/yy formats require exactly two.@br
-//**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4)@br
-//**Notice that [yy]yy may not touch any other format letter, so [yy]yymmdd is an invalid mask. (but [yy]yy.mmdd is fine).
-//**The function works if the string is latin-1 or utf-8, and it also supports German month names
-procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
-//**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParseParts)
+//**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
+//**Generally [x] marks the part x as optional (it tries all possible combinations, so you shouldn't have more than 10 optional parts)@br
+//**".." can be used to match the input verbatim@br
+//**The function works if the string is latin-1 or utf-8, and it also supports German month names@br
+//**If a part is not found, it returns high(integer), except for outMilliSeconds which will be 0 at not found, and outtimezone which will be NaN@br
+//**@return(If input could be matched with mask. It does not check, if the returned values are valid (e.g. month = 13 is allowed, in case you have to match durations))
+function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil): boolean;
+//**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
+procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
+//**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function dateTimeFormat(const mask: string; const y: integer; const m,d, h, n, s: word): string;
-//**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParseParts)
+//**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
-//**Reads a time string given a certain mask (mask is case-sensitive)@br
+//**Reads a time string given a certain mask (@see dateTimeParsePartsTry)@br
 procedure timeParseParts(const input,mask:string; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
-//**Reads a time string given a certain mask (mask is case-sensitive)@br
+//**Reads a time string given a certain mask (@see dateTimeParsePartsTry).@br This function checks, if the time is valid.
 function timeParse(const input,mask:string): TTime;
-//**Reads a date string given a certain mask (mask is case-sensitive)@br
+//**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br
 procedure dateParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil);
-//**Reads a date string given a certain mask (mask is case-sensitive)@br
+//**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br This function checks, if the date is valid.
 function dateParse(const input,mask:string): longint;
 //**Encodes a date as datetime (supports negative years)
 function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
@@ -1130,6 +1139,49 @@ begin
   result := strJoin(strWrapSplit(line, MaxCol, BreakChars), #13);
 end;
 
+//Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
+//the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
+//If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
+function strSplitGetUntilBracketClosing(const openBracket, closingBracket: string; var text: string; updateText: boolean): string;
+var pos: integer;
+  opened: Integer;
+begin
+  opened := 1;
+  pos := 1;
+  while (pos <= length(text)) and (opened >= 1) do begin
+    if strlcomp(@text[pos], @openBracket[1], length(openBracket)) = 0 then begin
+      opened += 1;
+      pos += length(openBracket);
+    end else if strlcomp(@text[pos], @closingBracket[1], length(closingBracket)) = 0 then begin
+      opened -= 1;
+      pos += length(closingBracket);
+    end else pos+=1;
+  end;
+  if opened < 1 then begin
+    pos-=1;
+    result := copy(text, 1, pos - length(closingBracket));
+    if updateText then delete(text, 1, pos);
+  end else begin
+    result := text;
+    if updateText then text := '';
+  end;
+end;
+
+function strSplitGetBetweenBrackets(const openBracket, closingBracket: string; var text: string; updateText: boolean): string;
+var
+  start: SizeInt;
+  temp: String;
+begin
+  start := pos(openBracket, text);
+  if start = 0 then exit('');
+  if updateText then begin
+    delete(text, 1, start + length(openBracket) - 1);
+    result := strSplitGetUntilBracketClosing(openBracket, closingBracket, text, updateText);
+  end else begin
+    temp := copy(text, start + length(openBracket), length(text));
+    result := strSplitGetUntilBracketClosing(openBracket, closingBracket, temp, updateText);
+  end;
+end;
 
 {%REPEAT}
 //copied from bbutils, need this here
@@ -1892,213 +1944,210 @@ begin
   else result:=n div 7+1;
 end;
 
-procedure dateTimeParseParts(input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
-  procedure matchFailed;
-  begin
-    raise EDateTimeParsingException.Create('Das Datum '+input+' passt nicht zum erwarteten Format '+mask+'.'#13#10+
-                                   'Mögliche Ursachen: Beschädigung der Installation, Programmierfehler in VideLibri oder Änderung der Büchereiseite.'#13#10+
-                                   'Mögliche Lösungen: Neuinstallation, auf Update warten.');
-  end;
-  procedure invalidMask (reason:string);
-  begin
-    raise EDateTimeParsingException.Create('The mask '+mask+' is invalid (noticed while matching against ' +input+') (reason:'+reason+')');
-  end;
+const DATETIME_PARSING_FORMAT_CHARS = ['h','n','s','d','y','Z','z'];
 
-var mp,dp,day,month,year,hour,minute,second,milliseconds,millisecondsLength:longint;
-    timeZone:longint; //timeZone in minutes
-  MMMstr:string;
-//    openBracketCount: longint; //just needed to validate mask
+type T8Ints = array[1..8] of integer;
 
+function dateTimeParsePartsTryInternal(input,mask:string; var parts: T8Ints): boolean;
+function readNumber(const s:string; var ip: integer; const count: integer): integer;
+begin
+  result := StrToIntDef(copy(input, ip, count), -1);
+  ip += count;
+end;
 
-  minc, maxc: longint;
-  number: ^longint;
+var
+  i,j: Integer;
+
+  prefix, mid, suffix: String;
+  p, formatChars: Integer;
+
+  count: integer;
+  base: Char;
+  index: Integer;
+
+  mp, ip: integer;
   positive: Boolean;
+  backup: T8Ints;
 
-  //Reads (x*\[x*\]x*) with x\in{d,y}
-  //(why didn't I use a regexp :-(, because this unit shouldn't have dependencies! )
-  function readNumberBlockFromMask(): boolean;
-  var base: char;
-    bracketState: longint;
-  begin
-    base:=mask[mp];
-    bracketState:=0;
-    if mask[mp] = '[' then begin
-      mp+=1;
-
-      if not (mask[mp] in ['h','n','s','d','y','Z','z']) then begin
-        if input[dp] <> mask[mp] then begin
-          while ( mp <= length(mask) ) and ( mask[mp] <> ']' ) do mp += 1;
-          if mp > length(mask) then invalidMask('No closing ]');
-          mp+=1;
-          exit(false);
-        end;
-        repeat
-          if input[dp] <> mask[mp] then matchFailed; //if the first char matches, all must match
-          mp+=1;
-          dp+=1;
-        until (mask[mp] in ['h','n','s','d','y','Z','z',']']);
-        if mask[mp] = ']' then begin
-          mp+=1;
-          exit(false);
-        end;
-      end;
-      base:=mask[mp];
-      bracketState:=1;
-    end;
-    case base of
-      'h': number:=@hour;
-      'n': number:=@minute;
-      's': number:=@second;
-      'd': number:=@day;
-      'y': number:=@year;
-      'Z': number:=@timeZone;
-      'z': number:=@milliseconds;
-      else invalidMask(base)
-    end;
-    minc:=0;
-    maxc:=0;
-    while (mp <= length(mask)) and ((mask[mp] = base) or
-                                    ((mask[mp] = ']') and (bracketState=1))) do begin
-      if mask[mp] = base then begin
-        maxc+=1;
-        if bracketState<>1 then minc+=1;
-      end else if mask[mp] = '[' then bracketState+=1
-      else bracketState-=1;
-      mp+=1;
-    end;
-    if bracketState=1 then invalidMask('missing ]');
-    result := true;
-  end;
-
-  //Reads \d{minc,maxc}
-  function readNumberFromDate(var number: integer; const minc, maxc: integer): integer;
-  var neg: boolean;
-  begin
-    result:=0;
-    neg := false;
-    if (@number = @year) and  (input[dp] = '-') and (input[dp+1] in ['0'..'9']) then begin dp+=1; neg := true; end;
-    while (dp <= length(input)) and (input[dp] in ['0'..'9']) and (result < maxc) do begin
-      number:=number*10+(ord(input[dp])-ord('0'));
-      result+=1;
-      dp+=1;
-    end;
-    if neg then number*=-1;
-    if result < minc then matchFailed;
-  end;
 
 begin
-  input:=trim(input)+' ';
-  mask:=trim(mask)+' '; //Das letzte Zeichen darf kein Steuerzeichen (d/m/z) sein
+  p := pos('[', mask);
+  if p > 0 then begin
+    suffix := mask;
+    prefix := copy(mask, 1, p - 1);
+    mid := strSplitGetBetweenBrackets('[', ']', suffix, true);
 
-  day:=high(day);
-  month:=high(month);
-  year:=high(year);
-  hour:=high(hour);
-  minute:=high(minute);
-  second:=high(second);
-  milliseconds:=high(milliseconds);
-  millisecondsLength:=0;
-  timeZone:=high(Integer);
+    backup := parts;
+    result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts);
+    if result then exit
+    else parts := backup;
+    if pos('[', mid) = 0 then begin
+      formatChars:=0;
+      for i:=1 to length(mid) do
+        if (mid[i] in DATETIME_PARSING_FORMAT_CHARS) then formatChars+=1;  //todo: check for ", but really, whotf cares?
+      for i:=1 to formatChars-1 do begin
+        for j:=1 to length(mid) do
+          if (mid[j] in DATETIME_PARSING_FORMAT_CHARS) then begin //mmm <> mm??
+            delete(mid, j, 1);
+            break;
+          end;
+        backup := parts;
+        result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts);
+        if result then exit
+        else parts := backup;
+      end;
+    end;
+    backup := parts; result := dateTimeParsePartsTryInternal(input, prefix+suffix, parts);
+    if not result then parts := backup;
+    exit;
+  end;
 
-  //  openBracketCount:=0;
-  MMMstr:='';
 
   mp:=1;
-  dp:=1;
-  while mp<length(mask) do begin
+  ip:=1;
+  while mp<=length(mask) do begin
     case mask[mp] of
-      'h','n','s','d', 'y', 'Z', 'z', '[': begin
-        if not readNumberBlockFromMask() then continue;
-        if (number = @day) and (maxc = 1) then maxc:=2; //map 'd' to '[d]d'
-        if number <> @timeZone then begin
-          if number^ = high(number^) then number^ := 0;
-          minc := readNumberFromDate(number^, minc, maxc);
-          if number = @milliseconds then millisecondsLength := minc;
-        end else begin
-          if input[dp] = 'Z' then begin number^ := 0; dp+=1; end //timezone = utc
-          else if (input[dp] in ['-','+']) then begin
-            number^ := 0;
-            positive := input[dp] = '+';
-            dp+=1;
-            if readNumberFromDate(timeZone, 2, 4) = 2 then
-              if input[dp] = ':' then begin dp+=1; readNumberFromDate(timeZone, 2, 2); end
-              else timeZone*=100;
-            timeZone := (timeZone div 100) * 60 + (timeZone mod 100);
-            if not positive then timeZone := - timeZone;
-          end else if minc > 0 then matchFailed;
+      'h','n','s','d', 'm', 'y', 'Z', 'z': begin
+        count := 0;
+        base := mask[mp];
+        while (mp <= length(mask)) and (mask[mp] = base) do begin mp+=1; count+=1; end;
+
+        index := -1;
+        case base of
+          'y': index := 1; 'm': index := 2; 'd': index := 3;
+          'h': index := 4; 'n': index := 5; 's': index := 6;
+          'z': index := 7;
+          'Z': index := 8;
+          else assert(false);
         end;
+
+        if ip+count-1 > length(input) then exit(false);
+
+        if (base='y') and (input[ip] = '-') then begin //special case: allow negative years
+          if input[ip] = '-' then begin
+            ip+=1;
+            parts[index] := - readNumber(input,ip,count);
+            if parts[index] = --1 then exit(false);
+          end;
+          continue;
+        end;
+
+        if (base = 'm') and (count = 3) then begin //special case verbose month names
+          //special month name handling
+          mid:=LowerCase(input[ip]+input[ip+1]+input[ip+2]);
+          if mid='jan' then parts[2]:=1
+          else if mid='feb' then parts[2]:=2
+          else if mid='mar' then parts[2]:=3
+          else if mid='m'#$E4'r' then parts[2]:=3
+          else if (mid='m'#$C3#$A4) and (input[ip+3]='r') then begin
+            parts[2]:=3;
+            ip+=1;
+          end else if mid='apr' then parts[2]:=4
+          else if mid='mai' then parts[2]:=5
+          else if mid='may' then parts[2]:=5
+          else if mid='jun' then parts[2]:=6
+          else if mid='jul' then parts[2]:=7
+          else if mid='aug' then parts[2]:=8
+          else if mid='sep' then parts[2]:=9
+          else if mid='okt' then parts[2]:=10
+          else if mid='oct' then parts[2]:=10
+          else if mid='nov' then parts[2]:=11
+          else if mid='dez' then parts[2]:=12
+          else if mid='dec' then parts[2]:=12
+          else exit(false);
+          ip+=3;
+          continue;
+        end;
+
+        if base = 'Z' then begin //special case time zone
+          if ip > length(input) then exit(false);
+          if input[ip] = 'Z' then begin parts[index] := 0; ip+=1; end //timezone = utc
+          else if (input[ip] in ['-','+']) then begin
+            parts[index]  := 0;
+            positive := input[ip] = '+';
+            ip+=1;
+            parts[index] := 60 * readNumber(input, ip, 2);
+            if parts[index] = -1 then exit(false);
+            if ip <= length(input) then begin
+              if input[ip] = ':' then ip+=1;
+              if input[ip] in ['0'..'9'] then begin
+                i := readNumber(input, ip, 2);
+                if i = -1 then exit(false);
+                parts[index] += i;
+              end;
+            end;
+            if not positive then parts[index] := - parts[index];
+          end else exit(false);
+          continue;
+        end;
+
+        parts[index] := readNumber(input, ip, count);
+        if parts[index] = -1 then exit(false);
+
+        if base = 'z' then
+          for i:=count + 1 to 9 do
+            parts[index] *= 10; //fixed length ms
       end;
-      'm': begin //Monat
-        if mask[mp+1] = 'm' then begin
-          if mask[mp+2] = 'm' then begin //mmm
-            MMMstr:=LowerCase(input[dp]+input[dp+1]+input[dp+2]);
-            if MMMstr='jan' then month:=1
-            else if MMMstr='feb' then month:=2
-            else if MMMstr='mar' then month:=3
-            else if MMMstr='m'#$E4'r' then month:=3
-            else if (MMMstr='m'#$C3#$A4) and (input[dp+3]='r') then begin
-              month:=3;
-              dp+=1;
-            end else if MMMstr='apr' then month:=4
-            else if MMMstr='mai' then month:=5
-            else if MMMstr='may' then month:=5
-            else if MMMstr='jun' then month:=6
-            else if MMMstr='jul' then month:=7
-            else if MMMstr='aug' then month:=8
-            else if MMMstr='sep' then month:=9
-            else if MMMstr='okt' then month:=10
-            else if MMMstr='oct' then month:=10
-            else if MMMstr='nov' then month:=11
-            else if MMMstr='dez' then month:=12
-            else if MMMstr='dec' then month:=12
-            else matchFailed;
-            dp+=3;
-            mp+=3;
-          end else begin //mm
-            month:=StrToInt(input[dp])*10+StrToInt(input[dp+1]);
-            dp+=2;
-            mp+=2;
-          end;
-        end else begin //m
-          month:=StrToInt(input[dp]);
-          dp+=1;
-          if input[dp] in ['0'..'9'] then begin
-            month:=month*10+StrToInt(input[dp]);
-            dp+=1;
-          end;
+      ']': raise EDateTimeParsingException.Create('Invalid mask: missing [, you can use \] to escape ]');
+      '"': begin
+        mp+=1;
+        while (mp <= length(mask)) and (ip <= length(input)) and (mask[mp] <> '"') and  (mask[mp] = input[ip]) do begin
+          ip+=1;
           mp+=1;
         end;
+        if (mp > length(mask)) or (mask[mp] <> '"') then exit(false);
+        mp+=1;
+      end
+      else if (mask[mp] = '$') and (mp  = length(mask)) then begin
+        result := ip = length(input) + 1;
+        exit;
+      end else if (ip > length(input)) or (mask[mp]<>input[ip]) then exit(false)
+      else begin
+        mp+=1;
+        ip+=1;
       end;
-      ']': invalidMask('missing [, you can use \] to escape ]');
-      else if (mask[mp] = '$') and (mp + 1 = length(mask)) then begin
-        if dp = length(input) then break;
-        matchFailed;
-      end else if mask[mp]<>input[dp] then
-        matchFailed
-       else begin
-         mp+=1;
-         dp+=1;
-       end;
     end;
   end;
+  result := true;
+end;
 
-  if assigned(outMilliSeconds) then
-    if millisecondsLength = 0 then outMilliSeconds^:=nan
-    else outMilliSeconds^:=milliseconds * (1000 / Math.intpower(10, millisecondsLength));
-  if assigned(outSeconds) then outSeconds^:=second;
-  if assigned(outMinutes) then outMinutes^:=minute;
-  if assigned(outHour) then outHour^:=hour;
-  if assigned(outDay) then outDay^:=day;
-  if assigned(outMonth) then outMonth^:=month;
-  if assigned(outYear) then
-    if (year>=100) or (year < 0) then outYear^ := year
-    else if year < 90 then outYear^ := year + 2000
-    else outYear^ := year + 1900;
-  if assigned(outTimeZone) then begin
-    if timeZone = high(integer) then outTimeZone^ := NaN
-    else outTimeZone^ := timeFromMinutes(timeZone);
+
+function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil): boolean;
+var parts: T8Ints;
+  i: Integer;
+  mask2: String;
+const singleletters: string = 'mdhns';
+begin
+  for i:=low(parts) to high(parts) do parts[i] := high(parts[i]);
+  mask2 := trim(mask);
+  for i:=1 to length(singleletters) do begin//single m,d,h,n,s doesn't make sense, so replace x by [x]x
+    if strlcount(singleletters[i], pchar(mask2), length(mask2)) <> 1 then continue;
+    mask2 := StringReplace(mask2, singleletters[i], '['+singleletters[i]+']'+singleletters[i],[]);
   end;
+  result := dateTimeParsePartsTryInternal(trim(input), mask2, parts);
+  if not result then exit;
+  if assigned(outYear) then
+    if (parts[1]>=100) or (parts[1] < 0) then outYear^ := parts[1]
+    else if parts[1] < 90 then outYear^ := parts[1] + 2000
+    else outYear^ := parts[1] + 1900;
+  if assigned(outMonth) then outMonth^:=parts[2];
+  if assigned(outDay) then outDay^:=parts[3];
+  if assigned(outHour) then outHour^:=parts[4];
+  if assigned(outMinutes) then outMinutes^:=parts[5];
+  if assigned(outSeconds) then outSeconds^:=parts[6];
+  if assigned(outMilliSeconds) then
+    if parts[7] = high(parts[7]) then outMilliSeconds^:=0
+    else outMilliSeconds^:= parts[7] / 1000000{000.0};
+  if assigned(outTimeZone) then begin
+    if parts[8] = high(integer) then outTimeZone^ := NaN
+    else outTimeZone^ := parts[8] / MinsPerDay;
+  end;
+end;
 
+procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil);
+begin
+  if not dateTimeParsePartsTry(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outMilliSeconds, outtimezone) then
+    raise Exception.Create('The date time ' + input + ' does not correspond to the date time format ' + mask);
 end;
 
 function dateTimeFormat(const mask: string; const y: integer; const m, d, h, n, s: word): string;
@@ -2109,6 +2158,7 @@ var mp: integer;
     oldpos: Integer;
   begin
     while (mp <= length(mask)) and (mask[mp] = '[') do begin
+      oldpos := mp;
       while (mp <= length(mask)) and (mask[mp] <> ']') do
         mp+=1;
       mp+=1;
@@ -2901,19 +2951,22 @@ begin
 end;
 
 procedure unitTests();
-const strs: array[1..14,1..2] of string=(
+const strs: array[1..16,1..2] of string=(
       ('05.10.1985','dd.mm.yyyy'),('05.10.1942','dd.mm.yy[yy]'),('05.10.42','dd.mm.yy[yy]'),
       ('19.10-1942','dd.mm-[yy]yy'),('19.10-90','dd.mm-[yy]yy'), ('11.7.2005','d.m.yyyy'),
       ('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),
       ('  11 Mär 1700',' dd mmm yyyy  '),('  15 Mär 1200XXXXXXXXXXXXXX',' dd mmm yyyy  '), ('20121014', 'yyyymmdd'),
-      ('20000304', 'yyyy[FOOBAR]mmdd'),('2000FOOBAR0405', 'yyyy[FOOBAR]mmdd')
+      ('20000304', 'yyyy[FOOBAR]mmdd'),('2000FOOBAR0405', 'yyyy[FOOBAR]mmdd'),
+      ('19890427', '[yy]yymmdd'), ('120709', '[yy]yymmdd')
       );
-      dates: array[1..14, 1..3] of word = (
+      dates: array[1..16, 1..3] of word = (
       (1985,10,5),(1942,10,5),(2042,10,5),
       (1942,10,19),(1990,10,19),(2005,7,11),
       (2000,1,16),(1989,6,17),(1953,9,29),
       (1700,3,11),(1200,3,15), (2012, 10, 14),
-      (2000,03,04), (2000,04,05));
+      (2000,03,04), (2000,04,05),
+      (1989,04,27), (2012,07,09)
+      );
 
 var i:longint;
 
@@ -2939,7 +2992,7 @@ begin
   dateParseParts('2010-05-06-02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -2.5/24);
   dateParseParts('2010-05-06Z','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
   dateParseParts('2010-05-06+01','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
-  dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan');
+  dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan: ' + FloatToStr(tz));
   dateParseParts('-0753-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, -753); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan');
   dateParseParts('---07','---dd', @y, @m, @d, @tz); test(d, 7);
   dateParseParts('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
@@ -2953,6 +3006,11 @@ begin
   timeParseParts('12:13:14.004','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 4);
   timeParseParts('12:13:14.1235','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123);
   timeParseParts('12:13:14.1235','hh:nn:ss[.zzzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123.5);
+  dateParseParts('12M10D', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 12); test(d, 10);
+  dateParseParts('08M', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 08); test(d, high(integer));
+  dateParseParts('09D', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, 9);
+  dateParseParts('', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, high(integer));
+  dateParseParts('dd05', '"dd"mm', @y, @m, @d, @ms); test(m, 05); test(d, high(integer));
 
   test(dateEncode(1,1,1), EncodeDate(1,1,1));
   test(dateEncode(2012,10,31), EncodeDate(2012,10,31));
