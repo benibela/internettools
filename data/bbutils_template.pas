@@ -3011,6 +3011,16 @@ begin
   dateParseParts('09D', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, 9);
   dateParseParts('', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, high(integer));
   dateParseParts('dd05', '"dd"mm', @y, @m, @d, @ms); test(m, 05); test(d, high(integer));
+  dateParseParts('X10M12D', '[yyyyY][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, high(integer)); test(m, 10); test(d, 12);
+  dateParseParts('X09M', '[yyyyY][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, high(integer)); test(m, 9); test(d, high(integer));
+  dateParseParts('X03M17D', '[yyyyY][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, high(integer)); test(m, 03); test(d, 17);
+  dateParseParts('1017Y', '[yyyyY][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, high(integer));test(d, high(integer));
+  dateParseParts('1017YX13D', '[yyyyY][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, high(integer));test(d, 13);
+  dateParseParts('1017YX45M13D', '[yyyyY][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 45);test(d, 13);
+  dateParseParts('1017YX47M13D', '[yyyyY][X[[m]mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 47);test(d, 13);
+  dateParseParts('1017YX2M13D', '[yyyyY][X[[m]mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 2);test(d, 13);
+  dateParseParts('1017YX8M13D', '[yyyyY][X[mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 8);test(d, 13);
+  dateParseParts('1017YX54M13D', '[yyyyY][X[[m]mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 54);test(d, 13);
 
   test(dateEncode(1,1,1), EncodeDate(1,1,1));
   test(dateEncode(2012,10,31), EncodeDate(2012,10,31));
