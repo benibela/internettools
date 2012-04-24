@@ -403,14 +403,16 @@ type EDateTimeParsingException = class(Exception);
 //**n or nn for a minute  @br
 //**h or hh for a hour  @br
 //**d or dd for a numerical day  @br
-//**m or mm for a numerical month, mmm for a short month name@br
+//**m or mm for a numerical month, mmm for a short month name, mmmm for a long month name@br
+//**am/pm or a/p match am/pm or a/p
 //**yy, yyyy or [yy]yy for the year  @br
 //**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional ms with up to 6 digit precision)
-//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format char matching several characters)
-//**The letter formats d/y matches one or two digits, the dd/mm/yy formats require exactly two.@br
+//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format char (except mmm) matching several characters)
+//**The letter formats d/y/h/n/s matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
 //**Generally [x] marks the part x as optional (it tries all possible combinations, so you shouldn't have more than 10 optional parts)@br
-//**".." can be used to match the input verbatim@br
+//**"something" can be used to match the input verbatim@br
+//**whitespace is matched against whitespace (i.e. [ #9#10#13]+ matches [ #9#10#13]+)
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names@br
 //**If a part is not found, it returns high(integer), except for outMilliSeconds which will be 0 at not found, and outtimezone which will be NaN@br
 //**@return(If input could be matched with mask. It does not check, if the returned values are valid (e.g. month = 13 is allowed, in case you have to match durations))
@@ -1944,11 +1946,33 @@ begin
   else result:=n div 7+1;
 end;
 
-const DATETIME_PARSING_FORMAT_CHARS = ['h','n','s','d','y','Z','z'];
+//const DATETIME_PARSING_FORMAT_CHARS = ['h','n','s','d','y','Z','z'];
 
-type T8Ints = array[1..8] of integer;
+type T9Ints = array[1..9] of integer;
 
-function dateTimeParsePartsTryInternal(input,mask:string; var parts: T8Ints): boolean;
+function dateTimeParsePartsTryInternal(input,mask:string; var parts: T9Ints): boolean;
+type THumanReadableName = record
+  n: string;
+  v: integer;
+end;
+const DefaultShortMonths: array[1..17] of THumanReadableName = (
+   //english
+   (n:'jan'; v:1), (n:'feb'; v:2), (n:'mar'; v: 3), (n:'apr'; v:4), (n:'may'; v:5), (n:'jun'; v:6)
+  ,(n:'jul'; v:7), (n:'aug'; v:8), (n:'sep'; v: 9), (n:'oct'; v:10), (n:'nov'; v:11), (n:'dec'; v:12),
+   //german (latin1)
+   (n:'m'#$E4'r'; v:3), (n:'mai'; v:5), (n:'okt'; v:10), (n:'dez'; v:12),
+   //german (utf8)
+   (n:'m'#$C3#$A4'r'; v:3)
+  );
+const DefaultLongMonths: array[1..21] of THumanReadableName = (
+  //english
+  (n:'january';v:1), (n:'february';v:2), (n:'march';v:3), (n:'april';v: 4), (n:'may';v: 5), (n:'june';v:6),
+  (n:'july';v:7), (n:'august';v:8), (n:'september';v:9), (n:'october';v:10), (n:'november';v:11), (n:'december';v:12),
+  //german
+  (n:'januar';v:1), (n:'februar';v:2), (n:'m'#$E4'rz';v:3), (n:'mai';v: 5), (n:'juni';v:6),
+  (n:'juli';v:7), (n:'oktober';v:10), (n:'dezember';v:12),
+  (n:'m'#$C3#$A4'rz';v:3));
+
 function readNumber(const s:string; var ip: integer; const count: integer): integer;
 begin
   result := StrToIntDef(copy(input, ip, count), -1);
@@ -1967,7 +1991,7 @@ var
 
   mp, ip: integer;
   positive: Boolean;
-  backup: T8Ints;
+  backup: T9Ints;
 
 
 begin
@@ -2007,10 +2031,17 @@ begin
   ip:=1;
   while mp<=length(mask) do begin
     case mask[mp] of
-      'h','n','s','d', 'm', 'y', 'Z', 'z': begin
+      'h','n','s','d', 'm', 'y', 'Z', 'z', 'a': begin
         count := 0;
         base := mask[mp];
-        while (mp <= length(mask)) and (mask[mp] = base) do begin mp+=1; count+=1; end;
+        if mask[mp] <> 'a' then begin
+          while (mp <= length(mask)) and (mask[mp] = base) do begin mp+=1; count+=1; end;
+        end else begin //am/pm special case
+          if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then mp+=5
+          else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then mp+=3
+          else if input[ip] <> 'a' then exit(false)
+          else continue;
+        end;
 
         index := -1;
         case base of
@@ -2018,67 +2049,94 @@ begin
           'h': index := 4; 'n': index := 5; 's': index := 6;
           'z': index := 7;
           'Z': index := 8;
+          'a': index := 9;
           else assert(false);
         end;
 
         if ip+count-1 > length(input) then exit(false);
 
-        if (base='y') and (input[ip] = '-') then begin //special case: allow negative years
-          if input[ip] = '-' then begin
+        case base of
+          'y': if (input[ip] = '-') then begin //special case: allow negative years
             ip+=1;
             parts[index] := - readNumber(input,ip,count);
             if parts[index] = --1 then exit(false);
+            continue;
           end;
-          continue;
-        end;
-
-        if (base = 'm') and (count = 3) then begin //special case verbose month names
-          //special month name handling
-          mid:=LowerCase(input[ip]+input[ip+1]+input[ip+2]);
-          if mid='jan' then parts[2]:=1
-          else if mid='feb' then parts[2]:=2
-          else if mid='mar' then parts[2]:=3
-          else if mid='m'#$E4'r' then parts[2]:=3
-          else if (mid='m'#$C3#$A4) and (input[ip+3]='r') then begin
-            parts[2]:=3;
-            ip+=1;
-          end else if mid='apr' then parts[2]:=4
-          else if mid='mai' then parts[2]:=5
-          else if mid='may' then parts[2]:=5
-          else if mid='jun' then parts[2]:=6
-          else if mid='jul' then parts[2]:=7
-          else if mid='aug' then parts[2]:=8
-          else if mid='sep' then parts[2]:=9
-          else if mid='okt' then parts[2]:=10
-          else if mid='oct' then parts[2]:=10
-          else if mid='nov' then parts[2]:=11
-          else if mid='dez' then parts[2]:=12
-          else if mid='dec' then parts[2]:=12
-          else exit(false);
-          ip+=3;
-          continue;
-        end;
-
-        if base = 'Z' then begin //special case time zone
-          if ip > length(input) then exit(false);
-          if input[ip] = 'Z' then begin parts[index] := 0; ip+=1; end //timezone = utc
-          else if (input[ip] in ['-','+']) then begin
-            parts[index]  := 0;
-            positive := input[ip] = '+';
-            ip+=1;
-            parts[index] := 60 * readNumber(input, ip, 2);
-            if parts[index] = -1 then exit(false);
-            if ip <= length(input) then begin
-              if input[ip] = ':' then ip+=1;
-              if input[ip] in ['0'..'9'] then begin
-                i := readNumber(input, ip, 2);
-                if i = -1 then exit(false);
-                parts[index] += i;
-              end;
+          'm': case count of
+            3: begin //special case verbose month names
+              //special month name handling
+              mid:=LowerCase(input[ip]+input[ip+1]+input[ip+2]);
+              parts[2] := high(parts[2]);
+              for i:=low(DefaultShortMonths) to high(DefaultShortMonths) do
+                if ((length(DefaultShortMonths[i].n) = 3) and (mid = DefaultShortMonths[i].n)) or
+                   ((length(DefaultShortMonths[i].n) <> 3) and strliequal(@input[ip], DefaultShortMonths[i].n, length(DefaultShortMonths[i].n))) then begin
+                     ip += length(DefaultShortMonths[i].n);
+                     parts[2] := DefaultShortMonths[i].v;
+                     break;
+                   end;
+              if parts[2] <> high(parts[2]) then continue;
+              for i:=1 to 12 do
+                if ((length(DefaultFormatSettings.ShortMonthNames[i]) = 3) and (DefaultFormatSettings.ShortMonthNames[i] = mid)) or
+                   (strliequal(@input[ip], DefaultFormatSettings.ShortMonthNames[i], length(DefaultFormatSettings.ShortMonthNames[i]))) then begin
+                     ip += length(DefaultFormatSettings.ShortMonthNames[i]);
+                     parts[2] := i;
+                     break;
+                   end;
+              if parts[2] <> high(parts[2]) then continue;
+              exit(false)
             end;
-            if not positive then parts[index] := - parts[index];
-          end else exit(false);
-          continue;
+            4: begin
+              //special month name handling
+              parts[2] := high(parts[2]);
+              for i:=low(DefaultLongMonths) to high(DefaultLongMonths) do
+                if strliequal(@input[ip], DefaultLongMonths[i].n, length(DefaultLongMonths[i].n)) then begin
+                     ip += length(DefaultLongMonths[i].n);
+                     parts[2] := DefaultLongMonths[i].v;
+                     break;
+                   end;
+              if parts[2] <> high(parts[2]) then continue;
+              for i:=1 to 12 do
+                if strliequal(@input[ip], DefaultFormatSettings.LongMonthNames[i], length(DefaultFormatSettings.LongMonthNames[i])) then begin
+                  ip += length(DefaultFormatSettings.LongMonthNames[i]);
+                  parts[2] := i;
+                  break;
+                end;
+              if parts[2] <> high(parts[2]) then continue;
+              exit(false)
+            end;
+          end;
+          'Z': begin //timezone
+            if ip > length(input) then exit(false);
+            if input[ip] = 'Z' then begin parts[index] := 0; ip+=1; end //timezone = utc
+            else if (input[ip] in ['-','+']) then begin
+              parts[index]  := 0;
+              positive := input[ip] = '+';
+              ip+=1;
+              parts[index] := 60 * readNumber(input, ip, 2);
+              if parts[index] = -1 then exit(false);
+              if ip <= length(input) then begin
+                if input[ip] = ':' then ip+=1;
+                if input[ip] in ['0'..'9'] then begin
+                  i := readNumber(input, ip, 2);
+                  if i = -1 then exit(false);
+                  parts[index] += i;
+                end;
+              end;
+              if not positive then parts[index] := - parts[index];
+            end else exit(false);
+            continue;
+          end;
+          'a': begin //am/pm or a/p
+            if (input[ip] in ['a', 'A']) then parts[index] := 0
+            else if (input[ip] in ['p', 'P']) then parts[index] := 12
+            else exit(false);
+            ip+=1;
+            if mask[mp-1] = 'm' then begin
+              if not (input[ip] in ['m', 'M']) then exit(false);
+              ip += 1;
+            end;
+            continue;
+          end;
         end;
 
         parts[index] := readNumber(input, ip, count);
@@ -2089,7 +2147,7 @@ begin
             parts[index] *= 10; //fixed length ms
       end;
       ']': raise EDateTimeParsingException.Create('Invalid mask: missing [, you can use \] to escape ]');
-      '"': begin
+      '"': begin   //verbatim
         mp+=1;
         while (mp <= length(mask)) and (ip <= length(input)) and (mask[mp] <> '"') and  (mask[mp] = input[ip]) do begin
           ip+=1;
@@ -2097,6 +2155,12 @@ begin
         end;
         if (mp > length(mask)) or (mask[mp] <> '"') then exit(false);
         mp+=1;
+      end;
+      ' ',#9: begin //skip whitespace
+        if ip > length(input) then exit(false);
+        while (mp <= length(mask)) and (mask[mp] in [' ',#9]) do mp+=1;
+        if not (input[ip] in [' ',#9]) then exit(false);
+        while (ip <= length(input)) and (input[ip] in [' ',#9]) do ip+=1;
       end
       else if (mask[mp] = '$') and (mp  = length(mask)) then begin
         result := ip = length(input) + 1;
@@ -2113,7 +2177,7 @@ end;
 
 
 function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outMilliSeconds: PDouble = nil; outtimezone: PDateTime = nil): boolean;
-var parts: T8Ints;
+var parts: T9Ints;
   i: Integer;
   mask2: String;
 const singleletters: string = 'mdhns';
@@ -2132,7 +2196,10 @@ begin
     else outYear^ := parts[1] + 1900;
   if assigned(outMonth) then outMonth^:=parts[2];
   if assigned(outDay) then outDay^:=parts[3];
-  if assigned(outHour) then outHour^:=parts[4];
+  if assigned(outHour) then begin
+    outHour^:=parts[4];
+    if parts[9] = 12 then outHour^ += 12;
+  end;
   if assigned(outMinutes) then outMinutes^:=parts[5];
   if assigned(outSeconds) then outSeconds^:=parts[6];
   if assigned(outMilliSeconds) then
@@ -2951,21 +3018,23 @@ begin
 end;
 
 procedure unitTests();
-const strs: array[1..16,1..2] of string=(
+const strs: array[1..19,1..2] of string=(
       ('05.10.1985','dd.mm.yyyy'),('05.10.1942','dd.mm.yy[yy]'),('05.10.42','dd.mm.yy[yy]'),
       ('19.10-1942','dd.mm-[yy]yy'),('19.10-90','dd.mm-[yy]yy'), ('11.7.2005','d.m.yyyy'),
       ('2000-Jan-16','yyyy-mmm-d'),('1989#Jun#17','yyyy#mmm#dd'),('  29 Sep 1953','dd mmm yyyy'),
       ('  11 Mär 1700',' dd mmm yyyy  '),('  15 Mär 1200XXXXXXXXXXXXXX',' dd mmm yyyy  '), ('20121014', 'yyyymmdd'),
       ('20000304', 'yyyy[FOOBAR]mmdd'),('2000FOOBAR0405', 'yyyy[FOOBAR]mmdd'),
-      ('19890427', '[yy]yymmdd'), ('120709', '[yy]yymmdd')
+      ('19890427', '[yy]yymmdd'), ('120709', '[yy]yymmdd'),
+      ('3 März 2018', 'd mmmm yyyy'), ('21 Dezember 2012', 'd mmmm yyyy'), ('23  January 2007', 'd mmmm yyyy')
       );
-      dates: array[1..16, 1..3] of word = (
+      dates: array[1..19, 1..3] of word = (
       (1985,10,5),(1942,10,5),(2042,10,5),
       (1942,10,19),(1990,10,19),(2005,7,11),
       (2000,1,16),(1989,6,17),(1953,9,29),
       (1700,3,11),(1200,3,15), (2012, 10, 14),
       (2000,03,04), (2000,04,05),
-      (1989,04,27), (2012,07,09)
+      (1989,04,27), (2012,07,09),
+      (2018, 3, 3), (2012, 12, 21), (2007, 1, 23)
       );
 
 var i:longint;
@@ -3006,6 +3075,13 @@ begin
   timeParseParts('12:13:14.004','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 4);
   timeParseParts('12:13:14.1235','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123);
   timeParseParts('12:13:14.1235','hh:nn:ss[.z[z[z[z]]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123.5);
+  timeParseParts('9:45:10','h:n:s[ am/pm]', @y, @m, @d, @ms); test(y, 9); test(m, 45); test(d, 10);
+  timeParseParts('9:45:10 am','h:n:s[ am/pm]', @y, @m, @d, @ms); test(y, 9); test(m, 45); test(d, 10);
+  timeParseParts('9:45:10 pm','h:n:s[ am/pm]', @y, @m, @d, @ms); test(y, 21); test(m, 45); test(d, 10);
+  timeParseParts('am3','am/pmh', @y, @m, @d, @ms); test(y, 3);
+  timeParseParts('pm5','am/pmh', @y, @m, @d, @ms); test(y, 17);
+  timeParseParts('a4','a/ph', @y, @m, @d, @ms); test(y, 4);
+  timeParseParts('p6','a/ph', @y, @m, @d, @ms); test(y, 18);
   dateParseParts('12M10D', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 12); test(d, 10);
   dateParseParts('08M', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 08); test(d, high(integer));
   dateParseParts('09D', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, 9);
