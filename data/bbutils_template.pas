@@ -405,8 +405,8 @@ type EDateTimeParsingException = class(Exception);
 //**d or dd for a numerical day  @br
 //**m or mm for a numerical month, mmm for a short month name@br
 //**yy, yyyy or [yy]yy for the year  @br
-//**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with 6 digit precision)
-//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?')
+//**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional ms with up to 6 digit precision)
+//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format char matching several characters)
 //**The letter formats d/y matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
 //**Generally [x] marks the part x as optional (it tries all possible combinations, so you shouldn't have more than 10 optional parts)@br
@@ -1979,9 +1979,9 @@ begin
 
     backup := parts;
     result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts);
-    if result then exit
-    else parts := backup;
-    if pos('[', mid) = 0 then begin
+    if not result then parts := backup
+    else  exit;
+    {if pos('[', mid) = 0 then begin
       formatChars:=0;
       for i:=1 to length(mid) do
         if (mid[i] in DATETIME_PARSING_FORMAT_CHARS) then formatChars+=1;  //todo: check for ", but really, whotf cares?
@@ -1996,8 +1996,8 @@ begin
         if result then exit
         else parts := backup;
       end;
-    end;
-    backup := parts; result := dateTimeParsePartsTryInternal(input, prefix+suffix, parts);
+    end;}
+    result := dateTimeParsePartsTryInternal(input, prefix+suffix, parts);
     if not result then parts := backup;
     exit;
   end;
@@ -2998,14 +2998,14 @@ begin
   dateParseParts('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
   dateParseParts('---08Z','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
   timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d); test(y, 14); test(m, 30); test(d, 21);
-  timeParseParts('12:13:14','hh:nn:ss[.zzz]', @y, @m, @d); test(y, 12); test(m, 13); test(d, 14);
+  timeParseParts('12:13:14','hh:nn:ss[.z[z[z]]]', @y, @m, @d); test(y, 12); test(m, 13); test(d, 14);
   timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d, @ms); test(y, 14); test(m, 30); test(d, 21);
-  timeParseParts('12:13:14','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14);
-  timeParseParts('12:13:14.1','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 100);
-  timeParseParts('12:13:14.02','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 20);
-  timeParseParts('12:13:14.004','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 4);
-  timeParseParts('12:13:14.1235','hh:nn:ss[.zzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123);
-  timeParseParts('12:13:14.1235','hh:nn:ss[.zzzz]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123.5);
+  timeParseParts('12:13:14','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14);
+  timeParseParts('12:13:14.1','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 100);
+  timeParseParts('12:13:14.02','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 20);
+  timeParseParts('12:13:14.004','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 4);
+  timeParseParts('12:13:14.1235','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123);
+  timeParseParts('12:13:14.1235','hh:nn:ss[.z[z[z[z]]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 123.5);
   dateParseParts('12M10D', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 12); test(d, 10);
   dateParseParts('08M', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 08); test(d, high(integer));
   dateParseParts('09D', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, 9);
