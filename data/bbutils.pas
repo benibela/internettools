@@ -7823,7 +7823,7 @@ var mp: integer;
       'h': result := (h <> 0) and (h <> high(integer));
       'n': result := (n <> 0) and (n <> high(integer));
       's': result := (s <> 0) and (s <> high(integer));
-      'z': result := (not IsNan(secondFraction)) and (secondFraction <> 0);
+      'z': result := not IsNan(secondFraction) and (secondFraction <> 0);
       'Z': result := not IsNan(timezone);
       else raise exception.Create('impossible');
     end;
@@ -7846,7 +7846,6 @@ var mp: integer;
           okc := result[i];
           break;
         end;
-//      writeln(result, ':', okc, secondFraction);
       if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then
         exit('"' + dateTimeFormat(result, y, m, d, h, n, s, secondFraction, timezone) + '"');
       result:='';
@@ -7888,16 +7887,14 @@ begin
       'n': result += strFromInt(n, length(part));
       's': result += strFromInt(s, length(part));
       'z': begin
-        if (mask[mp-1] = '+') and (length(part) < 4) then part := 'zzzz';
+        if (mask[mp-1] = '+') and (length(part) < 6) then part := 'zzzzzz';
         result += strTrimRight(IntToStr(trunc(secondFraction*intpower(10, length(part)))), ['0']);
       end;
       'Z': if not IsNan(timezone) then begin; //no timezone
         if timezone = 0 then result += 'Z'
-        else begin
-          if timezone > 0 then result += '+'
-          else result += '-';
-          result += strFromInt(trunc(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(timezone * MinsPerDay) mod 60, 2);
-        end;
+        else
+          if timezone > 0 then result += '+' + strFromInt(trunc(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(timezone * MinsPerDay) mod 60, 2)
+          else                 result += '-' + strFromInt(trunc(-timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(-timezone * MinsPerDay) mod 60, 2);
       end;
       '"': result += copy(part, 2, length(part) - 2);
       else result += part;
@@ -7913,7 +7910,7 @@ var
 begin
   dateDecode(dateTime, @y, @m, @d);
   DecodeTime(dateTime, h, n, s, ms);
-  result := dateTimeFormat(mask, y, m, d, h, n, s, ms / 1000.0);
+  result := dateTimeFormat(mask, y, m, d, h, n, s);
 end;
 
 procedure timeParseParts(const input, mask: string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble; outtimezone: PDateTime);

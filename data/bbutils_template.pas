@@ -2277,6 +2277,7 @@ var mp: integer;
         end;
       if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then
         exit('"' + dateTimeFormat(result, y, m, d, h, n, s, secondFraction, timezone) + '"');
+      result:='';
     end;
     while (mp <= length(mask)) and (mask[mp] = '"') do begin
       oldpos := mp;
@@ -2320,11 +2321,9 @@ begin
       end;
       'Z': if not IsNan(timezone) then begin; //no timezone
         if timezone = 0 then result += 'Z'
-        else begin
-          if timezone > 0 then result += '+'
-          else result += '-';
-          result += strFromInt(trunc(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(timezone * MinsPerDay) mod 60, 2);
-        end;
+        else
+          if timezone > 0 then result += '+' + strFromInt(trunc(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(timezone * MinsPerDay) mod 60, 2)
+          else                 result += '-' + strFromInt(trunc(-timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(-timezone * MinsPerDay) mod 60, 2);
       end;
       '"': result += copy(part, 2, length(part) - 2);
       else result += part;
