@@ -254,6 +254,7 @@ function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first part is returned as function result, the second one is again assign to remainingPart
+//**(If remainingPart does not contain separator, it returns remainingPart and sets remainingPart := '')
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is assign to firstPart, the second one is again assign to remainingPart

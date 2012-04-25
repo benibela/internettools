@@ -425,7 +425,8 @@ function strTrim(const s: string; const trimCharacters: TCharSet = [#0..' ']):st
 function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [#0..' ']):string;
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
-//**first part is returned as function result, the second one is again assign to remainingPart
+//**first part is returned as function result, the second one is again assign to remainingPart.
+//**(If )
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is assign to firstPart, the second one is again assign to remainingPart
