@@ -2,7 +2,7 @@ program htmlparserExampleXQTS;
 
 {$mode objfpc}{$H+}
 
-uses
+uses bbheaptrc,
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
@@ -111,5 +111,8 @@ begin
     end;
   end;
   writeln(stderr, 'Correct:', correct, ' Wrong: ',wrong, ' Skipped: ',skippedErrors,' Crashed: ', exception,' / ', total);
+  tree.free;
+  pxp.free;
+  htp.free;
 end.
 
