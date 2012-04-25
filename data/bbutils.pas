@@ -7628,6 +7628,7 @@ begin
           while (mp <= length(mask)) and (mask[mp] = base) do begin mp+=1; count+=1; end;
           if (mp <= length(mask)) and (mask[mp] = '+') then begin
             while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do count+=1;
+            if (input[ip] = '-') and (base = 'y') then count-=1;
             mp+=1;
           end;
         end else begin //am/pm special case
@@ -8715,6 +8716,7 @@ begin
   dateParseParts('2010-05-06+01','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
   dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan: ' + FloatToStr(tz));
   dateParseParts('-0753-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, -753); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan');
+  dateParseParts('-0123-05-07','y+-mm-dd[Z]', @y, @m, @d, @tz); test(y, -123);
   dateParseParts('---07','---dd', @y, @m, @d, @tz); test(d, 7);
   dateParseParts('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
   dateParseParts('---08Z','---dd[Z]', @y, @m, @d, @tz); test(d, 8);

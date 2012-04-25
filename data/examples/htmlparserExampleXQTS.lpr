@@ -2,7 +2,7 @@ program htmlparserExampleXQTS;
 
 {$mode objfpc}{$H+}
 
-uses bbheaptrc,
+uses //bbheaptrc,
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
