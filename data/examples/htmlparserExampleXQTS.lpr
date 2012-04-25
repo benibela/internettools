@@ -39,6 +39,20 @@ begin
   if variable = 'input-context' then value := pxpvalue(tree.getTree);
 end;
 
+function mytostring(v: TPXPValue): string;
+var
+  i: Integer;
+  seq: TPXPList;
+begin
+  if v is TPXPValueSequence then begin
+    seq :=  v.toSequence;
+    result := mytostring(seq[0]);
+    for i:=1 to seq.count-1 do begin
+      result += ' '+mytostring(seq[i]);
+    end;
+  end else result := v.toString;
+end;
+
 begin
   htp := THtmlTemplateParser.create;
   htp.parseTemplate(CATALOG_TEMPLATE);
@@ -80,13 +94,13 @@ begin
         try
           query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
 
-          if inputfile = 'emptydoc' then myoutput := pxp.evaluate(query, nil).toString
+          if inputfile = 'emptydoc' then myoutput := mytostring(pxp.evaluate(query, nil))
           else begin
             pxp.RootElement:=tree.getTree;
 
             tree.parseTreeFromFile('TestSources/'+inputfile+'.xml');
             query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
-            myoutput := pxp.evaluate(query, tree.getTree).toString;
+            myoutput := mytostring(pxp.evaluate(query, tree.getTree));
           end;
           if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))  then begin
             correct += 1;
