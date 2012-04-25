@@ -502,7 +502,7 @@ function strFromPchar(p:pchar;l:longint):string;
 
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
-//**Creates a string to display an integer
+//**Creates a string to display an integer. The result will have at least displayLength digits (digits, not characters, so -1 with length 2, will become -02).
 function strFromInt(i: int64; displayLength: longint): string;
 
 //**Creates count copies of rep
@@ -7175,6 +7175,7 @@ end;
 
 function strFromInt(i: int64; displayLength: longint): string;
 begin
+  if i < 0 then exit('-'+strFromInt(-i, displayLength));
   result := IntToStr(i);
   if length(result) < (displayLength) then
     result := strDup('0', (displayLength) - length(Result)) + result;
@@ -8763,6 +8764,7 @@ begin
   test(dateFormat('y+-mm-dd', 0, 12, 21), '0-12-21');
   test(dateFormat('[y+]-mm-dd', 0, 12, 21), '-12-21');
   test(dateFormat('[y+]-mm-dd', -23, 12, 21), '-23-12-21');
+  test(dateFormat('yyyy-mm-dd', -23, 12, 21), '-0023-12-21');
   test(timeFormat('[hH][nM][sS]', 99, 88, 77), '99H88M77S');
   test(timeFormat('[hH][nM][sS]', 99, high(integer), 77), '99H77S');
   test(timeFormat('[hH][nM][sS]', high(integer), high(integer), 77), '77S');
