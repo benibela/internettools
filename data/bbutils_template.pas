@@ -2011,6 +2011,7 @@ var
   mp, ip: integer;
   positive: Boolean;
   backup: T9Ints;
+  truecount: Integer;
 
 
 begin
@@ -2055,6 +2056,7 @@ begin
         base := mask[mp];
         if mask[mp] <> 'a' then begin
           while (mp <= length(mask)) and (mask[mp] = base) do begin mp+=1; count+=1; end;
+          truecount:=count;
           if (mp <= length(mask)) and (mask[mp] = '+') then begin
             while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do count+=1;
             if (input[ip] = '-') and (base = 'y') then count-=1;
@@ -2086,7 +2088,7 @@ begin
             if parts[index] = --1 then exit(false);
             continue;
           end;
-          'm': case count of
+          'm': case truecount of
             3: begin //special case verbose month names
               //special month name handling
               mid:=LowerCase(input[ip]+input[ip+1]+input[ip+2]);
@@ -3185,6 +3187,7 @@ begin
   dateParseParts('P7Y3M', 'Py"Y"mM',  @y, @m, @d, @ms); test(y, 2007); test(m, 3);
   dateParseParts('P7Y3M', 'PY"Y"mM',  @y, @m, @d, @ms); test(y, 7); test(m, 3);
   dateParseParts('P8Y2M', 'PY"Y"mM$',  @y, @m, @d, @ms); test(y, 8); test(m, 2);
+  dateParseParts('P8Y456M', 'PY"Y"m+M$',  @y, @m, @d, @ms); test(y, 8); test(m, 456);
   dateParseParts('P3Y4M', '[-]P[Y+"Y"][mM]',  @y, @m, @d, @ms); test(y, 3); test(m, 4);
   dateParseParts('P23Y05M', '[-]P[Y+"Y"][mM]',  @y, @m, @d, @ms); test(y, 23); test(m, 05);
   dateParseParts('P4D', 'PdD$',  @y, @m, @d, @ms); test(d, 04);
