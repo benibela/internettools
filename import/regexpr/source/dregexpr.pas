@@ -157,7 +157,7 @@ const
 
 
 const
- NSUBEXP = 15; // max number of subexpression //###0.929
+ NSUBEXP = 90; // max number of subexpression //###0.929 //enlarged by benibela (required to allow uri validation in pseudoxpath)
  // Cannot be more than NSUBEXPMAX
  // Be carefull - don't use values which overflow CLOSE opcode
  // (in this case you'll get compiler erorr).
