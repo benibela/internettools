@@ -512,6 +512,11 @@ begin
       for i:=0 to high(properties) do
         with properties[i] do
           temp.attributes.Add(trim(strFromPchar(name,nameLen))+'='+trim(strFromPchar(value,valueLen)));
+      if strEndsWith(temp.attributes.ValueFromIndex[temp.attributes.Count-1], '?') then
+        temp.attributes.ValueFromIndex[temp.attributes.Count-1] := copy(temp.attributes.ValueFromIndex[temp.attributes.Count-1], 1, length(temp.attributes.ValueFromIndex[temp.attributes.Count-1]) - 1)
+      else if (temp.attributes.ValueFromIndex[temp.attributes.Count-1] = '') and (strEndsWith(temp.attributes.names[temp.attributes.Count-1], '?') ) then
+        temp.attributes[temp.attributes.Count-1] := copy(temp.attributes.names[temp.attributes.Count-1], 1, length(temp.attributes.names[temp.attributes.Count-1]) - 1);
+
     end;
     temp.initialized;
     exit;
