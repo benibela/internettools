@@ -10,14 +10,6 @@ uses //bbheaptrc,
   { you can add units after this };
 
 const CATALOG_TEMPLATE = '<test-group><test-case is-XPath2="true" >{(path:=@FilePath,desc:=description,queryname:=query/@name,inputfile:=input-file,inputfilevar:=input-file/@variable,outputfile:=output-file,error:=expected-error, complete:="yes")}</test-case>*</test-group>';
-var htp: THtmlTemplateParser;
-    desc, queryname, inputfile, outputfile, error, path: string;
-    i: Integer;
-    query, output: String;
-    skippedErrors, total, correct, wrong, exception: Integer;
-    pxp: TPseudoXPathParser;
-    tree: TTreeParser;
-    myoutput: string;
 
 type
 
@@ -27,16 +19,49 @@ type
   procedure eval(sender: TObject; const variable: string; var value: TPXPValue);
 end;
 
-var wrap: twrapper;
-  CAT: Integer;
-  inputfilevar: String;
-
 { twrapper }
 
-procedure twrapper.eval(sender: TObject; const variable: string; var value: TPXPValue);
+
+procedure high(attributes: TStringList);
 begin
-  writeln(variable);
-  if variable = 'input-context' then value := pxpvalue(tree.getTree);
+
+end;
+
+function mytostring(n: TTreeElement): string;
+var
+  sub: TTreeElement;
+  i: Integer;
+begin
+  case n.typ of
+    tetText: result := n.value;
+    tetClose: result := '</'+n.value+'>';
+    tetComment: result := '<!--'+n.value+'-->';
+    tetProcessingInstruction: begin
+      result := '<?'+n.value;
+      if n.attributes <> nil then begin
+        for i:=0 to n.attributes.Count-1 do
+          if n.attributes.ValueFromIndex[i] = '' then result += ' ' +n.attributes.Names[i]
+          else result += ' ' +n.attributes[i];
+        end;
+      result += '?>';
+    end;
+    tetOpen: begin
+      result := '<'+n.value;
+      if n.attributes <> nil then begin
+        for i:=0 to n.attributes.Count - 1 do begin
+          result += ' ' + n.attributes.names[i]+'="'+n.attributes.ValueFromIndex[i]+'"';
+        end;
+      end;
+      result+='>';
+      sub := n.next;
+      while sub <> n.reverse do begin
+        result += mytostring(sub);
+        if sub.typ <> tetOpen then sub:=sub.next
+        else sub := sub.reverse.next;
+      end;
+      result+='</'+n.value+'>';
+    end;
+  end;
 end;
 
 function mytostring(v: TPXPValue): string;
@@ -48,10 +73,33 @@ begin
     seq :=  v.toSequence;
     result := mytostring(seq[0]);
     for i:=1 to seq.count-1 do begin
-      result += ' '+mytostring(seq[i]);
+      if seq[i] is TPXPValueNode then result += mytostring(seq[i])
+      else result += ' '+mytostring(seq[i]);
     end;
+  end else if (v is TPXPValueNode) and (TPXPValueNode(v).node <> nil) then begin
+    result := mytostring(TPXPValueNode(v).node);
   end else result := v.toString;
 end;
+
+var tree: TTreeParser;
+
+procedure twrapper.eval(sender: TObject; const variable: string; var value: TPXPValue);
+begin
+  writeln(variable);
+  if variable = 'input-context' then value := pxpvalue(tree.getTree);
+end;
+
+var htp: THtmlTemplateParser;
+    desc, queryname, inputfile, outputfile, error, path: string;
+    i: Integer;
+    query, output: String;
+    skippedErrors, total, correct, wrong, exception: Integer;
+    pxp: TPseudoXPathParser;
+    myoutput: string;
+    wrap: twrapper;
+    CAT: Integer;
+    inputfilevar: String;
+    from: SizeInt;
 
 begin
   htp := THtmlTemplateParser.create;
@@ -94,13 +142,19 @@ begin
         try
           query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
 
-          if inputfile = 'emptydoc' then myoutput := mytostring(pxp.evaluate(query, nil))
+          query := StringReplace(query, '(: insert-start :)', '(:insert-start:)',  []);
+          query := StringReplace(query, '(: insert-end :)', '(:insert-end:)',  []);
+          if strContains(query, '(:insert-start:)') and strContains(query, '(:insert-end:)') then begin
+            from := pos('(:insert-start:)', query);
+            delete(query, from, pos('(:insert-end:)', query) + length('(:insert-end:)')- from);
+          end;
+          if (inputfile = 'emptydoc') or (inputfile='') then myoutput := mytostring(pxp.evaluate('('+query+')', nil))
           else begin
             pxp.RootElement:=tree.getTree;
 
             tree.parseTreeFromFile('TestSources/'+inputfile+'.xml');
             query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
-            myoutput := mytostring(pxp.evaluate(query, tree.getTree));
+            myoutput := mytostring(pxp.evaluate('('+query+')', tree.getTree));
           end;
           if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))  then begin
             correct += 1;
