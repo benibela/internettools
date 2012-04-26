@@ -138,7 +138,7 @@ begin
           continue;
         end;
         query := strLoadFromFile('Queries/XQuery/'+path+'/'+queryname+'.xq');
-        output := strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile);
+        output := strDecodeHTMLEntities(strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile),eUTF8);
         try
           query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
 
