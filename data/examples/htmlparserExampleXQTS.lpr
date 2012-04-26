@@ -112,7 +112,11 @@ begin
   tree.trimText:=false;
 
   if paramstr(1) = '--simple' then begin
-    writeln(pxp.evaluate(paramstr(2),nil).toString);
+    if paramstr(3) = '--xml' then begin
+      tree.parseTreeFromFile(paramstr(4));
+      pxp.RootElement:=tree.getTree;
+    end;
+    writeln(pxp.evaluate(paramstr(2),tree.getTree).toString);
     exit;
   end;
 
