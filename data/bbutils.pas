@@ -7631,13 +7631,13 @@ begin
           truecount:=count;
           if (mp <= length(mask)) and (mask[mp] = '+') then begin
             while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do count+=1;
-            if (input[ip] = '-') and (base = 'y') then count-=1;
+            if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then count-=1;
             mp+=1;
           end;
         end else begin //am/pm special case
           if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then mp+=5
           else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then mp+=3
-          else if input[ip] <> 'a' then exit(false)
+          else if (ip > length(input)) and (input[ip] <> 'a') then exit(false)
           else continue;
         end;
 
