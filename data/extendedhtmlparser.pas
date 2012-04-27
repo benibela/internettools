@@ -357,6 +357,7 @@ THtmlTemplateParser=class
     FNamespaces: TStringList;
 
     FTemplate, FHTML: TTreeParser;
+    FHtmlTree: TTreeDocument;
 
     FVariables,FVariableLog,FOldVariableLog: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
@@ -540,8 +541,8 @@ end;
 procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   procedure updatePXP(pxp: TPseudoXPathParser);
   begin
-    pxp.RootElement := parser.FHTML.getLastTree;
-    pxp.StaticBaseUri := parser.FHTML.getLastTree.baseURI;
+    pxp.RootElement := parser.FHtmlTree;
+    pxp.StaticBaseUri := parser.FHtmlTree.baseURI;
   end;
 
   function cachePXP(name: string): TPseudoXPathParser;
@@ -644,8 +645,8 @@ end;
 
 function THtmlTemplateParser.getHTMLTree: TTreeElement;
 begin
-  if FHTML = nil then exit(nil);
-  result := FHTML.getLastTree;
+  if FHtmlTree = nil then exit(nil);
+  result := FHtmlTree;
 end;
 
 function THtmlTemplateParser.getTemplateTree: TTreeElement;
@@ -1066,9 +1067,10 @@ begin
 
   FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
   FHTML.parseTree(html, htmlfilename);
+  FHtmlTree := fhtml.getLastTree;
 
   //encoding trouble
-  FHTML.getLastTree.setEncoding(outputEncoding,true,true);
+  FHtmlTree.setEncoding(outputEncoding,true,true);
 
   if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
     FHTML.removeEmptyTextNodes(true);
@@ -1106,7 +1108,7 @@ begin
 
   FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
 
-  result:=matchTemplateTree(FHTML.getLastTree, FHTML.getLastTree.next, FHTML.getLastTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
+  result:=matchTemplateTree(FHtmlTree, FHtmlTree.next, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
 
   if not result and FParsingExceptions then begin
     cur := TTemplateElement(FTemplate.getLastTree.next);
@@ -1317,7 +1319,7 @@ begin
   setlength(res, 0);
   template := TTemplateElement(FTemplate.getLastTree.next);
   if template <> nil then template := template.templateNext;
-  html := FHTML.getLastTree;
+  html := FHtmlTree;
   if html <> nil then html := html.next;
   while template <> nil do begin
     tsl := strWrapSplit(template.toString(), width - length(tempTemplateIndent));
