@@ -2,7 +2,8 @@ program htmlparserExampleXQTS;
 
 {$mode objfpc}{$H+}
 
-uses //bbheaptrc,
+uses
+  bbheaptrc,
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
@@ -41,8 +42,9 @@ begin
       if seq[i] is TPXPValueNode then result += mytostring(seq[i])
       else result += ' '+mytostring(seq[i]);
     end;
+    seq.freeNonRecursive;
   end else if (v is TPXPValueNode) and (TPXPValueNode(v).node <> nil) then begin
-    result := TPXPValueNode(v).node.outerXML();
+    result := v.toNode.outerXML();
   end else result := v.toString;
 end;
 
@@ -78,6 +80,7 @@ begin
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
 
+  try
   if paramstr(1) = '--simple' then begin
     if paramstr(3) = '--xml' then begin
       tree.parseTreeFromFile(paramstr(4));
@@ -156,8 +159,11 @@ begin
     end;
   end;
   writeln(stderr, 'Correct:', correct, ' Wrong: ',wrong, ' Skipped: ',skippedErrors,' Crashed: ', exception,' / ', total);
+
+  finally
   tree.free;
   pxp.free;
   htp.free;
+  end;
 end.
 
