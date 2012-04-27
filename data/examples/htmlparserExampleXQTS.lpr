@@ -106,6 +106,7 @@ begin
   htp.parseTemplate(CATALOG_TEMPLATE);
   pxp := TPseudoXPathParser.create;
   pxp.OnEvaluateVariable:=@wrap.eval;
+  pxp.ImplicitTimezone:=-5 / HoursPerDay;
   tree := TTreeParser.Create;
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
@@ -152,13 +153,19 @@ begin
             from := pos('(:insert-start:)', query);
             delete(query, from, pos('(:insert-end:)', query) + length('(:insert-end:)')- from);
           end;
-          if (inputfile = 'emptydoc') or (inputfile='') then myoutput := mytostring(pxp.evaluate('('+query+')', nil))
-          else begin
-            pxp.RootElement:=tree.getTree;
+          if (inputfile = 'emptydoc') or (inputfile='') then begin
+            pxp.RootElement:=nil;
+            pxp.ParentElement:=nil;
+            pxp.parse('('+query+')');
+            myoutput := mytostring(pxp.evaluate())
+          end else begin
 
             tree.parseTreeFromFile('TestSources/'+inputfile+'.xml');
             query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
-            myoutput := mytostring(pxp.evaluate('('+query+')', tree.getTree));
+            pxp.parse('('+query+')');
+            pxp.RootElement:=tree.getTree;
+            pxp.ParentElement:=tree.getTree;
+            myoutput := mytostring(pxp.evaluate())
           end;
           if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))  then begin
             correct += 1;
