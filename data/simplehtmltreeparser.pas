@@ -41,12 +41,13 @@ TTreeElement = class
   value: string; //**< tag name for open/close nodes, text for text/comment nodes
   attributes: TAttributeList;  //**<nil für tetText
   next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
+  previous: TTreeElement; //**< previous element (self.next.previous = self)
   reverse: TTreeElement; //**<element paired by open/closing
 
   offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
 //otherwise use the functions
-  procedure deleteNext(); //**<delete the next node (you have to delete the reverse tag manually)
+  //procedure deleteNext(); //**<delete the next node (you have to delete the reverse tag manually)
   procedure deleteAll(); //**<deletes the tree
   procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
@@ -86,6 +87,8 @@ TTreeElement = class
 
 
   class function compareInDocumentOrder(p1, p2: Pointer): integer;
+protected
+  parentOrDoc: TObject;
 end;
 TTreeElementClass = class of TTreeElement;
 
@@ -170,7 +173,7 @@ uses pseudoxpath;
 
 { TTreeElement }
 
-procedure TTreeElement.deleteNext();
+{procedure TTreeElement.deleteNext();
 var
   temp: TTreeElement;
 begin
@@ -178,7 +181,7 @@ begin
   temp := next;
   next := next.next;
   temp.Free;
-end;
+end;}
 
 procedure TTreeElement.deleteAll();
 begin
@@ -293,7 +296,7 @@ function TTreeElement.getNextSibling(): TTreeElement;
 begin
   case typ of
     tetOpen: result:=reverse.next;
-    tetText, tetClose, tetComment: result := next;
+    tetText, tetClose, tetComment, tetProcessingInstruction: result := next;
     else raise Exception.Create('Invalid tree element type');
   end;
   if result.typ = tetClose then exit(nil);
@@ -307,59 +310,52 @@ begin
 end;
 
 function TTreeElement.getParent(): TTreeElement;
-var
-  cur: TTreeElement;
-  open: longint;
 begin
-  cur := self;
-  open := 1;
-  while cur <> nil do begin
-    if cur.typ = tetOpen then open+=1
-    else if cur.typ = tetClose then begin
-      open-=1;
-      if open = 0 then exit(cur.reverse);
-    end;
-    cur := cur.next;
-  end;
-  exit(nil);
+  if (self = nil) or (previous = nil) then exit(nil);
+  exit(TTreeElement(parentOrDoc));
 end;
 
 function TTreeElement.getPrevious: TTreeElement;
-var
-  parent: TTreeElement;
-  open: longint;
-  cur: TTreeElement;
 begin
-  parent := getParent();
-  if parent = nil then exit;
-  cur := parent;
-  while (cur <> nil) and (cur.next <> self) do cur := cur.next;
-  result := cur;
+  if self = nil then exit;
+  result := previous
 end;
 
 procedure TTreeElement.insert(el: TTreeElement);
 begin
+  if self = nil then exit;
   el.next := self.next;
   self.next := el;
   el.offset := offset;
+  el.previous:=self;
 end;
 
 procedure TTreeElement.insertSurrounding(before, after: TTreeElement);
-var surroundee, previous: TTreeElement;
+var surroundee, prev: TTreeElement;
+  el: TTreeElement;
 begin
   if self = nil then exit;
   if self.typ = tetClose then surroundee := reverse
   else surroundee := self;
-  previous := surroundee.getPrevious();
-  if previous = nil then exit;
+  prev := surroundee.getPrevious();
+  if prev = nil then exit;
 
-  previous.insert(before);
+  prev.insert(before);
 
   if surroundee.typ = tetOpen then surroundee.reverse.insert(after)
   else surroundee.insert(after);
 
   before.reverse := after;
   after.reverse := before;
+
+  if (before.typ = tetOpen) and (before.reverse = after) and (surroundee.previous <> nil) then begin
+    prev := surroundee.getParent();
+    el := surroundee;
+    while (el <> nil) and (el.parentOrDoc = prev) do begin
+      el.parentOrDoc := before;
+      el := el.next;
+    end;
+  end;
 end;
 
 procedure TTreeElement.insertSurrounding(basetag: TTreeElement);
@@ -390,7 +386,7 @@ begin
     raise Exception.Create('Cannot remove single closing tag')
   else
     next := toFree.next;
-
+  next.previous := self;
   tofree.free;
 end;
 
@@ -462,7 +458,11 @@ begin
   FTemplateCount+=1;
 
   FCurrentElement.next := result;
+  result.previous := FCurrentElement;
   FCurrentElement := result;
+
+  if typ <> tetClose then result.parentOrDoc := TTreeElement(FElementStack.Last)
+  else result.parentOrDoc := TTreeElement(FElementStack.Last).getParent();
   //FCurrentElement.id:=FTemplateCount;
 end;
 
@@ -726,6 +726,7 @@ begin
   //2. it serves as parent for multiple top level elements (althought they aren't allowed)
   FRootElement:=treeElementClass.create;
   FRootElement.typ := tetOpen;
+  FRootElement.parentOrDoc:=self;
   FCurrentElement:=FRootElement;
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);
