@@ -27,42 +27,7 @@ begin
 
 end;
 
-function mytostring(n: TTreeElement): string;
-var
-  sub: TTreeElement;
-  i: Integer;
-begin
-  case n.typ of
-    tetText: result := n.value;
-    tetClose: result := '</'+n.value+'>';
-    tetComment: result := '<!--'+n.value+'-->';
-    tetProcessingInstruction: begin
-      result := '<?'+n.value;
-      if n.attributes <> nil then begin
-        for i:=0 to n.attributes.Count-1 do
-          if n.attributes.ValueFromIndex[i] = '' then result += ' ' +n.attributes.Names[i]
-          else result += ' ' +n.attributes[i];
-        end;
-      result += '?>';
-    end;
-    tetOpen: begin
-      result := '<'+n.value;
-      if n.attributes <> nil then begin
-        for i:=0 to n.attributes.Count - 1 do begin
-          result += ' ' + n.attributes.names[i]+'="'+n.attributes.ValueFromIndex[i]+'"';
-        end;
-      end;
-      result+='>';
-      sub := n.next;
-      while sub <> n.reverse do begin
-        result += mytostring(sub);
-        if sub.typ <> tetOpen then sub:=sub.next
-        else sub := sub.reverse.next;
-      end;
-      result+='</'+n.value+'>';
-    end;
-  end;
-end;
+
 
 function mytostring(v: TPXPValue): string;
 var
@@ -77,7 +42,7 @@ begin
       else result += ' '+mytostring(seq[i]);
     end;
   end else if (v is TPXPValueNode) and (TPXPValueNode(v).node <> nil) then begin
-    result := mytostring(TPXPValueNode(v).node);
+    result := TPXPValueNode(v).node.outerXML();
   end else result := v.toString;
 end;
 
@@ -118,7 +83,7 @@ begin
       tree.parseTreeFromFile(paramstr(4));
       pxp.RootElement:=tree.getTree;
     end;
-    writeln(pxp.evaluate(paramstr(2),tree.getTree).toString);
+    writeln(mytostring(pxp.evaluate(paramstr(2),tree.getTree)));
     exit;
   end;
 

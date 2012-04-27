@@ -62,6 +62,7 @@ TTreeElement = class
   function findChild(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]): TTreeElement;
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
+  function outerXML():string;
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
@@ -71,6 +72,8 @@ TTreeElement = class
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+  function getRoot(): TTreeElement;
+  function getAbstractRoot(): TTreeElement;
 
 
   procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next, not reverse)
@@ -263,6 +266,48 @@ begin
   if (result<>'') and (separator<>'') then setlength(result,length(result)-length(separator));
 end;
 
+function TTreeElement.outerXML: string;
+var
+  sub: TTreeElement;
+  i: Integer;
+begin
+  if self = nil then exit;
+  case typ of
+    tetText: result := value;
+    tetClose: result := '</'+value+'>';
+    tetComment: result := '<!--'+value+'-->';
+    tetProcessingInstruction: begin
+      result := '<?'+value;
+      if attributes <> nil then begin
+        for i:=0 to attributes.Count-1 do
+          if attributes.ValueFromIndex[i] = '' then result += ' ' +attributes.Names[i]
+          else result += ' ' +attributes[i];
+        end;
+      result += '?>';
+    end;
+    tetOpen: begin
+      result := '<'+value;
+      if attributes <> nil then begin
+        for i:=0 to attributes.Count - 1 do begin
+          result += ' ' + attributes.names[i]+'="'+attributes.ValueFromIndex[i]+'"';
+        end;
+      end;
+      if next = reverse then begin
+        result += '/>';
+        exit();
+      end;
+      result+='>';
+      sub := next;
+      while sub <> reverse do begin
+        result += sub.outerXML;
+        if sub.typ <> tetOpen then sub:=sub.next
+        else sub := sub.reverse.next;
+      end;
+      result+='</'+value+'>';
+    end;
+  end;
+end;
+
 function TTreeElement.getValue(): string;
 begin
   if self = nil then exit('');
@@ -319,6 +364,18 @@ function TTreeElement.getPrevious: TTreeElement;
 begin
   if self = nil then exit;
   result := previous
+end;
+
+function TTreeElement.getRoot: TTreeElement;
+begin
+  result := self;
+  while (result <> nil) and (result.previous <> nil) and (TTreeElement(result.parentOrDoc).previous <> nil) do
+    result := TTreeElement(result.parentOrDoc);
+end;
+
+function TTreeElement.getAbstractRoot: TTreeElement;
+begin
+  result := getRoot().getParent();
 end;
 
 procedure TTreeElement.insert(el: TTreeElement);
