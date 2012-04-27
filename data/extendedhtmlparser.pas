@@ -540,8 +540,8 @@ end;
 procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   procedure updatePXP(pxp: TPseudoXPathParser);
   begin
-    pxp.RootElement := parser.FHTML.getTree;
-    pxp.StaticBaseUri := parser.FHTML.baseURI;
+    pxp.RootElement := parser.FHTML.getLastTree;
+    pxp.StaticBaseUri := parser.FHTML.getLastTree.baseURI;
   end;
 
   function cachePXP(name: string): TPseudoXPathParser;
@@ -645,13 +645,13 @@ end;
 function THtmlTemplateParser.getHTMLTree: TTreeElement;
 begin
   if FHTML = nil then exit(nil);
-  result := FHTML.getTree;
+  result := FHTML.getLastTree;
 end;
 
 function THtmlTemplateParser.getTemplateTree: TTreeElement;
 begin
   if FTemplate = nil then exit(nil);
-  result := FTemplate.getTree;
+  result := FTemplate.getLastTree;
 end;
 
 function THtmlTemplateParser.createPseudoXPathParser: TPseudoXPathParser;
@@ -1068,23 +1068,23 @@ begin
   FHTML.parseTree(html, htmlfilename);
 
   //encoding trouble
-  FHTML.setEncoding(outputEncoding,true,true);
+  FHTML.getLastTree.setEncoding(outputEncoding,true,true);
 
   if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
     FHTML.removeEmptyTextNodes(true);
 
-  if FTemplate.getTree <> nil then begin
-    if (FTemplate.getEncoding <> OutputEncoding) then begin
-      cur := TTemplateElement(FTemplate.getTree);
+  if FTemplate.getLastTree <> nil then begin
+    if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
+      cur := TTemplateElement(FTemplate.getLastTree.next);
       while cur <> nil do begin
         if (cur.templateAttributes<>nil) then
-          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getEncoding, OutputEncoding);
+          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
         if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
           cur.initializeCaches(self,true);
         cur := cur.templateNext;
       end;
     end else begin
-      cur := TTemplateElement(FTemplate.getTree);
+      cur := TTemplateElement(FTemplate.getLastTree.next);
       while cur <> nil do begin
         if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
           cur.initializeCaches(self,lastTrimTextNodes <> FTrimTextNodes);
@@ -1092,12 +1092,12 @@ begin
       end;
     end;
   end;
-  FTemplate.setEncoding(outputEncoding,true,true);
+  FTemplate.getLastTree.setEncoding(outputEncoding,true,true);
   lastTrimTextNodes := FTrimTextNodes;
 
 
   if FParsingExceptions then begin
-    cur := TTemplateElement(FTemplate.getTree);
+    cur := TTemplateElement(FTemplate.getLastTree.next);
     while cur <> nil do begin
       cur.match := nil;
       cur := cur.templateNext;
@@ -1106,10 +1106,10 @@ begin
 
   FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
 
-  result:=matchTemplateTree(FHTML.getTree, FHTML.getTree.next, FHTML.getTree.reverse, TTemplateElement(FTemplate.getTree.next), TTemplateElement(FTemplate.getTree.reverse));
+  result:=matchTemplateTree(FHTML.getLastTree, FHTML.getLastTree.next, FHTML.getLastTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
 
   if not result and FParsingExceptions then begin
-    cur := TTemplateElement(FTemplate.getTree);
+    cur := TTemplateElement(FTemplate.getLastTree.next);
     if cur = nil then raise EHTMLParseException.Create('No template');
     cur := cur.templateNext;
     realLast := cur;
@@ -1118,7 +1118,7 @@ begin
       case cur.templateType of
         tetHTMLOpen, tetHTMLText: begin
           if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
-            raise EHTMLParseException.create('Matching of template '+ftemplate.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+            raise EHTMLParseException.create('Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
           end;
           last:=cur;
         end;
@@ -1131,7 +1131,7 @@ begin
       realLast := cur;
       cur := cur.templateNext;
     end;
-    raise EHTMLParseException.create('Matching of template '+FTemplate.baseURI+' failed. for an unknown reason');
+    raise EHTMLParseException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason');
   end;
 //TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;
@@ -1152,17 +1152,17 @@ var el: TTemplateElement;
     looper: TTemplateElement;
     temp: TTemplateElement;
 begin
-  FTemplate.setEncoding(eUnknown, false, false);
+  FTemplate.getLastTree.setEncoding(eUnknown, false, false);
   if strbeginswith(template,#$ef#$bb#$bf) then begin
     delete(template,1,3);
-    FTemplate.setEncoding(eUTF8,false,false);
+    FTemplate.getLastTree.setEncoding(eUTF8,false,false);
   end else if strbeginswith(template,#$fe#$ff) or strbeginswith(template,#$ff#$fe) or
     strbeginswith(template,#00#00#$fe#$ef) then
     raise Exception.Create('Ungültiger Codierung BOM im Template');
 
   //read template
   FTemplate.parseTree(template, templateName);
-  el := TTemplateElement(FTemplate.getTree);
+  el := TTemplateElement(FTemplate.getLastTree.next);
   while el <> nil do begin
     el.postprocess(self);
     if (el.typ = tetOpen) and (el.templateType = tetCommandShortRead) then
@@ -1173,17 +1173,17 @@ begin
 
 
   //detect meta encoding (doesn't change encoding; just sets it, so we can convert from it to another one later)
-  el := TTemplateElement(FTemplate.getTree);
+  el := TTemplateElement(FTemplate.getLastTree.next);
 
   while el <> nil do begin
     if el.templateType = tetCommandMeta then begin
       if el.templateAttributes.Values['encoding'] <> '' then begin
         encoding:=el.templateAttributes.Values['encoding'];
         if striequal(encoding,'utf8') or striequal(encoding,'utf-8') then
-          FTemplate.setEncoding(eUTF8, false, false)
+          FTemplate.getLastTree.setEncoding(eUTF8, false, false)
         else if striequal(el.templateAttributes.Values['encoding'],'latin1') or striequal(el.templateAttributes.Values['encoding'],'iso88591') or
                 striequal(el.templateAttributes.Values['encoding'],'iso-8859-1') or striequal(el.templateAttributes.Values['encoding'],'windows1252') then
-          FTemplate.setEncoding(eWindows1252, false, false)
+          FTemplate.getLastTree.setEncoding(eWindows1252, false, false)
         else
          raise ETemplateParseException.create('Unknown/unsupported encoding: '+encoding);
         if el.templateAttributes.count > 1 then
@@ -1200,7 +1200,7 @@ begin
   defaultCaseSensitive := '';
   veryShortSyntax := true;
 
-  el := TTemplateElement(FTemplate.getTree);
+  el := TTemplateElement(FTemplate.getLastTree.next);
   while el <> nil do begin
     if (el.templateType = tetCommandMeta) and (el.templateAttributes<>nil) then begin
       if el.templateAttributes.Values['default-text-matching'] <> '' then defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
@@ -1315,9 +1315,9 @@ begin
   templateIndent:=0; htmlIndent:=0;
 
   setlength(res, 0);
-  template := TTemplateElement(FTemplate.getTree);
+  template := TTemplateElement(FTemplate.getLastTree.next);
   if template <> nil then template := template.templateNext;
-  html := FHTML.getTree;
+  html := FHTML.getLastTree;
   if html <> nil then html := html.next;
   while template <> nil do begin
     tsl := strWrapSplit(template.toString(), width - length(tempTemplateIndent));

@@ -42,6 +42,7 @@ TTreeElement = class
   attributes: TAttributeList;  //**<nil für tetText
   next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   previous: TTreeElement; //**< previous element (self.next.previous = self)
+  parent: TTreeElement;
   reverse: TTreeElement; //**<element paired by open/closing
 
   offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
@@ -90,10 +91,32 @@ TTreeElement = class
 
 
   class function compareInDocumentOrder(p1, p2: Pointer): integer;
-protected
-  parentOrDoc: TObject;
 end;
 TTreeElementClass = class of TTreeElement;
+TTreeParser = class;
+
+{ TTreeDocument }
+
+TTreeDocument = class(TTreeElement)
+protected
+  FEncoding: TEncoding;
+  FBaseURI: string;
+  FCreator: TTreeParser;
+
+public
+  property baseURI: string read FBaseURI;
+
+  function getCreator: TTreeParser;
+
+  //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
+  function getEncoding: TEncoding;
+  //**Changes the tree encoding
+  //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
+  //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
+  procedure setEncoding(new: TEncoding; convertFromOldToNew: Boolean; convertEntities: boolean);
+
+  destructor destroy; override;
+end;
 
 TreeParseException = Exception;
 { TTreeParser }
@@ -114,15 +137,15 @@ private
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
 //  FConvertEntities: boolean;
-  FRootElement: TTreeElement;
   FCurrentElement: TTreeElement;
   FTemplateCount: Integer;
   FElementStack: TList;
   FAutoCloseTag: boolean;
-  FCurrentFile, FCurrentFileName: string;
+  FCurrentFile: string;
   FParsingModel: TParsingModel;
   FTrimText, FReadComments: boolean;
-  FEncoding: TEncoding;
+  FTrees: TList;
+  FCurrentTree: TTreeDocument;
 
   function newTreeElement(typ:TTreeElementType; text: pchar; len:longint):TTreeElement;
   function newTreeElement(typ:TTreeElementType; s: string):TTreeElement;
@@ -141,19 +164,11 @@ public
 
   constructor Create;
   destructor destroy;override;
-  procedure clearTree; //**< Deletes the current tree
-  procedure parseTree(html: string; uri: string = ''); //**< Creates a new tree from a html document contained in html. The uri parameter is just stored and returned for you by baseURI, not actually used within this class.
-  procedure parseTreeFromFile(filename: string);
+  procedure clearTrees;
+  function parseTree(html: string; uri: string = ''): TTreeDocument; //**< Creates a new tree from a html document contained in html. The uri parameter is just stored and returned for you by baseURI, not actually used within this class.
+  function parseTreeFromFile(filename: string): TTreeDocument;
 
-  function getTree: TTreeElement; //**< Returns the current tree
-
-
-  //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
-  function getEncoding: TEncoding;
-  //**Changes the tree encoding
-  //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
-  //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
-  procedure setEncoding(new: TEncoding; convertExistingTree: Boolean; convertEntities: boolean);
+  function getLastTree: TTreeDocument; //**< Returns the last created tree
 
   procedure removeEmptyTextNodes(const whenTrimmed: boolean);
 published
@@ -167,12 +182,37 @@ published
   property readProcessingInstructions: boolean read FReadProcessingInstructions write FReadProcessingInstructions;
   property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
-  property baseURI: string read FCurrentFileName;
 end;
 
 
 implementation
 uses pseudoxpath;
+
+{ TTreeDocument }
+
+function TTreeDocument.getCreator: TTreeParser;
+begin
+  result := FCreator;
+end;
+
+function TTreeDocument.getEncoding: TEncoding;
+begin
+  if self = nil then exit(eUnknown);
+  result := FEncoding;
+end;
+
+procedure TTreeDocument.setEncoding(new: TEncoding; convertFromOldToNew: Boolean; convertEntities: boolean);
+begin
+  if self = nil then exit;
+  if (FEncoding = eUnknown) or not convertFromOldToNew then FEncoding:= new;
+  if convertFromOldToNew or convertEntities then changeEncoding(FEncoding, new, convertEntities, FCreator.FTrimText);
+  FEncoding := new;
+end;
+
+destructor TTreeDocument.destroy;
+begin
+  inherited destroy;
+end;
 
 { TTreeElement }
 
@@ -356,8 +396,8 @@ end;
 
 function TTreeElement.getParent(): TTreeElement;
 begin
-  if (self = nil) or (previous = nil) then exit(nil);
-  exit(TTreeElement(parentOrDoc));
+  if (self = nil) then exit(nil);
+  exit(TTreeElement(parent));
 end;
 
 function TTreeElement.getPrevious: TTreeElement;
@@ -369,8 +409,8 @@ end;
 function TTreeElement.getRoot: TTreeElement;
 begin
   result := self;
-  while (result <> nil) and (result.previous <> nil) and (TTreeElement(result.parentOrDoc).previous <> nil) do
-    result := TTreeElement(result.parentOrDoc);
+  while (result <> nil) and (result.previous <> nil) and (result.parent.parent <> nil) do
+    result := result.parent;
 end;
 
 function TTreeElement.getAbstractRoot: TTreeElement;
@@ -408,8 +448,8 @@ begin
   if (before.typ = tetOpen) and (before.reverse = after) and (surroundee.previous <> nil) then begin
     prev := surroundee.getParent();
     el := surroundee;
-    while (el <> nil) and (el.parentOrDoc = prev) do begin
-      el.parentOrDoc := before;
+    while (el <> nil) and (el.parent = prev) do begin
+      el.parent := before;
       el := el.next;
     end;
   end;
@@ -518,8 +558,8 @@ begin
   result.previous := FCurrentElement;
   FCurrentElement := result;
 
-  if typ <> tetClose then result.parentOrDoc := TTreeElement(FElementStack.Last)
-  else result.parentOrDoc := TTreeElement(FElementStack.Last).getParent();
+  if typ <> tetClose then result.parent := TTreeElement(FElementStack.Last)
+  else result.parent := TTreeElement(FElementStack.Last).getParent();
   //FCurrentElement.id:=FTemplateCount;
 end;
 
@@ -557,9 +597,9 @@ begin
   if tagName^ = '?' then begin //processing instruction
     if strlEqual(tagName, '?xml', tagNameLen) then begin
       enc := lowercase(getProperty('encoding', properties));
-      if enc = 'utf-8' then FEncoding:=eUTF8
+      if enc = 'utf-8' then FCurrentTree.FEncoding:=eUTF8
       else if (enc = 'windows-1252') or (enc = 'iso-8859-1') or (enc = 'iso-8859-15') or (enc = 'latin1') then
-        FEncoding:=eWindows1252;
+        FCurrentTree.FEncoding:=eWindows1252;
       exit;
     end;
     if not FReadProcessingInstructions then exit;
@@ -745,33 +785,38 @@ begin
   FReadComments:=false;
   FReadProcessingInstructions:=false;
   FAutoDetectHTMLEncoding:=true;
+  FTrees := TList.Create;
   //FConvertEntities := true;
 end;
 
 destructor TTreeParser.destroy;
 begin
-  clearTree;
+  clearTrees;
   FElementStack.free;
+  ftrees.Free;
   inherited destroy;
 end;
 
-procedure TTreeParser.clearTree;
+procedure TTreeParser.clearTrees;
+var
+  i: Integer;
 begin
-  FTemplateCount:=0;
-  if FRootElement<>nil then FRootElement.deleteAll();
-  FRootElement:=nil;
-  FElementStack.Clear;
+  for i:=0 to FTrees.Count-1 do
+    TTreeDocument(FTrees[i]).deleteAll();
+  ftrees.Clear;
 end;
 
 
-procedure TTreeParser.parseTree(html: string; uri: string);
+function TTreeParser.parseTree(html: string; uri: string): TTreeDocument;
 var
   encoding: String;
 begin
+  FTemplateCount:=0;
+  FElementStack.Clear;
+  FCurrentTree:=nil;
+
   //FVariables.clear;
-  clearTree;
-  FCurrentFileName:=uri;
-  if html='' then exit;
+  if html='' then exit(nil);
 
   FCurrentFile:=html;
   FAutoCloseTag:=false;
@@ -781,10 +826,11 @@ begin
   //1. it is necessary for the correct interpretion of xpath expressions html/... assumes
   //   that the current element is a parent of html
   //2. it serves as parent for multiple top level elements (althought they aren't allowed)
-  FRootElement:=treeElementClass.create;
-  FRootElement.typ := tetOpen;
-  FRootElement.parentOrDoc:=self;
-  FCurrentElement:=FRootElement;
+  FCurrentTree:=TTreeDocument.create;
+  FCurrentTree.FCreator:=self;
+  FCurrentTree.typ := tetOpen;
+  FCurrentTree.FBaseURI:=uri;
+  FCurrentElement:=FCurrentTree;
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);
   FTemplateCount:=1;
@@ -797,42 +843,33 @@ begin
   leaveTag('',0);
 
   if FAutoDetectHTMLEncoding and (parsingModel = pmHTML) then begin
-    FEncoding:=eUnknown;
-    encoding := lowercase(TPseudoXPathParser.EvaluateToString('html/head/meta[@http-equiv=''content-type'']/@content', FRootElement));
+    FCurrentTree.FEncoding:=eUnknown;
+    encoding := lowercase(TPseudoXPathParser.EvaluateToString('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree));
     if encoding <> '' then begin
-      if pos('charset=utf-8', encoding) > 0 then FEncoding:=eUTF8
+      if pos('charset=utf-8', encoding) > 0 then FCurrentTree.FEncoding:=eUTF8
       else if (pos('charset=windows-1252',encoding) > 0) or
               (pos('charset=latin1',encoding) > 0) or
               (pos('charset=iso-8859-1',encoding) > 0) then //also -15
-        FEncoding:=eWindows1252;
+        FCurrentTree.FEncoding:=eWindows1252;
     end;
 
   end;
+
+  FTrees.Add(FCurrentTree);
+  result := FCurrentTree;
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
 end;
 
-procedure TTreeParser.parseTreeFromFile(filename: string);
+function TTreeParser.parseTreeFromFile(filename: string): TTreeDocument;
 begin
-  parseTree(strLoadFromFile(filename), filename);
+  result := parseTree(strLoadFromFile(filename), filename);
 end;
 
-function TTreeParser.getTree: TTreeElement;
+function TTreeParser.getLastTree: TTreeDocument;
 begin
-  result := FRootElement;
-end;
-
-function TTreeParser.getEncoding: TEncoding;
-begin
-  exit(FEncoding);
-end;
-
-procedure TTreeParser.setEncoding(new: TEncoding; convertExistingTree: Boolean; convertEntities: boolean);
-begin
-  if FRootElement = nil then exit;
-  if (FEncoding = eUnknown) or not convertExistingTree then FEncoding:= new;
-  if convertExistingTree or convertEntities then FRootElement.changeEncoding(FEncoding, new, convertEntities, FTrimText);
-  FEncoding := new;
+  if FTrees.Count = 0 then exit(nil);
+  result := TTreeDocument(FTrees[FTrees.Count-1]);
 end;
 
 procedure TTreeParser.removeEmptyTextNodes(const whenTrimmed: boolean);
@@ -848,7 +885,7 @@ procedure TTreeParser.removeEmptyTextNodes(const whenTrimmed: boolean);
 var
   temp: TTreeElement;
 begin
-  temp := getTree;
+  temp := getLastTree;
   if temp = nil then exit;
   while temp.next <> nil do begin
     while (temp.next <> nil) and (temp.next.typ = tetText) and ( (temp.next.value = '') or (whenTrimmed and (strIsEmpty(temp.next.value)))) do

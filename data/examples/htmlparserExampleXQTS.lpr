@@ -51,7 +51,7 @@ var tree: TTreeParser;
 procedure twrapper.eval(sender: TObject; const variable: string; var value: TPXPValue);
 begin
   writeln(variable);
-  if variable = 'input-context' then value := pxpvalue(tree.getTree);
+  if variable = 'input-context' then value := pxpvalue(tree.getLastTree);
 end;
 
 var htp: THtmlTemplateParser;
@@ -81,9 +81,9 @@ begin
   if paramstr(1) = '--simple' then begin
     if paramstr(3) = '--xml' then begin
       tree.parseTreeFromFile(paramstr(4));
-      pxp.RootElement:=tree.getTree;
+      pxp.RootElement:=tree.getLastTree;
     end;
-    writeln(mytostring(pxp.evaluate(paramstr(2),tree.getTree)));
+    writeln(mytostring(pxp.evaluate(paramstr(2),tree.getLastTree)));
     exit;
   end;
 
@@ -129,8 +129,8 @@ begin
             tree.parseTreeFromFile('TestSources/'+inputfile+'.xml');
             query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
             pxp.parse('('+query+')');
-            pxp.RootElement:=tree.getTree;
-            pxp.ParentElement:=tree.getTree;
+            pxp.RootElement:=tree.getLastTree;
+            pxp.ParentElement:=tree.getLastTree;
             myoutput := mytostring(pxp.evaluate())
           end;
           if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))  then begin
