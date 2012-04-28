@@ -109,7 +109,7 @@ type
   TInternetAccessClass=class of TInternetAccess;
 procedure decodeURL(const totalURL: string; out protocol, host, url: string);
 var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all our classes
-    defaultInternetAccessClass:TInternetAccessClass; //**< default internet access, here you can store which internet library the program should use
+    defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access, here you can store which internet library the program should use
 implementation
 uses bbutils;
 //==============================================================================

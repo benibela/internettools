@@ -27,6 +27,9 @@ TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruc
 //**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
 TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensitive, tefoNoChildren, tefoNoGrandChildren);
 
+TTreeParser = class;
+TTreeDocument = class;
+
 { TTreeElement }
 
 //**@abstract This class representates an element of the html file
@@ -74,7 +77,7 @@ TTreeElement = class
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getRoot(): TTreeElement;
-  function getAbstractRoot(): TTreeElement;
+  function getDocument(): TTreeDocument;
 
 
   procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next, not reverse)
@@ -93,7 +96,6 @@ TTreeElement = class
   class function compareInDocumentOrder(p1, p2: Pointer): integer;
 end;
 TTreeElementClass = class of TTreeElement;
-TTreeParser = class;
 
 { TTreeDocument }
 
@@ -409,13 +411,17 @@ end;
 function TTreeElement.getRoot: TTreeElement;
 begin
   result := self;
+  if result = nil then exit;
+  if result.parent = nil then //document node
+    exit(findChild(tetOpen,'',[tefoIgnoreText]));
+
   while (result <> nil) and (result.previous <> nil) and (result.parent.parent <> nil) do
     result := result.parent;
 end;
 
-function TTreeElement.getAbstractRoot: TTreeElement;
+function TTreeElement.getDocument: TTreeDocument;
 begin
-  result := getRoot().getParent();
+  result := TTreeDocument(getRoot().getParent());
 end;
 
 procedure TTreeElement.insert(el: TTreeElement);
