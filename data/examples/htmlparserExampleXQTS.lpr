@@ -235,6 +235,7 @@ begin
   pxp := TPseudoXPathParser.create;
   pxp.OnEvaluateVariable:=@wrap.eval;
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
+  pxp.AllowVariableUseInStringLiterals := false;
   pxp.setDefaultCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint');
   tree := TTreeParser.Create;
   tree.readComments:=true;
