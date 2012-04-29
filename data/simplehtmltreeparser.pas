@@ -399,7 +399,7 @@ end;
 function TTreeElement.getParent(): TTreeElement;
 begin
   if (self = nil) then exit(nil);
-  exit(TTreeElement(parent));
+  exit(parent);
 end;
 
 function TTreeElement.getPrevious: TTreeElement;
