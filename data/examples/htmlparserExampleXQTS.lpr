@@ -18,7 +18,7 @@ type TLogger = class
 
 class procedure LOG_START; virtual; abstract;
 class procedure LOG_GROUP_START(filen, title, desc: string); static; virtual; abstract;
-class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string); virtual; abstract;
+class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime); virtual; abstract;
 class procedure LOG_GROUP_END(correct, wrong, exceptions, skipped: integer); virtual; abstract;
 class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; virtual; abstract;
 
@@ -30,7 +30,7 @@ TLoggerClass = class of TLogger;
 THTMLLogger = class(TLogger)
 class procedure LOG_START; override;
 class procedure LOG_GROUP_START(filen, title, desc: string); static; override;
-class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string); override;
+class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime); override;
 class procedure LOG_GROUP_END(correct, wrong, exceptions, skipped: integer); override;
 class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; override;
 end;
@@ -41,7 +41,7 @@ end;
 TPlainLogger = class(TLogger)
 class procedure LOG_START; override;
 class procedure LOG_GROUP_START(filen, title, desc: string); static; override;
-class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string); override;
+class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime); override;
 class procedure LOG_GROUP_END(correct, wrong, exceptions, skipped: integer); override;
 class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; override;
 end;
@@ -104,13 +104,14 @@ begin
   writeln('=====================================================');
 end;
 
-class procedure TPlainLogger.LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string);
+class procedure TPlainLogger.LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime);
 begin
   case state of
+  0: writeln('correct');
   1: writeln('ERROR: got "', myoutput, '" expected "', output, '"');
   2: writeln('EXCEPTION: ', myoutput);
   end;
-  writeln ('  In: ', queryfile, ': ',copy(desc,1,60), ' with ', inputfile);
+  writeln ('  In: ', queryfile, ': ',copy(desc,1,60), ' with ', inputfile, ' time: ', timing * MSecsPerDay);
 end;
 
 class procedure TPlainLogger.LOG_GROUP_END(correct, wrong, exceptions, skipped: integer);
@@ -150,7 +151,7 @@ begin
   buffer3.add('<tr><th>Testname</th><th>Description</th><th>Got</th><th>Expected</th></tr>');
 end;
 
-class procedure THTMLLogger.LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string);
+class procedure THTMLLogger.LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime);
 begin
 
     myoutput:=StringReplace(myoutput, '<', '&lt;', [rfReplaceAll]);
@@ -163,6 +164,7 @@ begin
 
 
     case state of
+    0: buffer3.add('<tr class="correct"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
     1: buffer3.add('<tr class="wrong"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
     2: buffer3.add('<tr class="error"><td>'+queryname+'</td><td>'+desc+'</td><td colspan=2> <b>Error</b>:'+myoutput+'</td></tr>');
     end;
@@ -221,11 +223,17 @@ var htp: THtmlTemplateParser;
     fileOpenFailed: String;
     currentTree: TTreeElement = nil;
     mylogger: TLoggerClass;
+    logCorrect: Boolean;
+    timing: TDateTime;
+    mypxpoutput: TPXPValue;
 begin
   {$ifdef win32}defaultInternetAccessClass := TW32InternetAccess.create{$else}defaultInternetAccessClass:=TSynapseInternetAccess{$endif};
 
-  if paramstr(1) = '--plain' then mylogger := TPlainLogger
+  if (paramstr(1) = '--plain') or (paramstr(2) = '--plain') then mylogger := TPlainLogger
   else mylogger := THTMLLogger;
+
+  logCorrect := (paramstr(1) = '--correct') or (paramstr(2) = '--correct');
+
 
   buffer1 := TStringList.Create;
   buffer2 := TStringList.Create;
@@ -318,27 +326,32 @@ begin
             pxp.RootElement:=nil;
             pxp.ParentElement:=nil;
             pxp.parse('('+query+')');
-            myoutput := mytostring(pxp.evaluate())
           end else begin
             //query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
             pxp.parse('('+query+')');
             pxp.RootElement:=currentTree;
             pxp.ParentElement:=currentTree;
-            myoutput := mytostring(pxp.evaluate())
           end;
-          if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))  then begin
+          timing := now;
+          mypxpoutput := pxp.evaluate();
+          timing := now - timing;
+          myoutput := mytostring(mypxpoutput);
+          if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
+             or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
+             or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18'))) then begin
             correctLocal += 1;
+            if logCorrect then mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
             //writeln('PASS: ', copy(desc,1,30),queryname,' : got '  , myoutput);
           end else begin
             wrongLocal+=1;
-            mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output);
+            mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
           {  write(stderr, 'WRONG: ', copy(desc,1,60),' ',queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
             writeln(stderr, '       ', arrayGet(strSplit(query, #13),-2) );
             writeln('      TestSources/'+inputfile+'.xml', '  |  ','Queries/XQuery/'+path+'/'+queryname+'.xq','    |   ', 'ExpectedTestResults/'+path+'/'+outputfile); writeln;}
           end;
         except on e: sysutils.Exception do begin
           exceptionLocal+=1;
-          mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', e.message, output);
+          mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', e.message, output, timing);
           fileOpenFailed  := '';
 {          writeln(stderr, 'EXCEPTION: ',desc, queryname, ': ', e.message);
           writeln('       ', arrayGet(strSplit(strTrim(query), #13),-1) );
