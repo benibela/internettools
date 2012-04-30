@@ -1764,7 +1764,7 @@ var data: array[1..258] of array[1..3] of string = (
       ,('<template:read source="string-join(*[@specialty]/node-name(.),'','')" var="test"/>','','test=bookstore')
       ,('<bookstore><book><template:read source="@style" var="test"/></book></bookstore>','','test=autobiography')
       ,('<bookstore><template:read source="//price/@exchange" var="test"/></bookstore>  ','','test=0.7')
-      ,('<bookstore><template:read source="//price/@exchange/total" var="test"/></bookstore>  ','','test=')
+      ,('<bookstore><template:read source="//price/@exchange/total" var="test"/></bookstore>  ','','test=') //todo: attribute nodes failed test
       ,('<bookstore><template:read source="string-join(book[@style]/price/text(),'','')" var="test"/></bookstore>  ','','test=12,55,6.50')
       ,('<bookstore><template:read source="string-join(book/@style,'','')" var="test"/></bookstore>  ','','test=autobiography,textbook,novel')
       ,('<bookstore><template:read source="string-join(@*,'','')" var="test"/></bookstore>  ','','test=novel')
