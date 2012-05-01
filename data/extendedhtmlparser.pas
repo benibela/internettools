@@ -351,6 +351,7 @@ THtmlTemplateParser=class
     FRepetitionRegEx: TRegExpr;
     FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
     FUnnamedVariableName: string;
+    function GetVariableLogCondensed: TPXPVariableChangeLog;
   protected
     FOutputEncoding: TEncoding;
     FKeepOldVariables: TKeepPreviousVariables;
@@ -359,7 +360,7 @@ THtmlTemplateParser=class
     FTemplate, FHTML: TTreeParser;
     FHtmlTree: TTreeDocument;
 
-    FVariables,FVariableLog,FOldVariableLog: TPXPVariableChangeLog;
+    FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
 
     function GetVariables: TPXPVariableChangeLog;
@@ -398,6 +399,7 @@ THtmlTemplateParser=class
     property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
     property oldVariableChangeLog: TPXPVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
+    property VariableChangeLogCondensed: TPXPVariableChangeLog read GetVariableLogCondensed; //**<oldVariableChangeLog with duplicated objects removed (i.e. if you have obj := object(), obj.a := 1, obj.b := 2, obj := object(); the normal change log will contain 4 objects (like {}, {a:1}, {a:1,b:2}, {}), but the condensed log only two {a:1,b:2}, {})
 
     property templateNamespaces: TStringList read FNamespaces write FNamespaces; //**< Namespace prefixes which are recognized as template commands. Default is template: and t: @br Namespaces defined in a template with the xmlns: notation are automatically added to this property (actually added, so they will also recognized in later documents. Since this behaviour is a violation of the xml standard, it might change in future). @br Remark: This property contains the complete namespace prefix, including the final :
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
@@ -660,6 +662,12 @@ begin
   result := TPseudoXPathParser.Create;
   result.OnEvaluateVariable:= @evaluatePXPVariable;
   result.OnDefineVariable:=@FVariableLog.defineVariable;
+end;
+
+function THtmlTemplateParser.GetVariableLogCondensed: TPXPVariableChangeLog;
+begin
+  if FVariableLogCondensed = nil then FVariableLogCondensed := FVariableLog.condensedSharedLog;
+  result := FVariableLogCondensed;
 end;
 
 function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
@@ -1041,6 +1049,7 @@ begin
   FRepetitionRegEx.Free;
   FNamespaces.Free;
   FreeAndNil(FVariables);
+  FVariableLogCondensed.free;
   FVariableLog.Free;
   FOldVariableLog.Free;
   FTemplate.Free;
@@ -1064,6 +1073,7 @@ begin
     if FKeepOldVariables = kpvKeepValues then
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
+  FreeAndNil(FVariableLogCondensed);
 
   FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
   FHTML.parseTree(html, htmlfilename);
