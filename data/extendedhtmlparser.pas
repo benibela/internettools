@@ -348,6 +348,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 *)
 THtmlTemplateParser=class
   private
+    FObjects: boolean;
     FRepetitionRegEx: TRegExpr;
     FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
     FVeryShortNotation: boolean;
@@ -408,7 +409,8 @@ THtmlTemplateParser=class
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
     property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.PXPGlobalTrimNodes which controls, how the values are returned.
     property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
-    property VeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
+    property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
+    property AllowObjects: boolean read FObjects write FObjects;
 
     property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
@@ -1041,6 +1043,7 @@ begin
   FUnnamedVariableName:='_result';
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
+  FObjects:=true;
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -1069,6 +1072,7 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
   FreeAndNil(FVariableLogCondensed);
+  FVariableLog.allowObjects:=FObjects;
 
   FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
   FHTML.parseTree(html, htmlfilename);
