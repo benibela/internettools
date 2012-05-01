@@ -582,8 +582,6 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     end;
   end;
 
-var
- i: Integer;
 begin
   contentRepetitions := 0;
 
@@ -696,7 +694,6 @@ function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
   template: TTemplateElement): Boolean;
 var
   name: string;
-  condition: string;
   i: Integer;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
@@ -907,8 +904,7 @@ var xpathText: TTreeElement;
     procedure switchTemplateCommand;
     var value: TPXPValue;
       function elementFit(e: TTemplateElement): boolean;
-      var test,myvalue: string;
-       evaluatedvalue: TPXPValue;
+      var evaluatedvalue: TPXPValue;
       begin
         if (e.templateAttributes = nil) or (e.templateAttributes.Count = 0) then exit(true);
         result := (e.test = nil) or performPXPEvaluation(e.test).toBoolean;
@@ -1059,10 +1055,6 @@ end;
 
 function THtmlTemplateParser.parseHTML(html: string; htmlFileName: string): boolean;
 var cur,last,realLast:TTemplateElement;
-  i: Integer;
-  curValue: TPXPValue;
-  j: Integer;
-  temp: TTreeElement;
 begin
   FreeAndNil(FVariables);
   if FKeepOldVariables = kpvForget then
@@ -1324,7 +1316,7 @@ begin
   NOLINK := '       ';
   EMPTY := strDup(' ', width) + NOLINK;
 
-  templateIndent:=0; htmlIndent:=0;
+  tempTemplateIndent:='';templateIndent:=0; htmlIndent:=0;
 
   setlength(res, 0);
   template := TTemplateElement(FTemplate.getLastTree.next);
