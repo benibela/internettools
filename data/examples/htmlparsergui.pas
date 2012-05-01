@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  StdCtrls, extendedhtmlparser;
+  StdCtrls, extendedhtmlparser,simplehtmltreeparser,pseudoxpath;
 
 type
 
@@ -16,8 +16,17 @@ type
     Button1: TButton;
     Button2: TButton;
     Button3: TButton;
-    CheckBox1: TCheckBox;
-    trimming: TComboBox;
+    CheckBoxverbose: TCheckBox;
+    CheckBoxOptions: TCheckBox;
+    CheckBoxEntities: TCheckBox;
+    CheckBoxObjects: TCheckBox;
+    CheckBoxShortnotatin: TCheckBox;
+    CheckBoxVarsInStrs: TCheckBox;
+    options: TGroupBox;
+    Label4: TLabel;
+    Label5: TLabel;
+    Label6: TLabel;
+    Panel4: TPanel;
     Label1: TLabel;
     Label2: TLabel;
     Label3: TLabel;
@@ -27,14 +36,19 @@ type
     Panel1: TPanel;
     Panel2: TPanel;
     Panel3: TPanel;
+    Panel5: TPanel;
     Splitter1: TSplitter;
     Splitter2: TSplitter;
+    trimming: TComboBox;
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure Button3Click(Sender: TObject);
+    procedure CheckBoxOptionsChange(Sender: TObject);
     procedure htmlparserVariableRead(variable: string; value: string);
   private
     { private declarations }
+    function mypxptostring(v: TPXPValue): string;
+    procedure parseHTML(tp: TTreeParser);
   public
     { public declarations }
   end; 
@@ -44,7 +58,7 @@ var
 
 implementation
 
-uses simplehtmltreeparser,pseudoxpath,bbutils;
+uses bbutils;
 {$R *.lfm}
 
 { TForm1 }
@@ -54,8 +68,9 @@ var htmlparser: THtmlTemplateParser;
   i: Integer;
 begin
   htmlparser := THtmlTemplateParser.create;
-  if not CheckBox1.Checked then htmlparser.OutputEncoding:=eUnknown;
+  if not CheckBoxEntities.Checked then htmlparser.OutputEncoding:=eUnknown;
   try
+    htmlparser.VeryShortNotation:=CheckBoxShortnotatin.Checked;
     htmlparser.parseTemplate(memo1.Lines.Text);
     htmlparser.trimTextNodes:=TTrimTextNodes(trimming.ItemIndex);
     memo3.Clear;
@@ -69,7 +84,10 @@ begin
       raise;
     end
     end;
-    memo3.Lines.Text:=htmlparser.variableChangeLog.debugTextRepresentation;
+
+    for i:=0 to htmlparser.variableChangeLog.count-1 do
+      memo3.Lines.add(htmlparser.variableChangeLog.getVariableName(i)+'='+mypxptostring(htmlparser.variableChangeLog.getVariableValue(i)));
+//    memo3.Lines.Text:=htmlparser.variableChangeLog.debugTextRepresentation;
   finally
     htmlparser.Free;
   end;
@@ -78,28 +96,18 @@ end;
 procedure TForm1.Button2Click(Sender: TObject);
 var
   tp: TTreeParser;
-  cur: TTreeElement;
 begin
   tp := TTreeParser.Create;
-  tp.readComments:=true;
-  tp.readProcessingInstructions:=true;
-  tp.parsingModel:=pmHTML;
-  tp.trimText := trimming.ItemIndex = 3;
-  tp.parseTree(memo2.Lines.Text);
-  if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
-
-  cur := tp.getTree;
-  memo3.Lines.Clear;
-  while cur <> nil do begin
-    memo3.Lines.Add(cur.toString());
-    cur:=cur.next;
-  end;
+  parseHTML(tp);
+  memo3.Lines.Text := tp.getLastTree.outerXML();
+  tp.free;
 end;
 
 procedure TForm1.Button3Click(Sender: TObject);
 var ppath: TPseudoXPathParser;
     tp: TTreeParser;
     vars: TPXPVariableChangeLog;
+    temp: TPXPValue;
 begin
   ppath := TPseudoXPathParser.Create;
   vars := TPXPVariableChangeLog.create();
@@ -107,20 +115,17 @@ begin
   try
     ppath.OnEvaluateVariable:=@vars.evaluateVariable;
     ppath.OnDefineVariable:=@vars.defineVariable;
+    ppath.AllowVariableUseInStringLiterals:=CheckBoxVarsInStrs.Checked;
+    vars.allowObjects:=CheckBoxObjects.Checked;
     ppath.parse(memo1.Lines.text);
 
-    tp.readComments:=true;
-    tp.readProcessingInstructions:=true;
-    tp.parsingModel:=pmHTML;
-    tp.trimText := trimming.ItemIndex = 3;
-    tp.autoDetectHTMLEncoding:=false;
-    tp.parseTree(memo2.Lines.Text);
-    if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
+    parseHTML(tp);
 
-
-    ppath.ParentElement := tp.getTree;
-    ppath.RootElement := tp.getTree;
-    memo3.Lines.Text:=ppath.evaluate().toString;
+    ppath.ParentElement := tp.getLastTree;
+    ppath.RootElement := tp.getLastTree;
+    temp := ppath.evaluate();
+    memo3.Lines.Text:=mypxptostring(temp);
+    temp.free;
   finally
     tp.Free;
     ppath.Free;
@@ -128,9 +133,36 @@ begin
   end;
 end;
 
+procedure TForm1.CheckBoxOptionsChange(Sender: TObject);
+begin
+  options.visible:=CheckBoxOptions.Checked;
+end;
+
 procedure TForm1.htmlparserVariableRead(variable: string; value: string);
 begin
   memo3.Lines.Add(variable+ ' = '+value);
+end;
+
+function TForm1.mypxptostring(v: TPXPValue): string;
+var
+  temp: TPXPValueObject;
+  i: Integer;
+begin
+  if not CheckBoxverbose.Checked then
+    result := v.asString
+   else
+    result := v.debugAsStringWithTypeAnnotation;
+end;
+
+procedure TForm1.parseHTML(tp: TTreeParser);
+begin
+  tp.readComments:=true;
+  tp.readProcessingInstructions:=true;
+  tp.parsingModel:=pmHTML;
+  tp.trimText := trimming.ItemIndex = 3;
+  tp.autoDetectHTMLEncoding:=false;
+  tp.parseTree(memo2.Lines.Text);
+  if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
 end;
 
 end.

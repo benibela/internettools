@@ -1,28 +1,28 @@
 object Form1: TForm1
   Left = 320
-  Height = 561
+  Height = 562
   Top = 230
-  Width = 769
+  Width = 808
   ActiveControl = Panel1
   Caption = 'Form1'
-  ClientHeight = 561
-  ClientWidth = 769
+  ClientHeight = 562
+  ClientWidth = 808
   LCLVersion = '1.1'
   object Panel1: TPanel
     Left = 0
     Height = 165
     Top = 0
-    Width = 769
+    Width = 808
     Align = alTop
     Caption = 'Panel1'
     ClientHeight = 165
-    ClientWidth = 769
+    ClientWidth = 808
     TabOrder = 0
     object Label1: TLabel
       Left = 1
       Height = 16
       Top = 1
-      Width = 767
+      Width = 806
       Align = alTop
       Caption = 'Template:'
       ParentColor = False
@@ -31,7 +31,7 @@ object Form1: TForm1
       Left = 1
       Height = 147
       Top = 17
-      Width = 767
+      Width = 806
       Align = alClient
       Font.Name = 'Monospace,Courier'
       Lines.Strings = (
@@ -48,28 +48,28 @@ object Form1: TForm1
   end
   object Panel2: TPanel
     Left = 0
-    Height = 110
+    Height = 98
     Top = 170
-    Width = 769
+    Width = 808
     Align = alClient
     Caption = 'Panel2'
-    ClientHeight = 110
-    ClientWidth = 769
+    ClientHeight = 98
+    ClientWidth = 808
     TabOrder = 1
     object Label2: TLabel
       Left = 1
       Height = 16
       Top = 1
-      Width = 767
+      Width = 806
       Align = alTop
       Caption = 'HTML-File:'
       ParentColor = False
     end
     object Memo2: TMemo
       Left = 1
-      Height = 92
+      Height = 80
       Top = 17
-      Width = 767
+      Width = 806
       Align = alClient
       Font.Name = 'Monospace,Courier'
       Lines.Strings = (
@@ -93,18 +93,18 @@ object Form1: TForm1
   object Panel3: TPanel
     Left = 0
     Height = 158
-    Top = 403
-    Width = 769
+    Top = 404
+    Width = 808
     Align = alBottom
     Caption = 'Panel3'
     ClientHeight = 158
-    ClientWidth = 769
+    ClientWidth = 808
     TabOrder = 2
     object Label3: TLabel
       Left = 1
       Height = 16
       Top = 1
-      Width = 767
+      Width = 806
       Align = alTop
       Caption = 'Result:'
       ParentColor = False
@@ -113,7 +113,7 @@ object Form1: TForm1
       Left = 1
       Height = 140
       Top = 17
-      Width = 767
+      Width = 806
       Align = alClient
       Font.Height = -13
       Font.Name = 'Monospace,Courier'
@@ -130,7 +130,7 @@ object Form1: TForm1
     Left = 0
     Height = 5
     Top = 165
-    Width = 769
+    Width = 808
     Align = alTop
     ResizeAnchor = akTop
   end
@@ -138,67 +138,189 @@ object Form1: TForm1
     Cursor = crVSplit
     Left = 0
     Height = 5
-    Top = 398
-    Width = 769
+    Top = 399
+    Width = 808
     Align = alBottom
     ResizeAnchor = akBottom
   end
-  object Button1: TButton
+  object Panel4: TPanel
     Left = 0
-    Height = 25
-    Top = 280
-    Width = 769
+    Height = 131
+    Top = 268
+    Width = 808
     Align = alBottom
-    Caption = 'GO'
-    OnClick = Button1Click
+    AutoSize = True
+    ClientHeight = 131
+    ClientWidth = 808
     TabOrder = 5
-  end
-  object Button2: TButton
-    Left = 0
-    Height = 25
-    Top = 373
-    Width = 769
-    Align = alBottom
-    Caption = 'Show html tree parser result'
-    OnClick = Button2Click
-    TabOrder = 6
-  end
-  object Button3: TButton
-    Left = 0
-    Height = 25
-    Top = 348
-    Width = 769
-    Align = alBottom
-    Caption = 'Evaluate template as pseudo xpath'
-    OnClick = Button3Click
-    TabOrder = 7
-  end
-  object CheckBox1: TCheckBox
-    Left = 0
-    Height = 18
-    Top = 305
-    Width = 769
-    Align = alBottom
-    Caption = 'convert encoding/entities'
-    Checked = True
-    State = cbChecked
-    TabOrder = 8
-  end
-  object trimming: TComboBox
-    Left = 0
-    Height = 25
-    Top = 323
-    Width = 769
-    Align = alBottom
-    ItemHeight = 0
-    ItemIndex = 1
-    Items.Strings = (
-      'trim: never'
-      'trim: matching'
-      'trim: empty'
-      'trim: all'
-    )
-    TabOrder = 9
-    Text = 'trim: matching'
+    object options: TGroupBox
+      Left = 1
+      Height = 96
+      Top = 34
+      Width = 806
+      Align = alClient
+      ClientHeight = 92
+      ClientWidth = 802
+      TabOrder = 0
+      Visible = False
+      object CheckBoxEntities: TCheckBox
+        AnchorSideLeft.Control = Label4
+        AnchorSideLeft.Side = asrBottom
+        AnchorSideTop.Side = asrCenter
+        Left = 178
+        Height = 18
+        Top = 69
+        Width = 183
+        BorderSpacing.Around = 5
+        Caption = 'convert encoding/entities'
+        Checked = True
+        State = cbChecked
+        TabOrder = 0
+      end
+      object trimming: TComboBox
+        AnchorSideLeft.Control = CheckBoxEntities
+        AnchorSideLeft.Side = asrBottom
+        AnchorSideTop.Control = Label4
+        AnchorSideTop.Side = asrCenter
+        Left = 366
+        Height = 25
+        Top = 67
+        Width = 186
+        ItemHeight = 0
+        ItemIndex = 1
+        Items.Strings = (
+          'trim: never'
+          'trim: matching'
+          'trim: empty'
+          'trim: all'
+        )
+        TabOrder = 1
+        Text = 'trim: matching'
+      end
+      object Label4: TLabel
+        Left = 13
+        Height = 16
+        Top = 71
+        Width = 160
+        Caption = 'Tree parsing options:      '
+        ParentColor = False
+      end
+      object Label5: TLabel
+        Left = 13
+        Height = 16
+        Top = 14
+        Width = 115
+        Caption = 'Template options:'
+        ParentColor = False
+      end
+      object CheckBoxShortnotatin: TCheckBox
+        AnchorSideLeft.Control = Label4
+        AnchorSideLeft.Side = asrBottom
+        Left = 178
+        Height = 18
+        Top = 14
+        Width = 151
+        BorderSpacing.Around = 5
+        Caption = 'Allow short notation'
+        Checked = True
+        State = cbChecked
+        TabOrder = 2
+      end
+      object Label6: TLabel
+        Left = 13
+        Height = 16
+        Top = 42
+        Width = 85
+        Caption = 'PXP-Options:'
+        ParentColor = False
+      end
+      object CheckBoxObjects: TCheckBox
+        AnchorSideLeft.Control = Label4
+        AnchorSideLeft.Side = asrBottom
+        Left = 178
+        Height = 18
+        Top = 41
+        Width = 107
+        BorderSpacing.Around = 5
+        Caption = 'Allow objects'
+        Checked = True
+        State = cbChecked
+        TabOrder = 3
+      end
+      object CheckBoxVarsInStrs: TCheckBox
+        AnchorSideLeft.Control = CheckBoxEntities
+        AnchorSideLeft.Side = asrBottom
+        AnchorSideTop.Control = CheckBoxObjects
+        AnchorSideTop.Side = asrCenter
+        Left = 366
+        Height = 18
+        Top = 41
+        Width = 222
+        Caption = 'Allow variables in string literals'
+        Checked = True
+        State = cbChecked
+        TabOrder = 4
+      end
+      object CheckBoxverbose: TCheckBox
+        Left = 604
+        Height = 18
+        Top = 41
+        Width = 118
+        Caption = 'Verbose output'
+        Checked = True
+        State = cbChecked
+        TabOrder = 5
+      end
+    end
+    object Panel5: TPanel
+      Left = 1
+      Height = 33
+      Top = 1
+      Width = 806
+      Align = alTop
+      BevelOuter = bvNone
+      ClientHeight = 33
+      ClientWidth = 806
+      TabOrder = 1
+      object Button2: TButton
+        Left = 559
+        Height = 25
+        Top = 4
+        Width = 242
+        Anchors = [akTop, akRight]
+        Caption = 'Show html tree parser result'
+        OnClick = Button2Click
+        TabOrder = 0
+      end
+      object Button3: TButton
+        Left = 215
+        Height = 25
+        Top = 4
+        Width = 232
+        Caption = 'Evaluate template as pXpath'
+        OnClick = Button3Click
+        TabOrder = 1
+      end
+      object Button1: TButton
+        Left = 7
+        Height = 25
+        Top = 4
+        Width = 201
+        Caption = 'Process as template'
+        OnClick = Button1Click
+        TabOrder = 2
+      end
+      object CheckBoxOptions: TCheckBox
+        Left = 455
+        Height = 18
+        Top = 9
+        Width = 70
+        Caption = 'Options'
+        Color = clNone
+        OnChange = CheckBoxOptionsChange
+        ParentColor = False
+        TabOrder = 3
+      end
+    end
   end
 end

@@ -3,7 +3,7 @@ program htmlparserExampleXQTS;
 {$mode objfpc}{$H+}
 
 uses
-//  bbheaptrc,
+//  heaptrc,
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
@@ -46,9 +46,6 @@ class procedure LOG_GROUP_END(correct, wrong, exceptions, skipped: integer); ove
 class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; override;
 end;
 
-const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{(path:=@FilePath,desc:=description,queryname:=query/@name,' +
-                         'outputfile:=output-file,error:=expected-error)}' +
-                         '<input-file>{input:=.}</input-file>*{complete:="yes"}</test-case>*</test-group>';
 
 type
 
@@ -203,8 +200,13 @@ begin
   //if variable = 'input-context' then value := pxpvalue(tree.getLastTree);
 end;
 
+const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{('+
+                         'test:=xs:object(), test.path:=@FilePath,test.desc:=description,test.queryname:=query/@name,' +
+                         'test.outputfile:=output-file,test.error:=expected-error)}' +
+                         '<input-file>{input:=.}</input-file>*{test.complete:="yes"}</test-case>*</test-group>';
+
 var htp: THtmlTemplateParser;
-    desc, queryname,  outputfile, error, path: string;
+    desc, queryname, outputfile, error, path: string;
     i: Integer;
     query, output: String;
     skippedErrorsLocal, totalLocal, correctLocal, wrongLocal, exceptionLocal: Integer;
@@ -226,6 +228,9 @@ var htp: THtmlTemplateParser;
     logCorrect: Boolean;
     timing: TDateTime;
     mypxpoutput: TPXPValue;
+    extendedvars: TPXPVariableChangeLog;
+    j: Integer;
+    varlog: TPXPVariableChangeLog;
 begin
   {$ifdef win32}defaultInternetAccessClass := TW32InternetAccess.create{$else}defaultInternetAccessClass:=TSynapseInternetAccess{$endif};
 
@@ -252,6 +257,11 @@ begin
   variables:=TStringList.Create;
   variables.Sorted:=true;
   inputfiles:=TStringList.Create;
+  extendedvars := TPXPVariableChangeLog.create();
+//  extendedvars.allowObjects:=true;
+ // pxp.OnDefineVariable:=@extendedvars.defineVariable;
+ // pxp.OnEvaluateVariable:=@extendedvars.evaluateVariable;
+
 
   try
   if paramstr(1) = '--simple' then begin
@@ -260,13 +270,15 @@ begin
       tree.parseTreeFromFile(paramstr(4));
       pxp.RootElement:=tree.getLastTree;
     end;
-    writeln(mytostring(pxp.evaluate(paramstr(2),tree.getLastTree)));
+    pxp.parse(ParamStr(2));
+    writeln(mytostring(pxp.evaluate()));
     exit;
   end;
 
   mylogger.LOG_START();
 
   PXPGlobalTrimNodes:=false;
+  correct:=0; skipped:=0; exceptions:=0; wrong:=0;
   for CAT:=1 to Paramcount() do begin;
     if mylogger <> TPlainLogger then writeln(stderr, 'Test ', CAT, ' / ', Paramcount, ': ',paramstr(cat));
     skippedErrorsLocal := 0; correctLocal := 0; wrongLocal := 0; totalLocal := 0; exceptionLocal:=0;
@@ -275,16 +287,16 @@ begin
 
 
     //writeln(htp.variableChangeLog.debugTextRepresentation);
-    for i:=0 to htp.variableChangeLog.count-1 do begin
-      if htp.variableChangeLog.getVariableName(i) = 'gi' then mylogger.LOG_GROUP_START(paramstr(CAT), htp.variableChangeLog.getVariableValueNode(i).findChild(tetOpen, 'title').deepNodeText(),htp.variableChangeLog.getVariableValueNode(i).findChild(tetOpen, 'description').deepNodeText())
-      else if htp.variableChangeLog.getVariableName(i) = 'desc' then desc := htp.variableChangeLog.getVariableValueString(i)
-      else if htp.variableChangeLog.getVariableName(i) = 'queryname' then queryname := htp.variableChangeLog.getVariableValueString(i)
-      else if htp.variableChangeLog.getVariableName(i) = 'inputfile' then inputfile := htp.variableChangeLog.getVariableValueString(i)
-      else if htp.variableChangeLog.getVariableName(i) = 'outputfile' then outputfile := htp.variableChangeLog.getVariableValueString(i)
-      else if htp.variableChangeLog.getVariableName(i) = 'error' then error := htp.variableChangeLog.getVariableValueString(i)
-      else if htp.variableChangeLog.getVariableName(i) = 'path' then path := htp.variableChangeLog.getVariableValueString(i)
-      else if htp.variableChangeLog.getVariableName(i) = 'input' then begin
-        node := htp.variableChangeLog.getVariableValueNode(i);
+    varlog := htp.VariableChangeLogCondensed;
+    for i:=0 to varlog.count-1 do begin
+      if varlog.getVariableName(i) = 'gi' then mylogger.LOG_GROUP_START(paramstr(CAT), varlog.getVariableValueNode(i).findChild(tetOpen, 'title').deepNodeText(),varlog.getVariableValueNode(i).findChild(tetOpen, 'description').deepNodeText())
+      else if varlog.getVariableName(i) = 'desc' then desc := varlog.getVariableValueString(i)
+      else if varlog.getVariableName(i) = 'queryname' then queryname := varlog.getVariableValueString(i)
+      else if varlog.getVariableName(i) = 'outputfile' then outputfile := varlog.getVariableValueString(i)
+      else if varlog.getVariableName(i) = 'error' then error := varlog.getVariableValueString(i)
+      else if varlog.getVariableName(i) = 'path' then path := varlog.getVariableValueString(i)
+      else if varlog.getVariableName(i) = 'input' then begin
+        node := varlog.getVariableValueNode(i);
         inputfilevar := node.getAttribute('variable');
         inputfile := node.deepNodeText();
         if inputfile = 'id-idref-dtd' then inputfile:='id';
@@ -301,7 +313,14 @@ begin
           if variables.IndexOf(inputfilevar) < 0 then variables.AddObject(inputfilevar, nil);
           variables.Objects[variables.IndexOf(inputfilevar)] :=inputfiles.Objects[inputfiles.IndexOf(inputfile)];
         end;
-      end else if htp.variableChangeLog.getVariableName(i) = 'complete' then begin
+      end else if varlog.getVariableName(i) = 'test' then begin
+        desc := varlog.getVariableValueObject(i).getAsString('desc');
+        queryname := varlog.getVariableValueObject(i).getAsString('queryname');
+        outputfile := varlog.getVariableValueObject(i).getAsString('outputfile');
+        error := varlog.getVariableValueObject(i).getAsString('error');
+        path := varlog.getVariableValueObject(i).getAsString('path');
+
+
         totalLocal += 1;
         if error <> '' then begin
           skippedErrorsLocal+=1;
@@ -378,7 +397,7 @@ begin
   for i:= 0 to buffer1.Count-1 do writeln(buffer1[i]);
   for i:= 0 to buffer2.Count-1 do writeln(buffer2[i]);
   for i:= 0 to buffer3.Count-1 do writeln(buffer3[i]);
-
+  extendedvars.free;
   buffer1.free;
   buffer2.free;
   buffer3.free;
