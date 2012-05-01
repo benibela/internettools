@@ -350,6 +350,7 @@ THtmlTemplateParser=class
   private
     FRepetitionRegEx: TRegExpr;
     FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
+    FVeryShortNotation: boolean;
     FUnnamedVariableName: string;
     function GetVariableLogCondensed: TPXPVariableChangeLog;
   protected
@@ -405,8 +406,9 @@ THtmlTemplateParser=class
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
-    property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
     property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.PXPGlobalTrimNodes which controls, how the values are returned.
+    property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
+    property VeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
 
     property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
@@ -1037,6 +1039,7 @@ begin
   FKeepOldVariables:=kpvForget;
   FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *, *([0-9]+) *[}] *');
   FUnnamedVariableName:='_result';
+  FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
 end;
 
@@ -1152,7 +1155,6 @@ var el: TTemplateElement;
     defaultTextMatching: String;
     defaultCaseSensitive: string;
     i: Integer;
-    veryShortSyntax: Boolean;
     looper: TTemplateElement;
     temp: TTemplateElement;
 begin
@@ -1202,7 +1204,6 @@ begin
 
   defaultTextMatching := 'starts-with';
   defaultCaseSensitive := '';
-  veryShortSyntax := true;
 
   el := TTemplateElement(FTemplate.getLastTree.next);
   while el <> nil do begin
@@ -1211,7 +1212,7 @@ begin
       i := el.templateAttributes.IndexOfName('default-text-case-sensitive');
       if i >= 0 then begin defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i]; if defaultCaseSensitive = '' then defaultCaseSensitive := 'true'; end;
     end else if el.templateType = tetHTMLText then begin
-      if (veryShortSyntax) and (el.value <> '') then begin
+      if (FVeryShortNotation) and (el.value <> '') then begin
         if el.value[1] = '?' then begin
           delete(el.value,1,1);
           temp := TTemplateElement(el.getPrevious());
