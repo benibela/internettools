@@ -425,8 +425,8 @@ function strTrim(const s: string; const trimCharacters: TCharSet = [#0..' ']):st
 function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [#0..' ']):string;
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
-//**first part is returned as function result, the second one is again assign to remainingPart.
-//**(If )
+//**first part is returned as function result, the second one is again assign to remainingPart
+//**(If remainingPart does not contain separator, it returns remainingPart and sets remainingPart := '')
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is assign to firstPart, the second one is again assign to remainingPart
@@ -772,6 +772,7 @@ var
  i: Integer;
 begin
   arraySliceIndices(a, slice1, slice2);
+  result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
     result[i] := a[slice1+i];
@@ -933,6 +934,7 @@ var
  i: Integer;
 begin
   arraySliceIndices(a, slice1, slice2);
+  result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
     result[i] := a[slice1+i];
@@ -1094,6 +1096,7 @@ var
  i: Integer;
 begin
   arraySliceIndices(a, slice1, slice2);
+  result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
     result[i] := a[slice1+i];
@@ -1255,6 +1258,7 @@ var
  i: Integer;
 begin
   arraySliceIndices(a, slice1, slice2);
+  result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
     result[i] := a[slice1+i];
@@ -1416,6 +1420,7 @@ var
  i: Integer;
 begin
   arraySliceIndices(a, slice1, slice2);
+  result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
     result[i] := a[slice1+i];
@@ -1897,6 +1902,7 @@ end;
 function strslice(const  first, last: pchar): string;
 begin
   if first>last then exit;
+  result := '';
   SetLength(result,last-first+1);
   move(first^,result[1],length(result));
 end;
@@ -1996,7 +2002,7 @@ var i: integer;
     lastTextStart, lastBreakChance: integer;
     tempBreak: Integer;
 begin
-  setlength(result, 0);
+  result := nil;
   lastTextStart:=1;
   lastBreakChance:=0;
   for i := 1 to length(line) do begin
@@ -2154,6 +2160,7 @@ begin
       if reslen = len then
         exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
       //reserve string
+      result := '';
       SetLength(result, reslen);
       pos:=1;
       for i:=1 to len do begin
@@ -2186,6 +2193,7 @@ begin
       if reslen = len then
         exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
       //conversion
+      result := '';
       SetLength(result,reslen);
       pos:=1;
       for i:=1 to reslen do begin
@@ -7030,6 +7038,7 @@ var
   i: Integer;
 begin
   assert(length(s) and 1 = 0);
+  result := '';
   setlength(result, length(s) div 2);
   for i:=1 to length(result) do
     result[i] := chr((decodeSingleHex(s[2*i-1]) shl 4) or decodeSingleHex(s[2*i]));
@@ -7043,6 +7052,7 @@ var
 begin
   assert(length(code) = 16);
   pcode := @code[1];
+  result := '';
   setlength(result, length(s) * 2);
   for i:=1 to length(s) do begin
     o := ord(s[i]);
@@ -7054,6 +7064,7 @@ end;
 function strFromPchar(p: pchar; l: longint): string;
 begin
   if l=0 then exit('');
+  result := '';
   setlength(result,l);
   move(p^,result[1],l);
 end;
@@ -7130,6 +7141,7 @@ function strLoadFromFile(filename: string): string;
 var f:TFileStream;
 begin
   f:=TFileStream.Create(filename,fmOpenRead);
+  result := '';
   SetLength(result,f.Size);
   if f.size>0 then
     f.Read(Result[1],length(result));
