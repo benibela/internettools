@@ -71,7 +71,8 @@ TReadCallbackFunction = procedure (read: pchar; readLen:longint) of object;*)
 TReplaceFunction = procedure (variable: string; var value:string) of object;
 
 ETemplateParseException = Exception;
-EHTMLParseException = Exception;
+EHTMLParseException = class(Exception);
+EHTMLParseMatchingException = class(EHTMLParseException);
 THtmlTemplateParser=class;
 
 { TTemplateElement }
@@ -682,16 +683,12 @@ begin
 end;
 
 procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
-var i:longint;
+var
+  temp: TPXPValue;
 begin
-  i := FVariableLog.getVariableIndex(variable);
-  if i = -1 then begin
-    i := FOldVariableLog.getVariableIndex(variable);
-    if i = -1 then exit;
-    pxpvalueAssign(value, FOldVariableLog.getVariableValueClone(i));
-    exit;
-  end;
-  pxpvalueAssign(value, FVariableLog.getVariableValueClone(i));
+  if not FVariableLog.hasVariable(variable, @temp) then
+    if not FOldVariableLog.hasVariable(variable, @temp) then exit;
+  pxpvalueAssign(value, temp.clone);
 end;
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
@@ -1129,7 +1126,7 @@ begin
       case cur.templateType of
         tetHTMLOpen, tetHTMLText: begin
           if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
-            raise EHTMLParseException.create('Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+            raise EHTMLParseMatchingException.create('Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
           end;
           last:=cur;
         end;
@@ -1359,7 +1356,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..258] of array[1..3] of string = (
+var data: array[1..259] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1926,8 +1923,9 @@ var data: array[1..258] of array[1..3] of string = (
       ,('<a><b>{1,1}{x:=text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'x=A1')
       ,('<a><b>{test:=/deep-text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=A1B1B2B3B4')
       ,('<a><b>{test:=static-base-uri()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=unittest')
+      ,('<a><b>{test:=123,abc:="foobar"}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=123'#13'abc=foobar')
 
-      //anonymouse variables
+      //anonymous variables
       ,('<a>{text()}</a>', '<a>hallo</a>', '_result=hallo')
       ,('<a>{t:=text()}</a>', '<a>hallo</a>', 't=hallo')
       ,('<a><t:read var="u" source="text()"/></a>', '<a>hallo</a>', 'u=hallo')
