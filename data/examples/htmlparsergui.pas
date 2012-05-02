@@ -70,7 +70,8 @@ begin
   htmlparser := THtmlTemplateParser.create;
   if not CheckBoxEntities.Checked then htmlparser.OutputEncoding:=eUnknown;
   try
-    htmlparser.VeryShortNotation:=CheckBoxShortnotatin.Checked;
+    htmlparser.AllowVeryShortNotation:=CheckBoxShortnotatin.Checked;
+    htmlparser.AllowObjects:=CheckBoxObjects.Checked;
     htmlparser.parseTemplate(memo1.Lines.Text);
     htmlparser.trimTextNodes:=TTrimTextNodes(trimming.ItemIndex);
     memo3.Clear;

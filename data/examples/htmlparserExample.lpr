@@ -14,6 +14,7 @@ var mycmdLine: TCommandLineReader;
     i: Integer;
     j: Integer;
     temp: TStringArray;
+    s: shortString;
 
 {$R *.res}
 
@@ -38,6 +39,7 @@ begin
 
 
   htmlparser:=THtmlTemplateParser.create;
+  htmlparser.AllowObjects:=false;
 
   htmlparser.parseTemplateFile(mycmdLine.readString('template'));
 
