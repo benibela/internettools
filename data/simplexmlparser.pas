@@ -153,10 +153,11 @@ end;
 
 procedure setProperty(propertyName, value: string; var properties: TProperties);
 var i:longint;
+  propertyNameLW: String;
 begin
-  propertyName:=LowerCase(propertyName);
+  propertyNameLW:=LowerCase(propertyName);
   for i:=0 to high(properties) do
-    if LowerCase(properties[i].name)=propertyName then begin
+    if LowerCase(properties[i].name)=propertyNameLW then begin
       properties[i].value:=value;
       exit;
     end;
