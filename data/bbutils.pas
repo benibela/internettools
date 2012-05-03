@@ -586,11 +586,11 @@ type EDateTimeParsingException = class(Exception);
 //**m or mm for a numerical month, mmm for a short month name, mmmm for a long month name@br
 //**am/pm or a/p match am/pm or a/p
 //**yy, yyyy or [yy]yy for the year. (if the year is < 90, it will become 20yy, else if it is < 100, it will become 19yy, unless you use uppercase Y instead of y)  @br
-//**yy, yyyy or [yy]yy for the year  @br
+//**YY, YYYY or [YY]YY for the year  @br
 //**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional ms with up to 6 digit precision)
 //**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format char (except mmm) matching several characters)
 //**The letter formats d/y/h/n/s matches one or two digits, the dd/mm/yy formats require exactly two.@br
-//**yyyy requires exactly 4 digits, and [yy]yy works with 2, 3 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
+//**yyyy requires exactly 4 digits, and [yy]yy works with 2 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
 //**Generally [x] marks the part x as optional (it tries all possible combinations, so you shouldn't have more than 10 optional parts)@br
 //**x+ will match any additional amount of x. (e.g. yy -> 2 digit year, yy+ -> at least 2 digit year, yyyy -> 4 digit year, [yy]yy -> 2 or 4 digit year)
 //**"something" can be used to match the input verbatim@br
@@ -602,15 +602,21 @@ function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDa
 //**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
 procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function dateTimeFormat(const mask: string; const y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+function dateTimeFormat(const mask: string; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
+//**Encodes a date time
+function dateTimeEncode(const y,m,d,h,n,s:integer; const secondFraction: double = 0): TDateTime;
+
+
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry)@br
 procedure timeParseParts(const input,mask:string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry).@br This function checks, if the time is valid.
 function timeParse(const input,mask:string): TTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function timeFormat(const mask: string; const h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+
+
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br
 procedure dateParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil);
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br This function checks, if the date is valid.
@@ -7828,7 +7834,9 @@ begin
     raise Exception.Create('The date time ' + input + ' does not correspond to the date time format ' + mask);
 end;
 
-function dateTimeFormat(const mask: string; const y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+const TryAgainWithRoundedSeconds: string = '<TryAgainWithRoundedSeconds>';
+
+function dateTimeFormatInternal(const mask: string; const y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
 var mp: integer;
   function nextMaskPart: string;
   function isValid(const c: char): boolean;
@@ -7863,8 +7871,11 @@ var mp: integer;
           okc := result[i];
           break;
         end;
-      if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then
-        exit('"' + dateTimeFormat(result, y, m, d, h, n, s, secondFraction, timezone) + '"');
+      if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then begin
+        result := dateTimeFormatInternal(result, y, m, d, h, n, s, secondFraction, timezone);
+        if pointer(result) = pointer(TryAgainWithRoundedSeconds) then exit;
+        exit('"' + result + '"');
+      end;
       result:='';
     end;
     while (mp <= length(mask)) and (mask[mp] = '"') do begin
@@ -7890,11 +7901,16 @@ var mp: integer;
   end;
 
 var part: String;
+  temp: Int64;
+  scale: Integer;
+  toadd: String;
+  len: Integer;
 begin
   mp := 1;
   result := '';
   while mp <= length(mask) do begin
     part := nextMaskPart;
+    if pointer(part) = pointer(TryAgainWithRoundedSeconds) then exit(TryAgainWithRoundedSeconds);
     if length(part) = 0 then continue;
     case part[1] of
       'y','Y': result += strFromInt(y, length(part));
@@ -7904,8 +7920,14 @@ begin
       'n': result += strFromInt(n, length(part));
       's': result += strFromInt(s, length(part));
       'z': begin
-        if (mask[mp-1] = '+') and (length(part) < 6) then part := 'zzzzzz';
-        result += strTrimRight(IntToStr(trunc(secondFraction*intpower(10, length(part)))), ['0']);
+        if (mask[mp-1] = '+') and (length(part) < 6) then len := 6
+        else len := length(part);
+        scale := powersOf10[len];
+        temp := round(secondFraction*scale);
+        if temp >= scale then exit(TryAgainWithRoundedSeconds);
+        toadd := strTrimRight(strFromInt(temp, len), ['0']);
+        result += toadd;
+        if length(toadd) < length(part) then result += strDup('0', length(part) - length(toadd));
       end;
       'Z': if not IsNan(timezone) then begin; //no timezone
         if timezone = 0 then result += 'Z'
@@ -7919,6 +7941,45 @@ begin
   end;
 end;
 
+function dateTimeFormat(const mask: string; y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+const invalid = high(integer);
+begin
+  Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,secondFraction,timezone);
+  if pointer(Result) = Pointer(TryAgainWithRoundedSeconds) then begin
+    s += 1;
+    //handle overflow
+    if s >= 60 then begin
+      s := 0;
+      if n <> invalid then begin
+        n+=1;
+        if n >= 60 then begin
+          n := 0;
+          if h <> invalid then begin
+            h+=1;
+            if h >= 24 then begin
+              h := 0;
+              if d <> invalid then begin
+                d+=1;
+                if (y <> invalid) and (m <> invalid) and (d > MonthDays[dateIsLeapYear(y), m]) then begin
+                   d := 1;
+                   m += 1;
+                   if m > 12 then begin
+                     m := 1;
+                     y += 1;
+                     if y = 0 then y+=1;
+                   end;
+                end;
+              end;
+            end;
+          end;
+        end;
+      end;
+    end;
+    Result := dateTimeFormatInternal(mask, y,m,d,h,n,s, 0, timezone);
+  end;
+end;
+
+
 function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
 var
   y,m,d: Integer;
@@ -7928,6 +7989,11 @@ begin
   dateDecode(dateTime, @y, @m, @d);
   DecodeTime(dateTime, h, n, s, ms);
   result := dateTimeFormat(mask, y, m, d, h, n, s);
+end;
+
+function dateTimeEncode(const y, m, d, h, n, s: integer; const secondFraction: double): TDateTime;
+begin
+  result := dateEncode(y,m,d) + EncodeTime(h,m,d,0) + secondFraction / SecsPerDay;
 end;
 
 procedure timeParseParts(const input, mask: string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble; outtimezone: PDateTime);
@@ -8788,6 +8854,19 @@ begin
   test(timeFormat('[hH][nM][sS]', high(integer), high(integer), 77), '77S');
   test(timeFormat('[hH][nM][sS]', high(integer), high(integer), high(integer)), '');
   test(timeFormat('[hH][T[nM][sS]]', high(integer), high(integer), high(integer)), '');
+  test(timeFormat('s.zzz', high(integer), high(integer), 12, 0.999), '12.999');
+  test(timeFormat('s.zzz', high(integer), high(integer), 12, 0.9992), '12.999');
+  test(timeFormat('s.zzz', high(integer), high(integer), 12, 0.9997), '13.000');
+  test(timeFormat('s.z', high(integer), high(integer), 12, 0.9997), '13.0');
+  test(timeFormat('s[.z]', high(integer), high(integer), 12, 0.9997), '13');
+  test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.9997), '12.9997');
+  test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.9999997), '13');
+  test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.9), '12.9');
+  test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.09), '12.09');
+  test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.000009), '12.000009');
+  test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.0000009), '12.000001');
+  test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.00000009), '12.0'); //TODO: fix this case (? print either 12.000000 or 12)
+  test(dateTimeFormat('yyyy-mm-dd hh:nn:ss.zz', -1, 12, 31, 23, 59, 59, 0.999), '0001-01-01 00:00:00.00');
 
   test(dateEncode(1,1,1), EncodeDate(1,1,1));
   test(dateEncode(2012,10,31), EncodeDate(2012,10,31));
