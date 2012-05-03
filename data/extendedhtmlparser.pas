@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {$mode objfpc}{$H+}
 
 //{$IFDEF DEBUG}
-{$DEFINE UNITTESTS}
+//{$DEFINE UNITTESTS}
 //{$ENDIF}
 
 interface
@@ -128,8 +128,8 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   and @code(parseHTML) matches the template to a html/xml file.@br
   A template file is just like a html file with special commands. The parser than matches every text and tag
   of the template to text/tag in the html file, while ignoring every additional data in latter file. If no match is possible an exception is raised.@br
-  The template can extract certain values from the html file into @noAutoLink(variables), and you can access these @noAutoLink(variables) with the property variables and variableChangeLog.
-  Former only contains the final value of the @noAutoLink(variables), latter records every assignment during the matching of the template.@br@br
+  The template can extract certain values from the html file into variables, and you can access these variables with the property @link(variables) and variableChangeLog.
+  Former only contains the final value of the variables, latter records every assignment during the matching of the template.@br@br
 
 
   @bold(Getting started)
@@ -181,6 +181,14 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   @itemLabel(@italic(Example, how to read the first <b>-tag using the short template notation):)
   @item(
     Template: @code(<b><t:s>test:=.</t:s></b>)@br
+    Html-File: @code(<b>Hello World!</b>)@br
+
+  This will also set the variable @code(test) to @code("Hello World!" )
+  )
+
+  @itemLabel(@italic(Example, how to read the first <b>-tag using the very short template notation):)
+  @item(
+    Template: @code(<b>{test:=.}</b>)@br
     Html-File: @code(<b>Hello World!</b>)@br
 
   This will also set the variable @code(test) to @code("Hello World!" )
@@ -240,7 +248,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
   This example will extract from each relevant element in the form the name and value pair which is sent to the webserver.
   It is very general, and will work with all forms, independent of things like nesting deep.
-  Therefore it is a little bit ugly; but if you @noAutoLink(create) a template for a specific page, you usually know which elements you will find there, so the template becomes much simpler in practical cases.
+  Therefore it is a little bit ugly; but if you create a template for a specific page, you usually know which elements you will find there, so the template becomes much simpler in practical cases.
 
 
   ))
@@ -264,7 +272,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
         )
       @item(@code(<template:s>var:=source</template:s>)
-        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several @noAutoLink(variables) like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the pxp-syntax, so you can use much more complex expressions.)
+        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several variables like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the pxp-syntax, so you can use much more complex expressions.)
         )
       @item(@code(<template:if test="??"/>  .. </template:if>)
         @br Everything inside this tag is only used iff the pseudo-XPath-expression in test equals to true)

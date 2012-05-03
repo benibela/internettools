@@ -11,7 +11,7 @@ You can also further @noAutoLink(process) the data with the function @link(simpl
 
 The interface TInternetAccess for accessing the internet is defined in the unit internetaccess, and contains several abstract methods to get/post http-data (other internet services like ftp/smtp might be added in future versions). @br 
 
-Inherited from TInternetAccess are TSynapseInternetAccess and TW32InternetAccess (in the units synapseinternetaccess and w32internetaccess) which provide wrappers around synapse and wininet.  So you can easily switch between the two libraries and choose the most appropriate (wininet integrates better with windows systems, but synapse it platform independent).
+Inherited from TInternetAccess are TSynapseInternetAccess and TW32InternetAccess (in the units synapseinternetaccess and w32internetaccess) which provide wrappers around synapse and wininet.  So you can easily switch between the two libraries and choose the most appropriate (wininet integrates better with windows systems, because it does not require openssl, but synapse it platform independent).
 
 
 @section(1 AnchorNameXYZABC Data processing)
@@ -23,19 +23,19 @@ It is implemented as a hierarchy of data processing classes, from a high level t
 
 The most powerful processing language is implemented by the THtmlTemplateParser-class in the unit extendedhtmlparser.@br
 
-To create a template, you can take the document you want process, remove all unimportant things and annotate the remaining things with template commands that read the relevant data into variables. 
+To create a template, you can take the document you want to @noAutoLink(process), remove all unimportant things and annotate the remaining things with template commands that read the relevant data into variables. 
 
 @section(2 AnchorNamePXP High-Mid-Level: PXPath/Expression processing)
 
 The PXPath expression language which used within the templates is implemented by the TPseudoXPathParser-class in the unit pseudoxpath.
 
-It is a almost complete implementation of the XPath 2 standard syntax + some things I needed for the templates (but it only supports a fraction of the XPath 2 data model). 
+It is an almost complete implementation of the XPath 2 standard syntax + some things I needed for the templates (e.g. objects and variable assignments).
 
 @section(2 AnchorNameTree Mid-Level: Tree/DOM-like processing)
 
-To process a html file directly in fpc, without using another, interpreted language, you can use the class TTreeParser in the unit simplehtmltreeparser.@br
+To @noAutoLink(process) a html file directly in fpc, without using another, interpreted language, you can use the class TTreeParser in the unit simplehtmltreeparser.@br
 
-It creates a tree of TTreeElement-s from the  html document text (you know such trees from DOM, but this tree has nothing to do with dom/doom).
+It creates a tree of TTreeElement-s from the  html document text (you know such trees from DOM, but this tree has nothing to do with do(o)m).
 
 @section(2 AnchorNameSimple Low-Level: Lexer/SAX-like interface)
 
