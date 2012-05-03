@@ -920,7 +920,7 @@ var xpathText: TTreeElement;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
-        result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0);
+        result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, e.valuepxp.getDefaultCollation, e.valuepxp.ImplicitTimezone);
         evaluatedvalue.Free;
       end;
 
