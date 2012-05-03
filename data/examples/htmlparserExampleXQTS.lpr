@@ -127,7 +127,8 @@ end;
 
 class procedure THTMLLogger.LOG_START;
 begin
-  writeln('<html><head><title>XQTS Evaluation</title>');
+  writeln('<html><head><title>XQuery Test Suite Evaluation</title>');
+  writeln('<style>  table tr th {background-color: #EEEEFF}    table tr:hover {background-color: #EEEEFF}   </style>');
   writeln('</head><body>');
   writeln('<h1>XQTS Evaluation</h1>');
   writeln('<h2>Overview</h2>');
