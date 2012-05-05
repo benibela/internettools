@@ -27,7 +27,7 @@ unit autoupdate;
 interface
 {$DEFINE showProgress}
 uses
-  Classes, SysUtils, internetaccess,bbutils,simplehtmlparser, simplexmlparser,  dialogs, {$IFDEF showProgress}progressdialog{$ENDIF}
+  Classes, SysUtils, internetaccess,bbutils,simplehtmlparser, simplexmlparser,  dialogs{$IFDEF showProgress},progressdialog{$ENDIF}
   ;
 
 //**this is shown in the message notifying about a *failed* update as a alternative way to get the update
@@ -418,7 +418,7 @@ begin
   try
     update:=TFileStream.Create(ftempDir+finstallerBaseName,fmCreate);
     try
-      finternet.get(updateUrl,update,@progress.progressEvent);
+      finternet.get(updateUrl,update{$IFDEF showProgress},@progress.progressEvent{$ENDIF});
       if update.Size=0 then Abort;
       update.free;
     except on e: Exception do
