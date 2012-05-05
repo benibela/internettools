@@ -23,7 +23,9 @@ unit w32internetaccess;
 interface
 
 uses
-  windows,Classes, SysUtils,dialogs,wininet,internetaccess;
+  windows,Classes, SysUtils,dialogs,
+  wininet, //Delphi wininet unit. Search for   "unit wininet" inurl:wininet.pas   to find one. (and then add {$mode delphi} there)
+  internetaccess;
 
 type
   EW32InternetException=class(EInternetException)

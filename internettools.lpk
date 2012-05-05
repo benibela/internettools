@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<CONFIG>
+  <Package Version="4">
+    <Name Value="internettools"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <IncludeFiles Value="data"/>
+        <OtherUnitFiles Value="data;internet;import/regexpr/source"/>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)/"/>
+      </SearchPaths>
+      <Other>
+        <CompilerMessages>
+          <MsgFileName Value=""/>
+        </CompilerMessages>
+        <CompilerPath Value="$(CompPath)"/>
+      </Other>
+    </CompilerOptions>
+    <Files Count="15">
+      <Item1>
+        <Filename Value="data/bbutils.pas"/>
+        <UnitName Value="bbutils"/>
+      </Item1>
+      <Item2>
+        <Filename Value="data/extendedhtmlparser.pas"/>
+        <UnitName Value="extendedhtmlparser"/>
+      </Item2>
+      <Item3>
+        <Filename Value="internet/progressdialog.lfm"/>
+        <Type Value="LFM"/>
+      </Item3>
+      <Item4>
+        <Filename Value="internet/progressdialog.pas"/>
+        <UnitName Value="progressdialog"/>
+      </Item4>
+      <Item5>
+        <Filename Value="import/regexpr/source/dregexpr.pas"/>
+        <UnitName Value="dregexpr"/>
+      </Item5>
+      <Item6>
+        <Filename Value="internet/autoupdate.pas"/>
+        <UnitName Value="autoupdate"/>
+      </Item6>
+      <Item7>
+        <Filename Value="internet/simpleinternet.pas"/>
+        <UnitName Value="simpleinternet"/>
+      </Item7>
+      <Item8>
+        <Filename Value="internet/internetaccess.pas"/>
+        <UnitName Value="internetaccess"/>
+      </Item8>
+      <Item9>
+        <Filename Value="data/pseudoxpath.pas"/>
+        <UnitName Value="pseudoxpath"/>
+      </Item9>
+      <Item10>
+        <Filename Value="data/disableRangeOverflowChecks.inc"/>
+        <Type Value="Include"/>
+      </Item10>
+      <Item11>
+        <Filename Value="data/simplehtmlparser.pas"/>
+        <UnitName Value="simplehtmlparser"/>
+      </Item11>
+      <Item12>
+        <Filename Value="data/simplehtmltreeparser.pas"/>
+        <UnitName Value="simplehtmltreeparser"/>
+      </Item12>
+      <Item13>
+        <Filename Value="data/pseudoxpath_derived_types.inc"/>
+        <Type Value="Include"/>
+      </Item13>
+      <Item14>
+        <Filename Value="data/simplexmlparser.pas"/>
+        <UnitName Value="simplexmlparser"/>
+      </Item14>
+      <Item15>
+        <Filename Value="data/restoreRangeOverflowChecks.inc"/>
+        <Type Value="Include"/>
+      </Item15>
+    </Files>
+    <Type Value="RunAndDesignTime"/>
+    <RequiredPkgs Count="2">
+      <Item1>
+        <PackageName Value="lcl"/>
+      </Item1>
+      <Item2>
+        <PackageName Value="FCL"/>
+      </Item2>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>
