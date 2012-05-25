@@ -63,9 +63,43 @@ TSynapseInternetAccessClass = class of TSynapseInternetAccess;
 
 implementation
 
-uses synautil,ssl_openssl_lib,bbutils;
+uses synautil,ssl_openssl_lib,bbutils{$ifndef win32},netdb{$endif};
 
 { TSynapseInternetAccess }
+
+{$ifdef win32}
+function checkEtcResolv(): boolean;
+begin
+  result := false;
+end;
+{$else}
+var resolvConfFileAge: longint = 0;
+    resolvConfCS: TRTLCriticalSection;
+function checkEtcResolv(): boolean;
+var resolvConf: string;
+  newAge: LongInt;
+begin
+  {$if FPC_FULlVERSION >= 020600}
+  resolvConf := netdb.EtcPath + netdb.SResolveFile;
+  {$else}
+  resolvConf:=netdb.SResolveFile;
+  {$endif}
+  newAge := FileAge(resolvConf);
+  result := false;
+  if newAge > resolvConfFileAge then begin
+    EnterCriticalsection(resolvConfCS);
+    try
+      if newAge > resolvConfFileAge then begin
+        SetLength(DNSServers, 0);
+        result := GetDNSServers(resolvConf) > 0;
+        resolvConfFileAge := newAge;
+      end;
+    finally
+      LeaveCriticalsection(resolvConfCS);
+    end;
+  end;
+end;
+{$endif}
 
 procedure TSynapseInternetAccess.connectionStatus(Sender: TObject;
   Reason: THookSocketReason; const Value: String);
@@ -88,32 +122,46 @@ end;
 
 function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol, host, url: string;
   data: string; progressEvent: TProgressEvent;redirectionCount:longint): string;
+  procedure initConnection;
+  begin
+   connection.Clear;
+   connection.AddPortNumberToHost:=false;
+   if data <> '' then begin
+     WriteStrToStream(connection.Document, data);
+     connection.MimeType := 'application/x-www-form-urlencoded';
+   end;
+   if Referer <> '' then
+     connection.Headers.Add('Referer: '+Referer);
+   connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml');;
+   connection.Protocol:='1.1';
+  end;
+
 var operation,newurl: string;
   i: Integer;
+  ok: Boolean;
 begin
   result:='';
-  connection.Clear;
-  connection.AddPortNumberToHost:=false;
-  if method=hcmPost then operation:='POST'
-  else operation:='GET';
-  if data <> '' then begin
-    WriteStrToStream(connection.Document, data);
-    connection.MimeType := 'application/x-www-form-urlencoded';
-  end;
-  if Referer <> '' then
-    connection.Headers.Add('Referer: '+Referer);
-  connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml');;
-  connection.Protocol:='1.1';
-
-  if (UpperCase(protocol)='HTTPS') then
-    if (not IsSSLloaded) then //check if ssl is actually loaded
-       raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
-
   contentLength:=-1;
   lastProgressLength:=-1;
   forwardProgressEvent:=progressEvent;
 
-  if connection.HTTPMethod(operation,protocol+'://'+host+url) then begin
+ if (UpperCase(protocol)='HTTPS') then
+   if (not IsSSLloaded) then //check if ssl is actually loaded
+      raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
+
+ if method=hcmPost then operation:='POST'
+  else operation:='GET';
+
+  initConnection;
+
+  ok := connection.HTTPMethod(operation,protocol+'://'+host+url);
+
+  if (not ok) and (checkEtcResolv) then begin
+    initConnection;
+    ok := connection.HTTPMethod(operation,protocol+'://'+host+url);
+  end;
+
+  if ok then begin
     //for i:=0 to connection.Headers.Count-1 do
     //  writeln(connection.Headers[i]);
      if (connection.ResultCode = 200) or ((connection.ResultCode = 302) and (connection.document.Size > 512)) then
@@ -185,6 +233,13 @@ function TSynapseInternetAccess.internalHandle: TObject;
 begin
  result:=connection;
 end;
+
+{$ifndef win32}
+initialization
+InitCriticalSection(resolvConfCS);
+finalization
+DoneCriticalsection(resolvConfCS);
+{$endif}
 
 end.
 
