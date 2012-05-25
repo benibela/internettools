@@ -1083,11 +1083,17 @@ begin
   FHTML.parseTree(html, htmlfilename);
   FHtmlTree := fhtml.getLastTree;
 
+
   //encoding trouble
   FHtmlTree.setEncoding(outputEncoding,true,true);
 
   if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
     FHTML.removeEmptyTextNodes(true);
+
+  if FHtmlTree = nil then begin
+    if FParsingExceptions then raise EPXPEvaluationException.Create('Website is empty: '+htmlFileName);
+    exit;
+  end;
 
   if FTemplate.getLastTree <> nil then begin
     if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
