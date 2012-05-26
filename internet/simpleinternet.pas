@@ -160,8 +160,8 @@ begin
     tree.parseTree(data, dataFileName);
     if pxpParser = nil then pxpParser := TPseudoXPathParser.create;
     pxpParser.parse(query);
-    pxpparser.ParentElement := tree.getTree;
-    pxpparser.RootElement := tree.getTree;
+    pxpparser.ParentElement := tree.getLastTree;
+    pxpparser.RootElement := tree.getLastTree;
     pxpparser.StaticBaseUri:=dataFileName;
     result := pxpParser.evaluate().toString;
   end;
@@ -171,7 +171,7 @@ function processedTree: TTreeElement;
 begin
   if lastQueryWasPXP then begin
     if tree = nil then exit(nil);
-    result := tree.getTree;
+    result := tree.getLastTree;
   end else if templateParser = nil then exit(nil)
   else result := templateParser.HTMLTree;
 
