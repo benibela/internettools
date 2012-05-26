@@ -123,6 +123,7 @@ begin
   protocol:=copy(url,1,pos('://',totalURL)-1);
   delete(url,1,length(protocol)+3);
   slash:=pos('/',url);
+  if slash = 0 then slash := length(url) + 1;
   points:=pos(':',url);
   if (points=0) or (points>slash) then points:=slash
   else begin
@@ -141,6 +142,7 @@ begin
   end;
   host:=copy(url,1,points-1);
   delete(url,1,slash-1);
+  if url = '' then url := '/';
 end;
 
 procedure saveAbleURL(var url:string);
