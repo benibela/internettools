@@ -24,8 +24,10 @@ interface
 
 uses
   windows,Classes, SysUtils,dialogs,
-  wininet, //Delphi wininet unit. Search for   "unit wininet" inurl:wininet.pas   to find one. (and then add {$mode delphi} there)
+  wininet,
   internetaccess;
+
+//{$DEFINE DELPHI_WININET} //If you use the Delphi wininet unit. Search for   "unit wininet" inurl:wininet.pas   to find one. (and then add {$mode delphi} there)
 
 type
   EW32InternetException=class(EInternetException)
@@ -111,13 +113,13 @@ The locator type is unknown.}
   s:='';
   case GetLastError of
     ERROR_INTERNET_OUT_OF_HANDLES:
-      s:='Keine Internethandles mehr verf�gbar.'#13#10'Bitte starten sie den Computer neu und versuchen es erneut';
+      s:='Keine Internethandles mehr verfügbar.'#13#10'Bitte starten sie den Computer neu und versuchen es erneut';
     ERROR_INTERNET_TIMEOUT:
       s:='Time out, meine Verbindungsanfrage wurde nicht beantwortet'#13#10'Verbindungsversuch fehlgeschlagen.';
     ERROR_INTERNET_EXTENDED_ERROR: begin
       setlength(s,4096);
       temp2:=length(s);
-      InternetGetLastResponseInfo(temp1,@s[1],temp2);
+      InternetGetLastResponseInfo({$ifndef DELPHI_WININET}@{$endif}temp1,@s[1],temp2);
       setlength(s,temp2);
       s:='Erweiterter Internetfehler: '#13#10+s;
     end;
@@ -187,8 +189,10 @@ The locator type is unknown.}
       s:='Headervalue existiert bereits'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
     ERROR_INVALID_HANDLE:
       s:='Handle bereits geschlossen'#13#10'Bitte nochmal versuchen';
+    ERROR_INVALID_PARAMETER:
+      s:='Ungültiger Parameter';
     else
-      s:='Unbekannter Internetfehler';
+      s:='Unbekannter Internetfehler: ' + IntToStr(GetLastError);
   end;
   inherited create(s);
 end;
@@ -245,7 +249,7 @@ var
   databuffer : array[0..4095] of char;
   hfile: hInternet;
   dwindex,dwcodelen,dwread,dwNumber,temp,dwContentLength: cardinal;
-  tempPort: word;
+  tempPort: integer;
   dwcode : array[1..20] of char;
   res    : pchar;
   cookiestr:string;
@@ -266,7 +270,7 @@ begin
     result:=readString(url+'##DATA##'+data+'##DATA-END##');
   exit;
   {$endif}
-  
+
   if not assigned(hSession) Then
     raise EW32InternetException.create('No internet session created');
 
@@ -291,7 +295,7 @@ begin
     lastCompleteUrl:='';
     hLastConnection:=InternetConnect(hSession,pchar(host),tempPort,'',nil,temp,0,0);
     if hLastConnection=nil then
-      raise EW32InternetException.create();
+      raise EW32InternetException.create('Verbindungsaufbau zu ' + host + ' fehlgeschlagen');
   end;
 
   if protocol='https' then
@@ -300,7 +304,7 @@ begin
     hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD, 0);
 
   if not assigned(hfile) then
-    raise EW32InternetException.create();//'Can''t connect');
+    raise EW32InternetException.create('Aufruf von '+ url + ' fehlgeschlagen');//'Can''t connect');
 
   cookiestr:=makeCookieHeader;
   if cookiestr<>'' then
