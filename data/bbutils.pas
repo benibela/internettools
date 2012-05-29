@@ -516,7 +516,7 @@ function intLog10(i:longint):longint; overload;
 //**log_b n  rounded down (= number of digits of n in base b - 1)
 function intLog(n,b: longint): longint; overload;
 //**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
-procedure intFactor(n,p: longint; out e, r:longint);
+procedure intFactor(const n,p: longint; out e, r:longint);
 
 function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
 function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
@@ -7287,16 +7287,48 @@ begin
   end;
 end;
 
-procedure intFactor(n, p: longint; out e, r: longint);
+{procedure intFactor(const n, p: longint; out e, r: longint);
+var pe, pold: longint;
 begin
   r := n;
   e := 0;
-  while r mod p = 0 do begin
-    r := r div p;
+  if r mod p <> 0 then exit;
+
+  pold := p;
+  pe := p * p;
+  e := 1;
+  while (r mod pe = 0)  do begin
+    e := e * 2;
+    if (pe >= $ffff) then break;
+    pold := pe;
+    pe := pe * pe;
+  end;
+
+  pe := pold * p;
+  while r mod pe = 0 do begin
+    e += 1;
+    pold := pe;
+    pe := pe * p;
+  end;
+
+  r := n div pold;
+end;             }
+
+
+procedure intFactor(const n, p: longint; out e, r: longint);
+var pold: longint;
+  m: Integer;
+  d: Integer;
+begin
+  r := n;
+  e := 0;
+  DivMod(r,p,d,m);
+  while m = 0 do begin
+    r := d;
+    DivMod(r,p,d,m);
     e += 1;
   end;
 end;
-
 
 function gcd(a, b: cardinal): cardinal;
 begin
