@@ -71,6 +71,10 @@ function processedTree: TTreeElement;
 //**Returns all variable assignments during the last query
 function processedVariables: TPXPVariableChangeLog;
 
+//**If you use the functions in this unit from different threads, you have to call freeThreadVars
+//**before the thread terminates to prevent memory leaks
+procedure freeThreadVars;
+
 threadvar defaultInternet: TInternetAccess;
 
 implementation
@@ -184,6 +188,14 @@ begin
   result := templateParser.variableChangeLog;
 end;
 
+procedure freeThreadVars;
+begin
+  pxpParser.Free; pxpParser := nil;
+  defaultInternet.Free; defaultInternet := nil;
+  templateParser.Free; templateParser := nil;
+  tree.Free; tree := nil;
+end;
+
 procedure needInternetAccess;
 begin
   if defaultInternet <> nil then exit;
@@ -219,10 +231,7 @@ begin
 end;
 
 finalization
-pxpParser.Free;
-defaultInternet.Free;
-templateParser.Free;
-tree.Free;
+freeThreadVars;
 
 end.
 
