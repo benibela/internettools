@@ -71,7 +71,7 @@ function processedTree: TTreeElement;
 //**Returns all variable assignments during the last query
 function processedVariables: TPXPVariableChangeLog;
 
-var defaultInternet: TInternetAccess = nil;
+threadvar defaultInternet: TInternetAccess;
 
 implementation
 
@@ -101,11 +101,12 @@ uses bbutils, extendedhtmlparser
 
 type TRetrieveType = (rtEmpty, rtHttp, rtFile, rtTag);
 
-var tree: TTreeParser = nil;
-    templateParser: THtmlTemplateParser = nil;
-    pxpParser: TPseudoXPathParser = nil;
-    lastQueryWasPXP: boolean = true;
-    lastRetrievedType: TRetrieveType;
+threadvar
+  tree: TTreeParser;
+  templateParser: THtmlTemplateParser;
+  pxpParser: TPseudoXPathParser;
+  lastQueryWasPXP: boolean;
+  lastRetrievedType: TRetrieveType;
 
 
 function retrieve(const data: string): string;
@@ -202,6 +203,7 @@ end;
 function httpRequest(const url: string): string;
 begin
   needInternetAccess();
+  writeln(stderr, url);
   result:=defaultInternet.get(url);
 end;
 
