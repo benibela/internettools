@@ -554,7 +554,7 @@ function binomialZScore(n:longint;p:float;k:longint):float;
 //**This calculates the euler phi function totient[i] := phi(i) = |{1 <= j <= i | gcd(i,j) = 0}| for all i <= n.@br
 //**It uses a sieve approach and is quite fast (10^7 in 3s)@br
 //**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
-procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
+procedure intSieveEulerPhi(n: cardinal; var totient: TLongintArray);
 //**This calculates the number of divisors: divcount[i] := |{1 <= j <= i | i mod j = 0}| for all i <= n.@br
 //**Speed: 10^7 in 5s@br
 procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
@@ -7511,17 +7511,35 @@ begin
 end;
 {$ENDIF}
 
-procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
+const MultiplyDeBruijnBitPosition: array[0..31] of cardinal =
+(
+  0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
+  31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+);
+
+procedure intSieveEulerPhi(n: cardinal; var totient: TLongintArray);
 var
-  p,j,e,r: Integer;
-  exps: array[1..32] of longint;
-  powers: array[0..32] of longint;
-  exphigh: longint;
+  p,j,e,r: cardinal;
+  exps: array[1..32] of cardinal;
+  powers: array[0..32] of cardinal;
+  exphigh: cardinal;
 begin
   setlength(totient, n+1);
   totient[0] := 0;
-  for p:=1 to high(totient) do totient[p] := 1;
-  for p:=2 to high(totient) do begin
+  for p:=1 to n do totient[p] := 1;
+         (*
+  j := 4;
+  while j <= high(totient) do begin
+
+{$push}{$R-}{$O-}
+    e := MultiplyDeBruijnBitPosition[(j and (-j)) * $077CB531)
+{$pop}
+
+    totient[j] := totient[j div (2 shl e)] * (2 shl (e-1));
+    j += 4;
+  end;
+                                                              *)
+  for p:=2 to n do begin
     if totient[p] = 1 then begin //prime
       exps[1] := 1;
       powers[0] := 1;
@@ -7529,10 +7547,12 @@ begin
       exphigh := 1;
       e := 0;
       j := p;
-      while j <= high(totient) do begin
+      while j <= n do begin
         totient[j] := totient[j div powers[e]] * (powers[e-1]) * (p - 1);
+
         j+=p;
 
+        //we need to find the largest e with (j mod p^e) = 0, so write j in base p and count trailing zeros
         exps[1] += 1;
         e:=1;
         while (e <= exphigh) and (exps[e] = p) do begin
