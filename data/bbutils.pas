@@ -7513,19 +7513,39 @@ end;
 
 procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
 var
-  i,j,e,r: Integer;
+  p,j,e,r: Integer;
+  exps: array[1..32] of longint;
+  powers: array[0..32] of longint;
+  exphigh: longint;
 begin
   setlength(totient, n+1);
   totient[0] := 0;
-  for i:=1 to high(totient) do totient[i] := 1;
-  for i:=2 to high(totient) do begin
-    if totient[i] = 1 then begin
-      //prime
-      j := i;
+  for p:=1 to high(totient) do totient[p] := 1;
+  for p:=2 to high(totient) do begin
+    if totient[p] = 1 then begin //prime
+      exps[1] := 1;
+      powers[0] := 1;
+      powers[1] := p;
+      exphigh := 1;
+      e := 0;
+      j := p;
       while j <= high(totient) do begin
-        intFactor(j, i, e, r);
-        totient[j] := totient[r] * (i ** (e-1) ) * (i - 1);
-        j+=i;
+        totient[j] := totient[j div powers[e]] * (powers[e-1]) * (p - 1);
+        j+=p;
+
+        exps[1] += 1;
+        e:=1;
+        while (e <= exphigh) and (exps[e] = p) do begin
+          exps[e] := 0;
+          e+=1;
+          exps[e] += 1;
+        end;
+
+        if exps[exphigh] = 0 then begin
+          powers[exphigh + 1] := powers[exphigh] * p;
+          exphigh+=1;
+          exps[exphigh] := 1;
+        end;
       end;
     end;
   end;
