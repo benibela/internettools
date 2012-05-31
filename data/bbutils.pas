@@ -554,7 +554,7 @@ function binomialZScore(n:longint;p:float;k:longint):float;
 //**This calculates the euler phi function totient[i] := phi(i) = |{1 <= j <= i | gcd(i,j) = 0}| for all i <= n.@br
 //**It uses a sieve approach and is quite fast (10^7 in 3s)@br
 //**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
-procedure intSieveEulerPhi(n: cardinal; var totient: TLongintArray);
+procedure intSieveEulerPhi(const n: cardinal; var totient: TLongwordArray);
 //**This calculates the number of divisors: divcount[i] := |{1 <= j <= i | i mod j = 0}| for all i <= n.@br
 //**Speed: 10^7 in 5s@br
 procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
@@ -7511,7 +7511,7 @@ begin
 end;
 {$ENDIF}
 
-procedure intSieveEulerPhi(n: cardinal; var totient: TLongintArray);
+procedure intSieveEulerPhi(const n: cardinal; var totient: TLongwordArray);
 var
   p,j,e,r: cardinal;
   exps: array[1..32] of cardinal;
@@ -7523,9 +7523,9 @@ begin
   for p:=1 to n do totient[p] := 1;
 
   j := 4;
-  while j <= high(totient) do begin
+  while j <= n do begin
     e := (j) and (-j);
-    totient[j] := totient[j div e] * (e shr 1);
+    totient[j] := e shr 1;
     j += 4;
   end;
 
@@ -7545,16 +7545,18 @@ begin
         //we need to find the largest e with (j mod p^e) = 0, so write j in base p and count trailing zeros
         exps[1] += 1;
         e:=1;
-        while (e <= exphigh) and (exps[e] = p) do begin
-          exps[e] := 0;
-          e+=1;
-          exps[e] += 1;
-        end;
+        if exps[e] = p then begin
+          repeat
+            exps[e] := 0;
+            e+=1;
+            exps[e] += 1;
+          until  (e > exphigh) or (exps[e] < p);
 
-        if exps[exphigh] = 0 then begin
-          powers[exphigh + 1] := powers[exphigh] * p;
-          exphigh+=1;
-          exps[exphigh] := 1;
+          if exps[exphigh] = 0 then begin
+            powers[exphigh + 1] := powers[exphigh] * p;
+            exphigh+=1;
+            exps[exphigh] := 1;
+          end;
         end;
       end;
     end;

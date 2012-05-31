@@ -344,7 +344,7 @@ function intLog10(i:longint):longint; overload;
 //**log_b n  rounded down (= number of digits of n in base b - 1)
 function intLog(n,b: longint): longint; overload;
 //**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
-procedure intFactor(n,p: longint; out e, r:longint);
+procedure intFactor(const n,p: longint; out e, r:longint);
 
 function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
 function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
@@ -379,7 +379,7 @@ function binomialZScore(n:longint;p:float;k:longint):float;
 //**This calculates the euler phi function totient[i] := phi(i) = |{1 <= j <= i | gcd(i,j) = 0}| for all i <= n.@br
 //**It uses a sieve approach and is quite fast (10^7 in 3s)@br
 //**You can also use it to calculate all primes (i  is prime iff phi(i) = i - 1)
-procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
+procedure intSieveEulerPhi(const n: cardinal; var totient: TLongwordArray);
 //**This calculates the number of divisors: divcount[i] := |{1 <= j <= i | i mod j = 0}| for all i <= n.@br
 //**Speed: 10^7 in 5s@br
 procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
@@ -1734,16 +1734,48 @@ begin
   end;
 end;
 
-procedure intFactor(n, p: longint; out e, r: longint);
+{procedure intFactor(const n, p: longint; out e, r: longint);
+var pe, pold: longint;
 begin
   r := n;
   e := 0;
-  while r mod p = 0 do begin
-    r := r div p;
+  if r mod p <> 0 then exit;
+
+  pold := p;
+  pe := p * p;
+  e := 1;
+  while (r mod pe = 0)  do begin
+    e := e * 2;
+    if (pe >= $ffff) then break;
+    pold := pe;
+    pe := pe * pe;
+  end;
+
+  pe := pold * p;
+  while r mod pe = 0 do begin
+    e += 1;
+    pold := pe;
+    pe := pe * p;
+  end;
+
+  r := n div pold;
+end;             }
+
+
+procedure intFactor(const n, p: longint; out e, r: longint);
+var pold: longint;
+  m: Integer;
+  d: Integer;
+begin
+  r := n;
+  e := 0;
+  DivMod(r,p,d,m);
+  while m = 0 do begin
+    r := d;
+    DivMod(r,p,d,m);
     e += 1;
   end;
 end;
-
 
 function gcd(a, b: cardinal): cardinal;
 begin
@@ -1904,21 +1936,53 @@ begin
 end;
 {$ENDIF}
 
-procedure intSieveEulerPhi(n: integer; var totient: TLongintArray);
+procedure intSieveEulerPhi(const n: cardinal; var totient: TLongwordArray);
 var
-  i,j,e,r: Integer;
+  p,j,e,r: cardinal;
+  exps: array[1..32] of cardinal;
+  powers: array[0..32] of cardinal;
+  exphigh: cardinal;
 begin
   setlength(totient, n+1);
   totient[0] := 0;
-  for i:=1 to high(totient) do totient[i] := 1;
-  for i:=2 to high(totient) do begin
-    if totient[i] = 1 then begin
-      //prime
-      j := i;
-      while j <= high(totient) do begin
-        intFactor(j, i, e, r);
-        totient[j] := totient[r] * (i ** (e-1) ) * (i - 1);
-        j+=i;
+  for p:=1 to n do totient[p] := 1;
+
+  j := 4;
+  while j <= n do begin
+    e := (j) and (-j);
+    totient[j] := e shr 1;
+    j += 4;
+  end;
+
+  for p:=3 to n do begin
+    if totient[p] = 1 then begin //prime
+      exps[1] := 1;
+      powers[0] := 1;
+      powers[1] := p;
+      exphigh := 1;
+      e := 1;
+      j := p;
+      while j <= n do begin
+        totient[j] := totient[j div powers[e]] * (powers[e-1]) * (p - 1);
+
+        j+=p;
+
+        //we need to find the largest e with (j mod p^e) = 0, so write j in base p and count trailing zeros
+        exps[1] += 1;
+        e:=1;
+        if exps[e] = p then begin
+          repeat
+            exps[e] := 0;
+            e+=1;
+            exps[e] += 1;
+          until  (e > exphigh) or (exps[e] < p);
+
+          if exps[exphigh] = 0 then begin
+            powers[exphigh + 1] := powers[exphigh] * p;
+            exphigh+=1;
+            exps[exphigh] := 1;
+          end;
+        end;
       end;
     end;
   end;
