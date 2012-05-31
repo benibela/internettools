@@ -7511,12 +7511,6 @@ begin
 end;
 {$ENDIF}
 
-const MultiplyDeBruijnBitPosition: array[0..31] of cardinal =
-(
-  0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
-  31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-);
-
 procedure intSieveEulerPhi(n: cardinal; var totient: TLongintArray);
 var
   p,j,e,r: cardinal;
@@ -7527,25 +7521,21 @@ begin
   setlength(totient, n+1);
   totient[0] := 0;
   for p:=1 to n do totient[p] := 1;
-         (*
+
   j := 4;
   while j <= high(totient) do begin
-
-{$push}{$R-}{$O-}
-    e := MultiplyDeBruijnBitPosition[(j and (-j)) * $077CB531)
-{$pop}
-
-    totient[j] := totient[j div (2 shl e)] * (2 shl (e-1));
+    e := (j) and (-j);
+    totient[j] := totient[j div e] * (e shr 1);
     j += 4;
   end;
-                                                              *)
-  for p:=2 to n do begin
+
+  for p:=3 to n do begin
     if totient[p] = 1 then begin //prime
       exps[1] := 1;
       powers[0] := 1;
       powers[1] := p;
       exphigh := 1;
-      e := 0;
+      e := 1;
       j := p;
       while j <= n do begin
         totient[j] := totient[j div powers[e]] * (powers[e-1]) * (p - 1);
