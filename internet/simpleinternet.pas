@@ -215,7 +215,7 @@ end;
 function httpRequest(const url: string): string;
 begin
   needInternetAccess();
-  writeln(stderr, url);
+  //writeln(stderr, url);
   result:=defaultInternet.get(url);
 end;
 
