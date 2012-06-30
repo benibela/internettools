@@ -1360,7 +1360,7 @@ begin
   end;
   arrayAdd(res, '<!--template end-->');
   printHTMLUntil(nil);
-  result := strJoin(res, #13);
+  result := strJoin(res, LineEnding);
 end;
 
 
