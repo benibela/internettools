@@ -1135,6 +1135,12 @@ begin
   lastTextStart:=1;
   lastBreakChance:=0;
   for i := 1 to length(line) do begin
+    if line[i] in [#13,#10] then begin
+      if lastTextStart > i  then continue;
+      arrayAdd(result, copy(Line,lastTextStart,i-lastTextStart));
+      lastTextStart:=i+1;
+      if (line[i] <> line[i+1]) and (line[i+1] in [#13, #10]) then lastTextStart+=1;
+    end;
     if (i < length(line)) and (line[i+1] in BreakChars) then begin
       lastBreakChance:=i+1;
       if lastTextStart = lastBreakChance then inc(lastTextStart); //merge seveal break characters into a single new line
@@ -1157,7 +1163,7 @@ end;
 
 function strWrap(const Line: string; MaxCol: Integer; const BreakChars: TCharSet): string;
 begin
-  result := strJoin(strWrapSplit(line, MaxCol, BreakChars), #13);
+  result := strJoin(strWrapSplit(line, MaxCol, BreakChars), LineEnding);
 end;
 
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
@@ -3419,15 +3425,16 @@ begin
   //splitting
   test(strSplit('hallo,welt,maus')[1] = 'welt');
 
-  if strWrap('hallo', 3) <> 'hal'#13'lo' then raise Exception.Create('strWrap failed, 1');
-  if strWrap('ha llo', 3) <> 'ha'#13'llo' then raise Exception.Create('strWrap failed, 2');
-  if strWrap('ha llo    abcdef', 3) <> 'ha'#13'llo'#13'abc'#13'def' then raise Exception.Create('strWrap failed, 3');
-  if strWrap('ha llo    abcdef', 2) <> 'ha'#13'll'#13'o'#13'ab'#13'cd'#13'ef' then raise Exception.Create('strWrap failed, 4');
-  if strWrap('ha llo    abcdef', 5) <> 'ha'#13'llo'#13'abcde'#13'f' then raise Exception.Create('strWrap failed, 5');
-  if strWrap('ha llo    abcdef', 7) <> 'ha llo'#13'abcdef' then raise Exception.Create('strWrap failed, 6');
-  if strWrap('ha llo    abcdefghi', 7) <> 'ha llo'#13'abcdefg'#13'hi' then raise Exception.Create('strWrap failed, 7');
-  if strWrap('ha llo    ab cd ef ghi', 8) <> 'ha llo'#13'ab cd ef'#13'ghi' then raise Exception.Create('strWrap failed, 8');
-  if strWrap('ha llo    ab cd ef g hi', 8) <> 'ha llo'#13'ab cd ef'#13'g hi' then raise Exception.Create('strWrap failed, 9');
+  if strWrap('hallo', 3) <> 'hal'+LineEnding+'lo' then raise Exception.Create('strWrap failed, 1');
+  if strWrap('ha llo', 3) <> 'ha'+LineEnding+'llo' then raise Exception.Create('strWrap failed, 2');
+  if strWrap('ha llo    abcdef', 3) <> 'ha'+LineEnding+'llo'+LineEnding+'abc'+LineEnding+'def' then raise Exception.Create('strWrap failed, 3');
+  if strWrap('ha llo    abcdef', 2) <> 'ha'+LineEnding+'ll'+LineEnding+'o'+LineEnding+'ab'+LineEnding+'cd'+LineEnding+'ef' then raise Exception.Create('strWrap failed, 4');
+  if strWrap('ha llo    abcdef', 5) <> 'ha'+LineEnding+'llo'+LineEnding+'abcde'+LineEnding+'f' then raise Exception.Create('strWrap failed, 5');
+  if strWrap('ha llo    abcdef', 7) <> 'ha llo'+LineEnding+'abcdef' then raise Exception.Create('strWrap failed, 6');
+  if strWrap('ha llo    abcdefghi', 7) <> 'ha llo'+LineEnding+'abcdefg'+LineEnding+'hi' then raise Exception.Create('strWrap failed, 7');
+  if strWrap('ha llo    ab cd ef ghi', 8) <> 'ha llo'+LineEnding+'ab cd ef'+LineEnding+'ghi' then raise Exception.Create('strWrap failed, 8');
+  if strWrap('ha llo    ab cd ef g hi', 8) <> 'ha llo'+LineEnding+'ab cd ef'+LineEnding+'g hi' then raise Exception.Create('strWrap failed, 9');
+  if strWrap('ha'#13'llo', 8) <> 'ha'+LineEnding+'llo' then raise Exception.Create('strWrap failed, 10');
 
   //trimming
   test(strTrimLeft('  ABC  DEF '#9) = 'ABC  DEF '#9);
