@@ -67,10 +67,12 @@ TTreeElement = class
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
   function outerXML():string;
+  function innerXML():string;
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
-  function getAttribute(const a: string; const def: string=''):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
+  function getAttribute(const a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
+  function getAttribute(const a: string; const def: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
   function getAttributeTry(const a: string; out valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
@@ -78,6 +80,8 @@ TTreeElement = class
   function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getRoot(): TTreeElement;
   function getDocument(): TTreeDocument;
+
+  property defaultProperty[name: string]: string read getAttribute; default;
 
 
   procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next, not reverse)
@@ -309,9 +313,7 @@ begin
 end;
 
 function TTreeElement.outerXML: string;
-var
-  sub: TTreeElement;
-  i: Integer;
+var i: Integer;
 begin
   if self = nil then exit;
   case typ of
@@ -331,22 +333,31 @@ begin
       result := '<'+value;
       if attributes <> nil then begin
         for i:=0 to attributes.Count - 1 do begin
-          result += ' ' + attributes.names[i]+'="'+attributes.ValueFromIndex[i]+'"';
+          result += ' ' + attributes.names[i]+'="'+attributes.ValueFromIndex[i]+'"'; //todo fix escaping & < >
         end;
       end;
       if next = reverse then begin
         result += '/>';
         exit();
       end;
-      result+='>';
-      sub := next;
-      while sub <> reverse do begin
-        result += sub.outerXML;
-        if sub.typ <> tetOpen then sub:=sub.next
-        else sub := sub.reverse.next;
-      end;
+      result +='>';
+      result += innerXML();
       result+='</'+value+'>';
     end;
+  end;
+end;
+
+function TTreeElement.innerXML: string;
+var
+  sub: TTreeElement;
+begin
+  result := '';
+  if (self = nil) or (typ <> tetOpen) then exit;
+  sub := next;
+  while sub <> reverse do begin
+    result += sub.outerXML;
+    if sub.typ <> tetOpen then sub:=sub.next
+    else sub := sub.reverse.next;
   end;
 end;
 
@@ -363,7 +374,13 @@ begin
   result := true;
 end;
 
-function TTreeElement.getAttribute(const a: string; const def: string=''):string;
+function TTreeElement.getAttribute(const a: string): string;
+begin
+  if not getAttributeTry(a, result) then
+    result:='';
+end;
+
+function TTreeElement.getAttribute(const a: string; const def: string):string;
 begin
   if not getAttributeTry(a, result) then
     result:=def;
@@ -695,7 +712,7 @@ begin
     FElementStack.Delete(FElementStack.Count-1);
     new.initialized;
   end else if FParsingModel = pmStrict then
-    raise TreeParseException.Create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but the latest opened was <'+last.value+'>')
+    raise TreeParseException.Create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but the latest opened was <'+last.value+'>  (url: '+FCurrentTree.FBaseURI+')')
   else if FParsingModel = pmHTML then begin
     //try to auto detect unclosed tags
     match:=-1;
@@ -728,6 +745,8 @@ begin
   if (FParsingModel = pmStrict) and (FElementStack.Count < 2) then begin
     strlTrimLeft(text, textLen);
     if textLen = 0 then exit;
+    if strBeginsWith(text, #239#187#191) or strBeginsWith(text,#254#255) or strBeginsWith(text, #255#254) or
+       strBeginsWith(text, #43#47#118) then raise Exception.Create('xml ' + FCurrentTree.FBaseURI + ' starts with unicode BOM. That is not supported');
     raise Exception.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
   end;
 
