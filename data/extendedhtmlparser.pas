@@ -993,7 +993,7 @@ begin
               if not HandleCommandPseudoIf then continue;
             if tefSwitchChild in templateStart.flags then begin
               if switchCommandAccepted then switchCommandAccepted:=false
-              else begin
+              else begin //try other switch children (?)
                 if templateStart.typ = tetOpen then templateStart := templateStart.templateReverse.templateNext
                 else templateStart := templateStart.templateNext;
                 continue;
