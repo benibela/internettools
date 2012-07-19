@@ -1139,7 +1139,7 @@ begin
       if lastTextStart > i  then continue;
       arrayAdd(result, copy(Line,lastTextStart,i-lastTextStart));
       lastTextStart:=i+1;
-      if (line[i] <> line[i+1]) and (line[i+1] in [#13, #10]) then lastTextStart+=1;
+      if (i < length(line)) and (line[i] <> line[i+1]) and (line[i+1] in [#13, #10]) then lastTextStart+=1;
     end;
     if (i < length(line)) and (line[i+1] in BreakChars) then begin
       lastBreakChance:=i+1;
