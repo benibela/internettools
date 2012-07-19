@@ -510,7 +510,7 @@ function strFromInt(i: int64; displayLength: longint): string;
 function strDup(const rep: string; const count: integer): string;
 
 //----------------Mathematical functions-------------------------------
-const powersOf10: array[0..10] of longint = (1,10,100,1000,10000,100000,1000000,1000000,10000000,100000000,1000000000);
+const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
 //**log 10 rounded down (= number of digits in base 10 - 1)
 function intLog10(i:longint):longint; overload;
 //**log_b n  rounded down (= number of digits of n in base b - 1)
