@@ -50,6 +50,7 @@ type
 //**@value tetCommandIfOpen <template:if> command to skip something
 //**@value tetCommandElseOpen <template:else> command to skip something
 //**@value tetCommandSwitchOpen <template:switch> command to branch
+//**@value tetCommandSwitchPrioritizedOpen <template:switch-prioritized> command to branch
 //duplicate open/close because this simplifies the case statements
 TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose,
@@ -59,7 +60,9 @@ TTemplateElementType=(tetIgnore,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
                       tetCommandElseOpen, tetCommandElseClose,
-                      tetCommandSwitchOpen, tetCommandSwitchClose);
+                      tetCommandSwitchOpen, tetCommandSwitchClose,
+                      tetCommandSwitchPrioritizedOpen, tetCommandSwitchPrioritizedClose
+                      );
 TTemplateElementFlag = (tefOptional, tefSwitchChild);
 TTemplateElementFlags = set of TTemplateElementFlag;
 
@@ -303,6 +306,13 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
        )
       ))
+      @item(@code(<template:switch-prioritized [value="??"]> ... </template:switch-prioritized>)
+        Another version of a case 2 switch statement that only may contain normal html tags. @br
+        The switch-prioritized prefers earlier child element to later child elements, while the normal switch match alls child elements equally. So a normal switch containing <a> and <b>, will match <a> or <b>, whichever appears first in the html file.
+        The switch-prioritized contrastingly would match <a>, if there is any <a>, and <b> only iff there is no <a> in the html file. @br
+        Therefore @code(<template:switch-prioritized [value="??"]> <a>..</a> <b>..</b> .. </template:switch-prioritized>) is identical to
+        @code(<a template:optional="true">..<t:s>found:=true()</t:s></a> <b template:optional="true" template:test="not($found)">..<t:s>found:=true()</t:s></b> ...). (and this command is kind of redunant, so it might be removed in later versions)
+      )
       @item(@code(<template:match-text [regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [is=".."] [case-sensitive=".."] [list-contains=".."]/>)@br
         Matches a text node and is more versatile than just including the text in the template.@br
         regex matches an arbitrary regular expression against the text node.@br
@@ -433,8 +443,8 @@ uses math;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchText;
-      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchClose] of longint=(0,0,0,0,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
-      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchClose] of string=('match-text','meta','read','s','loop','loop','if','if','else','else','switch','switch');
+      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of longint=(0,0,0,0,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of string=('match-text','meta','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized');
 
 { TTemplateElement }
 
@@ -907,7 +917,7 @@ var xpathText: TTreeElement;
 
   var switchCommandAccepted: boolean;
 
-  procedure HandleCommandSwitch;
+  procedure HandleCommandSwitch(prioritized: boolean);
   var curChild: TTemplateElement;
 
     procedure switchTemplateCommand;
@@ -945,6 +955,10 @@ var xpathText: TTreeElement;
 
     procedure switchHTML;
     begin
+      //TODO: understand and document how this all works
+
+      //idea for switch (html): foreach html position (<- that loop is in the caller's caller): foreach template child: check if match
+
       while curChild <> nil do begin //enumerate all child tags
         if tefOptional in curChild.flags then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
         if curChild.templateType >= firstRealTemplateType then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
@@ -962,6 +976,38 @@ var xpathText: TTreeElement;
       htmlStart:=htmlStart.next; //no match
     end;
 
+    procedure switchPrioritized;
+    var oldHtmlStart: TTreeElement;
+    begin
+      //TODO: understand and document how this all works
+
+      //idea for switch-prioritized: foreach template child: foreach html position: check if match
+
+      oldHtmlStart := htmlStart;
+      while curChild <> nil do begin //enumerate all child tags
+        if tefOptional in curChild.flags then raise ETemplateParseException.Create('A direct child of the template:switch-prioritized construct may not have the attribute template:optional (it is optional anyways)');
+        if curChild.templateType >= firstRealTemplateType then raise ETemplateParseException.Create('A switch-prioritized command must consist entirely of only html tags');
+
+        htmlStart := oldHtmlStart;
+        while (htmlStart <> nil) and ((htmlStart <> htmlEnd.next)) do begin
+          if templateElementFitHTMLOpen(htmlStart, curChild) and
+            matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
+            //found match
+            htmlStart := htmlStart.reverse.next;
+            templateStart := templateStart.templateReverse.templateNext;
+            exit;
+          end;
+          htmlStart := htmlStart.next;
+        end;
+
+
+        //no match, try other matches
+        curChild := TTemplateElement(curChild.getNextSibling());
+      end;
+
+      htmlStart:=htmlEnd.next; //no match possible
+    end;
+
   begin
     templateStart.match := htmlStart;
     curChild:=TTemplateElement(templateStart.getFirstChild());
@@ -970,9 +1016,11 @@ var xpathText: TTreeElement;
       exit;
     end;
 
-    if curChild.templateType >= firstRealTemplateType then switchTemplateCommand
+    if prioritized then switchPrioritized
+    else if curChild.templateType >= firstRealTemplateType then switchTemplateCommand
     else switchHTML;
   end;
+
 
 var level: integer;
 begin
@@ -1011,7 +1059,8 @@ begin
               tetCommandLoopOpen: HandleCommandLoopOpen;
               tetCommandLoopClose: HandleCommandLoopClose;
 
-              tetCommandSwitchOpen: HandleCommandSwitch;
+              tetCommandSwitchOpen: HandleCommandSwitch(false);
+              tetCommandSwitchPrioritizedOpen: HandleCommandSwitch(true);
 
               tetIgnore, tetCommandMeta, tetCommandIfOpen, tetCommandSwitchClose: templateStart := templateStart.templateNext;
 
@@ -1370,7 +1419,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..259] of array[1..3] of string = (
+var data: array[1..272] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -1962,6 +2011,25 @@ var data: array[1..259] of array[1..3] of string = (
       //t:test with html
       ,('<a>{go:="og"}<b t:test="$go=''og''">{text()}</b></a>', '<a><b>test</b></a>', 'go=og'#13'_result=test')
       ,('<a>{go:="go"}<b t:test="$go=''og''">{text()}</b></a>', '<a><b>test</b></a>', 'go=go')
+
+      //switch-prioritized
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><a>1</a><b>2</b></xx>', 'a=1')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><b>2</b></xx>', 'b=2')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><b>2</b><a>1</a></xx>', 'a=1')
+      //+fillings
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx>....<t>...<a>1</a>aas</t>assa<u>fdas<b>2</b>asdasd</u></xx>', 'a=1')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><h>ass</h>assa<b>2</b>asdas</xx>', 'b=2')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><h><b>2</b></h>asassas<t><z><a>1</a>wwerew</z>asas</t></xx>', 'a=1')
+      //+loop
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized>*</xx>', '<xx><a>1</a><b>2</b></xx>', 'a=1'#13'b=2')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized>*</xx>', '<xx><b>2</b><a>1</a></xx>', 'a=1')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized>*</xx>', '<xx><a>1</a><b>2</b><a>3</a><a>4</a></xx>', 'a=1'#13'a=3'#13'a=4')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized>*</xx>', '<xx><a>1</a><b>2</b><a>3</a><a>4</a><b>5</b></xx>', 'a=1'#13'a=3'#13'a=4'#13'b=5')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a></t:switch-prioritized>*</xx>', '<xx><a>1</a><b>2</b><a>3</a><a>4</a><b>5</b></xx>', 'a=1'#13'a=3'#13'a=4')
+      ,('<xx><t:switch-prioritized><b>{b:=text()}</b></t:switch-prioritized>*</xx>', '<xx><a>1</a><b>2</b><a>3</a><a>4</a><b>5</b></xx>', 'b=2'#13'b=5')
+      ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b><c>{c:=text()}</c></t:switch-prioritized>*</xx>', '<xx><c>0</c><a>1</a><b>2</b><a>3</a><a>4</a><b>5</b><c>6</c></xx>', 'a=1'#13'a=3'#13'a=4'#13'b=5'#13'c=6')
+
+
 
       //whitespace
       ,('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc1')
