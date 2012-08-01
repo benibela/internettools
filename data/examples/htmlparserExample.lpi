@@ -29,7 +29,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--template &quot;/home/benito/hg/programs/internet/VideLibri/data/libraries/search/templates/digibib/search&quot;  /tmp/res"/>
+        <CommandLineParams Value="http://www.google.de --extract //title --printed-node-format xml"/>
         <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
       </local>
     </RunParams>
