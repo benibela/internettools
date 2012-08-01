@@ -366,14 +366,13 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
 *)
 THtmlTemplateParser=class
-  private
+  protected
     FObjects: boolean;
     FRepetitionRegEx: TRegExpr;
     FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
     FVeryShortNotation: boolean;
     FUnnamedVariableName: string;
-    function GetVariableLogCondensed: TPXPVariableChangeLog;
-  protected
+
     FOutputEncoding: TEncoding;
     FKeepOldVariables: TKeepPreviousVariables;
     FNamespaces: TStringList;
@@ -384,6 +383,7 @@ THtmlTemplateParser=class
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
 
+    function GetVariableLogCondensed: TPXPVariableChangeLog;
     function GetVariables: TPXPVariableChangeLog;
     function getHTMLTree: TTreeElement;
     function getTemplateTree: TTreeElement;
