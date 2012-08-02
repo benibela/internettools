@@ -321,7 +321,7 @@ begin
   mycmdLine.beginDeclarationCategory('Extraction options:');
 
   mycmdLine.declareString('extract', joined(['Expression to extract from the data.','If it starts with < it is interpreted as template, otherwise as XPath 2 expression']));
-  mycmdLine.declareString('extract-exclude', 'Comma separated list of variables to ignore in an extract template. (black list) (default _follow)', '_follow');
+  mycmdLine.declareString('extract-exclude', 'Comma separated list of variables ignored in an extract template. (black list) (default _follow)', '_follow');
   mycmdLine.declareString('extract-include', 'If not empty, comma separated list of variables to use in an extract template (white list)');
   mycmdLine.declareFile('extract-file', 'File containing an extract expression (for longer expressions)');
 
@@ -329,8 +329,8 @@ begin
 
   mycmdLine.declareString('follow', joined(['Expression extracting links from the page which will be followed.', 'If the expression extracts a sequence, all elements are followed.', 'If the value is an "a" node, its @href attribute is followed, if it is a "i/frame" node its @src attribute is followed, otherwise its text().', 'If it is an object, its url properties and its other properties can override command line arguments','Otherwise, the string value is treated as url.']));
 //  mycmdLine.declareString('follow-level', '');
-  mycmdLine.declareString('follow-exclude', '');
-  mycmdLine.declareString('follow-include', '');
+  mycmdLine.declareString('follow-exclude', 'Comma separated list of variables ignored in an follow template. (black list)');
+  mycmdLine.declareString('follow-include', 'Comma separated list of variables used in an foloow template. (white list)');
   mycmdLine.declareFile('follow-file', 'File containing an follow expression (for longer expressions)');
 
   mycmdLine.beginDeclarationCategory('Extraction options:');
@@ -338,83 +338,124 @@ begin
 
   mycmdLine.beginDeclarationCategory('HTTP connection options:');
 
-  mycmdLine.declareFloat('wait', 'Wait seconds between requests');
+  mycmdLine.declareFloat('wait', 'Wait a certain count of seconds between requests');
   mycmdLine.declareString('user-agent', 'Useragent used in http request', defaultInternetConfiguration.userAgent);
   mycmdLine.declareString('proxy', 'Proxy used for http/s requests');
   mycmdLine.declareString('post', 'Post request to send (url encoded)');
 
   mycmdLine.beginDeclarationCategory('Output options:');
 
-  mycmdLine.declareFlag('quiet','Do not print meta information to stderr', 'q');
-  mycmdLine.declareString('default-variable-name', '', 'result');
-  mycmdLine.declareString('print-variables', joined(['', 'Comma separated list of:', '  log: Prints every variable value', '  final: Prints only the final value of a variable, if there are multiple assignments to it', '  condensed-log: Like log, but removes assignments to object properties(default)']), 'condensed-log');
-  mycmdLine.declareString('print-variables-time', joined(['', 'Comma separated list of:', '  immediate: Prints the variable values after processing each file (default)', '  final: Print the variable values after processing all pages']), 'immediate');
+  mycmdLine.declareFlag('quiet','Do not print status information to stderr', 'q');
+  mycmdLine.declareString('default-variable-name', 'Variable name for values read in the template without explicitely given variable name', 'result');
+  mycmdLine.declareString('print-variables', joined(['Which of the separate variable lists are printed', 'Comma separated list of:', '  log: Prints every variable value', '  final: Prints only the final value of a variable, if there are multiple assignments to it', '  condensed-log: Like log, but removes assignments to object properties(default)']), 'condensed-log');
+  mycmdLine.declareString('print-variables-time', joined(['When the template variables are printed. ', 'Comma separated list of:', '  immediate: Prints the variable values after processing each file (default)', '  final: Print the variable values after processing all pages']), 'immediate');
   mycmdLine.declareFlag('print-type-annotations','Prints all variable values with type annotations (e.g. string: abc, instead of abc)');
   mycmdLine.declareFlag('print-variable-names','Prints the name of variables defined in an extract template');
-  mycmdLine.declareString('printed-node-format', ' text or xml');
-  mycmdLine.declareString('output-encoding', 'input, utf8 or latin1');
+  mycmdLine.declareString('printed-node-format', 'Format of an extracted node: text or xml');
+  mycmdLine.declareString('output-encoding', 'Character encoding of the output. utf8 (default), latin1, or input (no encoding conversion)', 'utf8');
 
   mycmdLine.parse();
 
+
   SetLength(requests,1);
   requests[0].initFromCommandLine(mycmdLine);
+
+  defaultInternetConfiguration.userAgent:=requests[0].userAgent;
+  defaultInternetConfiguration.setProxy(requests[0].proxy);
 
   htmlparser:=THtmlTemplateParserBreaker.create;
   xpathparser := htmlparser.createPXP;
   alreadyProcessed := TStringList.Create;
 
 
-  while length(requests) > 0 do begin
-    while (length(requests[0].urls) > 0) and (alreadyProcessed.indexOf(requests[0].urls[0]+#1+requests[0].post) >= 0) do
-      requests[0].deleteUrl0;
+  try
+    while length(requests) > 0 do begin
+      while (length(requests[0].urls) > 0) and (alreadyProcessed.indexOf(requests[0].urls[0]+#1+requests[0].post) >= 0) do
+        requests[0].deleteUrl0;
 
-    if length(requests[0].urls) = 0 then begin
-      for i:=1 to high(requests) do
-        requests[i-1] := requests[i];
-      setlength(requests,length(requests)-1);
-      continue;
-    end;
-
-    with requests[0] do begin
-      urls[0] := trim(urls[0]);
-      if urls[0] = '' then begin deleteUrl0; continue; end;
-
-      printStatus('**** Retrieving:'+urls[0]+' ****');
-      if post = '' then data := retrieve(urls[0])
-      else data := httpRequest(urls[0], post);
-
-      alreadyProcessed.Add(urls[0]+#1+post);
-
-      printStatus('**** Processing:'+urls[0]+' ****');
-      if extract <> '' then begin
-        htmlparser.OutputEncoding := outputEncoding;
-
-        if extract[1] = '<' then begin //assume my template
-          htmlparser.parseTemplate(extract); //todo reuse existing parser
-          try
-            htmlparser.parseHTML(data, urls[0]);
-          except on e: EHTMLParseException do begin
-            writeln(stderr, 'Parsing error:');
-            writeln(stderr, e.Message);
-            writeln(stderr, 'Partial matching:');
-            temp := strSplit(htmlparser.debugMatchings(50), LineEnding); //print line by line, or the output "disappears"
-            for j := 0 to high(temp) do  writeln(stderr, temp[j]);
-
-            raise;
-          end;
-          end;
-          printExtractedVariables(htmlparser);
-        end else begin
-          //assume xpath
-          htmlparser.parseHTMLSimple(data, urls[0]);
-          xpathparser.RootElement := htmlparser.HTMLTree;
-          xpathparser.ParentElement := xpathparser.RootElement;
-          xpathparser.StaticBaseUri := urls[0];
-          xpathparser.parse(extract);
-          printExtractedValue(xpathparser.evaluate());
-          writeln;
-        end;
+      if length(requests[0].urls) = 0 then begin
+        for i:=1 to high(requests) do
+          requests[i-1] := requests[i];
+        setlength(requests,length(requests)-1);
+        continue;
       end;
+
+      with requests[0] do begin
+        urls[0] := trim(urls[0]);
+        if urls[0] = '' then begin deleteUrl0; continue; end;
+
+        if strBeginsWith(urls[0], 'http') and strContains(urls[0], '://')  then begin
+          simpleinternet.needInternetAccess;
+          if assigned(simpleinternet.defaultInternet.internetConfig) then begin
+            simpleinternet.defaultInternet.internetConfig^.userAgent := userAgent;
+            simpleinternet.defaultInternet.internetConfig^.setProxy(proxy);
+          end;
+        end;
+
+        printStatus('**** Retrieving:'+urls[0]+' ****');
+        if post = '' then data := retrieve(urls[0])
+        else data := httpRequest(urls[0], post);
+
+        alreadyProcessed.Add(urls[0]+#1+post);
+
+        printStatus('**** Processing:'+urls[0]+' ****');
+        if extract <> '' then begin
+          htmlparser.OutputEncoding := outputEncoding;
+
+          if extract[1] = '<' then begin //assume my template
+            htmlparser.parseTemplate(extract); //todo reuse existing parser
+            htmlparser.parseHTML(data, urls[0]);
+            printExtractedVariables(htmlparser);
+
+            for i := 0 to htmlparser.variableChangeLog.count-1 do
+              if htmlparser.variableChangeLog.getVariableName(i) = '_follow' then
+                followTo(htmlparser.variableChangeLog.getVariableValue(i));
+          end else begin
+            //assume xpath
+            htmlparser.parseHTMLSimple(data, urls[0]);
+            xpathparser.RootElement := htmlparser.HTMLTree;
+            xpathparser.ParentElement := xpathparser.RootElement;
+            xpathparser.StaticBaseUri := urls[0];
+            xpathparser.parse(extract);
+            printExtractedValue(xpathparser.evaluate());
+            writeln;
+          end;
+        end;
+
+        if follow <> '' then begin
+          htmlparser.OutputEncoding := outputEncoding; //todo correct encoding?
+
+          if follow[1] = '<' then begin //assume my template
+            htmlparser.parseTemplate(follow); //todo reuse existing parser
+            htmlparser.parseHTML(data, urls[0]);
+            for i:=0 to htmlparser.variableChangeLog.count-1 do
+              if ((length(followInclude) = 0) and (arrayIndexOf(followExclude, htmlparser.variableChangeLog.getVariableName(i)) = -1)) or
+                 ((length(followInclude) > 0) and (arrayIndexOf(followInclude, htmlparser.variableChangeLog.getVariableName(i)) > -1)) then
+                followTo(htmlparser.variableChangeLog.getVariableValue(i));
+          end else begin
+            //assume xpath
+            htmlparser.parseHTMLSimple(data, urls[0]);
+            xpathparser.RootElement := htmlparser.HTMLTree;
+            xpathparser.ParentElement := xpathparser.RootElement;
+            xpathparser.StaticBaseUri := urls[0];
+            xpathparser.parse(follow);
+            followTo(xpathparser.evaluate());
+          end;
+        end;
+
+        deleteUrl0;
+        if wait > 0.001 then Sleep(trunc(wait * 1000));
+      end;
+    end;
+  except
+    on e: EHTMLParseException do begin
+      writeln(stderr, 'Parsing error:');
+      writeln(stderr, e.Message);
+      writeln(stderr, 'Partial matching:');
+      temp := strSplit(htmlparser.debugMatchings(50), LineEnding); //print line by line, or the output "disappears"
+      for j := 0 to high(temp) do  writeln(stderr, temp[j]);
+
+      raise;
     end;
   end;
   xpathparser.free;
