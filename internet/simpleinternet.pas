@@ -77,6 +77,9 @@ procedure freeThreadVars;
 
 threadvar defaultInternet: TInternetAccess;
 
+//**Initializes the defaultInternet variable
+procedure needInternetAccess;
+
 implementation
 
 {$IFNDEF USE_SYNAPSE_WRAPPER}
