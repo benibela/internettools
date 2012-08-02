@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 unit internetaccess;
 
 {$mode objfpc}{$H+}
+{$modeswitch advancedrecords}
 
 interface
 
@@ -30,6 +31,9 @@ type
   PInternetConfig=^TInternetConfig;
   //**@abstract(Internet configuration)
   //**You don't have to set it, but the user would prefer to have those options
+
+  { TInternetConfig }
+
   TInternetConfig=record
     userAgent: string; //**< the user agent used when connecting
     tryDefaultConfig: boolean; //**< should the system default configuration be used (not always supported, currently it only works with wininet)
@@ -40,6 +44,8 @@ type
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
     logToPath: string;
+
+    procedure setProxy(proxy: string);
   end;
   { TCustomInternetAccess }
 
@@ -172,6 +178,31 @@ begin
   except
   end;
 end;
+
+{ TInternetConfig }
+
+procedure TInternetConfig.setProxy(proxy: string);
+var
+  portPos: SizeInt;
+  port: String;
+begin
+  proxy:=trim(proxy);;
+  if proxy='' then begin
+    useProxy:=false;
+    exit;
+  end;
+  portPos := pos(':', proxy);
+  port := copy(proxy,portPos+1, length(proxy));
+  if portPos > 0 then proxy := copy(proxy,1,portPos-1)
+  else port := '8080';
+
+  proxyHTTPName:=proxy;
+  proxyHTTPSName:=proxy;
+  proxyHTTPPort:=port;
+  proxyHTTPSPort:=port;
+  useProxy:=true;
+end;
+
 
 
 function TInternetAccess.transfer(method: THTTPConnectMethod; protocol, host, url, data: string;
