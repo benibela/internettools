@@ -16,6 +16,7 @@ type
     Button1: TButton;
     Button2: TButton;
     Button3: TButton;
+    CheckBoxTextOnly: TCheckBox;
     CheckBoxverbose: TCheckBox;
     CheckBoxOptions: TCheckBox;
     CheckBoxEntities: TCheckBox;
@@ -149,10 +150,11 @@ var
   temp: TPXPValueObject;
   i: Integer;
 begin
-  if not CheckBoxverbose.Checked then
-    result := v.asString
-   else
-    result := v.debugAsStringWithTypeAnnotation;
+  if not CheckBoxverbose.Checked then begin
+    if (CheckBoxTextOnly.Checked) or not (v is TPXPValueNode) then result := v.asString
+    else result := v.asNode.outerXML()
+  end else
+    result := v.debugAsStringWithTypeAnnotation(CheckBoxTextOnly.Checked);
 end;
 
 procedure TForm1.parseHTML(tp: TTreeParser);
@@ -163,6 +165,7 @@ begin
   tp.trimText := trimming.ItemIndex = 3;
   tp.autoDetectHTMLEncoding:=false;
   tp.parseTree(memo2.Lines.Text);
+  if CheckBoxEntities.Checked and assigned(tp.getLastTree) then tp.getLastTree.setEncoding(eUTF8, true, true);
   if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
 end;
 

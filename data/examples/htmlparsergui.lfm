@@ -2,36 +2,36 @@ object Form1: TForm1
   Left = 320
   Height = 562
   Top = 230
-  Width = 808
+  Width = 866
   ActiveControl = Panel1
   Caption = 'Form1'
   ClientHeight = 562
-  ClientWidth = 808
+  ClientWidth = 866
   LCLVersion = '1.1'
   object Panel1: TPanel
     Left = 0
     Height = 165
     Top = 0
-    Width = 808
+    Width = 866
     Align = alTop
     Caption = 'Panel1'
     ClientHeight = 165
-    ClientWidth = 808
+    ClientWidth = 866
     TabOrder = 0
     object Label1: TLabel
       Left = 1
-      Height = 16
+      Height = 15
       Top = 1
-      Width = 806
+      Width = 864
       Align = alTop
       Caption = 'Template:'
       ParentColor = False
     end
     object Memo1: TMemo
       Left = 1
-      Height = 147
-      Top = 17
-      Width = 806
+      Height = 148
+      Top = 16
+      Width = 864
       Align = alClient
       Font.Name = 'Monospace,Courier'
       Lines.Strings = (
@@ -48,28 +48,28 @@ object Form1: TForm1
   end
   object Panel2: TPanel
     Left = 0
-    Height = 98
+    Height = 99
     Top = 170
-    Width = 808
+    Width = 866
     Align = alClient
     Caption = 'Panel2'
-    ClientHeight = 98
-    ClientWidth = 808
+    ClientHeight = 99
+    ClientWidth = 866
     TabOrder = 1
     object Label2: TLabel
       Left = 1
-      Height = 16
+      Height = 15
       Top = 1
-      Width = 806
+      Width = 864
       Align = alTop
       Caption = 'HTML-File:'
       ParentColor = False
     end
     object Memo2: TMemo
       Left = 1
-      Height = 80
-      Top = 17
-      Width = 806
+      Height = 82
+      Top = 16
+      Width = 864
       Align = alClient
       Font.Name = 'Monospace,Courier'
       Lines.Strings = (
@@ -94,26 +94,26 @@ object Form1: TForm1
     Left = 0
     Height = 158
     Top = 404
-    Width = 808
+    Width = 866
     Align = alBottom
     Caption = 'Panel3'
     ClientHeight = 158
-    ClientWidth = 808
+    ClientWidth = 866
     TabOrder = 2
     object Label3: TLabel
       Left = 1
-      Height = 16
+      Height = 15
       Top = 1
-      Width = 806
+      Width = 864
       Align = alTop
       Caption = 'Result:'
       ParentColor = False
     end
     object Memo3: TMemo
       Left = 1
-      Height = 140
-      Top = 17
-      Width = 806
+      Height = 141
+      Top = 16
+      Width = 864
       Align = alClient
       Font.Height = -13
       Font.Name = 'Monospace,Courier'
@@ -130,7 +130,7 @@ object Form1: TForm1
     Left = 0
     Height = 5
     Top = 165
-    Width = 808
+    Width = 866
     Align = alTop
     ResizeAnchor = akTop
   end
@@ -139,35 +139,35 @@ object Form1: TForm1
     Left = 0
     Height = 5
     Top = 399
-    Width = 808
+    Width = 866
     Align = alBottom
     ResizeAnchor = akBottom
   end
   object Panel4: TPanel
     Left = 0
-    Height = 131
-    Top = 268
-    Width = 808
+    Height = 130
+    Top = 269
+    Width = 866
     Align = alBottom
     AutoSize = True
-    ClientHeight = 131
-    ClientWidth = 808
+    ClientHeight = 130
+    ClientWidth = 866
     TabOrder = 5
     object options: TGroupBox
       Left = 1
-      Height = 96
+      Height = 95
       Top = 34
-      Width = 806
+      Width = 864
       Align = alClient
-      ClientHeight = 92
-      ClientWidth = 802
+      ClientHeight = 91
+      ClientWidth = 860
       TabOrder = 0
       Visible = False
       object CheckBoxEntities: TCheckBox
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Side = asrCenter
-        Left = 178
+        Left = 177
         Height = 18
         Top = 69
         Width = 183
@@ -182,9 +182,9 @@ object Form1: TForm1
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = Label4
         AnchorSideTop.Side = asrCenter
-        Left = 366
+        Left = 365
         Height = 25
-        Top = 67
+        Top = 66
         Width = 186
         ItemHeight = 0
         ItemIndex = 1
@@ -199,24 +199,24 @@ object Form1: TForm1
       end
       object Label4: TLabel
         Left = 13
-        Height = 16
+        Height = 15
         Top = 71
-        Width = 160
+        Width = 159
         Caption = 'Tree parsing options:      '
         ParentColor = False
       end
       object Label5: TLabel
         Left = 13
-        Height = 16
+        Height = 15
         Top = 14
-        Width = 115
+        Width = 114
         Caption = 'Template options:'
         ParentColor = False
       end
       object CheckBoxShortnotatin: TCheckBox
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
-        Left = 178
+        Left = 177
         Height = 18
         Top = 14
         Width = 151
@@ -228,16 +228,16 @@ object Form1: TForm1
       end
       object Label6: TLabel
         Left = 13
-        Height = 16
+        Height = 15
         Top = 42
-        Width = 85
+        Width = 84
         Caption = 'PXP-Options:'
         ParentColor = False
       end
       object CheckBoxObjects: TCheckBox
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
-        Left = 178
+        Left = 177
         Height = 18
         Top = 41
         Width = 107
@@ -252,7 +252,7 @@ object Form1: TForm1
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = CheckBoxObjects
         AnchorSideTop.Side = asrCenter
-        Left = 366
+        Left = 365
         Height = 18
         Top = 41
         Width = 222
@@ -271,19 +271,34 @@ object Form1: TForm1
         State = cbChecked
         TabOrder = 5
       end
+      object CheckBoxTextOnly: TCheckBox
+        AnchorSideLeft.Control = CheckBoxverbose
+        AnchorSideLeft.Side = asrBottom
+        AnchorSideTop.Control = CheckBoxverbose
+        AnchorSideTop.Side = asrCenter
+        Left = 727
+        Height = 18
+        Top = 41
+        Width = 75
+        BorderSpacing.Around = 5
+        Caption = 'text only'
+        Checked = True
+        State = cbChecked
+        TabOrder = 6
+      end
     end
     object Panel5: TPanel
       Left = 1
       Height = 33
       Top = 1
-      Width = 806
+      Width = 864
       Align = alTop
       BevelOuter = bvNone
       ClientHeight = 33
-      ClientWidth = 806
+      ClientWidth = 864
       TabOrder = 1
       object Button2: TButton
-        Left = 559
+        Left = 617
         Height = 25
         Top = 4
         Width = 242
