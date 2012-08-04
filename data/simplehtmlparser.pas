@@ -223,6 +223,8 @@ begin
       else inc(pos);
     end;
   end;
+  if (marker<>pos)and(assigned(textEvent)) then
+    textEvent(marker,pos-marker);
 end;
 
 function existPropertyWithValue(propertyName,propertyValue: string; properties:THTMLProperties):boolean;
