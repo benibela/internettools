@@ -203,6 +203,7 @@ published
 end;
 
 
+function xmlStrEscape(s: string):string;
 implementation
 uses pseudoxpath;
 
@@ -329,7 +330,7 @@ var i: Integer;
 begin
   if self = nil then exit;
   case typ of
-    tetText: result := value;
+    tetText: result := xmlStrEscape(value);
     tetClose: result := '</'+value+'>';
     tetComment: result := '<!--'+value+'-->';
     tetProcessingInstruction: begin
@@ -929,6 +930,14 @@ begin
       temp.removeAndFreeNext();
     temp := temp.next;
   end;
+end;
+
+
+function xmlStrEscape(s: string):string;
+var
+  i: Integer;
+begin
+  result := StringReplace(s, '<', '&lt;', [rfReplaceAll]); //TODO: escape all
 end;
 
 end.

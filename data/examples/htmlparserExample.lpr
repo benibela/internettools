@@ -13,8 +13,11 @@ uses
 
 {$R *.res}
 
-var outputFormat: (ofAdhoc, ofJson);
+type TOutputFormat = (ofAdhoc, ofJson, ofXML);
+var outputFormat: TOutputFormat;
     firstExtraction: boolean = true;
+    outputArraySeparator: array[toutputformat] of string = ('', ', ', '</e><e>');
+
 
 function joined(s: array of string): string;
 var
@@ -237,6 +240,9 @@ begin
     ofJson: begin
       write(value.jsonSerialize(not printNodeXML));
     end;
+    ofXML: begin
+      write(value.xmlSerialize(not printNodeXML, 'seq', 'e', 'object'));
+    end;
   end;
 end;
 
@@ -289,12 +295,15 @@ begin
         end;
         writeln(']');
       end else begin
+        first := true;
         writeln('{');
         setlength(tempUsed, vars.count);
         FillChar(tempUsed[0], sizeof(tempUsed[0])*length(tempUsed), 0);
         for i:=0 to vars.count-1 do begin
           if tempUsed[i] then continue;
           if acceptName(vars.Names[i]) then begin
+            if first then first := false
+            else writeln(',');
             write(jsonStrEscape(vars.Names[i]) + ': ');
             values := vars.getAllVariableValues(vars.Names[i]);
             if length(values) = 1 then printExtractedValue(values[0])
@@ -307,12 +316,36 @@ begin
               end;
               write(']');
             end;
-            writeln;
           end;
           for j := i + 1 to vars.count-1 do
             if vars.Names[i] = vars.Names[j] then tempUsed[j] := true;
         end;
+        writeln();
         writeln('}');
+    end;
+    ofXML: begin
+      if hideVariableNames then begin
+        write('<seq>');
+        first := true;
+        for i:=0 to vars.count-1 do begin
+          if acceptName(vars.Names[i]) then begin
+            if first then begin first := false; write('<e>');end
+            else write('</e><e>');
+            printExtractedValue(vars.getVariableValue(i));
+          end;
+        end;
+        if not first then write('</e>');
+        writeln('</seq>');
+      end else begin
+        writeln('<object>');
+        for i:=0 to vars.count-1 do
+           if acceptName(vars.Names[i])  then begin
+             write('<'+vars.Names[i] + '>');
+             printExtractedValue(vars.getVariableValue(i));
+             writeln('</'+vars.Names[i] + '>');
+           end;
+        writeln('</object>');
+      end;
     end;
   end;
 end;
@@ -418,15 +451,17 @@ begin
   mycmdLine.declareFlag('print-type-annotations','Prints all variable values with type annotations (e.g. string: abc, instead of abc)');
   mycmdLine.declareFlag('hide-variable-names','Do not print the name of variables defined in an extract template');
   mycmdLine.declareString('printed-node-format', 'Format of an extracted node: text or xml');
-  mycmdLine.declareString('output-format', 'Output format: adhoc (human readable), json', 'adhoc');
+  mycmdLine.declareString('output-format', 'Output format: adhoc (simple human readable), json or xml', 'adhoc');
   mycmdLine.declareString('output-encoding', 'Character encoding of the output. utf8 (default), latin1, or input (no encoding conversion)', 'utf8');
 
   mycmdLine.parse();
 
   if mycmdLine.readString('output-format') = 'adhoc' then outputFormat:=ofAdhoc
   else if mycmdLine.readString('output-format') = 'json' then outputFormat:=ofJson
+  else if mycmdLine.readString('output-format') = 'xml' then outputFormat:=ofXML
   else raise EInvalidArgument.Create('Unknown output format: ' + mycmdLine.readString('output-format'));
-  if outputFormat = ofJson then writeln('[');;
+  if outputFormat = ofJson then writeln('[')
+  else if outputFormat = ofXML then writeln('<seq>');
 
   SetLength(requests,1);
   requests[0].initFromCommandLine(mycmdLine);
@@ -472,10 +507,11 @@ begin
 
         printStatus('**** Processing:'+urls[0]+' ****');
         if extract <> '' then begin
-          if outputFormat <> ofAdhoc then begin
-            if firstExtraction then firstExtraction := false
-            else writeln(',');
-          end;
+          if firstExtraction then begin
+            firstExtraction := false;
+            if outputFormat = ofXML then writeln('<e>');
+          end else writeln(outputArraySeparator[outputFormat]);
+
           htmlparser.OutputEncoding := outputEncoding;
 
           if extract[1] = '<' then begin //assume my templates
@@ -540,7 +576,11 @@ begin
   mycmdLine.free;
   alreadyProcessed.Free;
 
-  if outputFormat = ofJson then writeln(']');;
+  if outputFormat = ofJson then writeln(']')
+  else if outputFormat = ofXML then begin
+    if not firstExtraction then Writeln('</e>');
+    writeln('</seq>');
+  end;
 
 end.
 
