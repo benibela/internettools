@@ -433,6 +433,7 @@ THtmlTemplateParser=class
 
     property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
+    property TemplateParser: TTreeParser read FTemplate; //**< X/HTML parser used to read the templates (public so you can change the parsing behaviour, if you really need it)
   end;
 
 //** xml compatible namespace url to define new template prefixes
