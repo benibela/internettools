@@ -34,6 +34,18 @@ TTreeDocument = class;
 
 //**@abstract This class representates an element of the html file
 //**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
+//**E.g. a xml file like @code(<foo><bar>x</bar></foo>) is stored as a quadro-linked list:
+//**  @longCode(#
+//**   /---------------------------------\
+//**   |         |  -----------          |                                   link to parent (for faster access, it would work without it)
+//**  \|/        | \|/        |          |
+//**   '            '
+//** <foo> <---> <bar>  <---> x <--->  </bar>  <--->  </foo>                 double linked list of tags (previous link again for faster access, a single linked list would work as well)
+//**   .           .                     .               .
+//**  /|\         /|\                   /|\             /|\
+//**   |           -----------------------               |                   single linked of corresponding node
+//**   ---------------------------------------------------
+//**  #)
 //**There are functions (getNextSibling, getFirstChild, findNext, ...) to access it like a regular tree, but it is easier and faster to work directly with the list.@br
 //**Some invariants: (SO: set of opening tags in sequence)@br
 //**∀a \in SO: a < a.reverse@br
