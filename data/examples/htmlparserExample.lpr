@@ -13,6 +13,9 @@ uses
 
 {$R *.res}
 
+var outputFormat: (ofAdhoc, ofJson);
+    firstExtraction: boolean = true;
+
 function joined(s: array of string): string;
 var
   i: Integer;
@@ -45,7 +48,8 @@ type
   defaultName: string;
   printVariables: set of (pvLog, pvCondensedLog, pvFinal);
   printVariablesTime: set of (pvtImmediate, pvtFinal);
-  printTypeAnnotations,  printVariableNames, printNodeXML: boolean;
+  printTypeAnnotations,  hideVariableNames, printNodeXML: boolean;
+
   outputEncoding: TEncoding;
 
   procedure initFromCommandLine(cmdLine: TCommandLineReader);
@@ -90,7 +94,7 @@ begin
   quiet := cmdLine.readFlag('quiet');
   defaultName := cmdLine.readString('default-variable-name');
   printTypeAnnotations:=cmdLine.readFlag('print-type-annotations');
-  printVariableNames := cmdLine.readFlag('print-variable-names');
+  hideVariableNames := cmdLine.readFlag('hide-variable-names');
 
   setVariables(cmdLine.readString('print-variables'));
   setVariablesTime(cmdLine.readString('print-variables-time'));
@@ -129,11 +133,12 @@ begin
   if obj.hasProperty('quiet', @temp) then quiet := temp.asBoolean;
   if obj.hasProperty('default-variable-name', @temp) then defaultName := temp.asString;
   if obj.hasProperty('print-type-annotations', @temp) then printTypeAnnotations:=temp.asBoolean;
-  if obj.hasProperty('print-variable-names', @temp) then printVariableNames := temp.asBoolean;
+  if obj.hasProperty('hide-variable-names', @temp) then hideVariableNames := temp.asBoolean;
 
   if obj.hasProperty('print-variables', @temp) then setVariables(temp.asString);
   if obj.hasProperty('print-variables-time', @temp) then setVariablesTime(temp.asString);
   if obj.hasProperty('output-encoding', @temp) then outputEncoding:=strEncodingFromName(temp.asString);
+
 
   setlength(urls, 0);
   if obj.hasProperty('follow', @temp) then
@@ -160,6 +165,7 @@ begin
   if arrayIndexOf(tempSplitted, 'immediate') >= 0 then include(printVariablesTime, pvtImmediate);
   if arrayIndexOf(tempSplitted, 'final') >= 0 then include(printVariablesTime, pvtFinal);
 end;
+
 
 
 procedure TProcessingRequest.deleteUrl0;
@@ -203,28 +209,35 @@ var
   i: Integer;
   temp: TPXPValueObject;
 begin
-  if printTypeAnnotations then write(value.typeName+': ');
-  if value is TPXPValueSequence then begin
-    for i:=0 to TPXPValueSequence(value).seq.Count-1 do begin
-      printExtractedValue(TPXPValueSequence(value).seq[i]);
-      writeln;
+  case outputFormat of
+    ofAdhoc: begin
+      if printTypeAnnotations then write(value.typeName+': ');
+      if value is TPXPValueSequence then begin
+        for i:=0 to TPXPValueSequence(value).seq.Count-1 do begin
+          printExtractedValue(TPXPValueSequence(value).seq[i]);
+          if i <> TPXPValueSequence(value).seq.count-1 then writeln;
+        end;
+      end else if printNodeXML and (value is TPXPValueNode) then
+        write(value.asNode.outerXML())
+      else if value is TPXPValueObject then begin
+        temp := TPXPValueObject(value.clone);
+        write('{');
+        if temp.values.count > 0 then begin
+          write(temp.values.getVariableName(0),': '); printExtractedValue(temp.values.getVariableValue(0));
+          for i:=1 to temp.values.count-1 do begin
+            write(', ', temp.values.getVariableName(i), ': ');
+            printExtractedValue(temp.values.getVariableValue(i));
+          end;
+          temp.free;
+        end;
+        write('}');
+      end
+      else write(value.asString);
     end;
-  end else if printNodeXML and (value is TPXPValueNode) then
-    write(value.asNode.outerXML())
-  else if value is TPXPValueObject then begin
-    temp := TPXPValueObject(value.clone);
-    write('{');
-    if temp.values.count > 0 then begin
-      write(temp.values.getVariableName(0),': '); printExtractedValue(temp.values.getVariableValue(0));
-      for i:=1 to temp.values.count-1 do begin
-        write(', ', temp.values.getVariableName(i), ': ');
-        printExtractedValue(temp.values.getVariableValue(i));
-      end;
-      temp.free;
+    ofJson: begin
+      write(value.jsonSerialize(not printNodeXML));
     end;
-    write('}');
-  end
-  else write(value.asString);
+  end;
 end;
 
 procedure TProcessingRequest.printExtractedVariables(parser: THtmlTemplateParser);
@@ -240,17 +253,68 @@ begin
 end;
 
 procedure TProcessingRequest.printExtractedVariables(vars: TPXPVariableChangeLog; state: string);
+  function acceptName(n: string): boolean;
+  begin
+    result := ((length(extractInclude) = 0) and (arrayIndexOf(extractExclude, n) = -1)) or
+              ((length(extractInclude) > 0) and (arrayIndexOf(extractInclude, n) > -1));
+  end;
+
 var
   i: Integer;
+  tempUsed: array of boolean;
+  first: boolean;
+  values: TPXPValueArray;
+  j: Integer;
 begin
   printStatus(state);
-  for i:=0 to vars.count-1 do
-    if ((length(extractInclude) = 0) and (arrayIndexOf(extractExclude, vars.getVariableName(i)) = -1)) or
-       ((length(extractInclude) > 0) and (arrayIndexOf(extractInclude, vars.getVariableName(i)) > -1)) then begin
-      if printVariableNames then write(vars.getVariableName(i) + ': ');
-      printExtractedValue(vars.getVariableValue(i));
-      writeln;
+  case outputFormat of
+    ofAdhoc: begin
+      for i:=0 to vars.count-1 do
+         if acceptName(vars.Names[i])  then begin
+           if not hideVariableNames then write(vars.Names[i] + ': ');
+           printExtractedValue(vars.getVariableValue(i));
+           writeln;
+         end;
     end;
+    ofJson:
+      if hideVariableNames then begin
+        write('[');
+        first := true;
+        for i:=0 to vars.count-1 do begin
+          if acceptName(vars.Names[i]) then begin
+            if first then first := false
+            else writeln(', ');
+            printExtractedValue(vars.getVariableValue(i));
+          end;
+        end;
+        writeln(']');
+      end else begin
+        writeln('{');
+        setlength(tempUsed, vars.count);
+        FillChar(tempUsed[0], sizeof(tempUsed[0])*length(tempUsed), 0);
+        for i:=0 to vars.count-1 do begin
+          if tempUsed[i] then continue;
+          if acceptName(vars.Names[i]) then begin
+            write(jsonStrEscape(vars.Names[i]) + ': ');
+            values := vars.getAllVariableValues(vars.Names[i]);
+            if length(values) = 1 then printExtractedValue(values[0])
+            else begin
+              write('[');
+              printExtractedValue(values[0]);
+              for j:=1 to high(values) do begin
+                write(', ');
+                printExtractedValue(values[j]);
+              end;
+              write(']');
+            end;
+            writeln;
+          end;
+          for j := i + 1 to vars.count-1 do
+            if vars.Names[i] = vars.Names[j] then tempUsed[j] := true;
+        end;
+        writeln('}');
+    end;
+  end;
 end;
 
 var
@@ -309,6 +373,8 @@ begin
     FHTML.removeEmptyTextNodes(true);
 end;
 
+
+
 begin
   //normalized formats (for use in unittests)
   DecimalSeparator:='.';
@@ -350,12 +416,17 @@ begin
   mycmdLine.declareString('print-variables', joined(['Which of the separate variable lists are printed', 'Comma separated list of:', '  log: Prints every variable value', '  final: Prints only the final value of a variable, if there are multiple assignments to it', '  condensed-log: Like log, but removes assignments to object properties(default)']), 'condensed-log');
   mycmdLine.declareString('print-variables-time', joined(['When the template variables are printed. ', 'Comma separated list of:', '  immediate: Prints the variable values after processing each file (default)', '  final: Print the variable values after processing all pages']), 'immediate');
   mycmdLine.declareFlag('print-type-annotations','Prints all variable values with type annotations (e.g. string: abc, instead of abc)');
-  mycmdLine.declareFlag('print-variable-names','Prints the name of variables defined in an extract template');
+  mycmdLine.declareFlag('hide-variable-names','Do not print the name of variables defined in an extract template');
   mycmdLine.declareString('printed-node-format', 'Format of an extracted node: text or xml');
+  mycmdLine.declareString('output-format', 'Output format: adhoc (human readable), json', 'adhoc');
   mycmdLine.declareString('output-encoding', 'Character encoding of the output. utf8 (default), latin1, or input (no encoding conversion)', 'utf8');
 
   mycmdLine.parse();
 
+  if mycmdLine.readString('output-format') = 'adhoc' then outputFormat:=ofAdhoc
+  else if mycmdLine.readString('output-format') = 'json' then outputFormat:=ofJson
+  else raise EInvalidArgument.Create('Unknown output format: ' + mycmdLine.readString('output-format'));
+  if outputFormat = ofJson then writeln('[');;
 
   SetLength(requests,1);
   requests[0].initFromCommandLine(mycmdLine);
@@ -364,6 +435,7 @@ begin
   defaultInternetConfiguration.setProxy(requests[0].proxy);
 
   htmlparser:=THtmlTemplateParserBreaker.create;
+  htmlparser.TemplateParser.parsingModel:=pmHTML;
   xpathparser := htmlparser.createPXP;
   alreadyProcessed := TStringList.Create;
 
@@ -400,9 +472,14 @@ begin
 
         printStatus('**** Processing:'+urls[0]+' ****');
         if extract <> '' then begin
+          if outputFormat <> ofAdhoc then begin
+            if firstExtraction then firstExtraction := false
+            else writeln(',');
+          end;
           htmlparser.OutputEncoding := outputEncoding;
 
-          if extract[1] = '<' then begin //assume my template
+          if extract[1] = '<' then begin //assume my templates
+            htmlparser.UnnamedVariableName:=defaultName;
             htmlparser.parseTemplate(extract); //todo reuse existing parser
             htmlparser.parseHTML(data, urls[0]);
             printExtractedVariables(htmlparser);
@@ -463,6 +540,7 @@ begin
   mycmdLine.free;
   alreadyProcessed.Free;
 
+  if outputFormat = ofJson then writeln(']');;
 
 end.
 
