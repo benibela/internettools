@@ -383,6 +383,8 @@ THtmlTemplateParser=class
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
 
+    FAttributeMatching: TStringList;
+
     function GetVariableLogCondensed: TPXPVariableChangeLog;
     function GetVariables: TPXPVariableChangeLog;
     function getHTMLTree: TTreeElement;
@@ -713,8 +715,11 @@ end;
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
   template: TTemplateElement): Boolean;
 var
-  name: string;
-  i: Integer;
+  name, strategy: string;
+  i, j, k, strategyi: Integer;
+  templateList: TStringArray;
+  htmlList: TStringArray;
+  found: Boolean;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
@@ -724,8 +729,30 @@ begin
   for i:=0 to template.attributes.Count-1 do begin
     name := template.attributes.Names[i];
     if html.attributes = nil then exit(false);
-    if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
-      exit(false);
+    strategyi := FAttributeMatching.IndexOfName(template.attributes.Names[i]);
+    if strategyi = -1 then begin
+      if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
+        exit(false);
+    end else begin
+      strategy := FAttributeMatching.ValueFromIndex[strategyi];
+      if strategy = 'is' then begin
+        if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
+          exit(false);
+      end else if strategy = 'list-contains' then begin
+        templateList := strSplit(template.attributes.ValueFromIndex[i], ' ', false);
+        htmlList := strSplit(html.attributes.Values[name], ' ', false);
+        for j:=0 to high(templateList) do begin
+          found := false;
+          for k:= 0 to high(htmlList) do if striEqual(templateList[j], htmlList[k]) then begin found := true; break; end;
+          if not found then exit(false);
+        end;
+      end else raise Exception.Create('Invalid attribute matching kind');
+      {todo: cacheRegExpr('regex', '', '', false);
+      cacheRegExpr('starts-with', '^', '.*$', true);
+      cacheRegExpr('ends-with', '^.*', '$', true);
+      cacheRegExpr('contains', '', '', true);
+      cacheRegExpr('is', '^', '$', true);}
+    end;
   end;
   if template.templateAttributes = nil then exit(true);
   if template.condition = nil then exit(true);
@@ -1099,10 +1126,14 @@ begin
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
   FObjects:=true;
+
+  FAttributeMatching := TStringList.Create;
+  FAttributeMatching.Values['class'] := 'list-contains';
 end;
 
 destructor THtmlTemplateParser.destroy;
 begin
+  FAttributeMatching.Free;
   FRepetitionRegEx.Free;
   FNamespaces.Free;
   FreeAndNil(FVariables);
