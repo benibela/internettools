@@ -1,7 +1,7 @@
 object Form1: TForm1
-  Left = 320
+  Left = 315
   Height = 562
-  Top = 230
+  Top = 205
   Width = 866
   ActiveControl = Panel1
   Caption = 'Form1'

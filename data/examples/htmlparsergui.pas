@@ -101,7 +101,7 @@ var
 begin
   tp := TTreeParser.Create;
   parseHTML(tp);
-  memo3.Lines.Text := tp.getLastTree.outerXML();
+  memo3.Lines.Text := tp.getLastTree.outerXML(true);
   tp.free;
 end;
 

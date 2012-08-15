@@ -78,8 +78,8 @@ TTreeElement = class
   function findChild(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]): TTreeElement;
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
-  function outerXML():string;
-  function innerXML():string;
+  function outerXML(insertLineBreaks: boolean = false):string;
+  function innerXML(insertLineBreaks: boolean = false):string;
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
@@ -325,7 +325,7 @@ begin
   if (result<>'') and (separator<>'') then setlength(result,length(result)-length(separator));
 end;
 
-function TTreeElement.outerXML: string;
+function TTreeElement.outerXML(insertLineBreaks: boolean = false): string;
 var i: Integer;
 begin
   if self = nil then exit;
@@ -351,16 +351,19 @@ begin
       end;
       if next = reverse then begin
         result += '/>';
+        if insertLineBreaks then Result+=LineEnding;
         exit();
       end;
       result +='>';
-      result += innerXML();
+      if insertLineBreaks then Result+=LineEnding;
+      result += innerXML(insertLineBreaks);
       result+='</'+value+'>';
+      if insertLineBreaks then Result+=LineEnding;
     end;
   end;
 end;
 
-function TTreeElement.innerXML: string;
+function TTreeElement.innerXML(insertLineBreaks: boolean = false): string;
 var
   sub: TTreeElement;
 begin
@@ -368,7 +371,7 @@ begin
   if (self = nil) or (typ <> tetOpen) then exit;
   sub := next;
   while sub <> reverse do begin
-    result += sub.outerXML;
+    result += sub.outerXML(insertLineBreaks);
     if sub.typ <> tetOpen then sub:=sub.next
     else sub := sub.reverse.next;
   end;
