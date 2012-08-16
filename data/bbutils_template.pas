@@ -1595,11 +1595,22 @@ begin
     result:=Def;
 end;
 
+function killFileURLPrefix(const filename: string): string;
+begin
+  result := filename;
+
+  if not stribeginswith(result, 'file://') then
+    exit(result);
+
+  delete(result, 1, 7);
+  if (length(result) >= 4) and (result[1] = '/') and (result[3] = ':') and (result[4] = '\') then
+    delete(result, 1, 1); //Windows like file:///C:\abc\def url
+end;
 
 function strLoadFromFile(filename: string): string;
 var f:TFileStream;
 begin
-  f:=TFileStream.Create(filename,fmOpenRead);
+  f:=TFileStream.Create(killFileURLPrefix(filename),fmOpenRead);
   result := '';
   SetLength(result,f.Size);
   if f.size>0 then
@@ -1610,7 +1621,7 @@ end;
 procedure strSaveToFile(filename: string;str:string);
 var f:TFileStream;
 begin
-  f:=TFileStream.Create(filename,fmCreate);
+  f:=TFileStream.Create(killFileURLPrefix(filename),fmCreate);
   if length(str)>0 then f.Write(str[1],length(str));
   f.Free;
 end;
