@@ -45,8 +45,9 @@ type
 
     variables: TStringList;
 
-    constructor create(_dataPath,_name:string);
-    procedure loadTemplates;
+    constructor create();
+    procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
+    procedure loadTemplateFromString(template: string; aname: string = 'unknown');
     destructor destroy;override;
 
     function findAction(_name:string):PTemplateAction;
@@ -62,19 +63,21 @@ type
     constructor create;
     constructor create(s:string;more_details:string='');
   end;
-  TLogEvent = procedure (sender: TObject; logged: string; debugLevel: integer = 0) of object;
-  TPageProcessed = procedure (sender: TObject; parser: THtmlTemplateParser) of object;
+  TTemplateReader = class;
+  TLogEvent = procedure (sender: TTemplateReader; logged: string; debugLevel: integer = 0) of object;
+  TPageProcessed = procedure (sender: TTemplateReader; parser: THtmlTemplateParser) of object;
 
   TTemplateReader = class
   protected
     template:TMultiPageTemplate;
+    procedure setTemplate(atemplate: TMultiPageTemplate);
   public
     internet:TInternetAccess;
     parser: THtmlTemplateParser;
     onLog: TLogEvent;
     onPageProcessed: TPageProcessed;
 
-    constructor create(atemplate:TMultiPageTemplate);
+    constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
     destructor destroy();override;
 
     function findAction(name:string):PTemplateAction;
@@ -156,16 +159,36 @@ begin
   Result:=prContinue;
 end;
 
-constructor TMultiPageTemplate.create(_dataPath,_name:string);
+constructor TMultiPageTemplate.create();
+begin
+  variables:=TStringList.Create;
+end;
+
+procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
+  procedure loadTemplates;
+    procedure load(var action:TTemplateAction);
+    var i:longint;
+    begin
+      for i:=0 to high(action.actions) do begin
+        if action.actions[i].templateFile='' then continue;
+        action.actions[i].template:=strLoadFromFile(self.path+action.actions[i].templateFile);
+        if action.actions[i].template='' then
+          raise ETemplateReader.create('Template-Datei "'+self.path+action.actions[i].templateFile+'" konnte nicht geladen werden');
+      end;
+    end;
+  var i:longint;
+  begin
+    for i:=0 to high(actions) do
+      load(actions[i]);
+  end;
 var
   tree: TTreeParser;
 begin
   IncludeTrailingPathDelimiter(_dataPath);
   self.path:=_dataPath;
-  self.name:=_name;
+  self.name:=aname;
   if not FileExists(_dataPath+'template') then
     raise Exception.Create('Template '+_dataPath+' nicht gefunden');
-  variables:=TStringList.Create;
 
 
   tree := TTreeParser.Create;
@@ -173,22 +196,17 @@ begin
   tree.free;
 end;
 
-procedure TMultiPageTemplate.loadTemplates;
-  procedure load(var action:TTemplateAction);
-  var i:longint;
-  begin
-    for i:=0 to high(action.actions) do begin
-      if action.actions[i].templateFile='' then continue;
-      action.actions[i].template:=strLoadFromFile(self.path+action.actions[i].templateFile);
-      if action.actions[i].template='' then
-        raise ETemplateReader.create('Template-Datei "'+self.path+action.actions[i].templateFile+'" konnte nicht geladen werden');
-    end;
-  end;
-var i:longint;
+procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string);
+var
+  tree: TTreeParser;
 begin
-  for i:=0 to high(actions) do
-    load(actions[i]);
+  self.path:='';
+  self.name:=aname;
+  tree := TTreeParser.Create;
+  readTree(tree.parseTree(template));
+  tree.Free;
 end;
+
 
 
 destructor TMultiPageTemplate.destroy;
@@ -213,12 +231,24 @@ begin
     if actions[i].name=_name then exit(@actions[i]);;
 end;
 
-constructor TTemplateReader.create(atemplate:TMultiPageTemplate);
+procedure TTemplateReader.setTemplate(atemplate: TMultiPageTemplate);
+var
+  i: Integer;
 begin
   template:=atemplate;
+  for i:=0 to atemplate.variables.count-1 do
+    parser.variableChangeLog.ValuesString[atemplate.variables.Names[i]]:=atemplate.variables.ValueFromIndex[i];
+end;
+
+constructor TTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
+var
+  i: Integer;
+begin
+  internet:=ainternet;
   parser:=THtmlTemplateParser.create;
   parser.KeepPreviousVariables:=kpvKeepValues;
   parser.variableChangeLog.caseSensitive:=false;
+  setTemplate(atemplate);
 end;
 
 destructor TTemplateReader.destroy();
