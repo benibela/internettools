@@ -24,6 +24,7 @@ uses
 //{$DEFINE USE_NO_WRAPPER}
 
 
+
 (***
 Retrieve data from any url.@br@br
 
@@ -42,6 +43,17 @@ It supports:
 
 *)
 function retrieve(const data: string): string;
+
+
+type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
+
+(***
+  Guesses the type of given string@br@br
+
+  E.g. for 'http://' it returns rtRemoteURL, for '/tmp' rtFile and for '<abc/>' rtXML@br.
+  Internally used by retrieve to determine how to actually retrieve the data.
+*)
+function guessType(const data: string): TRetrieveType;
 
 //**Make a http GET request to a certain url
 function httpRequest(const url: string): string;
@@ -106,7 +118,6 @@ uses bbutils, extendedhtmlparser
 {$ENDIF}
 ;
 
-type TRetrieveType = (rtEmpty, rtHttp, rtFile, rtTag);
 
 threadvar
   tree: TTreeParser;
@@ -120,23 +131,34 @@ function retrieve(const data: string): string;
 var trimmed: string;
 begin
   trimmed:=TrimLeft(data);
-  lastRetrievedType:=rtEmpty;
-  if trimmed = '' then exit('');
-  if strBeginsWith(trimmed, 'http://') or strBeginsWith(trimmed, 'https://') then begin
-    lastRetrievedType:=rtHttp;
-    exit(httpRequest(trimmed));
+  lastRetrievedType:=guessType(data);
+  case lastRetrievedType of
+    rtEmpty:;
+    rtRemoteURL: exit(httpRequest(trimmed));
+    rtFile: exit(strLoadFromFileUTF8(trimmed));
+    rtXML: exit(data);
   end;
-  if strBeginsWith(trimmed, 'file://') then begin
-    lastRetrievedType:=rtFile;
-    exit(strLoadFromFileUTF8(strCopyFrom(trimmed, length('file://')+1)));
-  end;
-  if strBeginsWith(trimmed, '<') then begin
-    lastRetrievedType:=rtTag;
-    exit(trimmed);
-  end;
-  lastRetrievedType:=rtFile;
-  exit(strLoadFromFileUTF8(trimmed));
 end;
+
+
+function guessType(const data: string): TRetrieveType;
+var trimmed: string;
+begin
+  trimmed:=TrimLeft(data);
+  if trimmed = '' then exit(rtEmpty);
+
+  if strBeginsWith(trimmed, 'http://') or strBeginsWith(trimmed, 'https://') then
+    exit(rtRemoteURL);
+
+  if strBeginsWith(trimmed, 'file://') then
+    exit(rtFile);
+
+  if strBeginsWith(trimmed, '<') then
+    exit(rtXML);
+
+  exit(rtFile);
+end;
+
 
 function process(data: string; query: string): string;
 var dataFileName: string;
@@ -149,7 +171,7 @@ begin
 
   data := retrieve(data);
 
-  if lastRetrievedType <> rtTag then dataFileName:=datain;
+  if lastRetrievedType <> rtXML then dataFileName:=datain;
 
   query := trim(query);
   if query[1] = '<' then begin
