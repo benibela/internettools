@@ -7,6 +7,7 @@ uses
   Interfaces,
   Classes,
   extendedhtmlparser,  pseudoxpath, FileUtil,sysutils, bbutils, simplehtmltreeparser, internetaccess, simpleinternet,
+  multipagetemplate,
   rcmdline //<< if you don't have this command line parser unit, you can download it from www.benibela.de
   { you can add units after this };
 
@@ -38,6 +39,7 @@ type
   urls: TStringArray;
   extract: string;
   extractExclude, extractInclude: TStringArray;
+  extractKind: (ekXPath, ekTemplate, ekCSS, ekMultipage);
 
   follow: string;
   followExclude, followInclude: TStringArray;
@@ -60,6 +62,7 @@ type
 
   procedure setVariables(v: string);
   procedure setVariablesTime(v: string);
+  procedure setExtractKind(v: string);
 
   procedure deleteUrl0;
   procedure addBasicValueUrl(dest: tpxpvalue);
@@ -68,6 +71,8 @@ type
   procedure printExtractedValue(value: TPXPValue);
   procedure printExtractedVariables(vars: TPXPVariableChangeLog; state: string);
   procedure printExtractedVariables(parser: THtmlTemplateParser);
+
+  procedure pageProcessed(sender: TTemplateReader; parser: THtmlTemplateParser);
 end;
 
 type EInvalidArgument = Exception;
@@ -82,6 +87,11 @@ begin
   extract := trim(extract);
   extractExclude := strSplit(cmdLine.readString('extract-exclude'), ',', false);
   extractInclude := strSplit(cmdLine.readString('extract-include'), ',', false);
+  setExtractKind(cmdLine.readString('extract-kind'));
+  if cmdLine.readString('template-file') <> '' then begin
+    extract := strLoadFromFile(cmdLine.readString('template-file'));
+    extractKind := ekMultipage;
+  end;
 
   if cmdLine.readString('follow-file') <> '' then follow := strLoadFromFile(cmdLine.readString('follow-file'))
   else follow := cmdLine.readString('follow');
@@ -111,6 +121,8 @@ begin
   end;
 
   urls:=cmdLine.readNamelessFiles();
+
+  if (extractKind = ekMultipage) and (length(urls) = 0) then arrayAdd(urls, '<empty/>');
 end;
 
 procedure TProcessingRequest.mergeWithObject(obj: TPXPValueObject);
@@ -122,6 +134,11 @@ begin
   else if obj.hasProperty('extract', @temp) then extract := temp.asString;
   if obj.hasProperty('extract-exclude', @temp) then extractExclude := strSplit(temp.asString, ',', false);
   if obj.hasProperty('extract-include', @temp) then extractInclude := strSplit(temp.asString, ',', false);
+  if obj.hasProperty('extract-kind', @temp) then setExtractKind(temp.asString);
+  if obj.hasProperty('template-file', @temp)  then begin
+    extract := strLoadFromFile(temp.asString);
+    extractKind := ekMultipage;
+  end;
 
   if obj.hasProperty('follow-file', @temp) then follow := strLoadFromFile(temp.asString)
   else if obj.hasProperty('follow', @temp) then follow := temp.asString;
@@ -146,6 +163,8 @@ begin
   setlength(urls, 0);
   if obj.hasProperty('follow', @temp) then
     addBasicValueUrl(temp);
+
+  if (extractKind = ekMultipage) and (length(urls) = 0) then arrayAdd(urls, '<empty/>');
 end;
 
 procedure TProcessingRequest.setVariables(v: string);
@@ -167,6 +186,19 @@ begin
   tempSplitted := strSplit(v, ',');
   if arrayIndexOf(tempSplitted, 'immediate') >= 0 then include(printVariablesTime, pvtImmediate);
   if arrayIndexOf(tempSplitted, 'final') >= 0 then include(printVariablesTime, pvtFinal);
+end;
+
+procedure TProcessingRequest.setExtractKind(v: string);
+begin
+  if extract = '' then exit;
+  if striEqual(v, 'auto') then begin
+    if extract[1] = '<' then extractKind:=ekTemplate
+    else extractKind:=ekXPath;
+  end else if striEqual(v, 'xpath') then extractKind:=ekXPath
+  else if striEqual(v, 'css') then extractKind:=ekCSS
+  else if striEqual(v, 'template') then extractKind:=ekTemplate
+  else if striEqual(v, 'multipage') then extractKind:=ekMultipage
+  else raise Exception.Create('Unknown kind for the extract expression: '+v);
 end;
 
 
@@ -257,6 +289,7 @@ begin
   if pvCondensedLog in printVariables then
     printExtractedVariables(parser.VariableChangeLogCondensed, '** Current variable state: **');
 end;
+
 
 procedure TProcessingRequest.printExtractedVariables(vars: TPXPVariableChangeLog; state: string);
   function acceptName(n: string): boolean;
@@ -367,15 +400,37 @@ begin
   end;
 end;
 
+procedure TProcessingRequest.pageProcessed(sender: TTemplateReader; parser: THtmlTemplateParser);
+var
+  i: Integer;
+begin
+  printExtractedVariables(parser);
+
+  for i := 0 to parser.variableChangeLog.count-1 do
+    if parser.variableChangeLog.getVariableName(i) = '_follow' then
+      followTo(parser.variableChangeLog.getVariableValue(i));
+end;
+
 
 type
 
 { THtmlTemplateParserBreaker }
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
-  function createPXP: TPseudoXPathParser;
   procedure parseHTMLSimple(html,uri: string);
 end;
+
+ { TMultiPageTemplateBreaker }
+
+ { TTemplateReaderBreaker }
+
+ TTemplateReaderBreaker = class(TTemplateReader)
+   constructor create();
+   procedure setTemplate(atemplate: TMultiPageTemplate);
+   procedure perform;
+   procedure selfLog(sender: TTemplateReader; logged: string; debugLevel: integer);
+   procedure selfPageProcessed(sender: TTemplateReader; p: THtmlTemplateParser);
+ end;
 
 var mycmdLine: TCommandLineReader;
     htmlparser:THtmlTemplateParserBreaker;
@@ -386,13 +441,45 @@ var mycmdLine: TCommandLineReader;
 
     alreadyProcessed: TStringList;
     xpathparser: TPseudoXPathParser;
+    multipage: TTemplateReaderBreaker;
+    multipagetemp: TMultiPageTemplate;
+
+{ TMultiPageTemplateBreaker }
+
+constructor TTemplateReaderBreaker.create;
+begin
+  onLog:=@selfLog;
+  onPageProcessed:=@selfPageProcessed;
+end;
+
+procedure TTemplateReaderBreaker.setTemplate(atemplate: TMultiPageTemplate);
+begin
+  if atemplate = nil then begin
+    atemplate.free;
+    template:=nil;
+    exit;
+  end;
+  inherited setTemplate(atemplate);
+end;
+
+procedure TTemplateReaderBreaker.perform;
+begin
+  if length(template.actions) = 0 then raise Exception.Create('Template contains no actions!'+LineEnding+'A Multipage template should look like <action>  <page url="..."> <post> post data </post> <template> single page template </template> </page> </action> ');
+  performAction(template.actions[0]);
+end;
+
+procedure TTemplateReaderBreaker.selfLog(sender: TTemplateReader; logged: string; debugLevel: integer);
+begin
+  if debugLevel <> 0 then exit;
+  writeln(stderr, logged);
+end;
+
+procedure TTemplateReaderBreaker.selfPageProcessed(sender: TTemplateReader; p: THtmlTemplateParser);
+begin
+  requests[0].pageProcessed(sender,parser);
+end;
 
 { THtmlTemplateParserBreaker }
-
-function THtmlTemplateParserBreaker.createPXP: TPseudoXPathParser;
-begin
-  result := inherited createPseudoXPathParser;
-end;
 
 procedure THtmlTemplateParserBreaker.parseHTMLSimple(html, uri: string);
 begin
@@ -423,6 +510,8 @@ begin
   mycmdLine.declareString('extract-exclude', 'Comma separated list of variables ignored in an extract template. (black list) (default _follow)', '_follow');
   mycmdLine.declareString('extract-include', 'If not empty, comma separated list of variables to use in an extract template (white list)');
   mycmdLine.declareFile('extract-file', 'File containing an extract expression (for longer expressions)');
+  mycmdLine.declareString('extract-kind', 'How the extract expression is evaluated. Can be auto (automatically choose between xpath/template), xpath, css, template or multipage', 'auto');
+  mycmdLine.declareFile('template-file', 'Abbreviation for --extract-kind=multipage --extract-file=...');
 
   mycmdLine.beginDeclarationCategory('Follow options:');
 
@@ -461,7 +550,7 @@ begin
   else if mycmdLine.readString('output-format') = 'xml' then outputFormat:=ofXML
   else raise EInvalidArgument.Create('Unknown output format: ' + mycmdLine.readString('output-format'));
   if outputFormat = ofJson then writeln('[')
-  else if outputFormat = ofXML then writeln('<seq>');
+  else if outputFormat = ofXML then writeln('<?xml version="1.0" encoding="UTF-8"?>'+LineEnding+'<seq>');
 
   SetLength(requests,1);
   requests[0].initFromCommandLine(mycmdLine);
@@ -471,7 +560,10 @@ begin
 
   htmlparser:=THtmlTemplateParserBreaker.create;
   htmlparser.TemplateParser.parsingModel:=pmHTML;
-  xpathparser := htmlparser.createPXP;
+  htmlparser.KeepPreviousVariables:=kpvKeepValues;
+  multipage := TTemplateReaderBreaker.create();
+  multipage.parser:=htmlparser;
+  xpathparser := htmlparser.createPseudoXPathParser('');
   alreadyProcessed := TStringList.Create;
 
 
@@ -514,24 +606,37 @@ begin
 
           htmlparser.OutputEncoding := outputEncoding;
 
-          if extract[1] = '<' then begin //assume my templates
-            htmlparser.UnnamedVariableName:=defaultName;
-            htmlparser.parseTemplate(extract); //todo reuse existing parser
-            htmlparser.parseHTML(data, urls[0]);
-            printExtractedVariables(htmlparser);
+          case extractKind of
+            ekTemplate: begin
+              htmlparser.UnnamedVariableName:=defaultName;
+              htmlparser.parseTemplate(extract); //todo reuse existing parser
+              htmlparser.parseHTML(data, urls[0]);
+              printExtractedVariables(htmlparser);
 
-            for i := 0 to htmlparser.variableChangeLog.count-1 do
-              if htmlparser.variableChangeLog.getVariableName(i) = '_follow' then
-                followTo(htmlparser.variableChangeLog.getVariableValue(i));
-          end else begin
-            //assume xpath
-            htmlparser.parseHTMLSimple(data, urls[0]);
-            xpathparser.RootElement := htmlparser.HTMLTree;
-            xpathparser.ParentElement := xpathparser.RootElement;
-            xpathparser.StaticBaseUri := urls[0];
-            xpathparser.parse(extract);
-            printExtractedValue(xpathparser.evaluate());
-            writeln;
+              for i := 0 to htmlparser.variableChangeLog.count-1 do
+                if htmlparser.variableChangeLog.getVariableName(i) = '_follow' then
+                  followTo(htmlparser.variableChangeLog.getVariableValue(i));
+            end;
+            ekXPath, ekCSS: begin
+              htmlparser.parseHTMLSimple(data, urls[0]);
+              xpathparser.RootElement := htmlparser.HTMLTree;
+              xpathparser.ParentElement := xpathparser.RootElement;
+              xpathparser.StaticBaseUri := urls[0];
+              if extractKind = ekCSS then xpathparser.parse('css("'+StringReplace(extract,'"','""',[rfReplaceAll])+'")')
+              else xpathparser.parse(extract);
+              printExtractedValue(xpathparser.evaluate());
+              writeln;
+            end;
+            ekMultipage: begin
+              needInternetAccess;
+              multipage.internet:=defaultInternet;
+              multipagetemp := TMultiPageTemplate.create();
+              multipagetemp.loadTemplateFromString(extract);
+              multipage.setTemplate(multipagetemp);
+              multipage.perform();
+              multipage.setTemplate(nil);
+            end;
+            else raise Exception.Create('Impossible');
           end;
         end;
 
@@ -572,7 +677,8 @@ begin
     end;
   end;
   xpathparser.free;
-  htmlparser.free;
+  //htmlparser.free; freed by next line
+  multipage.Free;
   mycmdLine.free;
   alreadyProcessed.Free;
 

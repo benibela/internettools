@@ -29,7 +29,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="&quot;&lt;x>&lt;a>abc&lt;/a>&lt;/x>&quot; --extract &quot;&lt;a>{t:=.}&lt;/a>&quot; --output-format json"/>
+        <CommandLineParams Value=". --extract-file /tmp/sfsvn --extract-kind videlibri"/>
         <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
       </local>
     </RunParams>
