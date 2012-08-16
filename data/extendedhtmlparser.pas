@@ -620,7 +620,7 @@ begin
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
   if templateType = tetCommandShortRead then begin
-    source := parser.createPseudoXPathParser(deepNodeText());
+    source := parser.createPseudoXPathParser(strDecodeHTMLEntities(deepNodeText(),eUTF8)); //todo: use correct encoding
     updatePXP(source);
   end else source := cachePXP('source');
 

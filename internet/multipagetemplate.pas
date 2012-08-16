@@ -94,6 +94,7 @@ uses simpleinternet;
 procedure TMultiPageTemplate.readTree(t: TTreeElement);
 var tagName:string;
 begin
+  (t as TTreeDocument).setEncoding(eUTF8,true,true);
   while t <> nil do begin
     case t.typ of
       tetOpen: begin
