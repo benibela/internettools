@@ -29,7 +29,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value=". --extract-file /tmp/sfsvn --extract-kind videlibri"/>
+        <CommandLineParams Value="http://www.google.de --extract &quot;&lt;a>{.}&lt;/a>*&quot;"/>
         <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
       </local>
     </RunParams>

@@ -404,6 +404,11 @@ procedure TProcessingRequest.pageProcessed(sender: TTemplateReader; parser: THtm
 var
   i: Integer;
 begin
+  if firstExtraction then begin
+    firstExtraction := false;
+    if outputFormat = ofXML then writeln('<e>');
+  end else writeln(outputArraySeparator[outputFormat]);
+
   printExtractedVariables(parser);
 
   for i := 0 to parser.variableChangeLog.count-1 do
@@ -599,11 +604,6 @@ begin
 
         printStatus('**** Processing:'+urls[0]+' ****');
         if extract <> '' then begin
-          if firstExtraction then begin
-            firstExtraction := false;
-            if outputFormat = ofXML then writeln('<e>');
-          end else writeln(outputArraySeparator[outputFormat]);
-
           htmlparser.OutputEncoding := outputEncoding;
 
           case extractKind of
@@ -611,13 +611,14 @@ begin
               htmlparser.UnnamedVariableName:=defaultName;
               htmlparser.parseTemplate(extract); //todo reuse existing parser
               htmlparser.parseHTML(data, urls[0]);
-              printExtractedVariables(htmlparser);
-
-              for i := 0 to htmlparser.variableChangeLog.count-1 do
-                if htmlparser.variableChangeLog.getVariableName(i) = '_follow' then
-                  followTo(htmlparser.variableChangeLog.getVariableValue(i));
+              pageProcessed(nil, htmlparser);
             end;
             ekXPath, ekCSS: begin
+              if firstExtraction then begin
+                firstExtraction := false;
+                if outputFormat = ofXML then writeln('<e>');
+              end else writeln(outputArraySeparator[outputFormat]);
+
               htmlparser.parseHTMLSimple(data, urls[0]);
               xpathparser.RootElement := htmlparser.HTMLTree;
               xpathparser.ParentElement := xpathparser.RootElement;
