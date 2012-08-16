@@ -66,7 +66,7 @@ type
   TPageProcessed = procedure (sender: TObject; parser: THtmlTemplateParser) of object;
 
   TTemplateReader = class
-  private
+  protected
     template:TMultiPageTemplate;
   public
     internet:TInternetAccess;
