@@ -16,6 +16,8 @@ type
     templateFile:string;
     template:string;
     postparams:array of TProperty;
+    condition: string;
+    repeated: boolean;
     //call action
     action: string;
       //callOnce: boolean;
@@ -37,9 +39,6 @@ type
     function textRead(text: string):TParsingResult;
     function leaveTag(tagName: string):TParsingResult;
   public
-    earMarkedRegEx,maxLimitRegEx,accountExpiredRegEx:TRegExpr;
-    propertyAuthorRegEx, propertyTitleRegEx, propertyISBNRegEx, propertyYearRegEx:TRegExpr;
-
     path,name:string;
     actions:array of TTemplateAction;
 
@@ -108,6 +107,8 @@ begin
             setlength(postparams,0);
             url := t.getAttribute('url', url);
             templateFile := t.getAttribute('templateFile', templateFile);
+            if t['test'] <> '' then condition := t['test'];
+            if t['repeat'] <> '' then repeated := true;
           end;
         end else if SameText(tagName,'post') then begin
           if (currentAction=nil) then raise ETemplateReader.create('Template ungültig: post-Tag gefunden, ohne dass eine Aktion definiert wurde');
@@ -125,6 +126,7 @@ begin
           SetLength(actions,length(actions)+1);
           FillChar(actions[high(actions)],sizeof(actions[high(actions)]),0);
           actions[high(actions)].name:=LowerCase(t['id']);
+
           currentAction:=@actions[high(actions)];
         end else if SameText(tagName, 'template') then begin
           if (currentAction=nil) then raise ETemplateReader.create('Template ungültig: html template gefunden, ohne dass eine Aktion definiert wurde');
@@ -211,15 +213,7 @@ end;
 
 destructor TMultiPageTemplate.destroy;
 begin
-  earMarkedRegEx.free;
-  maxLimitRegEx.free;
-  accountExpiredRegEx.free;
   variables.Free;
-
-  propertyAuthorRegEx.Free; //nil.free is okay
-  propertyTitleRegEx.Free;
-  propertyYearRegEx.Free;
-  propertyISBNRegEx.Free;
   inherited destroy;
 end;
 
@@ -278,6 +272,7 @@ var i:longint;
     tempname: String;
     cururl: String;
     a: ^TTemplateRealAction;
+    cachedCondition: TPseudoXPathParser;
 begin
   if Assigned(onLog) then onLog(self, 'Enter performAction, finternet:', 5); //TODO: parser log
 
@@ -286,12 +281,20 @@ begin
 
   for i:=0 to high(action.actions) do begin
     a := @action.actions[i];
+    cachedCondition := nil;
     case a^.typ of
       tratCallAction: begin
         if Assigned(onLog) then onLog(self, 'Action call: '+a^.action, 2);
         performAction(a^.action);
       end;
-      tratLoadPage: begin
+      tratLoadPage: repeat
+        if a^.condition <> '' then begin
+          if cachedCondition = nil then
+            cachedCondition := parser.createPseudoXPathParser(a^.condition);
+          if not cachedCondition.evaluateToBoolean() then
+            break;
+        end;
+
         if a^.template<>'' then begin
           if Assigned(onLog) then onLog(self, 'Parse Template From File: '+template.path+a^.templateFile, 2);
           parser.parseTemplate(a^.template,a^.templateFile);
@@ -300,12 +303,13 @@ begin
         cururl := a^.url;
         if cururl <> '' then begin
           cururl := parser.replaceVars(a^.url);
-          if cururl = '' then continue;
+          if cururl = '' then break;
           //allow pages without url to set variables.
         end else begin
           parser.parseHTML('<html></html>'); //apply template to empty "page"
           if Assigned(onPageProcessed) then onPageProcessed(self, parser);
-          continue;
+          if a^.repeated then continue
+          else break;
         end;
 
         postparams := '';
@@ -344,7 +348,7 @@ begin
           if Assigned(onPageProcessed) then onPageProcessed(self, parser);
         end;
         if Assigned(onLog) then onLog(self, 'page finished', 2);
-      end;
+      until not a^.repeated;
     end;
     if Assigned(onLog) then onLog(self, 'pages finished', 3);
   end;
