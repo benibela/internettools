@@ -848,9 +848,33 @@ begin
 end;
 
 
+//like in TeXstudio
+function isInvalidUTF8(const s: string): boolean;
+var
+  prev, cur: Integer;
+  good, bad: Integer;
+  i: Integer;
+begin
+  prev := 0;
+  good := 0;
+  bad := 0;
+  for i := 1 to length(s) do begin
+    cur := ord(s[i]);
+    if (cur and $C0) = $80 then begin
+      if (prev and $C0) = $C0 then good += 1
+      else if (prev and $80) = $80 then bad += 1;
+    end else begin
+      if (prev and $C0) = $C0 then bad+=1
+    end;
+    prev := cur;
+  end;
+  result := good < 10 * bad;
+end;
+
 function TTreeParser.parseTree(html: string; uri: string): TTreeDocument;
 var
   encoding: String;
+  el: TTreeElement;
 begin
   FTemplateCount:=0;
   FElementStack.Clear;
@@ -892,6 +916,22 @@ begin
               (pos('charset=latin1',encoding) > 0) or
               (pos('charset=iso-8859-1',encoding) > 0) then //also -15
         FCurrentTree.FEncoding:=eWindows1252;
+    end else begin
+      FCurrentTree.FEncoding:=eUTF8;
+      el := FCurrentTree.next;
+      while el <> nil do begin
+        case el.typ of
+          tetText: if isInvalidUTF8(el.value) then begin
+            FCurrentTree.FEncoding:=eWindows1252;
+            break;
+          end;
+          tetOpen: if (el.attributes <> nil) and isInvalidUTF8(el.attributes.Text) then begin
+            FCurrentTree.FEncoding:=eWindows1252;
+            break;
+          end;
+        end;
+        el := el.next;
+      end;
     end;
 
   end;
