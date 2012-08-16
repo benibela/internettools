@@ -395,7 +395,6 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    function createPseudoXPathParser: TPseudoXPathParser;
     procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
@@ -418,6 +417,7 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     function debugMatchings(const width: integer): string;
+    function createPseudoXPathParser(const expression: string): TPseudoXPathParser; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
@@ -579,8 +579,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     if templateAttributes = nil then exit(nil);
     i := templateAttributes.IndexOfName(name);
     if i < 0 then exit(nil);
-    result := parser.createPseudoXPathParser;
-    result.parse(templateAttributes.ValueFromIndex[i]);
+    result := parser.createPseudoXPathParser(templateAttributes.ValueFromIndex[i]);
     updatePXP(result);
   end;
 
@@ -621,8 +620,7 @@ begin
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
   if templateType = tetCommandShortRead then begin
-    source := parser.createPseudoXPathParser;
-    source.parse(deepNodeText());
+    source := parser.createPseudoXPathParser(deepNodeText());
     updatePXP(source);
   end else source := cachePXP('source');
 
@@ -681,11 +679,12 @@ begin
   result := FTemplate.getLastTree;
 end;
 
-function THtmlTemplateParser.createPseudoXPathParser: TPseudoXPathParser;
+function THtmlTemplateParser.createPseudoXPathParser(const expression: string): TPseudoXPathParser;
 begin
   result := TPseudoXPathParser.Create;
   result.OnEvaluateVariable:= @evaluatePXPVariable;
   result.OnDefineVariable:=@FVariableLog.defineVariable;
+  if expression <> '' then result.parse(expression);
 end;
 
 function THtmlTemplateParser.GetVariableLogCondensed: TPXPVariableChangeLog;
