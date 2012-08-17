@@ -3,12 +3,14 @@ program htmlparserExample;
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
 
+{$define AllowInternetAccess}
+
 uses
-  Interfaces,
+  {$ifdef AllowInternetAccess}Interfaces, simpleinternet, internetaccess, multipagetemplate,{$endif}
   Classes,
-  extendedhtmlparser,  pseudoxpath, FileUtil,sysutils, bbutils, simplehtmltreeparser, internetaccess, simpleinternet,
-  multipagetemplate,
-  rcmdline //<< if you don't have this command line parser unit, you can download it from www.benibela.de
+  extendedhtmlparser,  pseudoxpath, sysutils, bbutils, simplehtmltreeparser,
+
+  rcmdline, rcmdlinecgi //<< if you don't have this command line parser unit, you can download it from www.benibela.de
   { you can add units after this };
 
 
@@ -18,6 +20,7 @@ type TOutputFormat = (ofAdhoc, ofJson, ofXML);
 var outputFormat: TOutputFormat;
     firstExtraction: boolean = true;
     outputArraySeparator: array[toutputformat] of string = ('', ', ', '</e><e>');
+    cgimode: boolean;
 
 
 function joined(s: array of string): string;
@@ -72,7 +75,7 @@ type
   procedure printExtractedVariables(vars: TPXPVariableChangeLog; state: string);
   procedure printExtractedVariables(parser: THtmlTemplateParser);
 
-  procedure pageProcessed(sender: TTemplateReader; parser: THtmlTemplateParser);
+  procedure pageProcessed(parser: THtmlTemplateParser);
 end;
 
 type EInvalidArgument = Exception;
@@ -99,10 +102,12 @@ begin
   followExclude := strSplit(cmdLine.readString('follow-exclude'), ',', false);
   followInclude := strSplit(cmdLine.readString('follow-include'), ',', false);
 
+  {$ifdef AllowInternetAccess}
   wait := cmdLine.readFloat('wait');
   userAgent := cmdLine.readString('user-agent');
   proxy := cmdLine.readString('proxy');
   post := cmdLine.readString('post');
+  {$endif}
 
   quiet := cmdLine.readFlag('quiet');
   defaultName := cmdLine.readString('default-variable-name');
@@ -123,6 +128,8 @@ begin
   urls:=cmdLine.readNamelessFiles();
 
   if (extractKind = ekMultipage) and (length(urls) = 0) then arrayAdd(urls, '<empty/>');
+
+  if cmdLine.readString('data') <> '' then arrayAdd(urls, cmdLine.readString('data'));
 end;
 
 procedure TProcessingRequest.mergeWithObject(obj: TPXPValueObject);
@@ -400,7 +407,7 @@ begin
   end;
 end;
 
-procedure TProcessingRequest.pageProcessed(sender: TTemplateReader; parser: THtmlTemplateParser);
+procedure TProcessingRequest.pageProcessed(parser: THtmlTemplateParser);
 var
   i: Integer;
 begin
@@ -429,6 +436,7 @@ end;
 
  { TTemplateReaderBreaker }
 
+ {$ifdef AllowInternetAccess}
  TTemplateReaderBreaker = class(TTemplateReader)
    constructor create();
    procedure setTemplate(atemplate: TMultiPageTemplate);
@@ -436,6 +444,7 @@ end;
    procedure selfLog(sender: TTemplateReader; logged: string; debugLevel: integer);
    procedure selfPageProcessed(sender: TTemplateReader; p: THtmlTemplateParser);
  end;
+ {$endif}
 
 var mycmdLine: TCommandLineReader;
     htmlparser:THtmlTemplateParserBreaker;
@@ -446,11 +455,14 @@ var mycmdLine: TCommandLineReader;
 
     alreadyProcessed: TStringList;
     xpathparser: TPseudoXPathParser;
+    {$ifdef AllowInternetAccess}
     multipage: TTemplateReaderBreaker;
     multipagetemp: TMultiPageTemplate;
+    {$endif}
 
 { TMultiPageTemplateBreaker }
 
+{$ifdef AllowInternetAccess}
 constructor TTemplateReaderBreaker.create;
 begin
   onLog:=@selfLog;
@@ -481,8 +493,10 @@ end;
 
 procedure TTemplateReaderBreaker.selfPageProcessed(sender: TTemplateReader; p: THtmlTemplateParser);
 begin
-  requests[0].pageProcessed(sender,parser);
+  requests[0].pageProcessed(parser);
 end;
+
+{$endif}
 
 { THtmlTemplateParserBreaker }
 
@@ -499,15 +513,17 @@ begin
 end;
 
 
-
 begin
   //normalized formats (for use in unittests)
   DecimalSeparator:='.';
   ThousandSeparator:=#0;
   ShortDateFormat:='YYYY-MM-DD';
   LongDateFormat:='YYYY-MM-DD';
-
-  mycmdLine:=TCommandLineReader.create;
+  cgimode := striEqual(GetEnvironmentVariable('REQUEST_METHOD'), 'GET') or striEqual(GetEnvironmentVariable('REQUEST_METHOD'), 'POST');
+  if cgimode then begin
+    mycmdLine:=TCommandLineReaderCGI.create;
+    mycmdLine.declareString('data', 'Data to process');
+  end else mycmdLine:=TCommandLineReader.create;
 
   mycmdLine.beginDeclarationCategory('Extraction options:');
 
@@ -529,12 +545,14 @@ begin
   mycmdLine.beginDeclarationCategory('Extraction options:');
 
 
+  {$ifdef AllowInternetAccess}
   mycmdLine.beginDeclarationCategory('HTTP connection options:');
 
   mycmdLine.declareFloat('wait', 'Wait a certain count of seconds between requests');
   mycmdLine.declareString('user-agent', 'Useragent used in http request', defaultInternetConfiguration.userAgent);
   mycmdLine.declareString('proxy', 'Proxy used for http/s requests');
   mycmdLine.declareString('post', 'Post request to send (url encoded)');
+  {$endif}
 
   mycmdLine.beginDeclarationCategory('Output options:');
 
@@ -554,20 +572,35 @@ begin
   else if mycmdLine.readString('output-format') = 'json' then outputFormat:=ofJson
   else if mycmdLine.readString('output-format') = 'xml' then outputFormat:=ofXML
   else raise EInvalidArgument.Create('Unknown output format: ' + mycmdLine.readString('output-format'));
+
+  if cgimode then begin
+    case outputFormat of
+      ofAdhoc: writeln('Content-Type: text/plain');
+      ofXML: writeln('Content-Type: text/html');
+      ofJson: writeln('Content-Type: application/json');
+    end;
+    writeln;
+  end;
+
   if outputFormat = ofJson then writeln('[')
   else if outputFormat = ofXML then writeln('<?xml version="1.0" encoding="UTF-8"?>'+LineEnding+'<seq>');
 
   SetLength(requests,1);
   requests[0].initFromCommandLine(mycmdLine);
 
+
+  {$ifdef AllowInternetAccess}
   defaultInternetConfiguration.userAgent:=requests[0].userAgent;
   defaultInternetConfiguration.setProxy(requests[0].proxy);
+  {$endif}
 
   htmlparser:=THtmlTemplateParserBreaker.create;
   htmlparser.TemplateParser.parsingModel:=pmHTML;
   htmlparser.KeepPreviousVariables:=kpvKeepValues;
+  {$ifdef AllowInternetAccess}
   multipage := TTemplateReaderBreaker.create();
   multipage.parser:=htmlparser;
+  {$endif}
   xpathparser := htmlparser.createPseudoXPathParser('');
   alreadyProcessed := TStringList.Create;
 
@@ -588,6 +621,7 @@ begin
         urls[0] := trim(urls[0]);
         if urls[0] = '' then begin deleteUrl0; continue; end;
 
+        {$ifdef AllowInternetAccess}
         if strBeginsWith(urls[0], 'http') and strContains(urls[0], '://')  then begin
           simpleinternet.needInternetAccess;
           if assigned(simpleinternet.defaultInternet.internetConfig) then begin
@@ -597,8 +631,12 @@ begin
         end;
 
         printStatus('**** Retrieving:'+urls[0]+' ****');
-        if post = '' then data := retrieve(urls[0])
+        if cgimode then data := urls[0] //disallow remote access in cgi mode
+        else if post = '' then data := retrieve(urls[0])
         else data := httpRequest(urls[0], post);
+        {$else}
+        data := urls[0];
+        {$endif}
 
         alreadyProcessed.Add(urls[0]+#1+post);
 
@@ -611,7 +649,7 @@ begin
               htmlparser.UnnamedVariableName:=defaultName;
               htmlparser.parseTemplate(extract); //todo reuse existing parser
               htmlparser.parseHTML(data, urls[0]);
-              pageProcessed(nil, htmlparser);
+              pageProcessed(htmlparser);
             end;
             ekXPath, ekCSS: begin
               if firstExtraction then begin
@@ -629,6 +667,7 @@ begin
               writeln;
             end;
             ekMultipage: begin
+              {$ifdef AllowInternetAccess}
               needInternetAccess;
               multipage.internet:=defaultInternet;
               multipagetemp := TMultiPageTemplate.create();
@@ -636,6 +675,7 @@ begin
               multipage.setTemplate(multipagetemp);
               multipage.perform();
               multipage.setTemplate(nil);
+              {$endif}
             end;
             else raise Exception.Create('Impossible');
           end;
@@ -678,8 +718,12 @@ begin
     end;
   end;
   xpathparser.free;
-  //htmlparser.free; freed by next line
+
+  {$ifdef AllowInternetAccess}
   multipage.Free;
+  {$else}
+  htmlparser.free; //freed by previous line
+  {$endif}
   mycmdLine.free;
   alreadyProcessed.Free;
 
