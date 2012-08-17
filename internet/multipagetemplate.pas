@@ -87,7 +87,6 @@ type
 
 implementation
 
-uses simpleinternet;
 { TMultiPageTemplate }
 
 

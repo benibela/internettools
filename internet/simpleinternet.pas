@@ -45,15 +45,6 @@ It supports:
 function retrieve(const data: string): string;
 
 
-type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
-
-(***
-  Guesses the type of given string@br@br
-
-  E.g. for 'http://' it returns rtRemoteURL, for '/tmp' rtFile and for '<abc/>' rtXML@br.
-  Internally used by retrieve to determine how to actually retrieve the data.
-*)
-function guessType(const data: string): TRetrieveType;
 
 //**Make a http GET request to a certain url
 function httpRequest(const url: string): string;
@@ -138,25 +129,6 @@ begin
     rtFile: exit(strLoadFromFileUTF8(trimmed));
     rtXML: exit(data);
   end;
-end;
-
-
-function guessType(const data: string): TRetrieveType;
-var trimmed: string;
-begin
-  trimmed:=TrimLeft(data);
-  if trimmed = '' then exit(rtEmpty);
-
-  if strBeginsWith(trimmed, 'http://') or strBeginsWith(trimmed, 'https://') then
-    exit(rtRemoteURL);
-
-  if strBeginsWith(trimmed, 'file://') then
-    exit(rtFile);
-
-  if strBeginsWith(trimmed, '<') then
-    exit(rtXML);
-
-  exit(rtFile);
 end;
 
 

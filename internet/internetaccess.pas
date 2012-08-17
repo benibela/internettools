@@ -113,9 +113,23 @@ type
     details:string;
   end;
   TInternetAccessClass=class of TInternetAccess;
+
+
 procedure decodeURL(const totalURL: string; out protocol, host, url: string);
+
+type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
+
+(***
+  Guesses the type of given string@br@br
+
+  E.g. for 'http://' it returns rtRemoteURL, for '/tmp' rtFile and for '<abc/>' rtXML@br.
+  Internally used by simpleinternet.retrieve to determine how to actually retrieve the data.
+*)
+function guessType(const data: string): TRetrieveType;
+
+
 var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all our classes
-    defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access, here you can store which internet library the program should use
+  defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access, here you can store which internet library the program should use
 implementation
 uses bbutils;
 //==============================================================================
@@ -150,6 +164,25 @@ begin
   delete(url,1,slash-1);
   if url = '' then url := '/';
 end;
+
+function guessType(const data: string): TRetrieveType;
+var trimmed: string;
+begin
+  trimmed:=TrimLeft(data);
+  if trimmed = '' then exit(rtEmpty);
+
+  if strBeginsWith(trimmed, 'http://') or strBeginsWith(trimmed, 'https://') then
+    exit(rtRemoteURL);
+
+  if strBeginsWith(trimmed, 'file://') then
+    exit(rtFile);
+
+  if strBeginsWith(trimmed, '<') then
+    exit(rtXML);
+
+  exit(rtFile);
+end;
+
 
 procedure saveAbleURL(var url:string);
 var temp:integer;
