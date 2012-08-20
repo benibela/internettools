@@ -124,6 +124,14 @@ begin
                and ((pos+6)^ in ['E','e'])  then begin//doctype
               while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
               inc(pos);
+             end else if (pos^ in ['[']) and (strliBeginsWith(pos+1, htmlEnd-pos, 'CDATA[')) then begin //cdata
+               pos += 7;
+               marker:=pos;
+               while (pos <= htmlEnd) and ((pos^ <> ']') or ((pos+1)^ <> ']') or ((pos+2)^ <> '>')) do
+                 pos+=1;
+               if (marker<>pos) and (Assigned(textEvent)) then
+                 if textEvent(marker,pos-marker) = prStop then exit;   //TODO: fix: here we lost the "don't parse"-information, and it will replace entities
+               pos += 3;
              end else begin
               marker := pos;
               if (pos^ = '-') and ((pos+1)^ = '-') then marker+=2; //don't pass -- at begin, but also pass <![endif]--> as comment
