@@ -37,7 +37,8 @@ type
   { TTemplateActionVariable }
 
   TTemplateActionVariable = class(TTemplateAction)
-    name, value: string;
+    name, value, valuex: string;
+    hasValueStr: boolean;
     procedure initFromTree(t: TTreeElement); override;
     procedure perform(reader: TTemplateReader); override;
   end;
@@ -139,10 +140,13 @@ var
   testx: TPseudoXPathParser;
   i: Integer;
   j: Integer;
+  pxp: TPseudoXPathParser;
 begin
   if list <> '' then begin
     if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
-    listx := reader.parser.createPseudoXPathParser(list).evaluate();
+    pxp := reader.parser.createPseudoXPathParser(list);
+    listx := pxp.evaluate();
+    pxp.free;
   end else listx := nil;
   if test <> '' then testx := reader.parser.createPseudoXPathParser(test)
   else testx := nil;
@@ -286,12 +290,23 @@ end;
 procedure TTemplateActionVariable.initFromTree(t: TTreeElement);
 begin
   name := t['name'];
-  value := t['value'];
+  hasValueStr :=  t.getAttributeTry('value', value);
+  valuex := t.deepNodeText();
 end;
 
 procedure TTemplateActionVariable.perform(reader: TTemplateReader);
+var
+  pxp: TPseudoXPathParser;
 begin
-  reader.parser.variableChangeLog.ValuesString[name] := value;
+  if hasValueStr then
+    reader.parser.variableChangeLog.ValuesString[name] := reader.parser.replaceVars(value);
+  if valuex <> '' then begin
+    pxp := reader.parser.createPseudoXPathParser(valuex);
+    if name <> '' then reader.parser.variableChangeLog.addVariable(name, pxp.evaluate())
+    else pxp.evaluate();
+    pxp.free;
+  end;
+
 end;
 
 { TTemplateActionMain }
