@@ -370,6 +370,7 @@ var
 begin
   for i:=0 to high(children) do
     children[i].free;
+  SetLength(children,0);
 end;
 
 destructor TTemplateAction.Destroy;
