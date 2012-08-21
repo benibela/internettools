@@ -8,48 +8,87 @@ uses
   Classes, SysUtils,bbutils,extendedhtmlparser,simplehtmlparser,simplehtmltreeparser,simplexmlparser, pseudoxpath,dRegExpr,internetaccess;
 
 type
-  TTemplateRealActionType = (tratLoadPage,tratCallAction);
-  TTemplateRealAction=record
-    typ: TTemplateRealActionType;
-    //load page
+  TTemplateActionKind = (takMain, takDeclareVariable, takLoadPage, takCallAction, takLoop);
+
+  { TTemplateAction }
+
+  TTemplateReader = class;
+  TTemplateAction = class
+  protected
+    procedure addChildFromTree(t: TTreeElement);
+    procedure performChildren(reader: TTemplateReader);
+  public
+    children: array of TTemplateAction;
+    class function kind: TTemplateActionKind; virtual;
+    procedure initFromTree(t: TTreeElement); virtual;
+    procedure addChildrenFromTree(t: TTreeElement);
+    procedure perform(reader: TTemplateReader); virtual; abstract;
+    procedure clear;
+    destructor Destroy; override;
+  end;
+  TTemplateActionClass = class of TTemplateAction;
+
+  { TTemplateActionMain }
+
+  TTemplateActionMain = class(TTemplateAction)
+    name: string;
+    procedure initFromTree(t: TTreeElement); override;
+    procedure perform(reader: TTemplateReader); override;
+  end;
+
+  { TTemplateActionVariable }
+
+  TTemplateActionVariable = class(TTemplateAction)
+    name, value: string;
+    procedure initFromTree(t: TTreeElement); override;
+    procedure perform(reader: TTemplateReader); override;
+  end;
+
+  { TTemplateActionLoadPage }
+
+  TTemplateActionLoadPage = class(TTemplateAction)
     url:string;
     templateFile:string;
     template:string;
     postparams:array of TProperty;
     condition: string;
-    repeated: boolean;
-    //call action
-    action: string;
-      //callOnce: boolean;
+    procedure initFromTree(t: TTreeElement); override;
+    procedure perform(reader: TTemplateReader); override;
   end;
 
-  TTemplateAction=record
-    name: string;
-    actions:array of TTemplateRealAction;
+  { TTemplateActionCallAction }
+
+  TTemplateActionCallAction = class(TTemplateAction)
+    action: string;
+    procedure initFromTree(t: TTreeElement); override;
+    procedure perform(reader: TTemplateReader); override;
   end;
-  PTemplateAction=^TTemplateAction;
+
+  { TTemplateActionLoop }
+
+  TTemplateActionLoop = class(TTemplateAction)
+    varname, list, test: string;
+    procedure initFromTree(t: TTreeElement); override;
+    procedure perform(reader: TTemplateReader); override;
+  end;
 
   { TMultiPageTemplate }
 
   TMultiPageTemplate=class
   protected
-    currentAction:PTemplateAction;
-    currentTag: string;
     procedure readTree(t: TTreeElement);
-    function textRead(text: string):TParsingResult;
-    function leaveTag(tagName: string):TParsingResult;
   public
+    baseActions: TTemplateAction;
     path,name:string;
-    actions:array of TTemplateAction;
 
-    variables: TStringList;
+    //variables: TStringList;
 
     constructor create();
     procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
     procedure loadTemplateFromString(template: string; aname: string = 'unknown');
     destructor destroy;override;
 
-    function findAction(_name:string):PTemplateAction;
+    function findAction(_name:string): TTemplateAction;
     //function getAccountObject():TCustomAccountAccess;override;
   end;
 
@@ -62,7 +101,6 @@ type
     constructor create;
     constructor create(s:string;more_details:string='');
   end;
-  TTemplateReader = class;
   TLogEvent = procedure (sender: TTemplateReader; logged: string; debugLevel: integer = 0) of object;
   TPageProcessed = procedure (sender: TTemplateReader; parser: THtmlTemplateParser) of object;
 
@@ -79,7 +117,7 @@ type
     constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
     destructor destroy();override;
 
-    function findAction(name:string):PTemplateAction;
+    function findAction(name:string):TTemplateAction;
     procedure performAction(action:string);
     procedure performAction(const action:TTemplateAction);
 
@@ -87,101 +125,280 @@ type
 
 implementation
 
+{ TTemplateActionLoop }
+
+procedure TTemplateActionLoop.initFromTree(t: TTreeElement);
+begin
+  varname:=t['var'];
+  list:=t['list'];
+  test:=t['test'];
+  addChildrenFromTree(t);
+end;
+
+procedure TTemplateActionLoop.perform(reader: TTemplateReader);
+var
+  listx: TPXPValue;
+  testx: TPseudoXPathParser;
+  i: Integer;
+begin
+  if list <> '' then begin
+    if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
+    listx := reader.parser.createPseudoXPathParser(list).evaluate();
+  end else listx := nil;
+  if test <> '' then testx := reader.parser.createPseudoXPathParser(test)
+  else testx := nil;
+
+  if listx = nil then begin
+    if testx <> nil then
+      while testx.evaluateToBoolean do
+        performChildren(reader);
+  end else if listx.kind <> pvkSequence then begin
+    reader.parser.variableChangeLog.addVariable(varname, listx);
+    if (testx = nil) or (testx.evaluateToBoolean) then
+      performChildren(reader);
+  end else begin
+    for i := 0 to TPXPValueSequence(listx).seq.Count-1 do begin
+      reader.parser.variableChangeLog.addVariable(varname, TPXPValueSequence(listx).seq[i]);
+      if (testx <> nil) and (not testx.evaluateToBoolean()) then break;
+        performChildren(reader);
+    end;
+  end;
+  listx.free;
+  testx.free;
+end;
+
+{ TTemplateActionCallAction }
+
+procedure TTemplateActionCallAction.initFromTree(t: TTreeElement);
+begin
+  action := t['action'];
+end;
+
+procedure TTemplateActionCallAction.perform(reader: TTemplateReader);
+var
+  act: TTemplateAction;
+begin
+  act := reader.findAction(action);
+  if act = nil then raise Exception.Create('Could not find action: '+action);
+  act.perform(reader);
+end;
+
+{ TTemplateActionLoadPage }
+
+procedure TTemplateActionLoadPage.initFromTree(t: TTreeElement);
+begin
+  SetLength(postparams, 0);
+  url := t.getAttribute('url', url);
+  templateFile := t.getAttribute('templateFile', templateFile);
+  condition := t['test'];
+
+  t := t.getFirstChild();
+  while t <> nil do begin
+    if t.typ = tetOpen then begin
+      if SameText(t.value, 'post') then begin
+        setlength(postparams, length(postparams)+1);
+        postparams[high(postparams)].name:=t['name'];
+        postparams[high(postparams)].value:=t.deepNodeText();
+      end else if SameText(t.value, 'template') then
+        template:=t.innerXML();
+    end;
+    t := t.getNextSibling();
+  end;
+end;
+
+procedure TTemplateActionLoadPage.perform(reader: TTemplateReader);
+var
+  cachedCondition: TPseudoXPathParser;
+  cururl: String;
+  post: String;
+  page: String;
+  tempname: String;
+  j: Integer;
+begin
+  if condition <> '' then begin
+    cachedCondition := reader.parser.createPseudoXPathParser(condition); //TODO: long term cache
+    try
+      if not cachedCondition.evaluateToBoolean() then
+        exit;
+    finally
+      cachedCondition.clear;
+    end;
+  end;
+
+  if template<>'' then begin
+    if Assigned(reader.onLog) then reader.onLog(reader, 'Parse Template From File: '+reader.template.path+templateFile, 2);
+    reader.parser.parseTemplate(template,templateFile);
+  end;
+
+  cururl := url;
+  if cururl <> '' then begin
+    cururl := reader.parser.replaceVars(url);
+    if cururl = '' then exit;
+    //allow pages without url to set variables.
+  end else begin
+    reader.parser.parseHTML('<html></html>'); //apply template to empty "page"
+    if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
+    exit;
+  end;
+
+  post := '';
+  for j:=0 to high(postparams) do begin
+    if j <> 0 then post += '&';
+    tempname := reader.parser.replaceVars(postparams[j].name);
+    if tempname = '' then
+      post += reader.parser.replaceVars(postparams[j].value) //no urlencode! parameter passes multiple values
+     else
+      post += TInternetAccess.urlEncodeData(tempname)+'='+ TInternetAccess.urlEncodeData(reader.parser.replaceVars(postparams[j].value));
+  end;
+
+  if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post internet page '+cururl+#13#10'Post: '+post);
+
+  case guessType(cururl) of
+    rtRemoteURL:
+      if post='' then page:=reader.internet.get(cururl)
+      else page:=reader.internet.post(cururl, post);
+    rtFile:
+      page := strLoadFromFileUTF8(cururl);
+    rtXML:
+      page := cururl;
+    else raise ETemplateReader.create('Unknown url type: '+cururl);
+  end;
+
+  if Assigned(reader.onLog) then reader.onLog(reader, 'downloaded: '+inttostr(length(page))+' bytes', 1);
+
+  if page='' then raise EInternetException.Create(url +' konnte nicht geladen werden');
+
+  if template<>'' then begin
+    if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.parser.replaceVars(url), 1);
+
+    reader.parser.parseHTML(page);
+
+    if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
+  end;
+  if Assigned(reader.onLog) then reader.onLog(reader, 'page finished', 2);
+end;
+
+{ TTemplateActionVariable }
+
+procedure TTemplateActionVariable.initFromTree(t: TTreeElement);
+begin
+  name := t['name'];
+  value := t['value'];
+end;
+
+procedure TTemplateActionVariable.perform(reader: TTemplateReader);
+begin
+  reader.parser.variableChangeLog.ValuesString[name] := value;
+end;
+
+{ TTemplateActionMain }
+
+procedure TTemplateActionMain.initFromTree(t: TTreeElement);
+begin
+  name := t['id'];
+  addChildrenFromTree(t);
+end;
+
+procedure TTemplateActionMain.perform(reader: TTemplateReader);
+begin
+  performChildren(reader);
+end;
+
+{ TTemplateAction }
+
+class function TTemplateAction.kind: TTemplateActionKind;
+begin
+  raise EAbstractError.Create('abstract template action class used');
+end;
+
+procedure TTemplateAction.initFromTree(t: TTreeElement);
+begin
+
+end;
+
+procedure TTemplateAction.addChildFromTree(t: TTreeElement);
+  procedure addChild(c: TTemplateActionClass);
+  begin
+    SetLength(children, length(children)+1);
+    children[high(children)] := c.create();
+    children[high(children)].initFromTree(t);
+  end;
+
+begin
+  if t.typ <> tetOpen then exit;
+  if SameText(t.value, 'variable') then addChild(TTemplateActionVariable)
+  else if SameText(t.value, 'action') then addChild(TTemplateActionMain)
+  else if SameText(t.value, 'page') then addChild(TTemplateActionLoadPage)
+  else if SameText(t.value, 'call') then addChild(TTemplateActionCallAction)
+  else if SameText(t.value, 'loop') then addChild(TTemplateActionLoop)
+  else raise Exception.Create('Unknown template node: '+t.outerXML);
+end;
+
+procedure TTemplateAction.performChildren(reader: TTemplateReader);
+var
+  i: Integer;
+begin
+  for i:=0 to high(children) do children[i].perform(reader);
+end;
+
+procedure TTemplateAction.addChildrenFromTree(t: TTreeElement);
+begin
+  t := t.getFirstChild();
+  while t <> nil do begin
+    addChildFromTree(t);
+    t := t.getNextSibling();
+  end;
+end;
+
+procedure TTemplateAction.clear;
+var
+  i: Integer;
+begin
+  for i:=0 to high(children) do
+    children[i].free;
+end;
+
+destructor TTemplateAction.Destroy;
+begin
+  clear;
+  inherited Destroy;
+end;
+
 { TMultiPageTemplate }
 
 
 procedure TMultiPageTemplate.readTree(t: TTreeElement);
 var tagName:string;
+  u: TTreeElement;
 begin
+  baseActions.clear;
+
   (t as TTreeDocument).setEncoding(eUTF8,true,true);
-  while t <> nil do begin
-    case t.typ of
-      tetOpen: begin
-        tagName:=t.value;
-        if SameText(tagName,'variable') then begin
-          variables.Values[t['name']]:=t['value']
-        end else if SameText(tagName,'page') then begin
-          SetLength(currentAction^.actions,length(currentAction^.actions)+1);
-          with currentAction^.actions[high(currentAction^.actions)] do begin
-            typ:=tratLoadPage;
-            setlength(postparams,0);
-            url := t.getAttribute('url', url);
-            templateFile := t.getAttribute('templateFile', templateFile);
-            if t['test'] <> '' then condition := t['test'];
-            if t['repeat'] <> '' then repeated := true;
-          end;
-        end else if SameText(tagName,'post') then begin
-          if (currentAction=nil) then raise ETemplateReader.create('Template ungültig: post-Tag gefunden, ohne dass eine Aktion definiert wurde');
-          if (length(currentAction^.actions)=0)or(currentAction^.actions[high(currentAction^.actions)].typ<>tratLoadPage) then raise ETemplateReader.create('Template ungültig: post-Tag nicht innerhalb eines page-Tags');
-          setlength(currentAction^.actions[high(currentAction^.actions)].postparams, length(currentAction^.actions[high(currentAction^.actions)].postparams)+1);
-          currentAction^.actions[high(currentAction^.actions)].postparams[high(currentAction^.actions[high(currentAction^.actions)].postparams)].name:=t['name']
-          //for value see textread
-        end else if SameText(tagName,'call') then begin
-          SetLength(currentAction^.actions,length(currentAction^.actions)+1);
-          with currentAction^.actions[high(currentAction^.actions)] do begin
-            typ:=tratCallAction;
-            action:=t['action'];
-          end;
-        end else if SameText(tagName,'action') then begin
-          SetLength(actions,length(actions)+1);
-          FillChar(actions[high(actions)],sizeof(actions[high(actions)]),0);
-          actions[high(actions)].name:=LowerCase(t['id']);
-
-          currentAction:=@actions[high(actions)];
-        end else if SameText(tagName, 'template') then begin
-          if (currentAction=nil) then raise ETemplateReader.create('Template ungültig: html template gefunden, ohne dass eine Aktion definiert wurde');
-          currentAction^.actions[high(currentAction^.actions)].template:=t.innerXML();
-          if t.typ = tetOpen then t := t.reverse;
-        end;
-        currentTag:=tagName;
-      end;
-      tetClose: currentTag := '';
-      tetText: textRead(t.value);
-    end;
-    t := t.next;
-  end;
-end;
-
-function TMultiPageTemplate.textRead(text: string): TParsingResult;
-var page: ^TTemplateRealAction;
-begin
-  if currentTag = 'post' then begin
-    if (currentAction=nil) then raise ETemplateReader.create('Template ungültig: post-Tag gefunden, ohne dass eine Aktion definiert wurde');
-    if (length(currentAction^.actions)=0)or(currentAction^.actions[high(currentAction^.actions)].typ<>tratLoadPage) then raise ETemplateReader.create('Template ungültig: post-Tag nicht innerhalb eines page-Tags');
-    page:=@currentAction^.actions[high(currentAction^.actions)];
-    if length(page^.postparams) = 0 then raise ETemplateReader.create('internal invalid post params');
-    page^.postparams[high(page^.postparams)].value:=text
-  end;
-  Result:=prContinue;
-end;
-
-function TMultiPageTemplate.leaveTag(tagName: string): TParsingResult;
-begin
-  currentTag:='';
-  Result:=prContinue;
+  if t.typ <> tetOpen then raise Exception.Create('Empty template');
+  u := t.findChild(tetOpen,'action',[tefoIgnoreText]);
+  if u = nil then raise Exception.Create('Empty template');
+  baseActions.addChildrenFromTree(u.getParent());
 end;
 
 constructor TMultiPageTemplate.create();
 begin
-  variables:=TStringList.Create;
+  baseActions:=TTemplateAction.Create;
 end;
 
 procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
-  procedure loadTemplates;
-    procedure load(var action:TTemplateAction);
-    var i:longint;
-    begin
-      for i:=0 to high(action.actions) do begin
-        if action.actions[i].templateFile='' then continue;
-        action.actions[i].template:=strLoadFromFile(self.path+action.actions[i].templateFile);
-        if action.actions[i].template='' then
-          raise ETemplateReader.create('Template-Datei "'+self.path+action.actions[i].templateFile+'" konnte nicht geladen werden');
-      end;
-    end;
+  procedure loadTemplates(a: TTemplateAction);
   var i:longint;
+    b: TTemplateActionLoadPage;
   begin
-    for i:=0 to high(actions) do
-      load(actions[i]);
+    for i:=0 to high(a.children) do
+      loadTemplates(a.children[i]);
+    if a is TTemplateActionLoadPage then begin
+      b := TTemplateActionLoadPage(a);
+      if b.templateFile = '' then exit;
+      b.template:=strLoadFromFile(self.path+b.templateFile);
+      if b.template='' then
+        raise ETemplateReader.create('Template-Datei "'+self.path+b.templateFile+'" konnte nicht geladen werden');
+    end;
   end;
 var
   tree: TTreeParser;
@@ -195,6 +412,7 @@ begin
 
   tree := TTreeParser.Create;
   readTree(tree.parseTreeFromFile(_dataPath+'template'));
+  loadTemplates(baseActions);
   tree.free;
 end;
 
@@ -213,16 +431,27 @@ end;
 
 destructor TMultiPageTemplate.destroy;
 begin
-  variables.Free;
+  baseActions.Free;
   inherited destroy;
 end;
 
-function TMultiPageTemplate.findAction(_name: string): PTemplateAction;
+function TMultiPageTemplate.findAction(_name: string): TTemplateAction;
+  function find(a: TTemplateAction): TTemplateAction;
+  var
+    i: Integer;
+  begin
+    for i:=0 to high(a.children) do begin
+      if a.children[i] is TTemplateActionMain then
+        if TTemplateActionMain(a.children[i]).name = _name then exit(a.children[i]);
+      result := find(a.children[i]);
+      if result <> nil then exit;
+    end;
+    result := nil;
+  end;
+
 var i:longint;
 begin
-  result:=nil;
-  for i:=0 to high(actions) do
-    if actions[i].name=_name then exit(@actions[i]);;
+  result:=find(baseActions);
 end;
 
 procedure TTemplateReader.setTemplate(atemplate: TMultiPageTemplate);
@@ -230,8 +459,9 @@ var
   i: Integer;
 begin
   template:=atemplate;
-  for i:=0 to atemplate.variables.count-1 do
-    parser.variableChangeLog.ValuesString[atemplate.variables.Names[i]]:=atemplate.variables.ValueFromIndex[i];
+  for i:=0 to high(atemplate.baseActions.children) do
+    if atemplate.baseActions.children[i] is TTemplateActionVariable then
+      atemplate.baseActions.children[i].perform(self);
 end;
 
 constructor TTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
@@ -251,107 +481,27 @@ begin
   inherited destroy();
 end;
 
-function TTemplateReader.findAction(name:string): PTemplateAction;
+function TTemplateReader.findAction(name:string): TTemplateAction;
 begin
   result:=template.findAction(name);
 end;
 
 procedure TTemplateReader.performAction(action: string);
-var act: PTemplateAction;
+var act: TTemplateAction;
 begin
   act:=findAction(action);
   if act=nil then raise ETemplateReader.Create('Aktion '+action+' konnte nicht ausgeführt werden, da sie nicht gefunden wurde.');
-  performAction(act^);
+  performAction(act);
 end;
 
 procedure TTemplateReader.performAction(const action:TTemplateAction);
-var i:longint;
-    page:string;
-    j: Integer;
-    postparams: String;
-    tempname: String;
-    cururl: String;
-    a: ^TTemplateRealAction;
-    cachedCondition: TPseudoXPathParser;
 begin
   if Assigned(onLog) then onLog(self, 'Enter performAction, finternet:', 5); //TODO: parser log
 
   //OutputDebugString(pchar(lib.defaultVariables.Text));
   Assert(internet<>nil,'Internet nicht initialisiert');
 
-  for i:=0 to high(action.actions) do begin
-    a := @action.actions[i];
-    cachedCondition := nil;
-    case a^.typ of
-      tratCallAction: begin
-        if Assigned(onLog) then onLog(self, 'Action call: '+a^.action, 2);
-        performAction(a^.action);
-      end;
-      tratLoadPage: repeat
-        if a^.condition <> '' then begin
-          if cachedCondition = nil then
-            cachedCondition := parser.createPseudoXPathParser(a^.condition);
-          if not cachedCondition.evaluateToBoolean() then
-            break;
-        end;
-
-        if a^.template<>'' then begin
-          if Assigned(onLog) then onLog(self, 'Parse Template From File: '+template.path+a^.templateFile, 2);
-          parser.parseTemplate(a^.template,a^.templateFile);
-        end;
-
-        cururl := a^.url;
-        if cururl <> '' then begin
-          cururl := parser.replaceVars(a^.url);
-          if cururl = '' then break;
-          //allow pages without url to set variables.
-        end else begin
-          parser.parseHTML('<html></html>'); //apply template to empty "page"
-          if Assigned(onPageProcessed) then onPageProcessed(self, parser);
-          if a^.repeated then continue
-          else break;
-        end;
-
-        postparams := '';
-        for j:=0 to high(a^.postparams) do begin
-          if j <> 0 then postparams += '&';
-          tempname := parser.replaceVars(a^.postparams[j].name);
-          if tempname = '' then
-            postparams += parser.replaceVars(a^.postparams[j].value) //no urlencode! parameter passes multiple values
-           else
-            postparams += TInternetAccess.urlEncodeData(tempname)+'='+
-                          TInternetAccess.urlEncodeData(parser.replaceVars(a^.postparams[j].value));
-        end;
-
-        if Assigned(onLog) then onLog(self, 'Get/Post internet page '+cururl+#13#10'Post: '+postparams);
-
-        case guessType(cururl) of
-          rtRemoteURL:
-            if postparams='' then page:=internet.get(cururl)
-            else page:=internet.post(cururl, postparams);
-          rtFile:
-            page := strLoadFromFileUTF8(cururl);
-          rtXML:
-            page := cururl;
-          else raise ETemplateReader.create('Unknown url type: '+cururl);
-        end;
-
-        if Assigned(onLog) then onLog(self, 'downloaded: '+inttostr(length(page))+' bytes', 1);
-
-        if page='' then raise EInternetException.Create(a^.url +' konnte nicht geladen werden');
-
-        if a^.template<>'' then begin
-          if Assigned(onLog) then onLog(self, 'parse page: '+parser.replaceVars(a^.url), 1);
-
-          parser.parseHTML(page);
-
-          if Assigned(onPageProcessed) then onPageProcessed(self, parser);
-        end;
-        if Assigned(onLog) then onLog(self, 'page finished', 2);
-      until not a^.repeated;
-    end;
-    if Assigned(onLog) then onLog(self, 'pages finished', 3);
-  end;
+  action.perform(self);
 
   if Assigned(onLog) then onLog(self, 'Leave performAction', 5);
 end;
