@@ -306,7 +306,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
        )
       ))
-      @item(@code(<template:switch-prioritized [value="??"]> ... </template:switch-prioritized>)
+      @item(@code(<template:switch-prioritized> ... </template:switch-prioritized>)
         Another version of a case 2 switch statement that only may contain normal html tags. @br
         The switch-prioritized prefers earlier child element to later child elements, while the normal switch match alls child elements equally. So a normal switch containing <a> and <b>, will match <a> or <b>, whichever appears first in the html file.
         The switch-prioritized contrastingly would match <a>, if there is any <a>, and <b> only iff there is no <a> in the html file. @br
@@ -348,10 +348,11 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
     The short read tag @code(<t:s>foo:=..</t:s>) to read something in variable @code(foo) can be abbreviated as @code({foo:=..}).
 
-    Optional and repeated elements can be marked with ?, * or +; like @code(<a>?...</a>) or, equivalent, @code(<a>..</a>?). @br
+    Optional and repeated elements can be marked with ?, *, +, {min, max}; like @code(<a>?...</a>) or, equivalent, @code(<a>..</a>?). @br
     An element marked with ? becomes optional, which has the same effect as adding the template:optional="true" attribute.@br
     An element marked with * can be repeated any times, which has the same effect as surrounding it with a template:loop element.@br
     An element marked with + has to be repeated at least once, which has the same effect as surrounding it with a template:loop element with attribute min=1.@br
+    An element marked with {min,max} has to be repeated at least min-times and at most max-times (just like in a t:loop).@br
 
 
     @bold(Breaking changes from previous versions:)@br
