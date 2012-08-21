@@ -8,7 +8,6 @@ uses
   Classes, SysUtils,bbutils,extendedhtmlparser,simplehtmlparser,simplehtmltreeparser,simplexmlparser, pseudoxpath,dRegExpr,internetaccess;
 
 type
-  TTemplateActionKind = (takMain, takDeclareVariable, takLoadPage, takCallAction, takLoop);
 
   { TTemplateAction }
 
@@ -19,7 +18,6 @@ type
     procedure performChildren(reader: TTemplateReader);
   public
     children: array of TTemplateAction;
-    class function kind: TTemplateActionKind; virtual;
     procedure initFromTree(t: TTreeElement); virtual;
     procedure addChildrenFromTree(t: TTreeElement);
     procedure perform(reader: TTemplateReader); virtual; abstract;
@@ -140,6 +138,7 @@ var
   listx: TPXPValue;
   testx: TPseudoXPathParser;
   i: Integer;
+  j: Integer;
 begin
   if list <> '' then begin
     if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
@@ -159,11 +158,15 @@ begin
   end else begin
     for i := 0 to TPXPValueSequence(listx).seq.Count-1 do begin
       reader.parser.variableChangeLog.addVariable(varname, TPXPValueSequence(listx).seq[i]);
-      if (testx <> nil) and (not testx.evaluateToBoolean()) then break;
-        performChildren(reader);
+      if (testx <> nil) and (not testx.evaluateToBoolean()) then begin
+        for j:=i+1 to TPXPValueSequence(listx).seq.Count-1 do
+          TPXPValueSequence(listx).seq[j].free;
+        break;
+      end;
+      performChildren(reader);
     end;
+    TPXPValueSequence(listx).freeNonRecursive;
   end;
-  listx.free;
   testx.free;
 end;
 
@@ -306,10 +309,6 @@ end;
 
 { TTemplateAction }
 
-class function TTemplateAction.kind: TTemplateActionKind;
-begin
-  raise EAbstractError.Create('abstract template action class used');
-end;
 
 procedure TTemplateAction.initFromTree(t: TTreeElement);
 begin
