@@ -2438,8 +2438,8 @@ begin
       'Z': if not IsNan(timezone) then begin; //no timezone
         if timezone = 0 then result += 'Z'
         else
-          if timezone > 0 then result += '+' + strFromInt(trunc(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(timezone * MinsPerDay) mod 60, 2)
-          else                 result += '-' + strFromInt(trunc(-timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(trunc(-timezone * MinsPerDay) mod 60, 2);
+          if timezone > 0 then result += '+' + strFromInt(round(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(timezone * MinsPerDay) mod 60, 2)
+          else                 result += '-' + strFromInt(round(-timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(-timezone * MinsPerDay) mod 60, 2);
       end;
       '"': result += copy(part, 2, length(part) - 2);
       else result += part;
