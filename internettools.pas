@@ -7,8 +7,8 @@ unit internettools;
 interface
 
 uses
-  bbutils, extendedhtmlparser, progressdialog, dregexpr, autoupdate, simpleinternet, internetaccess, pseudoxpath, simplehtmlparser, 
-  simplehtmltreeparser, simplexmlparser, LazarusPackageIntf;
+  bbutils, extendedhtmlparser, dregexpr, autoupdate, simpleinternet, internetaccess, pseudoxpath, simplehtmlparser, simplehtmltreeparser, 
+  simplexmlparser, progressdialog, LazarusPackageIntf;
 
 implementation
 
