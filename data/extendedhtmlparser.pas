@@ -1451,7 +1451,7 @@ end;
 {$IFNDEF DEBUG}{$WARNING unittests without debug}{$ENDIF}
 
 procedure unitTests();
-var data: array[1..274] of array[1..3] of string = (
+var data: array[1..284] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -2067,6 +2067,19 @@ var data: array[1..274] of array[1..3] of string = (
 
       //whitespace
       ,('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</b></a>', '_result=abc1')
+
+
+      //some html parser tests
+      ,('<html>{x:=outer-xml(.)}</html>', '<html>abc<input/>def1</html>', 'x=<html>abc<input/>def1</html>')
+      ,('<html>{x:=outer-xml(.)}</html>', '<html>abc<input>def2</input></html>',        'x=<html>abc<input>def2</input></html>') //allow content within <input> tags (this is absolutely necessary for things like <input>{data:=concat(@name,'=',@value)}</input>)
+      ,('<html>{x:=outer-xml(.)}</html>', '<html>abc<input>def3<input>123x</input>456</input></html>', 'x=<html>abc<input/>def3<input>123x</input>456</html>')
+      ,('<html>{x:=outer-xml(.)}</html>', '<html>abc<input><b>def2</b></input></input></input></html>',        'x=<html>abc<input><b>def2</b></input></html>')
+      ,('<html>{x:=outer-xml(.)}</html>', '<html></input></input></input></html>',        'x=<html/>')
+      ,('<html>{x:=outer-xml(.)}</html>', '<html><b>abc<input>def</b></input></html>',        'x=<html><b>abc<input/>def</b></html>')
+      ,('<html>{x:=outer-xml(.)}</html>', '<html><input><b>abc<input>def</b></input></html>',        'x=<html><input/><b>abc<input/>def</b></html>') //don't allow nesting of auto closed tags in each other
+      ,('<html>{x:=outer-xml(.)}</html>', '<html>abc<img>def2</img></html>',        'x=<html>abc<img>def2</img></html>') //same for all auto closed tags
+      ,('<img>{@src}</img>', '<html><img src="joke.gif"/></html>',        '_result=joke.gif') //real world example (but the template is parsed as xml, not html, so it does not really test anything)
+      ,('<input>{post:=concat(@name,"=",@value)}</input>', '<html><input name="a" value="b"/></html>',        'post=a=b')
 );
 
 //test all possible (4*2) white space config options

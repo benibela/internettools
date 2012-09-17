@@ -99,8 +99,12 @@ TTreeElement = class
   procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next, not reverse)
   procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
-  procedure removeAndFreeNext();
 
+protected
+  procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
+  procedure removeElementKeepChildren; //**< removes/frees the current element, but keeps the children (i.e. removes self and possible self.reverse. Will not remove the opening tag, if called on a closing tag)
+
+public
   function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
 
   constructor create();
@@ -526,6 +530,24 @@ begin
   tofree.free;
 end;
 
+procedure TTreeElement.removeElementKeepChildren;
+var
+  temp: TTreeElement;
+begin
+  if previous = nil then raise Exception.Create('Cannot remove first tag');
+  previous.next := next;
+  next.previous := previous;
+  if typ = tetOpen then begin
+    temp := next;
+    while temp <> reverse do begin
+      if temp.parent = self then temp.parent := parent;
+      temp := temp.getNextSibling();
+    end;
+    reverse.removeElementKeepChildren;
+  end;
+  free;
+end;
+
 function TTreeElement.toString(): string;
 var
   i: Integer;
@@ -706,10 +728,12 @@ end;
 
 function TTreeParser.leaveTag(tagName: pchar; tagNameLen: longint): TParsingResult;
 var
-  new,last: TTreeElement;
+  new,last,temp: TTreeElement;
   match: longint;
   i: Integer;
   weight: LongInt;
+  parenDelta: integer;
+  name: String;
 begin
   result:=prContinue;
 
@@ -738,6 +762,7 @@ begin
         break;
       end;
     if match > -1 then begin
+      //there are unclosed tags, but a tag opening the currently closed exist, close all in between
       weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
       for i:=match+1 to FElementStack.Count-1 do
         if htmlTagWeight(TTreeElement(FElementStack[i]).value) > weight then
@@ -750,6 +775,37 @@ begin
       FElementStack.Count:=match;
       new.initialized;
     end;
+
+    name := strFromPchar(tagName, tagNameLen);
+    if htmlTagAutoClosed(name) then begin
+      parenDelta := 0;
+      last := FCurrentElement;
+      while last <> nil do begin
+        if last.typ = tetClose then parenDelta -= 1
+        else if (last.typ = tetOpen) then begin
+          parenDelta+=1;
+          if (last.value = name) then begin
+            if (last.reverse <> last.next) or (parenDelta <> 0) then break; //do not allow nested auto closed elements (reasonable?)
+            //remove old closing tag, and insert new one at the end
+            new := newTreeElement(tetClose, tagName, tagNameLen);
+            last.reverse.removeElementKeepChildren;
+            last.reverse := new; new.reverse := last;
+
+            new.parent := last.parent;
+
+            //update parents
+            temp := last.getFirstChild();
+            while (temp <> nil) and (last <> new) do begin
+              if temp.parent = last.parent then temp.parent := last;
+              temp := temp.getNextSibling();
+            end;
+            break;
+          end;
+        end;
+        last := last.previous;
+      end;
+    end;
+
     //if no opening tag can be found the closing tag is ignored (not contained in tree)
   end;
 end;
@@ -810,6 +866,7 @@ end;
 
 function TTreeParser.htmlTagAutoClosed(s: string): boolean;
 begin
+  //elements that should/must not have children
   result:=striequal(s,'meta') or
           striequal(s,'br') or
           striequal(s,'input') or
