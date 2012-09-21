@@ -3,9 +3,7 @@ program tests;
 {$mode objfpc}{$H+}
 
 uses
-  {$IFDEF UNIX}{$IFDEF UseCThreads}
-  cthreads,
-  {$ENDIF}{$ENDIF}
+  //heaptrc,
   Classes, pseudoxpath_tests, extendedhtmlparser_tests
   { you can add units after this };
 

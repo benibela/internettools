@@ -83,6 +83,7 @@ TTreeElement = class
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
+  function hasAttribute(const a: string): boolean; //**< returns if an attribute with that name exists
   function getAttribute(const a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
   function getAttribute(const a: string; const def: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
   function getAttributeTry(const a: string; out valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
@@ -392,6 +393,11 @@ begin
   if self = nil then exit(false);
   valueout := self.value;
   result := true;
+end;
+
+function TTreeElement.hasAttribute(const a: string): boolean;
+begin
+  result := attributes.IndexOfName(a) >= 0;
 end;
 
 function TTreeElement.getAttribute(const a: string): string;
