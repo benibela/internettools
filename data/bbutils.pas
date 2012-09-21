@@ -509,6 +509,12 @@ function strFromInt(i: int64; displayLength: longint): string;
 //**Creates count copies of rep
 function strDup(const rep: string; const count: integer): string;
 
+//**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
+function strIsAbsoluteURI(const s: string): boolean;
+//**Returns a absolute uri for a uri relative to the absolute uri base
+function strResolveURI(rel, base: string): string;
+
+
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
 //**log 10 rounded down (= number of digits in base 10 - 1)
@@ -7285,6 +7291,70 @@ begin
   result := '';
   for i:=1 to count do
     result := result + rep;
+end;
+
+function strIsAbsoluteURI(const s: string): boolean;
+var
+  p: SizeInt;
+  i: Integer;
+begin
+  result := false;
+  if s = '' then exit;
+  if not (s[1] in ['A'..'Z','a'..'z']) then exit;
+  p := pos(':', s);
+  if p = 0 then exit;
+  for i:=2 to p-1 do
+    if not (s[i] in ['A'..'Z','a'..'z','0'..'9','+','-','.']) then exit;
+  result := true;
+end;
+
+function strResolveURI(rel, base: string): string;
+var
+  schemeLength: SizeInt;
+  p: SizeInt;
+  relsplit, basesplit: TStringArray;
+  i: Integer;
+  relparams: string;
+begin
+  if strIsAbsoluteURI(rel) then exit(rel);
+  p := pos('#', base);
+  if p > 0 then delete(base, p, length(base) - p + 1);
+  p := pos('?', base);
+  if p > 0 then delete(base, p, length(base) - p + 1);
+  schemeLength := pos(':', base); schemeLength+=1;
+  while base[schemeLength] = '/' do schemeLength+=1;
+  if strBeginsWith(rel, '/') then begin
+    if strBeginsWith(base, 'file') then p := schemeLength - 1
+    else p := strIndexOf(base, '/', schemeLength);
+    delete(base, p, length(base) - p + 1);
+    exit(base+rel);
+  end;
+  p := pos('#', rel);
+  if p > 0 then begin relparams:=strCopyFrom(rel, p); delete(rel, p, length(rel) - p + 1);end;
+  p := pos('?', rel);
+  if p > 0 then begin relparams:=strCopyFrom(rel, p) + relparams; delete(rel, p, length(rel) - p + 1);end;
+  if rel = '' then exit(base + relparams);
+  relsplit:=strSplit(rel, '/');
+  basesplit:=strSplit(strCopyFrom(base,schemeLength),'/');
+  basesplit[0] := copy(base,1,schemeLength-1) + basesplit[0];
+  for i:=high(relsplit) downto 0 do if relsplit[i] = '.' then arrayDelete(relsplit, i);
+
+  if (length(basesplit) > 1) then SetLength(basesplit, high(basesplit));
+
+  if (length(relsplit) > 0) and (relsplit[high(relsplit)] <> '')  and (relsplit[high(relsplit)] <> '.') and (relsplit[high(relsplit)] <> '..') then begin
+    relparams:=relsplit[high(relsplit)] + relparams;
+    setlength(relsplit, high(relsplit));
+  end;
+
+  for i:=0 to high(relsplit)  do begin
+    if (relsplit[i] = '') or (relsplit[i] = '.') then continue;
+    if relsplit[i] = '..' then begin
+      if length(basesplit) > 1 then SetLength(basesplit, length(basesplit) - 1);
+      continue;
+    end;
+    arrayAdd(basesplit, relsplit[i]);
+  end;
+  result := strJoin(basesplit, '/') + '/' + relparams;
 end;
 
 function intLog10(i: longint): longint;

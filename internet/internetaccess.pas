@@ -116,7 +116,6 @@ type
 
 
 procedure decodeURL(const totalURL: string; out protocol, host, url: string);
-function resolveURI(rel, base: string): string;
 
 type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
 
@@ -164,54 +163,6 @@ begin
   host:=copy(url,1,points-1);
   delete(url,1,slash-1);
   if url = '' then url := '/';
-end;
-
-function resolveURI(rel, base: string): string;
-var
-  schemeLength: SizeInt;
-  p: SizeInt;
-  relsplit, basesplit: TStringArray;
-  i: Integer;
-  relparams: string;
-begin
-  p := pos('#', base);
-  if p > 0 then delete(base, p, length(base) - p + 1);
-  p := pos('?', base);
-  if p > 0 then delete(base, p, length(base) - p + 1);
-  schemeLength := pos(':', base); schemeLength+=1;
-  while base[schemeLength] = '/' do schemeLength+=1;
-  if strBeginsWith(rel, '/') then begin
-    if strBeginsWith(base, 'file') then p := schemeLength - 1
-    else p := strIndexOf(base, '/', schemeLength);
-    delete(base, p, length(base) - p + 1);
-    exit(base+rel);
-  end;
-  p := pos('#', rel);
-  if p > 0 then begin relparams:=strCopyFrom(rel, p); delete(rel, p, length(rel) - p + 1);end;
-  p := pos('?', rel);
-  if p > 0 then begin relparams:=strCopyFrom(rel, p) + relparams; delete(rel, p, length(rel) - p + 1);end;
-  if rel = '' then exit(base + relparams);
-  relsplit:=strSplit(rel, '/');
-  basesplit:=strSplit(strCopyFrom(base,schemeLength),'/');
-  basesplit[0] := copy(base,1,schemeLength-1) + basesplit[0];
-  for i:=high(relsplit) downto 0 do if relsplit[i] = '.' then arrayDelete(relsplit, i);
-
-  if (length(basesplit) > 1) then SetLength(basesplit, high(basesplit));
-
-  if (length(relsplit) > 0) and (relsplit[high(relsplit)] <> '')  and (relsplit[high(relsplit)] <> '.') and (relsplit[high(relsplit)] <> '..') then begin
-    relparams:=relsplit[high(relsplit)] + relparams;
-    setlength(relsplit, high(relsplit));
-  end;
-
-  for i:=0 to high(relsplit)  do begin
-    if (relsplit[i] = '') or (relsplit[i] = '.') then continue;
-    if relsplit[i] = '..' then begin
-      if length(basesplit) > 1 then SetLength(basesplit, length(basesplit) - 1);
-      continue;
-    end;
-    arrayAdd(basesplit, relsplit[i]);
-  end;
-  result := strJoin(basesplit, '/') + '/' + relparams;
 end;
 
 function guessType(const data: string): TRetrieveType;
