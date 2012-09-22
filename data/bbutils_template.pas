@@ -339,7 +339,10 @@ function strDup(const rep: string; const count: integer): string;
 
 //**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
 function strIsAbsoluteURI(s: string): boolean;
-//**Returns a absolute uri for a uri relative to the absolute uri base
+//**Returns a absolute uri for a uri relative to the uri base.@br
+//**E.g. strResolveURI('foo/bar', 'http://example.org/abc/def') returns 'http://example.org/abc/foo/bar'@br
+//**Or.  strResolveURI('foo/bar', 'http://example.org/abc/def/') returns 'http://example.org/abc/def/foo/bar'@br
+//**base may be relative itself (e.g. strResolveURI('foo/bar', 'test/') becomes 'test/foo/bar')
 function strResolveURI(rel, base: string): string;
 
 //----------------Mathematical functions-------------------------------
@@ -1761,7 +1764,7 @@ var
   i: Integer;
   relparams: string;
 begin
-  if strIsAbsoluteURI(rel) then exit(rel);
+  if strIsAbsoluteURI(rel) or (base = '') then exit(rel);
   p := pos('#', base);
   if p > 0 then delete(base, p, length(base) - p + 1);
   p := pos('?', base);
