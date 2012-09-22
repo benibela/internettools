@@ -50,6 +50,8 @@ type
     lastProtocol,lastHost:string;
     lastCompleteUrl: string;
     newConnectionOpened:boolean;
+    FLastHTTPHeaders: TStringList;
+    function GetLastHTTPHeaders: TStringList; override;
     function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;override;
   public
     constructor create();override;
@@ -243,6 +245,11 @@ begin
 end;
 {$endif}
 
+function TW32InternetAccess.GetLastHTTPHeaders: TStringList;
+begin
+  result := FLastHTTPHeaders;
+end;
+
 function TW32InternetAccess.doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
 var
@@ -256,6 +263,8 @@ var
   operation: string;
   callResult: boolean;
   htmlOpenTagRead: boolean; htmlClosingTagRead: boolean;
+  i: Integer;
+  headerOut: string;
   label getMore;
 begin
   if method=hcmPost then operation:='POST'
@@ -309,6 +318,8 @@ begin
   cookiestr:=makeCookieHeader;
   if cookiestr<>'' then
     HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+  for i:=0 to additionalHeaders.Count - 1 do
+    HttpAddRequestHeaders(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
 
   if data='' then
     callResult:= httpSendRequest(hfile, nil,0,nil,0)
@@ -324,6 +335,8 @@ begin
   if not HttpQueryInfo(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, dwcodeLen, dwIndex) then
     raise EW32InternetException.create();
   res := pchar(@dwcode);
+
+  lastHTTPResultCode := StrToIntDef(res, -1);
 
   Result:='';
   if (res ='200') or (res ='302') then begin
@@ -368,6 +381,14 @@ begin
    else
     raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+protocol+'://'+host+url);
 
+  lastHTTPHeaders.Clear;
+  if not HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
+    if (GetLastError = ERROR_INSUFFICIENT_BUFFER) and (i > 0) then begin
+      setlength(headerOut, i+1);
+      HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @headerOut[1], @i, nil);
+      lastHTTPHeaders.Text:=headerOut;
+    end;
+
 
   InternetCloseHandle(hfile);
 
@@ -385,6 +406,8 @@ var proxyStr:string;
 begin
   {$ifdef debug}randomize;{$endif}
   lastCompleteUrl:='';
+  FLastHTTPHeaders := TStringList.Create;
+  additionalHeaders := TStringList.Create;
   internetConfig:=@defaultInternetConfiguration;
   if defaultInternetConfiguration.userAgent='' then
     defaultInternetConfiguration.userAgent:='Mozilla 3.0 (compatible)';
@@ -435,6 +458,8 @@ begin
   if hLastConnection<>nil then
     InternetCloseHandle(hLastConnection);
   InternetCloseHandle(hsession);
+  FLastHTTPHeaders.Free;
+  additionalHeaders.Free;
   inherited;
 end;
 
