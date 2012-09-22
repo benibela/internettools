@@ -123,6 +123,7 @@ type
   TTemplateReader = class
   protected
     template:TMultiPageTemplate;
+    lastURL: string;
     procedure setTemplate(atemplate: TMultiPageTemplate);
   public
     internet:TInternetAccess;
@@ -277,16 +278,23 @@ begin
 
   if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post internet page '+cururl+#13#10'Post: '+post);
 
+  if guessType(cururl) = rtFile then
+    cururl := strResolveURI(cururl, reader.lastURL);
+
+
   case guessType(cururl) of
     rtRemoteURL:
       if post='' then page:=reader.internet.get(cururl)
       else page:=reader.internet.post(cururl, post);
     rtFile:
       page := strLoadFromFileUTF8(cururl);
-    rtXML:
+    rtXML: begin
       page := cururl;
+      cururl:='';
+    end
     else raise ETemplateReader.create('Unknown url type: '+cururl);
   end;
+  reader.lastURL:=cururl;
 
   if Assigned(reader.onLog) then reader.onLog(reader, 'downloaded: '+inttostr(length(page))+' bytes', 1);
 
@@ -295,7 +303,7 @@ begin
   if template<>'' then begin
     if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.parser.replaceVars(url), 1);
 
-    reader.parser.parseHTML(page);
+    reader.parser.parseHTML(page, cururl);
 
     if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
   end;
