@@ -47,8 +47,8 @@ protected
   forwardProgressEvent: TProgressEvent;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  function doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent;redirectionCount:longint): string;
-  function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;override;
+  function doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string; redirectionCount:longint): string;
+  function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;override;
 public
   Referer: string;
 
@@ -106,7 +106,7 @@ procedure TSynapseInternetAccess.connectionStatus(Sender: TObject;
 var
   i: Integer;
 begin
-  if (forwardProgressEvent=nil) or (connection=nil) then exit;
+  if (FOnProgress=nil) or (connection=nil) then exit;
   if contentLength=-1 then begin
     for i:=0 to connection.Headers.Count-1 do
       if pos('content-length',lowercase(connection.Headers[i]))>0 then begin
@@ -116,12 +116,12 @@ begin
     if contentLength=-1 then exit;
   end;
   lastProgressLength:=connection.DownloadSize;
-  forwardProgressEvent(self, connection.DownloadSize, contentLength);
+  FOnProgress(self, connection.DownloadSize, contentLength);
 end;
 
 
 function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol, host, url: string;
-  data: string; progressEvent: TProgressEvent;redirectionCount:longint): string;
+  data: string; redirectionCount:longint): string;
   procedure initConnection;
   begin
    connection.Clear;
@@ -143,7 +143,6 @@ begin
   result:='';
   contentLength:=-1;
   lastProgressLength:=-1;
-  forwardProgressEvent:=progressEvent;
 
  if (UpperCase(protocol)='HTTPS') then
    if (not IsSSLloaded) then //check if ssl is actually loaded
@@ -173,7 +172,7 @@ begin
              newurl := connection.Headers[i]; strSplitGet(':',newurl);
              if (pos('://',newurl) > 0) then decodeURL(Trim(newurl), protocol, host, url)
              else url := trim(newurl);
-             exit(doTransferRec(hcmGet, protocol, host, url, '', progressEvent, redirectionCount - 1));
+             exit(doTransferRec(hcmGet, protocol, host, url, '', redirectionCount - 1));
            end;
        raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+protocol+'://'+host+url);
       end;
@@ -182,15 +181,15 @@ begin
 
   Referer:=protocol+'://'+host+url;
 
-  if (progressEvent<>nil) and (lastProgressLength<connection.DownloadSize) then
-    if contentLength=-1 then progressEvent(self,connection.DownloadSize,connection.DownloadSize)
-    else progressEvent(self,connection.DownloadSize,contentLength);
+  if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then
+    if contentLength=-1 then FOnProgress(self,connection.DownloadSize,connection.DownloadSize)
+    else FOnProgress(self,connection.DownloadSize,contentLength);
 end;
 
 function TSynapseInternetAccess.doTransfer(method:THTTPConnectMethod;protocol, host, url: string;
-  data: string; progressEvent: TProgressEvent): string;
+  data: string): string;
 begin
-  result:=doTransferRec(method, protocol, host, url, data, progressEvent, 10);
+  result:=doTransferRec(method, protocol, host, url, data, 10);
 end;
 
 constructor TSynapseInternetAccess.create();

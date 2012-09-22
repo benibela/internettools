@@ -50,7 +50,7 @@ type
     lastProtocol,lastHost:string;
     lastCompleteUrl: string;
     newConnectionOpened:boolean;
-    function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;override;
+    function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;override;
   public
     constructor create();override;
     destructor destroy;override;
@@ -243,7 +243,7 @@ begin
 end;
 {$endif}
 
-function TW32InternetAccess.doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string;progressEvent:TProgressEvent): string;
+function TW32InternetAccess.doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
 var
   databuffer : array[0..4095] of char;
@@ -331,12 +331,12 @@ begin
     if HttpQueryInfo(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,dwNumber,dwindex) then
       parseHeaderForCookies(databuffer);
 
-    if assigned(progressEvent) then begin
+    if assigned(OnProgress) then begin
       dwCodeLen := 15;
       HttpQueryInfo(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, dwcodelen, dwIndex);
       res := pchar(@dwcode);
       dwContentLength:=StrToIntDef(res,1*1024*1024);
-      progressEvent(self,0,dwContentLength);
+      OnProgress(self,0,dwContentLength);
     end;
     dwRead:=0;
     dwNumber := sizeof(databuffer)-1;
@@ -353,8 +353,8 @@ begin
         htmlOpenTagRead:=pos('<html',lowercase(databuffer))>0; //check if it is html file
       if htmlOpenTagRead then
         htmlClosingTagRead:=pos('</html',lowercase(databuffer))>0;
-      if assigned(progressEvent) then
-        progressEvent(self,length(result),dwContentLength);
+      if assigned(OnProgress) then
+        OnProgress(self,length(result),dwContentLength);
 //      if length(result)<2*dwNumber;
     end;
     {$ifdef debug}writeString('res_'+host+'_'+url,inttostr(GetTickCount)+': '+ inttostr(getlasterror));{$endif}

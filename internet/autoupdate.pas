@@ -418,7 +418,11 @@ begin
   try
     update:=TFileStream.Create(ftempDir+finstallerBaseName,fmCreate);
     try
-      finternet.get(updateUrl,update{$IFDEF showProgress},@progress.progressEvent{$ENDIF});
+      {$IFDEF showProgress}
+      finternet.OnProgress:=@progress.progressEvent;
+      {$ENDIF}
+      finternet.get(updateUrl,update);
+      finternet.OnProgress:=nil;
       if update.Size=0 then Abort;
       update.free;
     except on e: Exception do

@@ -63,13 +63,15 @@ type
   //**If a transfer fails it will raise a EInternetException
   TInternetAccess=class
   private
-   FOnTransferEnd: TTransferEndEvent;
-   FOnTransferStart: TTransferStartEvent;
-    function transfer(method: THTTPConnectMethod; protocol,host,url, data:string;progressEvent: TProgressEvent=nil):string;
+    FOnTransferEnd: TTransferEndEvent;
+    FOnTransferStart: TTransferStartEvent;
+    function transfer(method: THTTPConnectMethod; protocol,host,url, data:string):string;
   protected
-    function doTransfer(method: THTTPConnectMethod; protocol,host,url, data:string; progressEvent: TProgressEvent):string;virtual;abstract;
+    FOnProgress:TProgressEvent;
+    function doTransfer(method: THTTPConnectMethod; protocol,host,url, data:string):string;virtual;abstract;
 //  protected
   public
+    //in
     internetConfig: PInternetConfig;
     cookies: array of record
       name, value:string;
@@ -81,18 +83,18 @@ type
     constructor create();virtual;
     //**post the (url encoded) data to the given url and returns the resulting document
     //**as string
-    function post(totalUrl: string;data:string):string;
+    function post(totalUrl: string; data:string):string;
     //**post the (url encoded) data to the url given as three parts and returns the page as string
     //** (override this if you want to sub class it)
-    function post(protocol,host,url: string;data:string):string;
+    function post(protocol,host,url: string; data:string):string;
     //**get the url as stream and optionally monitors the progress with a progressEvent
-    procedure get(totalUrl: string;stream:TStream;progressEvent:TProgressEvent=nil);
+    procedure get(totalUrl: string; stream:TStream);
     //**get the url as string and optionally monitors the progress with a progressEvent
-    function get(totalUrl: string;progressEvent:TProgressEvent=nil):string;
+    function get(totalUrl: string):string;
     //**get the url as stream and optionally monitors the progress with a progressEvent
-    procedure get(protocol,host,url: string;stream:TStream;progressEvent:TProgressEvent=nil);
+    procedure get(protocol,host,url: string; stream:TStream);
     //**get the url as string and optionally monitors the progress with a progressEvent
-    function get(protocol,host,url: string;progressEvent:TProgressEvent=nil):string;
+    function get(protocol,host,url: string):string;
     //**checks if an internet connection exists
     function existsConnection():boolean;virtual;
     //**call this to open a connection (very unreliable). It will return true on success
@@ -108,6 +110,7 @@ type
   published
     property OnTransferStart: TTransferStartEvent read FOnTransferStart write FOnTransferStart;
     property OnTransferEnd: TTransferEndEvent read FOnTransferEnd write FOnTransferEnd;
+    property OnProgress: TProgressEvent read FOnProgress write FOnProgress;
   end;
   EInternetException=class(Exception)
     details:string;
@@ -238,13 +241,12 @@ end;
 
 
 
-function TInternetAccess.transfer(method: THTTPConnectMethod; protocol, host, url, data: string;
-  progressEvent: TProgressEvent):string;
+function TInternetAccess.transfer(method: THTTPConnectMethod; protocol, host, url, data: string):string;
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
   if assigned(FOnTransferStart) then
     FOnTransferStart(self, method, protocol, host, url, data);
-  result:=doTransfer(method,protocol,host,url,data,progressEvent);
+  result:=doTransfer(method,protocol,host,url,data);
   if internetConfig^.logToPath<>'' then
     writeString(internetConfig^.logToPath, protocol+'://'+host+url+'<-DATA:'+data,result);
   if assigned(FOnTransferEnd) then
@@ -326,33 +328,32 @@ begin
   result:=transfer(hcmPost,protocol,host,url,data);
 end;
 
-procedure TInternetAccess.get(totalUrl: string; stream: TStream;progressEvent:TProgressEvent=nil);
+procedure TInternetAccess.get(totalUrl: string; stream: TStream);
 var buffer:string;
 begin
   assert(stream<>nil);
-  buffer:=get(totalUrl,progressEvent);
+  buffer:=get(totalUrl);
   stream.WriteBuffer(buffer[1],sizeof(buffer[1])*length(buffer));
 end;
 
-function TInternetAccess.get(totalUrl: string;progressEvent:TProgressEvent=nil):string;
+function TInternetAccess.get(totalUrl: string):string;
 var protocol, host, url: string;
 begin
   decodeURL(totalUrl,protocol,host,url);
-  result:=get(protocol,host,url,progressEvent);
+  result:=get(protocol,host,url);
 end;
 
-procedure TInternetAccess.get(protocol, host, url: string; stream: TStream;progressEvent:TProgressEvent=nil);
+procedure TInternetAccess.get(protocol, host, url: string; stream: TStream);
 var buffer:string;
 begin
   assert(stream<>nil);
-  buffer:=get(protocol,host,url,progressEvent);
+  buffer:=get(protocol,host,url);
   stream.WriteBuffer(buffer[1],sizeof(buffer[1])*length(buffer));
 end;
 
-function TInternetAccess.get(protocol, host, url: string;
-  progressEvent: TProgressEvent): string;
+function TInternetAccess.get(protocol, host, url: string): string;
 begin
-  result:=transfer(hcmGet, protocol, host, url, '', progressEvent);
+  result:=transfer(hcmGet, protocol, host, url, '');
 end;
 
 
