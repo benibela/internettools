@@ -70,17 +70,18 @@ type
     FOnProgress:TProgressEvent;
     function doTransfer(method: THTTPConnectMethod; protocol,host,url, data:string):string;virtual;abstract;
     function GetLastHTTPHeaders: TStringList; virtual; abstract;
-//  protected
-  public
-    //in
-    internetConfig: PInternetConfig;
-    additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
+  protected
+    //** Cookies receive from/to-send the server (only for backends that does not support cookies natively (i.e.. win32). Synapse has its own cookies)
     cookies: array of record
       name, value:string;
     end;
     procedure setCookie(name,value:string);
     procedure parseHeaderForCookies(header: string);
     function makeCookieHeader:string;
+  public
+    //in
+    internetConfig: PInternetConfig;
+    additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
   public
     //out
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
