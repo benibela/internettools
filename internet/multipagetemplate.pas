@@ -303,7 +303,7 @@ begin
   if template<>'' then begin
     if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.parser.replaceVars(url), 1);
 
-    reader.parser.parseHTML(page, cururl);
+    reader.parser.parseHTML(page, cururl, reader.internet.getLastHTTPHeader('Content-Type'));
 
     if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
   end;

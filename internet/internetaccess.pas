@@ -86,6 +86,7 @@ type
     //out
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
     property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last request
+    function getLastHTTPHeader(header: string): string;
   public
     constructor create();virtual;
     //**post the (url encoded) data to the given url and returns the resulting document
@@ -315,6 +316,19 @@ begin
   for i:=1 to high(cookies) do
     result+='; '+cookies[i].name+'='+cookies[i].value;
   result+=#13#10;
+end;
+
+function TInternetAccess.getLastHTTPHeader(header: string): string;
+var
+  headers: TStringList;
+  i: Integer;
+begin
+  header := header + ':';
+  headers := GetLastHTTPHeaders;
+  for i:= 0 to headers.count - 1 do
+    if striBeginsWith(headers[i], header) then
+      exit(trim(strCopyFrom(headers[i], length(header) + 1)));
+  exit('');
 end;
 
 constructor TInternetAccess.create();

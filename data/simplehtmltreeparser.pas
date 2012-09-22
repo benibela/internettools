@@ -188,7 +188,10 @@ public
   constructor Create;
   destructor destroy;override;
   procedure clearTrees;
-  function parseTree(html: string; uri: string = ''): TTreeDocument; //**< Creates a new tree from a html document contained in html. The uri parameter is just stored and returned for you by baseURI, not actually used within this class.
+  //**< Creates a new tree from a html document contained in html. @br
+  //**< The uri parameter is just stored and returned for you by baseURI, not actually used within this class. @br
+  //**< contentType is used to detect the encoding
+  function parseTree(html: string; uri: string = ''; contentType: string = ''): TTreeDocument;
   function parseTreeFromFile(filename: string): TTreeDocument;
 
   function getLastTree: TTreeDocument; //**< Returns the last created tree
@@ -934,10 +937,21 @@ begin
   result := good < 10 * bad;
 end;
 
-function TTreeParser.parseTree(html: string; uri: string): TTreeDocument;
+function TTreeParser.parseTree(html: string; uri: string; contentType: string): TTreeDocument;
+  function encodingFromContentType(encoding: string): TEncoding;
+  begin
+    encoding := lowercase(encoding);
+    if pos('charset=utf-8', encoding) > 0 then exit(eUTF8);
+    if (pos('charset=windows-1252',encoding) > 0) or
+       (pos('charset=latin1',encoding) > 0) or
+       (pos('charset=iso-8859-1',encoding) > 0) then //also -15
+        exit(eWindows1252);
+    exit(eUnknown);
+  end;
+
 var
-  encoding: String;
   el: TTreeElement;
+  encMeta, encHeader: TEncoding;
 begin
   FTemplateCount:=0;
   FElementStack.Clear;
@@ -970,16 +984,19 @@ begin
   //close root element
   leaveTag('',0);
 
-  if FAutoDetectHTMLEncoding and (parsingModel = pmHTML) then begin
+  if FAutoDetectHTMLEncoding  then begin
     FCurrentTree.FEncoding:=eUnknown;
-    encoding := lowercase(TPseudoXPathParser.EvaluateToString('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree));
-    if encoding <> '' then begin
-      if pos('charset=utf-8', encoding) > 0 then FCurrentTree.FEncoding:=eUTF8
-      else if (pos('charset=windows-1252',encoding) > 0) or
-              (pos('charset=latin1',encoding) > 0) or
-              (pos('charset=iso-8859-1',encoding) > 0) then //also -15
-        FCurrentTree.FEncoding:=eWindows1252;
-    end else begin
+    encHeader := encodingFromContentType(contentType);
+    if parsingModel = pmHTML then
+      encMeta := encodingFromContentType(TPseudoXPathParser.EvaluateToString('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree))
+     else
+      encMeta := encHeader;
+
+    if encMeta = eUnknown then encMeta := encHeader;
+    if encHeader = eUnknown then encHeader := encMeta;
+    if (encMeta = encHeader) and (encMeta <> eUnknown) then
+      FCurrentTree.FEncoding := encMeta
+    else begin //if in doubt, detect encoding and ignore meta/header data
       FCurrentTree.FEncoding:=eUTF8;
       el := FCurrentTree.next;
       while el <> nil do begin

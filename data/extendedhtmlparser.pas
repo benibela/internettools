@@ -405,7 +405,7 @@ THtmlTemplateParser=class
 
     procedure parseTemplate(template: string; templateName: string = '<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string); //**<loads a template from a file
-    function parseHTML(html: string; htmlFileName: string = ''):boolean; //**< parses the given data. htmlFileName is just for debugging issues
+    function parseHTML(html: string; htmlFileName: string = ''; contentType: string = ''):boolean; //**< parses the given data. htmlFileName is just for debugging issues
     function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file.
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
     //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
@@ -1141,7 +1141,7 @@ begin
   inherited destroy;
 end;
 
-function THtmlTemplateParser.parseHTML(html: string; htmlFileName: string): boolean;
+function THtmlTemplateParser.parseHTML(html: string; htmlFileName: string; contentType: string): boolean;
 var cur,last,realLast:TTemplateElement;
 begin
   FreeAndNil(FVariables);
@@ -1157,7 +1157,7 @@ begin
   FVariableLog.allowObjects:=FObjects;
 
   FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
-  FHTML.parseTree(html, htmlfilename);
+  FHTML.parseTree(html, htmlfilename, contentType);
   FHtmlTree := fhtml.getLastTree;
 
 
