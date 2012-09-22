@@ -69,16 +69,22 @@ type
   protected
     FOnProgress:TProgressEvent;
     function doTransfer(method: THTTPConnectMethod; protocol,host,url, data:string):string;virtual;abstract;
+    function GetLastHTTPHeaders: TStringList; virtual; abstract;
 //  protected
   public
     //in
     internetConfig: PInternetConfig;
+    additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
     cookies: array of record
       name, value:string;
     end;
     procedure setCookie(name,value:string);
     procedure parseHeaderForCookies(header: string);
     function makeCookieHeader:string;
+  public
+    //out
+    lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
+    property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last request
   public
     constructor create();virtual;
     //**post the (url encoded) data to the given url and returns the resulting document

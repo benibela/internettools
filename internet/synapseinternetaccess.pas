@@ -49,6 +49,7 @@ protected
   //newConnectionOpened:boolean;
   function doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string; redirectionCount:longint): string;
   function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;override;
+  function GetLastHTTPHeaders: TStringList; override;
 public
   Referer: string;
 
@@ -123,6 +124,8 @@ end;
 function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol, host, url: string;
   data: string; redirectionCount:longint): string;
   procedure initConnection;
+  var
+    i: Integer;
   begin
    connection.Clear;
    connection.AddPortNumberToHost:=false;
@@ -134,6 +137,9 @@ function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol
      connection.Headers.Add('Referer: '+Referer);
    connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml');;
    connection.Protocol:='1.1';
+   if additionalHeaders.Count > 0 then
+     for i := 0 to additionalHeaders.Count - 1 do
+       connection.Headers.add(additionalHeaders[i]);
   end;
 
 var operation,newurl: string;
@@ -152,7 +158,6 @@ begin
   else operation:='GET';
 
   initConnection;
-
   ok := connection.HTTPMethod(operation,protocol+'://'+host+url);
 
   if (not ok) and (checkEtcResolv) then begin
@@ -180,6 +185,7 @@ begin
     raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+protocol+'://'+host+url);
 
   Referer:=protocol+'://'+host+url;
+  lastHTTPResultCode := connection.ResultCode;
 
   if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then
     if contentLength=-1 then FOnProgress(self,connection.DownloadSize,connection.DownloadSize)
@@ -192,8 +198,15 @@ begin
   result:=doTransferRec(method, protocol, host, url, data, 10);
 end;
 
+function TSynapseInternetAccess.GetLastHTTPHeaders: TStringList;
+begin
+  result := connection.Headers;
+end;
+
 constructor TSynapseInternetAccess.create();
 begin
+  additionalHeaders := TStringList.Create;
+
   internetConfig:=@defaultInternetConfiguration;
   if defaultInternetConfiguration.userAgent='' then
     defaultInternetConfiguration.userAgent:='Mozilla/3.0 (compatible)';
@@ -215,6 +228,7 @@ end;
 destructor TSynapseInternetAccess.destroy;
 begin
   FreeAndNil(connection);
+  additionalHeaders.free;
   inherited destroy;
 end;
 
