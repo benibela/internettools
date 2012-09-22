@@ -367,6 +367,7 @@ begin
   if t.typ <> tetOpen then exit;
   if SameText(t.value, 'variable') then addChild(TTemplateActionVariable)
   else if SameText(t.value, 'action') then addChild(TTemplateActionMain)
+  else if SameText(t.value, 'actions') then addChildrenFromTree(t)
   else if SameText(t.value, 'page') then addChild(TTemplateActionLoadPage)
   else if SameText(t.value, 'call') then addChild(TTemplateActionCallAction)
   else if SameText(t.value, 'loop') then addChild(TTemplateActionLoop)
