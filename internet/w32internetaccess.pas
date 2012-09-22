@@ -342,7 +342,7 @@ begin
     dwNumber := sizeof(databuffer)-1;
     htmlOpenTagRead:=false;
     htmlClosingTagRead:=false;
-    if (pos('abderos',host)>0) and (pos('GETLIST',url)>0)  then sleep(1000);
+
    getMore:
    SetLastError(0);
     while (InternetReadfile(hfile,@databuffer,dwNumber,DwRead)) and (dwread>0) do begin
