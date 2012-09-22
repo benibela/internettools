@@ -105,6 +105,7 @@ type
     destructor destroy;override;
 
     function findAction(_name:string): TTemplateAction;
+    function findVariableValue(aname: string): string;
     //function getAccountObject():TCustomAccountAccess;override;
   end;
 
@@ -125,6 +126,9 @@ type
     template:TMultiPageTemplate;
     lastURL: string;
     procedure setTemplate(atemplate: TMultiPageTemplate);
+    procedure processPage(page, cururl, contenttype: string); virtual;
+
+
   public
     internet:TInternetAccess;
     parser: THtmlTemplateParser;
@@ -303,9 +307,7 @@ begin
   if template<>'' then begin
     if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.parser.replaceVars(url), 1);
 
-    reader.parser.parseHTML(page, cururl, reader.internet.getLastHTTPHeader('Content-Type'));
-
-    if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
+    reader.processPage(page, cururl, reader.internet.getLastHTTPHeader('Content-Type'));
   end;
   if Assigned(reader.onLog) then reader.onLog(reader, 'page finished', 2);
 end;
@@ -490,7 +492,24 @@ function TMultiPageTemplate.findAction(_name: string): TTemplateAction;
     result := nil;
   end;
 
-var i:longint;
+begin
+  result:=find(baseActions);
+end;
+
+function TMultiPageTemplate.findVariableValue(aname: string): string;
+function find(a: TTemplateAction): string;
+var
+  i: Integer;
+begin
+  for i:=0 to high(a.children) do begin
+    if a.children[i] is TTemplateActionVariable then
+      if TTemplateActionVariable(a.children[i]).name = aname then exit(TTemplateActionVariable(a.children[i]).value);
+    result := find(a.children[i]);
+    if result <> '' then exit;
+  end;
+  result := '';
+end;
+
 begin
   result:=find(baseActions);
 end;
@@ -503,6 +522,14 @@ begin
   for i:=0 to high(atemplate.baseActions.children) do
     if atemplate.baseActions.children[i] is TTemplateActionVariable then
       atemplate.baseActions.children[i].perform(self);
+end;
+
+procedure TTemplateReader.processPage(page, cururl, contenttype: string);
+begin
+  parser.parseHTML(page, cururl, contenttype);
+
+  if Assigned(onPageProcessed) then
+    onPageProcessed(self, parser);
 end;
 
 constructor TTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
