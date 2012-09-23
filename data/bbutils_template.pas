@@ -1066,16 +1066,19 @@ end;
 
 type TStrTrimProcedure = procedure (var p: pchar; var l: integer; const trimCharacters: TCharSet);
 
-function strTrimCommon(s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
+function strTrimCommon(const s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
 var p: pchar;
     l: Integer;
+    cutOffFront: integer;
 begin
-  l := length(s);
-  if l = 0 then exit('');
-  p:= pchar(pointer(s));
+  result := s;
+  l := length(Result);
+  if l = 0 then exit;
+  p := pchar(pointer(result));
   trimProc(p, l, trimCharacters);
-  if (p = pchar(pointer(s))) and (l = length(s)) then exit(s);
-  result:=strFromPchar(p, l);
+  if (p = pchar(pointer(result))) and (l = length(result)) then exit;
+  cutOffFront := p - pchar(pointer(result));
+  result := copy(result, 1 + cutOffFront, l);
 end;
 
 function strTrimLeft(const s: string; const trimCharacters: TCharSet): string;
