@@ -265,7 +265,7 @@ procedure strSplit(out splitted: TStringArray;s:string;sep:string=',';includeEmp
 function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArray;overload;
 
 function strWrapSplit(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
-function strWrap(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): string;
+function strWrap(Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): string;
 
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
 //the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
@@ -307,7 +307,7 @@ function strFromSIze(size: int64):string;
 //**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
 function strLengthUtf8(str: string): longint;
 function strConvertToUtf8(str: string; from: TEncoding): string; //**< Returns a utf-8 string from the string in encoding @code(from)
-function strConvertFromUtf8(const str: string; toe: TEncoding): string; //**< Converts a utf-8 string to the encoding @code(from)
+function strConvertFromUtf8(str: string; toe: TEncoding): string; //**< Converts a utf-8 string to the encoding @code(from)
 function strChangeEncoding(const str: string; from,toe: TEncoding):string; //**< Changes the string encoding from @code(from) to @code(toe)
 function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string; //**< Get unicode character @code(character) in a certain encoding
 function strDecodeUTF8Character(const str: string; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
@@ -321,11 +321,11 @@ function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boo
 //**even if it contains rogue &).
 function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = false):string;
 //**Replace all occurences of x \in toEscape with escapeChar + x
-function strEscape(const s:string; const toEscape: TCharSet; escapeChar: char = '\'): string;
+function strEscape(s:string; const toEscape: TCharSet; escapeChar: char = '\'): string;
 //**Returns a regex matching s
 function strEscapeRegex(const s:string): string;
-function strDecodeHex(const s:string):string;
-function strEncodeHex(const s:string; const code: string = '0123456789ABCDEF'):string;
+function strDecodeHex(s:string):string;
+function strEncodeHex(s:string; const code: string = '0123456789ABCDEF'):string;
 //**Returns the first l bytes of p (copies them so O(n))
 function strFromPchar(p:pchar;l:longint):string;
 
@@ -335,10 +335,10 @@ function strFromPtr(p: pointer): string;
 function strFromInt(i: int64; displayLength: longint): string;
 
 //**Creates count copies of rep
-function strDup(const rep: string; const count: integer): string;
+function strDup(rep: string; const count: integer): string;
 
 //**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
-function strIsAbsoluteURI(s: string): boolean;
+function strIsAbsoluteURI(const s: string): boolean;
 //**Returns a absolute uri for a uri relative to the uri base.@br
 //**E.g. strResolveURI('foo/bar', 'http://example.org/abc/def') returns 'http://example.org/abc/foo/bar'@br
 //**Or.  strResolveURI('foo/bar', 'http://example.org/abc/def/') returns 'http://example.org/abc/def/foo/bar'@br
@@ -1066,7 +1066,7 @@ end;
 
 type TStrTrimProcedure = procedure (var p: pchar; var l: integer; const trimCharacters: TCharSet);
 
-function strTrimCommon(const s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
+function strTrimCommon(s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
 var p: pchar;
     l: Integer;
 begin
@@ -1169,7 +1169,7 @@ begin
   if length(result) = 0 then arrayAdd(result, '');
 end;
 
-function strWrap(const Line: string; MaxCol: Integer; const BreakChars: TCharSet): string;
+function strWrap(Line: string; MaxCol: Integer; const BreakChars: TCharSet): string;
 begin
   result := strJoin(strWrapSplit(line, MaxCol, BreakChars), LineEnding);
 end;
@@ -1347,7 +1347,7 @@ begin
   end;
 end;
 
-function strConvertFromUtf8(const str: string; toe: TEncoding): string;
+function strConvertFromUtf8(str: string; toe: TEncoding): string;
 var len, reslen, i, pos: longint;
 begin
   case toe of
@@ -1469,7 +1469,7 @@ end;
 
 {$endif}
 
-function strEscape(const s: string; const toEscape: TCharSet; escapeChar: char): string;
+function strEscape(s: string; const toEscape: TCharSet; escapeChar: char): string;
 var
  i: Integer;
 begin
@@ -1491,7 +1491,7 @@ begin
   result:=strDecodeHTMLEntities(pchar(s), length(s), encoding, strict);
 end;
 
-function strDecodeHex(const s: string): string;
+function strDecodeHex(s: string): string;
   function decodeSingleHex(const c: char): byte; inline;
   begin
     case c of
@@ -1511,7 +1511,7 @@ begin
     result[i] := chr((decodeSingleHex(s[2*i-1]) shl 4) or decodeSingleHex(s[2*i]));
 end;
 
-function strEncodeHex(const s: string; const code: string): string;
+function strEncodeHex(s: string; const code: string): string;
 var
   o: Integer;
   pcode: pchar;
@@ -1732,7 +1732,7 @@ begin
   result := strCompareClever(lowercase(s1), lowercase(s2)); //todo optimize
 end;
 
-function strDup(const rep: string; const count: integer): string;
+function strDup(rep: string; const count: integer): string;
 var
   i: Integer;
 begin
