@@ -241,7 +241,8 @@ begin
       if SameText(t.value, 'post') then begin
         setlength(postparams, length(postparams)+1);
         postparams[high(postparams)].name:=t['name'];
-        postparams[high(postparams)].value:=t.deepNodeText();
+        if t.hasAttribute('value') then postparams[high(postparams)].value:=t['value']
+        else postparams[high(postparams)].value:=t.deepNodeText(); //support old for a while
       end else if SameText(t.value, 'template') then
         template:=t.innerXML();
     end;
