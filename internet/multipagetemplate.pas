@@ -148,6 +148,20 @@ implementation
 
 { TTemplateActionLoop }
 
+type
+
+{ THtmlTemplateParserBreaker }
+
+ THtmlTemplateParserBreaker = class(THtmlTemplateParser)
+  function getVariable(name: string): TPXPValue;
+end;
+
+function THtmlTemplateParserBreaker.getVariable(name: string): TPXPValue;
+begin
+  result := pxpvalue();
+  evaluatePXPVariable(self, name, result);
+end;
+
 procedure TTemplateActionLoop.initFromTree(t: TTreeElement);
 begin
   varname:=t['var'];
@@ -243,6 +257,7 @@ var
   page: String;
   tempname: String;
   j: Integer;
+  tempvalue: TPXPValue;
 begin
   if condition <> '' then begin
     cachedCondition := reader.parser.createPseudoXPathParser(condition); //TODO: long term cache
@@ -260,8 +275,18 @@ begin
   end;
 
   cururl := url;
+  post := '';
+
   if cururl <> '' then begin
-    cururl := reader.parser.replaceVars(url);
+    if (url[1] = '$') and (url[length(url)] = ';') and (pos('$', copy(url, 2, length(url) - 1)) <= 0) and (pos(';', copy(url, 1, length(url) - 1)) <= 0) then begin;
+      tempvalue := THtmlTemplateParserBreaker(reader.parser).getVariable(copy(url, 2, length(url)-2));
+      if tempvalue is TPXPValueObject then begin
+        cururl := TPXPValueObject(tempvalue).getAsString('url');
+        post := TPXPValueObject(tempvalue).getAsString('post');
+      end else cururl:=tempvalue.asString;
+      tempvalue.free;
+    end else
+      cururl := reader.parser.replaceVars(url);
     if cururl = '' then exit;
     //allow pages without url to set variables.
   end else begin
@@ -270,9 +295,8 @@ begin
     exit;
   end;
 
-  post := '';
   for j:=0 to high(postparams) do begin
-    if j <> 0 then post += '&';
+    if post <> '' then post += '&';
     tempname := reader.parser.replaceVars(postparams[j].name);
     if tempname = '' then
       post += reader.parser.replaceVars(postparams[j].value) //no urlencode! parameter passes multiple values
