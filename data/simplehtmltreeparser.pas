@@ -188,9 +188,9 @@ public
   constructor Create;
   destructor destroy;override;
   procedure clearTrees;
-  //**< Creates a new tree from a html document contained in html. @br
-  //**< The uri parameter is just stored and returned for you by baseURI, not actually used within this class. @br
-  //**< contentType is used to detect the encoding
+  //** Creates a new tree from a html document contained in html. @br
+  //** The uri parameter is just stored and returned for you by baseURI, not actually used within this class. @br
+  //** contentType is used to detect the encoding
   function parseTree(html: string; uri: string = ''; contentType: string = ''): TTreeDocument;
   function parseTreeFromFile(filename: string): TTreeDocument;
 
