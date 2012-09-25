@@ -35,17 +35,17 @@ type
 
   { TTemplateAction }
 
-  TTemplateReader = class;
+  TMultipageTemplateReader = class;
   //**@abstract(Internal used base class for an action within the multi page template)
   TTemplateAction = class
   protected
     procedure addChildFromTree(t: TTreeElement);
-    procedure performChildren(reader: TTemplateReader);
+    procedure performChildren(reader: TMultipageTemplateReader);
   public
     children: array of TTemplateAction;
     procedure initFromTree(t: TTreeElement); virtual;
     procedure addChildrenFromTree(t: TTreeElement);
-    procedure perform(reader: TTemplateReader); virtual; abstract;
+    procedure perform(reader: TMultipageTemplateReader); virtual; abstract;
     procedure clear;
     destructor Destroy; override;
   end;
@@ -179,7 +179,7 @@ type
     //function getAccountObject():TCustomAccountAccess;override;
   end;
 
-  { TTemplateReader }
+  { TMultipageTemplateReader }
 
   { ETemplateReader }
 
@@ -190,13 +190,13 @@ type
   end;
   //**Event you can use to log, what the template is doing .@br
   //**Arguments: logged contains the message, debugLevel the importance of this event
-  TLogEvent = procedure (sender: TTemplateReader; logged: string; debugLevel: integer = 0) of object;
+  TLogEvent = procedure (sender: TMultipageTemplateReader; logged: string; debugLevel: integer = 0) of object;
   //**Event that is called after every <page> element is processed. @br
   //**You can use parser to read the variables changed by the template applied to the page
-  TPageProcessed = procedure (sender: TTemplateReader; parser: THtmlTemplateParser) of object;
+  TPageProcessed = procedure (sender: TMultipageTemplateReader; parser: THtmlTemplateParser) of object;
   //**@abstract(Class to process a multi page template)
   //**see TMultiPageTemplate for a documentation of the allowed xml elements
-  TTemplateReader = class
+  TMultipageTemplateReader = class
   protected
     template:TMultiPageTemplate;
     lastURL: string;
@@ -220,10 +220,10 @@ type
     function findAction(name:string):TTemplateAction;
     //** Executes the action with the given id @br(e.g. setting all variables, downloading all pages defined there) @br
     //** This does not modify the action, so you can use the same template with multiple readers (even in other threads)
-    procedure performAction(action:string);
+    procedure callAction(action:string);
     //** Executes the given action @br(e.g. setting all variables, downloading all pages defined there)
     //** This does not modify the action, so you can use the same template with multiple readers (even in other threads)
-    procedure performAction(const action:TTemplateAction);
+    procedure callAction(const action:TTemplateAction);
 
   end;
 
@@ -235,7 +235,7 @@ type
   TTemplateActionMain = class(TTemplateAction)
     name: string;
     procedure initFromTree(t: TTreeElement); override;
-    procedure perform(reader: TTemplateReader); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
   { TTemplateActionVariable }
@@ -244,7 +244,7 @@ type
     name, value, valuex: string;
     hasValueStr: boolean;
     procedure initFromTree(t: TTreeElement); override;
-    procedure perform(reader: TTemplateReader); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
   { TTemplateActionLoadPage }
@@ -256,7 +256,7 @@ type
     postparams:array of TProperty;
     condition: string;
     procedure initFromTree(t: TTreeElement); override;
-    procedure perform(reader: TTemplateReader); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
   { TTemplateActionCallAction }
@@ -264,7 +264,7 @@ type
   TTemplateActionCallAction = class(TTemplateAction)
     action: string;
     procedure initFromTree(t: TTreeElement); override;
-    procedure perform(reader: TTemplateReader); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
   { TTemplateActionLoop }
@@ -272,7 +272,7 @@ type
   TTemplateActionLoop = class(TTemplateAction)
     varname, list, test: string;
     procedure initFromTree(t: TTreeElement); override;
-    procedure perform(reader: TTemplateReader); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
 { THtmlTemplateParserBreaker }
@@ -295,7 +295,7 @@ begin
   addChildrenFromTree(t);
 end;
 
-procedure TTemplateActionLoop.perform(reader: TTemplateReader);
+procedure TTemplateActionLoop.perform(reader: TMultipageTemplateReader);
 var
   listx: TPXPValue;
   testx: TPseudoXPathParser;
@@ -342,7 +342,7 @@ begin
   action := t['action'];
 end;
 
-procedure TTemplateActionCallAction.perform(reader: TTemplateReader);
+procedure TTemplateActionCallAction.perform(reader: TMultipageTemplateReader);
 var
   act: TTemplateAction;
 begin
@@ -375,7 +375,7 @@ begin
   end;
 end;
 
-procedure TTemplateActionLoadPage.perform(reader: TTemplateReader);
+procedure TTemplateActionLoadPage.perform(reader: TMultipageTemplateReader);
 var
   cachedCondition: TPseudoXPathParser;
   cururl: String;
@@ -471,7 +471,7 @@ begin
   valuex := t.deepNodeText();
 end;
 
-procedure TTemplateActionVariable.perform(reader: TTemplateReader);
+procedure TTemplateActionVariable.perform(reader: TMultipageTemplateReader);
 var
   pxp: TPseudoXPathParser;
 begin
@@ -494,7 +494,7 @@ begin
   addChildrenFromTree(t);
 end;
 
-procedure TTemplateActionMain.perform(reader: TTemplateReader);
+procedure TTemplateActionMain.perform(reader: TMultipageTemplateReader);
 begin
   performChildren(reader);
 end;
@@ -526,7 +526,7 @@ begin
   else raise Exception.Create('Unknown template node: '+t.outerXML);
 end;
 
-procedure TTemplateAction.performChildren(reader: TTemplateReader);
+procedure TTemplateAction.performChildren(reader: TMultipageTemplateReader);
 var
   i: Integer;
 begin
@@ -664,7 +664,7 @@ begin
   result:=find(baseActions);
 end;
 
-procedure TTemplateReader.setTemplate(atemplate: TMultiPageTemplate);
+procedure TMultipageTemplateReader.setTemplate(atemplate: TMultiPageTemplate);
 var
   i: Integer;
 begin
@@ -674,7 +674,7 @@ begin
       atemplate.baseActions.children[i].perform(self);
 end;
 
-procedure TTemplateReader.processPage(page, cururl, contenttype: string);
+procedure TMultipageTemplateReader.processPage(page, cururl, contenttype: string);
 begin
   parser.parseHTML(page, cururl, contenttype);
 
@@ -682,7 +682,7 @@ begin
     onPageProcessed(self, parser);
 end;
 
-constructor TTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
+constructor TMultipageTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
 var
   i: Integer;
 begin
@@ -693,26 +693,26 @@ begin
   setTemplate(atemplate);
 end;
 
-destructor TTemplateReader.destroy();
+destructor TMultipageTemplateReader.destroy();
 begin
   parser.free;
   inherited destroy();
 end;
 
-function TTemplateReader.findAction(name:string): TTemplateAction;
+function TMultipageTemplateReader.findAction(name:string): TTemplateAction;
 begin
   result:=template.findAction(name);
 end;
 
-procedure TTemplateReader.performAction(action: string);
+procedure TMultipageTemplateReader.callAction(action: string);
 var act: TTemplateAction;
 begin
   act:=findAction(action);
   if act=nil then raise ETemplateReader.Create('Aktion '+action+' konnte nicht ausgeführt werden, da sie nicht gefunden wurde.');
-  performAction(act);
+  callAction(act);
 end;
 
-procedure TTemplateReader.performAction(const action:TTemplateAction);
+procedure TMultipageTemplateReader.callAction(const action:TTemplateAction);
 begin
   if Assigned(onLog) then onLog(self, 'Enter performAction, finternet:', 5); //TODO: parser log
 
