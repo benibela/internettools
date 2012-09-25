@@ -15,6 +15,13 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
 
+(***
+  @abstract(This unit contains classes to handle multi-page templates. A collection of single-page templates that can applied to different pages.)@br@br
+
+  The class TMultiPageTemplate can be used to load a template (and there is also the documentation of the template syntax/semantic).
+
+  The class TMultipageTemplateReader can be used to run the template.
+*)
 unit multipagetemplate;
 
 {$mode objfpc}{$H+}
@@ -29,6 +36,7 @@ type
   { TTemplateAction }
 
   TTemplateReader = class;
+  //**@abstract(Internal used base class for an action within the multi page template)
   TTemplateAction = class
   protected
     procedure addChildFromTree(t: TTreeElement);
@@ -43,8 +51,187 @@ type
   end;
   TTemplateActionClass = class of TTemplateAction;
 
-  { TTemplateActionMain }
+  { TMultiPageTemplate }
 
+  (***@abstract(A multi page template, which defines which and how pages are processed. @br )
+
+    A multi page template defines a list of actions, each listing variables to set as well as pages to download and
+    process with single-page templates. @br
+    You can then call an action, let it process the elements defined in the template and then read the resulting variables.
+
+   (Notice: Although both the multi-page and single-page templates are called templates, they are actually something
+    *entirely* different:
+       A multi-page template is a list of explicit actions that are performed in order, like an algorithm;
+       A single-page template is an implicit pattern that is matched against the page, like a regular expression)
+
+    The xml file of such a multi-page template looks like this:
+   @longCode(
+   <actions>
+   <action id="action-1">
+     <variable name="foobar" value="xyz"/>
+
+     <page url="url to send the request to"
+           templateFile="File containing a single page template (optional)"  >
+       <post name="post variable name"> Daten (optional) </post>
+       ...
+       <template>A single page template (optional) </template>
+     </page>
+
+     ...
+
+   </action>
+   <action id="action-2">
+
+     ...
+   </action>
+    ...
+   </actions>)
+
+    <actions> contains a list/map of named actions, each <action> can contain:
+
+    @unorderedList(
+      @item(@code(<variable>)  Sets an variable, either to a string value or to an evaluated XPath expression )
+      @item(@code(<page>)     Downloads a page and processes it with a single-page template )
+      @item(@code(<loop>)      Repeats the children of the loop element )
+      @item(@code(<call>)      Calls another action )
+    )
+
+    Details for each element:
+
+    @definitionList(
+
+    @itemLabel(@code(<variable name="name" value="str value">xpath expression</variable>))
+    @item(
+
+      This sets the value of the variable with name $name.
+      If the value attribute is given, it is set to the string value of the attribute, otherwise the xpath expression
+      is evaluated its result is used.
+      (there is no document loaded for node reading, but the xpath expression is still useful for computations on the other
+       variables.)
+
+    )
+    @itemLabel(@code(<page url="request url" templateFile="single page template file">))
+    @item(
+
+      A page to download and process. @br
+      You can use @code(<post name="..name.." value="..value..">..value..</post>) elements in the <page> to add
+      variables for a post request to send to the url. @br
+      If the name attribute exists, the content is url encoded, otherwise not. @br @code()
+      (currently the value attribute and the contained text are treated as string to send.
+       In future versions, the contained text will be evaluated as xpath expression.
+       Older version (like Xidel 0.5) do not support the value-attribute)  @br
+      If no <post> children exist, a GET request is send.
+
+      The template that should be applied to the downloaded page, can be given directly in a <template> element, or
+      in a separate file linked by the templateFile attribute.
+      (see THtmlTemplateParser for a description of the pattern-matching single-page template.)
+
+      There is also a @code(test="xpath") attribute that can define a condition, which will skip a page,
+      if the condition evaluates to false().
+
+    )
+    @itemLabel(@code(<loop var="variable name" list="list (xpath)" test="condition (xpath)">))
+    @item(
+
+      Repeats the children of this element.@br
+      It can be used like a foreach loop by giving the var/list attributes, like a while loop by using test,
+      or like a combination of both.@br
+      In the first case the expression in list is evaluated, each element of the resulting sequence is assigned
+      once to the variable with the name var, and the loop body is evaluated each time.@br
+      In the second case, the loop is simply repeated forever, until the expression in the test attributes evaluates to false.
+
+    )
+    @itemLabel(@code(<call action="name">))
+    @item(
+
+      Calls the action of the given name.
+
+    )
+   )
+
+   Within all string attributes you can access the previously defined variables by writing @code($variable;)  (with colon).@br
+   Within a xpath expression you can access the variables as usually with @code($variable)
+  *)
+  TMultiPageTemplate=class
+  protected
+    procedure readTree(t: TTreeElement);
+  public
+    //**The primary <actions> element (or the first <action> element, if only one exists)
+    baseActions: TTemplateAction;
+    //**The path of the xml file containing this template
+    path,name:string;
+
+    //variables: TStringList;
+
+    constructor create();
+    //**Loads this template from a directory. @br The multipage template is read from the file template, and
+    //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
+    procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
+    //**Loads the template directly from a string. @br Loading pattern-matching templates with the templateFile attribute is not supported
+    procedure loadTemplateFromString(template: string; aname: string = 'unknown');
+    destructor destroy;override;
+
+    //**Returns a <action> element with the given id
+    function findAction(_name:string): TTemplateAction;
+    //**Find the first <variable> element definining a variable with the given name. @br
+    //**Only returns the value of the value attribute, ignoring any contained xpath expression
+    function findVariableValue(aname: string): string;
+    //function getAccountObject():TCustomAccountAccess;override;
+  end;
+
+  { TTemplateReader }
+
+  { ETemplateReader }
+
+  ETemplateReader=class(Exception)
+    details:string;
+    constructor create;
+    constructor create(s:string;more_details:string='');
+  end;
+  //**Event you can use to log, what the template is doing .@br
+  //**Arguments: logged contains the message, debugLevel the importance of this event
+  TLogEvent = procedure (sender: TTemplateReader; logged: string; debugLevel: integer = 0) of object;
+  //**Event that is called after every <page> element is processed. @br
+  //**You can use parser to read the variables changed by the template applied to the page
+  TPageProcessed = procedure (sender: TTemplateReader; parser: THtmlTemplateParser) of object;
+  //**@abstract(Class to process a multi page template)
+  //**see TMultiPageTemplate for a documentation of the allowed xml elements
+  TTemplateReader = class
+  protected
+    template:TMultiPageTemplate;
+    lastURL: string;
+    procedure setTemplate(atemplate: TMultiPageTemplate);
+    procedure processPage(page, cururl, contenttype: string); virtual;
+  public
+    //** Object used to send requests and download pages
+    internet:TInternetAccess;
+    //** Parser used to apply the given single page templates to a downloaded page
+    parser: THtmlTemplateParser;
+    //** Log event
+    onLog: TLogEvent;
+    //** Event to access the changed variable state after each processed <page> element
+    onPageProcessed: TPageProcessed;
+
+    //** Creates a reader using a certain template (atemplate is mandatory, ainternet optional)
+    constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
+    destructor destroy();override;
+
+    //** Searches the action element with the given id (equivalent to TMultiPageTemplate.findAction)
+    function findAction(name:string):TTemplateAction;
+    //** Executes the action with the given id @br(e.g. setting all variables, downloading all pages defined there) @br
+    //** This does not modify the action, so you can use the same template with multiple readers (even in other threads)
+    procedure performAction(action:string);
+    //** Executes the given action @br(e.g. setting all variables, downloading all pages defined there)
+    //** This does not modify the action, so you can use the same template with multiple readers (even in other threads)
+    procedure performAction(const action:TTemplateAction);
+
+  end;
+
+implementation
+
+{ TTemplateActionLoop }
+
+type
   TTemplateActionMain = class(TTemplateAction)
     name: string;
     procedure initFromTree(t: TTreeElement); override;
@@ -87,68 +274,6 @@ type
     procedure initFromTree(t: TTreeElement); override;
     procedure perform(reader: TTemplateReader); override;
   end;
-
-  { TMultiPageTemplate }
-
-  TMultiPageTemplate=class
-  protected
-    procedure readTree(t: TTreeElement);
-  public
-    baseActions: TTemplateAction;
-    path,name:string;
-
-    //variables: TStringList;
-
-    constructor create();
-    procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
-    procedure loadTemplateFromString(template: string; aname: string = 'unknown');
-    destructor destroy;override;
-
-    function findAction(_name:string): TTemplateAction;
-    function findVariableValue(aname: string): string;
-    //function getAccountObject():TCustomAccountAccess;override;
-  end;
-
-  { TTemplateReader }
-
-  { ETemplateReader }
-
-  ETemplateReader=class(Exception)
-    details:string;
-    constructor create;
-    constructor create(s:string;more_details:string='');
-  end;
-  TLogEvent = procedure (sender: TTemplateReader; logged: string; debugLevel: integer = 0) of object;
-  TPageProcessed = procedure (sender: TTemplateReader; parser: THtmlTemplateParser) of object;
-
-  TTemplateReader = class
-  protected
-    template:TMultiPageTemplate;
-    lastURL: string;
-    procedure setTemplate(atemplate: TMultiPageTemplate);
-    procedure processPage(page, cururl, contenttype: string); virtual;
-
-
-  public
-    internet:TInternetAccess;
-    parser: THtmlTemplateParser;
-    onLog: TLogEvent;
-    onPageProcessed: TPageProcessed;
-
-    constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
-    destructor destroy();override;
-
-    function findAction(name:string):TTemplateAction;
-    procedure performAction(action:string);
-    procedure performAction(const action:TTemplateAction);
-
-  end;
-
-implementation
-
-{ TTemplateActionLoop }
-
-type
 
 { THtmlTemplateParserBreaker }
 

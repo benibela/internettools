@@ -19,11 +19,20 @@ Inherited from TInternetAccess are TSynapseInternetAccess and TW32InternetAccess
 There are several ways to actually process a downloaded html/xml-document.@br
 It is implemented as a hierarchy of data processing classes, from a high level template language to a low level tokenizer, where each levels uses the things from the lower level.
 
-@section(2 AnchorNameTemplate High-Level: Template processing)
+@section(2 AnchorNameTemplate High-Level: (Pattern-matching) template processing)
 
 The most powerful processing language is implemented by the THtmlTemplateParser-class in the unit extendedhtmlparser.@br
 
-To create a template, you can take the document you want to @noAutoLink(process), remove all unimportant things and annotate the remaining things with template commands that read the relevant data into variables. 
+To create a template, you can take the document you want to process and remove all unimportant things, which results in a pattern template that can be matched against the page to find the relevant elements.
+These elements can then be read into variables, by annotating them with the corresponding variable names.@br
+
+
+A collection of such single-page templates can be stored in a multi-page template file, which can be loaded with the TMultipageTemplate class and applied to the these pages by the TMultipageTemplateReader class.
+
+   (Notice: Although both the multi-page and single-page templates are called templates, they are actually something
+    *entirely* different:
+       A multi-page template is a list of explicit actions that are performed in order, like an algorithm;
+       A single-page template is an implicit pattern that is matched against the page, like a regular expression)
 
 @section(2 AnchorNamePXP High-Mid-Level: PXPath/Expression processing)
 
