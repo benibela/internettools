@@ -400,6 +400,7 @@ end;
 
 function TTreeElement.hasAttribute(const a: string): boolean;
 begin
+  if (self = nil) or (attributes = nil) then exit(false);
   result := attributes.IndexOfName(a) >= 0;
 end;
 
