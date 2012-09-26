@@ -42,16 +42,16 @@ It supports:
 )
 
 *)
-function retrieve(const data: string): string;
+function retrieve(data: string): string;
 
 
 
 //**Make a http GET request to a certain url
-function httpRequest(const url: string): string;
+function httpRequest(url: string): string;
 //**Make a http POST request to a certain url, sending the data in rawpostdata unmodified to the server
-function httpRequest(const url: string; rawpostdata: string): string;
+function httpRequest(url: string; rawpostdata: string): string;
 //**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it
-function httpRequest(const url: string; postdata: TStringList): string;
+function httpRequest(url: string; postdata: TStringList): string;
 
 (***
 Processes data with a certain query.@br@br
@@ -118,7 +118,7 @@ threadvar
   lastRetrievedType: TRetrieveType;
 
 
-function retrieve(const data: string): string;
+function retrieve(data: string): string;
 var trimmed: string;
 begin
   trimmed:=TrimLeft(data);
@@ -209,20 +209,20 @@ begin
   defaultInternet := defaultInternetAccessClass.create;
 end;
 
-function httpRequest(const url: string): string;
+function httpRequest(url: string): string;
 begin
   needInternetAccess();
   //writeln(stderr, url);
   result:=defaultInternet.get(url);
 end;
 
-function httpRequest(const url: string; rawpostdata: string): string;
+function httpRequest(url: string; rawpostdata: string): string;
 begin
   needInternetAccess();
   result:=defaultInternet.post(url, rawpostdata);
 end;
 
-function httpRequest(const url: string; postdata: TStringList): string;
+function httpRequest(url: string; postdata: TStringList): string;
 begin
   result := httpRequest(url, TInternetAccess.urlEncodeData(postdata));
 end;

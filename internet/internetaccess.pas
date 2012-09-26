@@ -151,7 +151,7 @@ var slash,points: integer;
     port:string;
 begin
   url:=totalURL;
-  protocol:=copy(url,1,pos('://',totalURL)-1);
+  protocol:=copy(url,1,pos('://',url)-1);
   delete(url,1,length(protocol)+3);
   slash:=pos('/',url);
   if slash = 0 then slash := length(url) + 1;
