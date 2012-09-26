@@ -15,7 +15,7 @@ uses extendedhtmlparser, pseudoxpath, bbutils;
 
 
 procedure unitTests();
-var data: array[1..284] of array[1..3] of string = (
+var data: array[1..285] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -585,6 +585,8 @@ var data: array[1..284] of array[1..3] of string = (
       ,('<a><b>{test:=/deep-text()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=A1B1B2B3B4')
       ,('<a><b>{test:=static-base-uri()}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=unittest')
       ,('<a><b>{test:=123,abc:="foobar"}</b></a>', '<a><b>A1</b></a><a><b>B1</b><b>B2</b><b>B3</b><b>B4</b></a>', 'test=123'#13'abc=foobar')
+      ,('<table id="foobar"><tr>{temp := 0}<td>abc</td><td>{temp := $temp + .}</td>*{result := $temp}</tr>*</table>', '<table id="foobar"><tr><td>abc</td><td>1</td><td>2</td></tr><tr><td>abc</td><td>20</td><td>50</td></tr></table>', 'temp=0'#13'temp=1'#13'temp=3'#13'result=3'#13'temp=0'#13'temp=20'#13'temp=70'#13'result=70')
+
 
       //anonymous variables
       ,('<a>{text()}</a>', '<a>hallo</a>', '_result=hallo')
