@@ -97,7 +97,7 @@ TTreeElement = class
   property defaultProperty[name: string]: string read getAttribute; default;
 
 
-  procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next, not reverse)
+  procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next+previous, not reverse+parent)
   procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
@@ -169,6 +169,7 @@ private
   FTrimText, FReadComments: boolean;
   FTrees: TList;
   FCurrentTree: TTreeDocument;
+  FXmlHeaderEncoding: TEncoding;
 
   function newTreeElement(typ:TTreeElementType; text: pchar; len:longint):TTreeElement;
   function newTreeElement(typ:TTreeElementType; s: string):TTreeElement;
@@ -473,11 +474,13 @@ end;
 
 procedure TTreeElement.insert(el: TTreeElement);
 begin
+  // self  self.next  => self el self.next
   if self = nil then exit;
   el.next := self.next;
   self.next := el;
   el.offset := offset;
   el.previous:=self;
+  if el.next <> nil then el.next.previous := el;
 end;
 
 procedure TTreeElement.insertSurrounding(before, after: TTreeElement);
@@ -498,12 +501,12 @@ begin
   before.reverse := after;
   after.reverse := before;
 
-  if (before.typ = tetOpen) and (before.reverse = after) and (surroundee.previous <> nil) then begin
+  if (before.typ = tetOpen) and (before.reverse = after) then begin
     prev := surroundee.getParent();
     el := surroundee;
     while (el <> nil) and (el.parent = prev) do begin
       el.parent := before;
-      el := el.next;
+      el := el.getNextSibling();
     end;
   end;
 end;
@@ -668,9 +671,9 @@ begin
   if tagName^ = '?' then begin //processing instruction
     if strlEqual(tagName, '?xml', tagNameLen) then begin
       enc := lowercase(getProperty('encoding', properties));
-      if enc = 'utf-8' then FCurrentTree.FEncoding:=eUTF8
+      if enc = 'utf-8' then FXmlHeaderEncoding:=eUTF8
       else if (enc = 'windows-1252') or (enc = 'iso-8859-1') or (enc = 'iso-8859-15') or (enc = 'latin1') then
-        FCurrentTree.FEncoding:=eWindows1252;
+        FXmlHeaderEncoding:=eWindows1252;
       exit;
     end;
     if not FReadProcessingInstructions then exit;
@@ -977,6 +980,7 @@ begin
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);
   FTemplateCount:=1;
+  FXmlHeaderEncoding := eUnknown;
 
   //parse
   if FParsingModel = pmHTML then simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText, @readComment)
@@ -993,9 +997,11 @@ begin
      else
       encMeta := encHeader;
 
-    if encMeta = eUnknown then encMeta := encHeader;
+    if encHeader = eUnknown then encHeader := FXmlHeaderEncoding;
     if encHeader = eUnknown then encHeader := encMeta;
-    if (encMeta = encHeader) and (encMeta <> eUnknown) then
+    if encMeta  = eUnknown then encMeta := encHeader;
+    if FXmlHeaderEncoding = eUnknown then FXmlHeaderEncoding := encHeader;
+    if (encMeta = encHeader) and (encMeta = FXmlHeaderEncoding) and (encMeta <> eUnknown) then
       FCurrentTree.FEncoding := encMeta
     else begin //if in doubt, detect encoding and ignore meta/header data
       FCurrentTree.FEncoding:=eUTF8;
