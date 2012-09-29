@@ -361,6 +361,23 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
     @item(There was always some confusion, if the old variable changelog should be deleted or merged with the new one, if you process several html documents. Therefore the old merging option was removed and replaced by the KeepPreviousVariables property.)
     )
 
+    @bold(Planned breaking changes: )@br
+    @unorderedList(
+    @item(Avoid using numbers and other variables with the unnamed result variable:@br
+          Currently the very short notation @code({x}) always assigns the value of x to the unnamed result variable. (when x doesn't contain a comma)@br
+          So @code({5}) is the same as @code({result:=5}) and @code({$a}) is the same as @code({result:=$a}).@br
+          But that is pretty much useless, so in future versions @code({5}) will probably ask for a five-time repetition of the previous element (which is the same @code({5,5}) does now) and
+          @code({$a}) will be the same a @code({a := .}), saving two letters)
+    @item(Avoid using {} at the begin/end of attributes:@br
+          The only way to read an attribute is to use the XPath attribute selector, e.g. @code({attrib:=@href}) or @code({@href}) with the unnamed variable.@br
+          This is not how the templates are supposed to look, so in future the very short notation will probably also be interpreted in attributes,
+          e.g. @code(<a href="{url:=.}"/>) might read an url. )
+    @item(Avoid unmatched parenthesis and pipes within text nodes:@br
+          Currently is no short notation to read alternatives with the template:switch command, like @code(<template:switch><a>..</a><b>..</b><c>..</c></template:switch>).@br
+          In future this might be the same as @code((<a>..</a>|<b>..</b>|<c>..</c>)).@br
+          )
+    )
+
 *)
 THtmlTemplateParser=class
   protected
