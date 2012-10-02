@@ -2471,7 +2471,7 @@ var mp: integer;
     if mask[mp] = '$' then begin mp+=1; exit(''); end;
     oldpos := mp;
     if mask[mp] in SPECIAL_MASK_CHARS then begin
-      while (mp <= length(mask)) and (mask[mp] in SPECIAL_MASK_CHARS) do mp+=1;
+      while (mp <= length(mask)) and (mask[mp] = mask[oldpos]) do mp+=1;
       result := copy(mask, oldpos, mp - oldpos);
       if (mp <= length(mask)) and (mask[mp] = '+') then mp+=1;
     end else begin

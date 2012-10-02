@@ -457,6 +457,10 @@ begin
   test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.0000009), '12.000001');
   test(timeFormat('s[.z+]', high(integer), high(integer), 12, 0.00000009), '12.0'); //TODO: fix this case (? print either 12.000000 or 12)
   test(dateTimeFormat('yyyy-mm-dd hh:nn:ss.zz', -1, 12, 31, 23, 59, 59, 0.999), '0001-01-01 00:00:00.00');
+  test(dateFormat('yyyymmdd', 2012, 12, 21), '20121221');
+  test(dateTimeFormat('yyyymmddhhnnss', 2012, 12, 21, 17,00,00), '20121221170000');
+  test(dateTimeFormat('yyyymmdd[hhnnss]', 2012, 12, 21, 17,00,00), '20121221170000');
+  test(dateTimeFormat('yyyymmdd[hhnnss]', 2987, 12, 31, high(integer),high(integer),high(integer)), '29871231');
 
   test(dateEncode(1,1,1), EncodeDate(1,1,1));
   test(dateEncode(2012,10,31), EncodeDate(2012,10,31));
