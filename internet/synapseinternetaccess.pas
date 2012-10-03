@@ -135,7 +135,7 @@ function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol
    end;
    if Referer <> '' then
      connection.Headers.Add('Referer: '+Referer);
-   connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml');;
+   connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml,*/*');;
    connection.Protocol:='1.1';
    if additionalHeaders.Count > 0 then
      for i := 0 to additionalHeaders.Count - 1 do
