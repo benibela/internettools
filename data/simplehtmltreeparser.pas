@@ -21,7 +21,7 @@ type
 TAttributeList = TStringList; //TODO: use a map
 
 //**The type of a tree element. <Open>, text, or </close>
-TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction);
+TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttributeValue, tetAttributeName);
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
 //**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
@@ -50,15 +50,36 @@ TTreeDocument = class;
 //**Some invariants: (SO: set of opening tags in sequence)@br
 //**∀a \in SO: a < a.reverse@br
 //**∀a,b \in SO: a < b < a.reverse => a < b.reverse < a.reverse@br
+//**@br
+//**Attributes should be accessed with the getAttribute or getAttributeTry method. @br
+//**But if you are brave or need to modify the attributes, you can access the internal attribute storage with the attributes field.@br
+//**All attributes are stored in the same structure as the other elements as quadro-linked list. The names and values are stored in two lists, which are connected with the connecting @code(reverse) field.@br
+//**You can use the second getAttributeTry method to get a pointer to value node for a certain name.
+//**
+//** @code(<foo name1="value1" name2="value2" name3="value3>/>)
+//** @longCode(#
+//**      /--------------\                                     pointer to first attribute (attributes)
+//**      |              |
+//**      |      /-->  <foo>  <-----------------------\
+//**      |       |             |           |          |       single linked list to parent (parent)
+//**      |       |             |           |          |
+//**      \-->  name1  <-->  name2  <-->  name3        |       double linked list of attributes (previous and next)
+//**             /|\          /|\          /|\         |
+//**              |            |            |          |       single linked list of corresponding node/thing (reverse)
+//**             \|/          \|/          \|/         |
+//**            value1 <-->  value2 <-->  value3       |       (again) double linked list of attributes (previous and next)
+//**              |            |            |          |
+//**              \------------------------------------/       (again) single linked list to parent
+//** #)
 TTreeElement = class
 //use the fields if you know what you're doing
   typ: TTreeElementType; //**<open, close, text or comment node
   value: string; //**< tag name for open/close nodes, text for text/comment nodes
-  attributes: TAttributeList;  //**<nil für tetText
+  attributes: TTreeElement;  //**<nil if there are no attributes
   next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   previous: TTreeElement; //**< previous element (self.next.previous = self)
   parent: TTreeElement;
-  reverse: TTreeElement; //**<element paired by open/closing
+  reverse: TTreeElement; //**<element paired by open/closing, or corresponding attributes
 
   offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
@@ -87,6 +108,7 @@ TTreeElement = class
   function getAttribute(const a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
   function getAttribute(const a: string; const def: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
   function getAttributeTry(const a: string; out valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
+  function getAttributeTry(const a: string; out valueout: TTreeElement):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
@@ -100,6 +122,11 @@ TTreeElement = class
   procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next+previous, not reverse+parent)
   procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
+
+  function addAttributes(const props: array of THTMLProperty): TTreeElement; //adds an array of properties to the attributes. Returns the element of the last inserted attribute.
+
+  procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
+  function deleteElementFromDoubleLinkedList: TTreeElement; //removes the element from the double linked list (only updates previous/next), frees it and returns next  (mostly useful for attribute nodes)
 
 protected
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
@@ -262,26 +289,36 @@ begin
 end;
 
 procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
+  function change(s: string): string;
+  begin
+    result := strChangeEncoding(s, from, toe);
+    if substituteEntities then result := strDecodeHTMLEntities(result, toe, false);
+    if trimText then result := trim(result); //retrim because &nbsp; replacements could have introduced new spaces
+  end;
+
 var tree: TTreeElement;
   s: String;
+  attrib: TTreeElement;
 begin
   if (from = eUnknown) or (toe = eUnknown) then exit;
   if (from = toe) and not substituteEntities then exit;
   tree := self;
   while tree <> nil do begin
-    if tree.typ = tetText then begin
-      tree.value:=strChangeEncoding(tree.value, from, toe);
-      if substituteEntities then tree.value:=strDecodeHTMLEntities(tree.value, toe, false);
-      if trimText then tree.value:=trim(tree.value); //retrim because &nbsp; replacements could have introduced new spaces
-    end else if tree.typ = tetComment then begin
-      tree.value:=strChangeEncoding(tree.value, from, toe);
-    end else if tree.attributes <> nil then begin
-      s :=strChangeEncoding(tree.attributes.text,from,toe);
-      if substituteEntities then s:=strDecodeHTMLEntities(s, toe, false);
-      if trimText then s:=trim(s);
-      tree.attributes.text:=s;
+    case tree.typ of
+      tetText, tetProcessingInstruction: tree.value := change(tree.value);
+      tetComment: tree.value:=strChangeEncoding(tree.value, from, toe);
+      tetOpen, tetClose: begin
+        tree.value := change(tree.value);
+        attrib := tree.attributes;
+        while attrib <> nil do begin
+          attrib.value := change(attrib.value);
+          assert(attrib.reverse <> nil);
+          attrib.reverse.value := change(attrib.reverse.value);
+          attrib := attrib.next;
+        end;
+      end;
+      else raise Exception.Create('Unkown tree element: '+tree.outerXML());
     end;
-    //TODO: convert tree tag names (but this is not necessary as long as only latin1 and utf8 is supported)
     tree := tree.next;
   end;
 end;
@@ -336,6 +373,7 @@ end;
 
 function TTreeElement.outerXML(insertLineBreaks: boolean = false): string;
 var i: Integer;
+  attrib: TTreeElement;
 begin
   if self = nil then exit;
   case typ of
@@ -344,20 +382,23 @@ begin
     tetComment: result := '<!--'+value+'-->';
     tetProcessingInstruction: begin
       result := '<?'+value;
-      if attributes <> nil then begin
-        for i:=0 to attributes.Count-1 do
-          if attributes.ValueFromIndex[i] = '' then result += ' ' +attributes.Names[i]
-          else result += ' ' +attributes[i];
-        end;
+      attrib := attributes;
+      while attrib <> nil do begin
+        if attrib.reverse.value = '' then result += ' ' + attrib.value
+        else result += ' ' + attrib.value + '=' + attrib.reverse.value;
+        attrib := attrib.next;
+      end;
       result += '?>';
     end;
     tetOpen: begin
       result := '<'+value;
-      if attributes <> nil then begin
-        for i:=0 to attributes.Count - 1 do begin
-          result += ' ' + attributes.names[i]+'="'+attributes.ValueFromIndex[i]+'"'; //todo fix escaping & < >
-        end;
+      attrib := attributes;
+      while attrib <> nil do begin
+        assert(attrib.reverse <> nil);
+        result += ' ' + attrib.value+'="'+attrib.reverse.value+'"'; //todo fix escaping & < >
+        attrib := attrib.next;
       end;
+
       if next = reverse then begin
         result += '/>';
         if insertLineBreaks then Result+=LineEnding;
@@ -400,9 +441,9 @@ begin
 end;
 
 function TTreeElement.hasAttribute(const a: string): boolean;
+var temp: TTreeElement;
 begin
-  if (self = nil) or (attributes = nil) then exit(false);
-  result := attributes.IndexOfName(a) >= 0;
+  exit(getAttributeTry(a, temp));
 end;
 
 function TTreeElement.getAttribute(const a: string): string;
@@ -418,13 +459,27 @@ begin
 end;
 
 function TTreeElement.getAttributeTry(const a: string; out valueout: string): boolean;
-var i:integer;
+var temp: TTreeElement;
 begin
-  if (self = nil) or (attributes = nil) then exit(false);
-  i := attributes.IndexOfName(a);
-  if i < 0 then exit(false);
-  valueout := attributes.ValueFromIndex[i];
-  result := true;
+  result := getAttributeTry(a, temp);
+  if not result then exit;
+  valueout := temp.value;
+end;
+
+function TTreeElement.getAttributeTry(const a: string; out valueout: TTreeElement): boolean;
+var
+  attrib: TTreeElement;
+begin
+  result := false;
+  if self = nil then exit;
+  attrib := attributes;
+  while attrib <> nil do begin
+    if striEqual(attrib.value, a) then begin //Todo: case sensitive or insensitive??
+      valueout := attrib.reverse;
+      exit(true);
+    end;
+    attrib := attrib.next;
+  end;
 end;
 
 function TTreeElement.getNextSibling(): TTreeElement;
@@ -521,6 +576,57 @@ begin
   insertSurrounding(basetag, closing);
 end;
 
+function TTreeElement.addAttributes(const props: array of THTMLProperty): TTreeElement;
+var
+  prev: TTreeElement;
+  attrib: TTreeElement;
+  i: Integer;
+begin
+  if length(props) = 0 then exit(nil);
+
+  prev := attributes;
+  if prev <> nil then
+    while prev.next <> nil do
+      prev := prev.next;
+
+
+  for i := 0 to high(props) do begin
+    attrib := TTreeElement.create(tetAttributeName, strFromPchar(props[i].name, props[i].nameLen));
+    attrib.parent := self;
+    if prev <> nil then prev.next := attrib
+    else attributes := attrib;
+    attrib.previous := prev;
+
+
+    attrib.reverse := TTreeElement.create(tetAttributeValue, strFromPchar(props[i].value, props[i].valueLen));
+    attrib.reverse.parent := self;
+    attrib.reverse.reverse := attrib;
+    if prev <> nil then begin
+      prev.reverse.next := attrib.reverse ;
+      attrib.reverse.previous := prev.reverse;
+    end;
+
+    prev := attrib;
+  end;
+
+  exit(attrib);
+
+
+end;
+
+procedure TTreeElement.removeElementFromDoubleLinkedList;
+begin
+  if previous <> nil then previous.next := next;
+  if next <> nil then next.previous := nil;
+end;
+
+function TTreeElement.deleteElementFromDoubleLinkedList: TTreeElement;
+begin
+  result := next;
+  removeElementFromDoubleLinkedList;
+  free;
+end;
+
 procedure TTreeElement.removeAndFreeNext();
 var
   toFree: TTreeElement;
@@ -564,17 +670,20 @@ end;
 function TTreeElement.toString(): string;
 var
   i: Integer;
+  attrib: TTreeElement;
 begin
   if self = nil then exit('');
   case typ of
     tetText: exit(value);
     tetClose: exit('</'+value+'>');
     tetOpen: begin
-        result := '<'+value;
-        if attributes <> nil then
-          for i:=0 to attributes.Count-1 do
-            result += ' '+attributes.Names[i] + '="'+attributes.ValueFromIndex[i]+'"';
-        result+='>';
+      result := '<'+value;
+      attrib := attributes;
+      while attrib <> nil do begin
+        result += ' '+attrib.value + '="'+attrib.reverse.value+'"';
+        attrib := attrib.next;
+      end;
+      result+='>';
     end;
     tetComment: exit('<!--'+value+'-->');
     else exit('??');
@@ -677,19 +786,15 @@ begin
       exit;
     end;
     if not FReadProcessingInstructions then exit;
-    temp := newTreeElement(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
+    new := newTreeElement(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
     if length(properties)>0 then begin
-      temp.attributes:=TAttributeList.Create;
-      for i:=0 to high(properties) do
-        with properties[i] do
-          temp.attributes.Add(trim(strFromPchar(name,nameLen))+'='+trim(strFromPchar(value,valueLen)));
-      if strEndsWith(temp.attributes.ValueFromIndex[temp.attributes.Count-1], '?') then
-        temp.attributes.ValueFromIndex[temp.attributes.Count-1] := copy(temp.attributes.ValueFromIndex[temp.attributes.Count-1], 1, length(temp.attributes.ValueFromIndex[temp.attributes.Count-1]) - 1)
-      else if (temp.attributes.ValueFromIndex[temp.attributes.Count-1] = '') and (strEndsWith(temp.attributes.names[temp.attributes.Count-1], '?') ) then
-        temp.attributes[temp.attributes.Count-1] := copy(temp.attributes.names[temp.attributes.Count-1], 1, length(temp.attributes.names[temp.attributes.Count-1]) - 1);
-
+      temp := new.addAttributes(properties);
+      if strEndsWith(temp.reverse.value, '?') then
+        temp.reverse.value := copy(temp.reverse.value, 1, length(temp.reverse.value) - 1)
+      else if (temp.reverse.value = '') and (strEndsWith(temp.value, '?') ) then
+        temp.value := copy(temp.value, 1, length(temp.value) - 1);
     end;
-    temp.initialized;
+    new.initialized;
     exit;
   end;
 
@@ -729,13 +834,7 @@ begin
     FAutoCloseTag:=htmlTagAutoClosed(new.value);
 
   FElementStack.Add(new);
-  if length(properties)>0 then begin
-    new.attributes:=TAttributeList.Create;
-    for i:=0 to high(properties) do
-      with properties[i] do
-        new.attributes.Add(trim(strFromPchar(name,nameLen))+'='+
-                                               trim(strFromPchar(value,valueLen)));
-  end;
+  if length(properties)>0 then new.addAttributes(properties);
   new.initialized;
 end;
 
@@ -954,7 +1053,7 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
   end;
 
 var
-  el: TTreeElement;
+  el, attrib: TTreeElement;
   encMeta, encHeader: TEncoding;
 begin
   FTemplateCount:=0;
@@ -1012,9 +1111,16 @@ begin
             FCurrentTree.FEncoding:=eWindows1252;
             break;
           end;
-          tetOpen: if (el.attributes <> nil) and isInvalidUTF8(el.attributes.Text) then begin
-            FCurrentTree.FEncoding:=eWindows1252;
-            break;
+          tetOpen: begin
+            attrib := el.attributes;
+            while attrib <> nil do begin
+              if isInvalidUTF8(attrib.value) or isInvalidUTF8(attrib.reverse.value) then begin
+                FCurrentTree.FEncoding:=eWindows1252;
+                break;
+              end;
+              attrib := attrib.next;
+            end;
+            if FCurrentTree.FEncoding <> eUTF8 then break;
           end;
         end;
         el := el.next;

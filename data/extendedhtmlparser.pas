@@ -529,24 +529,30 @@ var
  namespaceended: integer;
  j: Integer;
  curChild: TTreeElement;
+ attrib, temp: TTreeElement;
 begin
   //inherited initialized;
-  if attributes <> nil then
-  for i:=attributes.Count-1 downto 0 do
-    if strBeginsWith(attributes.Names[i], 'xmlns:') then begin
-      if (attributes.ValueFromIndex[i] = HTMLPARSER_NAMESPACE_URL) then
-        parser.FNamespaces.Add(strCopyFrom(attributes.Names[i], 7)+':');
-      attributes.Delete(i);
+  attrib := attributes;
+  while attrib <> nil do begin
+    if strBeginsWith(attrib.value, 'xmlns:') then begin
+      if attrib.reverse.value = HTMLPARSER_NAMESPACE_URL then
+        parser.FNamespaces.add(strCopyFrom(attrib.value, 7) + ':');
+      if attributes = attrib then attributes := attrib.next;
+      attrib.reverse.deleteElementFromDoubleLinkedList;
+      attrib := attrib.deleteElementFromDoubleLinkedList;
+      continue;
     end;
+    attrib := attrib.next;
+  end;
 
   templateType:=strToCommand(value, typ, parser.FNamespaces);
 
-  if attributes <> nil then
-  for i:=attributes.Count-1 downto 0 do begin
+  attrib := attributes;
+  while attrib <> nil do begin
     namespaceended:=-1;
     templateAttrib:=false;
     for j:=0 to parser.FNamespaces.Count-1 do
-      if strBeginsWith(attributes.Names[i], parser.FNamespaces[j]) then begin
+      if strBeginsWith(attrib.value, parser.FNamespaces[j]) then begin
         templateAttrib:=true;
         namespaceended:=length(parser.FNamespaces[j])+1;
         break;
@@ -554,10 +560,14 @@ begin
     templateAttrib:=templateAttrib or (templateType >= firstRealTemplateType);
     if templateAttrib then begin;
       if templateAttributes = nil then templateAttributes := TAttributeList.Create;
-      if namespaceended = -1 then templateAttributes.Add(attributes[i])
-      else templateAttributes.Add(strcopyfrom(attributes.Names[i], namespaceended) +'='+ attributes.ValueFromIndex[i]);
-      attributes.Delete(i);
+      if namespaceended = -1 then templateAttributes.Add(attrib.value+'='+attrib.reverse.value)
+      else templateAttributes.Add(strcopyfrom(attrib.value, namespaceended) +'='+ attrib.reverse.value);
+      if attributes = attrib then attributes := attrib.next;
+      attrib.reverse.deleteElementFromDoubleLinkedList;
+      attrib := attrib.deleteElementFromDoubleLinkedList;
+      continue;
     end;
+    attrib := attrib.next;
   end;
 
   if templateAttributes <> nil then
@@ -733,27 +743,29 @@ var
   templateList: TStringArray;
   htmlList: TStringArray;
   found: Boolean;
+  attrib: TTreeElement;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
        exit(false);
-  if template.attributes = nil then
+  if (template.attributes = nil) and (template.templateAttributes = nil) then
     exit(true);
-  for i:=0 to template.attributes.Count-1 do begin
-    name := template.attributes.Names[i];
+  attrib := template.attributes;
+  while attrib <> nil do begin
+    name := attrib.value;
     if html.attributes = nil then exit(false);
-    strategyi := FAttributeMatching.IndexOfName(template.attributes.Names[i]);
+    strategyi := FAttributeMatching.IndexOfName(attrib.value);
     if strategyi = -1 then begin
-      if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
+      if not striequal(html.getAttribute(name), attrib.reverse.value) then
         exit(false);
     end else begin
       strategy := FAttributeMatching.ValueFromIndex[strategyi];
       if strategy = 'is' then begin
-        if not striequal(html.attributes.Values[name], template.attributes.ValueFromIndex[i]) then
+        if not striequal(html.getAttribute(name), attrib.reverse.value) then
           exit(false);
       end else if strategy = 'list-contains' then begin
-        templateList := strSplit(template.attributes.ValueFromIndex[i], ' ', false);
-        htmlList := strSplit(html.attributes.Values[name], ' ', false);
+        templateList := strSplit(attrib.reverse.value, ' ', false);
+        htmlList := strSplit(html.getAttribute(name), ' ', false);
         for j:=0 to high(templateList) do begin
           found := false;
           for k:= 0 to high(htmlList) do if striEqual(templateList[j], htmlList[k]) then begin found := true; break; end;
@@ -766,6 +778,7 @@ begin
       cacheRegExpr('contains', '', '', true);
       cacheRegExpr('is', '^', '$', true);}
     end;
+    attrib := attrib.next;
   end;
   if template.templateAttributes = nil then exit(true);
   if template.condition = nil then exit(true);
