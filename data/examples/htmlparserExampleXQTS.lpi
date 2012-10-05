@@ -33,6 +33,11 @@
         <CommandLineParams Value="--simple 'xs:date(&quot;2030-12-31Z&quot;) - xs:yearMonthDuration(&quot;P0Y0M&quot;)'"/>
       </local>
     </RunParams>
+    <RequiredPackages Count="1">
+      <Item1>
+        <PackageName Value="mlprocessing"/>
+      </Item1>
+    </RequiredPackages>
     <Units Count="1">
       <Unit0>
         <Filename Value="htmlparserExampleXQTS.lpr"/>
