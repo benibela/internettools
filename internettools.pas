@@ -8,7 +8,7 @@ interface
 
 uses
   bbutils, extendedhtmlparser, dregexpr, autoupdate, simpleinternet, internetaccess, pseudoxpath, simplehtmlparser, simplehtmltreeparser, 
-  simplexmlparser, progressdialog, LazarusPackageIntf;
+  simplexmlparser, progressdialog, int65math, LazarusPackageIntf;
 
 implementation
 

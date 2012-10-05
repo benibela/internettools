@@ -16,7 +16,7 @@
         <CompilerPath Value="$(CompPath)"/>
       </Other>
     </CompilerOptions>
-    <Files Count="17">
+    <Files Count="18">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -85,6 +85,10 @@
         <Filename Value="../lazarus/dialogs/progressdialog.lfm"/>
         <Type Value="LFM"/>
       </Item17>
+      <Item18>
+        <Filename Value="data/int65math.pas"/>
+        <UnitName Value="int65math"/>
+      </Item18>
     </Files>
     <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="2">
