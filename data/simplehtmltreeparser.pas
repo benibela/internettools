@@ -581,13 +581,18 @@ var
   prev: TTreeElement;
   attrib: TTreeElement;
   i: Integer;
+  newoffset: Integer;
 begin
   if length(props) = 0 then exit(nil);
 
+  newoffset := offset + 1;
+
   prev := attributes;
-  if prev <> nil then
+  if prev <> nil then begin
     while prev.next <> nil do
       prev := prev.next;
+    newoffset := prev.offset + 1;
+  end;
 
 
   for i := 0 to high(props) do begin
@@ -596,6 +601,7 @@ begin
     if prev <> nil then prev.next := attrib
     else attributes := attrib;
     attrib.previous := prev;
+    attrib.offset:=newoffset; //offset hack to sort attributes after their parent elements in result sequence
 
 
     attrib.reverse := TTreeElement.create(tetAttributeValue, strFromPchar(props[i].value, props[i].valueLen));
@@ -605,7 +611,9 @@ begin
       prev.reverse.next := attrib.reverse ;
       attrib.reverse.previous := prev.reverse;
     end;
+    attrib.reverse.offset:=newoffset;
 
+    newoffset+=1;
     prev := attrib;
   end;
 
