@@ -719,7 +719,10 @@ end;
 
 destructor TTreeElement.destroy();
 begin
-  attributes.Free;
+  if attributes <> nil then begin
+    if attributes.reverse <> nil then attributes.reverse.deleteAll();
+    attributes.deleteAll();
+  end;
   inherited destroy();
 end;
 
