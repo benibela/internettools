@@ -37,7 +37,7 @@
         <PackageName Value="internettools"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="2">
+    <Units Count="6">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -48,13 +48,33 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="bbutils_tests"/>
       </Unit1>
+      <Unit2>
+        <Filename Value="../pseudoxpath.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="pseudoxpath"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="../int65math.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="int65math"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="../bbutils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="bbutils"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="../extendedhtmlparser.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="extendedhtmlparser"/>
+      </Unit5>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="11"/>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;/home/benito/hg/components/pascal/internet/;.;../../../components/pascal/import/bigint"/>
+      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;/home/benito/hg/components/pascal/internet/;.;../../../components/pascal/import/bigint;.."/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <CodeGeneration>
