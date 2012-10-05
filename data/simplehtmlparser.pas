@@ -163,7 +163,10 @@ begin
             tempLen:=pos-marker;
             //read properties
             while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
-            while (pos<=htmlEnd) and  not (pos^ in ['>','/']) do begin
+            while (pos<=htmlEnd)
+                   and  not (pos^ in ['>','/'])
+                   and ((marker^ <> '?') or (pos^ <> '?') or ((pos+1)^ <> '>') )
+                   do begin
               if pos>htmlEnd then exit;
               //new property
               setlength(properties,length(properties)+1);
@@ -207,6 +210,7 @@ begin
                 exit;
 
             cdataTag:=false;
+            if pos^ = '?' then inc(pos);
             if (pos^ = '/')  then begin
               if assigned(leaveTagEvent) then
                 if leaveTagEvent(marker,tempLen) = prStop then

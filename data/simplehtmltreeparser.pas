@@ -123,6 +123,7 @@ TTreeElement = class
   procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
+  function addAttribute(aname, avalue: string): TTreeElement; //adds a single attribute. Returns the element of the last inserted attribute. (runs in O(|attributes|) => do not use for multiple attributes)
   function addAttributes(const props: array of THTMLProperty): TTreeElement; //adds an array of properties to the attributes. Returns the element of the last inserted attribute.
 
   procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
@@ -382,12 +383,7 @@ begin
     tetComment: result := '<!--'+value+'-->';
     tetProcessingInstruction: begin
       result := '<?'+value;
-      attrib := attributes;
-      while attrib <> nil do begin
-        if attrib.reverse.value = '' then result += ' ' + attrib.value
-        else result += ' ' + attrib.value + '=' + attrib.reverse.value;
-        attrib := attrib.next;
-      end;
+      if attributes <> nil then result += ' '+attributes.reverse.value;
       result += '?>';
     end;
     tetOpen: begin
@@ -574,6 +570,17 @@ begin
   closing.typ := tetClose;
   closing.value := basetag.value;
   insertSurrounding(basetag, closing);
+end;
+
+function TTreeElement.addAttribute(aname, avalue: string): TTreeElement;
+var temp: THTMLProperties;
+begin
+  SetLength(temp, 1);
+  temp[0].name:=pchar(aname);
+  temp[0].nameLen:=length(aname);
+  temp[0].value:=pchar(avalue);
+  temp[0].valueLen:=length(avalue);
+  addAttributes(temp);
 end;
 
 function TTreeElement.addAttributes(const props: array of THTMLProperty): TTreeElement;
@@ -782,6 +789,7 @@ var
   i: Integer;
   j: Integer;
   enc: String;
+  first,last: PChar;
 begin
   result:=prContinue;
 
@@ -796,11 +804,15 @@ begin
     if not FReadProcessingInstructions then exit;
     new := newTreeElement(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
     if length(properties)>0 then begin
-      temp := new.addAttributes(properties);
-      if strEndsWith(temp.reverse.value, '?') then
-        temp.reverse.value := copy(temp.reverse.value, 1, length(temp.reverse.value) - 1)
-      else if (temp.reverse.value = '') and (strEndsWith(temp.value, '?') ) then
-        temp.value := copy(temp.value, 1, length(temp.value) - 1);
+      first := properties[0].name;
+      first-=1;
+      while first^ in [' ',#9] do first-=1;
+      first+=2;
+      last := properties[high(properties)].value + properties[high(properties)].valueLen;
+      while ((last+1)^ <> #0) and ((last^ <> '?') or ((last+1)^ <> '>'))  do last+=1;
+
+      new.addAttribute('', strFromPchar(first, last-first));
+      new.addAttributes(properties);
     end;
     new.initialized;
     exit;
