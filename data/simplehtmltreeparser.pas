@@ -387,6 +387,7 @@ begin
       result += '?>';
     end;
     tetOpen: begin
+      if (value = '') and (self is TTreeDocument) then exit(innerXML());
       result := '<'+value;
       attrib := attributes;
       while attrib <> nil do begin
@@ -692,6 +693,7 @@ begin
     tetText: exit(value);
     tetClose: exit('</'+value+'>');
     tetOpen: begin
+      if (value = '') and (self is TTreeDocument) then exit(innerXML());
       result := '<'+value;
       attrib := attributes;
       while attrib <> nil do begin
