@@ -4,8 +4,7 @@ program tests;
 
 uses
   //heaptrc,
-  Classes, pseudoxpath_tests, extendedhtmlparser_tests, bbutils_tests, int65math, pseudoxpath, extendedhtmlparser, bbutils
-  { you can add units after this };
+  Classes, pseudoxpath_tests, extendedhtmlparser_tests, bbutils_tests, int65math, pseudoxpath, extendedhtmlparser, bbutils;
 
 begin
   bbutils_tests.unitTests;
