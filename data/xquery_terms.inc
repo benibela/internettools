@@ -1,3 +1,35 @@
+function getAxis(const axis: string): TPXPQueryCommandType;
+begin
+   //forward
+   if (axis ='') or (axis='child') then exit(qcDirectChild);
+   if axis='descendant' then exit(qcDescendant);
+   if axis='self' then exit(qcSameNode);
+   if axis='parent' then exit(qcDirectParent);
+   //if axis='attribute' then exit(qcDescendant);
+   if axis='descendant-or-self' then exit(qcSameOrDescendant);
+   if axis='following-sibling' then exit(qcFollowingSibling);
+   if axis='following' then exit(qcFollowing);
+
+   //reverse
+   if axis='ancestor' then exit(qcAncestor);
+   if axis='preceding-sibling' then exit(qcPrecedingSibling);
+   if axis='preceding' then exit(qcPreceding);
+   if axis='ancestor-or-self' then exit(qcSameOrAncestor);
+   raise EPXPEvaluationException.Create('Unknown axis: '+axis);
+end;
+
+function convertElementTestToMatchingOptions(select: string): TPXPQueryMatchingTypes;
+begin
+  if select = 'node' then
+    exit([qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute])
+  else if select = 'text' then exit([qmText])
+  else if select = 'comment' then exit([qmComment])
+  else if select = 'element' then exit([qmElement,qmExcludeRoot])
+  else if select = 'processing-instruction' then
+    exit([qmProcessingInstruction])
+  else raise Exception.Create('Unkown element test: '+select);
+end;
+
 { TXQTermReadProperty }
 
 constructor TXQTermReadObjectProperty.create(apropname: string);
@@ -57,6 +89,30 @@ begin
   Result:=inherited staticTypeGuess;
 end;
 
+function TXQTermFilterSequence.toQueryCommand: TPXPQueryCommand;
+begin
+  if length(children) <> 2 then raiseEvaluationError('invalid [] construct');
+  result := children[0].toQueryCommand;
+  setlength(result.pxp, length(result.pxp)+1);
+  result.pxp[high(result.pxp)] := children[1];
+end;
+
+procedure TXQTermFilterSequence.addToQueryList(var path: TPXPQueryCommands);
+begin
+  if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
+
+  if (children[0] is TXQTermNodeMatcher) and (children[0] is TXQTermNodeMatcherFunction) then begin
+    children[0].addToQueryList(path);
+    setlength(path[high(path)].pxp, length(path[high(path)].pxp) + 1);
+    path[high(path)].pxp[high(path[high(path)].pxp)] := children[1];
+  end else begin
+    setlength(path, length(path) +1);
+    path[high(path)].typ:=qcFunctionSpecialCase;
+    path[high(path)].specialCase:=self;
+  end;
+
+end;
+
 { TXQTermNodeRoot }
 
 function TXQTermNodeRoot.evaluate(const context: TEvaluationContext): TPXPValue;
@@ -68,6 +124,11 @@ end;
 function TXQTermNodeRoot.staticTypeGuess: TPXPValueKind;
 begin
   Result:=inherited staticTypeGuess;
+end;
+
+function TXQTermNodeRoot.toQueryCommand: TPXPQueryCommand;
+begin
+  result.typ:=qcDocumentRoot;
 end;
 
 { TXQTermNodeMatcherFunction }
@@ -82,7 +143,7 @@ begin
   if (value = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
   else if (value = 'text') and (context.sender.TextElement<>nil) then result := pxpvalue(context.sender.TextElement)
   else begin
-    result := context.sender.evaluateSingleStepQuery(context.sender.termToQueryCommand(self), context);
+    result := context.sender.evaluateSingleStepQuery(toQueryCommand, context);
     pxpvalueSeqSqueeze(result);
   end;
 end;
@@ -90,6 +151,24 @@ end;
 function TXQTermNodeMatcherFunction.staticTypeGuess: TPXPValueKind;
 begin
   Result:=inherited staticTypeGuess;
+end;
+
+function TXQTermNodeMatcherFunction.toQueryCommand: TPXPQueryCommand;
+var
+  axis: String;
+  select: String;
+begin
+  axis := '';
+  select := value;
+  if strContains(select,'::') then
+    axis:=strSplitGet('::',select);
+  result.matching:=convertElementTestToMatchingOptions(select);
+  if (result.matching = [qmProcessingInstruction]) and (length(children) > 0) then begin
+    assert(children[0] is TXQTermType);
+    result.value := TXQTermType(children[0]).value;
+    include(result.matching, qmValue) ;
+  end;
+  result.typ:=getAxis(axis);
 end;
 
 { TXQTermDefineVariable }
@@ -392,6 +471,39 @@ begin
   result := PPXPOperatorInfo(binaryOps.Objects[index])
 end;
 
+procedure TXQTermBinaryOp.addToQueryList(var path: TPXPQueryCommands);
+var
+  isDoubleSlash: Boolean;
+  last: Integer;
+begin
+  isDoubleSlash := (index = binaryOps.IndexOf('//'));
+  if  not (isDoubleSlash or (index = binaryOps.IndexOf('/'))) then begin
+    inherited addToQueryList(path);
+    exit;
+  end;
+
+  children[0].addToQueryList(path);
+  if isDoubleSlash then begin
+    setlength(path, length(path) + 1);
+    path[high(path)].typ:=qcSameOrDescendant;
+    path[high(path)].matching:=[qmElement, qmText, qmComment, qmProcessingInstruction];
+  end;
+  if children[1] is TXQTermFilterSequence then begin
+    setlength(path, length(path) + 1);
+    path[high(path)] := children[1].toQueryCommand;
+  end else children[1].addToQueryList(path);
+
+  //optimization
+  //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
+  last := high(path);
+  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].pxp) = 0)
+      and (path[last].typ in [qcDirectChild, qcDescendant]) and (length(path[last].pxp) = 0) then begin
+    path[last - 1] := path[last];
+    path[last - 1].typ := qcDescendant;
+    SetLength(path, last);
+  end;
+end;
+
 { TXQTermNodeMatcher }
 
 constructor TXQTermNodeMatcher.Create(const avalue: string);
@@ -401,12 +513,43 @@ end;
 
 function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): TPXPValue;
 begin
-  result := context.sender.evaluateSingleStepQuery(context.sender.termToQueryCommand(self),context);
+  result := context.sender.evaluateSingleStepQuery(toQueryCommand,context);
 end;
 
 function TXQTermNodeMatcher.staticTypeGuess: TPXPValueKind;
 begin
   Result:=inherited staticTypeGuess;
+end;
+
+function TXQTermNodeMatcher.toQueryCommand: TPXPQueryCommand;
+var
+  axis: String;
+  select: String;
+begin
+  axis := '';
+  select:=value;
+  if strContains(select,'::') then
+    axis:=strSplitGet('::',select);
+  if select = '.' then begin
+    result.typ:=qcSameNode; //same node /./
+    result.matching:=[qmElement, qmAttribute];
+  end else if select='..' then begin
+    result.typ:=qcDirectParent; //parent /../
+    result.matching:=[qmElement];
+  end else if select='' then begin //grand child //
+    //if (length(term.children[i]^.children) > 0) then raiseEvaluationError('Invalid // wildcard');
+   // if i + 1 = high(term.children) then raiseEvaluationError('Unexpected end of xpath expression');
+    //if term.children[i+1]^.value = '' then raiseEvaluationError('/// is invalid');
+    result.typ := qcSameOrDescendant;
+    result.matching:=[qmElement];
+  end else if select='*' then begin
+    result.typ:=getAxis(axis); //any child /*/
+    result.matching:=[qmElement,qmAttribute, qmExcludeRoot];
+  end else begin //specific child
+    result.typ := getAxis(axis);
+    result.matching := [qmValue,qmElement];
+    result.value:=select;
+  end;
 end;
 
 { TXQTermUnaryOp }

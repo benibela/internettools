@@ -57,6 +57,18 @@ begin
     results[i] := children[i].evaluate(context);
 end;
 
+function TXQTerm.toQueryCommand: TPXPQueryCommand;
+begin
+  result.typ:=qcFunctionSpecialCase;
+  result.specialCase:=self;
+end;
+
+procedure TXQTerm.addToQueryList(var path: TPXPQueryCommands);
+begin
+  SetLength(path, length(path) + 1);
+  path[high(path)] := toQueryCommand;
+end;
+
 type TXQParsingContext = class
   AllowVariableUseInStringLiterals: boolean;
 
