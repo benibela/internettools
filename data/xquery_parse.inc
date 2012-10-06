@@ -57,6 +57,31 @@ begin
     results[i] := children[i].evaluate(context);
 end;
 
+type TXQParsingContext = class
+  AllowVariableUseInStringLiterals: boolean;
+
+  str: string;
+  pos: pchar;
+
+  procedure raiseParsingError(s: string);
+
+  procedure skipComment();
+  procedure skipWhitespaceAndComment();
+  procedure expect(c: char);
+  procedure expect(s: string);
+  function nextToken(lookahead: boolean=false): string;
+
+  function parseSequenceLike(target: TXQTerm): TXQTerm;
+
+  //**Parses the next complete value@br
+  //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
+  //**from @code(1 + 2) it will parse @code(1) (since @code(1) is complete), from @code(function(1,2,3)) it will parse everything (since @code(function) can not be evaluated without its parameters))@br
+  //**(observation: that kind of looks like it parses everything except binary operators)
+  function parseValue: TXQTerm;
+  function parse: TXQTerm;
+end;
+
+
 
 procedure TXQParsingContext.raiseParsingError(s: string);
 begin
