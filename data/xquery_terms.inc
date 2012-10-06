@@ -101,7 +101,12 @@ procedure TXQTermFilterSequence.addToQueryList(var path: TPXPQueryCommands);
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
 
-  if (children[0] is TXQTermNodeMatcher) and (children[0] is TXQTermNodeMatcherFunction) then begin
+
+  children[0].addToQueryList(path);
+  setlength(path[high(path)].pxp, length(path[high(path)].pxp) + 1);
+  path[high(path)].pxp[high(path[high(path)].pxp)] := children[1];
+
+  {if (children[0] is TXQTermNodeMatcher) and (children[0] is TXQTermNodeMatcherFunction) then begin
     children[0].addToQueryList(path);
     setlength(path[high(path)].pxp, length(path[high(path)].pxp) + 1);
     path[high(path)].pxp[high(path[high(path)].pxp)] := children[1];
@@ -109,7 +114,7 @@ begin
     setlength(path, length(path) +1);
     path[high(path)].typ:=qcFunctionSpecialCase;
     path[high(path)].specialCase:=self;
-  end;
+  end;   }
 
 end;
 
@@ -488,10 +493,11 @@ begin
     path[high(path)].typ:=qcSameOrDescendant;
     path[high(path)].matching:=[qmElement, qmText, qmComment, qmProcessingInstruction];
   end;
-  if children[1] is TXQTermFilterSequence then begin
+  {if children[1] is TXQTermFilterSequence then begin
     setlength(path, length(path) + 1);
     path[high(path)] := children[1].toQueryCommand;
-  end else children[1].addToQueryList(path);
+  end else}
+  children[1].addToQueryList(path);
 
   //optimization
   //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
