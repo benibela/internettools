@@ -376,6 +376,14 @@ begin
 end;
 
 type PXQTerm = ^TXQTerm;
+
+//searchs the term to split
+//e.g.
+//          to                          to
+//        1     +        * 4      =>  1     +
+//            2    3                      2    3 <- * 4
+//takes a pointer to a txqterm, since it sets the variable that should be changed
+//(parentheses can be ignored since they are stored as sequence terms in the tree)
 function ripBinOpApart(term: pxqterm; const prio: integer): PXQTerm;
 begin
   if not (term^ is TXQTermBinaryOp) or (TXQTermBinaryOp(term^).operatorInfo^.priority >= prio) then result := term
@@ -425,25 +433,8 @@ var astroot: TXQTerm;
     if res.operatorInfo^.followedBy <> '' then begin
       expect(res.operatorInfo^.followedBy);
       res.push(readSequenceType()); //assume we read instance of/cast/castable/treat as
-    end else begin
-      res.push(parseValue());
-
-     { if res.children[1] is TXQTermBinaryOp then begin
-        op1 := res.operatorInfo;
-        op2 := TXQTermBinaryOp(res.children[1]).operatorInfo;
-        if (op1^.priority >= op2^.priority) then begin
-           //rotate tree
-           //          *                 +
-           //        1     +      =>   *      3
-           //            2    3      1   2
-          oldres := res;
-          res := TXQTermBinaryOp(oldres.children[1]);
-          oldres.children[1] := res.children[0];
-          res.children[0] := oldres;
-        end;
-      end;}
-
-    end;
+    end else
+      res.push(parseValue())
   end;
 
   var word: string;

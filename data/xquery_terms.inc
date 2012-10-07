@@ -101,21 +101,9 @@ procedure TXQTermFilterSequence.addToQueryList(var path: TPXPQueryCommands);
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
 
-
   children[0].addToQueryList(path);
   setlength(path[high(path)].pxp, length(path[high(path)].pxp) + 1);
   path[high(path)].pxp[high(path[high(path)].pxp)] := children[1];
-
-  {if (children[0] is TXQTermNodeMatcher) and (children[0] is TXQTermNodeMatcherFunction) then begin
-    children[0].addToQueryList(path);
-    setlength(path[high(path)].pxp, length(path[high(path)].pxp) + 1);
-    path[high(path)].pxp[high(path[high(path)].pxp)] := children[1];
-  end else begin
-    setlength(path, length(path) +1);
-    path[high(path)].typ:=qcFunctionSpecialCase;
-    path[high(path)].specialCase:=self;
-  end;   }
-
 end;
 
 { TXQTermNodeRoot }
@@ -493,10 +481,6 @@ begin
     path[high(path)].typ:=qcSameOrDescendant;
     path[high(path)].matching:=[qmElement, qmText, qmComment, qmProcessingInstruction];
   end;
-  {if children[1] is TXQTermFilterSequence then begin
-    setlength(path, length(path) + 1);
-    path[high(path)] := children[1].toQueryCommand;
-  end else}
   children[1].addToQueryList(path);
 
   //optimization
