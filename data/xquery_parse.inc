@@ -2,10 +2,6 @@
 
 { TXQTerm }
 
-function TXQTerm.staticTypeGuess: TPXPValueKind;
-begin
-end;
-
 function TXQTerm.debugTermToString: string;
 var
   i: Integer;

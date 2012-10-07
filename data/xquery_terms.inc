@@ -29,11 +29,6 @@ begin
   obj.free;
 end;
 
-function TXQTermReadObjectProperty.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
 { TXQTermIf }
 
 function TXQTermIf.evaluate(const context: TEvaluationContext): TPXPValue;
@@ -41,11 +36,6 @@ begin
   if length(children)<>3 then raiseEvaluationError('if must have 3 arguments');
   if children[0].evaluate(context).toBoolean then result:=children[1].evaluate(context)
   else result:=children[2].evaluate(context);
-end;
-
-function TXQTermIf.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 { TXQTermFilterSequence }
@@ -62,11 +52,6 @@ begin
   result := children[0].evaluate(context);
   context.sender.filterSequence(result, children[1], context);
   pxpvalueSeqSqueeze(result);
-end;
-
-function TXQTermFilterSequence.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 function TXQTermFilterSequence.toQueryCommand: TPXPQueryCommand;
@@ -106,11 +91,6 @@ begin
   context.sender.OnDefineVariable(self, variablename, result.clone);
 end;
 
-function TXQTermDefineVariable.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
 { TXQTermType }
 
 constructor TXQTermType.create(const avalue: string);
@@ -121,11 +101,6 @@ end;
 function TXQTermType.evaluate(const context: TEvaluationContext): TPXPValue;
 begin
   result := pxpvalue(value)
-end;
-
-function TXQTermType.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 { TXQTermSequence }
@@ -139,11 +114,6 @@ begin
   result := TPXPValueSequence.create(length(children));
   for i := 0 to high(children) do
     TPXPValueSequence(result).addChild(children[i].evaluate(context));
-end;
-
-function TXQTermSequence.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 { TXQTermSomeEvery }
@@ -200,11 +170,6 @@ begin
   if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
 end;
 
-function TXQTermSomeEvery.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
 { TXQTermFor }
 
 function TXQTermFor.evaluate(const context: TEvaluationContext): TPXPValue;
@@ -241,11 +206,6 @@ begin
   result:=evaluateForLoop(0);
   pxpvalueSeqSqueeze(result);
   if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
-end;
-
-function TXQTermFor.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 { TXQTermNamedFunction }
@@ -301,11 +261,6 @@ begin
       result := TPXPValueClass(types.Objects[index]).createFromValue(evilkids);
 
   end;
-end;
-
-function TXQTermNamedFunction.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 procedure pxpFunctionGeneralConstructor(args: array of TPXPValue; var result: TPXPValue);forward;
@@ -375,11 +330,6 @@ begin
   operatorInfo^.func(context, children[0].evaluate(context), children[1].evaluate(context),result);
 end;
 
-function TXQTermBinaryOp.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
 function TXQTermBinaryOp.operatorInfo: PPXPOperatorInfo;
 begin
   if (index < 0) or (index >= binaryOps.Count) then raiseEvaluationError('Invalid bin op index');
@@ -434,11 +384,6 @@ begin
     result := context.sender.evaluateSingleStepQuery(toQueryCommand,context);
     pxpvalueSeqSqueeze(result);
   end;
-end;
-
-function TXQTermNodeMatcher.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 function TXQTermNodeMatcher.toQueryCommand: TPXPQueryCommand;
@@ -514,11 +459,6 @@ begin
   PPXPOperatorInfo(binaryOps.Objects[index])^.func(context, pxpvalue(0),children[0].evaluate(context),result);
 end;
 
-function TXQTermUnaryOp.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
 { TXQTermNumber }
 
 constructor TXQTermNumber.create(const avalue: string);
@@ -531,11 +471,6 @@ begin
   if strContains(value,'e') or strContains(value,'E') then exit(TPXPValue_double.create(StrToFloat(value,PXPFormats)))
   else if strContains(value,'.') then exit(pxpvalue(StrToFloat(value,PXPFormats)))
   else exit(pxpvalue(StrToInt65(value)));
-end;
-
-function TXQTermNumber.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
 end;
 
 { TXQTermReadAttribute }
@@ -575,11 +510,6 @@ begin
     result:=pxpvalue();
 end;
 
-function TXQTermReadAttribute.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
 { TXQTermVariable }
 
 constructor TXQTermVariable.create(const avalue: string);
@@ -606,12 +536,6 @@ begin
   else result := pxpvalue();
   if assigned(context.sender.OnEvaluateVariable) then context.sender.OnEvaluateVariable(self, value, result );
 end;
-
-function TXQTermVariable.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
 { TXQTermString }
 
 constructor TXQTermString.create(avalue: string);
@@ -624,8 +548,4 @@ begin
   Result := pxpvalue(value);
 end;
 
-function TXQTermString.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=pvkString;
-end;
 
