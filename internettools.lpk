@@ -42,52 +42,52 @@
         <UnitName Value="internetaccess"/>
       </Item6>
       <Item7>
-        <Filename Value="data/pseudoxpath.pas"/>
-        <UnitName Value="pseudoxpath"/>
-      </Item7>
-      <Item8>
         <Filename Value="data/disableRangeOverflowChecks.inc"/>
         <Type Value="Include"/>
-      </Item8>
-      <Item9>
+      </Item7>
+      <Item8>
         <Filename Value="data/simplehtmlparser.pas"/>
         <UnitName Value="simplehtmlparser"/>
-      </Item9>
-      <Item10>
+      </Item8>
+      <Item9>
         <Filename Value="data/simplehtmltreeparser.pas"/>
         <UnitName Value="simplehtmltreeparser"/>
+      </Item9>
+      <Item10>
+        <Filename Value="data/simplexmlparser.pas"/>
+        <UnitName Value="simplexmlparser"/>
       </Item10>
       <Item11>
-        <Filename Value="data/pseudoxpath_derived_types.inc"/>
+        <Filename Value="data/restoreRangeOverflowChecks.inc"/>
         <Type Value="Include"/>
       </Item11>
       <Item12>
-        <Filename Value="data/simplexmlparser.pas"/>
-        <UnitName Value="simplexmlparser"/>
+        <Filename Value="../lazarus/dialogs/progressdialog.lfm"/>
+        <Type Value="LFM"/>
       </Item12>
       <Item13>
-        <Filename Value="data/restoreRangeOverflowChecks.inc"/>
-        <Type Value="Include"/>
-      </Item13>
-      <Item14>
-        <Filename Value="../lazarus/dialogs/progressdialog.lfm"/>
-        <Type Value="LFM"/>
-      </Item14>
-      <Item15>
         <Filename Value="../lazarus/dialogs/progressdialog.lrs"/>
         <Type Value="LRS"/>
-      </Item15>
-      <Item16>
+      </Item13>
+      <Item14>
         <Filename Value="../lazarus/dialogs/progressdialog.pas"/>
         <UnitName Value="progressdialog"/>
-      </Item16>
-      <Item17>
+      </Item14>
+      <Item15>
         <Filename Value="../lazarus/dialogs/progressdialog.lfm"/>
         <Type Value="LFM"/>
-      </Item17>
-      <Item18>
+      </Item15>
+      <Item16>
         <Filename Value="data/int65math.pas"/>
         <UnitName Value="int65math"/>
+      </Item16>
+      <Item17>
+        <Filename Value="data/xquery.pas"/>
+        <UnitName Value="xquery"/>
+      </Item17>
+      <Item18>
+        <Filename Value="data/xquery_derived_types.inc"/>
+        <Type Value="Include"/>
       </Item18>
     </Files>
     <Type Value="RunAndDesignTime"/>

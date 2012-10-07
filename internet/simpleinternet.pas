@@ -15,7 +15,7 @@ unit simpleinternet;
 interface
 
 uses
-  Classes, SysUtils, pseudoxpath, internetaccess, simplehtmltreeparser;
+  Classes, SysUtils, xquery, internetaccess, simplehtmltreeparser;
 
 //Usually this unit uses synapse on linux and wininet on windows, but you can choose a certain wrapper below:
 
@@ -72,7 +72,7 @@ function process(data: string; query: string): string;
 //**Might return nil
 function processedTree: TTreeElement;
 //**Returns all variable assignments during the last query
-function processedVariables: TPXPVariableChangeLog;
+function processedVariables: TXQVariableChangeLog;
 
 //**If you use the functions in this unit from different threads, you have to call freeThreadVars
 //**before the thread terminates to prevent memory leaks
@@ -179,7 +179,7 @@ begin
 
 end;
 
-function processedVariables: TPXPVariableChangeLog;
+function processedVariables: TXQVariableChangeLog;
 begin
   if templateParser = nil then templateParser := THtmlTemplateParser.create;
   result := templateParser.variableChangeLog;

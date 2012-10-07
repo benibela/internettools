@@ -49,9 +49,9 @@
         <UnitName Value="bbutils_tests"/>
       </Unit1>
       <Unit2>
-        <Filename Value="../pseudoxpath.pas"/>
+        <Filename Value="../xquery.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="pseudoxpath"/>
+        <UnitName Value="xquery"/>
       </Unit2>
       <Unit3>
         <Filename Value="../int65math.pas"/>

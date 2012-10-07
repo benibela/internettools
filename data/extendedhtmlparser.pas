@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 interface
 uses
-  Classes, SysUtils,simplehtmltreeparser,pseudoxpath,
+  Classes, SysUtils,simplehtmltreeparser,xquery,
     dRegExpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page dead, I create a mirror on benibela.de) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr)
     bbutils;
 
@@ -395,13 +395,13 @@ THtmlTemplateParser=class
     FHtmlTree: TTreeDocument;
     FQueryEngine: TXQueryEngine;
 
-    FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TPXPVariableChangeLog;
+    FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TXQVariableChangeLog;
     FParsingExceptions: boolean;
 
     FAttributeMatching: TStringList;
 
-    function GetVariableLogCondensed: TPXPVariableChangeLog;
-    function GetVariables: TPXPVariableChangeLog;
+    function GetVariableLogCondensed: TXQVariableChangeLog;
+    function GetVariables: TXQVariableChangeLog;
     function getHTMLTree: TTreeElement;
     function getTemplateTree: TTreeElement;
   protected
@@ -410,7 +410,7 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
+    procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: TXQValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
@@ -434,16 +434,16 @@ THtmlTemplateParser=class
     function debugMatchings(const width: integer): string;
     function createXQuery(const expression: string): IXQuery; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
-    property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
-    property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
-    property oldVariableChangeLog: TPXPVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
-    property VariableChangeLogCondensed: TPXPVariableChangeLog read GetVariableLogCondensed; //**<oldVariableChangeLog (no, no, no, it's the new one) with duplicated objects removed (i.e. if you have obj := object(), obj.a := 1, obj.b := 2, obj := object(); the normal change log will contain 4 objects (like {}, {a:1}, {a:1,b:2}, {}), but the condensed log only two {a:1,b:2}, {})
+    property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables
+    property variableChangeLog: TXQVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
+    property oldVariableChangeLog: TXQVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
+    property VariableChangeLogCondensed: TXQVariableChangeLog read GetVariableLogCondensed; //**<oldVariableChangeLog (no, no, no, it's the new one) with duplicated objects removed (i.e. if you have obj := object(), obj.a := 1, obj.b := 2, obj := object(); the normal change log will contain 4 objects (like {}, {a:1}, {a:1,b:2}, {}), but the condensed log only two {a:1,b:2}, {})
 
     property templateNamespaces: TStringList read FNamespaces write FNamespaces; //**< Namespace prefixes which are recognized as template commands. Default is template: and t: @br Namespaces defined in a template with the xmlns: notation are automatically added to this property (actually added, so they will also recognized in later documents. Since this behaviour is a violation of the xml standard, it might change in future). @br Remark: This property contains the complete namespace prefix, including the final :
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
-    property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.PXPGlobalTrimNodes which controls, how the values are returned.
+    property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.XQGlobalTrimNodes which controls, how the values are returned.
     property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
     property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
     property AllowObjects: boolean read FObjects write FObjects;
@@ -696,13 +696,13 @@ begin
   result := FQueryEngine.parseXPath2(expression);
 end;
 
-function THtmlTemplateParser.GetVariableLogCondensed: TPXPVariableChangeLog;
+function THtmlTemplateParser.GetVariableLogCondensed: TXQVariableChangeLog;
 begin
   if FVariableLogCondensed = nil then FVariableLogCondensed := FVariableLog.condensedSharedLog;
   result := FVariableLogCondensed;
 end;
 
-function THtmlTemplateParser.GetVariables: TPXPVariableChangeLog;
+function THtmlTemplateParser.GetVariables: TXQVariableChangeLog;
 begin
   if FVariables = nil then begin
     FVariables := FVariableLog.finalValues();
@@ -711,13 +711,13 @@ begin
   result := FVariables;
 end;
 
-procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: TPXPValue);
+procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: TXQValue);
 var
-  temp: TPXPValue;
+  temp: TXQValue;
 begin
   if not FVariableLog.hasVariable(variable, @temp) then
     if not FOldVariableLog.hasVariable(variable, @temp) then exit;
-  pxpvalueAssign(value, temp.clone);
+  xqvalueAssign(value, temp.clone);
 end;
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
@@ -777,9 +777,9 @@ function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: T
 
 var xpathText: TTreeElement;
 
-  function performPXPEvaluation(const pxp: IXQuery): TPXPValue;
+  function performPXPEvaluation(const pxp: IXQuery): TXQValue;
   begin
-    if pxp = nil then exit(pxpvalue());
+    if pxp = nil then exit(xqvalue());
     FQueryEngine.ParentElement := htmlParent;
     FQueryEngine.TextElement := xpathText;
     result := pxp.evaluate;
@@ -839,7 +839,7 @@ var xpathText: TTreeElement;
 
   procedure HandleCommandRead;
   var
-   value:TPXPValue;
+   value:TXQValue;
    regexp: TRegExpr;
    oldvarcount: Integer;
    varnameindex: Integer;
@@ -858,7 +858,7 @@ var xpathText: TTreeElement;
       regexp.Expression:=regex;
       regexp.Exec(value.toString);
       submatch := StrToIntDef(templateStart.templateAttributes.Values['submatch'],0);
-      value:=pxpvalue(regexp.Match[submatch]);
+      value:=xqvalue(regexp.Match[submatch]);
       regexp.free;
     end;
 
@@ -875,7 +875,7 @@ var xpathText: TTreeElement;
 
   procedure HandleCommandShortRead;
   var varcount: integer;
-    read: TPXPValue;
+    read: TXQValue;
   begin
     varcount:=FVariableLog.count;
     read := performPXPEvaluation(templateStart.source);
@@ -955,22 +955,22 @@ var xpathText: TTreeElement;
   var curChild: TTemplateElement;
 
     procedure switchTemplateCommand;
-    var value: TPXPValue;
+    var value: TXQValue;
       function elementFit(e: TTemplateElement): boolean;
-      var evaluatedvalue: TPXPValue;
+      var evaluatedvalue: TXQValue;
       begin
         if (e.templateAttributes = nil) or (e.templateAttributes.Count = 0) then exit(true);
         result := (e.test = nil) or performPXPEvaluation(e.test).toBoolean;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
-        result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, FQueryEngine.getDefaultCollation, FQueryEngine.ImplicitTimezone);
+        result := xqvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, FQueryEngine.getDefaultCollation, FQueryEngine.ImplicitTimezone);
         evaluatedvalue.Free;
       end;
 
     begin
       if templateStart.valuepxp <> nil then value := performPXPEvaluation(templateStart.valuepxp)
-      else value := pxpvalue();
+      else value := xqvalue();
 
       while curChild <> nil do begin //enumerate all child tags
         if curChild.templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
@@ -1113,8 +1113,8 @@ end;
 
 constructor THtmlTemplateParser.create;
 begin
-  FVariableLog := TPXPVariableChangeLog.Create;
-  FOldVariableLog := TPXPVariableChangeLog.create;
+  FVariableLog := TXQVariableChangeLog.Create;
+  FOldVariableLog := TXQVariableChangeLog.create;
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
   FTemplate.treeElementClass:=TTemplateElement;
@@ -1183,7 +1183,7 @@ begin
     FHTML.removeEmptyTextNodes(true);
 
   if FHtmlTree = nil then begin
-    if FParsingExceptions then raise EPXPEvaluationException.Create('Website is empty: '+htmlFileName);
+    if FParsingExceptions then raise EXQEvaluationException.Create('Website is empty: '+htmlFileName);
     exit;
   end;
 
@@ -1371,7 +1371,7 @@ end;
 function THtmlTemplateParser.replaceVars(s: string; customReplace: TReplaceFunction): string;
 var f,i:longint;
     temp,value:string;
-    temppxpvalue: TPXPValue;
+    tempxqvalue: TXQValue;
 begin
   Result:='';
   i:=1;
@@ -1380,9 +1380,9 @@ begin
       f:=i+1;
       while (i<=length(s)) and (s[i]<>';')  do inc(i);
       temp:=copy(s,f,i-f);
-      temppxpvalue:=pxpvalue();
-      evaluatePXPVariable(self,temp,temppxpvalue);
-      value:=temppxpvalue.toString;
+      tempxqvalue:=xqvalue();
+      evaluatePXPVariable(self,temp,tempxqvalue);
+      value:=tempxqvalue.toString;
       if assigned(customReplace) then customReplace(temp,value);
     //  OutputDebugString(pchar(parser.variables.Text));
       result+=value;

@@ -242,7 +242,7 @@ end;
 
 function xmlStrEscape(s: string):string;
 implementation
-uses pseudoxpath;
+uses xquery;
 
 { TTreeDocument }
 

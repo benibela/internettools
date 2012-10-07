@@ -7,7 +7,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, extendedhtmlparser, simplehtmltreeparser, pseudoxpath, bbutils , sysutils, internetaccess
+  Classes, extendedhtmlparser, simplehtmltreeparser, xquery, bbutils , sysutils, internetaccess
   ,{$ifdef win32}w32internetaccess{$else}synapseinternetaccess{$endif};
   { you can add units after this }
 
@@ -52,7 +52,7 @@ type
 { twrapper }
 
  twrapper = class
-  procedure eval(sender: TObject; const variable: string; var value: TPXPValue);
+  procedure eval(sender: TObject; const variable: string; var value: TXQValue);
 end;
 
 { twrapper }
@@ -65,20 +65,20 @@ end;
 
 
 
-function mytostring(v: TPXPValue): string;
+function mytostring(v: TXQValue): string;
 var
   i: Integer;
-  seq: TPXPList;
+  seq: TXQVList;
 begin
-  if v is TPXPValueSequence then begin
+  if v is TXQValueSequence then begin
     seq :=  v.toSequence;
     result := mytostring(seq[0]);
     for i:=1 to seq.count-1 do begin
-      if seq[i] is TPXPValueNode then result += mytostring(seq[i])
+      if seq[i] is TXQValueNode then result += mytostring(seq[i])
       else result += ' '+mytostring(seq[i]);
     end;
     seq.freeNonRecursive;
-  end else if (v is TPXPValueNode) and (TPXPValueNode(v).node <> nil) then begin
+  end else if (v is TXQValueNode) and (TXQValueNode(v).node <> nil) then begin
     result := v.toNode.outerXML();
   end else result := v.toString;
 end;
@@ -190,14 +190,14 @@ begin
 //  writeln('Correct: ', correct, '<br> Wrong:', wrong, ' <br>Error: ', exceptions, '<br>Total: ', correct + wrong + exceptions, ' <br> Skipped: ', skipped,'<br><br>');
 end;
 
-procedure twrapper.eval(sender: TObject; const variable: string; var value: TPXPValue);
+procedure twrapper.eval(sender: TObject; const variable: string; var value: TXQValue);
 var
   i: Integer;
 begin
   i := variables.IndexOf(variable);
 //  writeln(variable, ':', i);
   if i < 0 then exit;
-  pxpvalueAssign(value, TTreeElement(variables.Objects[i]));
+  xqvalueAssign(value, TTreeElement(variables.Objects[i]));
   //if variable = 'input-context' then value := pxpvalue(tree.getLastTree);
 end;
 
@@ -228,10 +228,10 @@ var htp: THtmlTemplateParser;
     mylogger: TLoggerClass;
     logCorrect: Boolean;
     timing: TDateTime;
-    mypxpoutput: TPXPValue;
-    extendedvars: TPXPVariableChangeLog;
+    mypxpoutput: TXQValue;
+    extendedvars: TXQVariableChangeLog;
     j: Integer;
-    varlog: TPXPVariableChangeLog;
+    varlog: TXQVariableChangeLog;
 begin
   {$ifdef win32}defaultInternetAccessClass := TW32InternetAccess.create{$else}defaultInternetAccessClass:=TSynapseInternetAccess{$endif};
 
@@ -258,7 +258,7 @@ begin
   variables:=TStringList.Create;
   variables.Sorted:=true;
   inputfiles:=TStringList.Create;
-  extendedvars := TPXPVariableChangeLog.create();
+  extendedvars := TXQVariableChangeLog.create();
 //  extendedvars.allowObjects:=true;
  // pxp.OnDefineVariable:=@extendedvars.defineVariable;
  // pxp.OnEvaluateVariable:=@extendedvars.evaluateVariable;
@@ -278,7 +278,7 @@ begin
 
   mylogger.LOG_START();
 
-  PXPGlobalTrimNodes:=false;
+  XQGlobalTrimNodes:=false;
   correct:=0; skipped:=0; exceptions:=0; wrong:=0;
   for CAT:=1 to Paramcount() do begin;
     if mylogger <> TPlainLogger then writeln(stderr, 'Test ', CAT, ' / ', Paramcount, ': ',paramstr(cat));

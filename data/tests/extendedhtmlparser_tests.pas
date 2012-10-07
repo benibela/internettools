@@ -734,10 +734,10 @@ begin
     performTest(data[i,1],data[i,2],data[i,3]);
   for i:=low(whiteSpaceData) to high(whiteSpaceData) do begin
     extParser.trimTextNodes:=TTrimTextNodes(StrToInt(whiteSpaceData[i,0][1]));
-    PXPGlobalTrimNodes:=whiteSpaceData[i,0][2] <> 'f';
+    XQGlobalTrimNodes:=whiteSpaceData[i,0][2] <> 'f';
     performTest(whiteSpaceData[i,1],whiteSpaceData[i,2],whiteSpaceData[i,3]);
   end;
-  PXPGlobalTrimNodes:=true;
+  XQGlobalTrimNodes:=true;
 
   //---special encoding tests---
   extParser.parseTemplate('<a><template:read source="text()" var="test"/></a>');
