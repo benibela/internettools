@@ -41,10 +41,10 @@ end;
 
 procedure TXQTerm.raiseEvaluationError(const s: string);
 begin
-  raise EPXPEvaluationException.Create(s);
+  raise EXQEvaluationException.Create(s);
 end;
 
-procedure TXQTerm.evaluateChildren(const context: TEvaluationContext; out results: TPXPValueArray);
+procedure TXQTerm.evaluateChildren(const context: TEvaluationContext; out results: TXQVArray);
 var
   i: Integer;
 begin
@@ -53,13 +53,13 @@ begin
     results[i] := children[i].evaluate(context);
 end;
 
-function TXQTerm.toQueryCommand: TPXPQueryCommand;
+function TXQTerm.toQueryCommand: TXQPathMatchingStep;
 begin
   result.typ:=qcFunctionSpecialCase;
   result.specialCase:=self;
 end;
 
-procedure TXQTerm.addToQueryList(var path: TPXPQueryCommands);
+procedure TXQTerm.addToQueryList(var path: TXQPathMatching);
 begin
   SetLength(path, length(path) + 1);
   path[high(path)] := toQueryCommand;

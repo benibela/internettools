@@ -1,4 +1,4 @@
-function convertElementTestToMatchingOptions(select: string): TPXPQueryMatchingTypes;
+function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
 begin
   if select = 'node' then
     exit([qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute])
@@ -17,21 +17,21 @@ begin
   propname := apropname;
 end;
 
-function TXQTermReadObjectProperty.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermReadObjectProperty.evaluate(const context: TEvaluationContext): TXQValue;
 var
-  obj: TPXPValue;
+  obj: TXQValue;
 begin
   if length(children) = 0 then raiseEvaluationError('Found no term to read property from');
   if length(children) > 1 then raiseEvaluationError('Can only read property from one term');
   obj:=children[0].evaluate(context);
-  if not (obj is TPXPValueObject) then raiseEvaluationError('Expected object, got: '+obj.toString);
-  result := TPXPValueObject(obj).getClone(propname);
+  if not (obj is TXQValueObject) then raiseEvaluationError('Expected object, got: '+obj.toString);
+  result := TXQValueObject(obj).getClone(propname);
   obj.free;
 end;
 
 { TXQTermIf }
 
-function TXQTermIf.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermIf.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   if length(children)<>3 then raiseEvaluationError('if must have 3 arguments');
   if children[0].evaluate(context).toBoolean then result:=children[1].evaluate(context)
@@ -46,29 +46,29 @@ begin
   push(filter);
 end;
 
-function TXQTermFilterSequence.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermFilterSequence.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
   result := children[0].evaluate(context);
   context.sender.filterSequence(result, children[1], context);
-  pxpvalueSeqSqueeze(result);
+  xqvalueSeqSqueeze(result);
 end;
 
-function TXQTermFilterSequence.toQueryCommand: TPXPQueryCommand;
+function TXQTermFilterSequence.toQueryCommand: TXQPathMatchingStep;
 begin
   if length(children) <> 2 then raiseEvaluationError('invalid [] construct');
   result := children[0].toQueryCommand;
-  setlength(result.pxp, length(result.pxp)+1);
-  result.pxp[high(result.pxp)] := children[1];
+  setlength(result.filters, length(result.filters)+1);
+  result.filters[high(result.filters)] := children[1];
 end;
 
-procedure TXQTermFilterSequence.addToQueryList(var path: TPXPQueryCommands);
+procedure TXQTermFilterSequence.addToQueryList(var path: TXQPathMatching);
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
 
   children[0].addToQueryList(path);
-  setlength(path[high(path)].pxp, length(path[high(path)].pxp) + 1);
-  path[high(path)].pxp[high(path[high(path)].pxp)] := children[1];
+  setlength(path[high(path)].filters, length(path[high(path)].filters) + 1);
+  path[high(path)].filters[high(path[high(path)].filters)] := children[1];
 end;
 
 { TXQTermDefineVariable }
@@ -82,7 +82,7 @@ begin
   push(value);
 end;
 
-function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   if not assigned(context.sender.OnDefineVariable) then raiseEvaluationError(':= can''t be used without a method assigned to the OnDefineVariable event');
   if length(children) = 0 then raiseEvaluationError('Value missing');
@@ -99,22 +99,22 @@ begin
   value := avalue;
 end;
 
-function TXQTermType.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermType.evaluate(const context: TEvaluationContext): TXQValue;
 begin
-  result := pxpvalue(value)
+  result := xqvalue(value)
 end;
 
 { TXQTermSequence }
 
-function TXQTermSequence.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermSequence.evaluate(const context: TEvaluationContext): TXQValue;
 var
   i: Integer;
 begin
-  if length(children) = 0 then exit(pxpvalue);
+  if length(children) = 0 then exit(xqvalue);
   if length(children) = 1 then exit(children[0].evaluate(context));
-  result := TPXPValueSequence.create(length(children));
+  result := TXQValueSequence.create(length(children));
   for i := 0 to high(children) do
-    TPXPValueSequence(result).addChild(children[i].evaluate(context));
+    TXQValueSequence(result).addChild(children[i].evaluate(context));
 end;
 
 { TXQTermSomeEvery }
@@ -124,10 +124,10 @@ begin
   isEvery:=every;
 end;
 
-function TXQTermSomeEvery.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermSomeEvery.evaluate(const context: TEvaluationContext): TXQValue;
 var tempContext:TEvaluationContext;
   function evaluateSomeEvery(const pos:integer): boolean;
-  var tempSeq: TPXPValue;
+  var tempSeq: TXQValue;
       i:integer;
   begin
     if pos = high(children) then exit(children[pos].evaluate(tempContext).toBoolean);
@@ -141,10 +141,10 @@ var tempContext:TEvaluationContext;
       end;
       pvkSequence: begin
         result:=isEvery;
-        for i:=TPXPValueSequence(tempSeq).seq.Count-1 downto 0 do begin
+        for i:=TXQValueSequence(tempSeq).seq.Count-1 downto 0 do begin
           tempContext.temporaryVariables.pushAll;
-          tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, TPXPValueSequence(tempSeq).seq[i]);
-          TPXPValueSequence(tempSeq).seq.Delete(i);
+          tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, TXQValueSequence(tempSeq).seq[i]);
+          TXQValueSequence(tempSeq).seq.Delete(i);
           if evaluateSomeEvery(pos+2) <> (isEvery) then begin
             tempContext.temporaryVariables.popAll;
             result := not isEvery;
@@ -165,35 +165,35 @@ var tempContext:TEvaluationContext;
 
 begin
   tempContext:=context;
-  if context.temporaryVariables=nil then tempContext.temporaryVariables:=TPXPVariableChangeLog.create();
-  result:=pxpvalue(evaluateSomeEvery(0));
-  pxpvalueSeqSqueeze(result);
+  if context.temporaryVariables=nil then tempContext.temporaryVariables:=TXQVariableChangeLog.create();
+  result:=xqvalue(evaluateSomeEvery(0));
+  xqvalueSeqSqueeze(result);
   if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
 end;
 
 { TXQTermFor }
 
-function TXQTermFor.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermFor.evaluate(const context: TEvaluationContext): TXQValue;
 var
   tempContext: TEvaluationContext;
-  function evaluateForLoop(const pos:integer): TPXPValue;
-   var tempSeq: TPXPValue;
+  function evaluateForLoop(const pos:integer): TXQValue;
+   var tempSeq: TXQValue;
        i:integer;
    begin
      if pos = high(children) then exit(children[pos].evaluate(tempContext));
      if not (children[pos] is TXQTermVariable) then raiseEvaluationError('Expected variable, but got '+children[pos].debugTermToString);
 
      tempSeq:=children[pos+1].evaluate(tempContext);
-     if tempSeq.wasUndefined then exit(pxpvalue);
-     if tempSeq is TPXPValueSequence then begin
-       result:=TPXPValueSequence.create(TPXPValueSequence(tempSeq).seq.Count);
-       for i:=0 to TPXPValueSequence(tempSeq).seq.Count-1 do begin
+     if tempSeq.wasUndefined then exit(xqvalue);
+     if tempSeq is TXQValueSequence then begin
+       result:=TXQValueSequence.create(TXQValueSequence(tempSeq).seq.Count);
+       for i:=0 to TXQValueSequence(tempSeq).seq.Count-1 do begin
          tempContext.temporaryVariables.pushAll;
-         tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, TPXPValueSequence(tempSeq).seq[i]);
-         TPXPValueSequence(result).addChild(evaluateForLoop(pos+2));
+         tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, TXQValueSequence(tempSeq).seq[i]);
+         TXQValueSequence(result).addChild(evaluateForLoop(pos+2));
          tempContext.temporaryVariables.popAll;
        end;
-       TPXPValueSequence(tempSeq).freeNonRecursive;
+       TXQValueSequence(tempSeq).freeNonRecursive;
      end else begin
        tempContext.temporaryVariables.pushAll;
        tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, tempSeq);
@@ -203,9 +203,9 @@ var
    end;
 begin
   tempContext:=context;
-  if context.temporaryVariables=nil then tempContext.temporaryVariables:=TPXPVariableChangeLog.create();
+  if context.temporaryVariables=nil then tempContext.temporaryVariables:=TXQVariableChangeLog.create();
   result:=evaluateForLoop(0);
-  pxpvalueSeqSqueeze(result);
+  xqvalueSeqSqueeze(result);
   if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
 end;
 
@@ -236,9 +236,9 @@ begin
   result := TXQTermNamedFunction.Create(akind, aindex);
 end;
 
-function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): TXQValue;
 var
-  evilkids: TPXPValueArray;
+  evilkids: TXQVArray;
 begin
   evaluateChildren(context, evilkids);
 
@@ -246,25 +246,25 @@ begin
 
   case kind of
     xqfkBasic: begin
-      result := pxpvalue();
-      PPXPBasicFunctionInfo(basicFunctions.Objects[index])^.func(evilkids, result)
+      result := xqvalue();
+      PXQBasicFunctionInfo(basicFunctions.Objects[index])^.func(evilkids, result)
     end;
     xqfkComplex: begin
-      result := pxpvalue();
-      PPXPComplexFunctionInfo(complexFunctions.Objects[index])^.func(context, evilkids, result);
+      result := xqvalue();
+      PXQComplexFunctionInfo(complexFunctions.Objects[index])^.func(context, evilkids, result);
     end;
     xqfkWrappedOperator: begin
       if length(evilkids) <> 2 then raiseEvaluationError('Need two arguments for function: op:' + binaryOpFunctions[index]);
-      result := pxpvalue();
-      TPXPBinaryOp(binaryOpFunctions.Objects[index])(context, evilkids[0], evilkids[1], result);
+      result := xqvalue();
+      TXQBinaryOp(binaryOpFunctions.Objects[index])(context, evilkids[0], evilkids[1], result);
     end;
     xqfkTypeConstructor:
-      result := TPXPValueClass(types.Objects[index]).createFromValue(evilkids);
+      result := TXQValueClass(types.Objects[index]).createFromValue(evilkids);
 
   end;
 end;
 
-procedure pxpFunctionGeneralConstructor(args: array of TPXPValue; var result: TPXPValue);forward;
+procedure xqFunctionGeneralConstructor(args: array of TXQValue; var result: TXQValue);forward;
 
 class function TXQTermNamedFunction.findKindIndex(const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer; checkForOps: boolean): boolean;
 var
@@ -272,7 +272,7 @@ var
 begin
   aindex := basicFunctions.IndexOf(name);
   if aindex >= 0 then begin
-    if PPXPBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @pxpfunctionGeneralConstructor then begin
+    if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
       akind:=xqfkTypeConstructor;
       aindex:=types.indexof(name);;
       exit(true);
@@ -316,12 +316,12 @@ begin
   create(op, arg1, arg2);
 end;
 
-function TXQTermBinaryOp.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermBinaryOp.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   if length(children)<2 then raiseEvaluationError('Not enough subterms');
   if length(children)>2 then raiseEvaluationError('Too many subterms');
 
-  result := pxpvalue();
+  result := xqvalue();
 
   if (index = binaryOps.IndexOf('/')) or (index = binaryOps.IndexOf('//')) then begin
     context.sender.evaluateAccessList(self, context, result);
@@ -331,13 +331,13 @@ begin
   operatorInfo^.func(context, children[0].evaluate(context), children[1].evaluate(context),result);
 end;
 
-function TXQTermBinaryOp.operatorInfo: PPXPOperatorInfo;
+function TXQTermBinaryOp.operatorInfo: PXQOperatorInfo;
 begin
   if (index < 0) or (index >= binaryOps.Count) then raiseEvaluationError('Invalid bin op index');
-  result := PPXPOperatorInfo(binaryOps.Objects[index])
+  result := PXQOperatorInfo(binaryOps.Objects[index])
 end;
 
-procedure TXQTermBinaryOp.addToQueryList(var path: TPXPQueryCommands);
+procedure TXQTermBinaryOp.addToQueryList(var path: TXQPathMatching);
 var
   isDoubleSlash: Boolean;
   last: Integer;
@@ -359,8 +359,8 @@ begin
   //optimization
   //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
   last := high(path);
-  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].pxp) = 0)
-      and (path[last].typ in [qcDirectChild, qcDescendant]) and (length(path[last].pxp) = 0) then begin
+  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
+      and (path[last].typ in [qcDirectChild, qcDescendant]) and (length(path[last].filters) = 0) then begin
     path[last - 1] := path[last];
     path[last - 1].typ := qcDescendant;
     SetLength(path, last);
@@ -377,18 +377,18 @@ begin
   func := asfunction;
 end;
 
-function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
-  else if func and (axis = '') and (select = 'text') and (context.sender.TextElement<>nil) then result := pxpvalue(context.sender.TextElement)
+  else if func and (axis = '') and (select = 'text') and (context.sender.TextElement<>nil) then result := xqvalue(context.sender.TextElement)
   else begin
     result := context.sender.evaluateSingleStepQuery(toQueryCommand,context);
-    pxpvalueSeqSqueeze(result);
+    xqvalueSeqSqueeze(result);
   end;
 end;
 
-function TXQTermNodeMatcher.toQueryCommand: TPXPQueryCommand;
-  function getAxis(const axis: string): TPXPQueryCommandType;
+function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
+  function getAxis(const axis: string): TXQPathMatchingAxis;
   begin
      //forward
      if (axis ='') or (axis='child') then exit(qcDirectChild);
@@ -405,7 +405,7 @@ function TXQTermNodeMatcher.toQueryCommand: TPXPQueryCommand;
      if axis='preceding-sibling' then exit(qcPrecedingSibling);
      if axis='preceding' then exit(qcPreceding);
      if axis='ancestor-or-self' then exit(qcSameOrAncestor);
-     raise EPXPEvaluationException.Create('Unknown axis: '+axis);
+     raise EXQEvaluationException.Create('Unknown axis: '+axis);
   end;
 
 begin
@@ -451,25 +451,25 @@ begin
   if arg <> nil then push(arg);
 end;
 
-function TXQTermUnaryOp.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermUnaryOp.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   if length(children)<1 then raiseEvaluationError( 'Not enough subterms')
   else if length(children)>1 then raiseEvaluationError('Too many subterms');
   if index < 0 then raiseEvaluationError('Unknown unary op');
-  result := pxpvalue();
-  PPXPOperatorInfo(binaryOps.Objects[index])^.func(context, pxpvalue(0),children[0].evaluate(context),result);
+  result := xqvalue();
+  PXQOperatorInfo(binaryOps.Objects[index])^.func(context, xqvalue(0),children[0].evaluate(context),result);
 end;
 
 { TXQTermNumber }
 
 constructor TXQTermNumber.create(const avalue: string);
 begin
-  if strContains(avalue,'e') or strContains(avalue,'E') then value := TPXPValue_double.create(StrToFloat(avalue,PXPFormats))
-  else if strContains(avalue,'.') then value := pxpvalue(StrToFloat(avalue,PXPFormats))
-  else value := pxpvalue(StrToInt65(avalue));
+  if strContains(avalue,'e') or strContains(avalue,'E') then value := TXQValue_double.create(StrToFloat(avalue,XQFormats))
+  else if strContains(avalue,'.') then value := xqvalue(StrToFloat(avalue,XQFormats))
+  else value := xqvalue(StrToInt65(avalue));
 end;
 
-function TXQTermNumber.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermNumber.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   result := value.clone;
 end;
@@ -487,34 +487,34 @@ begin
   value := avalue;
 end;
 
-function TXQTermReadAttribute.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermReadAttribute.evaluate(const context: TEvaluationContext): TXQValue;
 var
   tempEl: TTreeElement;
 begin
-  if (context.SeqValue <> nil) and (context.SeqValue is TPXPValueNode) then
-    tempEl := TPXPValueNode(context.SeqValue).node
+  if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
+    tempEl := TXQValueNode(context.SeqValue).node
    else
     tempEl:=context.ParentElement;
   if tempEl.typ = tetProcessingInstruction then
-    exit(pxpvalue);
+    exit(xqvalue);
   if value = '*' then begin
-    if tempEl.attributes = nil then result := pxpvalue()
+    if tempEl.attributes = nil then result := xqvalue()
     else if tempEl.attributes.next = nil then begin
       assert(tempEl.attributes.reverse <> nil);
-      result := pxpvalue(tempEl.attributes.reverse)
+      result := xqvalue(tempEl.attributes.reverse)
     end else begin
-      result := TPXPValueSequence.create();
+      result := TXQValueSequence.create();
       tempEl := tempEl.attributes;
       while tempEl <> nil do begin
         assert(tempEl.reverse <> nil);
-        TPXPValueSequence(result).addChild(pxpValue(tempEl.reverse));
+        TXQValueSequence(result).addChild(xqvalue(tempEl.reverse));
         tempEl := tempEl.next;
       end;
     end;
   end else if tempEl.getAttributeTry(value, tempEl) then  //TODO: multi attributes with the same name
-    result:=pxpvalue(tempEl)
+    result:=xqvalue(tempEl)
   else
-    result:=pxpvalue();
+    result:=xqvalue();
 end;
 
 { TXQTermVariable }
@@ -528,19 +528,19 @@ begin
   if value[length(value)] = ';' then delete(value, length(value), 1);
 end;
 
-function TXQTermVariable.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermVariable.evaluate(const context: TEvaluationContext): TXQValue;
 begin
   if context.temporaryVariables <> nil then begin
     result := nil;
     if context.temporaryVariables.hasVariableOrObject(value, @result) then begin
       if result <> nil then result := result.clone
-      else result := pxpvalue();
+      else result := xqvalue();
       exit();
     end;
   end;
-  if value = '$' then result := pxpvalue('$') //default $$; as $
-  else if value = 'line-ending' then result := pxpvalue(LineEnding) //default $line-ending; as #13#10
-  else result := pxpvalue();
+  if value = '$' then result := xqvalue('$') //default $$; as $
+  else if value = 'line-ending' then result := xqvalue(LineEnding) //default $line-ending; as #13#10
+  else result := xqvalue();
   if assigned(context.sender.OnEvaluateVariable) then context.sender.OnEvaluateVariable(self, value, result );
 end;
 { TXQTermString }
@@ -550,9 +550,9 @@ begin
   value := avalue;
 end;
 
-function TXQTermString.evaluate(const context: TEvaluationContext): TPXPValue;
+function TXQTermString.evaluate(const context: TEvaluationContext): TXQValue;
 begin
-  Result := pxpvalue(value);
+  Result := xqvalue(value);
 end;
 
 
