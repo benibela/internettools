@@ -92,7 +92,7 @@ end;
 
 function Int65ToStr(const v: Int65): string;
 begin
-  if v.sign then result := '-'
+  if v.sign and (v.value > 0) then result := '-'
   else result := '';
   result += IntToStr(v.value);
 end;
@@ -281,6 +281,7 @@ begin
   if a.value = 0 then exit((    b.sign) and (b.value > 0)); // b < 0
   if b.value = 0 then exit((not a.sign) and (a.value > 0)); // a > 0
   if a.sign <> b.sign then exit(b.sign);
+  if a.value = b.value then exit(false);
   result := (a.value > b.value) <> (a.sign);
 end;
 
@@ -296,7 +297,8 @@ begin
   if a.value = 0 then exit((not b.sign) and (b.value > 0)); // b > 0
   if b.value = 0 then exit((    a.sign) and (a.value > 0)); // a < 0
   if a.sign <> b.sign then exit(a.sign);
+  if a.value = b.value then exit(false);
   result := (a.value < b.value) <> (a.sign);
 end;
 
-                                      end.
+end.
