@@ -78,6 +78,7 @@ begin
   if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).select
   else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
   else raiseParsingError('Invalid term to assign a variable to: '+varname.debugTermToString);
+  varname.Free;
   push(value);
 end;
 

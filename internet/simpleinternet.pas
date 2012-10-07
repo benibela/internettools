@@ -113,7 +113,7 @@ uses bbutils, extendedhtmlparser
 threadvar
   tree: TTreeParser;
   templateParser: THtmlTemplateParser;
-  pxpParser: TPseudoXPathParser;
+  pxpParser: TXQueryEngine;
   lastQueryWasPXP: boolean;
   lastRetrievedType: TRetrieveType;
 
@@ -160,8 +160,8 @@ begin
       tree.parsingModel:=pmHTML;
     end;
     tree.parseTree(data, dataFileName);
-    if pxpParser = nil then pxpParser := TPseudoXPathParser.create;
-    pxpParser.parse(query);
+    if pxpParser = nil then pxpParser := TXQueryEngine.create;
+    pxpParser.parseXPath2(query);
     pxpparser.ParentElement := tree.getLastTree;
     pxpparser.RootElement := tree.getLastTree;
     pxpparser.StaticBaseUri:=dataFileName;

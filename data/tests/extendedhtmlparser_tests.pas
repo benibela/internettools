@@ -92,7 +92,7 @@ var data: array[1..285] of array[1..3] of string = (
  ('<a><img width="100"> <template:read var="test" source="@src"/> </img></a>',
  '<a><img width=120 src="abc.jpg"><img width=320 src="def.jpg"><img width=100 src="123.jpg"><img width=500 src="baum.jpg"></a>',
  'test=123.jpg'),
- //if tests (== strue)
+ //if tests (== strue)         (also tests variable reading for the first time)
  ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"$test;"="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
  '<a><b>abc</b><c>dies kommt raus</c></a>',
  'test=abc'#13#10'test=dies kommt raus'),

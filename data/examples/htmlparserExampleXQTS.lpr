@@ -211,7 +211,7 @@ var htp: THtmlTemplateParser;
     i: Integer;
     query, output: String;
     skippedErrorsLocal, totalLocal, correctLocal, wrongLocal, exceptionLocal: Integer;
-    pxp: TPseudoXPathParser;
+    pxp: TXQueryEngine;
     myoutput: string;
     wrap: twrapper;
     CAT: Integer;
@@ -246,7 +246,7 @@ begin
   buffer3 := TStringList.Create;
   htp := THtmlTemplateParser.create;
   htp.parseTemplate(CATALOG_TEMPLATE);
-  pxp := TPseudoXPathParser.create;
+  pxp := TXQueryEngine.create;
   pxp.OnEvaluateVariable:=@wrap.eval;
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
   pxp.AllowVariableUseInStringLiterals := false;
@@ -271,7 +271,7 @@ begin
       tree.parseTreeFromFile(paramstr(4));
       pxp.RootElement:=tree.getLastTree;
     end;
-    pxp.parse(ParamStr(2));
+    pxp.parseXPath2(ParamStr(2));
     writeln(mytostring(pxp.evaluate()));
     exit;
   end;
@@ -345,10 +345,10 @@ begin
           if (inputfile = 'emptydoc') or (inputfile='') then begin
             pxp.RootElement:=nil;
             pxp.ParentElement:=nil;
-            pxp.parse('('+query+')');
+            pxp.parseXPath2('('+query+')');
           end else begin
             //query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
-            pxp.parse('('+query+')');
+            pxp.parseXPath2('('+query+')');
             pxp.RootElement:=currentTree;
             pxp.ParentElement:=currentTree;
           end;

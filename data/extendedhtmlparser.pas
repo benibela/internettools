@@ -87,7 +87,7 @@ TTemplateElement=class(TTreeElement)
   match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
-  test, condition, valuepxp, source, min, max: TPseudoXPathParser;
+  test, condition, valuepxp, source, min, max: IXQuery;
   textRegexs: array of TRegExpr;
 
   function templateReverse: TTemplateElement; inline;
@@ -393,6 +393,7 @@ THtmlTemplateParser=class
 
     FTemplate, FHTML: TTreeParser;
     FHtmlTree: TTreeDocument;
+    FQueryEngine: TXQueryEngine;
 
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TPXPVariableChangeLog;
     FParsingExceptions: boolean;
@@ -431,7 +432,7 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     function debugMatchings(const width: integer): string;
-    function createPseudoXPathParser(const expression: string): TPseudoXPathParser; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
+    function createXQuery(const expression: string): IXQuery; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TPXPVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TPXPVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
@@ -591,20 +592,13 @@ begin
 end;
 
 procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
-  procedure updatePXP(pxp: TPseudoXPathParser);
-  begin
-    pxp.RootElement := parser.FHtmlTree;
-    pxp.StaticBaseUri := parser.FHtmlTree.baseURI;
-  end;
-
-  function cachePXP(name: string): TPseudoXPathParser;
+  function cachePXP(name: string): IXQuery;
   var i: integer;
   begin
     if templateAttributes = nil then exit(nil);
     i := templateAttributes.IndexOfName(name);
     if i < 0 then exit(nil);
-    result := parser.createPseudoXPathParser(templateAttributes.ValueFromIndex[i]);
-    updatePXP(result);
+    result := parser.createXQuery(templateAttributes.ValueFromIndex[i]);
   end;
 
   procedure cacheRegExpr(name: string; prefix, suffix: string; escape: boolean);
@@ -636,17 +630,10 @@ begin
 
   if recreate then freeCaches;
 
-  if test <> nil then updatePXP(test);
-  if condition <> nil then updatePXP(condition);
-  if valuepxp <> nil then updatePXP(valuepxp);
-  if source <> nil then updatePXP(source);
-
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
-  if templateType = tetCommandShortRead then begin
-    source := parser.createPseudoXPathParser(strDecodeHTMLEntities(deepNodeText(),eUTF8)); //todo: use correct encoding
-    updatePXP(source);
-  end else source := cachePXP('source');
+  if templateType = tetCommandShortRead then source := parser.createXQuery(strDecodeHTMLEntities(deepNodeText(),eUTF8)) //todo: use correct encoding
+  else source := cachePXP('source');
 
   if templateAttributes= nil then exit;
 
@@ -676,12 +663,12 @@ begin
   for i:=0 to high(textRegexs) do
     FreeAndNil(textRegexs[i]);
   setlength(textRegexs, 0);
-  FreeAndNil(test);
+  {FreeAndNil(test);
   FreeAndNil(condition);
   FreeAndNil(source);
   FreeAndNil(valuepxp);
   FreeAndNil(min);
-  FreeAndNil(max);
+  FreeAndNil(max);}
 end;
 
 destructor TTemplateElement.destroy;
@@ -703,12 +690,10 @@ begin
   result := FTemplate.getLastTree;
 end;
 
-function THtmlTemplateParser.createPseudoXPathParser(const expression: string): TPseudoXPathParser;
+function THtmlTemplateParser.createXQuery(const expression: string): IXQuery;
 begin
-  result := TPseudoXPathParser.Create;
-  result.OnEvaluateVariable:= @evaluatePXPVariable;
-  result.OnDefineVariable:=@FVariableLog.defineVariable;
-  if expression <> '' then result.parse(expression);
+  if expression = '' then raise ETemplateParseException.Create('no expression given');
+  result := FQueryEngine.parseXPath2(expression);
 end;
 
 function THtmlTemplateParser.GetVariableLogCondensed: TPXPVariableChangeLog;
@@ -782,8 +767,8 @@ begin
   end;
   if template.templateAttributes = nil then exit(true);
   if template.condition = nil then exit(true);
-  template.condition.ParentElement := html;
-  template.condition.TextElement := nil;
+  FQueryEngine.ParentElement := html;
+  FQueryEngine.TextElement := nil;
   result := template.condition.evaluate().toBoolean;
 end;
 
@@ -792,12 +777,12 @@ function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: T
 
 var xpathText: TTreeElement;
 
-  function performPXPEvaluation(const pxp: TPseudoXPathParser): TPXPValue;
+  function performPXPEvaluation(const pxp: IXQuery): TPXPValue;
   begin
     if pxp = nil then exit(pxpvalue());
-    pxp.ParentElement := htmlParent;
-    pxp.TextElement := xpathText;
-    result:=pxp.evaluate;
+    FQueryEngine.ParentElement := htmlParent;
+    FQueryEngine.TextElement := xpathText;
+    result := pxp.evaluate;
   end;
 
   procedure HandleMatchText;
@@ -850,11 +835,6 @@ var xpathText: TTreeElement;
         templateStart := templateStart.templateReverse.templateNext;
       end;
     end;
-  end;
-
-
-  procedure performRead(const varname: string; source: TPseudoXPathParser; const regex:string=''; const submatch: integer = 0);
-  begin
   end;
 
   procedure HandleCommandRead;
@@ -984,7 +964,7 @@ var xpathText: TTreeElement;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
-        result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, e.valuepxp.getDefaultCollation, e.valuepxp.ImplicitTimezone);
+        result := pxpvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, FQueryEngine.getDefaultCollation, FQueryEngine.ImplicitTimezone);
         evaluatedvalue.Free;
       end;
 
@@ -1155,10 +1135,15 @@ begin
 
   FAttributeMatching := TStringList.Create;
   FAttributeMatching.Values['class'] := 'list-contains';
+
+  FQueryEngine := TXQueryEngine.create;
+  FQueryEngine.OnDefineVariable:= @FVariableLog.defineVariable;
+  FQueryEngine.OnEvaluateVariable:=@evaluatePXPVariable;
 end;
 
 destructor THtmlTemplateParser.destroy;
 begin
+  FQueryEngine.Free;
   FAttributeMatching.Free;
   FRepetitionRegEx.Free;
   FNamespaces.Free;
@@ -1234,6 +1219,8 @@ begin
   end;
 
   FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
+  FQueryEngine.RootElement := FHtmlTree;
+  FQueryEngine.StaticBaseUri := FHtmlTree.baseURI;
 
   result:=matchTemplateTree(FHtmlTree, FHtmlTree.next, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
 

@@ -1117,7 +1117,7 @@ begin
     FCurrentTree.FEncoding:=eUnknown;
     encHeader := encodingFromContentType(contentType);
     if parsingModel = pmHTML then
-      encMeta := encodingFromContentType(TPseudoXPathParser.EvaluateToString('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree))
+      encMeta := encodingFromContentType(TXQueryEngine.evaluateStaticXPath2('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree).toString)
      else
       encMeta := encHeader;
 

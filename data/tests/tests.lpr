@@ -3,7 +3,7 @@ program tests;
 {$mode objfpc}{$H+}
 
 uses
-  //heaptrc,
+  heaptrc,
   Classes, pseudoxpath_tests, extendedhtmlparser_tests, bbutils_tests, int65math, pseudoxpath, extendedhtmlparser, bbutils, sysutils;
 
 var
