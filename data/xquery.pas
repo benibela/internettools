@@ -5275,9 +5275,9 @@ begin
 end;
 
 procedure xqvalueTo(const cxt: TEvaluationContext; a, b: TXQValue; var result: TXQValue);
-var f,t: integer;
-    i: Integer;
+var i, f,t: int65;
     typ: TXQValueInt65Class;
+    len: Int65;
 begin
   typ := commonIntegerClass(a,b);
   f := a.toInt65();
@@ -5287,9 +5287,15 @@ begin
     xqvalueAssign(result, typ.create(f));
     exit;
   end;
-  xqvalueAssign(result, TXQValueSequence.create(t-f));
-  for i:=f to t do
+  len := t - f + 1;
+  if len > MaxInt then raise EXQEvaluationException.Create('Too large to operation ');
+  xqvalueAssign(result, TXQValueSequence.create(len));
+  i := f;
+  while i < t do begin
     TXQValueSequence(result).addChild(typ.create(i));
+    i += 1;
+  end;
+  TXQValueSequence(result).addChild(typ.create(t));
 end;
 
 procedure xqvalueMultiply(const cxt: TEvaluationContext; a, b: TXQValue;var result: TXQValue);
@@ -5377,7 +5383,7 @@ end;
 
 procedure xqvalueDivideInt(const cxt: TEvaluationContext; a, b: TXQValue; var result: TXQValue);
 var f: decimal;
- i: Integer;
+ i: int65;
  ak, bk: TXQValueKind;
 begin
   ak := a.kind; bk := b.kind;
