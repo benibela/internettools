@@ -6,7 +6,7 @@ begin
   else if select = 'comment' then exit([qmComment])
   else if select = 'element' then exit([qmElement,qmExcludeRoot])
   else if select = 'processing-instruction' then exit([qmProcessingInstruction])
-  else raise Exception.Create('Unkown element test: '+select);
+  else raise Exception.Create('Unknown element test: '+select);
 end;
 
 
@@ -75,7 +75,7 @@ end;
 
 constructor TXQTermDefineVariable.create(varname: TXQTerm; value: TXQTerm);
 begin
-  if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).select
+  if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).debugTermToString
   else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
   else raiseParsingError('Invalid term to assign a variable to: '+varname.debugTermToString);
   varname.Free;
@@ -374,6 +374,8 @@ begin
   axis := '';
   select := avalue;
   if strContains(select,'::') then axis:=strSplitGet('::',select);
+  hadNamespace := strContains(select,':');
+  if hadNamespace then  namespace:=strSplitGet(':',select);
   func := asfunction;
 end;
 
@@ -385,6 +387,14 @@ begin
     result := context.sender.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
   end;
+end;
+
+function TXQTermNodeMatcher.debugTermToString: string;
+begin
+  result := '';
+  if axis <> '' then result += axis + '::';
+  if namespace <> '' then result += namespace + ':';
+  result += select;
 end;
 
 function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
@@ -412,16 +422,29 @@ begin
   if func then begin
     result.typ:=getAxis(axis);
     result.matching:=convertElementTestToMatchingOptions(select);
-    if (result.matching = [qmProcessingInstruction]) and (length(children) > 0) then begin
-      if children[0] is TXQTermNodeMatcher then begin;
-        if TXQTermNodeMatcher(children[0]).axis <> '' then raiseEvaluationError('axis within element test is not allowed');
-        result.value := TXQTermNodeMatcher(children[0]).select;
-      end else if children[0] is TXQTermString then
-        result.value:=TXQTermString(children[0]).value
-      else raiseEvaluationError('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
-      include(result.matching, qmValue) ;
-    end;
-  end else case select of
+    if (length(children) > 0) then
+      if (result.matching = [qmProcessingInstruction])  then begin
+        if children[0] is TXQTermNodeMatcher then begin;
+          if TXQTermNodeMatcher(children[0]).axis <> '' then raiseEvaluationError('axis within element test is not allowed');
+          result.value := TXQTermNodeMatcher(children[0]).select;
+        end else if children[0] is TXQTermString then
+          result.value:=TXQTermString(children[0]).value
+        else raiseEvaluationError('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
+        include(result.matching, qmValue) ;
+      end else if select = 'element' then begin
+        if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('Invalid element test.');
+        if TXQTermNodeMatcher(children[0]).select <> '*' then begin
+          Include(result.matching, qmValue);
+          result.value:=TXQTermNodeMatcher(children[0]).select;
+          if TXQTermNodeMatcher(children[0]).hadNamespace then begin
+            Include(result.matching, qmCheckNamespace);
+            result.namespace:=TXQTermNodeMatcher(children[0]).namespace;
+          end;
+        end else if TXQTermNodeMatcher(children[0]).hadNamespace then raiseEvaluationError('Namespace:wildcard not allowed in element test') ;
+      end else raiseEvaluationError('Children not allowed for element test "'+select+'"');
+    exit;
+  end;
+  case select of
     '/': result.typ := qcDocumentRoot;
     '.': begin
       result.typ:=qcSameNode; //same node /./
@@ -434,11 +457,19 @@ begin
     '*': begin
       result.typ:=getAxis(axis); //any child /*/
       result.matching:=[qmElement,qmAttribute, qmExcludeRoot];
+      if (hadNamespace) and (namespace <> '*') then begin
+        Include(Result.matching, qmCheckNamespace);
+        result.namespace:=namespace;
+      end;
     end;
     else begin
       result.typ := getAxis(axis);
       result.matching := [qmValue,qmElement];
       result.value:=select;
+      if (namespace <> '*') then begin
+        Include(Result.matching, qmCheckNamespace);
+        result.namespace:=namespace;
+      end;
     end;
   end;
 end;
@@ -484,12 +515,15 @@ end;
 
 constructor TXQTermReadAttribute.create(avalue: string);
 begin
+  if pos(':', avalue) > 0 then namespace := strSplitGet(':', avalue);
   value := avalue;
 end;
 
 function TXQTermReadAttribute.evaluate(const context: TEvaluationContext): TXQValue;
 var
   tempEl: TTreeElement;
+  testValue: Boolean;
+  testNS: Boolean;
 begin
   if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
     tempEl := TXQValueNode(context.SeqValue).node
@@ -497,24 +531,23 @@ begin
     tempEl:=context.ParentElement;
   if tempEl.typ = tetProcessingInstruction then
     exit(xqvalue);
-  if value = '*' then begin
-    if tempEl.attributes = nil then result := xqvalue()
-    else if tempEl.attributes.next = nil then begin
-      assert(tempEl.attributes.reverse <> nil);
-      result := xqvalue(tempEl.attributes.reverse)
-    end else begin
-      result := TXQValueSequence.create();
-      tempEl := tempEl.attributes;
-      while tempEl <> nil do begin
-        assert(tempEl.reverse <> nil);
-        TXQValueSequence(result).addChild(xqvalue(tempEl.reverse));
-        tempEl := tempEl.next;
-      end;
+
+  result := nil;
+  tempEl := tempEl.attributes;
+  testValue := value <> '*';
+  testNS := (namespace <> '*') and (testValue or (namespace <> ''));
+  while tempEl <> nil do begin
+    if      (not testValue or striEqual(tempEl.value, value))
+        and (not testNS or striEqual(tempEl.namespace, namespace)) then begin
+      if result = nil then result := xqvalue(tempEl.reverse)
+      else begin
+        if not (result is TXQValueSequence) then result := TXQValueSequence.create(result);
+        TXQValueSequence(result).addChild(xqvalue(tempEl.reverse))
+      end
     end;
-  end else if tempEl.getAttributeTry(value, tempEl) then  //TODO: multi attributes with the same name
-    result:=xqvalue(tempEl)
-  else
-    result:=xqvalue();
+    tempEl := tempEl.next;
+  end;
+  if result = nil then result:=xqvalue();
 end;
 
 { TXQTermVariable }

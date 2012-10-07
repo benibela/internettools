@@ -80,6 +80,7 @@ TTreeElement = class
   previous: TTreeElement; //**< previous element (self.next.previous = self)
   parent: TTreeElement;
   reverse: TTreeElement; //**<element paired by open/closing, or corresponding attributes
+  namespace: string; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
 
   offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
@@ -108,13 +109,19 @@ TTreeElement = class
   function getAttribute(const a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
   function getAttribute(const a: string; const def: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
   function getAttributeTry(const a: string; out valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
-  function getAttributeTry(const a: string; out valueout: TTreeElement):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
+  function getAttributeTry(a: string; out valueout: TTreeElement):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
+
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getRoot(): TTreeElement;
   function getDocument(): TTreeDocument;
+
+  function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
+  function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
+  function getNamespaceURL(): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute)
+  function getNamespaceURL(prefixOverride: string): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents
 
   property defaultProperty[name: string]: string read getAttribute; default;
 
@@ -379,7 +386,7 @@ begin
   if self = nil then exit;
   case typ of
     tetText: result := xmlStrEscape(value);
-    tetClose: result := '</'+value+'>';
+    tetClose: result := '</'+getNodeName()+'>';
     tetComment: result := '<!--'+value+'-->';
     tetProcessingInstruction: begin
       result := '<?'+value;
@@ -388,11 +395,13 @@ begin
     end;
     tetOpen: begin
       if (value = '') and (self is TTreeDocument) then exit(innerXML());
-      result := '<'+value;
+      result := '<' + getNodeName();
       attrib := attributes;
       while attrib <> nil do begin
         assert(attrib.reverse <> nil);
-        result += ' ' + attrib.value+'="'+attrib.reverse.value+'"'; //todo fix escaping & < >
+        result += ' ';
+        if attrib.namespace <> '' then result += attrib.namespace+':';
+        result += attrib.value+'="'+attrib.reverse.value+'"'; //todo fix escaping & < >
         attrib := attrib.next;
       end;
 
@@ -463,15 +472,21 @@ begin
   valueout := temp.value;
 end;
 
-function TTreeElement.getAttributeTry(const a: string; out valueout: TTreeElement): boolean;
+function TTreeElement.getAttributeTry(a: string; out valueout: TTreeElement): boolean;
 var
   attrib: TTreeElement;
+  checkNamespace: Boolean;
+  ns: string;
 begin
   result := false;
   if self = nil then exit;
   attrib := attributes;
+  checkNamespace := pos(':', a) > 0;
+  if checkNamespace then
+    ns := strSplitGet(':', a);
+
   while attrib <> nil do begin
-    if striEqual(attrib.value, a) then begin //Todo: case sensitive or insensitive??
+    if striEqual(attrib.value, a) and (not checkNamespace or striEqual(ns, attrib.namespace)) then begin //Todo: case sensitive or insensitive??
       valueout := attrib.reverse;
       exit(true);
     end;
@@ -522,6 +537,44 @@ end;
 function TTreeElement.getDocument: TTreeDocument;
 begin
   result := TTreeDocument(getRoot().getParent());
+end;
+
+function TTreeElement.getNodeName: string;
+begin
+  case typ of
+    tetOpen, tetAttributeName, tetClose: begin
+      if namespace = '' then exit(value);
+      exit(namespace + ':' + value);
+    end;
+    tetAttributeValue: result := reverse.getNodeName();
+    else result := '';
+  end;
+end;
+
+function TTreeElement.getNamespacePrefix: string;
+begin
+  result := namespace;
+end;
+
+function TTreeElement.getNamespaceURL: string;
+begin
+  result := getNamespaceURL(getNamespacePrefix());
+end;
+
+function TTreeElement.getNamespaceURL(prefixOverride: string): string;
+var
+  n: TTreeElement;
+  attrib: String;
+begin
+  if prefixOverride <> '' then prefixOverride:=':'+prefixOverride;
+  attrib := 'xmlns' + prefixOverride;
+  n := self;
+  while n <> nil do begin
+    if n.getAttributeTry(attrib, result) then
+      exit;
+    n := n.getParent();
+  end;
+  exit('');
 end;
 
 procedure TTreeElement.insert(el: TTreeElement);
@@ -605,6 +658,8 @@ begin
 
   for i := 0 to high(props) do begin
     attrib := TTreeElement.create(tetAttributeName, strFromPchar(props[i].name, props[i].nameLen));
+    if pos(':', attrib.value) > 0 then
+      attrib.namespace := strSplitGet(':', attrib.value);
     attrib.parent := self;
     if prev <> nil then prev.next := attrib
     else attributes := attrib;
@@ -763,6 +818,9 @@ begin
 
   if typ <> tetClose then result.parent := TTreeElement(FElementStack.Last)
   else result.parent := TTreeElement(FElementStack.Last).getParent();
+
+  if (typ in [tetOpen, tetClose]) and (pos(':', result.value) > 0) then
+    result.namespace := strSplitGet(':', result.value);
   //FCurrentElement.id:=FTemplateCount;
 end;
 
@@ -883,7 +941,7 @@ begin
   if FAutoCloseTag and (not strliequal(tagName, last.value, tagNameLen)) then autoCloseLastTag();
   FAutoCloseTag:=false;
 
-  if (strliequal(tagName, last.value, tagNameLen)) then begin
+  if (strliequal(tagName, last.getNodeName, tagNameLen)) then begin
     new := newTreeElement(tetClose, tagName, tagNameLen);
     new.reverse := last; last.reverse := new;
     FElementStack.Delete(FElementStack.Count-1);

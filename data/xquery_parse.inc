@@ -65,7 +65,11 @@ begin
   path[high(path)] := toQueryCommand;
 end;
 
-type TXQParsingContext = class
+type
+
+{ TXQParsingContext }
+
+ TXQParsingContext = class
   AllowVariableUseInStringLiterals: boolean;
 
   str: string;
@@ -80,6 +84,7 @@ type TXQParsingContext = class
   function nextToken(lookahead: boolean=false): string;
 
   function parseSequenceLike(target: TXQTerm): TXQTerm;
+  function parseQNameContinuation: string;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -223,6 +228,13 @@ begin
   if t <> ')' then raiseParsingError('Expected closing parenthesis: )');
 end;
 
+function TXQParsingContext.parseQNameContinuation: string;
+begin
+  if (pos^ = ':') and (((pos - 1)^ = '*') or ((pos + 1)^ = '*')) then result := nextToken()
+  else if ((pos - 1)^ = ':') and (((pos)^ = '*') or ((pos - 1)^ = '*')) then result := nextToken()
+  else result := '';
+end;
+
 function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
 begin
   result := (word = 'text') or (word = 'node') or (word = 'comment') or (word = 'processing-instruction')
@@ -271,7 +283,7 @@ begin
       if length(word) < 2 then raiseParsingError('Variable must have at least 2 characters: '+word);
       exit(TXQTermVariable.Create(word));
     end;
-    '@':  exit(TXQTermReadAttribute.create(strcopyfrom(word,2)));
+    '@': exit(TXQTermReadAttribute.create(strcopyfrom(word,2) + parseQNameContinuation));
     '+', '-': begin
       wordlookahead:=nextToken(true);
       if (word = '-') and
@@ -285,7 +297,7 @@ begin
 
     '(': exit(parseSequenceLike(TXQTermSequence.Create)); //only sequence or priority brackets
 
-    '*': exit(TXQTermNodeMatcher.Create(word));
+    '*': exit(TXQTermNodeMatcher.Create(word + parseQNameContinuation));
     '/': begin
       if pos^ = '/' then begin expect('/'); word+='/';end;
       skipWhitespaceAndComment();
@@ -306,6 +318,12 @@ begin
         word+=nextToken();
         wordlookahead := nextToken(true);
       end;
+      if ((wordlookahead = '*') and strEndsWith(word, ':') and not strEndsWith(word, '::'))
+         or (strEndsWith(word, '::*') and strBeginsWith(wordlookahead, ':')) then begin
+        word += nextToken();
+        wordlookahead := nextToken(true);
+      end;
+
 
       if strBeginsWith(word,'attribute::') then begin
         if strEndsWith(word, ':node') then begin

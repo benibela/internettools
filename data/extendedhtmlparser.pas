@@ -466,24 +466,20 @@ const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
 
 { TTemplateElement }
 
-function strToCommand(s:string; treeTyp: TTreeElementType; commandnamespaces: TStringList): TTemplateElementType;
-var tag:pchar; taglen: integer;
-  t: TTemplateElementType;
-  i: Integer;
+function strToCommand(ns, s:string; treeTyp: TTreeElementType; commandnamespaces: TStringList): TTemplateElementType;
+var  t: TTemplateElementType;
+     i: Integer;
 begin
   if ((treeTyp = tetOpen) or (treeTyp = tetClose)) then begin
-    for i:=0 to commandnamespaces.Count - 1 do begin
-      if (stribeginswith(s,commandnamespaces[i])) then begin
-        tag:=@s[length(commandnamespaces[i])+1];
-        taglen:=length(s)-length(commandnamespaces[i]);
-        for t:=low(COMMAND_STR) to high(COMMAND_STR) do
-          if strliequal(tag,COMMAND_STR[t],taglen) then begin
-            if treeTyp = tetOpen then exit(t)
-            else if COMMAND_CLOSED[t] = 0 then exit(tetIgnore)
-            else if COMMAND_CLOSED[t] = 2 then exit(t);
-          end;
-        raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s)
-      end;
+    i := commandnamespaces.IndexOf(ns);
+    if i >= 0 then begin
+      for t:=low(COMMAND_STR) to high(COMMAND_STR) do
+        if striequal(s,COMMAND_STR[t]) then begin
+          if treeTyp = tetOpen then exit(t)
+          else if COMMAND_CLOSED[t] = 0 then exit(tetIgnore)
+          else if COMMAND_CLOSED[t] = 2 then exit(t);
+        end;
+      raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s)
     end;
   end;
   case treeTyp of
@@ -526,8 +522,6 @@ end;
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
  i: Integer;
- templateAttrib: boolean;
- namespaceended: integer;
  j: Integer;
  curChild: TTreeElement;
  attrib, temp: TTreeElement;
@@ -535,9 +529,9 @@ begin
   //inherited initialized;
   attrib := attributes;
   while attrib <> nil do begin
-    if strBeginsWith(attrib.value, 'xmlns:') then begin
+    if attrib.namespace = 'xmlns' then begin
       if attrib.reverse.value = HTMLPARSER_NAMESPACE_URL then
-        parser.FNamespaces.add(strCopyFrom(attrib.value, 7) + ':');
+        parser.FNamespaces.add(attrib.value);
       if attributes = attrib then attributes := attrib.next;
       attrib.reverse.deleteElementFromDoubleLinkedList;
       attrib := attrib.deleteElementFromDoubleLinkedList;
@@ -546,23 +540,13 @@ begin
     attrib := attrib.next;
   end;
 
-  templateType:=strToCommand(value, typ, parser.FNamespaces);
+  templateType:=strToCommand(namespace, value, typ, parser.FNamespaces);
 
   attrib := attributes;
   while attrib <> nil do begin
-    namespaceended:=-1;
-    templateAttrib:=false;
-    for j:=0 to parser.FNamespaces.Count-1 do
-      if strBeginsWith(attrib.value, parser.FNamespaces[j]) then begin
-        templateAttrib:=true;
-        namespaceended:=length(parser.FNamespaces[j])+1;
-        break;
-      end;
-    templateAttrib:=templateAttrib or (templateType >= firstRealTemplateType);
-    if templateAttrib then begin;
+    if (templateType >= firstRealTemplateType) or (parser.FNamespaces.IndexOf(attrib.namespace) >= 0) then begin;
       if templateAttributes = nil then templateAttributes := TAttributeList.Create;
-      if namespaceended = -1 then templateAttributes.Add(attrib.value+'='+attrib.reverse.value)
-      else templateAttributes.Add(strcopyfrom(attrib.value, namespaceended) +'='+ attrib.reverse.value);
+      templateAttributes.Add(attrib.value+'='+attrib.reverse.value);
       if attributes = attrib then attributes := attrib.next;
       attrib.reverse.deleteElementFromDoubleLinkedList;
       attrib := attrib.deleteElementFromDoubleLinkedList;
@@ -1122,8 +1106,8 @@ begin
   FHTML.parsingModel:=pmHTML;
   FHTML.readComments:=true;
   FNamespaces := TStringList.Create;
-  FNamespaces.Add('template:');
-  FNamespaces.Add('t:');
+  FNamespaces.Add('template');
+  FNamespaces.Add('t');
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;

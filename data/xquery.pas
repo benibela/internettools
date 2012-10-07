@@ -556,11 +556,12 @@ type
                           qcAncestor, qcPrecedingSibling, qcPreceding, qcSameOrAncestor,
                           qcDocumentRoot,
                           qcFunctionSpecialCase);
-  TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmExcludeRoot);
+  TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmExcludeRoot, qmCheckNamespace);
   TXQPathMatchingKinds = set of TXQPathMatchingKind;
   //***@abstract(Step of a query in a tree)
   //***You can use it to use queries, but it is intended for internal use
   TXQPathMatchingStep = record
+    namespace: string;
     value: string; //**< If @code(value <> ''), only nodes with the corresponding value are found (value = node-name for element node, value = text for text/comment nodes)
     filters: array of TXQTerm; //**< expressions a matched node must satisfy
     case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
@@ -580,6 +581,8 @@ type
     matchStartNode: boolean; //**< If the search begins at start or at start.next
     checkValue: boolean; //**< If the name of the element matters
     requiredValue: string; //**< Required node name (if checkValue)
+    checkNamespace: boolean;
+    requiredNamespace: string;
   end;
 
 
@@ -652,10 +655,11 @@ type
   { TXQTermNodeMatcher }
 
   TXQTermNodeMatcher = class(TXQTerm)
-    axis, select: string;
-    func: boolean;
+    axis, namespace, select: string;
+    hadNamespace, func: boolean;
     constructor Create(const avalue: string; asfunction: boolean = false);
     function evaluate(const context: TEvaluationContext): TXQValue; override;
+    function debugTermToString: string; override;
   protected
     function toQueryCommand: TXQPathMatchingStep; override;
   end;
@@ -673,7 +677,7 @@ type
   { TXQTermReadAttribute }
 
   TXQTermReadAttribute = class(TXQTerm)
-    value: string;
+    value, namespace: string;
     constructor create(avalue: string);
     function evaluate(const context: TEvaluationContext): TXQValue; override;
   end;
@@ -5048,8 +5052,10 @@ end;
 
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
 begin
-  result :=  assigned(node) and (node.typ in nodeCondition.searchedTypes)
-             and (not (nodeCondition.checkValue) or striEqual(nodeCondition.requiredValue, node.getValue()));
+  result :=  assigned(node)
+             and (node.typ in nodeCondition.searchedTypes)
+             and (not (nodeCondition.checkValue) or striEqual(nodeCondition.requiredValue, node.getValue()))
+             and (not (nodeCondition.checkNamespace) or striEqual(nodeCondition.requiredNamespace, node.getNamespacePrefix));
 end;
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement;
@@ -5105,6 +5111,9 @@ begin
   nodeCondition.iteration := qcnciNext;
   nodeCondition.checkValue:=qmValue in command.matching;
   nodeCondition.requiredValue:=command.value;
+  nodeCondition.checkNamespace:=qmCheckNamespace in command.matching;
+  nodeCondition.requiredNamespace:=command.namespace;
+
   case command.typ of
     qcSameNode: begin
       nodeCondition.matchStartNode:=true;
@@ -7010,9 +7019,8 @@ begin
   testlang := lowercase(args[0].toString);
   if node.getParent() = nil then node := node.findNext(tetOpen,'',[tefoIgnoreText]);
   while node <> nil do begin
-    if node.hasAttribute('xml:lang') or node.hasAttribute('lang') then begin
-      rlang := node.getAttribute('xml:lang');
-      if rlang = '' then rlang := node.getAttribute('lang');
+    if node.hasAttribute('lang') then begin
+      rlang := node.getAttribute('lang');
       rlang := LowerCase(rlang);
       xqvalueAssign(result, (rlang = testlang) or (strBeginsWith(rlang, testlang + '-')));
       exit;
@@ -7023,16 +7031,6 @@ begin
 end;
 
 
-function resolveNamespace(n: TTreeElement; prefix: string): string;
-begin
-  if prefix <> '' then prefix:=':'+prefix;
-  while n <> nil do begin
-    if n.getAttributeTry('xmlns' + prefix, result) then
-      exit;
-    n := n.getParent();
-  end;
-  exit('');
-end;
 
 procedure xqFunctionResolve_QName(args: array of TXQValue; var result: TXQValue);
 
@@ -7044,7 +7042,7 @@ begin
   name := args[0].toString;
   ns := '';
   if pos(':', name) > 0 then ns := copy(name, 1, pos(':', name) - 1);
-  ns := resolveNamespace(args[1].toNode, ns);
+  ns := args[1].toNode.getNamespaceURL(ns);
   if ns <> '' then ns := ns + #2;
   xqvalueAssign(result, TXQValue_QName.create(ns + name));
 end;
@@ -7102,7 +7100,7 @@ var
   res: String;
 begin
   requiredArgCount(args, 2);
-  res := resolveNamespace(args[1].toNode, args[0].toString);
+  res := args[1].toNode.getNamespaceURL(args[0].toString);
   if res = '' then exit;
   xqvalueAssign(result, res);
 end;
@@ -7123,12 +7121,10 @@ begin
       if el.attributes <> nil then begin
         attrib := el.attributes;
         while attrib <> nil do begin
-          n := attrib.value;
-          if strBeginsWith(n , 'xmlns') then
-            if length(n) = 5 then begin
-              if sl.IndexOf('') = -1 then sl.add('');
-            end else if (n[6] = ':') and (sl.IndexOf(strCopyFrom(n, 7)) = -1) then
-              sl.Add(strCopyFrom(n, 7));
+          if (attrib.namespace = '') and (attrib.value = 'xmlns') then begin
+            if sl.IndexOf('') = -1 then sl.add('');
+          end else if attrib.namespace = 'xmlns' then
+            if sl.IndexOf(attrib.value) = -1 then sl.add(attrib.value);
           attrib := attrib.next;
         end;
       end;
@@ -7771,11 +7767,7 @@ var
 begin
   node := simpleNode(context, args);
   if node = nil then exit('');
-  case node.typ of
-    tetOpen,tetProcessingInstruction,tetAttributeName: result := node.value;
-    tetAttributeValue: result := node.reverse.value;
-    else result := '';
-  end;
+  result := node.getNodeName();
 end;
 
 procedure xqFunctionName(const context: TEvaluationContext; args: array of TXQValue; var result: TXQValue);
@@ -7803,9 +7795,8 @@ begin
   node := simpleNode(context, args);
   if (node = nil) or (node.typ <> tetOpen) then xqvalueAssign(result, TXQValue_anyURI.create(''))
   else begin
-    prefix := copy(node.value, 1, pos(':', node.value) - 1);
-    if prefix = '' then xqvalueAssign(result, TXQValue_anyURI.create(''));
-    xqvalueAssign(result, TXQValue_anyURI.create(resolveNamespace(node, prefix)));
+    //if node.getNamespacePrefix() = '' then xqvalueAssign(result, TXQValue_anyURI.create(''));
+    xqvalueAssign(result, TXQValue_anyURI.create(node.getNamespaceURL()));
   end;
 end;
 
