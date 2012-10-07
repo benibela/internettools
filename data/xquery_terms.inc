@@ -90,20 +90,20 @@ end;
 
 constructor TXQTermDefineVariable.create(varname: TXQTerm; value: TXQTerm);
 begin
-  push(varname);
+  if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).select
+  else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
+  else raiseParsingError('Invalid term to assign a variable to: '+varname.debugTermToString);
   push(value);
 end;
 
 function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): TPXPValue;
 begin
   if not assigned(context.sender.OnDefineVariable) then raiseEvaluationError(':= can''t be used without a method assigned to the OnDefineVariable event');
-  if length(children) < 2 then raiseEvaluationError('Defining a variable requires a variable name and a variable value');
-  if length(children) > 2 then raiseEvaluationError('Only one value can be assigned to a variable');
-  if not (children[0] is TXQTermNodeMatcher) and not (children[0] is TXQTermVariable) then raiseEvaluationError('A variable name is required on the left side of :=');
-  result := children[1].evaluate(context);
+  if length(children) = 0 then raiseEvaluationError('Value missing');
+  if length(children) > 1 then raiseEvaluationError('Only one value can be assigned to a variable');
+  result := children[0].evaluate(context);
 
-  if children[0] is TXQTermNodeMatcher then  context.sender.OnDefineVariable(self, TXQTermNodeMatcher(children[0]).select, result.clone)
-  else if children[0] is TXQTermVariable then  context.sender.OnDefineVariable(self, TXQTermVariable(children[0]).value, result.clone);
+  context.sender.OnDefineVariable(self, variablename, result.clone);
 end;
 
 function TXQTermDefineVariable.staticTypeGuess: TPXPValueKind;
@@ -475,26 +475,25 @@ begin
       else raiseEvaluationError('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
       include(result.matching, qmValue) ;
     end;
-  end else if select = '/' then result.typ := qcDocumentRoot
-  else if select = '.' then begin
-    result.typ:=qcSameNode; //same node /./
-    result.matching:=[qmElement, qmAttribute];
-  end else if select='..' then begin
-    result.typ:=qcDirectParent; //parent /../
-    result.matching:=[qmElement];
-  end else if select='' then begin //grand child //
-    //if (length(term.children[i]^.children) > 0) then raiseEvaluationError('Invalid // wildcard');
-   // if i + 1 = high(term.children) then raiseEvaluationError('Unexpected end of xpath expression');
-    //if term.children[i+1]^.value = '' then raiseEvaluationError('/// is invalid');
-    result.typ := qcSameOrDescendant;
-    result.matching:=[qmElement];
-  end else if select='*' then begin
-    result.typ:=getAxis(axis); //any child /*/
-    result.matching:=[qmElement,qmAttribute, qmExcludeRoot];
-  end else begin //specific child
-    result.typ := getAxis(axis);
-    result.matching := [qmValue,qmElement];
-    result.value:=select;
+  end else case select of
+    '/': result.typ := qcDocumentRoot;
+    '.': begin
+      result.typ:=qcSameNode; //same node /./
+      result.matching:=[qmElement, qmAttribute];
+    end;
+    '..': begin
+      result.typ:=qcDirectParent; //parent /../
+      result.matching:=[qmElement];
+    end;
+    '*': begin
+      result.typ:=getAxis(axis); //any child /*/
+      result.matching:=[qmElement,qmAttribute, qmExcludeRoot];
+    end;
+    else begin
+      result.typ := getAxis(axis);
+      result.matching := [qmValue,qmElement];
+      result.value:=select;
+    end;
   end;
 end;
 
