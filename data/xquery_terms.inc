@@ -513,10 +513,16 @@ end;
 
 { TXQTermReadAttribute }
 
-constructor TXQTermReadAttribute.create(avalue: string);
+constructor TXQTermReadAttribute.create(avalue: string; func: boolean);
 begin
-  if pos(':', avalue) > 0 then namespace := strSplitGet(':', avalue);
-  value := avalue;
+  if func then begin
+    if pos('::', avalue) > 0 then if strSplitGet('::', avalue) <> 'attribute' then raiseParsingError('Invalid axis for attribute test');
+    if (avalue <> 'attribute') and (avalue <> 'node') then raiseParsingError('invalid attribute test: '+avalue);
+    value := '*';
+  end else begin
+    if pos(':', avalue) > 0 then namespace := strSplitGet(':', avalue);
+    value := avalue;
+  end;
 end;
 
 function TXQTermReadAttribute.evaluate(const context: TEvaluationContext): TXQValue;
@@ -524,6 +530,8 @@ var
   tempEl: TTreeElement;
   testValue: Boolean;
   testNS: Boolean;
+  readvalue: String;
+  readnamespace: String;
 begin
   if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
     tempEl := TXQValueNode(context.SeqValue).node
@@ -532,13 +540,21 @@ begin
   if tempEl.typ = tetProcessingInstruction then
     exit(xqvalue);
 
+  readvalue := value;
+  readnamespace := namespace;
+  if length(children) > 0 then begin
+    if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('Invalid subtype');
+    readvalue := TXQTermNodeMatcher(children[0]).select;
+    readnamespace := TXQTermNodeMatcher(children[0]).namespace;
+  end;
+
   result := nil;
   tempEl := tempEl.attributes;
-  testValue := value <> '*';
-  testNS := (namespace <> '*') and (testValue or (namespace <> ''));
+  testValue := readvalue <> '*';
+  testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
   while tempEl <> nil do begin
-    if      (not testValue or striEqual(tempEl.value, value))
-        and (not testNS or striEqual(tempEl.namespace, namespace)) then begin
+    if      (not testValue or striEqual(tempEl.value, readvalue))
+        and (not testNS or striEqual(tempEl.namespace, readnamespace)) then begin
       if result = nil then result := xqvalue(tempEl.reverse)
       else begin
         if not (result is TXQValueSequence) then result := TXQValueSequence.create(result);

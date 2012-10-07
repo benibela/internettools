@@ -678,7 +678,7 @@ type
 
   TXQTermReadAttribute = class(TXQTerm)
     value, namespace: string;
-    constructor create(avalue: string);
+    constructor create(avalue: string; func: boolean = false);
     function evaluate(const context: TEvaluationContext): TXQValue; override;
   end;
 

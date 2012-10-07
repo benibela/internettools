@@ -324,16 +324,6 @@ begin
         wordlookahead := nextToken(true);
       end;
 
-
-      if strBeginsWith(word,'attribute::') then begin
-        if strEndsWith(word, ':node') then begin
-          expect('('); expect(')');
-          exit(TXQTermReadAttribute.create('*'));
-        end;
-        assert(wordlookahead <> '(');
-        exit(TXQTermReadAttribute.Create(strcopyfrom(word,length('attribute::')+1)));
-      end;
-
       if wordlookahead = '(' then begin
         expect('(');
         if word = 'if' then begin
@@ -349,8 +339,10 @@ begin
         result := TXQTermNamedFunction.createIfExists(word, strBeginsWith(word, 'op:'));
         if (result = nil) and
            (isKindTestFunction(word)
-           or (strContains(word, '::') and (not strBeginsWith(word,'attribute')) and isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2)))) then
-          result := TXQTermNodeMatcher.Create(word, true);
+           or (strContains(word, '::') and (isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2))))) then begin
+          if strContains(word, 'attribute') then result := TXQTermReadAttribute.create(word, true)
+          else result := TXQTermNodeMatcher.Create(word, true);
+        end;
         if result = nil then raise Exception.Create('unknown function: '+word);
         exit(parseSequenceLike(result));
       end;
@@ -382,6 +374,9 @@ begin
           exit;
         end;
       end;
+
+      if strBeginsWith(word,'attribute::') then
+        exit(TXQTermReadAttribute.Create(strcopyfrom(word,length('attribute::')+1)));
 
       result := TXQTermNodeMatcher.Create(word);
     end;
