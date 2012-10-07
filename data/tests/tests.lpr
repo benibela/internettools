@@ -4,7 +4,7 @@ program tests;
 
 uses
   heaptrc,
-  Classes, pseudoxpath_tests, extendedhtmlparser_tests, bbutils_tests, int65math, extendedhtmlparser, bbutils, xquery, sysutils;
+  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests, int65math, extendedhtmlparser, bbutils, xquery, sysutils;
 
 var
   start: TDateTime;

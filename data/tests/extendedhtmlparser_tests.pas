@@ -11,7 +11,7 @@ procedure unitTests();
 
 implementation
 
-uses extendedhtmlparser, pseudoxpath, bbutils;
+uses extendedhtmlparser, xquery, bbutils;
 
 
 procedure unitTests();

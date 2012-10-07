@@ -37,7 +37,7 @@
         <PackageName Value="internettools"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="8">
+    <Units Count="9">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -76,6 +76,11 @@
         <Filename Value="../xquery_terms.inc"/>
         <IsPartOfProject Value="True"/>
       </Unit7>
+      <Unit8>
+        <Filename Value="xpath2_tests.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="xpath2_tests"/>
+      </Unit8>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
