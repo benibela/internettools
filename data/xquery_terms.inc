@@ -1,23 +1,3 @@
-function getAxis(const axis: string): TPXPQueryCommandType;
-begin
-   //forward
-   if (axis ='') or (axis='child') then exit(qcDirectChild);
-   if axis='descendant' then exit(qcDescendant);
-   if axis='self' then exit(qcSameNode);
-   if axis='parent' then exit(qcDirectParent);
-   //if axis='attribute' then exit(qcDescendant);
-   if axis='descendant-or-self' then exit(qcSameOrDescendant);
-   if axis='following-sibling' then exit(qcFollowingSibling);
-   if axis='following' then exit(qcFollowing);
-
-   //reverse
-   if axis='ancestor' then exit(qcAncestor);
-   if axis='preceding-sibling' then exit(qcPrecedingSibling);
-   if axis='preceding' then exit(qcPreceding);
-   if axis='ancestor-or-self' then exit(qcSameOrAncestor);
-   raise EPXPEvaluationException.Create('Unknown axis: '+axis);
-end;
-
 function convertElementTestToMatchingOptions(select: string): TPXPQueryMatchingTypes;
 begin
   if select = 'node' then
@@ -25,10 +5,10 @@ begin
   else if select = 'text' then exit([qmText])
   else if select = 'comment' then exit([qmComment])
   else if select = 'element' then exit([qmElement,qmExcludeRoot])
-  else if select = 'processing-instruction' then
-    exit([qmProcessingInstruction])
+  else if select = 'processing-instruction' then exit([qmProcessingInstruction])
   else raise Exception.Create('Unkown element test: '+select);
 end;
+
 
 { TXQTermReadProperty }
 
@@ -124,46 +104,6 @@ begin
   result.typ:=qcDocumentRoot;
 end;
 
-{ TXQTermNodeMatcherFunction }
-
-constructor TXQTermNodeMatcherFunction.Create(const avalue: string);
-begin
-  value := avalue;
-end;
-
-function TXQTermNodeMatcherFunction.evaluate(const context: TEvaluationContext): TPXPValue;
-begin
-  if (value = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
-  else if (value = 'text') and (context.sender.TextElement<>nil) then result := pxpvalue(context.sender.TextElement)
-  else begin
-    result := context.sender.evaluateSingleStepQuery(toQueryCommand, context);
-    pxpvalueSeqSqueeze(result);
-  end;
-end;
-
-function TXQTermNodeMatcherFunction.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
-function TXQTermNodeMatcherFunction.toQueryCommand: TPXPQueryCommand;
-var
-  axis: String;
-  select: String;
-begin
-  axis := '';
-  select := value;
-  if strContains(select,'::') then
-    axis:=strSplitGet('::',select);
-  result.matching:=convertElementTestToMatchingOptions(select);
-  if (result.matching = [qmProcessingInstruction]) and (length(children) > 0) then begin
-    assert(children[0] is TXQTermType);
-    result.value := TXQTermType(children[0]).value;
-    include(result.matching, qmValue) ;
-  end;
-  result.typ:=getAxis(axis);
-end;
-
 { TXQTermDefineVariable }
 
 constructor TXQTermDefineVariable.create(varname: TXQTerm; value: TXQTerm);
@@ -180,7 +120,7 @@ begin
   if not (children[0] is TXQTermNodeMatcher) and not (children[0] is TXQTermVariable) then raiseEvaluationError('A variable name is required on the left side of :=');
   result := children[1].evaluate(context);
 
-  if children[0] is TXQTermNodeMatcher then  context.sender.OnDefineVariable(self, TXQTermNodeMatcher(children[0]).value, result.clone)
+  if children[0] is TXQTermNodeMatcher then  context.sender.OnDefineVariable(self, TXQTermNodeMatcher(children[0]).select, result.clone)
   else if children[0] is TXQTermVariable then  context.sender.OnDefineVariable(self, TXQTermVariable(children[0]).value, result.clone);
 end;
 
@@ -496,14 +436,22 @@ end;
 
 { TXQTermNodeMatcher }
 
-constructor TXQTermNodeMatcher.Create(const avalue: string);
+constructor TXQTermNodeMatcher.Create(const avalue: string; asfunction: boolean);
 begin
-  value := avalue;
+  axis := '';
+  select := avalue;
+  if strContains(select,'::') then axis:=strSplitGet('::',select);
+  func := asfunction;
 end;
 
 function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): TPXPValue;
 begin
-  result := context.sender.evaluateSingleStepQuery(toQueryCommand,context);
+  if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
+  else if func and (axis = '') and (select = 'text') and (context.sender.TextElement<>nil) then result := pxpvalue(context.sender.TextElement)
+  else begin
+    result := context.sender.evaluateSingleStepQuery(toQueryCommand,context);
+    pxpvalueSeqSqueeze(result);
+  end;
 end;
 
 function TXQTermNodeMatcher.staticTypeGuess: TPXPValueKind;
@@ -512,15 +460,40 @@ begin
 end;
 
 function TXQTermNodeMatcher.toQueryCommand: TPXPQueryCommand;
-var
-  axis: String;
-  select: String;
+  function getAxis(const axis: string): TPXPQueryCommandType;
+  begin
+     //forward
+     if (axis ='') or (axis='child') then exit(qcDirectChild);
+     if axis='descendant' then exit(qcDescendant);
+     if axis='self' then exit(qcSameNode);
+     if axis='parent' then exit(qcDirectParent);
+     //if axis='attribute' then exit(qcDescendant);
+     if axis='descendant-or-self' then exit(qcSameOrDescendant);
+     if axis='following-sibling' then exit(qcFollowingSibling);
+     if axis='following' then exit(qcFollowing);
+
+     //reverse
+     if axis='ancestor' then exit(qcAncestor);
+     if axis='preceding-sibling' then exit(qcPrecedingSibling);
+     if axis='preceding' then exit(qcPreceding);
+     if axis='ancestor-or-self' then exit(qcSameOrAncestor);
+     raise EPXPEvaluationException.Create('Unknown axis: '+axis);
+  end;
+
 begin
-  axis := '';
-  select:=value;
-  if strContains(select,'::') then
-    axis:=strSplitGet('::',select);
-  if select = '.' then begin
+  if func then begin
+    result.typ:=getAxis(axis);
+    result.matching:=convertElementTestToMatchingOptions(select);
+    if (result.matching = [qmProcessingInstruction]) and (length(children) > 0) then begin
+      if children[0] is TXQTermNodeMatcher then begin;
+        if TXQTermNodeMatcher(children[0]).axis <> '' then raiseEvaluationError('axis within element test is not allowed');
+        result.value := TXQTermNodeMatcher(children[0]).select;
+      end else if children[0] is TXQTermString then
+        result.value:=TXQTermString(children[0]).value
+      else raiseEvaluationError('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
+      include(result.matching, qmValue) ;
+    end;
+  end else if select = '.' then begin
     result.typ:=qcSameNode; //same node /./
     result.matching:=[qmElement, qmAttribute];
   end else if select='..' then begin

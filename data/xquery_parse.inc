@@ -285,7 +285,6 @@ begin
         exit(TXQTermNumber.Create('-' + wordlookahead));
       end else
         exit(TXQTermUnaryOp.create(word, parseValue()));
-        //if (word = '/') and ((length(wordlookahead) = 0) or  ((length(wordlookahead) = 1) and (wordlookahead[1] in [']',')']))) then          pushCompleteTerm(newTerm(tNodeMatcher, '.'));
     end;
 
     '(': exit(parseSequenceLike(TXQTermSequence.Create)); //only sequence or priority brackets
@@ -337,7 +336,7 @@ begin
         if (result = nil) and
            (isKindTestFunction(word)
            or (strContains(word, '::') and (not strBeginsWith(word,'attribute')) and isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2)))) then
-          result := TXQTermNodeMatcherFunction.Create(word);
+          result := TXQTermNodeMatcher.Create(word, true);
         if result = nil then raise Exception.Create('unknown function: '+word);
         exit(parseSequenceLike(result));
       end;
