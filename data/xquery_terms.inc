@@ -463,14 +463,20 @@ end;
 
 constructor TXQTermNumber.create(const avalue: string);
 begin
-  value := avalue;
+  if strContains(avalue,'e') or strContains(avalue,'E') then value := TPXPValue_double.create(StrToFloat(avalue,PXPFormats))
+  else if strContains(avalue,'.') then value := pxpvalue(StrToFloat(avalue,PXPFormats))
+  else value := pxpvalue(StrToInt65(avalue));
 end;
 
 function TXQTermNumber.evaluate(const context: TEvaluationContext): TPXPValue;
 begin
-  if strContains(value,'e') or strContains(value,'E') then exit(TPXPValue_double.create(StrToFloat(value,PXPFormats)))
-  else if strContains(value,'.') then exit(pxpvalue(StrToFloat(value,PXPFormats)))
-  else exit(pxpvalue(StrToInt65(value)));
+  result := value.clone;
+end;
+
+destructor TXQTermNumber.destroy;
+begin
+  value.free;
+  inherited destroy;
 end;
 
 { TXQTermReadAttribute }
