@@ -86,24 +86,6 @@ begin
   path[high(path)].pxp[high(path[high(path)].pxp)] := children[1];
 end;
 
-{ TXQTermNodeRoot }
-
-function TXQTermNodeRoot.evaluate(const context: TEvaluationContext): TPXPValue;
-begin
-  result := pxpvalue();
-  context.sender.evaluateAccessList(self, context, result);
-end;
-
-function TXQTermNodeRoot.staticTypeGuess: TPXPValueKind;
-begin
-  Result:=inherited staticTypeGuess;
-end;
-
-function TXQTermNodeRoot.toQueryCommand: TPXPQueryCommand;
-begin
-  result.typ:=qcDocumentRoot;
-end;
-
 { TXQTermDefineVariable }
 
 constructor TXQTermDefineVariable.create(varname: TXQTerm; value: TXQTerm);
@@ -493,7 +475,8 @@ begin
       else raiseEvaluationError('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
       include(result.matching, qmValue) ;
     end;
-  end else if select = '.' then begin
+  end else if select = '/' then result.typ := qcDocumentRoot
+  else if select = '.' then begin
     result.typ:=qcSameNode; //same node /./
     result.matching:=[qmElement, qmAttribute];
   end else if select='..' then begin
