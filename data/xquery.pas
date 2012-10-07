@@ -865,7 +865,8 @@ type
     @item(The system is weaker typed, most values are automatically converted if necessary. @br
           Especially @code('false' = false()).  (in contrast to XPath where @code('false' = true()) holds)
           )
-    @item(Namespaces and the namespace axis are not supported)
+    @item(The namespace axis are not supported and namespace comparisons only look at the prefix (ignoring the associated namespace url, althought you can read that if you want))
+    @item(Element tests based on types of the xml are not suppored (since it can not read schemes ) )
     @item(Regex remarks: @unorderedList(
       @item(If you use "-strings instead of '-strings, you have to escape $ as @code($$;).)
       @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
