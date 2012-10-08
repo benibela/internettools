@@ -510,13 +510,14 @@ TIntSet = specialize TSet <integer>;
 procedure setInsertAll(oldSet:TIntSet; insertedSet: TIntSet);
 procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //----------------------------Others-----------------------------------
-//**Compare function to compare the two values where a and b points to, return -1 for a^<b^
+//**Compare function to compare the two values where a and b points to, ideally returning -1 for a^<b^, 0 for a^=b^, +1 for a^>b^
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
 //**so the function use the same call convention like a method
 type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**General stable sort function @br
 //**a is the first element in the array to sort, and b is the last. size is the size of every element@br
 //**compareFunction is a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers). @br
+//**Only the > 0 and <= 0 return values are discerned. (i.e. you can safely use a comparison function that e.g. only returns +7 and 0)  @br
 //**Currently it uses a combination of merge and insert sort. Merge requires the allocation of additional memory.
 procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil);
 //**general stable sort function (using merge + insert sort in the moment)

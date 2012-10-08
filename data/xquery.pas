@@ -6,6 +6,7 @@
 unit xquery;
 
 {$mode objfpc}
+{$modeswitch advancedrecords}
 {$H+}
 
 interface
@@ -484,11 +485,16 @@ type
     function getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass; //**< Returns the lowest type derived by datetime that all items in the list can be converted to
   end;
 
+  TXQTermFlowerOrderEmpty = (xqfoStatic, xqfoEmptyLeast, xqfoEmptyGreatest);
+
   (***
   @abstract(evaluation context, internal used)
 
   Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
   *)
+
+  { TEvaluationContext }
+
   TEvaluationContext = record
     sender: TXQueryEngine;
     ParentElement: TTreeElement; //**< associated tree element (= context item if context item is a node)
@@ -499,6 +505,10 @@ type
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
 
     temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
+
+    function emptyOrderSpec: TXQTermFlowerOrderEmpty;
+
+    function compareAtomicBase(const a,b: TXQValue): integer;
   end;
 
   (***
@@ -718,11 +728,32 @@ type
     procedure addToQueryList(var path: TXQPathMatching); override;
   end;
 
-  { TXQTermFor }
-
-  TXQTermFor = class(TXQTerm)
-    function evaluate(const context: TEvaluationContext): TXQValue; override;
+  { TXQTermFlower }
+  TXQTermFlowerVariable = record
+    kind: (xqfkFor, xqfkLet);
+    varname: string;
+    sequenceTyp: TXQTermType;
+    //allowingEmpty: boolean;
+    positionVarname: string;
+    expr: TXQTerm;
   end;
+  TXQTermFlowerOrder = record
+    expr: TXQTerm;
+    descending: boolean; //ascending is default
+    emptyOrder: TXQTermFlowerOrderEmpty;
+    collation: string;
+  end;
+
+  TXQTermFlower = class(TXQTerm)
+    vars: array of TXQTermFlowerVariable;
+    where: TXQTerm;
+    //stableOrder: boolean; //always be stable
+    orders: array of TXQTermFlowerOrder;
+    returned: TXQTerm;
+    function evaluate(const context: TEvaluationContext): TXQValue; override;
+    destructor destroy; override;
+  end;
+
 
   { TXQTermSomeEvery }
 
@@ -771,6 +802,7 @@ type
   type TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: TXQValue) of object;
   { TXQueryEngine }
 
+  TXQParsingModel = (xqpmXPath2, xqpmXQuery1{, xqpmXPath3, xqpmXquery3});
 
 
   (***
@@ -816,9 +848,12 @@ type
     )
 
     Differences between this implementation and standard XPath/XQuery:
+
+
+
     @unorderedList(
       @item(@code($var;) @br You can _also_ use  @code($var;) instead of @code($var))
-      @item(@code("something") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. )
+      @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. )
       @item(@code(var:=value) @br This assignes the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) @br (Remark: I'm too lazy to formally define a execution order, but you can assume it is left-to-right _for now_))
 
       @item(@code(deep-text()) @br This is the concatenated plain text of the every tag inside the current text.
@@ -875,7 +910,7 @@ type
     ))
     )
 
-    You can look at the unit test at the end of xquery.pas to see many (> 1000) examples.
+    You can look at the unit test at the end of tests/xpath2_test.pas to see many (~ 2000) examples.
 
     @bold(Using the class in FPC)
 
@@ -935,6 +970,8 @@ type
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
     function parseXPath2(s:string): IXQuery;
+    //** Parses a new XQuery expression and stores it in tokenized form.
+    function parseXQuery1(s:string): IXQuery;
     //** Parses a new CSS expression and stores it in tokenized form.
     function parseCSS3(s:string): IXQuery;
 
@@ -976,7 +1013,7 @@ type
     class procedure registerBinaryOp(const name: string; const func: TXQBinaryOp; const priority: integer; const returnType: TXQValueKind=pvkUndefined);
     class procedure registerBinaryOpFunction(const name: string; const func: TXQBinaryOp);
 
-    function parseTerm(str:string): TXQTerm;
+    function parseTerm(str:string; model: TXQParsingModel): TXQTerm;
     function parseCSSTerm(css:string): TXQTerm;
     function getEvaluationContext(): TEvaluationContext;
 
@@ -1057,9 +1094,10 @@ type
   procedure xqvalueAssign(var old: TXQValue; v: TTreeElement); inline; //**< Assigns the value new to the TXQValue old
 
   procedure xqvalueSeqSqueeze(var v: TXQValue); //**< Squeezes a TXQValue (single element seq => single element, empty seq => undefined)
+  procedure xqvalueSeqAdd(var list: TXQValue; add: TXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add )
   function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
 
-  //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b (doesn't free them)
+  //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b (doesn't free them); -2 for unknown
   function xqvalueCompareAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
   //**Compares two values generically (=,!=,...) and returns if the compare value \in [accept1,accept2]@br
   //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
@@ -1693,6 +1731,18 @@ begin
   tofree.Free;
 end;
 
+{ TEvaluationContext }
+
+function TEvaluationContext.emptyOrderSpec: TXQTermFlowerOrderEmpty;
+begin
+  result := xqfoEmptyGreatest; //TODO: changable
+end;
+
+function TEvaluationContext.compareAtomicBase(const a, b: TXQValue): integer;
+begin
+  result := xqvalueCompareAtomicBase(a, b, collation, sender.ImplicitTimezone);
+end;
+
 { TXQuery }
 
 constructor TXQuery.Create(aengine: TXQueryEngine; aterm: TXQTerm);
@@ -1741,14 +1791,18 @@ begin
   else xqvalueAssign(v, xqvalue());
 end;
 
-procedure xqvalueSeqAdd(var v: TXQValue; add: TXQValue);
+procedure xqvalueSeqAdd(var list: TXQValue; add: TXQValue);
 begin
-  case v.kind of
-    pvkUndefined: xqvalueAssign(v, add);
-    pvkSequence: TXQValueSequence(v).addChild(add);
+  if list = nil then begin
+    list := add;
+    exit;
+  end;
+  case list.kind of
+    pvkUndefined: xqvalueAssign(list, add);
+    pvkSequence: TXQValueSequence(list).addChild(add);
     else begin
-      v := TXQValueSequence.create(v);  //don't use xqvalueAssign, as result is moved in the list
-      TXQValueSequence(v).addChild(add);
+      list := TXQValueSequence.create(list);  //don't use xqvalueAssign, as result is moved in the list
+      TXQValueSequence(list).addChild(add);
     end;
   end;
 end;
@@ -4220,7 +4274,13 @@ end;
 
 function TXQueryEngine.parseXPath2(s: string): IXQuery;
 begin
-  FLastQuery:=TXQuery.Create(self, parseTerm(s));
+  FLastQuery:=TXQuery.Create(self, parseTerm(s, xqpmXPath2));
+  result := FLastQuery;
+end;
+
+function TXQueryEngine.parseXQuery1(s: string): IXQuery;
+begin
+  FLastQuery:=TXQuery.Create(self, parseTerm(s, xqpmXQuery1));
   result := FLastQuery;
 end;
 
@@ -4371,12 +4431,13 @@ begin
   binaryOpFunctions.AddObject(name, TObject(func));
 end;
 
-function TXQueryEngine.parseTerm(str: string): TXQTerm;
+function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQTerm;
 var cxt: TXQParsingContext;
 begin
   if str = '' then exit(TXQTermSequence.Create);
   cxt := TXQParsingContext.Create;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
+  cxt.parsingModel:=model;
   try
     cxt.str := str;
     cxt.pos := @cxt.str[1];
@@ -4597,14 +4658,17 @@ var token: String;
       end else begin
         if axis <> '' then axisTerm := TXQTermNodeMatcher.Create(axis+'::*')
         else axisTerm := newBinOp(TXQTermNodeMatcher.Create('..'), '/', TXQTermNodeMatcher.Create('*'));
-        result := TXQTermFor.Create().push([
-                    TXQTermVariable.Create('$__csstemp'),
-                    newFunction('node-name', [TXQTermNodeMatcher.Create('.')]),
-                      TXQTermFilterSequence.create(
-                        axisTerm,
-                        newBinOp(newFunction('node-name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('$__csstemp'))
-                      )
-                    ]);
+        result := TXQTermFlower.Create();
+        setlength(TXQTermFlower(result).vars, 1);
+        TXQTermFlower(result).vars[0].kind:=xqfkFor;
+        TXQTermFlower(result).vars[0].varname := '__csstemp';
+        TXQTermFlower(result).vars[0].sequenceTyp := nil;
+        TXQTermFlower(result).vars[0].expr := newFunction('node-name', [TXQTermNodeMatcher.Create('.')]);
+
+        TXQTermFlower(result).returned := TXQTermFilterSequence.create(
+          axisTerm,
+          newBinOp(newFunction('node-name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('$__csstemp'))
+        );
       end;
     end;
 

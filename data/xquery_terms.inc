@@ -173,40 +173,170 @@ end;
 
 { TXQTermFor }
 
-function TXQTermFor.evaluate(const context: TEvaluationContext): TXQValue;
+type TOrderedTuple = class
+  orders: array of TXQValue;
+  result: TXQValue;
+end;
+  TFlowerSortingData = record
+    flower: TXQTermFlower;
+    collations: array of TXQCollation;
+    context: ^TEvaluationContext;
+  end;
+  PFlowerSortingData = ^TFlowerSortingData;
+
+function flowerTupleCompareFunction(data: TObject; xa, xb: pointer): longint;
+var meta: PFlowerSortingData;
+
+  function isGreaterThan(w, v: txqvalue; emptyLeast: boolean; const collation: TXQCollation): boolean;
+  var
+    temp: integer;
+  begin
+    result := false;
+    if emptyLeast then begin
+      if v.isUndefined and not w.isUndefined then
+        exit(true);
+      if ((v is TXQValueDecimal) and IsNan(TXQValueDecimal(v).value)) and not w.isUndefined and not ((w is TXQValueDecimal) and IsNan(TXQValueDecimal(w).value)) then
+        exit(true);
+    end else begin
+      if w.isUndefined and not v.isUndefined then
+        exit(true);
+      if ((w is TXQValueDecimal) and IsNan(TXQValueDecimal(w).value)) and not v.isUndefined and not ((v is TXQValueDecimal) and IsNan(TXQValueDecimal(v).value)) then
+        exit(true);
+    end;
+
+    if (collation <> nil) and (v is TXQValueString) and (w is TXQValueString) then
+      exit(collation.compare(v.asString, w.asString) < 0);
+    temp := meta^.context^.compareAtomicBase(v,w) ;
+    result := (temp <> -2) and (temp < 0);
+  end;
+
+var
+  a, b: TOrderedTuple;
+  orders: array of TXQTermFlowerOrder;
+  i: Integer;
+  emptyLeast: Boolean;
+begin
+  meta := PFlowerSortingData(data);
+  orders := meta^.flower.orders;
+  a := TOrderedTuple(ppointer(xa)^);
+  b := TOrderedTuple(ppointer(xb)^);
+
+  result := 0;
+
+  for i := 0 to high(orders) do begin
+    emptyLeast := (orders[i].emptyOrder = xqfoEmptyLeast) or ((orders[i].emptyOrder = xqfoStatic) and (meta^.context^.emptyOrderSpec = xqfoEmptyLeast));
+    if isGreaterThan(a.orders[i], b.orders[i], emptyLeast, meta^.collations[i]) then result := 1
+    else if isGreaterThan(b.orders[i], a.orders[i], emptyLeast, meta^.collations[i]) then result := -1;
+    if orders[i].descending then result := -Result;
+    if result <> 0 then exit;
+  end;
+end;
+
+function TXQTermFlower.evaluate(const context: TEvaluationContext): TXQValue;
 var
   tempContext: TEvaluationContext;
-  function evaluateForLoop(const pos:integer): TXQValue;
+  sortingCache: TFPList;
+  finalResult: TXQValue;
+  oldVarCount: Integer;
+  procedure evaluateForLoop(const pos:integer);
+    procedure continueWithValue(v: TXQValue; index: integer = 1);
+    begin
+      tempContext.temporaryVariables.pushAll;
+      //sequenceTyp: TXQTermType;
+      tempContext.temporaryVariables.addVariable(vars[pos].varname, v);
+      if vars[pos].positionVarname <> '' then ;
+        tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index));
+      evaluateForLoop(pos+1);
+      tempContext.temporaryVariables.popAll;
+    end;
+
    var tempSeq: TXQValue;
        i:integer;
+       tuple: TOrderedTuple;
    begin
-     if pos = high(children) then exit(children[pos].evaluate(tempContext));
-     if not (children[pos] is TXQTermVariable) then raiseEvaluationError('Expected variable, but got '+children[pos].debugTermToString);
+     if pos = length(vars) then begin
+       if (where <> nil) and not where.evaluate(tempContext).toBoolean then
+         exit;
 
-     tempSeq:=children[pos+1].evaluate(tempContext);
-     if tempSeq.wasUndefined then exit(xqvalue);
-     if tempSeq is TXQValueSequence then begin
-       result:=TXQValueSequence.create(TXQValueSequence(tempSeq).seq.Count);
-       for i:=0 to TXQValueSequence(tempSeq).seq.Count-1 do begin
-         tempContext.temporaryVariables.pushAll;
-         tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, TXQValueSequence(tempSeq).seq[i]);
-         TXQValueSequence(result).addChild(evaluateForLoop(pos+2));
-         tempContext.temporaryVariables.popAll;
+       if sortingCache = nil then begin
+         xqvalueSeqAdd(finalResult, returned.evaluate(tempContext));
+         exit;
+       end else begin
+         tuple := TOrderedTuple.Create;
+         tuple.result := returned.evaluate(tempContext);
+         setlength(tuple.orders, length(orders));
+         for i:= 0 to high(orders) do
+           tuple.orders[i] := orders[i].expr.evaluate(tempContext);
+         sortingCache.Add(tuple);
+         exit;
        end;
-       TXQValueSequence(tempSeq).freeNonRecursive;
-     end else begin
-       tempContext.temporaryVariables.pushAll;
-       tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, tempSeq);
-       result := evaluateForLoop(pos+2);
-       tempContext.temporaryVariables.popAll;
+     end;
+
+     tempSeq:=vars[pos].expr.evaluate(tempContext);
+
+     if vars[pos].kind = xqfkLet then
+       continueWithValue(tempSeq)
+     else case tempSeq.kind of
+       pvkUndefined: tempSeq.Free;
+       pvkSequence: begin
+         for i:=0 to TXQValueSequence(tempSeq).seq.Count-1 do
+           continueWithValue(TXQValueSequence(tempSeq).seq[i], i + 1);
+         TXQValueSequence(tempSeq).freeNonRecursive;
+       end
+       else continueWithValue(tempSeq);
      end;
    end;
+var i, j: Integer;
+    sortingData: TFlowerSortingData;
+
 begin
   tempContext:=context;
   if context.temporaryVariables=nil then tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-  result:=evaluateForLoop(0);
+
+  oldVarCount := tempContext.temporaryVariables.count;
+
+  finalResult := nil;
+  if length(orders) = 0 then sortingCache := nil
+  else sortingCache := tfplist.Create;
+
+  evaluateForLoop(0);
+
+  if sortingCache <> nil then begin
+    sortingData.flower:=self;
+    sortingData.context:=@tempContext;
+    setlength(sortingData.collations, length(orders));
+    for i := 0 to high(orders) do
+      if orders[i].collation = '' then sortingData.collations[i] := nil
+      else sortingData.collations[i] := context.sender.getCollation(orders[i].collation);
+    stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
+    for i := 0 to sortingCache.Count - 1 do begin
+      xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
+      for j := 0 to high(TOrderedTuple(sortingCache[i]).orders) do
+        TOrderedTuple(sortingCache[i]).orders[j].Free;
+      TOrderedTuple(sortingCache[i]).Free;
+    end;
+    sortingCache.free;
+  end;
+
+  if finalResult = nil then result := TXQValueUndefined.create
+  else result := finalResult;
   xqvalueSeqSqueeze(result);
   if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
+end;
+
+destructor TXQTermFlower.destroy;
+var
+  i: Integer;
+begin
+  for i:=0 to high(vars) do begin
+    vars[i].expr.Free;
+    vars[i].sequenceTyp.Free;
+  end;
+  for i:= 0 to high(orders) do
+    orders[i].expr.Free;
+  where.Free;
+  returned.Free;
+  inherited destroy;
 end;
 
 { TXQTermNamedFunction }

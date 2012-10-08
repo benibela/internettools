@@ -43,7 +43,7 @@ var
        raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
   end;
 
-  procedure t(a,b,c: string);
+  procedure t(a,b: string; c: string = '');
   begin
     try
     performUnitTest(a,b,c);
@@ -2209,6 +2209,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(/r/attribute::attribute(*), ",")', 'AB,xB,AC,BA,BB', '');
   t('string-join(/r/attribute::attribute(a:b), ",")', 'AB', '');
 
+  t('string-join(for $i in (1, 2), $j in (3, 4) return ($i, $j), ":")', '1:3:1:4:2:3:2:4');
 
   //More failed XQTS tests
   //t('xs:untypedAtomic("-10000000") cast as xs:float', '-10000000', ''); this is an fpc bug! (22567)

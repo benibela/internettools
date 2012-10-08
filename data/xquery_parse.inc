@@ -71,11 +71,15 @@ type
 
  TXQParsingContext = class
   AllowVariableUseInStringLiterals: boolean;
+  parsingModel: TXQParsingModel;
 
   str: string;
   pos: pchar;
 
   procedure raiseParsingError(s: string);
+  procedure raiseInvalidModel(s: string);
+
+  procedure requireXQuery;
 
   procedure skipComment();
   procedure skipWhitespaceAndComment();
@@ -85,6 +89,9 @@ type
 
   function parseSequenceLike(target: TXQTerm): TXQTerm;
   function parseQNameContinuation: string;
+  function parseSequenceType(): TXQTermType;
+
+  function parseFlower(akind: string): TXQTermFlower;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -101,6 +108,16 @@ begin
   if (pos < @str[1]) then pos := @str[1]; //make sure pos points to str
   if (pos > @str[length(str)]) then pos := @str[1];
   raise Exception.Create(s+#13#10'in: '+strslice(@str[1],pos-1)+' [<- error occurs before here] '+strslice(pos,@str[length(str)]));
+end;
+
+procedure TXQParsingContext.raiseInvalidModel(s: string);
+begin
+  raiseParsingError('This language feature is not available in the selected language. '+s);
+end;
+
+procedure TXQParsingContext.requireXQuery;
+begin
+  if parsingModel <> xqpmXQuery1 then raiseInvalidModel('XQuery is required');
 end;
 
 procedure TXQParsingContext.skipComment;
@@ -235,6 +252,130 @@ begin
   else result := '';
 end;
 
+function TXQParsingContext.parseSequenceType: TXQTermType;
+begin
+  //todo
+end;
+
+function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
+  function parseVariableName: string;
+  begin
+    Result := nextToken;
+    if result = '' then raiseParsingError('Expected variable name');
+    if result[1] <> '$' then raiseParsingError('Expected variable name starting with $, but got "'+result+'"');
+    delete(result, 1, 1);
+  end;
+
+  procedure parseVarBinding;
+  var temp: string;
+  begin
+    setlength(result.vars, length(result.vars) + 1);
+    with result.vars[high(result.vars)] do begin
+      if akind = 'for' then kind := xqfkFor
+      else if akind = 'let' then kind := xqfkLet
+      else raiseParsingError('Invalid flower: '+akind);
+
+      if (kind = xqfkLet) and (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
+
+      varname := parseVariableName;
+
+      temp := nextToken;
+      if temp = 'as' then begin
+        requireXQuery;
+        sequenceTyp := parseSequenceType;
+        temp := nextToken;
+      end else sequenceTyp := nil;
+
+      if kind = xqfkFor then begin
+
+        {if temp = 'allowing' then begin
+          requireXQuery3;
+          allowingEmpty := nextToken;
+          temp := nextToken;
+        end;}
+
+        if temp = 'at' then begin
+          requireXQuery;
+          positionVarname := parseVariableName;
+          temp := nextToken;
+        end;
+
+        if temp <> 'in' then raiseParsingError('Expected "in".')
+      end else
+        if temp <> ':=' then raiseParsingError('Expected ":=".');
+
+      expr := parse();
+    end;
+  end;
+
+var
+  token: String;
+
+  procedure parseOrderSpecAndNextToken;
+  begin
+    setlength(result.orders, length(result.orders) + 1);
+    with result.orders[high(result.orders)] do begin
+      expr := parse();
+      token := nextToken;
+
+      if (token = 'ascending') or (token = 'descending') then begin
+        descending := token = 'descending';
+        token := nextToken;
+      end;
+
+      emptyOrder := xqfoStatic;
+      if token = 'empty' then begin
+        token := nextToken;
+        if token = 'greatest' then emptyOrder := xqfoEmptyGreatest
+        else if token = 'least' then emptyOrder := xqfoEmptyLeast
+        else raiseParsingError('Expected "greatest" or "least"');
+        token := nextToken;
+      end;
+
+      if token = 'collation' then begin
+        collation := nextToken;
+        if (collation = '') or not (collation[1] in ['''', '"']) or (collation[1] <> collation[length(collation)]) then raiseParsingError('Invalid collation');
+        collation := copy(collation, 2, length(collation) - 2);
+        token := nextToken;
+      end
+    end;
+  end;
+begin
+  result := TXQTermFlower.Create;
+  parseVarBinding;
+
+  token := nextToken();
+
+  while (token = ',') or (token = 'for') or (token = 'let') do begin
+    if token <> ',' then begin
+      requireXQuery;
+      akind := token;;
+    end;
+    parseVarBinding;
+    token := nextToken();
+  end;
+
+  if token <> 'return' then begin
+    requireXQuery;
+
+    if token = 'where' then begin
+      result.where := parse;
+      token := nextToken();
+    end;
+
+    if (token = 'stable') or (token = 'order') then begin
+      if token = 'stable' then expect('order'); //always be stable
+      expect('by');
+      repeat
+        parseOrderSpecAndNextToken;
+      until token <> ',';
+      if token <> 'return' then raiseParsingError('Expected return');
+    end;
+  end;
+
+  result.returned := parse;
+end;
+
 function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
 begin
   result := (word = 'text') or (word = 'node') or (word = 'comment') or (word = 'processing-instruction')
@@ -348,18 +489,8 @@ begin
       end;
 
       if (wordlookahead<>'') and (wordlookahead[1]='$') then begin
-        if word = 'for' then begin
-          result := TXQTermFor.Create;
-          result.push(TXQTermVariable.Create(nextToken())); expect('in'); result.push(parse());
-          word := nextToken();
-          while word = ',' do begin
-            result.push(TXQTermVariable.Create(nextToken())); expect('in'); result.push(parse());
-            word := nextToken();
-          end;
-          Assert(word = 'return');
-          result.push(parse());
-          exit;
-        end;
+        if (word = 'for') or (word = 'let') then
+          exit(parseFlower(word));
 
         if (word = 'some') or (word = 'every') then begin
           result := TXQTermSomeEvery.Create(word = 'every');
@@ -452,7 +583,8 @@ begin
   while true do begin
     word := nextToken(true);
     case word of
-      '', ',', ')', ']', 'else', 'return', 'satisfies': exit(astroot);
+      '', ',', ')', ']', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation':
+        exit(astroot);
       //'=', '+', '-', '*': pushBinaryOp(word);
       '!': pushBinaryOp('!=');
       '<', '>': case (pos+1)^ of
@@ -479,7 +611,7 @@ begin
           replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
          else
           raiseParsingError('Unexpected .');
-      end else raise exception.Create('Unknown operator: '+word);
+      end else raise exception.Create('Unknown or unexpected operator: '+word);
     end;
   end;
   result := astroot;
