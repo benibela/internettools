@@ -421,18 +421,20 @@ begin
   evaluateForLoop(0);
 
   if sortingCache <> nil then begin
-    sortingData.flower:=self;
-    sortingData.context:=@tempContext;
-    setlength(sortingData.collations, length(orders));
-    for i := 0 to high(orders) do
-      if orders[i].collation = '' then sortingData.collations[i] := nil
-      else sortingData.collations[i] := context.sender.getCollation(orders[i].collation);
-    stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
-    for i := 0 to sortingCache.Count - 1 do begin
-      xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
-      for j := 0 to high(TOrderedTuple(sortingCache[i]).orders) do
-        TOrderedTuple(sortingCache[i]).orders[j].Free;
-      TOrderedTuple(sortingCache[i]).Free;
+    if sortingCache.Count > 0 then begin
+      sortingData.flower:=self;
+      sortingData.context:=@tempContext;
+      setlength(sortingData.collations, length(orders));
+      for i := 0 to high(orders) do
+        if orders[i].collation = '' then sortingData.collations[i] := nil
+        else sortingData.collations[i] := context.sender.getCollation(orders[i].collation);
+      stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
+      for i := 0 to sortingCache.Count - 1 do begin
+        xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
+        for j := 0 to high(TOrderedTuple(sortingCache[i]).orders) do
+          TOrderedTuple(sortingCache[i]).orders[j].Free;
+        TOrderedTuple(sortingCache[i]).Free;
+      end;
     end;
     sortingCache.free;
   end;
