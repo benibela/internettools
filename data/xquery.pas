@@ -40,7 +40,7 @@ type
   TXQTerm=class;
 
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject);
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkFunction);
 
   Decimal = Extended;
 
@@ -461,6 +461,23 @@ type
     function getAsNode(const name: string): TTreeElement; //**< Returns the value of a property as node
   end;
 
+  { TXQValueFunction }
+
+  TXQValueFunction = class(TXQValue)
+    body: TXQTerm;
+
+    constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
+
+    class function kind: TXQValueKind; override;
+    class function typeName: string; override;
+    class function instanceOf(const typ: TXQValueClass): boolean; override;
+
+    function canConvertToInt65: boolean; override;
+    function canConvertToDecimal: boolean; override;
+
+    function clone: TXQValue; override;
+  end;
+
   { TXQVList }
 
   (*** @abstract(List of TXQValue-s, basic wrapper around TFPList) *)
@@ -484,6 +501,7 @@ type
     function getPromotedDecimalType: TXQValueDecimalClass; //**< Returns the lowest type derived by decimal that all items in the list can be converted to
     function getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass; //**< Returns the lowest type derived by datetime that all items in the list can be converted to
   end;
+
 
   TXQTermFlowerOrderEmpty = (xqfoStatic, xqfoEmptyLeast, xqfoEmptyGreatest);
 
@@ -640,10 +658,30 @@ type
 
   { TXQTermType }
 
-  TXQTermType = class(TXQTerm)
-    value: string;
+  type
+  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikElementTest);
+
+  { TXQTermSequenceType }
+
+  TXQTermSequenceType = class(TXQTerm)
+    serializedValue: string;
+
+    name: string;
+    allowNone, allowMultiple: boolean;
+    kind: TXQTypeInformationKind;
+    atomicTypeInfo: TXQValueClass; //only for tikAtomic
+    matchedTypes: TTreeElementTypes; //only for tikElementTest
+
     constructor create(const avalue: string);
     function evaluate(const context: TEvaluationContext): TXQValue; override;
+  protected
+    procedure init(const s: string);
+    function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
+    function castableAsBase(v: TXQValue): boolean;
+    function castAs(v: TXQValue): TXQValue;
+    function castableAs(v: TXQValue): boolean;
+    function instanceOfBase(ta: TXQValue): boolean;
+    function instanceOf(ta: TXQValue): boolean;
   end;
 
   { TXQTermVariable }
@@ -732,7 +770,7 @@ type
   TXQTermFlowerVariable = record
     kind: (xqfkFor, xqfkLet);
     varname: string;
-    sequenceTyp: TXQTermType;
+    sequenceTyp: TXQTermSequenceType;
     //allowingEmpty: boolean;
     positionVarname: string;
     expr: TXQTerm;
@@ -1729,6 +1767,43 @@ procedure xqvalueAssignThenFree(var old: TXQValue; new, tofree: TXQValue); inlin
 begin
   xqvalueAssign(old, new);
   tofree.Free;
+end;
+
+{ TXQValueFunction }
+
+constructor TXQValueFunction.create(aterm: TXQTerm);
+begin
+  body := aterm;
+end;
+
+class function TXQValueFunction.kind: TXQValueKind;
+begin
+  Result:=pvkFunction;
+end;
+
+class function TXQValueFunction.typeName: string;
+begin
+  Result:='function';
+end;
+
+class function TXQValueFunction.instanceOf(const typ: TXQValueClass): boolean;
+begin
+  Result:=typ = TXQValueFunction;
+end;
+
+function TXQValueFunction.canConvertToInt65: boolean;
+begin
+  Result:=false;
+end;
+
+function TXQValueFunction.canConvertToDecimal: boolean;
+begin
+  Result:=false;
+end;
+
+function TXQValueFunction.clone: TXQValue;
+begin
+  result := TXQValueFunction.create(body);
 end;
 
 { TEvaluationContext }
@@ -5104,17 +5179,6 @@ begin
   collations.Move(i, 0);
 end;
 
-
-function convertMatchingOptionsToMatchedTypes(const qmt: TXQPathMatchingKinds): TTreeElementTypes;
-begin
-  result := [];
-  if qmText in qmt then include(result, tetText);
-  if qmElement in qmt then include(result, tetOpen);
-  if qmComment in qmt then include(result, tetComment);
-  if qmProcessingInstruction in qmt then include(result, tetProcessingInstruction);
-  if qmAttribute in qmt then begin result += [tetAttributeName, tetAttributeValue]; end;
-end;
-
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
 begin
   result :=  assigned(node)
@@ -5856,134 +5920,35 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-type
-TTypeInformationKind = (tikNone, tikAny, tikAtomic, tikElementTest);
-TTypeInformation = record
-  name: string;
-  allowNone, allowMultiple: boolean;
-  case kind: TTypeInformationKind of
-    tikAtomic: (typeInfo: TXQValueClass;);
-    tikElementTest: (matchedTypes: TTreeElementTypes);
-end;
-
-function getTypeInformation(const s: string): TTypeInformation;
-var occurenceLength: integer;
-  index: Integer;
+function getTypeInfo(wrapper: txqvalue): TXQTermSequenceType;
 begin
-  if s = '' then raise Exception.Create('no type');
-  if pos('(', s) > 0 then begin
-    if pos('()', s) = 0 then raise Exception.Create('Element tests with arguments are not supported');
-  end;
-  result.allowNone:=false;
-  result.allowMultiple:=false;
-  if s = 'empty-sequence()' then result.kind:=tikNone
-  else begin
-    occurenceLength := 1;
-    case s[length(s)] of
-      '?': result.allowNone:=true;
-      '+': result.allowMultiple:=true;
-      '*': begin result.allowNone:=true; result.allowMultiple:=true; end;
-      else occurenceLength := 0;
-    end;
-    if strBeginsWith(s, 'item()') then
-      result.kind:=tikAny
-    else if pos('()', s) > 0 then begin
-      result.kind:=tikElementTest;
-      result.name:=copy(s,1,length(s)-occurenceLength);
-      delete(result.name, pos('(', result.name), 2);
-      result.matchedTypes := convertMatchingOptionsToMatchedTypes(convertElementTestToMatchingOptions(result.name));
-    end else begin
-      result.kind:=tikAtomic;
-      result.name:=copy(s,1,length(s)-occurenceLength);
-      index := types.IndexOf(result.name);
-      if index < 0 then raise Exception.Create('Unknown type: '+result.name);
-      result.typeInfo := TXQValueClass(types.Objects[index]);
-    end;
-  end;
-end;
-
-function isSingleType(const ti: TTypeInformation): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
-begin
-  result := (ti.kind = tikAtomic) and not ti.allowMultiple;
-end;
-
-function xqvalueCastableAsBase(ta: TXQValue; const ti: TTypeInformation): boolean;
-begin
-  if ta.isUndefined then result := ti.allowNone
-  else if ta.getSequenceCount > 1 then result := false
-  else if ta is TXQValueSequence then result := TXQValueSequence(ta).seq[0].canConvertToType(ti.typeInfo)
-  else result := ta.canConvertToType(ti.typeInfo)
+  if not (wrapper is TXQValueFunction) or not (TXQValueFunction(wrapper).body is TXQTermSequenceType) then
+    raise Exception.Create('Expected type, got: '+wrapper.toString);
+  result := TXQTermSequenceType(TXQValueFunction(wrapper).body);
+  wrapper.free;
 end;
 
 procedure xqvalueCastAs(const cxt: TEvaluationContext; ta, tb: TXQValue; var result: TXQValue);
-var
-  ti: TTypeInformation;
 begin
-  ti := getTypeInformation(tb.toString);
-  if not isSingleType(ti) then raise exception.Create('need singletype for cast as');
-  if not xqvalueCastableAsBase(ta, ti) then raise exception.Create('impossible cast as');
-  xqvalueAssign(result, ti.typeInfo.createFromValue(ta));
+  xqvalueAssign(result, getTypeInfo(tb).castAs(ta));
 end;
 
 procedure xqvalueCastableAs(const cxt: TEvaluationContext; ta, tb: TXQValue; var result: TXQValue);
-var
-  ti: TTypeInformation;
 begin
-  ti := getTypeInformation(tb.toString);
-  if not isSingleType(ti) then raise exception.Create('need singletype for castable as');
-  xqvalueAssign(result, xqvalueCastableAsBase(ta, ti));
-  ta.free;
+  xqvalueAssign(result, getTypeInfo(tb).castableAs(ta));
 end;
 
-function xqvalueIsInstanceOf(const ta: TXQValue; const ti: TTypeInformation): boolean;
-  function instanceOfSingleType(sub: TXQValue): boolean;
-  begin
-    case ti.kind of
-      //tikAny, tikNone: ; //handled before
-      tikAtomic: result := sub.instanceOf(ti.typeInfo);
-      tikElementTest: begin
-        if (not (sub is TXQValueNode)) or (TXQValueNode(sub).node = nil) then exit(false);
-        result  := TXQValueNode(sub).node.typ in ti.matchedTypes;
-      end;
-    end;
-  end;
-var
-  seq: TXQVList;
-  i: Integer;
-  count: Integer;
-begin
-  //compare count with sequence count
-  if ti.kind = tikNone then exit(ta.isUndefined);
-  count := ta.getSequenceCount;
-  if ((count = 0) and not ti.allowNone) or
-     ((count > 1) and not ti.allowMultiple) then
-    exit(false);
-  if (count = 0) then
-    exit(true);
-  //compare item type
-  if ti.kind = tikAny then
-    exit(true);
-  if not (ta is TXQValueSequence) then exit(instanceOfSingleType(ta))
-  else begin
-    seq := TXQValueSequence(ta).seq;
-    result := true;
-    for i:=0 to seq.Count - 1 do begin
-      result := result and instanceOfSingleType(seq[i]);
-      if not result then exit;
-    end;
-  end
-end;
+
 
 procedure xqvalueInstanceOf(const cxt: TEvaluationContext; ta, tb: TXQValue; var result: TXQValue);
 begin
-  xqvalueAssign(result, xqvalueIsInstanceOf(ta, getTypeInformation(tb.toString)));
-  ta.free;
+  xqvalueAssign(result, getTypeInfo(tb).instanceOf(ta));
 end;
 
 procedure xqvalueTreatAs(const cxt: TEvaluationContext; ta, tb: TXQValue; var result: TXQValue);
 begin
   xqvalueAssign(result, ta);
-  if not xqvalueIsInstanceOf(result, getTypeInformation(tb.toString)) then
+  if not getTypeInfo(tb).instanceOfBase(result) then
     raise Exception.Create('treat as type not matched');
 end;
 

@@ -9,6 +9,15 @@ begin
   else raise Exception.Create('Unknown element test: '+select);
 end;
 
+function convertMatchingOptionsToMatchedTypes(const qmt: TXQPathMatchingKinds): TTreeElementTypes;
+begin
+  result := [];
+  if qmText in qmt then include(result, tetText);
+  if qmElement in qmt then include(result, tetOpen);
+  if qmComment in qmt then include(result, tetComment);
+  if qmProcessingInstruction in qmt then include(result, tetProcessingInstruction);
+  if qmAttribute in qmt then begin result += [tetAttributeName, tetAttributeValue]; end;
+end;
 
 { TXQTermReadProperty }
 
@@ -94,16 +103,124 @@ end;
 
 { TXQTermType }
 
-constructor TXQTermType.create(const avalue: string);
+constructor TXQTermSequenceType.create(const avalue: string);
 begin
-  value := avalue;
+  init(avalue);
 end;
 
-function TXQTermType.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermSequenceType.evaluate(const context: TEvaluationContext): TXQValue;
 begin
-  result := xqvalue(value)
+  result := TXQValueFunction.create(self); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
 end;
 
+procedure TXQTermSequenceType.init(const s: string);
+var occurenceLength: integer;
+  index: Integer;
+begin
+  if s = '' then raise Exception.Create('no type');
+  serializedValue:=s;
+  if pos('(', s) > 0 then begin
+    if pos('()', s) = 0 then raise Exception.Create('Element tests with arguments are not supported');
+  end;
+  allowNone:=false;
+  allowMultiple:=false;
+  if s = 'empty-sequence()' then kind:=tikNone
+  else begin
+    occurenceLength := 1;
+    case s[length(s)] of
+      '?': allowNone:=true;
+      '+': allowMultiple:=true;
+      '*': begin allowNone:=true; allowMultiple:=true; end;
+      else occurenceLength := 0;
+    end;
+    if strBeginsWith(s, 'item()') then
+      kind:=tikAny
+    else if pos('()', s) > 0 then begin
+      kind:=tikElementTest;
+      name:=copy(s,1,length(s)-occurenceLength);
+      delete(name, pos('(', name), 2);
+      matchedTypes := convertMatchingOptionsToMatchedTypes(convertElementTestToMatchingOptions(name));
+    end else begin
+      kind:=tikAtomic;
+      name:=copy(s,1,length(s)-occurenceLength);
+      index := types.IndexOf(name);
+      if index < 0 then raise Exception.Create('Unknown type: '+name);
+      atomicTypeInfo := TXQValueClass(types.Objects[index]);
+    end;
+  end;
+end;
+
+function TXQTermSequenceType.isSingleType(): boolean;
+begin
+  result := (kind = tikAtomic) and not allowMultiple;
+end;
+
+function TXQTermSequenceType.castableAsBase(v: TXQValue): boolean;
+begin
+  if v.isUndefined then result := allowNone
+  else if v.getSequenceCount > 1 then result := false
+  else if v is TXQValueSequence then result := TXQValueSequence(v).seq[0].canConvertToType(atomicTypeInfo)
+  else result := v.canConvertToType(atomicTypeInfo)
+end;
+
+function TXQTermSequenceType.castAs(v: TXQValue): TXQValue;
+begin
+  if not isSingleType() then raise exception.Create('need singletype for cast as');
+  if not castableAsBase(v) then raise exception.Create('impossible cast as');
+  result := atomicTypeInfo.createFromValue(v);
+end;
+
+function TXQTermSequenceType.castableAs(v: TXQValue): boolean;
+begin
+  if not isSingleType() then raise exception.Create('need singletype for castable as');
+  result := castableAsBase(v);
+  v.free;
+end;
+
+function TXQTermSequenceType.instanceOf(ta: TXQValue): boolean;
+begin
+  result := instanceOfBase(ta);
+  ta.free;
+end;
+
+function TXQTermSequenceType.instanceOfBase(ta: TXQValue): boolean;
+  function instanceOfSingleType(sub: TXQValue): boolean;
+  begin
+    case kind of
+      //tikAny, tikNone: ; //handled before
+      tikAtomic: result := sub.instanceOf(atomicTypeInfo);
+      tikElementTest: begin
+        if (not (sub is TXQValueNode)) or (TXQValueNode(sub).node = nil) then exit(false);
+        result  := TXQValueNode(sub).node.typ in matchedTypes;
+      end;
+    end;
+  end;
+var
+  seq: TXQVList;
+  i: Integer;
+  count: Integer;
+begin
+  //compare count with sequence count
+  if kind = tikNone then exit(ta.isUndefined);
+  count := ta.getSequenceCount;
+  if ((count = 0) and not allowNone) or
+     ((count > 1) and not allowMultiple) then
+    exit(false);
+  if (count = 0) then
+    exit(true);
+  //compare item type
+  if kind = tikAny then
+    exit(true);
+  if not (ta is TXQValueSequence) then exit(instanceOfSingleType(ta))
+  else begin
+    seq := TXQValueSequence(ta).seq;
+    result := true;
+    for i:=0 to seq.Count - 1 do begin
+      result := result and instanceOfSingleType(seq[i]);
+      if not result then exit;
+    end;
+  end
+end;
 { TXQTermSequence }
 
 function TXQTermSequence.evaluate(const context: TEvaluationContext): TXQValue;
@@ -244,6 +361,8 @@ var
       tempContext.temporaryVariables.pushAll;
       //sequenceTyp: TXQTermType;
       tempContext.temporaryVariables.addVariable(vars[pos].varname, v);
+      if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOfBase(v)) then
+        raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serializedValue+' got value '+v.asString);
       if vars[pos].positionVarname <> '' then ;
         tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index));
       evaluateForLoop(pos+1);

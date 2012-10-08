@@ -111,10 +111,26 @@ begin
 
   t('for $x at $i in ("a", "b", "c") return "($i;: $x;)"', '(1: a) (2: b) (3: c)'); //using extended string syntax
   t('for $x at $i in ("a", "b", "c") let $j := $i * 2 return "($j;: $x;)"', '(2: a) (4: b) (6: c)');
+  t('for $x at $i in ("a", "b", "c") let $j := $i * 2 where $j != 4 return "($j;: $x;)"', '(2: a) (6: c)');
+
+  t('for $x in ("1", "2", "3") return type-of($x)', 'string string string');
+  //t('for $x as xs:integer in ("1", "2", "3") return type-of($x)', 'integer integer integer'); //not actually allowed, read the standard wrong again
+
+  t('let $j := 7 return concat($j, ": ", type-of($j))', '7: integer');
+  t('let $j:= 7 return concat($j, ": ", type-of($j))', '7: integer');
+  t('let $j :=7 return concat($j, ": ", type-of($j))', '7: integer');
+  t('let $j:=7 return concat($j, ": ", type-of($j))', '7: integer');
+  {t('let $j as xs:integer  := 7 return concat($j, ": ", type-of($j))', '7: integer');
+  t('let $j as xs:decimal  := 7 return concat($j, ": ", type-of($j))', '7: decimal');
+  t('let $j as xs:string := 7 return concat($j, ": ", type-of($j))', '7: string');
+  t('let $j as string  := 7 return concat($j, ": ", type-of($j))', '7: string');}
+  t('let $j as integer := 7 return concat($j, ": ", type-of($j))', '7: integer');
+  t('let $j as integer := positiveInteger(7) return concat($j, ": ", type-of($j))', '7: positiveInteger');
 
   //from the standard
   t('let $j := 7 return (let $i := 5, $j := 20 * $i return $i, $j)', '5 7');
   t('let $j := 7 return (let $i := 5, $j := 20 * $i return ($i, $j))', '5 100');
+
 
 
   xml.free;

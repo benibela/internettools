@@ -89,7 +89,7 @@ type
 
   function parseSequenceLike(target: TXQTerm): TXQTerm;
   function parseQNameContinuation: string;
-  function parseSequenceType(): TXQTermType;
+  function parseSequenceType(): TXQTermSequenceType;
 
   function parseFlower(akind: string): TXQTermFlower;
 
@@ -252,9 +252,34 @@ begin
   else result := '';
 end;
 
-function TXQParsingContext.parseSequenceType: TXQTermType;
+function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
 begin
-  //todo
+  result := (word = 'text') or (word = 'node') or (word = 'comment') or (word = 'processing-instruction')
+            or (word = 'element') or (word = 'document-node') or (word = 'schema-element') or (word = 'attribute') or (word = 'schema-attribute');
+end;
+
+function TXQParsingContext.parseSequenceType: TXQTermSequenceType; //read SequenceType of the xpathebnf and pushes it as tType ()
+var word, sequenceType: string;
+begin
+  word := nextToken();
+  sequenceType := word;
+  if (isKindTestFunction(word)) or (word = 'empty-sequence') then begin
+    repeat
+      word := nextToken();
+      sequenceType += word;
+    until (word = ')') or (word = '');
+  end else begin
+    if sequenceType = 'item' then begin
+      expect('('); expect(')');
+      sequenceType+='()';
+    end else if strBeginsWith(sequenceType, 'xs:') then delete(sequenceType, 1, 3);
+    word := nextToken(true);
+    if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin
+      sequenceType+=word;
+      expect(word);
+    end;
+  end;
+  result := TXQTermSequenceType.Create(sequenceType);
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
@@ -374,12 +399,6 @@ begin
   end;
 
   result.returned := parse;
-end;
-
-function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
-begin
-  result := (word = 'text') or (word = 'node') or (word = 'comment') or (word = 'processing-instruction')
-            or (word = 'element') or (word = 'document-node') or (word = 'schema-element') or (word = 'attribute') or (word = 'schema-attribute');
 end;
 
 function TXQParsingContext.parseValue: TXQTerm;
@@ -534,29 +553,6 @@ var astroot: TXQTerm;
 
 
   procedure pushBinaryOp(const v: string);
-        function readSequenceType(): TXQTermType;  //read SequenceType of the xpathebnf and pushes it as tType ()
-        var word, sequenceType: string;
-        begin
-          word := nextToken();
-          sequenceType := word;
-          if (isKindTestFunction(word)) or (word = 'empty-sequence') then begin
-            repeat
-              word := nextToken();
-              sequenceType += word;
-            until (word = ')') or (word = '');
-          end else begin
-            if sequenceType = 'item' then begin
-              expect('('); expect(')');
-              sequenceType+='()';
-            end else if strBeginsWith(sequenceType, 'xs:') then delete(sequenceType, 1, 3);
-            word := nextToken(true);
-            if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin
-              sequenceType+=word;
-              expect(word);
-            end;
-          end;
-          result := TXQTermType.Create(sequenceType);
-        end;
   var res: TXQTermBinaryOp;
       oldres: TXQTermBinaryOp;
       replace: PXQTerm;
@@ -571,7 +567,7 @@ var astroot: TXQTerm;
 
     if res.operatorInfo^.followedBy <> '' then begin
       expect(res.operatorInfo^.followedBy);
-      res.push(readSequenceType()); //assume we read instance of/cast/castable/treat as
+      res.push(parseSequenceType()); //assume we read instance of/cast/castable/treat as
     end else
       res.push(parseValue())
   end;
