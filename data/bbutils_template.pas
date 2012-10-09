@@ -179,10 +179,15 @@ function strSlice(const s:string; start,last:longint):string;
 //all pchar<->string comparisons are null-terminated iff the string doesn't contain #0 characters
 
 //length limited
-function strlEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strlsEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsiEqual(p1,p2:pchar;l1,l2: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlEqual(const p1,p2:pchar;const l: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strlEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(const p1,p2:pchar;const l: longint):boolean; inline; //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strlsEqual(const p1,p2:pchar;const l: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsiEqual(const p1,p2:pchar;const l: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsiEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+
 function strlEqual(p:pchar;const s:string; l: longint):boolean; //**< Tests if the strings are case-sensitive equal (same length and same characters)
 function strliEqual(p:pchar;const s:string;l: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters)
 function strlBeginsWith(const p:pchar; l:longint; const expectedStart:string):boolean; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-sensitive)
@@ -787,39 +792,57 @@ end;
 
 //---------------------Comparison----------------------------
 //--Length-limited
+function strlEqual(const p1, p2: pchar; const l: longint): boolean;
+begin
+  result:=(strlcomp(p1, p2, l) = 0);
+end;
+
 //Length limited && null terminated
 //equal comparison, case sensitive, stopping at #0-bytes
-function strlequal(p1,p2:pchar;l1,l2: longint):boolean;
+function strlequal(const p1,p2:pchar;const l1,l2: longint):boolean;
 begin
   result:=(l1=l2) and (strlcomp(p1, p2,l1) = 0);
 end;
 
 //equal comparison, case insensitive, stopping at #0-bytes
-function strliequal(p1,p2:pchar;l1,l2: longint):boolean;
+function strliEqual(const p1, p2: pchar; const l: longint): boolean;
+begin
+  result:=(strlicomp(p1,p2,l)=0);
+end;
+
+//equal comparison, case insensitive, stopping at #0-bytes
+function strliequal(const p1,p2:pchar;const l1,l2: longint):boolean;
 begin
   result:=(l1=l2) and (strlicomp(p1,p2,l1)=0);
 end;
 
+
 //equal comparison, case sensitive, ignoring #0-bytes
-function strlsequal(p1,p2:pchar;l1,l2: longint):boolean;
+function strlsequal(const p1,p2:pchar;const l: longint):boolean; inline;
+begin
+  result:= (CompareByte(p1^, p2^, l) = 0);
+end;
+
+//equal comparison, case sensitive, ignoring #0-bytes
+function strlsequal(const p1,p2:pchar;const l1,l2: longint):boolean; inline;
+begin
+  result:= (l1=l2) and (CompareByte(p1^, p2^, l1) = 0);
+end;
+
+function strlsiEqual(const p1, p2: pchar; const l: longint): boolean;
 var i:integer;
 begin
-  result:=l1=l2;
-  if not result then exit;
-  for i:=0 to l1-1 do
-    if p1[i]<>p2[i] then
+  result := true;
+  for i:=0 to l-1 do
+    if upcase(p1[i])<>upCase(p2[i]) then
       exit(false);
 end;
 
 //equal comparison, case insensitive, ignoring #0-bytes
-function strlsiequal(p1, p2: pchar; l1, l2: longint): boolean;
+function strlsiequal(const p1, p2: pchar; const l1, l2: longint): boolean;
 var i:integer;
 begin
-  result:=l1=l2;
-  if not result then exit;
-  for i:=0 to l1-1 do
-    if upcase(p1[i])<>upCase(p2[i]) then
-      exit(false);
+  result:=(l1=l2) and strlsiequal(p1, p2, l1);
 end;
 
 
@@ -854,7 +877,6 @@ function strlsequal(p: pchar; const s: string; l: longint): boolean;
 begin
   result:=(l = length(s)) and ((l = 0) or (strlsequal(p, pchar(pointer(s)),l,l)));
 end;
-
 
 function strlequal(p: pchar; const s: string; l: longint): boolean;
 begin
@@ -932,7 +954,7 @@ begin
   result:=0;
   while str <= last do begin
     if str^ = searched^ then
-      if strlsequal(str, searched, l2, l2) then
+      if strlsequal(str, searched, l2) then
         exit();
     inc(str);
     result+=1;
