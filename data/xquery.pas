@@ -4536,6 +4536,7 @@ begin
   end;}
   cxt := TXQParsingContext.Create;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
+  cxt.AllowObjects:=VariableChangelog.allowObjects;
   cxt.parsingModel:=model;
   try
     cxt.str := str;

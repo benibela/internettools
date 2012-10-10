@@ -71,6 +71,7 @@ type
 
  TXQParsingContext = class
   AllowVariableUseInStringLiterals: boolean;
+  AllowObjects: boolean;
   parsingModel: TXQParsingModel;
 
   str: string;
@@ -596,11 +597,11 @@ begin
         expect('[');
         replace := ripBinOpApart(@astroot, 10000);
         replace^ := TXQTermFilterSequence.Create(replace^, parse());
-        expect(']');   //todo: object
+        expect(']');
       end;
       ':=': begin expect(':='); exit(TXQTermDefineVariable.Create(astroot, parse())); end;
       else if binaryOps.IndexOf(word) >= 0 then pushBinaryOp(word)
-      else if word[1] = '.' then begin
+      else if (word[1] = '.') and AllowObjects then begin
         expect(word);
         replace := ripBinOpApart(@astroot, 10000);
         if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction)  then

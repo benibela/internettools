@@ -282,7 +282,10 @@ var tempContext:TEvaluationContext;
 
 begin
   tempContext:=context;
-  if context.temporaryVariables=nil then tempContext.temporaryVariables:=TXQVariableChangeLog.create();
+  if context.temporaryVariables=nil then begin
+    tempContext.temporaryVariables:=TXQVariableChangeLog.create();
+    tempContext.temporaryVariables.allowObjects:=tempContext.sender.VariableChangelog.allowObjects;
+  end;
   result:=xqvalue(evaluateSomeEvery(0));
   xqvalueSeqSqueeze(result);
   if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
@@ -410,7 +413,10 @@ var i, j: Integer;
 
 begin
   tempContext:=context;
-  if context.temporaryVariables=nil then tempContext.temporaryVariables:=TXQVariableChangeLog.create();
+  if context.temporaryVariables=nil then begin
+    tempContext.temporaryVariables:=TXQVariableChangeLog.create();
+    tempContext.temporaryVariables.allowObjects:=tempContext.sender.VariableChangelog.allowObjects;
+  end;
 
   oldVarCount := tempContext.temporaryVariables.count;
 
