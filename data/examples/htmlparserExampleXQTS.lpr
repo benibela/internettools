@@ -11,7 +11,7 @@ uses
   ,{$ifdef win32}w32internetaccess{$else}synapseinternetaccess{$endif};
   { you can add units after this }
 
-var lastGroup: string;
+var lastGroupStart: TTreeElement;
     buffer1, buffer2, buffer3: TStringList;
 
 type TLogger = class
@@ -19,7 +19,7 @@ type TLogger = class
 class procedure LOG_START; virtual; abstract;
 class procedure LOG_GROUP_START(filen, title, desc: string); static; virtual; abstract;
 class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime); virtual; abstract;
-class procedure LOG_GROUP_END(correct, wrong, exceptions, skipped: integer); virtual; abstract;
+class procedure LOG_GROUP_END(startlogged: boolean; correct, wrong, exceptions, skipped: integer); virtual; abstract;
 class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; virtual; abstract;
 
 end;
@@ -31,7 +31,7 @@ THTMLLogger = class(TLogger)
 class procedure LOG_START; override;
 class procedure LOG_GROUP_START(filen, title, desc: string); static; override;
 class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime); override;
-class procedure LOG_GROUP_END(correct, wrong, exceptions, skipped: integer); override;
+class procedure LOG_GROUP_END(startlogged: boolean; correct, wrong, exceptions, skipped: integer); override;
 class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; override;
 end;
 
@@ -42,7 +42,7 @@ TPlainLogger = class(TLogger)
 class procedure LOG_START; override;
 class procedure LOG_GROUP_START(filen, title, desc: string); static; override;
 class procedure LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime); override;
-class procedure LOG_GROUP_END(correct, wrong, exceptions, skipped: integer); override;
+class procedure LOG_GROUP_END(startlogged: boolean; correct, wrong, exceptions, skipped: integer); override;
 class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; override;
 end;
 
@@ -100,9 +100,8 @@ end;
 
 class procedure TPlainLogger.LOG_GROUP_START(filen, title, desc: string);
 begin
-  lastGroup:= title + ' '+ desc;
   writeln('=====================================================');
-  writeln('Testing: ', title, ' ', desc, ' ',filen);
+  writeln('Testing: ', lastgroupStart.findChild(tetOpen, 'title').deepNodeText() , ' ', lastgroupStart.findChild(tetOpen, 'description').deepNodeText(), ' ',filen);
   writeln('=====================================================');
 end;
 
@@ -116,9 +115,9 @@ begin
   writeln ('  In: ', queryfile, ': ',copy(desc,1,60), ' with ', inputfile, ' time: ', timing * MSecsPerDay);
 end;
 
-class procedure TPlainLogger.LOG_GROUP_END(correct, wrong, exceptions, skipped: integer);
+class procedure TPlainLogger.LOG_GROUP_END(startlogged: boolean; correct, wrong, exceptions, skipped: integer);
 begin
-    writeln('Group: ', lastGroup, ' Correct: ', correct, ' Wrong:', wrong, ' Error: ', exceptions, ' / ', correct + wrong + exceptions, ' | Skipped: ', skipped);
+    writeln('Group: ', lastgroupStart.findChild(tetOpen, 'title').deepNodeText() + ' '+ lastgroupStart.findChild(tetOpen, 'description').deepNodeText()  , ' Correct: ', correct, ' Wrong:', wrong, ' Error: ', exceptions, ' / ', correct + wrong + exceptions, ' | Skipped: ', skipped);
 end;
 
 class procedure TPlainLogger.LOG_END(correct, wrong, exceptions, skipped: integer);
@@ -144,7 +143,6 @@ end;
 
 class procedure THTMLLogger.LOG_GROUP_START(filen, title, desc: string);
 begin
-  lastGroup := title;
   buffer2.add('<h3><a name="'+title+'">'+title+'</a></h3>');
   buffer2.add(filen+': ' +desc+'<br><br>');
 
@@ -173,11 +171,17 @@ begin
     end;
 end;
 
-class procedure THTMLLogger.LOG_GROUP_END(correct, wrong, exceptions, skipped: integer);
+class procedure THTMLLogger.LOG_GROUP_END(startlogged: boolean; correct, wrong, exceptions, skipped: integer);
 var
   i: Integer;
+  lastGroup: String;
 begin
-  buffer1.add('<tr><td><a href="#'+lastGroup+'">'+lastGroup+'</td><td>'+inttostr(correct)+'</td><td>'+inttostr(wrong)+'</td><td>'+inttostr(exceptions)+'</td><td>'+inttostr(correct+wrong+exceptions)+'</td><td>'+inttostr(skipped)+'</td></td>');
+  lastGroup := lastgroupStart.findChild(tetOpen, 'title').deepNodeText();
+  if startlogged then lastGroup := '<a href="#'+lastGroup+'">'+lastGroup+'</a>';
+
+
+  buffer1.add('<tr><td>'+lastGroup+'</td><td>'+inttostr(correct)+'</td><td>'+inttostr(wrong)+'</td><td>'+inttostr(exceptions)+'</td><td>'+inttostr(correct+wrong+exceptions)+'</td><td>'+inttostr(skipped)+'</td></td>');
+  if not startlogged then exit;
   buffer2.add('Result: Correct: '+inttostr(correct)+' Wrong: '+inttostr(wrong)+' Errors: '+inttostr(exceptions)+' Total: '+inttostr(correct+wrong+exceptions)+ '   Skipped: '+inttostr(skipped)+'<br><br>');
   for i:=0 to buffer3.count-1 do
     buffer2.add(buffer3[i]);
@@ -193,6 +197,19 @@ begin
   WriteLn('<tr><td colspan=6>&nbsp;</td></tr>');
   WriteLn('<tr><td colspan=6>&nbsp;</td></tr>');
 //  writeln('Correct: ', correct, '<br> Wrong:', wrong, ' <br>Error: ', exceptions, '<br>Total: ', correct + wrong + exceptions, ' <br> Skipped: ', skipped,'<br><br>');
+end;
+
+var mylogger: TLoggerClass;
+    startLogged: boolean;
+    CAT: Integer;
+    groupStart: TTreeElement;
+procedure logGroupStart;
+begin
+  if groupStart <> nil then begin
+    mylogger.LOG_GROUP_START(paramstr(CAT), groupStart.findChild(tetOpen, 'title').deepNodeText(),groupStart.findChild(tetOpen, 'description').deepNodeText());
+    groupStart := nil;
+    startLogged := true;
+  end;
 end;
 
 procedure twrapper.eval(sender: TObject; const variable: string; var value: TXQValue);
@@ -219,7 +236,6 @@ var htp: THtmlTemplateParser;
     pxp: TXQueryEngine;
     myoutput: string;
     wrap: twrapper;
-    CAT: Integer;
     from: SizeInt;
     node: TTreeElement;
     inputfile: String;
@@ -230,7 +246,6 @@ var htp: THtmlTemplateParser;
     exceptions: Integer;
     fileOpenFailed: String;
     currentTree: TTreeElement = nil;
-    mylogger: TLoggerClass;
     logCorrect: Boolean;
     timing: TDateTime;
     mypxpoutput: TXQValue;
@@ -284,6 +299,7 @@ begin
   end;
 
   mylogger.LOG_START();
+  startLogged:=false; //start of a group, not the start in the line above
 
   XQGlobalTrimNodes:=false;
   correct:=0; skipped:=0; exceptions:=0; wrong:=0;
@@ -297,7 +313,7 @@ begin
     //writeln(htp.variableChangeLog.debugTextRepresentation);
     varlog := htp.VariableChangeLogCondensed;
     for i:=0 to varlog.count-1 do begin
-      if varlog.getVariableName(i) = 'gi' then mylogger.LOG_GROUP_START(paramstr(CAT), varlog.getVariableValueNode(i).findChild(tetOpen, 'title').deepNodeText(),varlog.getVariableValueNode(i).findChild(tetOpen, 'description').deepNodeText())
+      if varlog.getVariableName(i) = 'gi' then begin groupStart := varlog.getVariableValueNode(i); lastGroupStart := groupStart; end
       else if varlog.getVariableName(i) = 'input' then begin
         node := varlog.getVariableValueNode(i);
         inputfilevar := node.getAttribute('variable');
@@ -365,16 +381,23 @@ begin
              or ((striEqual('xml', outputcomparator) or striEqual('fragment', outputcomparator)) and (trim(myoutput) = trim(output)))
              then begin
             correctLocal += 1;
-            if logCorrect then mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+            if logCorrect then begin
+              logGroupStart;
+              mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+            end;
             //writeln('PASS: ', copy(desc,1,30),queryname,' : got '  , myoutput);
           end else begin
             wrongLocal+=1;
+
+            logGroupStart;
+
             mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
           {  write(stderr, 'WRONG: ', copy(desc,1,60),' ',queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
             writeln(stderr, '       ', arrayGet(strSplit(query, #13),-2) );
             writeln('      TestSources/'+inputfile+'.xml', '  |  ','Queries/XQuery/'+path+'/'+queryname+'.xq','    |   ', 'ExpectedTestResults/'+path+'/'+outputfile); writeln;}
           end;
         except on e: sysutils.Exception do begin
+          logGroupStart;
           exceptionLocal+=1;
           mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', e.message, output, timing);
           fileOpenFailed  := '';
@@ -389,7 +412,8 @@ begin
       end;
      end;
     end;
-    mylogger.LOG_GROUP_END(correctLocal, wrongLocal, exceptionLocal, skippedErrorsLocal);
+    mylogger.LOG_GROUP_END(startLogged, correctLocal, wrongLocal, exceptionLocal, skippedErrorsLocal);
+    startLogged := false;
     correct += correctLocal;
     wrong += wrongLocal;
     exceptions += exceptionLocal;
