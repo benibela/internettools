@@ -199,7 +199,7 @@ end;
 const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{('+
                          'test:=xs:object(), test.path:=@FilePath,test.desc:=description,test.queryname:=query/@name,' +
                          'test.outputfile:=output-file,test.outputcomparator:=output-file/@compare, test.error:=expected-error)}' +
-                         '<input-file>{input:=.}</input-file>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
+                         '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
 
 var htp: THtmlTemplateParser;
     desc, queryname, outputfile, error, path: string;
