@@ -69,13 +69,18 @@ function mytostring(v: TXQValue): string;
 var
   i: Integer;
   seq: TXQVList;
+  isnode: boolean;
+  wasnode: boolean;
 begin
   if v is TXQValueSequence then begin
     seq :=  v.toSequence;
+    wasnode := seq[0] is TXQValueNode;
     result := mytostring(seq[0]);
     for i:=1 to seq.count-1 do begin
-      if seq[i] is TXQValueNode then result += mytostring(seq[i])
+      isnode := seq[i] is TXQValueNode;
+      if isnode or wasnode then result += mytostring(seq[i])
       else result += ' '+mytostring(seq[i]);
+      wasnode := isnode;
     end;
     seq.freeNonRecursive;
   end else if (v is TXQValueNode) and (TXQValueNode(v).node <> nil) then begin
@@ -356,7 +361,9 @@ begin
           myoutput := mytostring(mypxpoutput);
           if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
              or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
-             or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18'))) then begin
+             or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18')))
+             or ((striEqual('xml', outputcomparator) or striEqual('fragment', outputcomparator)) and (trim(myoutput) = trim(output)))
+             then begin
             correctLocal += 1;
             if logCorrect then mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
             //writeln('PASS: ', copy(desc,1,30),queryname,' : got '  , myoutput);
