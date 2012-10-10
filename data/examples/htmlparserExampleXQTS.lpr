@@ -203,7 +203,7 @@ end;
 
 const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{('+
                          'test:=xs:object(), test.path:=@FilePath,test.desc:=description,test.queryname:=query/@name,' +
-                         'test.outputfile:=output-file,test.error:=expected-error)}' +
+                         'test.outputfile:=output-file,test.outputcomparator:=output-file/@compare, test.error:=expected-error)}' +
                          '<input-file>{input:=.}</input-file>*{test.complete:="yes"}</test-case>*</test-group>';
 
 var htp: THtmlTemplateParser;
@@ -232,6 +232,7 @@ var htp: THtmlTemplateParser;
     extendedvars: TXQVariableChangeLog;
     j: Integer;
     varlog: TXQVariableChangeLog;
+    outputcomparator: String;
 begin
   {$ifdef win32}defaultInternetAccessClass := TW32InternetAccess.create{$else}defaultInternetAccessClass:=TSynapseInternetAccess{$endif};
 
@@ -292,11 +293,6 @@ begin
     varlog := htp.VariableChangeLogCondensed;
     for i:=0 to varlog.count-1 do begin
       if varlog.getVariableName(i) = 'gi' then mylogger.LOG_GROUP_START(paramstr(CAT), varlog.getVariableValueNode(i).findChild(tetOpen, 'title').deepNodeText(),varlog.getVariableValueNode(i).findChild(tetOpen, 'description').deepNodeText())
-      else if varlog.getVariableName(i) = 'desc' then desc := varlog.getVariableValueString(i)
-      else if varlog.getVariableName(i) = 'queryname' then queryname := varlog.getVariableValueString(i)
-      else if varlog.getVariableName(i) = 'outputfile' then outputfile := varlog.getVariableValueString(i)
-      else if varlog.getVariableName(i) = 'error' then error := varlog.getVariableValueString(i)
-      else if varlog.getVariableName(i) = 'path' then path := varlog.getVariableValueString(i)
       else if varlog.getVariableName(i) = 'input' then begin
         node := varlog.getVariableValueNode(i);
         inputfilevar := node.getAttribute('variable');
@@ -319,12 +315,13 @@ begin
         desc := varlog.getVariableValueObject(i).getAsString('desc');
         queryname := varlog.getVariableValueObject(i).getAsString('queryname');
         outputfile := varlog.getVariableValueObject(i).getAsString('outputfile');
+        outputcomparator := varlog.getVariableValueObject(i).getAsString('outputcomparator');
         error := varlog.getVariableValueObject(i).getAsString('error');
         path := varlog.getVariableValueObject(i).getAsString('path');
 
 
         totalLocal += 1;
-        if error <> '' then begin
+        if (error <> '') or (striEqual(outputcomparator, 'Inspect')) then begin
           skippedErrorsLocal+=1;
           continue;
         end;
