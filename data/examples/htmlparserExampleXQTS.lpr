@@ -47,22 +47,6 @@ class procedure LOG_END(correct, wrong, exceptions, skipped: integer); static; o
 end;
 
 
-type
-
-{ twrapper }
-
- twrapper = class
-  procedure eval(sender: TObject; const variable: string; var value: TXQValue);
-end;
-
-{ twrapper }
-
-
-procedure high(attributes: TStringList);
-begin
-
-end;
-
 
 
 function mytostring(v: TXQValue): string;
@@ -89,7 +73,7 @@ begin
 end;
 
 var tree: TTreeParser;
-    inputfiles, variables: TStringList;
+    inputfiles: TStringList;
 
 { TPlainLogger }
 
@@ -212,21 +196,10 @@ begin
   end;
 end;
 
-procedure twrapper.eval(sender: TObject; const variable: string; var value: TXQValue);
-var
-  i: Integer;
-begin
-  i := variables.IndexOf(variable);
-//  writeln(variable, ':', i);
-  if i < 0 then exit;
-  xqvalueAssign(value, TTreeElement(variables.Objects[i]));
-  //if variable = 'input-context' then value := pxpvalue(tree.getLastTree);
-end;
-
 const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{('+
                          'test:=xs:object(), test.path:=@FilePath,test.desc:=description,test.queryname:=query/@name,' +
                          'test.outputfile:=output-file,test.outputcomparator:=output-file/@compare, test.error:=expected-error)}' +
-                         '<input-file>{input:=.}</input-file>*{test.complete:="yes"}</test-case>*</test-group>';
+                         '<input-file>{input:=.}</input-file>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
 
 var htp: THtmlTemplateParser;
     desc, queryname, outputfile, error, path: string;
@@ -235,7 +208,6 @@ var htp: THtmlTemplateParser;
     skippedErrorsLocal, totalLocal, correctLocal, wrongLocal, exceptionLocal: Integer;
     pxp: TXQueryEngine;
     myoutput: string;
-    wrap: twrapper;
     from: SizeInt;
     node: TTreeElement;
     inputfile: String;
@@ -268,7 +240,6 @@ begin
   htp := THtmlTemplateParser.create;
   htp.parseTemplate(CATALOG_TEMPLATE);
   pxp := TXQueryEngine.create;
-  pxp.OnEvaluateVariable:=@wrap.eval;
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
   pxp.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
   pxp.AllowVariableUseInStringLiterals := false;
@@ -277,8 +248,6 @@ begin
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
-  variables:=TStringList.Create;
-  variables.Sorted:=true;
   inputfiles:=TStringList.Create;
   extendedvars := TXQVariableChangeLog.create();
 //  extendedvars.allowObjects:=true;
@@ -313,25 +282,33 @@ begin
     //writeln(htp.variableChangeLog.debugTextRepresentation);
     varlog := htp.VariableChangeLogCondensed;
     for i:=0 to varlog.count-1 do begin
-      if varlog.getVariableName(i) = 'gi' then begin groupStart := varlog.getVariableValueNode(i); lastGroupStart := groupStart; end
+      if varlog.getVariableName(i) = 'gi' then begin begin
+        groupStart := varlog.getVariableValueNode(i); lastGroupStart := groupStart; end;
+        pxp.VariableChangelog.clear;
+      end
       else if varlog.getVariableName(i) = 'input' then begin
         node := varlog.getVariableValueNode(i);
         inputfilevar := node.getAttribute('variable');
         inputfile := node.deepNodeText();
         if inputfile = 'id-idref-dtd' then inputfile:='id';
-        if inputfiles.IndexOf(inputfile) < 0 then begin
-          try
-          fileOpenFailed:='';
-          inputfiles.AddObject(inputfile, tree.parseTreeFromFile('TestSources/'+inputfile+'.xml'));
-          currentTree:=TTreeElement(inputfiles.Objects[inputfiles.Count-1]);
-          except on e: EFOpenError do
-            fileOpenFailed := e.Message;
-          end;
-        end else currentTree := TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]);
-        if fileOpenFailed = '' then begin
-          if variables.IndexOf(inputfilevar) < 0 then variables.AddObject(inputfilevar, nil);
-          variables.Objects[variables.IndexOf(inputfilevar)] :=inputfiles.Objects[inputfiles.IndexOf(inputfile)];
+        if striEqual(node.getNodeName(), 'input-URI') then
+          pxp.VariableChangelog.addVariable(inputfilevar,  GetCurrentDir + DirectorySeparator + 'TestSources/'+inputfile+'.xml')
+        else begin
+          if inputfiles.IndexOf(inputfile) < 0 then begin
+            try
+            fileOpenFailed:='';
+            inputfiles.AddObject(inputfile, tree.parseTreeFromFile('TestSources/'+inputfile+'.xml'));
+            currentTree:=TTreeElement(inputfiles.Objects[inputfiles.Count-1]);
+            except on e: EFOpenError do
+              fileOpenFailed := e.Message;
+              on e: ETreeParseException do
+              fileOpenFailed := e.Message;
+            end;
+          end else currentTree := TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]);
+          if fileOpenFailed = '' then
+            pxp.VariableChangelog.addVariable(inputfilevar, TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]));
         end;
+
       end else if varlog.getVariableName(i) = 'test' then begin
         desc := varlog.getVariableValueObject(i).getAsString('desc');
         queryname := varlog.getVariableValueObject(i).getAsString('queryname');
@@ -431,7 +408,6 @@ begin
   buffer1.free;
   buffer2.free;
   buffer3.free;
-  variables.Free;
   inputfiles.Free;
   tree.free;
   pxp.free;
