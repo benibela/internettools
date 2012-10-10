@@ -176,7 +176,7 @@ public
   destructor destroy; override;
 end;
 
-TreeParseException = Exception;
+ETreeParseException = Exception;
 { TTreeParser }
 
 //**Parsing model used to interpret the document
@@ -934,7 +934,7 @@ begin
 
   last := TTreeElement(FElementStack.Last);
   if (FParsingModel = pmStrict) and (last = nil) then
-    raise TreeParseException.create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but none was open');
+    raise ETreeParseException.create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but none was open');
 
   if last = nil then exit;
 
@@ -947,7 +947,7 @@ begin
     FElementStack.Delete(FElementStack.Count-1);
     new.initialized;
   end else if FParsingModel = pmStrict then
-    raise TreeParseException.Create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but the latest opened was <'+last.value+'>  (url: '+FCurrentTree.FBaseURI+')')
+    raise ETreeParseException.Create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but the latest opened was <'+last.value+'>  (url: '+FCurrentTree.FBaseURI+')')
   else if FParsingModel = pmHTML then begin
     //try to auto detect unclosed tags
     match:=-1;
@@ -1014,7 +1014,7 @@ begin
     if textLen = 0 then exit;
     if strBeginsWith(text, #239#187#191) or strBeginsWith(text,#254#255) or strBeginsWith(text, #255#254) or
        strBeginsWith(text, #43#47#118) then raise Exception.Create('xml ' + FCurrentTree.FBaseURI + ' starts with unicode BOM. That is not supported');
-    raise Exception.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
+    raise ETreeParseException.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
   end;
 
   if FAutoCloseTag then
