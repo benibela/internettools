@@ -159,12 +159,25 @@ class procedure THTMLLogger.LOG_GROUP_END(startlogged: boolean; correct, wrong, 
 var
   i: Integer;
   lastGroup: String;
+  color: String;
 begin
   lastGroup := lastgroupStart.findChild(tetOpen, 'title').deepNodeText();
   if startlogged then lastGroup := '<a href="#'+lastGroup+'">'+lastGroup+'</a>';
 
+  if correct+wrong+exceptions = 0 then color := ''
+  else begin
+    if wrong + exceptions = 0 then color := 'AAFFAA'
+    else if wrong + exceptions <= correct then  begin
+      color := IntToHex(($FF - $88) * (wrong + exceptions) div correct  + $88 , 2);
+      color := color+'FF00';
+    end else begin
+      color := IntToHex(($FF - $88) * (wrong + exceptions) div (wrong+exceptions+correct)  + $88 , 2);
+      color := color+'5500'; //'FF'+color+color;
+    end;
+    color := 'style="background-color:#'+color+'"';
+  end;
 
-  buffer1.add('<tr><td>'+lastGroup+'</td><td>'+inttostr(correct)+'</td><td>'+inttostr(wrong)+'</td><td>'+inttostr(exceptions)+'</td><td>'+inttostr(correct+wrong+exceptions)+'</td><td>'+inttostr(skipped)+'</td></td>');
+  buffer1.add('<tr '+color+'><td>'+lastGroup+'</td><td>'+inttostr(correct)+'</td><td>'+inttostr(wrong)+'</td><td>'+inttostr(exceptions)+'</td><td>'+inttostr(correct+wrong+exceptions)+'</td><td>'+inttostr(skipped)+'</td></td>');
   if not startlogged then exit;
   buffer2.add('Result: Correct: '+inttostr(correct)+' Wrong: '+inttostr(wrong)+' Errors: '+inttostr(exceptions)+' Total: '+inttostr(correct+wrong+exceptions)+ '   Skipped: '+inttostr(skipped)+'<br><br>');
   for i:=0 to buffer3.count-1 do
@@ -264,6 +277,7 @@ begin
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
   pxp.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
   pxp.AllowVariableUseInStringLiterals := false;
+  pxp.VariableChangelog.allowObjects:=false;
   pxp.setDefaultCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint');
   tree := TTreeParser.Create;
   tree.readComments:=true;
