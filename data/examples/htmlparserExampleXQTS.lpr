@@ -164,7 +164,7 @@ begin
     case state of
     0: buffer3.add('<tr class="correct"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
     1: buffer3.add('<tr class="wrong"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
-    2: buffer3.add('<tr class="error"><td>'+queryname+'</td><td>'+desc+'</td><td colspan=2> <b>Error</b>:'+myoutput+'</td></tr>');
+    2: buffer3.add('<tr class="error"><td>'+queryname+'</td><td>'+desc+'</td><td> <b>Error</b>:'+myoutput+'</td><td>'+output+'</td></tr>');
     end;
 end;
 
