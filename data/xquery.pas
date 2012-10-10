@@ -998,6 +998,8 @@ type
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
 
+    VariableChangelog: TXQVariableChangeLog;
+
     OnEvaluateVariable: TEvaluateVariableEvent; //**< Event called if a variable has to be read
     OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set
 
@@ -4396,10 +4398,14 @@ begin
   self.CurrentDateTime:=now;
   ImplicitTimezone:=getNaN;
   AllowVariableUseInStringLiterals:=true;
+  VariableChangelog := TXQVariableChangeLog.create();
+  OnEvaluateVariable := @VariableChangelog.evaluateVariable;
+  OnDefineVariable:= @VariableChangelog.defineVariable;
 end;
 
 destructor TXQueryEngine.Destroy;
 begin
+  VariableChangelog.Free;
   FExternalDocuments.free;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}FInternet.Free;{$endif}
   clear;
