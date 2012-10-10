@@ -196,6 +196,25 @@ begin
   end;
 end;
 
+
+var compareTree: TTreeParser;
+
+
+function xmlEqual(a, b: string): boolean;
+var tree1, tree2: TTreeElement;
+begin
+  try
+  compareTree.clearTrees;
+  tree1 := compareTree.parseTree(a);
+  tree1.changeEncoding(eUTF8,eUTF8,true,false);
+  tree2 := compareTree.parseTree(b);
+  tree2.changeEncoding(eUTF8,eUTF8,true,false);
+  result := tree1.outerXML() = tree2.outerXML();
+
+  except on e: ETreeParseException do result := false;
+  end;
+end;
+
 const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{('+
                          'test:=xs:object(), test.path:=@FilePath,test.desc:=description,test.queryname:=query/@name,' +
                          'test.outputfile:=output-file,test.outputcomparator:=output-file/@compare, test.error:=expected-error)}' +
@@ -234,6 +253,8 @@ begin
   logCorrect := (paramstr(1) = '--correct') or (paramstr(2) = '--correct');
 
 
+  compareTree := TTreeParser.Create;
+  compareTree.parsingModel:= pmStrict;
   buffer1 := TStringList.Create;
   buffer2 := TStringList.Create;
   buffer3 := TStringList.Create;
@@ -356,6 +377,8 @@ begin
              or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
              or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18')))
              or ((striEqual('xml', outputcomparator) or striEqual('fragment', outputcomparator)) and (trim(myoutput) = trim(output)))
+             or ((striEqual('xml', outputcomparator) and xmlEqual(myoutput, output)))
+             or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
              then begin
             correctLocal += 1;
             if logCorrect then begin
