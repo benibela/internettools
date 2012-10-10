@@ -115,8 +115,8 @@ TTreeElement = class
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
-  function getRoot(): TTreeElement;
-  function getDocument(): TTreeDocument;
+  function getRoot(): TTreeElement;    //**< Returns the highest element node ancestor (not the document root, that is returned by getDocument)
+  function getDocument(): TTreeDocument; //**< Returns the document node containing this node
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
   function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
@@ -530,7 +530,7 @@ begin
   if result.parent = nil then //document node
     exit(findChild(tetOpen,'',[tefoIgnoreText]));
 
-  while (result <> nil) and (result.previous <> nil) and (result.parent.parent <> nil) do
+  while (result <> nil) and ((result.previous <> nil) or (result.typ in [tetAttributeName, tetAttributeValue])) and (result.parent.parent <> nil) do
     result := result.parent;
 end;
 
