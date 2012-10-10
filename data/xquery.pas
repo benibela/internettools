@@ -4515,8 +4515,19 @@ end;
 
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQTerm;
 var cxt: TXQParsingContext;
+  i: Integer;
 begin
   if str = '' then exit(TXQTermSequence.Create);
+{  if pos(#13, str) > 0 then begin
+    i := 1;
+    while i < length(str) do begin
+      if str[i] = #13 then
+        if (i+1 < length(str)) and (str[i+1] = #10) then delete(str, i, 1)
+        else str[i] := #10;
+      i += 1;
+    end;
+
+  end;}
   cxt := TXQParsingContext.Create;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
   cxt.parsingModel:=model;
