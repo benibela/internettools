@@ -613,6 +613,8 @@ type EDateTimeParsingException = class(Exception);
 function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil): boolean;
 //**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
 procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+//**Reads date/time from a input matching a given mask (@see dateTimeParsePartsTry)
+function dateTimeParse(const input,mask:string; outtimezone: PDateTime = nil): TDateTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function dateTimeFormat(const mask: string; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
@@ -8119,6 +8121,27 @@ begin
   end;
 end;
 
+function dateTimeParse(const input, mask: string; outtimezone: PDateTime): TDateTime;
+var y,m,d: integer;
+    hour, minutes, seconds: integer;
+    milliseconds: double;
+    timeZone: TDateTime;
+begin
+  dateTimeParseParts(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @milliseconds, @timeZone);
+
+  if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
+  if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
+  if y=high(y) then raise EDateTimeParsingException.Create('No year contained in '+input+' with format '+mask+'');
+  if hour=high(hour) then raise EDateTimeParsingException.Create('No hour contained in '+input+' with format '+mask+'');
+  if minutes=high(minutes) then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
+  if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
+
+  result := trunc(EncodeDate(y,m,d)) + EncodeTime(hour,minutes,seconds,0);
+  if not IsNan(milliseconds) then result += milliseconds / SecsPerDay;
+  if outtimezone <> nil then outtimezone^ := timeZone
+  else if not IsNan(timeZone) then result -= timeZone;
+end;
+
 function dateTimeFormat(const mask: string; y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
 const invalid = high(integer);
 begin
@@ -8186,9 +8209,9 @@ var
   timeZone: TDateTime;
 begin
   timeParseParts(input,mask,@hour,@minutes,@seconds,@milliseconds,@timeZone);
-  if hour=high(hour) then raise EDateTimeParsingException.Create('Konnte keine Stunde aus '+input+' im Format '+mask+' entnehmen');
-  if minutes=high(minutes) then raise EDateTimeParsingException.Create('Konnte keine Minuten aus '+input+' im Format '+mask+' entnehmen');
-  if seconds=high(seconds) then raise EDateTimeParsingException.Create('Konnte keine Sekunden aus '+input+' im Format '+mask+' entnehmen');
+  if hour=high(hour) then raise EDateTimeParsingException.Create('No hour contained in '+input+' with format '+mask+'');
+  if minutes=high(minutes) then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
+  if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
   result := EncodeTime(hour,minutes,seconds,0);
   if not IsNan(milliseconds) then result += milliseconds / SecsPerDay;
   if not IsNan(timeZone) then result -= timeZone;
@@ -8208,9 +8231,9 @@ function dateParse(const input, mask: string): longint;
 var y,m,d: integer;
 begin
   dateParseParts(input, mask, @y, @m, @d);
-  if d=high(d) then raise EDateTimeParsingException.Create('Konnte keinen Tag aus '+input+' im Format '+mask+' entnehmen');
-  if m=high(m) then raise EDateTimeParsingException.Create('Konnte keinen Monat aus '+input+' im Format '+mask+' entnehmen');
-  if y=high(y) then raise EDateTimeParsingException.Create('Konnte kein Jahr aus '+input+' im Format '+mask+' entnehmen');
+  if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
+  if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
+  if y=high(y) then raise EDateTimeParsingException.Create('No year contained in '+input+' with format '+mask+'');
   result := trunc(EncodeDate(y,m,d));
 end;
 

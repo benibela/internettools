@@ -249,6 +249,7 @@ begin
   pxp := TXQueryEngine.create;
   pxp.OnEvaluateVariable:=@wrap.eval;
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
+  pxp.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
   pxp.AllowVariableUseInStringLiterals := false;
   pxp.setDefaultCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint');
   tree := TTreeParser.Create;
