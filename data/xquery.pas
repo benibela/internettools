@@ -7016,6 +7016,7 @@ procedure xqFunctionCurrent_Datetime(const context: TEvaluationContext; args: ar
 begin
   requiredArgCount(args, 0);
   xqvalueAssign(result, TXQValueDateTime.create(context.sender.CurrentDateTime)); //stable during evaluation
+  if not IsNan(context.sender.ImplicitTimezone) then TXQValueDateTime(result).value.timezone := context.sender.ImplicitTimezone;
 end;
 
 procedure xqFunctionCurrent_Date(const context: TEvaluationContext; args: array of TXQValue; var result: TXQValue);
@@ -7024,6 +7025,7 @@ begin
   requiredArgCount(args, 0);
   setlength(targs, 1); targs[0] := TXQValueDateTime.create(context.sender.currentDateTime);
   xqvalueAssign(result, TXQValue_Date.createFromValue(targs));
+  if not IsNan(context.sender.ImplicitTimezone) then TXQValue_date(result).value.timezone := context.sender.ImplicitTimezone;
 end;
 
 procedure xqFunctionCurrent_Time(const context: TEvaluationContext; args: array of TXQValue; var result: TXQValue);
@@ -7032,6 +7034,7 @@ begin
   requiredArgCount(args, 0);
   setlength(targs, 1); targs[0] := TXQValueDateTime.create(context.sender.currentDateTime);
   xqvalueAssign(result, TXQValue_Time.createFromValue(targs));
+  if not IsNan(context.sender.ImplicitTimezone) then TXQValue_Time(result).value.timezone := context.sender.ImplicitTimezone;
 end;
 
 procedure xqFunctionTrace(const context: TEvaluationContext; args: array of TXQValue; var result: TXQValue);
