@@ -1384,6 +1384,11 @@ begin
   if frac(tempf) < 0 then result -= 1;
 end;
 
+function xqtruncdecimal(const f: Decimal): Decimal;
+begin
+  result := f - frac(f);
+end;
+
 procedure xqswap(var a, b: TXQValue); inline;
 var
   t: TXQValue;
@@ -1434,8 +1439,10 @@ begin
 end;
 function myDecimalToStr(const v:decimal): string;
 begin
-  if frac(v) = 0 then result := FloatToStrF(V, ffFixed, 16, 0, FormatSettings)
-  else result := FloatToStrF(V, ffGeneral, 16, 0, FormatSettings);
+  if frac(v) = 0 then begin
+    if  (v >= -9200000000000000000) and (v <= 9200000000000000000) then result := IntToStr(trunc(v))
+    else result := FloatToStrF(V, ffFixed, 16, 0, FormatSettings)
+  end else result := FloatToStrF(V, ffGeneral, 16, 0, FormatSettings);
 end;
 function myDecimalToStr(const v:single): string;
 begin
@@ -6062,13 +6069,12 @@ begin
 end;
 
 procedure xqFunctionCeiling(args: array of TXQValue; var result: TXQValue);
-var temp: int65;
 begin
   requiredArgCount(args, 1);
   if args[0].wasUndefined then exit();
-  temp := trunc(args[0].asDecimal);
-  if frac(args[0].asDecimal) > 0 then temp += 1;
-  xqvalueAssign(result, temp, args[0]);
+  if args[0] is TXQValueInt65 then xqvalueAssign(result, args[0].asInt65, args[0])
+  else if frac(args[0].asDecimal) > 0 then xqvalueAssign(result, xqtruncdecimal(args[0].asDecimal) + 1, args[0])
+  else xqvalueAssign(result, xqtruncdecimal(args[0].asDecimal), args[0]);
 end;
 
 procedure xqFunctionFloor(args: array of TXQValue; var result: TXQValue);
@@ -6076,37 +6082,94 @@ var temp: int65;
 begin
   requiredArgCount(args, 1);
   if args[0].wasUndefined then exit();
-  temp := trunc(args[0].asDecimal);
-  if frac(args[0].asDecimal) < 0 then temp -= 1;
-  xqvalueAssign(result, temp, args[0]);
+  if args[0] is TXQValueInt65 then xqvalueAssign(result, args[0].asInt65, args[0])
+  else if frac(args[0].asDecimal) < 0 then xqvalueAssign(result, xqtruncdecimal(args[0].asDecimal) - 1, args[0])
+  else xqvalueAssign(result, xqtruncdecimal(args[0].asDecimal), args[0]);
 end;
 
 procedure xqFunctionRound(args: array of TXQValue; var result: TXQValue);
 var
-  f: Decimal;
+  f,ff: Decimal;
 begin
   requiredArgCount(args, 1);
   if args[0].wasUndefined then exit();
+  if args[0] is TXQValueInt65 then begin xqvalueAssign(result, args[0].asInt65, args[0]); exit; end;
   f := args[0].asDecimal;
   if IsNan(f) or IsInfinite(f) then begin xqvalueAssign(result, args[0]); exit; end;
-  xqvalueAssign(result, xqround(args[0].asDecimal), args[0]);
+  ff := frac(f);
+  if ff = 0 then xqvalueAssign(result, f, args[0])
+  else begin
+    f := f + 0.5;
+    ff := frac(f);
+    if ff >= 0 then xqvalueAssign(result, f - ff, args[0])
+    else xqvalueAssign(result, f - ff  - 1, args[0])
+  end;
 end;
 
 procedure xqFunctionRound_Half_To_Even(args: array of TXQValue; var result: TXQValue);
+  //reimplement rounding to avoid precision lose due to int64/65 <-> extended conversions
+  function intRoundHalfToEven(const i: int65; prec: integer): Int65;
+  var rpower: int65;
+    switchPoint: Int65;
+    modu: UInt64;
+  begin
+    rpower := 1;
+    if prec >= 9 then begin rpower *= powersOf10[9]; prec -= 9; end;
+    rpower *= powersOf10[prec];
+
+    result := i div rpower;
+    modu := i.value mod rpower.value;
+
+    switchPoint := rpower div 2;
+    if modu > switchPoint.value then result.value += 1
+    else if (modu = switchPoint) and (result.value and 1 = 1) then
+      if result.sign then result.value -= 1
+      else result.value += 1;
+    result := result * rpower;
+  end;
+
+  function decimalRoundHalfToEven(const d: Decimal): Decimal;
+  var f: decimal;
+  begin
+    f := frac(d);
+    if f = 0 then exit(d)
+    else if (f < 0.5) and (f > -0.5) then exit(d - f)
+    else if (f > 0.5) or (f < -0.5) then begin
+      if d > 0 then exit(d - f + 1)
+      else exit(d - f - 1);
+    end else result := round(d);
+  end;
+
 var
-  f: Decimal;
+  f, p: Decimal;
+  prec: Int65;
+
 begin
   requiredArgCount(args, 1, 2);
   if args[0].wasUndefined then begin
     if length(args) = 2 then args[1].free;
     exit();
   end;
+  if args[0] is TXQValueInt65 then begin
+    if length(args) = 1 then begin xqvalueAssign(result, args[0].asInt65, args[0]); exit; end
+    else if (args[1].asInt65 > 0) or (args[1].asInt65 = 0) then begin xqvalueAssign(result, args[0].asInt65, args[0]); args[1].free; exit; end
+    else if args[1].asInt65 >= -17 then begin xqvalueAssign(result, intRoundHalfToEven(args[0].asInt65, - args[1].toInteger), args[0]); exit; end
+  end;
+
   f := args[0].asDecimal;
   if IsNan(f) or IsInfinite(f) then begin xqvalueAssign(result, args[0]); if length(args) = 2 then args[1].free; exit; end;
+
   if length(args) = 1 then
-    xqvalueAssign(result, round(f), args[0])
-  else
-    xqvalueAssign(result, RoundTo(f, - integer(args[1].toInt65)), args[0]);
+    xqvalueAssign(result, decimalRoundHalfToEven(f), args[0])
+  else begin
+    prec := - args[1].toInt65;
+    if prec < -4933 {approximately extended range} then xqvalueAssign(result, f, args[0])
+    else if prec > 4933 then xqvalueAssign(result, 0, args[0])
+    else begin
+      p := power(10, prec);
+      xqvalueAssign(result, decimalRoundHalfToEven(f /  p) * p, args[0]);
+    end;
+  end;
 end;
 
 //String functions
