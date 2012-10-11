@@ -518,6 +518,7 @@ type
     ParentElement: TTreeElement; //**< associated tree element (= context item if context item is a node)
     RootElement: TTreeElement;
     collation: TXQCollation; //**< Default collation used for string comparisons
+    nodeCollation: TXQCollation; //**< Default collation used for node string comparisons
 
     SeqValue: TXQValue; //**<Context item / value of @code(.),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
@@ -600,6 +601,7 @@ type
 
   TTreeElementTypes = set of TTreeElementType;
   TXQPathNodeConditionIteration = (qcnciNext, qcnciPreceding, qcnciParent);
+
   //** Record mapping
   TXQPathNodeCondition = record
     findOptions, initialFindOptions: TTreeElementFindOptions; //**< find options for findNext
@@ -611,6 +613,7 @@ type
     requiredValue: string; //**< Required node name (if checkValue)
     checkNamespace: boolean;
     requiredNamespace: string;
+    equalFunction: TStringComparisonFunc;
   end;
 
 
@@ -1042,6 +1045,9 @@ type
     class function getDefaultCollation: TXQCollation;
     //** Changes the default collation, e.g. to switch between case/in/sensitive or un/localized. (see registerCollation at the end pseudoxpath.pas for possible values.)
     class procedure setDefaultCollation(id: string);
+    class function getDefaultNodeCollation: TXQCollation;
+    //** Changes the default collation used for node name comparisons, e.g. to switch between case/in/sensitive or un/localized. (see registerCollation at the end pseudoxpath.pas for possible values.)
+    class procedure setDefaultNodeCollation(id: string);
   private
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
@@ -1249,12 +1255,12 @@ type
   end;
 
 
-type
+
+{ TXQCollation }
+
 TXQCollationIntFunction = function (const a,b: string): integer;
 TXQCollationBoolFunction = function (const a,b: string): boolean;
 TXQCollationPointerIntFunction = function (a,b: pchar; len: longword): integer;
-
-{ TXQCollation }
 
 //** Class to perform string comparisons, so they different comparison rules can be used in different languages
 TXQCollation = class
@@ -4382,10 +4388,14 @@ begin
   else exit(FLastQuery.evaluate(tree));
 end;
 
+var defaultNodeCollation: TXQCollation = nil;
+
 function TXQueryEngine.getEvaluationContext: TEvaluationContext;
 begin
   result.sender:=self;
   result.collation := TXQueryEngine.getDefaultCollation;
+  result.nodeCollation := defaultnodeCollation;
+  if result.nodeCollation = nil then result.nodeCollation := result.collation;
   result.ParentElement := ParentElement;
   result.RootElement := RootElement;
   result.SeqValue:=nil;
@@ -5076,6 +5086,7 @@ begin
   end;
 
   newSequence := TXQValueSequence.create(0);;
+  nodeCondition.equalFunction:=@context.nodeCollation.equal;
   onlyNodes := false;
   for i:=0 to previousSeq.Count-1 do begin
     if command.typ = qcFunctionSpecialCase then begin
@@ -5204,12 +5215,23 @@ begin
   collations.Move(i, 0);
 end;
 
+
+class function TXQueryEngine.getDefaultNodeCollation: TXQCollation;
+begin
+  result := defaultNodeCollation;
+end;
+
+class procedure TXQueryEngine.setDefaultNodeCollation(id: string);
+begin
+  defaultNodeCollation := getCollation(id);
+end;
+
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
 begin
   result :=  assigned(node)
              and (node.typ in nodeCondition.searchedTypes)
-             and (not (nodeCondition.checkValue) or striEqual(nodeCondition.requiredValue, node.getValue()))
-             and (not (nodeCondition.checkNamespace) or striEqual(nodeCondition.requiredNamespace, node.getNamespacePrefix));
+             and (not (nodeCondition.checkValue) or nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
+             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespace, node.getNamespacePrefix));
 end;
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement;
@@ -6253,6 +6275,7 @@ procedure xqFunctionForm(const context: TEvaluationContext; args: array of TXQVa
 
 var node: TTreeElement;
     replace: TStringList;
+    cmp: TStringComparisonFunc;
     procedure add(s: string);
     var
       split: TStringArray;
@@ -6295,30 +6318,30 @@ var node: TTreeElement;
       temp := form.getFirstChild();
       while temp <> form.reverse do begin
         if temp.typ = tetOpen then begin
-          if striEqual(temp.value, 'textarea') then
-            addToRequest(temp.getAttribute('name'), temp.deepNodeText())
-          else if striEqual(temp.value, 'input') then begin
-            typ := temp.getAttribute('type');
-            if (typ = '') or (typ = 'hidden') or (typ = 'password') or (typ = 'text') then
-              addToRequest(temp.getAttribute('name'), temp.getAttribute('value'))
-            else if ((typ = 'checkbox') or (typ = 'radio')) and (temp.hasAttribute('checked'))  then
-              addToRequest(temp.getAttribute('name'), temp.getAttribute('value', 'on'));
-          end else if typ = 'select' then begin
+          if cmp(temp.value, 'textarea') then
+            addToRequest(temp.getAttribute('name', cmp), temp.deepNodeText())
+          else if cmp(temp.value, 'input') then begin
+            typ := temp.getAttribute('type', cmp);
+            if (typ = '') or cmp(typ, 'hidden') or cmp(typ, 'password') or cmp(typ, 'text') then
+              addToRequest(temp.getAttribute('name', cmp), temp.getAttribute('value', cmp))
+            else if (cmp(typ, 'checkbox') or cmp(typ, 'radio')) and (temp.hasAttribute('checked', cmp))  then
+              addToRequest(temp.getAttribute('name', cmp), temp.getAttribute('value', 'on', cmp));
+          end else if cmp(typ, 'select') then begin
             tempend := temp.reverse;
             value := '';
             first := true;
             while temp <> tempend do begin
-              if striEqual(temp.value, 'option') and (first or temp.hasAttribute('selected')) then begin
-                value := temp.getAttribute('value');
+              if cmp(temp.value, 'option') and (first or temp.hasAttribute('selected', cmp)) then begin
+                value := temp.getAttribute('value', cmp);
                 first := false;
-                if temp.hasAttribute('selected') then
+                if temp.hasAttribute('selected', cmp) then
                   break;
               end;
               temp := temp.next;
             end;
             while temp <> tempend do
               temp := temp.next;
-            addToRequest(tempend.reverse.getAttribute('name'), value);
+            addToRequest(tempend.reverse.getAttribute('name', cmp), value);
           end;
         end;
 
@@ -6331,8 +6354,8 @@ var node: TTreeElement;
       end;
       used.free;
 
-      typ := form.getAttribute('method', 'GET');
-      value := form.getAttribute('action');
+      typ := form.getAttribute('method', 'GET', cmp);
+      value := form.getAttribute('action', cmp);
 
       result := TXQValueObject.create();
       TXQValueObject(result).setMutable('method', typ);
@@ -6357,6 +6380,8 @@ begin
     args[1].free;
     exit;
   end;
+
+  cmp := @context.nodeCollation.equal;
 
   replace := TStringList.Create;
   if length(args) = 2 then begin
@@ -7081,7 +7106,7 @@ begin
   else if args[0].wasUndefined then exit
   else node := xqvalueToSingleNode(args[0]);
   while node <> nil do begin
-    if node.getAttributeTry('xml:base', temp) then begin
+    if node.getAttributeTry('xml:base', temp, @context.nodeCollation.equal) then begin
       if temp <> '' then
         if temp[length(temp)] = '/' then uri := temp + uri
         else uri := temp + '/' + uri;
@@ -7133,10 +7158,10 @@ begin
   testlang := lowercase(args[0].toString);
   if node.getParent() = nil then node := node.findNext(tetOpen,'',[tefoIgnoreText]);
   while node <> nil do begin
-    if node.hasAttribute('lang') then begin
-      rlang := node.getAttribute('lang');
-      rlang := LowerCase(rlang);
-      xqvalueAssign(result, (rlang = testlang) or (strBeginsWith(rlang, testlang + '-')));
+    if node.hasAttribute('lang', @context.nodeCollation.equal) then begin
+      rlang := node.getAttribute('lang', @context.nodeCollation.equal);
+      rlang := lowercase(rlang); //that for one is supposed to be case in sensitive in the spec
+      xqvalueAssign(result, strEqual(rlang, testlang) or (strBeginsWith(rlang, testlang + '-')));
       exit;
     end;
     node := node.getParent();
@@ -7146,7 +7171,7 @@ end;
 
 
 
-procedure xqFunctionResolve_QName(args: array of TXQValue; var result: TXQValue);
+procedure xqFunctionResolve_QName(const context: TEvaluationContext;  args: array of TXQValue; var result: TXQValue);
 
 var
   name, ns: String;
@@ -7156,7 +7181,7 @@ begin
   name := args[0].toString;
   ns := '';
   if pos(':', name) > 0 then ns := copy(name, 1, pos(':', name) - 1);
-  ns := args[1].toNode.getNamespaceURL(ns);
+  ns := args[1].toNode.getNamespaceURL(ns, @context.nodeCollation.equal);
   if ns <> '' then ns := ns + #2;
   xqvalueAssign(result, TXQValue_QName.create(ns + name));
 end;
@@ -7209,17 +7234,17 @@ begin
   xqvalueAssign(result, TXQValue_anyURI.create(splitted[0]));
 end;
 
-procedure xqFunctionNamespace_URI_For_Prefix(args: array of TXQValue; var result: TXQValue);
+procedure xqFunctionNamespace_URI_For_Prefix(const context: TEvaluationContext;  args: array of TXQValue; var result: TXQValue);
 var
   res: String;
 begin
   requiredArgCount(args, 2);
-  res := args[1].toNode.getNamespaceURL(args[0].toString);
+  res := args[1].toNode.getNamespaceURL(args[0].toString, @context.nodeCollation.equal);
   if res = '' then exit;
   xqvalueAssign(result, res);
 end;
 
-procedure xqFunctionIn_Scope_prefixes(args: array of TXQValue; var result: TXQValue);
+procedure xqFunctionIn_Scope_prefixes(const context: TEvaluationContext;  args: array of TXQValue; var result: TXQValue);
 var
   el: TTreeElement;
   n: String;
@@ -7235,9 +7260,9 @@ begin
       if el.attributes <> nil then begin
         attrib := el.attributes;
         while attrib <> nil do begin
-          if (attrib.namespace = '') and (attrib.value = 'xmlns') then begin
+          if (attrib.namespace = '') and context.nodeCollation.equal(attrib.value, 'xmlns') then begin
             if sl.IndexOf('') = -1 then sl.add('');
-          end else if attrib.namespace = 'xmlns' then
+          end else if context.nodeCollation.equal(attrib.namespace, 'xmlns') then
             if sl.IndexOf(attrib.value) = -1 then sl.add(attrib.value);
           attrib := attrib.next;
         end;
@@ -7416,14 +7441,14 @@ begin
   args[0].Free;
 end;
 
-procedure xqFunctionNilled(args: array of TXQValue; var result: TXQValue);
+procedure xqFunctionNilled(const context: TEvaluationContext; args: array of TXQValue; var result: TXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].wasUndefined then exit;
   if args[0] is TXQValueSequence then args[0] := TXQValueSequence(args[0]).toFirstChild;
   if args[0] is TXQValueNode then
     if (TXQValueNode(args[0]).node <> nil) and (TXQValueNode(args[0]).node.typ = tetOpen) then
-      xqvalueAssign(result, (TXQValueNode(args[0]).node.getAttribute('xml:nil') = 'true') and (TXQValueNode(args[0]).node.deepNodeText() = ''));
+      xqvalueAssign(result, (TXQValueNode(args[0]).node.getAttribute('xml:nil', @context.nodeCollation.equal) = 'true') and (TXQValueNode(args[0]).node.deepNodeText() = ''));
   args[0].Free;
 end;
 
@@ -7910,7 +7935,7 @@ begin
   if (node = nil) or (node.typ <> tetOpen) then xqvalueAssign(result, TXQValue_anyURI.create(''))
   else begin
     //if node.getNamespacePrefix() = '' then xqvalueAssign(result, TXQValue_anyURI.create(''));
-    xqvalueAssign(result, TXQValue_anyURI.create(node.getNamespaceURL()));
+    xqvalueAssign(result, TXQValue_anyURI.create(node.getNamespaceURL(@context.nodeCollation.equal)));
   end;
 end;
 
@@ -7941,6 +7966,15 @@ begin
   end;
 end;
 
+function isSearchedId(const s: string): boolean;
+var
+  i: Integer;
+begin
+  for i:=0 to sl.count-1 do
+    if context.nodeCollation.equal(sl[i], s) then exit(true);
+  result := false;
+end;
+
 var
   seq: TXQVList;
   i: Integer;
@@ -7968,8 +8002,8 @@ begin
     while node <> nil do begin
       attrib := node.attributes;
       while attrib <> nil do begin
-        if attrib.value = 'id' then ;
-          if sl.IndexOf(attrib.reverse.value) >= 0 then begin
+        if context.nodeCollation.equal(attrib.value, 'id') then ;
+          if isSearchedId(attrib.reverse.value) then begin
             xqvalueSeqAdd(result, xqvalue(node));
             break;
           end;

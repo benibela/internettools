@@ -32,6 +32,8 @@ TTreeDocument = class;
 
 { TTreeElement }
 
+TStringComparisonFunc = function (const a,b: string): boolean of object;
+
 //**@abstract This class representates an element of the html file
 //**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
 //**E.g. a xml file like @code(<foo><bar>x</bar></foo>) is stored as a quadro-linked list:
@@ -105,11 +107,11 @@ TTreeElement = class
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
-  function hasAttribute(const a: string): boolean; //**< returns if an attribute with that name exists
-  function getAttribute(const a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
-  function getAttribute(const a: string; const def: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist
-  function getAttributeTry(const a: string; out valueout: string):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
-  function getAttributeTry(a: string; out valueout: TTreeElement):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist
+  function hasAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): boolean; //**< returns if an attribute with that name exists. cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttributeTry(a: string; out valueout: TTreeElement; cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
 
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
@@ -120,8 +122,8 @@ TTreeElement = class
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
   function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
-  function getNamespaceURL(): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute)
-  function getNamespaceURL(prefixOverride: string): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents
+  function getNamespaceURL(cmpFunction: TStringComparisonFunc = nil): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute) cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
 
   property defaultProperty[name: string]: string read getAttribute; default;
 
@@ -140,6 +142,7 @@ protected
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
   procedure removeElementKeepChildren; //**< removes/frees the current element, but keeps the children (i.e. removes self and possible self.reverse. Will not remove the opening tag, if called on a closing tag)
 
+
 public
   function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
 
@@ -148,6 +151,8 @@ public
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
 
+  function caseInsensitiveCompare(const a,b: string): boolean; //**< returns true if a=b case insensitive. Can be passed to getAttribute
+  function caseSensitiveCompare(const a,b: string): boolean;   //**< returns true if a=b case sensitive. Can be passed to getAttribute
 
   class function compareInDocumentOrder(p1, p2: Pointer): integer;
 end;
@@ -446,33 +451,33 @@ begin
   result := true;
 end;
 
-function TTreeElement.hasAttribute(const a: string): boolean;
+function TTreeElement.hasAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
 var temp: TTreeElement;
 begin
-  exit(getAttributeTry(a, temp));
+  exit(getAttributeTry(a, temp, cmpFunction));
 end;
 
-function TTreeElement.getAttribute(const a: string): string;
+function TTreeElement.getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): string;
 begin
-  if not getAttributeTry(a, result) then
+  if not getAttributeTry(a, result, cmpFunction) then
     result:='';
 end;
 
-function TTreeElement.getAttribute(const a: string; const def: string):string;
+function TTreeElement.getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string;
 begin
-  if not getAttributeTry(a, result) then
+  if not getAttributeTry(a, result, cmpFunction) then
     result:=def;
 end;
 
-function TTreeElement.getAttributeTry(const a: string; out valueout: string): boolean;
+function TTreeElement.getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
 var temp: TTreeElement;
 begin
-  result := getAttributeTry(a, temp);
+  result := getAttributeTry(a, temp, cmpFunction);
   if not result then exit;
   valueout := temp.value;
 end;
 
-function TTreeElement.getAttributeTry(a: string; out valueout: TTreeElement): boolean;
+function TTreeElement.getAttributeTry(a: string; out valueout: TTreeElement; cmpFunction: TStringComparisonFunc = nil): boolean;
 var
   attrib: TTreeElement;
   checkNamespace: Boolean;
@@ -485,8 +490,10 @@ begin
   if checkNamespace then
     ns := strSplitGet(':', a);
 
+  if cmpFunction = nil then cmpFunction:=@caseInsensitiveCompare;
+
   while attrib <> nil do begin
-    if striEqual(attrib.value, a) and (not checkNamespace or striEqual(ns, attrib.namespace)) then begin //Todo: case sensitive or insensitive??
+    if cmpFunction(attrib.value, a) and (not checkNamespace or cmpFunction(ns, attrib.namespace)) then begin
       valueout := attrib.reverse;
       exit(true);
     end;
@@ -556,12 +563,12 @@ begin
   result := namespace;
 end;
 
-function TTreeElement.getNamespaceURL: string;
+function TTreeElement.getNamespaceURL(cmpFunction: TStringComparisonFunc = nil): string;
 begin
-  result := getNamespaceURL(getNamespacePrefix());
+  result := getNamespaceURL(getNamespacePrefix(), cmpFunction);
 end;
 
-function TTreeElement.getNamespaceURL(prefixOverride: string): string;
+function TTreeElement.getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string;
 var
   n: TTreeElement;
   attrib: String;
@@ -570,7 +577,7 @@ begin
   attrib := 'xmlns' + prefixOverride;
   n := self;
   while n <> nil do begin
-    if n.getAttributeTry(attrib, result) then
+    if n.getAttributeTry(attrib, result, cmpFunction) then
       exit;
     n := n.getParent();
   end;
@@ -736,6 +743,16 @@ begin
     reverse.removeElementKeepChildren;
   end;
   free;
+end;
+
+function TTreeElement.caseInsensitiveCompare(const a, b: string): boolean;
+begin
+  result := striEqual(a, b);
+end;
+
+function TTreeElement.caseSensitiveCompare(const a, b: string): boolean;
+begin
+  result := a = b;
 end;
 
 function TTreeElement.toString(): string;
