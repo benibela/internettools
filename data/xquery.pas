@@ -98,7 +98,7 @@ type
     function wasUndefined: boolean; //**< Returns true, iff the value is undefined or an empty sequence; and, in the case it returns true, it also calls free.
 
     function asBoolean: boolean; virtual; //**< Returns the value as boolean; dynamically converted, if necessary
-    function asInteger: int64; virtual; //**< Returns the value as int64; dynamically converted, if necessary
+    function asInt64: int64; virtual; //**< Returns the value as int64; dynamically converted, if necessary
     function asInt65: int65; virtual; //**< Returns the value as int65; dynamically converted, if necessary
     function asDecimal: decimal; virtual; //**< Returns the value as decimal; dynamically converted, if necessary
     function asString: string; virtual; //**< Returns the value as string; dynamically converted, if necessary
@@ -108,7 +108,7 @@ type
 
     //Converts the xqvalue to a basic value and destroys it,
     function toBoolean: boolean; //**< Returns the value as boolean, dynamically converted, if necessary. Afterwards self is destroyed
-    function toInteger: int64; //**< Returns the value as int64; dynamically converted, if necessary Afterwards self is destroyed
+    function toInt64: int64; //**< Returns the value as int64; dynamically converted, if necessary Afterwards self is destroyed
     function toInt65: int65;  //**< Returns the value as int65, dynamically converted, if necessary. Afterwards self is destroyed
     function toDecimal: decimal; //**< Returns the value as decimal, dynamically converted, if necessary. Afterwards self is destroyed
     function toString: string; override;  //**< Returns the value as string, dynamically converted, if necessary. Afterwards self is destroyed
@@ -955,7 +955,7 @@ type
 
     @bold(Using the class in FPC)
 
-    The easiest way to evaluate a XQuery/XPath-expression is to call the class methods like @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInteger) which returns the value of the expression, converted to the corresponding type.@br
+    The easiest way to evaluate a XQuery/XPath-expression is to call the class methods like @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
     If you want to process a html/xml document, you have to pass the root TTreeElement (obtained by TTreeParser) instead of nil.@br@br@br
     If you call @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) with a following toType-call, you obtain the result as an TXQValue. (see TXQValue on how to use it)@br@br@br
     You can also create a TXQueryEngine instance and then call @code(parseXPath2('expression')) and @code(evaluateXPath2()). @br
@@ -2062,7 +2062,7 @@ begin
  result := false;
 end;
 
-function TXQValue.asInteger: int64;
+function TXQValue.asInt64: int64;
 begin
   result := asInt65;
 end;
@@ -2267,7 +2267,7 @@ begin
   Free;
 end;
 
-function TXQValue.toInteger: int64;
+function TXQValue.toInt64: int64;
 begin
   result := toInt65;
 end;
@@ -3925,7 +3925,7 @@ end;
 
 function TXQVariableChangeLog.getVariableValueInteger(const name: string): integer;
 begin
-  result := getVariableValue(name).asInteger;
+  result := getVariableValue(name).asInt64;
 end;
 
 function TXQVariableChangeLog.getVariableValueDecimal(const name: string): decimal;
@@ -4011,7 +4011,7 @@ end;
 
 function TXQVariableChangeLog.getVariableValueInteger(i: integer): integer;
 begin
-  result := getVariableValue(i).asInteger;
+  result := getVariableValue(i).asInt64;
 end;
 
 function TXQVariableChangeLog.getVariableValueDecimal(i: integer): decimal;
@@ -6193,7 +6193,7 @@ begin
   if args[0] is TXQValueInt65 then begin
     if length(args) = 1 then begin xqvalueAssign(result, args[0].asInt65, args[0]); exit; end
     else if (args[1].asInt65 > 0) or (args[1].asInt65 = 0) then begin xqvalueAssign(result, args[0].asInt65, args[0]); args[1].free; exit; end
-    else if args[1].asInt65 >= -17 then begin xqvalueAssign(result, intRoundHalfToEven(args[0].asInt65, - args[1].toInteger), args[0]); exit; end
+    else if args[1].asInt65 >= -17 then begin xqvalueAssign(result, intRoundHalfToEven(args[0].asInt65, - args[1].toInt64), args[0]); exit; end
   end;
 
   f := args[0].asDecimal;
@@ -6431,7 +6431,7 @@ begin
     exit;
   end;
   if args[0].kind <> pvkSequence then begin
-    xqvalueAssign(result, strGetUnicodeCharacter(args[0].toInteger));
+    xqvalueAssign(result, strGetUnicodeCharacter(args[0].toInt64));
     exit;
   end;
   temp:='';
@@ -6670,7 +6670,7 @@ begin
       regEx.ModifierStr := args[3].toString;
     regEx.Exec(args[0].toString);
     if length(args) >= 3 then begin
-      xqvalueAssign(result, regex.Match[args[2].toInteger]);
+      xqvalueAssign(result, regex.Match[args[2].toInt64]);
     end else
       xqvalueAssign(result, regEx.Match[0]);
   finally

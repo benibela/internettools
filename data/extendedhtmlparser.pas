@@ -907,13 +907,13 @@ var xpathText: TTreeElement;
     //1. Continued in loop (preferred of course)
     //2. Jumped over loop
     templateStart.contentRepetitions+=1;
-    if ((templateStart.max = nil) or (templateStart.contentRepetitions <= performPXPEvaluation(templateStart.max).toInteger))
+    if ((templateStart.max = nil) or (templateStart.contentRepetitions <= performPXPEvaluation(templateStart.max).toInt64))
        and matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart.templateNext, templateEnd) then begin
       templateStart.contentRepetitions-=1;
       templateStart := templateEnd;
     end else begin
       templateStart.contentRepetitions-=1;
-      if (templateStart.min = nil) or (performPXPEvaluation(templateStart.min).toInteger <= templateStart.contentRepetitions) then templateStart := templateStart.templateReverse.templateNext
+      if (templateStart.min = nil) or (performPXPEvaluation(templateStart.min).toInt64 <= templateStart.contentRepetitions) then templateStart := templateStart.templateReverse.templateNext
       else htmlStart := htmlStart.next;
     end;
   end;
