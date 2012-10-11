@@ -37,7 +37,7 @@
         <PackageName Value="internettools"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="10">
+    <Units Count="13">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -86,6 +86,18 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="xquery1_tests"/>
       </Unit9>
+      <Unit10>
+        <Filename Value="../xquery_types.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="../xquery_functions.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit11>
+      <Unit12>
+        <Filename Value="../xquery_functions_generated_template.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit12>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

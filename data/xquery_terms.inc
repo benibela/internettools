@@ -26,21 +26,20 @@ begin
   propname := apropname;
 end;
 
-function TXQTermReadObjectProperty.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermReadObjectProperty.evaluate(const context: TEvaluationContext): IXQValue;
 var
-  obj: TXQValue;
+  obj: IXQValue;
 begin
   if length(children) = 0 then raiseEvaluationError('Found no term to read property from');
   if length(children) > 1 then raiseEvaluationError('Can only read property from one term');
   obj:=children[0].evaluate(context);
   if not (obj is TXQValueObject) then raiseEvaluationError('Expected object, got: '+obj.toString);
-  result := TXQValueObject(obj).getClone(propname);
-  obj.free;
+  result := (obj as TXQValueObject).getClonedValue(propname);
 end;
 
 { TXQTermIf }
 
-function TXQTermIf.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermIf.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if length(children)<>3 then raiseEvaluationError('if must have 3 arguments');
   if children[0].evaluate(context).toBoolean then result:=children[1].evaluate(context)
@@ -55,12 +54,13 @@ begin
   push(filter);
 end;
 
-function TXQTermFilterSequence.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermFilterSequence.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
   result := children[0].evaluate(context);
   context.sender.filterSequence(result, children[1], context);
-  xqvalueSeqSqueeze(result);
+  if result = nil then result := xqvalue()
+  else xqvalueSeqSqueeze(result);
 end;
 
 function TXQTermFilterSequence.toQueryCommand: TXQPathMatchingStep;
@@ -91,14 +91,14 @@ begin
   push(value);
 end;
 
-function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if not assigned(context.sender.OnDefineVariable) then raiseEvaluationError(':= can''t be used without a method assigned to the OnDefineVariable event');
   if length(children) = 0 then raiseEvaluationError('Value missing');
   if length(children) > 1 then raiseEvaluationError('Only one value can be assigned to a variable');
   result := children[0].evaluate(context);
 
-  context.sender.OnDefineVariable(self, variablename, result.clone);
+  context.sender.OnDefineVariable(self, variablename, result);
 end;
 
 { TXQTermType }
@@ -108,7 +108,7 @@ begin
   init(avalue);
 end;
 
-function TXQTermSequenceType.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermSequenceType.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   result := TXQValueFunction.create(self); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
 end;
@@ -155,50 +155,47 @@ begin
   result := (kind = tikAtomic) and not allowMultiple;
 end;
 
-function TXQTermSequenceType.castableAsBase(v: TXQValue): boolean;
+function TXQTermSequenceType.castableAsBase(v: IXQValue): boolean;
 begin
   if v.isUndefined then result := allowNone
   else if v.getSequenceCount > 1 then result := false
-  else if v is TXQValueSequence then result := TXQValueSequence(v).seq[0].canConvertToType(atomicTypeInfo)
+  else if v is TXQValueSequence then result := (v as TXQValueSequence).seq[0].canConvertToType(atomicTypeInfo)
   else result := v.canConvertToType(atomicTypeInfo)
 end;
 
-function TXQTermSequenceType.castAs(v: TXQValue): TXQValue;
+function TXQTermSequenceType.castAs(v: IXQValue): IXQValue;
 begin
   if not isSingleType() then raise exception.Create('need singletype for cast as');
   if not castableAsBase(v) then raise exception.Create('impossible cast as');
   result := atomicTypeInfo.createFromValue(v);
 end;
 
-function TXQTermSequenceType.castableAs(v: TXQValue): boolean;
+function TXQTermSequenceType.castableAs(v: IXQValue): boolean;
 begin
   if not isSingleType() then raise exception.Create('need singletype for castable as');
   result := castableAsBase(v);
-  v.free;
 end;
 
-function TXQTermSequenceType.instanceOf(ta: TXQValue): boolean;
+function TXQTermSequenceType.instanceOf(ta: IXQValue): boolean;
 begin
   result := instanceOfBase(ta);
-  ta.free;
 end;
 
-function TXQTermSequenceType.instanceOfBase(ta: TXQValue): boolean;
-  function instanceOfSingleType(sub: TXQValue): boolean;
+function TXQTermSequenceType.instanceOfBase(ta: IXQValue): boolean;
+  function instanceOfSingleType(sub: IXQValue): boolean;
   begin
     case kind of
       //tikAny, tikNone: ; //handled before
-      tikAtomic: result := sub.instanceOf(atomicTypeInfo);
+      tikAtomic: result := sub.instanceOfInternal(atomicTypeInfo);
       tikElementTest: begin
-        if (not (sub is TXQValueNode)) or (TXQValueNode(sub).node = nil) then exit(false);
-        result  := TXQValueNode(sub).node.typ in matchedTypes;
+        if (not (sub is TXQValueNode)) or (sub.toNode = nil) then exit(false);
+        result  := sub.toNode.typ in matchedTypes;
       end;
     end;
   end;
 var
-  seq: TXQVList;
-  i: Integer;
   count: Integer;
+  v: IXQValue;
 begin
   //compare count with sequence count
   if kind = tikNone then exit(ta.isUndefined);
@@ -211,27 +208,26 @@ begin
   //compare item type
   if kind = tikAny then
     exit(true);
-  if not (ta is TXQValueSequence) then exit(instanceOfSingleType(ta))
-  else begin
-    seq := TXQValueSequence(ta).seq;
-    result := true;
-    for i:=0 to seq.Count - 1 do begin
-      result := result and instanceOfSingleType(seq[i]);
-      if not result then exit;
-    end;
-  end
+
+  result := true;
+  for v in ta do begin
+    result := result and instanceOfSingleType(v);
+    if not result then exit;
+  end;
 end;
 { TXQTermSequence }
 
-function TXQTermSequence.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermSequence.evaluate(const context: TEvaluationContext): IXQValue;
 var
   i: Integer;
+  tempSeq: TXQValueSequence;
 begin
   if length(children) = 0 then exit(xqvalue);
   if length(children) = 1 then exit(children[0].evaluate(context));
-  result := TXQValueSequence.create(length(children));
+  tempSeq := TXQValueSequence.create(length(children));
   for i := 0 to high(children) do
-    TXQValueSequence(result).addChild(children[i].evaluate(context));
+    tempSeq.addChild(children[i].evaluate(context));
+  result := tempSeq;
 end;
 
 { TXQTermSomeEvery }
@@ -241,42 +237,24 @@ begin
   isEvery:=every;
 end;
 
-function TXQTermSomeEvery.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermSomeEvery.evaluate(const context: TEvaluationContext): IXQValue;
 var tempContext:TEvaluationContext;
   function evaluateSomeEvery(const pos:integer): boolean;
-  var tempSeq: TXQValue;
-      i:integer;
+  var v: IXQValue;
   begin
     if pos = high(children) then exit(children[pos].evaluate(tempContext).toBoolean);
     if not (children[pos] is TXQTermVariable) then raiseEvaluationError('Expected variable, but got '+children[pos].debugTermToString);
 
-    tempSeq:=children[pos+1].evaluate(tempContext);
-    case tempSeq.kind of
-      pvkUndefined: begin
-        result := isEvery;
-        tempSeq.Free;
-      end;
-      pvkSequence: begin
-        result:=isEvery;
-        for i:=TXQValueSequence(tempSeq).seq.Count-1 downto 0 do begin
-          tempContext.temporaryVariables.pushAll;
-          tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, TXQValueSequence(tempSeq).seq[i]);
-          TXQValueSequence(tempSeq).seq.Delete(i);
-          if evaluateSomeEvery(pos+2) <> (isEvery) then begin
-            tempContext.temporaryVariables.popAll;
-            result := not isEvery;
-            break;
-          end;
-          tempContext.temporaryVariables.popAll;
-        end;
-        tempSeq.Free;
-      end;
-      else begin
-        tempContext.temporaryVariables.pushAll;
-        tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, tempSeq);
-        result := evaluateSomeEvery(pos+2);
+    result := isEvery;
+    for v in children[pos+1].evaluate(tempContext) do begin
+      tempContext.temporaryVariables.pushAll;
+      tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, v);
+      if evaluateSomeEvery(pos+2) <> (isEvery) then begin
         tempContext.temporaryVariables.popAll;
+        result := not isEvery;
+        break;
       end;
+      tempContext.temporaryVariables.popAll;
     end;
   end;
 
@@ -294,8 +272,8 @@ end;
 { TXQTermFor }
 
 type TOrderedTuple = class
-  orders: array of TXQValue;
-  result: TXQValue;
+  orders: array of IXQValue;
+  result: IXQValue;
 end;
   TFlowerSortingData = record
     flower: TXQTermFlower;
@@ -307,7 +285,7 @@ end;
 function flowerTupleCompareFunction(data: TObject; xa, xb: pointer): longint;
 var meta: PFlowerSortingData;
 
-  function isGreaterThan(w, v: txqvalue; emptyLeast: boolean; const collation: TXQCollation): boolean;
+  function isGreaterThan(w, v: IXQValue; emptyLeast: boolean; const collation: TXQCollation): boolean;
   var
     temp: integer;
   begin
@@ -315,17 +293,17 @@ var meta: PFlowerSortingData;
     if emptyLeast then begin
       if v.isUndefined and not w.isUndefined then
         exit(true);
-      if ((v is TXQValueDecimal) and IsNan(TXQValueDecimal(v).value)) and not w.isUndefined and not ((w is TXQValueDecimal) and IsNan(TXQValueDecimal(w).value)) then
+      if ((v is TXQValueDecimal) and IsNan(v.toDecimal)) and not w.isUndefined and not ((w is TXQValueDecimal) and IsNan(w.toDecimal)) then
         exit(true);
     end else begin
       if w.isUndefined and not v.isUndefined then
         exit(true);
-      if ((w is TXQValueDecimal) and IsNan(TXQValueDecimal(w).value)) and not v.isUndefined and not ((v is TXQValueDecimal) and IsNan(TXQValueDecimal(v).value)) then
+      if ((w is TXQValueDecimal) and IsNan(w.toDecimal)) and not v.isUndefined and not ((v is TXQValueDecimal) and IsNan(v.toDecimal)) then
         exit(true);
     end;
 
     if (collation <> nil) and (v is TXQValueString) and (w is TXQValueString) then
-      exit(collation.compare(v.asString, w.asString) < 0);
+      exit(collation.compare(v.toString, w.toString) < 0);
     temp := meta^.context^.compareAtomicBase(v,w) ;
     result := (temp <> -2) and (temp < 0);
   end;
@@ -352,27 +330,27 @@ begin
   end;
 end;
 
-function TXQTermFlower.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermFlower.evaluate(const context: TEvaluationContext): IXQValue;
 var
   tempContext: TEvaluationContext;
   sortingCache: TFPList;
-  finalResult: TXQValue;
-  oldVarCount: Integer;
+  finalResult: IXQValue;
+
   procedure evaluateForLoop(const pos:integer);
-    procedure continueWithValue(v: TXQValue; index: integer = 1);
+    procedure continueWithValue(v: IXQValue; index: integer = 1);
     begin
       tempContext.temporaryVariables.pushAll;
       //sequenceTyp: TXQTermType;
       tempContext.temporaryVariables.addVariable(vars[pos].varname, v);
       if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOfBase(v)) then
-        raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serializedValue+' got value '+v.asString);
+        raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serializedValue+' got value '+v.toString);
       if vars[pos].positionVarname <> '' then ;
         tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index));
       evaluateForLoop(pos+1);
       tempContext.temporaryVariables.popAll;
     end;
 
-   var tempSeq: TXQValue;
+   var tempSeq: IXQValue;
        i:integer;
        tuple: TOrderedTuple;
    begin
@@ -399,16 +377,14 @@ var
      if vars[pos].kind = xqfkLet then
        continueWithValue(tempSeq)
      else case tempSeq.kind of
-       pvkUndefined: tempSeq.Free;
-       pvkSequence: begin
-         for i:=0 to TXQValueSequence(tempSeq).seq.Count-1 do
-           continueWithValue(TXQValueSequence(tempSeq).seq[i], i + 1);
-         TXQValueSequence(tempSeq).freeNonRecursive;
-       end
+       pvkUndefined:;
+       pvkSequence:
+         for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
+           continueWithValue((tempSeq as TXQValueSequence).seq[i], i + 1);
        else continueWithValue(tempSeq);
      end;
    end;
-var i, j: Integer;
+var i: Integer;
     sortingData: TFlowerSortingData;
 
 begin
@@ -418,7 +394,7 @@ begin
     tempContext.temporaryVariables.allowObjects:=tempContext.sender.VariableChangelog.allowObjects;
   end;
 
-  oldVarCount := tempContext.temporaryVariables.count;
+  //oldVarCount := tempContext.temporaryVariables.count;
 
   finalResult := nil;
   if length(orders) = 0 then sortingCache := nil
@@ -437,8 +413,6 @@ begin
       stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
       for i := 0 to sortingCache.Count - 1 do begin
         xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
-        for j := 0 to high(TOrderedTuple(sortingCache[i]).orders) do
-          TOrderedTuple(sortingCache[i]).orders[j].Free;
         TOrderedTuple(sortingCache[i]).Free;
       end;
     end;
@@ -493,7 +467,7 @@ begin
   result := TXQTermNamedFunction.Create(akind, aindex);
 end;
 
-function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): IXQValue;
 var
   evilkids: TXQVArray;
 begin
@@ -521,7 +495,7 @@ begin
   end;
 end;
 
-procedure xqFunctionGeneralConstructor(args: array of TXQValue; var result: TXQValue);forward;
+procedure xqFunctionGeneralConstructor(args: array of IXQValue; var result: IXQValue);forward;
 
 class function TXQTermNamedFunction.findKindIndex(const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer; checkForOps: boolean): boolean;
 var
@@ -544,13 +518,15 @@ begin
     exit(true);
   end;
 
-  aindex := -1;
-  for i:=0 to  binaryOpFunctions.Count-1 do
-    if strContains(name, binaryOpFunctions[i]) then begin
-      aindex := i;
-      akind := xqfkWrappedOperator;
-      exit(true);
-    end;;
+  if checkForOps then begin
+    aindex := -1;
+    for i:=0 to  binaryOpFunctions.Count-1 do
+      if strContains(name, binaryOpFunctions[i]) then begin
+        aindex := i;
+        akind := xqfkWrappedOperator;
+        exit(true);
+      end;;
+  end;
 
   exit(false);
 end;
@@ -573,7 +549,7 @@ begin
   create(op, arg1, arg2);
 end;
 
-function TXQTermBinaryOp.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermBinaryOp.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if length(children)<2 then raiseEvaluationError('Not enough subterms');
   if length(children)>2 then raiseEvaluationError('Too many subterms');
@@ -636,7 +612,7 @@ begin
   func := asfunction;
 end;
 
-function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
   else if func and (axis = '') and (select = 'text') and (context.sender.TextElement<>nil) then result := xqvalue(context.sender.TextElement)
@@ -739,7 +715,7 @@ begin
   if arg <> nil then push(arg);
 end;
 
-function TXQTermUnaryOp.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermUnaryOp.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if length(children)<1 then raiseEvaluationError( 'Not enough subterms')
   else if length(children)>1 then raiseEvaluationError('Too many subterms');
@@ -757,15 +733,9 @@ begin
   else value := xqvalue(StrToInt65(avalue));
 end;
 
-function TXQTermNumber.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermNumber.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   result := value.clone;
-end;
-
-destructor TXQTermNumber.destroy;
-begin
-  value.free;
-  inherited destroy;
 end;
 
 { TXQTermReadAttribute }
@@ -782,7 +752,7 @@ begin
   end;
 end;
 
-function TXQTermReadAttribute.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermReadAttribute.evaluate(const context: TEvaluationContext): IXQValue;
 var
   tempEl: TTreeElement;
   testValue: Boolean;
@@ -791,7 +761,7 @@ var
   readnamespace: String;
 begin
   if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
-    tempEl := TXQValueNode(context.SeqValue).node
+    tempEl := context.SeqValue.toNode
    else
     tempEl:=context.ParentElement;
   if tempEl.typ = tetProcessingInstruction then
@@ -811,13 +781,8 @@ begin
   testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
   while tempEl <> nil do begin
     if      (not testValue or striEqual(tempEl.value, readvalue))
-        and (not testNS or striEqual(tempEl.namespace, readnamespace)) then begin
-      if result = nil then result := xqvalue(tempEl.reverse)
-      else begin
-        if not (result is TXQValueSequence) then result := TXQValueSequence.create(result);
-        TXQValueSequence(result).addChild(xqvalue(tempEl.reverse))
-      end
-    end;
+        and (not testNS or striEqual(tempEl.namespace, readnamespace)) then
+      xqvalueSeqAdd(result, xqvalue(tempEl.reverse));
     tempEl := tempEl.next;
   end;
   if result = nil then result:=xqvalue();
@@ -834,13 +799,15 @@ begin
   if value[length(value)] = ';' then delete(value, length(value), 1);
 end;
 
-function TXQTermVariable.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermVariable.evaluate(const context: TEvaluationContext): IXQValue;
+var
+  temp: TXQValue;
 begin
   if context.temporaryVariables <> nil then begin
-    result := nil;
-    if context.temporaryVariables.hasVariableOrObject(value, @result) then begin
-      if result <> nil then result := result.clone
-      else result := xqvalue();
+    temp := nil;
+    if context.temporaryVariables.hasVariableOrObject(value, @temp) then begin
+      if temp = nil then result := xqvalue()
+      else result := temp;
       exit();
     end;
   end;
@@ -856,7 +823,7 @@ begin
   value := avalue;
 end;
 
-function TXQTermString.evaluate(const context: TEvaluationContext): TXQValue;
+function TXQTermString.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   Result := xqvalue(value);
 end;

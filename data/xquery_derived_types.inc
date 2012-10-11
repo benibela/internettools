@@ -48,9 +48,9 @@ const RegExpr_QName = '^('+RegExpr_anyURIRaw+'['+#2+'])?'+RegExpr_XMLNameRaw+'$'
 //** Type for the XPath type long. (automatic generated)
 type TXQValue_long = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -77,22 +77,22 @@ begin
 
   
 end;
-class function TXQValue_long.typeName: string;
+class function TXQValue_long.classTypeName: string;
 begin
   result := 'long';
 end;
-class function TXQValue_long.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_long.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_long.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_long.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_long.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_long then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -148,9 +148,9 @@ TXQueryEngine.registerType(TXQValue_long);
 //** Type for the XPath type int. (automatic generated)
 type TXQValue_int = class (TXQValue_Long)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -186,22 +186,22 @@ begin
 
   
 end;
-class function TXQValue_int.typeName: string;
+class function TXQValue_int.classTypeName: string;
 begin
   result := 'int';
 end;
-class function TXQValue_int.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_int.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_int.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_int.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_int.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_int then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -261,9 +261,9 @@ t('type-of(xs:int(2147483647))', 'int', '');
 //** Type for the XPath type short. (automatic generated)
 type TXQValue_short = class (TXQValue_Int)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -299,22 +299,22 @@ begin
 
   
 end;
-class function TXQValue_short.typeName: string;
+class function TXQValue_short.classTypeName: string;
 begin
   result := 'short';
 end;
-class function TXQValue_short.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_short.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_short.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_short.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_short.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_short then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -374,9 +374,9 @@ t('type-of(xs:short(32767))', 'short', '');
 //** Type for the XPath type byte. (automatic generated)
 type TXQValue_byte = class (TXQValue_Short)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -412,22 +412,22 @@ begin
 
   
 end;
-class function TXQValue_byte.typeName: string;
+class function TXQValue_byte.classTypeName: string;
 begin
   result := 'byte';
 end;
-class function TXQValue_byte.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_byte.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_byte.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_byte.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_byte.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_byte then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -487,9 +487,9 @@ t('type-of(xs:byte(127))', 'byte', '');
 //** Type for the XPath type nonPositiveInteger. (automatic generated)
 type TXQValue_nonPositiveInteger = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -521,22 +521,22 @@ begin
 
   
 end;
-class function TXQValue_nonPositiveInteger.typeName: string;
+class function TXQValue_nonPositiveInteger.classTypeName: string;
 begin
   result := 'nonPositiveInteger';
 end;
-class function TXQValue_nonPositiveInteger.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_nonPositiveInteger.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_nonPositiveInteger.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_nonPositiveInteger.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_nonPositiveInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_nonPositiveInteger then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -594,9 +594,9 @@ t('type-of(xs:nonPositiveInteger(0))', 'nonPositiveInteger', '');
 //** Type for the XPath type negativeInteger. (automatic generated)
 type TXQValue_negativeInteger = class (TXQValue_NonPositiveInteger)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -628,22 +628,22 @@ begin
 
   
 end;
-class function TXQValue_negativeInteger.typeName: string;
+class function TXQValue_negativeInteger.classTypeName: string;
 begin
   result := 'negativeInteger';
 end;
-class function TXQValue_negativeInteger.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_negativeInteger.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_negativeInteger.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_negativeInteger.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_negativeInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_negativeInteger then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -701,9 +701,9 @@ t('type-of(xs:negativeInteger(-1))', 'negativeInteger', '');
 //** Type for the XPath type nonNegativeInteger. (automatic generated)
 type TXQValue_nonNegativeInteger = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -730,22 +730,22 @@ begin
 
   
 end;
-class function TXQValue_nonNegativeInteger.typeName: string;
+class function TXQValue_nonNegativeInteger.classTypeName: string;
 begin
   result := 'nonNegativeInteger';
 end;
-class function TXQValue_nonNegativeInteger.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_nonNegativeInteger.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_nonNegativeInteger.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_nonNegativeInteger.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_nonNegativeInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_nonNegativeInteger then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -803,9 +803,9 @@ t('type-of(xs:nonNegativeInteger(0))', 'nonNegativeInteger', '');
 //** Type for the XPath type positiveInteger. (automatic generated)
 type TXQValue_positiveInteger = class (TXQValue_NonNegativeInteger)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -832,22 +832,22 @@ begin
 
   
 end;
-class function TXQValue_positiveInteger.typeName: string;
+class function TXQValue_positiveInteger.classTypeName: string;
 begin
   result := 'positiveInteger';
 end;
-class function TXQValue_positiveInteger.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_positiveInteger.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_positiveInteger.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_positiveInteger.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_positiveInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_positiveInteger then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -905,9 +905,9 @@ t('type-of(xs:positiveInteger(1))', 'positiveInteger', '');
 //** Type for the XPath type unsignedLong. (automatic generated)
 type TXQValue_unsignedLong = class (TXQValue_NonNegativeInteger)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -934,22 +934,22 @@ begin
 
   
 end;
-class function TXQValue_unsignedLong.typeName: string;
+class function TXQValue_unsignedLong.classTypeName: string;
 begin
   result := 'unsignedLong';
 end;
-class function TXQValue_unsignedLong.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_unsignedLong.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_unsignedLong.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_unsignedLong.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_unsignedLong.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_unsignedLong then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1007,9 +1007,9 @@ t('type-of(xs:unsignedLong(0))', 'unsignedLong', '');
 //** Type for the XPath type unsignedInt. (automatic generated)
 type TXQValue_unsignedInt = class (TXQValue_unsignedLong)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -1045,22 +1045,22 @@ begin
 
   
 end;
-class function TXQValue_unsignedInt.typeName: string;
+class function TXQValue_unsignedInt.classTypeName: string;
 begin
   result := 'unsignedInt';
 end;
-class function TXQValue_unsignedInt.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_unsignedInt.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_unsignedInt.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_unsignedInt.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_unsignedInt.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_unsignedInt then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1120,9 +1120,9 @@ t('type-of(xs:unsignedInt(4294967295))', 'unsignedInt', '');
 //** Type for the XPath type unsignedShort. (automatic generated)
 type TXQValue_unsignedShort = class (TXQValue_unsignedInt)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -1158,22 +1158,22 @@ begin
 
   
 end;
-class function TXQValue_unsignedShort.typeName: string;
+class function TXQValue_unsignedShort.classTypeName: string;
 begin
   result := 'unsignedShort';
 end;
-class function TXQValue_unsignedShort.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_unsignedShort.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_unsignedShort.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_unsignedShort.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_unsignedShort.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_unsignedShort then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1233,9 +1233,9 @@ t('type-of(xs:unsignedShort(65536))', 'unsignedShort', '');
 //** Type for the XPath type unsignedByte. (automatic generated)
 type TXQValue_unsignedByte = class (TXQValue_unsignedShort)
   constructor create(const v: TXQ_int65); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -1271,22 +1271,22 @@ begin
 
   
 end;
-class function TXQValue_unsignedByte.typeName: string;
+class function TXQValue_unsignedByte.classTypeName: string;
 begin
   result := 'unsignedByte';
 end;
-class function TXQValue_unsignedByte.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_unsignedByte.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_unsignedByte.create(args[0].toint65));
   result := inherited;
 end;
-class function TXQValue_unsignedByte.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_unsignedByte.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_unsignedByte then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1346,13 +1346,13 @@ t('type-of(xs:unsignedByte(255))', 'unsignedByte', '');
 //** Type for the XPath type float. (automatic generated)
 type TXQValue_float = class (TXQValueDecimal)
   constructor create(const v: TXQ_decimal); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
   
-  function asString: string; override;
+  function toString: string; override;
 end;
 {$endif}
 
@@ -1371,24 +1371,24 @@ begin
 
   
 end;
-class function TXQValue_float.typeName: string;
+class function TXQValue_float.classTypeName: string;
 begin
   result := 'float';
 end;
-class function TXQValue_float.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_float.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_float.create(args[0].todecimal));
   result := inherited;
 end;
-class function TXQValue_float.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_float.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_float then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1404,7 +1404,7 @@ end;
 
 
 
-function TXQValue_float.asString: string;
+function TXQValue_float.toString: string;
 begin
   if isnan(value) then result:='NaN'
   else if isPosInf(value) then result:='INF'
@@ -1450,13 +1450,13 @@ TXQueryEngine.registerType(TXQValue_float);
 //** Type for the XPath type double. (automatic generated)
 type TXQValue_double = class (TXQValueDecimal)
   constructor create(const v: TXQ_decimal); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
   
-  function asString: string; override;
+  function toString: string; override;
 end;
 {$endif}
 
@@ -1475,24 +1475,24 @@ begin
 
   
 end;
-class function TXQValue_double.typeName: string;
+class function TXQValue_double.classTypeName: string;
 begin
   result := 'double';
 end;
-class function TXQValue_double.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_double.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_double.create(args[0].todecimal));
   result := inherited;
 end;
-class function TXQValue_double.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_double.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_double then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1508,7 +1508,7 @@ end;
 
 
 
-function TXQValue_double.asString: string;
+function TXQValue_double.toString: string;
 begin
   if isnan(value) then result:='NaN'
   else if isPosInf(value) then result:='INF'
@@ -1554,9 +1554,9 @@ TXQueryEngine.registerType(TXQValue_double);
 //** Type for the XPath type untypedAtomic. (automatic generated)
 type TXQValue_untypedAtomic = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1583,24 +1583,24 @@ begin
 
   
 end;
-class function TXQValue_untypedAtomic.typeName: string;
+class function TXQValue_untypedAtomic.classTypeName: string;
 begin
   result := 'untypedAtomic';
 end;
-class function TXQValue_untypedAtomic.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_untypedAtomic.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_untypedAtomic.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_untypedAtomic.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_untypedAtomic.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_untypedAtomic then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1653,9 +1653,9 @@ t('type-of(xs:untypedAtomic(''abc''))', 'untypedAtomic', '');
 //** Type for the XPath type normalizedString. (automatic generated)
 type TXQValue_normalizedString = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1682,22 +1682,22 @@ begin
 
   
 end;
-class function TXQValue_normalizedString.typeName: string;
+class function TXQValue_normalizedString.classTypeName: string;
 begin
   result := 'normalizedString';
 end;
-class function TXQValue_normalizedString.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_normalizedString.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_normalizedString.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_normalizedString.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_normalizedString.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_normalizedString then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1750,9 +1750,9 @@ t('type-of(xs:normalizedString(''abc''))', 'normalizedString', '');
 //** Type for the XPath type token. (automatic generated)
 type TXQValue_token = class (TXQValue_normalizedString)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1779,22 +1779,22 @@ begin
 
   
 end;
-class function TXQValue_token.typeName: string;
+class function TXQValue_token.classTypeName: string;
 begin
   result := 'token';
 end;
-class function TXQValue_token.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_token.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_token.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_token.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_token.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_token then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1847,9 +1847,9 @@ t('type-of(xs:token(''abc''))', 'token', '');
 //** Type for the XPath type language. (automatic generated)
 type TXQValue_language = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1876,22 +1876,22 @@ begin
 
   
 end;
-class function TXQValue_language.typeName: string;
+class function TXQValue_language.classTypeName: string;
 begin
   result := 'language';
 end;
-class function TXQValue_language.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_language.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_language.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_language.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_language.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_language then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -1944,9 +1944,9 @@ t('type-of(xs:language(''abc''))', 'language', '');
 //** Type for the XPath type NMTOKEN. (automatic generated)
 type TXQValue_NMTOKEN = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1973,22 +1973,22 @@ begin
 
   
 end;
-class function TXQValue_NMTOKEN.typeName: string;
+class function TXQValue_NMTOKEN.classTypeName: string;
 begin
   result := 'NMTOKEN';
 end;
-class function TXQValue_NMTOKEN.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_NMTOKEN.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_NMTOKEN.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_NMTOKEN.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_NMTOKEN.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_NMTOKEN then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -2041,9 +2041,9 @@ t('type-of(xs:NMTOKEN(''abc''))', 'NMTOKEN', '');
 //** Type for the XPath type Name. (automatic generated)
 type TXQValue_Name = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2070,22 +2070,22 @@ begin
 
   
 end;
-class function TXQValue_Name.typeName: string;
+class function TXQValue_Name.classTypeName: string;
 begin
   result := 'Name';
 end;
-class function TXQValue_Name.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_Name.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_Name.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_Name.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_Name.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_Name then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -2138,9 +2138,9 @@ t('type-of(xs:Name(''abc''))', 'Name', '');
 //** Type for the XPath type NCName. (automatic generated)
 type TXQValue_NCName = class (TXQValue_Name)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2167,22 +2167,22 @@ begin
 
   
 end;
-class function TXQValue_NCName.typeName: string;
+class function TXQValue_NCName.classTypeName: string;
 begin
   result := 'NCName';
 end;
-class function TXQValue_NCName.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_NCName.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_NCName.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_NCName.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_NCName.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_NCName then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -2235,9 +2235,9 @@ t('type-of(xs:NCName(''abc''))', 'NCName', '');
 //** Type for the XPath type ID. (automatic generated)
 type TXQValue_ID = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2264,22 +2264,22 @@ begin
 
   
 end;
-class function TXQValue_ID.typeName: string;
+class function TXQValue_ID.classTypeName: string;
 begin
   result := 'ID';
 end;
-class function TXQValue_ID.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_ID.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_ID.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_ID.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_ID.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_ID then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -2332,9 +2332,9 @@ t('type-of(xs:ID(''abc''))', 'ID', '');
 //** Type for the XPath type IDREF. (automatic generated)
 type TXQValue_IDREF = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2361,22 +2361,22 @@ begin
 
   
 end;
-class function TXQValue_IDREF.typeName: string;
+class function TXQValue_IDREF.classTypeName: string;
 begin
   result := 'IDREF';
 end;
-class function TXQValue_IDREF.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_IDREF.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_IDREF.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_IDREF.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_IDREF.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_IDREF then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -2429,9 +2429,9 @@ t('type-of(xs:IDREF(''abc''))', 'IDREF', '');
 //** Type for the XPath type ENTITY. (automatic generated)
 type TXQValue_ENTITY = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2458,22 +2458,22 @@ begin
 
   
 end;
-class function TXQValue_ENTITY.typeName: string;
+class function TXQValue_ENTITY.classTypeName: string;
 begin
   result := 'ENTITY';
 end;
-class function TXQValue_ENTITY.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_ENTITY.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_ENTITY.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_ENTITY.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_ENTITY.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_ENTITY then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -2526,10 +2526,10 @@ t('type-of(xs:ENTITY(''abc''))', 'ENTITY', '');
 //** Type for the XPath type anyURI. (automatic generated)
 type TXQValue_anyURI = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
-  class function castableFrom(const v: TXQValue): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
   
@@ -2555,33 +2555,33 @@ begin
 
   
 end;
-class function TXQValue_anyURI.typeName: string;
+class function TXQValue_anyURI.classTypeName: string;
 begin
   result := 'anyURI';
 end;
-class function TXQValue_anyURI.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_anyURI.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_anyURI.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_anyURI.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_anyURI.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_anyURI then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
 const CastableFromanyURI: TClassArray = nil;
 const CastableFromanyURISplit: TStringArray = nil;
-class function TXQValue_anyURI.castableFrom(const v: TXQValue): boolean;
+class function TXQValue_anyURI.castableFromInternal(const v: IXQValue): boolean;
 var i,t: integer; temp: string;
 begin
-  if v.instanceOf(self) then exit(true);
+  if v.instanceOfInternal(self) then exit(true);
   if CastableFromanyURI = nil then begin
     CastableFromanyURISplit := strSplit('string|untypedAtomic', '|');
     setlength(CastableFromanyURI, length(CastableFromanyURISplit));
@@ -2595,7 +2595,7 @@ begin
   end;
   result := false;
   for i:=0 to high(CastableFromanyURI) do
-    if v.instanceOf(CastableFromanyURI[i]) then begin
+    if v.instanceOfInternal(CastableFromanyURI[i]) then begin
       result := true;
       if CastableFromanyURISplit[i][1] = '*' then exit;
       break;
@@ -2652,10 +2652,10 @@ t('type-of(xs:anyURI(''abc''))', 'anyURI', '');
 //** Type for the XPath type QName. (automatic generated)
 type TXQValue_QName = class (TXQValue_anyURI)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
-  class function castableFrom(const v: TXQValue): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
   
@@ -2681,33 +2681,33 @@ begin
 
   
 end;
-class function TXQValue_QName.typeName: string;
+class function TXQValue_QName.classTypeName: string;
 begin
   result := 'QName';
 end;
-class function TXQValue_QName.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_QName.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_QName.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_QName.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_QName.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_QName then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
 const CastableFromQName: TClassArray = nil;
 const CastableFromQNameSplit: TStringArray = nil;
-class function TXQValue_QName.castableFrom(const v: TXQValue): boolean;
+class function TXQValue_QName.castableFromInternal(const v: IXQValue): boolean;
 var i,t: integer; temp: string;
 begin
-  if v.instanceOf(self) then exit(true);
+  if v.instanceOfInternal(self) then exit(true);
   if CastableFromQName = nil then begin
     CastableFromQNameSplit := strSplit('*QName|string', '|');
     setlength(CastableFromQName, length(CastableFromQNameSplit));
@@ -2721,7 +2721,7 @@ begin
   end;
   result := false;
   for i:=0 to high(CastableFromQName) do
-    if v.instanceOf(CastableFromQName[i]) then begin
+    if v.instanceOfInternal(CastableFromQName[i]) then begin
       result := true;
       if CastableFromQNameSplit[i][1] = '*' then exit;
       break;
@@ -2778,10 +2778,10 @@ t('type-of(xs:QName(''abc''))', 'QName', '');
 //** Type for the XPath type NOTATION. (automatic generated)
 type TXQValue_NOTATION = class (TXQValue_QName)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
-  class function castableFrom(const v: TXQValue): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
   
@@ -2807,33 +2807,33 @@ begin
 
   
 end;
-class function TXQValue_NOTATION.typeName: string;
+class function TXQValue_NOTATION.classTypeName: string;
 begin
   result := 'NOTATION';
 end;
-class function TXQValue_NOTATION.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_NOTATION.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   exit(TXQValue_NOTATION.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_NOTATION.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_NOTATION.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_NOTATION then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
 const CastableFromNOTATION: TClassArray = nil;
 const CastableFromNOTATIONSplit: TStringArray = nil;
-class function TXQValue_NOTATION.castableFrom(const v: TXQValue): boolean;
+class function TXQValue_NOTATION.castableFromInternal(const v: IXQValue): boolean;
 var i,t: integer; temp: string;
 begin
-  if v.instanceOf(self) then exit(true);
+  if v.instanceOfInternal(self) then exit(true);
   if CastableFromNOTATION = nil then begin
     CastableFromNOTATIONSplit := strSplit('NOTATION|string', '|');
     setlength(CastableFromNOTATION, length(CastableFromNOTATIONSplit));
@@ -2847,7 +2847,7 @@ begin
   end;
   result := false;
   for i:=0 to high(CastableFromNOTATION) do
-    if v.instanceOf(CastableFromNOTATION[i]) then begin
+    if v.instanceOfInternal(CastableFromNOTATION[i]) then begin
       result := true;
       if CastableFromNOTATIONSplit[i][1] = '*' then exit;
       break;
@@ -2904,10 +2904,10 @@ t('type-of(xs:NOTATION(''abc''))', 'NOTATION', '');
 //** Type for the XPath type hexBinary. (automatic generated)
 type TXQValue_hexBinary = class (TXQValue_Binary)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
-  class function castableFrom(const v: TXQValue): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
   
@@ -2933,31 +2933,31 @@ begin
 
   
 end;
-class function TXQValue_hexBinary.typeName: string;
+class function TXQValue_hexBinary.classTypeName: string;
 begin
   result := 'hexBinary';
 end;
-class function TXQValue_hexBinary.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_hexBinary.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   exit(inherited);
   exit(TXQValue_hexBinary.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_hexBinary.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_hexBinary.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_hexBinary then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
 const CastableFromhexBinary: TClassArray = nil;
 const CastableFromhexBinarySplit: TStringArray = nil;
-class function TXQValue_hexBinary.castableFrom(const v: TXQValue): boolean;
+class function TXQValue_hexBinary.castableFromInternal(const v: IXQValue): boolean;
 var i,t: integer; temp: string;
 begin
-  if v.instanceOf(self) then exit(true);
+  if v.instanceOfInternal(self) then exit(true);
   if CastableFromhexBinary = nil then begin
     CastableFromhexBinarySplit := strSplit('string|untypedAtomic|*base64Binary', '|');
     setlength(CastableFromhexBinary, length(CastableFromhexBinarySplit));
@@ -2971,7 +2971,7 @@ begin
   end;
   result := false;
   for i:=0 to high(CastableFromhexBinary) do
-    if v.instanceOf(CastableFromhexBinary[i]) then begin
+    if v.instanceOfInternal(CastableFromhexBinary[i]) then begin
       result := true;
       if CastableFromhexBinarySplit[i][1] = '*' then exit;
       break;
@@ -3025,10 +3025,10 @@ TXQueryEngine.registerType(TXQValue_hexBinary);
 //** Type for the XPath type base64Binary. (automatic generated)
 type TXQValue_base64Binary = class (TXQValue_Binary)
   constructor create(const v: TXQ_string); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
-  class function castableFrom(const v: TXQValue): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
   
@@ -3054,31 +3054,31 @@ begin
 
   
 end;
-class function TXQValue_base64Binary.typeName: string;
+class function TXQValue_base64Binary.classTypeName: string;
 begin
   result := 'base64Binary';
 end;
-class function TXQValue_base64Binary.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_base64Binary.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   exit(inherited);
   exit(TXQValue_base64Binary.create(args[0].tostring));
   result := inherited;
 end;
-class function TXQValue_base64Binary.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_base64Binary.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_base64Binary then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
 const CastableFrombase64Binary: TClassArray = nil;
 const CastableFrombase64BinarySplit: TStringArray = nil;
-class function TXQValue_base64Binary.castableFrom(const v: TXQValue): boolean;
+class function TXQValue_base64Binary.castableFromInternal(const v: IXQValue): boolean;
 var i,t: integer; temp: string;
 begin
-  if v.instanceOf(self) then exit(true);
+  if v.instanceOfInternal(self) then exit(true);
   if CastableFrombase64Binary = nil then begin
     CastableFrombase64BinarySplit := strSplit('string|untypedAtomic|*hexBinary', '|');
     setlength(CastableFrombase64Binary, length(CastableFrombase64BinarySplit));
@@ -3092,7 +3092,7 @@ begin
   end;
   result := false;
   for i:=0 to high(CastableFrombase64Binary) do
-    if v.instanceOf(CastableFrombase64Binary[i]) then begin
+    if v.instanceOfInternal(CastableFrombase64Binary[i]) then begin
       result := true;
       if CastableFrombase64BinarySplit[i][1] = '*' then exit;
       break;
@@ -3146,9 +3146,9 @@ TXQueryEngine.registerType(TXQValue_base64Binary);
 //** Type for the XPath type time. (automatic generated)
 type TXQValue_time = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3176,24 +3176,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_time.typeName: string;
+class function TXQValue_time.classTypeName: string;
 begin
   result := 'time';
 end;
-class function TXQValue_time.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_time.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_time.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_time.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_time then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -3254,9 +3254,9 @@ TXQueryEngine.registerType(TXQValue_time);
 //** Type for the XPath type date. (automatic generated)
 type TXQValue_date = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3284,24 +3284,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_date.typeName: string;
+class function TXQValue_date.classTypeName: string;
 begin
   result := 'date';
 end;
-class function TXQValue_date.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_date.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_date.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_date.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_date then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -3362,9 +3362,9 @@ TXQueryEngine.registerType(TXQValue_date);
 //** Type for the XPath type gYear. (automatic generated)
 type TXQValue_gYear = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3392,24 +3392,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_gYear.typeName: string;
+class function TXQValue_gYear.classTypeName: string;
 begin
   result := 'gYear';
 end;
-class function TXQValue_gYear.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_gYear.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_gYear.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_gYear.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_gYear then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -3470,9 +3470,9 @@ TXQueryEngine.registerType(TXQValue_gYear);
 //** Type for the XPath type gYearMonth. (automatic generated)
 type TXQValue_gYearMonth = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3500,24 +3500,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_gYearMonth.typeName: string;
+class function TXQValue_gYearMonth.classTypeName: string;
 begin
   result := 'gYearMonth';
 end;
-class function TXQValue_gYearMonth.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_gYearMonth.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_gYearMonth.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_gYearMonth.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_gYearMonth then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -3578,9 +3578,9 @@ TXQueryEngine.registerType(TXQValue_gYearMonth);
 //** Type for the XPath type gMonthDay. (automatic generated)
 type TXQValue_gMonthDay = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3608,24 +3608,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_gMonthDay.typeName: string;
+class function TXQValue_gMonthDay.classTypeName: string;
 begin
   result := 'gMonthDay';
 end;
-class function TXQValue_gMonthDay.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_gMonthDay.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_gMonthDay.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_gMonthDay.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_gMonthDay then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -3686,9 +3686,9 @@ TXQueryEngine.registerType(TXQValue_gMonthDay);
 //** Type for the XPath type gMonth. (automatic generated)
 type TXQValue_gMonth = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3716,24 +3716,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_gMonth.typeName: string;
+class function TXQValue_gMonth.classTypeName: string;
 begin
   result := 'gMonth';
 end;
-class function TXQValue_gMonth.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_gMonth.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_gMonth.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_gMonth.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_gMonth then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -3794,9 +3794,9 @@ TXQueryEngine.registerType(TXQValue_gMonth);
 //** Type for the XPath type gDay. (automatic generated)
 type TXQValue_gDay = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3824,24 +3824,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_gDay.typeName: string;
+class function TXQValue_gDay.classTypeName: string;
 begin
   result := 'gDay';
 end;
-class function TXQValue_gDay.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_gDay.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_gDay.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_gDay.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_gDay then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -3902,9 +3902,9 @@ TXQueryEngine.registerType(TXQValue_gDay);
 //** Type for the XPath type duration. (automatic generated)
 type TXQValue_duration = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3932,24 +3932,24 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_duration.typeName: string;
+class function TXQValue_duration.classTypeName: string;
 begin
   result := 'duration';
 end;
-class function TXQValue_duration.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_duration.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_duration.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_duration.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_duration then exit(true);
   
   exit(false);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -4010,9 +4010,9 @@ TXQueryEngine.registerType(TXQValue_duration);
 //** Type for the XPath type dayTimeDuration. (automatic generated)
 type TXQValue_dayTimeDuration = class (TXQValue_duration)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -4040,22 +4040,22 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_dayTimeDuration.typeName: string;
+class function TXQValue_dayTimeDuration.classTypeName: string;
 begin
   result := 'dayTimeDuration';
 end;
-class function TXQValue_dayTimeDuration.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_dayTimeDuration.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_dayTimeDuration.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_dayTimeDuration.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_dayTimeDuration then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 
@@ -4116,9 +4116,9 @@ TXQueryEngine.registerType(TXQValue_dayTimeDuration);
 //** Type for the XPath type yearMonthDuration. (automatic generated)
 type TXQValue_yearMonthDuration = class (TXQValue_duration)
   constructor create(const v: TXQ_datetime); override;
-  class function typeName: string; override;
-  class function createFromValue(const args: array of TXQValue): TXQValue; override;
-  class function instanceOf(const typ: TXQValueClass): boolean; override;
+  class function classTypeName: string; override;
+  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -4146,22 +4146,22 @@ begin
 
   inherited; truncateRange();  
 end;
-class function TXQValue_yearMonthDuration.typeName: string;
+class function TXQValue_yearMonthDuration.classTypeName: string;
 begin
   result := 'yearMonthDuration';
 end;
-class function TXQValue_yearMonthDuration.createFromValue(const args: array of TXQValue): TXQValue;
+class function TXQValue_yearMonthDuration.createFromValue(const args: array of IXQValue): IXQValue;
 begin
   requiredArgCount(args,1);
   
   
   result := inherited;
 end;
-class function TXQValue_yearMonthDuration.instanceOf(const typ: TXQValueClass): boolean;
+function TXQValue_yearMonthDuration.instanceOfInternal(const typ: TXQValueClass): boolean;
 begin
   if typ = TXQValue_yearMonthDuration then exit(true);
   
-  result := inherited instanceOf(typ);
+  result := inherited instanceOfInternal(typ);
 end;
 
 

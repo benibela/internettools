@@ -555,7 +555,6 @@ var astroot: TXQTerm;
 
   procedure pushBinaryOp(const v: string);
   var res: TXQTermBinaryOp;
-      oldres: TXQTermBinaryOp;
       replace: PXQTerm;
   begin
     expect(v);

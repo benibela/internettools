@@ -410,7 +410,7 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: TXQValue);
+    procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: IXQValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
@@ -695,13 +695,13 @@ begin
   result := FVariables;
 end;
 
-procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: TXQValue);
+procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: IXQValue);
 var
   temp: TXQValue;
 begin
   if not FVariableLog.hasVariable(variable, @temp) then
     if not FOldVariableLog.hasVariable(variable, @temp) then exit;
-  xqvalueAssign(value, temp.clone);
+  value := temp;
 end;
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
@@ -761,7 +761,7 @@ function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: T
 
 var xpathText: TTreeElement;
 
-  function performPXPEvaluation(const pxp: IXQuery): TXQValue;
+  function performPXPEvaluation(const pxp: IXQuery): IXQValue;
   begin
     if pxp = nil then exit(xqvalue());
     FQueryEngine.ParentElement := htmlParent;
@@ -823,7 +823,7 @@ var xpathText: TTreeElement;
 
   procedure HandleCommandRead;
   var
-   value:TXQValue;
+   value:IXQValue;
    regexp: TRegExpr;
    oldvarcount: Integer;
    varnameindex: Integer;
@@ -850,21 +850,18 @@ var xpathText: TTreeElement;
     if varnameindex >= 0 then
       FVariableLog.addVariable(Trim(replaceVars(attribs.Values['var'])), value)
     else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
-      FVariableLog.addVariable(FUnnamedVariableName, value)
-    else
-      value.free;
+      FVariableLog.addVariable(FUnnamedVariableName, value);
 
     templateStart := templateStart.templateReverse;
   end;
 
   procedure HandleCommandShortRead;
   var varcount: integer;
-    read: TXQValue;
+    read: IXQValue;
   begin
     varcount:=FVariableLog.count;
     read := performPXPEvaluation(templateStart.source);
-    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then FVariableLog.addVariable(FUnnamedVariableName, read)
-    else read.free;
+    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then FVariableLog.addVariable(FUnnamedVariableName, read);
     templateStart := templateStart.templateReverse;
   end;
 
@@ -939,9 +936,9 @@ var xpathText: TTreeElement;
   var curChild: TTemplateElement;
 
     procedure switchTemplateCommand;
-    var value: TXQValue;
+    var value: IXQValue;
       function elementFit(e: TTemplateElement): boolean;
-      var evaluatedvalue: TXQValue;
+      var evaluatedvalue: IXQValue;
       begin
         if (e.templateAttributes = nil) or (e.templateAttributes.Count = 0) then exit(true);
         result := (e.test = nil) or performPXPEvaluation(e.test).toBoolean;
@@ -949,7 +946,6 @@ var xpathText: TTreeElement;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
         result := xqvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, FQueryEngine.getDefaultCollation, FQueryEngine.ImplicitTimezone);
-        evaluatedvalue.Free;
       end;
 
     begin
@@ -962,12 +958,10 @@ var xpathText: TTreeElement;
         if elementFit(curChild) then begin
           templateStart := curChild;
           switchCommandAccepted:=true;
-          value.Free;
           exit;
         end else curChild := TTemplateElement(curChild.getNextSibling());
       end;
 
-      value.Free;
       templateStart:=templateStart.templateReverse;
     end;
 
@@ -1355,7 +1349,7 @@ end;
 function THtmlTemplateParser.replaceVars(s: string; customReplace: TReplaceFunction): string;
 var f,i:longint;
     temp,value:string;
-    tempxqvalue: TXQValue;
+    tempxqvalue: IXQValue;
 begin
   Result:='';
   i:=1;
