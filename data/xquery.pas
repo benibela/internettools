@@ -3450,6 +3450,7 @@ var
   query: TXQPathMatching;
   i:integer;
 begin
+  query := nil;
   term.addToQueryList(query);
 
   result := evaluateSingleStepQuery(query[0],context);
