@@ -49,7 +49,7 @@ end;
 
 
 
-function mytostring(v: TXQValue): string;
+function mytostring(v: IXQValue): string;
 var
   i: Integer;
   seq: TXQVList;
@@ -66,8 +66,7 @@ begin
       else result += ' '+mytostring(seq[i]);
       wasnode := isnode;
     end;
-    seq.freeNonRecursive;
-  end else if (v is TXQValueNode) and (TXQValueNode(v).node <> nil) then begin
+  end else if (v is TXQValueNode) and ((v as TXQValueNode).node <> nil) then begin
     result := v.toNode.outerXML();
   end else result := v.toString;
 end;
@@ -252,7 +251,7 @@ var htp: THtmlTemplateParser;
     currentTree: TTreeElement = nil;
     logCorrect: Boolean;
     timing: TDateTime;
-    mypxpoutput: TXQValue;
+    mypxpoutput: IXQValue;
     extendedvars: TXQVariableChangeLog;
     j: Integer;
     varlog: TXQVariableChangeLog;
