@@ -2445,7 +2445,7 @@ begin
   sl.Sorted:=true;;
   if args[0].kind <> pvkSequence then addSplitted(args[0].toString)
   else begin
-    seq := args[0].toSequence;
+    seq := args[0].toXQVList;
     for i:=0 to seq.Count-1 do
       addSplitted(seq[i].toString);
     seq.free;

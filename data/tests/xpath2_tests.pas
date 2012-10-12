@@ -2271,9 +2271,12 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('fn:round-half-to-even(-10.355, 2)', '-10.36');
   t('fn:round-half-to-even(-10.356, 2)', '-10.36');
   t('fn:round(xs:nonNegativeInteger("303884545991464527"))', '303884545991464527');
-  t('.//@att', 'xyz', '<a><b><c att="xyz"/></b></a>');
-  t('outer-xml(root(.//c/@att))', '<a><b><c att="xyz"/></b></a>');
-  t('outer-xml(root(.//@att))', '<a><b><c att="xyz"/></b></a>');
+  t('.//@att', 'xyz', '<a><b><c att="xyz">C</c></b></a>');
+  t('outer-xml(root(.//c/@att))', '<a><b><c att="xyz">C</c></b></a>');
+  t('outer-xml(root(.//@att))', '<a><b><c att="xyz">C</c></b></a>');
+  t('string-join(.//c except .//d, ":")', 'C');
+  t('string-join(.//c except .//c/@att, ":")', 'C');
+  t('string-join(.//d except .//c, ":")', '');
 
 
 

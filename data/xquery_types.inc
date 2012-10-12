@@ -18,7 +18,7 @@ begin
   setlength(result, 0);
 end;
 
-function TXQValueUndefined.toSequence: TXQVList;
+function TXQValueUndefined.toXQVList: TXQVList;
 begin
   Result:=TXQVList.Create;
 end;
@@ -261,7 +261,7 @@ begin
   result := false;
 end;
 
-function TXQValue.toSequence: TXQVList;
+function TXQValue.toXQVList: TXQVList;
 begin
   result:=TXQVList.Create;
   result.add(self);
@@ -1178,7 +1178,7 @@ begin
   for i:=0 to high(result) do result[i] := seq[i];
 end;
 
-function TXQValueSequence.toSequence: TXQVList;
+function TXQValueSequence.toXQVList: TXQVList;
 var
   i: Integer;
 begin
@@ -1384,7 +1384,7 @@ begin
   obj := TXQValueObject.create();
   if length(args) = 1 then begin
     if (args[0].kind <> pvkSequence) or (args[0].getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('Argument to object constructor must be a sequence with an even number of elements');
-    seq := args[0].toSequence;
+    seq := args[0].toXQVList;
     for i:=0 to (seq.Count-1) div 2 do begin
       if not (seq[2*i].kind = pvkString) then raise EXQEvaluationException.Create('Only string values are allowed as property names');
       obj.setMutable(seq[2*i].toString, seq[2*i+1]);

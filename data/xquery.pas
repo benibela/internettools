@@ -39,7 +39,7 @@ type
   TXQTerm=class;
 
   { TXQValueEnumerator }
-
+  //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
   TXQValueEnumerator = record
   private
     fcurrentidx: integer;
@@ -59,10 +59,50 @@ type
 
   TXQValueClass = class of TXQValue;
 
+  (***
+  @abstract(Variant used in XQuery-expressions)
+
+  This is the base interface used to store the various values occuring during the evaluation of a XQuery expression.
+
+  You can read its value with the methods toBoolean, toInt64, toDecimal, toString, toDateTime, toNode, toArray,
+  which convert the returned value to the requested type.
+
+  The @code(kind) property and the @code(is) operator can be used to check for the actually contained type.
+  E.g. for an string @code(kind) returns @code(pvkString) and @code(is TXQValueString) returns true. @code(kind)
+  returns a basic type, so e.g. float and double values both return pvkDecimal.
+
+  Since IXQValue is an interface, it can be used without worrying much about memory management. @br
+  So if you have an IXQValue @code(value), you can read it like @code(value.toString) or @code(value.toBoolean).
+  Or assign it to another value2 just by writing @code(value2 := value).
+
+  IXQValue are usually returned by the "parser" classes, so you don't have to create your own, but if you want, you can
+  use the xqvalue() functions which return a IXQValue corresponding to the type of their parameter.
+
+  You can declare user defined types by deriving TXQValue (not IXQValue, there is a bunch of depending on the class) and
+  calling TXQueryEngine.registerType with the new type.
+
+  @br@br@br@br@br@bold(Internal types / data model)@br
+  Each xq value has a certain type. These types are almost the same as those in the xpath/xquery data model, but not quite.@br
+  There a seven primary types: boolean, int65, decimal, string, datetime, sequence, node and function.@br
+  By restricting their values to a sub range, secondary types are created, and for each type a native fpc class exists, as follow: @br
+    decimal -> (float, double)@br
+    integer -> (long -> (int -> (short -> byte)), nonPositiveInteger -> negativeInteger, nonNegativeInteger -> (positiveInteger, unsignedLong -> (unsignedInt -> (unsignedShort -> unsignedByte))))@br@br
+
+   (Notation: a -> (b, c) means "b" and "c" were created by restricting the range of type "a"; a -> (b -> c) means "c" is a restricted "b" which is a restricted "a". "a ~~> c" means that "c" is a (indirectly) restricted "a" and "a ~~> c" holds in both previous examples)@br
+   E.g.  A "unsignedInt" is a "unsignedLong", a "nonNegativeInteger" and a "integer", but not a "positiveInteger".@br@br
+
+   If an operator is applied to two values of type "a" and type "b", which are both restricted types, the result is the most general subtype "c". I.e. the type "c", such that "c ~~> a" and "c ~~> b" holds.@br
+   (so. xs:byte(3) + 1 has type integer, since 1 has type integer; and if a ~~> b, b is converted to a, backward to the arrow)
+   However, in XPath decimal/float/double are distinct types, so all functions/operators behave as if the primary type was double, not how the values are actually stored in the class inheritance tree.
+   I.e. double -> (float -> (decimal -> integer))@br
+
+   All integer calculations are done on an int65 type, i.e. a 65 bit integer, consisting of a sign flag and a unsigned 64 integer. This is necessary since the XPath datamodel demands distinct signed and unsigned 64 types,
+   and I need a common type to avoid writing every function twice.
+  *)
   IXQValue = interface
     function kind: TXQValueKind; //**< Primary type of a value
     function typeName: string;    //**< XPath type name
-    function getClassType: TXQValueClass;
+    function getClassType: TXQValueClass;  //**< Returns the class underlying the interface
 
     function canConvertToInt65: boolean;  //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
     function canConvertToDecimal: boolean;  //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
@@ -78,63 +118,35 @@ type
     function toString: string;  //**< Returns the value as string; dynamically converted, if necessary
     function toDateTime: TDateTime;  //**< Returns the value as datetime; dynamically converted, if necessary
     function toNode: TTreeElement;  //**< Returns the value as node; dynamically converted, if necessary
-    function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer to each element of the sequence
-    function toSequence: TXQVList;  //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer interface to each element of the sequence
+    function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
 
-    function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
-    function jsonSerialize(xmlTextOnly: boolean = true): string;
-    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
+    function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
+    function jsonSerialize(xmlTextOnly: boolean = true): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
+    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
 
-    function clone: IXQValue;
-    function GetEnumerator: TXQValueEnumerator;
+    function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
+    function GetEnumerator: TXQValueEnumerator; //**< Returns an enumerator for @code(for var in value). For a sequence the enumerator runs over all values contained in the sequence, for other values it will do one iteration over the value of that value. The iterated values have the IXQValue interface type
 
     function instanceOfInternal(const typ: TXQValueClass): boolean; //**< If the XPath expression "self instance of typ" should return true
   end;
 
-  (***
-  @abstract(Variant used in XQuery-expressions)
 
-  This is the base class used to store the various values occuring during the evaluation of a XQuery expression.
-
-  You can read its value with the methods asBoolean, asInteger, asdecimal, asString, asDateTime, asNode, asArray,
-  which convert the returned value to the requested type.
-
-
-  Since a TXQValue is a normal class, you need to destroy its instances, by calling free. @br
-  Alternatively, you can use the methods toBoolean, toInteger, todecimal, toString, toDateTime, toNode, toSequence,
-  which work like asSomething with followed by a call to free.  @br
-  So you can write @code(TXQueryEngine.evaluate(...).toString()) to get a string value without causing a memory leak.
-
-  You mustn't free variables returned by the TXQVariableChangeLog class (unless you call the methods whose names end with clone), since
-  these variables are owned by the changelog class.
-
-  TXQValue are usually returned by the "parser" classes, so you don't have to create your own, but if you want, you can
-  use the xqvalue() functions which return a TXQValue corresponding to the type of their parameter.
-
-  @br@br@br@br@br@bold(Types / data model)@br
-  Each xq value has a certain type. These types are almost the same as those in the xpath data model, but not quite.@br
-  There a seven primary types: boolean, integer, decimal, string, datetime, sequence and node.@br
-  By restricting their values to a sub range, secondary types are created, as follow: @br
-    decimal -> (float, double)@br
-    integer -> (long -> (int -> (short -> byte)), nonPositiveInteger -> negativeInteger, nonNegativeInteger -> (positiveInteger, unsignedLong -> (unsignedInt -> (unsignedShort -> unsignedByte))))@br@br
-
-   (Notation: a -> (b, c) means "b" and "c" were created by restricting the range of type "a"; a -> (b -> c) means "c" is a restricted "b" which is a restricted "a". "a ~~> c" means that "c" is a (indirectly) restricted "a" and "a ~~> c" holds in both previous examples)@br
-   E.g.  A "unsignedInt" is a "unsignedLong", a "nonNegativeInteger" and a "integer", but not a "positiveInteger".@br@br
-
-   If an operator is applied to two values of type "a" and type "b", which are both restricted types, the result is the most general subtype "c". I.e. the type "c", such that "c ~~> a" and "c ~~> b" holds.@br
-   (so. xs:byte(3) + 1 has type integer, since 1 has type integer; and if a ~~> b, b is converted to a, backward to the arrow)
-   However, for compatibility with XPath, decimal conversion behaves, as if the primary type was double. I.e. double -> (float -> (decimal -> integer))@br
-  *)
 
   { TXQValue }
 
+  (***
+  Base class for XQuery-variants types, implementing the IXQValue interface. All other type classes are derived from it.@br@br
+
+  See IXQValue for an actual description
+  *)
   TXQValue = class(TInterfacedObject, IXQValue)
     constructor create; virtual;
 
-    function kind: TXQValueKind;  //**< Primary type of a value
-    function typeName: string;      //**< XPath type name
-    function getClassType: TXQValueClass;
+    function kind: TXQValueKind;  //**< Primary type of a value (actually just wraps classKind. Since you can't define class functions in the interface, but we need to do calculations with types itself)
+    function typeName: string;      //**< XPath type name (actually just wraps classTypeName. Since you can't define class functions in the interface, but we need to do calculations with types itself)
+    function getClassType: TXQValueClass; //**< Returns the actual class type of the value. (just wraps classType, but can be called through the interface)
 
     class function createFromValue(const args: array of IXQValue): IXQValue; virtual; //**< Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
 
@@ -153,10 +165,8 @@ type
     function toDateTime: TDateTime; virtual; //**< Returns the value as datetime; dynamically converted, if necessary
     function toNode: TTreeElement; virtual; //**< Returns the value as node; dynamically converted, if necessary
     function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer to each element of the sequence
-    function toSequence: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
-
-    function GetEnumerator: TXQValueEnumerator;virtual;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
     function jsonSerialize(xmlTextOnly: boolean = true): string; virtual;
@@ -169,6 +179,9 @@ type
     class function classTypeName: string; virtual;   //**< XPath type name
     function instanceOfInternal(const typ: TXQValueClass): boolean; virtual; //**< If the XPath expression "self instance of typ" should return true
     class function castableFromInternal(const v: IXQValue): boolean; virtual; //**< If the XPath expression "v castable as self" should return true (only handles special cases here, most is handled in canConvertToType)
+
+  private
+    function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (private because it wraps the object instance in a IXQValue. which may free it, if there is not another interface variable pointing to it )
   end;
   PXQValue = ^TXQValue;
 
@@ -197,14 +210,15 @@ type
     class function classTypeName: string; override;
     function isUndefined: boolean; override;
     function toArray: TXQVArray; override;
-    function toSequence: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
     function getSequenceCount: integer; override;
     function clone: IXQValue; override;
 
-    function GetEnumerator: TXQValueEnumerator;override;
-
     function jsonSerialize(xmlTextOnly: boolean = true): string; override;
     function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+
+  private
+    function GetEnumerator: TXQValueEnumerator;override;
   end;
 
   { TXQValueBoolean }
@@ -235,7 +249,7 @@ type
 
 
   { TXQValueInt65 }
-  //** integer value (should have unlimited range, but is actually signed 64 bit)
+  //** integer value (should have unlimited range, but is actually a signed 65 bit)
   TXQValueInt65 = class (TXQValue_AnyAtomicType)
     value:  int65;
 
@@ -390,6 +404,7 @@ type
 
   { TXQValueSequence }
 
+  //**< Type for a sequence containg an arbitrary number (>= 0) of other IXQValue
   TXQValueSequence = class (TXQValue_AnySimpleType)
     seq: TXQVList;    //**< pointer to a list of the contained sequence values.@br Attention: An owned pvtSequence has to be destroyed with xqvalueDestroy
 
@@ -412,7 +427,7 @@ type
     function toNode: TTreeElement; override; //**< Converts the TXQValue dynamically to a node
     function toArray: TXQVArray; override; //**< Converts the TXQValue dynamically to an array
 
-    function toSequence: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
     function getSequenceCount: integer; override;
     function GetEnumerator: TXQValueEnumerator; override;
 
@@ -431,6 +446,7 @@ type
 
   { TXQValueNode }
 
+  //** Type for a node
   TXQValueNode = class (TXQValue)
     node: TTreeElement; //**< pointer to a tree element in the html tree.@br Attention: this tree is shared, you don't have to free anything, but the pointer becomes invalid if the tree is free
 
@@ -501,6 +517,7 @@ type
 
   { TXQValueFunction }
 
+  //** A function. Currenlty only wraps a TXQTerm and can not be called (some kind of hack to store types without having a metatype value)
   TXQValueFunction = class(TXQValue)
     body: TXQTerm;
 
@@ -518,29 +535,28 @@ type
 
   { TXQVList }
 
-  (*** @abstract(List of TXQValue-s, basic wrapper around TFPList) *)
+  (*** @abstract(List of TXQValue-s) *)
   TXQVList = class
   protected
-    fcount: integer;
-    list: array of IXQValue;
+    fcount: integer; //**< count
+    list: array of IXQValue; //**< Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
     function everyIsNodeOrNot(checkForNode: boolean): boolean; //**< checks: every $n in (self) satisfies (($n is node) = checkForNode)
-    procedure sortInDocumentOrderUnchecked;
-    procedure checkIndex(i: integer); inline;
-    procedure reserve(cap: integer);
-    procedure compress;
-    procedure setCount(c: integer);
+    procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
+    procedure checkIndex(i: integer); inline; //**< Range check
+    procedure reserve(cap: integer); //**< Allocates new memory with list if necessary
+    procedure compress; //**< Deallocates memory by shorting list
+    procedure setCount(c: integer); //**< Forces a count
   public
     constructor create(capacity: integer = 0);
-    procedure insert(i: integer; child: IXQValue);
-    procedure add(child: IXQValue); //**< Adds a TXQValue to the sequence and takes ownership. If @code(child) is a sequence, the sequences are concattenated.
-    procedure addMerging(child: IXQValue); //**< Adds a TXQValue to a node sequence and takes ownership. If @code(child) is a sequence, the sequences are concattenated and duplicates eliminated.
-    procedure delete(i: integer);
-    function get(i: integer): IXQValue; inline; //**< Gets a PXQValue from the list. (keeps ownership)
-    procedure put(i: integer; const AValue: IXQValue); inline; //**< Puts a TXQValue to a node sequence and takes ownership.
-    function last: IXQValue; //**< Last PXQValue from the list. (keeps ownership)
-    function first: IXQValue; //**< First PXQValue from the list. (keeps ownership)
+    procedure insert(i: integer; child: IXQValue); //**< Inserts a IXQValue to the sequence.
+    procedure add(child: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure addMerging(child: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
+    function get(i: integer): IXQValue; inline; //**< Gets a PXQValue from the list.
+    procedure put(i: integer; const AValue: IXQValue); inline; //**< Puts a IXQValue to a node sequence
+    function last: IXQValue; //**< Last PXQValue from the list.
+    function first: IXQValue; //**< First PXQValue from the list.
     procedure clear;
-    destructor destroy; override; //**< Destructor, frees all contained TXQValues
     property items[i: integer]: IXQValue read get write put; default;
 
     procedure revert; //**< Reverts the list
@@ -582,24 +598,25 @@ type
 
   (***
     @abstract(Event call back that is called to receive the value of the variable @code(variable)).
-    If you change @code(value), you have to destroy the old value. (i.e. use xqvalueAssign to assign something to value)
   *)
   TEvaluateVariableEvent = procedure (sender: TObject; const variable: string; var value: IXQValue) of object;
   (***
     @abstract(Event call back that is called to set the @code(value) of the variable @code(variable)).
-    If you receive the event, you are responsible to destroy the value, if it is no longer needed
   *)
   TDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
   (***
-    @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue)
+    @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
+    It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
   TXQBasicFunction = procedure (args: array of IXQValue; var result: IXQValue);
   (***
     @abstract(Function, taking some TXQValue-arguments and returning a new TXQValue which can depend on the current context state)
+    It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
   TXQComplexFunction = procedure (const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
   (***
     @abstract(Binary operator of TXQValues)
+    It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
   TXQBinaryOp = procedure (const cxt: TEvaluationContext; a,b: IXQValue; var result: IXQValue);
 
@@ -640,7 +657,7 @@ type
   //***@abstract(Step of a query in a tree)
   //***You can use it to use queries, but it is intended for internal use
   TXQPathMatchingStep = record
-    namespace: string;
+    namespace: string; //**< Namespace the matched node must be in (only used if qmCheckNamespace is set)
     value: string; //**< If @code(value <> ''), only nodes with the corresponding value are found (value = node-name for element node, value = text for text/comment nodes)
     filters: array of TXQTerm; //**< expressions a matched node must satisfy
     case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
@@ -661,9 +678,9 @@ type
     matchStartNode: boolean; //**< If the search begins at start or at start.next
     checkValue: boolean; //**< If the name of the element matters
     requiredValue: string; //**< Required node name (if checkValue)
-    checkNamespace: boolean;
-    requiredNamespace: string;
-    equalFunction: TStringComparisonFunc;
+    checkNamespace: boolean;  //**< If the namespace matters
+    requiredNamespace: string; //**< Required namespace (if checkNamespace)
+    equalFunction: TStringComparisonFunc; //**< Function used to compare node values with the required values
   end;
 
 
@@ -896,10 +913,10 @@ type
 
 
   (***
-    @abstract(@bold(This is the Pseudo-XPath-parser))
+    @abstract(@bold(This is the XPath/XQuery-engine))
 
-    You can use this class to evaluate a (Pseudo-)XPath-expression on a certain document tree.@br
-    For example, @code(TXQueryEngine.evaluateToString('expression', nil)) returns the value of the evaluation of expression.@br@br
+    You can use this class to evaluate a XPath/XQuery-expression on a certain document tree.@br
+    For example, @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) returns the value of the evaluation of expression.@br@br
 
 
 
@@ -937,7 +954,7 @@ type
       @item(@code(if (condition) then $x else $y) @br This returns @code(x) if @code(condition) is true, and @code(y) otherwise  )
     )
 
-    Differences between this implementation and standard XPath/XQuery:
+    Differences between this implementation and standard XPath/XQuery (most differences can be turned off by setting the respective parameter):
 
 
 
@@ -1000,18 +1017,18 @@ type
     ))
     )
 
-    You can look at the unit test at the end of tests/xpath2_test.pas to see many (~ 2000) examples.
+    You can look at the unit tests in the tests directory to see many (~ 2000) examples.
 
     @bold(Using the class in FPC)
 
     The easiest way to evaluate a XQuery/XPath-expression is to call the class methods like @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
     If you want to process a html/xml document, you have to pass the root TTreeElement (obtained by TTreeParser) instead of nil.@br@br@br
-    If you call @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) with a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br@br@br
+    If you call @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) without a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br
+    With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeElement or @code(toDecimal) an extended. @br@br
+
     You can also create a TXQueryEngine instance and then call @code(parseXPath2('expression')) and @code(evaluateXPath2()). @br
     This is not as easy, but you have more options: @br
-    You can set the root tree element / set with the property RootElement and the parent element ./ with the property ParentElement.@br
-    You can read and define variables in the expression, if the properties OnEvaluateVariable and OnDefineVariable are set (you can assign these events to the corresponding methods of a @code(TXQVariableChangeLog)).
-
+    You can set separate root (/) (with the property RootElement) and parent elements (./) (with the property ParentElement), and you can read and define variables in the expression.
 
 
     @br@br@bold(Compatibility to previous version)@br
@@ -1051,10 +1068,10 @@ type
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
 
-    VariableChangelog: TXQVariableChangeLog;
+    VariableChangelog: TXQVariableChangeLog;  //**< All variables that have been set (if a variable was overriden, it stores the old and new value)
 
-    OnEvaluateVariable: TEvaluateVariableEvent; //**< Event called if a variable has to be read
-    OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set
+    OnEvaluateVariable: TEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
+    OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
@@ -1065,7 +1082,7 @@ type
     function parseXPath2(s:string): IXQuery;
     //** Parses a new XQuery expression and stores it in tokenized form.
     function parseXQuery1(s:string): IXQuery;
-    //** Parses a new CSS expression and stores it in tokenized form.
+    //** Parses a new CSS 3.0 Selector expression and stores it in tokenized form.
     function parseCSS3(s:string): IXQuery;
 
     function evaluate(tree:TTreeElement = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as TXQValue
@@ -1073,9 +1090,9 @@ type
     constructor create;
     destructor Destroy; override;
 
-    //** Evaluates an expression with a certain tree element as current node.
+    //** Evaluates an XPath 2.0 expression with a certain tree element as current node.
     function evaluateXPath2(expression: string; tree:TTreeElement = nil): IXQValue;
-    //** Evaluates an expression with a certain tree element as current node.
+    //** Evaluates an CSS 3 Selector expression with a certain tree element as current node.
     function evaluateCSS3(expression: string; tree:TTreeElement = nil): IXQValue;
 
     //** Evaluates an expression with a certain tree element as current node.
@@ -1113,9 +1130,9 @@ type
     function parseCSSTerm(css:string): TXQTerm;
     function getEvaluationContext(): TEvaluationContext;
 
-    //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements [])
+    //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: TXQTerm; const context: TEvaluationContext);
-    //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements [])
+    //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: array of TXQTerm; const context: TEvaluationContext);
 
     class function nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean; static;
@@ -1128,9 +1145,10 @@ type
     //** Initialize a query by performing the first step
     class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;const context: TEvaluationContext): IXQValue;
 
-
+    //**< Evaluates a path expression, created from the given term in the given context.
     procedure evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
 
+    //**< Returns the collation for an url id
     class function getCollation(id:string): TXQCollation;
   end;
 
@@ -1227,7 +1245,7 @@ type
     readonly: boolean; //**< If true, modifying the variable value raises an error
     allowObjects: boolean;  //**< If true, object properties can be changed by assigning something to e.g. @code(obj.property)
 
-    procedure addVariable(name: string; const value: IXQValue); //**< Add a variable (it will NOT copy value)
+    procedure addVariable(name: string; const value: IXQValue); //**< Add a variable
     procedure addVariable(name: string; const value: string); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure addVariable(name: string; const value: integer); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure addVariable(name: string; const value: decimal); //**< Add a variable (@code(value) is converted to a IXQValue)
@@ -1235,7 +1253,7 @@ type
     procedure addVariable(name: string; const value: TDateTime); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure addVariable(name: string; const value: TTreeElement); //**< Add a variable (@code(value) is converted to a IXQValue)
 
-    function getVariableValue(name: string): IXQValue; //**< Returns the value of the variable @code(name) @br You must not destroy it (so use things like asString instead of toString). It is possible to change the value of the variable by changing the returned value, but absolutely not recommended
+    function getVariableValue(name: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
 
     function getVariableValueBoolean(const name: string): boolean; //**< Last value of the variable with name @code(name) as boolean
     function getVariableValueInteger(const name: string): integer; //**< Last value of the variable with name @code(name) as integer
@@ -1251,18 +1269,21 @@ type
     function count: integer; //**< Returns the number of stored values (>= count of variables)
 
     function getVariableName(i: integer): string; //**< Name of the variable at index @code(i)
-    function getVariableValue(i: integer): IXQValue; inline; //**< Value of the variable at index @code(i) @br (you must not destroy it)
+    function getVariableValue(i: integer): IXQValue; inline; //**< Value of the variable at index @code(i)  @br The returned interface points to the same instance as the interface in the internal variable storage
 
     function getVariableValueBoolean(i: integer): boolean; //**< Value of the variable at index @code(i) as boolean
     function getVariableValueInteger(i: integer): integer; //**< Value of the variable at index @code(i) as integer
     function getVariableValueDecimal(i: integer): decimal; //**< Value of the variable at index @code(i) as decimal
     function getVariableValueDateTime(i: integer): TDateTime; //**< Value of the variable at index @code(i) as datetime
     function getVariableValueString(i: integer): string; //**< Value of the variable at index @code(i) as string
-    function getVariableValueNode(i: integer): TTreeElement; //**< Value of the variable at index @code(i) as ttreeelement
-    function getVariableValueArray(i: integer): TXQVArray; //**< Value of the variable at index @code(i) as array of txqvalue. It uses an array instead of an list, so you don't have to free it.
-    function getVariableValueObject(i: integer): TXQValueObject; //**< Value of the variable at index @code(i) as object
+    function getVariableValueNode(i: integer): TTreeElement; //**< Value of the variable at index @code(i) as ttreeelement (the TTreeElement is shared with the tree, so do not free it)
+    function getVariableValueArray(i: integer): TXQVArray; //**< Value of the variable at index @code(i) as array of txqvalue. It uses an array instead of an list, so you don't have to free anything.
+    function getVariableValueObject(i: integer): TXQValueObject; //**< Value of the variable at index @code(i) as object. (the object is not a copy, but contained in an internal interface, so do not free it)
 
     function getAllVariableValues(name: string): TXQVArray; //**< Returns all values of the variable with name @name(name) as array
+
+    function hasVariable(const variable: string; value: PXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+    function hasVariableOrObject(const variable: string; value: PXQValue): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
 
     //property Values[name:string]:TXQValue read getVariableValueClone write addVariable;
     property ValuesString[name:string]:string read getVariableValueString write addVariable;
@@ -1283,9 +1304,6 @@ type
     function finalValues: TXQVariableChangeLog; //**< Remove all duplicates, so that only the last version of each variable remains
     procedure takeFrom(other: TXQVariableChangeLog); //**< Adds all variables from other to self, and clears other
     function condensedSharedLog: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
-
-    function hasVariable(const variable: string; value: PXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects.
-    function hasVariableOrObject(const variable: string; value: PXQValue): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz.
 
 
     procedure evaluateVariable(sender: TObject; const variable: string; var value: IXQValue); //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
@@ -2098,11 +2116,6 @@ begin
     list[j] := list[j-1];
   list[i] := child;
   fcount+=1;
-end;
-
-destructor TXQVList.destroy;
-begin
-  inherited destroy;
 end;
 
 procedure TXQVList.revert;
