@@ -58,6 +58,11 @@ begin
  result := false;
 end;
 
+function TXQValue.toBooleanEffective: boolean;
+begin
+  result :=  toBoolean;
+end;
+
 function TXQValue.toInt64: int64;
 begin
   result := toInt65;
@@ -637,6 +642,11 @@ begin
   result:=(temp<>'0') and (temp<>'false') and (temp<>'');
 end;
 
+function TXQValueString.toBooleanEffective: boolean;
+begin
+  result := length(str) > 0
+end;
+
 function TXQValueString.toInt65: int65;
 begin
   result := myStrToInt(str);
@@ -745,6 +755,11 @@ end;
 function TXQValueDateTime.toBoolean: boolean;
 begin
  Result:=toDateTime <> 0;
+end;
+
+function TXQValueDateTime.toBooleanEffective: boolean;
+begin
+  raise EXQEvaluationException.Create('A datetime cannot be used a boolean');
 end;
 
 function TXQValueDateTime.toInt65: int65;
@@ -1135,6 +1150,11 @@ begin
   else result:=false;
 end;
 
+function TXQValueSequence.toBooleanEffective: boolean;
+begin
+  result := (getSequenceCount > 0) and (seq[0] is TXQValueNode);
+end;
+
 function TXQValueSequence.toInt65: int65;
 begin
   if seq.Count >= 1 then result := seq[0].toInt65
@@ -1292,6 +1312,11 @@ end;
 function TXQValueNode.toBoolean: boolean;
 begin
  Result:=node <> nil;
+end;
+
+function TXQValueNode.toBooleanEffective: boolean;
+begin
+  Result:=true;
 end;
 
 function TXQValueNode.toInt65: int65;

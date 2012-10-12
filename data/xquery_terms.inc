@@ -42,7 +42,7 @@ end;
 function TXQTermIf.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if length(children)<>3 then raiseEvaluationError('if must have 3 arguments');
-  if children[0].evaluate(context).toBoolean then result:=children[1].evaluate(context)
+  if children[0].evaluate(context).toBooleanEffective then result:=children[1].evaluate(context)
   else result:=children[2].evaluate(context);
 end;
 
@@ -244,7 +244,7 @@ var tempContext:TEvaluationContext;
   function evaluateSomeEvery(const pos:integer): boolean;
   var v: IXQValue;
   begin
-    if pos = high(children) then exit(children[pos].evaluate(tempContext).toBoolean);
+    if pos = high(children) then exit(children[pos].evaluate(tempContext).toBooleanEffective);
     if not (children[pos] is TXQTermVariable) then raiseEvaluationError('Expected variable, but got '+children[pos].debugTermToString);
 
     result := isEvery;

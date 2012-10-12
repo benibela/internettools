@@ -251,7 +251,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('a/B[@bat=''MEN'']/text()', '', '');
   t('a/B[''TRUE'']/text()', 'Hallo', '');
   t('a/B[''true'']/text()', 'Hallo', '');
-  t('a/B[''FALSE'']/text()', '', '');
+  t('a/B[''FALSE'']/text()', 'Hallo', '');
+  t('a/B['''']/text()', '', '');
   t('''A''=''a''', 'true', '');
   t('  ''A''  =  ''a''  ', 'true', '');
   t('A/attribute::*', 'att1', '');
@@ -634,11 +635,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('normalize-space("  ha'#9#13#10'l'#9' '#9'lo   ")', 'ha l lo', '');
                 //Boolean
   t('boolean(0)', 'false', '');
-  t('boolean("0")', 'false', '');
+  t('boolean("0")', 'true', '');
   t('boolean("1")', 'true', '');
   t('boolean("")', 'false', '');
   t('boolean(1)', 'true', '');
-  t('boolean("false")', 'false', '');
+  t('boolean("false")', 'true', '');
   t('boolean("true")', 'true', '');
   t('boolean(false())', 'false', '');
   t('boolean(true())', 'true', '');
@@ -646,7 +647,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('true()', 'true', '');
   t('not(false())', 'true', '');
   t('not(true())', 'false', '');
-  t('not("false")', 'true', '');
+  t('not("")', 'true', '');
+  t('not("false")', 'false', '');
   t('not("true")', 'false', '');
   t('not("falses")', 'false', '');
                 //Dates
@@ -1134,7 +1136,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('every $x in (1, 2, "cat") satisfies $x * 2 = 4', 'false', '');
 
   t('if ("true") then 1 else 2', '1', '');
-  t('if ("false") then 1 else 2', '2', '');
+  t('if ("") then 1 else 2', '2', '');
+  t('if ("false") then 1 else 2', '1', '');
   t('if (true()) then 1 else 2', '1', '');
   t('if (false()) then 1 else 2', '2', '');
   t('if (1) then 1 else 2', '1', '');
@@ -1142,7 +1145,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('if ("a"="A") then 1 else 2', '1', '');
   t('if ("a"="b") then 1 else 2', '2', '');
   t('if ("true") then (1) else 2', '1', '');
-  t('if ("false") then (1) else 2', '2', '');
+  t('if ("false") then (1) else 2', '1', '');
+  t('if ("") then (1) else 2', '2', '');
   t('if (true()) then (1) else 2', '1', '');
   t('if (false()) then (1) else 2', '2', '');
   t('if (1) then (1) else 2', '1', '');
@@ -1150,7 +1154,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('if ("a"="A") then (1) else 2', '1', '');
   t('if ("a"="b") then (1) else 2', '2', '');
   t('if ("true") then 1 else (2)', '1', '');
-  t('if ("false") then 1 else (2)', '2', '');
+  t('if ("false") then 1 else (2)', '1', '');
+  t('if ("") then 1 else (2)', '2', '');
   t('if (true()) then 1 else (2)', '1', '');
   t('if (false()) then 1 else (2)', '2', '');
   t('if (1) then 1 else (2)', '1', '');
@@ -1158,7 +1163,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('if ("a"="A") then 1 else (2)', '1', '');
   t('if ("a"="b") then 1 else (2)', '2', '');
   t('if ("true") then (1) else (2)', '1', '');
-  t('if ("false") then (1) else (2)', '2', '');
+  t('if ("false") then (1) else (2)', '1', '');
+  t('if ("") then (1) else (2)', '2', '');
   t('if (true()) then (1) else (2)', '1', '');
   t('if (false()) then (1) else (2)', '2', '');
   t('if (1) then (1) else (2)', '1', '');
@@ -2358,6 +2364,35 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('xs:string("-INF") castable as xs:double', 'true');
   t('xs:string("NaN") castable as xs:decimal', 'false');
   t('xs:string("NaN") castable as xs:double', 'true');
+  t('xs:string("false") castable as xs:boolean', 'true');
+  t('xs:string("true") castable as xs:boolean', 'true');
+  t('xs:string("falsex") castable as xs:boolean', 'false');
+  t('xs:string("false") cast as xs:boolean', 'false');
+  t('xs:string("true") cast as xs:boolean', 'true');
+  t('data((1,2))', '1');
+  t('(1,2) castable as xs:integer?', 'false');
+  //effective boolean value tests (most are duplicates to previous tests)
+  t('xs:boolean("true")', 'true');
+  t('xs:boolean("false")', 'false');
+  t('not("true")', 'false');
+  t('not("false")', 'false');
+  t('not("")', 'true');
+  t('"true" and true()', 'true');
+  t('"false" and true()', 'true');
+  t('"false" or false()', 'true');
+  t('"false" and foobar', 'false');
+  t('"" and true', 'false');
+  t('"" or false', 'false');
+  t('string-join((1,2,3)["false"], ":")', '1:2:3');
+  t('string-join((1,2,3)[""], ":")', '');
+  t('string-join((1,2,3)["abc"], ":")', '1:2:3');
+  t('if ("false") then 1 else 2', '1');
+  t('some $x in (1,2,3) satisfies "true"', 'true');
+  t('some $x in (1,2,3) satisfies "false"', 'true');
+  t('some $x in (1,2,3) satisfies ""', 'false');
+  t('every $x in (1,2,3) satisfies "true"', 'true');
+  t('every $x in (1,2,3) satisfies "false"', 'true');
+  t('every $x in (1,2,3) satisfies ""', 'false');
 
 
 

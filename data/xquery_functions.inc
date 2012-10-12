@@ -582,18 +582,14 @@ end;
 
 procedure xqvalueAnd(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  if a.isUndefined or b.isUndefined then
-    exit;
-  if a.toBoolean then result := xqvalue(b.toBoolean)
+  if a.toBooleanEffective then result := xqvalue(b.toBooleanEffective)
   else result := xqvalue(false);
 end;
 
 procedure xqvalueOr(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  if a.isUndefined and b.isUndefined then
-    exit;
-  if a.toBoolean then result := xqvalue(true)
-  else result := xqvalue(b.toBoolean);
+  if a.toBooleanEffective then result := xqvalue(true)
+  else result := xqvalue(b.toBooleanEffective);
 end;
 
 
@@ -761,7 +757,7 @@ begin
         isAlreadyAtomized := false;
         break;
       end;
-    if isAlreadyAtomized then exit;
+    if isAlreadyAtomized then exit(v);
     seqResult := TXQValueSequence.create(v.getSequenceCount);
     for x in v do seqResult.seq.add(xqvalueAtomize(x));
     result := seqResult;
@@ -1504,8 +1500,7 @@ end;
 procedure xqFunctionBoolean(args: array of IXQValue; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
-  //todo: boolean('true') = false in xpath :(
-  result := xqvalue(args[0].toBoolean);
+  result := xqvalue(args[0].toBooleanEffective);
 end;
 
 procedure xqFunctionTrue(args: array of IXQValue; var result: IXQValue);
@@ -1524,8 +1519,7 @@ end;
 procedure xqFunctionNot(args: array of IXQValue; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
-  //todo: boolean('true') = false in xpath :(
-  result := xqvalue(not args[0].toBoolean);
+  result := xqvalue(not args[0].toBooleanEffective);
 end;
 
 //Datetime functions

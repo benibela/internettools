@@ -112,6 +112,7 @@ type
     function isUndefined: boolean;  //**< Returns true, iff the value is undefined or an empty sequence
 
     function toBoolean: boolean;  //**< Returns the value as boolean; dynamically converted, if necessary
+    function toBooleanEffective: boolean;  //**< Returns the effective boolean value, as defined in XPath. (the main difference to toBoolean is that toBooleanEffective returns true for the string "false", while toBoolean returns false)
     function toInt64: int64;  //**< Returns the value as int64; dynamically converted, if necessary
     function toInt65: int65;  //**< Returns the value as int65; dynamically converted, if necessary
     function toDecimal: decimal;  //**< Returns the value as decimal; dynamically converted, if necessary
@@ -158,6 +159,7 @@ type
     function isUndefined: boolean; virtual;  //**< Returns true, iff the value is undefined or an empty sequence
 
     function toBoolean: boolean; virtual; //**< Returns the value as boolean; dynamically converted, if necessary
+    function toBooleanEffective: boolean; virtual; //**< Returns the value effective boolean value
     function toInt64: int64; virtual; //**< Returns the value as int64; dynamically converted, if necessary
     function toInt65: int65; virtual; //**< Returns the value as int65; dynamically converted, if necessary
     function toDecimal: decimal; virtual; //**< Returns the value as decimal; dynamically converted, if necessary
@@ -322,6 +324,7 @@ type
     function canConvertToBoolean: boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
+    function toBooleanEffective: boolean; override;
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
@@ -367,6 +370,7 @@ type
     function canConvertToBoolean: boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
+    function toBooleanEffective: boolean; override;
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
@@ -417,6 +421,7 @@ type
     function canConvertToDecimal(pure: boolean): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
+    function toBooleanEffective: boolean; override;
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
@@ -456,6 +461,7 @@ type
     function canConvertToDecimal(pure: boolean): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
+    function toBooleanEffective: boolean; override;
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
@@ -1910,7 +1916,7 @@ function sequenceFilterConditionSatisfied(evaluatedCondition: IXQValue; const in
 begin
   case evaluatedCondition.kind of
     pvkUndefined: result := false;
-    pvkBoolean, pvkString,pvkSequence,pvkNode: result := evaluatedCondition.toBoolean;
+    pvkBoolean, pvkString,pvkSequence,pvkNode: result := evaluatedCondition.toBooleanEffective;
     pvkInt: result := evaluatedCondition.toInt65 = index;
     pvkDecimal: result := (evaluatedCondition.toDecimal = index);
     pvkDateTime: raise EXQEvaluationException.create('Sequence filter returned invalid value');
