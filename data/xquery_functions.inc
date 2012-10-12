@@ -2042,7 +2042,7 @@ begin
   requiredArgCount(args, 1);
   if args[0].getSequenceCount <> 1 then exit;
   if args[0] is TXQValueSequence then args[0] := (args[0] as TXQValueSequence).seq[0];
-  if (args[0].toNode <> nil) and (args[0].toNode.typ = tetOpen) then
+  if (args[0].toNode <> nil) and (args[0].toNode.typ = tetOpen) and not (args[0].toNode is TTreeDocument) then
     result := xqvalue((args[0].toNode.getAttribute('xml:nil', @context.nodeCollation.equal) = 'true')
                        and (args[0].toNode.deepNodeText() = ''));
 end;
