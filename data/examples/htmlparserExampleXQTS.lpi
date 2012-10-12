@@ -30,7 +30,8 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--simple 'int(0)'"/>
+        <CommandLineParams Value="--plain /home/benito/xxtest/cat/SeqExcept.xml"/>
+        <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
     <RequiredPackages Count="1">

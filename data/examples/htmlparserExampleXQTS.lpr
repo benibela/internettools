@@ -56,7 +56,7 @@ var
   isnode: boolean;
   wasnode: boolean;
 begin
-  if v is TXQValueSequence then begin
+  if (v is TXQValueSequence) and (v.getSequenceCount > 0) then begin
     seq :=  v.toSequence;
     wasnode := seq[0] is TXQValueNode;
     result := mytostring(seq[0]);
