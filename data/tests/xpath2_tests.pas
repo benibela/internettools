@@ -2226,6 +2226,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(92233720368547757 to 92233720368547759, ":")', '92233720368547757:92233720368547758:92233720368547759', '');
   t('string-join(-92233720368547759 to -92233720368547757, ":")', '-92233720368547759:-92233720368547758:-92233720368547757', '');
   t('string-join(-3 to 3, ":")', '-3:-2:-1:0:1:2:3', '');
+  //rounding
   t('ceiling(1.5e20)', '1.5E20');
   t('fn:ceiling(xs:float("-3.4028235E38"))', '-3.4028235E38');
   t('fn:ceiling(xs:float("-3.4028235E38")) instance of xs:float', 'true');
@@ -2274,12 +2275,14 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('fn:round-half-to-even(-10.355, 2)', '-10.36');
   t('fn:round-half-to-even(-10.356, 2)', '-10.36');
   t('fn:round(xs:nonNegativeInteger("303884545991464527"))', '303884545991464527');
+  //node comparison
   t('.//@att', 'xyz', '<a><b><c att="xyz">C</c></b></a>');
   t('outer-xml(root(.//c/@att))', '<a><b><c att="xyz">C</c></b></a>');
   t('outer-xml(root(.//@att))', '<a><b><c att="xyz">C</c></b></a>');
   t('string-join(.//c except .//d, ":")', 'C');
   t('string-join(.//c except .//c/@att, ":")', 'C');
   t('string-join(.//d except .//c, ":")', '');
+  //type checking
   t('1.2 eq xs:float(1.2)', 'true');
   t('1.2 eq xs:double(1.2)', 'true');
   t('xs:float(1.2) eq xs:double(1.2)', 'false'); //??? Zorba agrees
@@ -2342,8 +2345,19 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('deep-equal(/r/a[1],  /r/a[4])', 'true');
   t('deep-equal(/r/a[1],  /r/a[5])', 'false');
   t('deep-equal(/r/a[5],  /r/a[1])', 'false');
-
-
+  //casting tests
+  t('10 cast as xs:integer', '10');
+  t('() castable as xs:integer', 'false');
+  t('() castable as xs:integer?', 'true');
+  t('xs:double(5.1) castable as xs:decimal', 'true');
+  t('xs:string("5.1") castable as xs:decimal', 'true');
+  t('xs:string("5e1") castable as xs:decimal', 'false');
+  t('xs:string("INF") castable as xs:decimal', 'false');
+  t('xs:string("INF") castable as xs:double', 'true');
+  t('xs:string("-INF") castable as xs:decimal', 'false');
+  t('xs:string("-INF") castable as xs:double', 'true');
+  t('xs:string("NaN") castable as xs:decimal', 'false');
+  t('xs:string("NaN") castable as xs:double', 'true');
 
 
 

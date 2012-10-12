@@ -105,7 +105,7 @@ type
     function getClassType: TXQValueClass;  //**< Returns the class underlying the interface
 
     function canConvertToInt65: boolean;  //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
-    function canConvertToDecimal: boolean;  //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
+    function canConvertToDecimal(pure: boolean): boolean;  //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
     function canConvertToBoolean: boolean;  //**< Checks if the value can be converted to an boolean.
     function canConvertToType(v: TXQValueClass): boolean;  //**< Checks if the value can be converted to a certain type. This method contains (indirectly) all XPath casting rules (i.e. it directly maps to "self castable as v")!
 
@@ -151,7 +151,7 @@ type
     class function createFromValue(const args: array of IXQValue): IXQValue; virtual; //**< Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
 
     function canConvertToInt65: boolean;    virtual; //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
-    function canConvertToDecimal: boolean;  virtual; //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
+    function canConvertToDecimal(pure: boolean): boolean;  virtual; //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
     function canConvertToBoolean: boolean;  virtual; //**< Checks if the value can be converted to an boolean.
     function canConvertToType(v: TXQValueClass): boolean; virtual; //**< Checks if the value can be converted to a certain type. This method contains (indirectly) all XPath casting rules (i.e. it directly maps to "self castable as v")!
 
@@ -230,7 +230,7 @@ type
     constructor create(abool: boolean = false); reintroduce; virtual;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
 
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
@@ -261,7 +261,7 @@ type
     class function classParentNonBlocked: TXQValueClass; override;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -289,7 +289,7 @@ type
     class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
     class function truncateRange(const v: decimal): Decimal; virtual;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
@@ -318,7 +318,7 @@ type
     class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
     function canConvertToBoolean: boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
@@ -363,7 +363,7 @@ type
     class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
     function canConvertToBoolean: boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
@@ -414,7 +414,7 @@ type
     function isUndefined: boolean; override;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -453,7 +453,7 @@ type
     class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -522,7 +522,7 @@ type
     class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
-    function canConvertToDecimal: boolean; override;
+    function canConvertToDecimal(pure: boolean): boolean; override;
 
     function clone: IXQValue; override;
   end;
@@ -1361,7 +1361,7 @@ TXQValue_Binary = class (TXQValueString)
   function toRawBinary: string; virtual;
   class function fromRawBinary(s: string): string; virtual;
   function canConvertToInt65: boolean; override;
-  function canConvertToDecimal: boolean; override;
+  function canConvertToDecimal(pure: boolean): boolean; override;
   function canConvertToBoolean: boolean; override;
   class function classParentNonBlocked: TXQValueClass; override;
 end;
@@ -1565,6 +1565,7 @@ end;
 
 function commonClass(a,b: TXQValueClass): TXQValueClass; forward;
 function commonClass(a,b: IXQValue): TXQValueClass; forward;
+function xqvalueAtomize(const v: IXQValue): IXQValue; forward;
 
 function commonClass(a,b: TXQValueClass): TXQValueClass; overload;
 var ta: TClass;

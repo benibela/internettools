@@ -165,14 +165,16 @@ end;
 
 function TXQTermSequenceType.castAs(v: IXQValue): IXQValue;
 begin
-  if not isSingleType() then raise exception.Create('need singletype for cast as');
-  if not castableAsBase(v) then raise exception.Create('impossible cast as');
+  if not isSingleType() then raiseEvaluationError('need singletype for cast as');
+  v := xqvalueAtomize(v);
+  if not castableAsBase(v) then raiseEvaluationError('impossible cast as');
   result := atomicTypeInfo.createFromValue(v);
 end;
 
 function TXQTermSequenceType.castableAs(v: IXQValue): boolean;
 begin
-  if not isSingleType() then raise exception.Create('need singletype for castable as');
+  if not isSingleType() then raiseEvaluationError('need singletype for castable as');
+  v := xqvalueAtomize(v);
   result := castableAsBase(v);
 end;
 

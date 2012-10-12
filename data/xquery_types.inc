@@ -172,7 +172,7 @@ begin
   Result:=false;
 end;
 
-function TXQValue_Binary.canConvertToDecimal: boolean;
+function TXQValue_Binary.canConvertToDecimal(pure: boolean): boolean;
 begin
   Result:=false;
 end;
@@ -221,7 +221,7 @@ begin
     exit(false);
   if ClassType = v then result := true
   else if v.InheritsFrom(TXQValueInt65) then result := canConvertToInt65 and TXQValueInt65Class(v).canCreateFromInt65(toInt65)
-  else if v.InheritsFrom(TXQValueDecimal) then result := canConvertToDecimal and TXQValueDecimalClass(v).canCreateFromDecimal(toDecimal)
+  else if v.InheritsFrom(TXQValueDecimal) then result :=  canConvertToDecimal(v = TXQValueDecimal) and TXQValueDecimalClass(v).canCreateFromDecimal(toDecimal)
   else if v.InheritsFrom(TXQValueString) then begin
     result := v.castableFromInternal(self);// and TXQValueStringClass(v).canCreateFromString(asString);
    //  if (v.instanceOf(TXQValueString)) or (self is TXQValue_untypedAtomic) or  v.InheritsFrom(TXQValue_untypedAtomic) then
@@ -252,7 +252,7 @@ begin
   result := false;
 end;
 
-function TXQValue.canConvertToDecimal: boolean;
+function TXQValue.canConvertToDecimal(pure: boolean): boolean;
 begin
   result := false;
 end;
@@ -344,7 +344,7 @@ begin
   Result:=true;
 end;
 
-function TXQValueBoolean.canConvertToDecimal: boolean;
+function TXQValueBoolean.canConvertToDecimal(pure: boolean): boolean;
 begin
   Result:=true;
 end;
@@ -435,7 +435,7 @@ begin
   result := true;
 end;
 
-function TXQValueInt65.canConvertToDecimal: boolean;
+function TXQValueInt65.canConvertToDecimal(pure: boolean): boolean;
 begin
   result := true;
 end;
@@ -517,9 +517,10 @@ begin
   else result:=true;
 end;
 
-function TXQValueDecimal.canConvertToDecimal: boolean;
+function TXQValueDecimal.canConvertToDecimal(pure: boolean): boolean;
 begin
-  Result:=true;
+  if pure then result := canConvertToInt65
+  else Result:=true;
 end;
 
 class function TXQValueDecimal.truncateRange(const v: decimal): Decimal;
@@ -614,11 +615,12 @@ begin
   result := TryStrToInt64(str,temp);
 end;
 
-function TXQValueString.canConvertToDecimal: boolean;
+function TXQValueString.canConvertToDecimal(pure: boolean): boolean;
 var
   temp: Extended;
 begin
-  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(true);
+  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(not pure);
+  if pure and striContains(str, 'e') then exit(false);
   result := TryStrToFloat(str, temp, XQFormats);
 end;
 
@@ -730,7 +732,7 @@ begin
   Result:=false;
 end;
 
-function TXQValueDateTime.canConvertToDecimal: boolean;
+function TXQValueDateTime.canConvertToDecimal(pure: boolean): boolean;
 begin
   Result:=false;
 end;
@@ -1122,9 +1124,9 @@ begin
   Result:=(seq.Count = 1) and (seq[0].canConvertToInt65);
 end;
 
-function TXQValueSequence.canConvertToDecimal: boolean;
+function TXQValueSequence.canConvertToDecimal(pure: boolean): boolean;
 begin
-  Result:=(seq.Count = 1) and (seq[0].canConvertToDecimal);
+  Result:=(seq.Count = 1) and (seq[0].canConvertToDecimal(pure));
 end;
 
 function TXQValueSequence.toBoolean: boolean;
@@ -1276,13 +1278,14 @@ begin
   result := TryStrToInt64(str,temp);
 end;
 
-function TXQValueNode.canConvertToDecimal: boolean;
+function TXQValueNode.canConvertToDecimal(pure: boolean): boolean;
 var
   temp: Extended;
   str: string;
 begin
   str := toString;
-  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(true);
+  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(not pure);
+  if pure and striContains(str, 'e') then exit(false);
   Result:=TryStrToFloat(toString, temp, XQFormats);
 end;
 
@@ -1597,7 +1600,7 @@ begin
   Result:=false;
 end;
 
-function TXQValueFunction.canConvertToDecimal: boolean;
+function TXQValueFunction.canConvertToDecimal(pure: boolean): boolean;
 begin
   Result:=false;
 end;

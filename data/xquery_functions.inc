@@ -10,8 +10,8 @@ var
 begin
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
      (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit();
 
@@ -49,8 +49,8 @@ var
 begin
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
      (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit();
 
@@ -123,15 +123,15 @@ var
   bd: Decimal;
 begin
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
      (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
     exit();
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit;
     if bk = pvkDateTime then xqswap(a, b);
-    if (not (a is TXQValue_duration)) or (not b.canConvertToDecimal) then exit;
+    if (not (a is TXQValue_duration)) or (not b.canConvertToDecimal(false)) then exit;
     result := a.clone;
     (result as TXQValueDateTime).multiplyComponents(b.toDecimal);
     exit;
@@ -159,8 +159,8 @@ var f: decimal;
   e: Decimal;
 begin
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
      (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
     exit();
 
@@ -199,8 +199,8 @@ var f: decimal;
  ak, bk: TXQValueKind;
 begin
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
      (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
     exit();
 
@@ -226,8 +226,8 @@ var f,e: decimal;
  ak, bk: TXQValueKind;
 begin
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
      (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
     exit();
 
@@ -748,33 +748,46 @@ begin
   result := xqvalue();
 end;
 
-procedure xqFunctionData(args: array of IXQValue; var result: IXQValue);
-  function convert(v: IXQValue): IXQValue;
-  begin
-    if not (v is TXQValueNode) then exit(v);
-    case v.toNode.typ of
-      tetOpen: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
-      tetClose: result := xqvalue();
-      tetText: result := xqvalue(v.tonode.value);
-      tetComment, tetAttributeValue: result := TXQValue_untypedAtomic.create(v.tonode.value);
-      tetAttributeName: result := TXQValue_untypedAtomic.create(v.tonode.reverse.value);
-      tetProcessingInstruction: result := xqvalue(v.tonode.getAttribute(''));
-      else raise Exception.Create('Impossible node type');
-    end;
+function xqvalueAtomize(const v: IXQValue): IXQValue;
+var x: IXQValue;
+  isAlreadyAtomized: Boolean;
+  seqResult: TXQValueSequence;
+begin
+  if v is TXQValueSequence then begin
+    if v.getSequenceCount = 0 then exit(v);
+    isAlreadyAtomized := true;
+    for x in v do
+      if not (x is TXQValue_AnyAtomicType) then begin
+        isAlreadyAtomized := false;
+        break;
+      end;
+    if isAlreadyAtomized then exit;
+    seqResult := TXQValueSequence.create(v.getSequenceCount);
+    for x in v do seqResult.seq.add(xqvalueAtomize(x));
+    result := seqResult;
+    exit
   end;
+  if v is TXQValueUndefined then exit(v);
+  if v is TXQValue_AnyAtomicType then exit(v);
+  if not (v is TXQValueNode) then raise EXQEvaluationException.Create('Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
+  case v.toNode.typ of
+    tetOpen: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
+    tetClose: result := xqvalue();
+    tetText: result := xqvalue(v.tonode.value);
+    tetComment, tetAttributeValue: result := TXQValue_untypedAtomic.create(v.tonode.value);
+    tetAttributeName: result := TXQValue_untypedAtomic.create(v.tonode.reverse.value);
+    tetProcessingInstruction: result := xqvalue(v.tonode.getAttribute(''));
+    else raise EXQEvaluationException.Create('Impossible node type');
+  end;
+end;
 
+procedure xqFunctionData(args: array of IXQValue; var result: IXQValue);
 var
   resseq: TXQValueSequence;
   x: IXQValue;
 begin
   requiredArgCount(args, 1, 1);
-  if not (args[0] is TXQValueSequence) then result := convert(args[0])
-  else begin
-    resseq := TXQValueSequence.create(args[0].getSequenceCount);
-    for x in args[0] do
-      resseq.addChild(convert(x));
-    result := resseq;
-  end;
+  result := xqvalueAtomize(args[0]);
 end;
 
 //Number functions
