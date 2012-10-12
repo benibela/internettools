@@ -50,7 +50,7 @@ type TXQValue_long = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -87,12 +87,7 @@ begin
   exit(TXQValue_long.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_long.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_long then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -153,7 +148,7 @@ type TXQValue_int = class (TXQValue_Long)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -199,12 +194,7 @@ begin
   exit(TXQValue_int.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_int.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_int then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -269,7 +259,7 @@ type TXQValue_short = class (TXQValue_Int)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -315,12 +305,7 @@ begin
   exit(TXQValue_short.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_short.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_short then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -385,7 +370,7 @@ type TXQValue_byte = class (TXQValue_Short)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -431,12 +416,7 @@ begin
   exit(TXQValue_byte.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_byte.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_byte then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -501,7 +481,7 @@ type TXQValue_nonPositiveInteger = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -543,12 +523,7 @@ begin
   exit(TXQValue_nonPositiveInteger.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_nonPositiveInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_nonPositiveInteger then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -611,7 +586,7 @@ type TXQValue_negativeInteger = class (TXQValue_NonPositiveInteger)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -653,12 +628,7 @@ begin
   exit(TXQValue_negativeInteger.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_negativeInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_negativeInteger then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -721,7 +691,7 @@ type TXQValue_nonNegativeInteger = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -758,12 +728,7 @@ begin
   exit(TXQValue_nonNegativeInteger.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_nonNegativeInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_nonNegativeInteger then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -826,7 +791,7 @@ type TXQValue_positiveInteger = class (TXQValue_NonNegativeInteger)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -863,12 +828,7 @@ begin
   exit(TXQValue_positiveInteger.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_positiveInteger.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_positiveInteger then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -931,7 +891,7 @@ type TXQValue_unsignedLong = class (TXQValue_NonNegativeInteger)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -968,12 +928,7 @@ begin
   exit(TXQValue_unsignedLong.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_unsignedLong.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_unsignedLong then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -1036,7 +991,7 @@ type TXQValue_unsignedInt = class (TXQValue_unsignedLong)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -1082,12 +1037,7 @@ begin
   exit(TXQValue_unsignedInt.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_unsignedInt.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_unsignedInt then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -1152,7 +1102,7 @@ type TXQValue_unsignedShort = class (TXQValue_unsignedInt)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -1198,12 +1148,7 @@ begin
   exit(TXQValue_unsignedShort.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_unsignedShort.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_unsignedShort then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -1268,7 +1213,7 @@ type TXQValue_unsignedByte = class (TXQValue_unsignedShort)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
   
@@ -1314,12 +1259,7 @@ begin
   exit(TXQValue_unsignedByte.create(args[0].toint65));
   result := inherited;
 end;
-function TXQValue_unsignedByte.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_unsignedByte then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -1384,7 +1324,7 @@ type TXQValue_float = class (TXQValueDecimal)
   constructor create(const v: TXQ_decimal); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
   
@@ -1422,14 +1362,12 @@ begin
   exit(TXQValue_float.create(args[0].todecimal));
   result := inherited;
 end;
-function TXQValue_float.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_float.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_float then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -1500,7 +1438,7 @@ type TXQValue_double = class (TXQValueDecimal)
   constructor create(const v: TXQ_decimal); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
   
@@ -1538,14 +1476,12 @@ begin
   exit(TXQValue_double.create(args[0].todecimal));
   result := inherited;
 end;
-function TXQValue_double.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_double.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_double then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -1616,7 +1552,7 @@ type TXQValue_untypedAtomic = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1653,14 +1589,12 @@ begin
   exit(TXQValue_untypedAtomic.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_untypedAtomic.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_untypedAtomic.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_untypedAtomic then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -1718,7 +1652,7 @@ type TXQValue_normalizedString = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1755,12 +1689,7 @@ begin
   exit(TXQValue_normalizedString.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_normalizedString.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_normalizedString then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -1818,7 +1747,7 @@ type TXQValue_token = class (TXQValue_normalizedString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1855,12 +1784,7 @@ begin
   exit(TXQValue_token.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_token.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_token then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -1918,7 +1842,7 @@ type TXQValue_language = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -1955,12 +1879,7 @@ begin
   exit(TXQValue_language.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_language.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_language then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -2018,7 +1937,7 @@ type TXQValue_NMTOKEN = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2055,12 +1974,7 @@ begin
   exit(TXQValue_NMTOKEN.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_NMTOKEN.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_NMTOKEN then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -2118,7 +2032,7 @@ type TXQValue_Name = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2155,12 +2069,7 @@ begin
   exit(TXQValue_Name.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_Name.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_Name then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -2218,7 +2127,7 @@ type TXQValue_NCName = class (TXQValue_Name)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2255,12 +2164,7 @@ begin
   exit(TXQValue_NCName.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_NCName.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_NCName then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -2318,7 +2222,7 @@ type TXQValue_ID = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2355,12 +2259,7 @@ begin
   exit(TXQValue_ID.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_ID.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_ID then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -2418,7 +2317,7 @@ type TXQValue_IDREF = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2455,12 +2354,7 @@ begin
   exit(TXQValue_IDREF.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_IDREF.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_IDREF then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -2518,7 +2412,7 @@ type TXQValue_ENTITY = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2555,12 +2449,7 @@ begin
   exit(TXQValue_ENTITY.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_ENTITY.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_ENTITY then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -2618,7 +2507,7 @@ type TXQValue_anyURI = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2655,14 +2544,12 @@ begin
   exit(TXQValue_anyURI.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_anyURI.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_anyURI.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_anyURI then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 const CastableFromanyURI: TClassArray = nil;
@@ -2747,7 +2634,7 @@ type TXQValue_QName = class (TXQValue_anyURI)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2784,14 +2671,12 @@ begin
   exit(TXQValue_QName.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_QName.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_QName.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_QName then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 const CastableFromQName: TClassArray = nil;
@@ -2876,7 +2761,7 @@ type TXQValue_NOTATION = class (TXQValue_QName)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -2913,14 +2798,12 @@ begin
   exit(TXQValue_NOTATION.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_NOTATION.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_NOTATION.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_NOTATION then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 const CastableFromNOTATION: TClassArray = nil;
@@ -3005,7 +2888,7 @@ type TXQValue_hexBinary = class (TXQValue_Binary)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -3042,12 +2925,7 @@ begin
   exit(TXQValue_hexBinary.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_hexBinary.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_hexBinary then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 const CastableFromhexBinary: TClassArray = nil;
@@ -3129,7 +3007,7 @@ type TXQValue_base64Binary = class (TXQValue_Binary)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
   
@@ -3166,12 +3044,7 @@ begin
   exit(TXQValue_base64Binary.create(args[0].tostring));
   result := inherited;
 end;
-function TXQValue_base64Binary.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_base64Binary then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 const CastableFrombase64Binary: TClassArray = nil;
@@ -3253,7 +3126,7 @@ type TXQValue_time = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3291,14 +3164,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_time.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_time.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_time then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -3364,7 +3235,7 @@ type TXQValue_date = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3402,14 +3273,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_date.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_date.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_date then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -3475,7 +3344,7 @@ type TXQValue_gYear = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3513,14 +3382,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_gYear.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_gYear.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_gYear then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -3586,7 +3453,7 @@ type TXQValue_gYearMonth = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3624,14 +3491,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_gYearMonth.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_gYearMonth.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_gYearMonth then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -3697,7 +3562,7 @@ type TXQValue_gMonthDay = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3735,14 +3600,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_gMonthDay.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_gMonthDay.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_gMonthDay then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -3808,7 +3671,7 @@ type TXQValue_gMonth = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3846,14 +3709,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_gMonth.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_gMonth.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_gMonth then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -3919,7 +3780,7 @@ type TXQValue_gDay = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -3957,14 +3818,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_gDay.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_gDay.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_gDay then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -4030,7 +3889,7 @@ type TXQValue_duration = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -4068,14 +3927,12 @@ begin
   
   result := inherited;
 end;
-function TXQValue_duration.instanceOfInternal(const typ: TXQValueClass): boolean;
+
+class function TXQValue_duration.classParentNonBlocked: TXQValueClass;
 begin
-  if typ = TXQValue_duration then exit(true);
-  
-  exit(false);
-  
-  result := inherited instanceOfInternal(typ);
+  result := txqvalue_anyatomictype;
 end;
+
 
 
 
@@ -4141,7 +3998,7 @@ type TXQValue_dayTimeDuration = class (TXQValue_duration)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -4179,12 +4036,7 @@ begin
   
   result := inherited;
 end;
-function TXQValue_dayTimeDuration.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_dayTimeDuration then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 
@@ -4250,7 +4102,7 @@ type TXQValue_yearMonthDuration = class (TXQValue_duration)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
   class function createFromValue(const args: array of IXQValue): IXQValue; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
   
@@ -4288,12 +4140,7 @@ begin
   
   result := inherited;
 end;
-function TXQValue_yearMonthDuration.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  if typ = TXQValue_yearMonthDuration then exit(true);
-  
-  result := inherited instanceOfInternal(typ);
-end;
+
 
 
 

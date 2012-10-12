@@ -249,6 +249,44 @@ begin
   else result := commonDecimalClass(a,b).create(e - trunc(e / f) * f)
 end;
 
+function xqvalueComparableTypes(const a, b: IXQValue): boolean;
+  function decidedByUniqueTypeClass(const c: TXQValueClass): boolean;
+  var
+    ais, bis: boolean;
+  begin
+    ais := a is c;
+    bis := b is c;
+    result := ais or bis;
+    if result then
+      xqvalueComparableTypes := ais and bis;
+  end;
+
+var
+  ak: TXQValueKind;
+  bk: TXQValueKind;
+begin
+  ak := a.kind;
+  bk := b.kind;
+  if ((ak in [pvkInt, pvkDecimal]) and (bk in [pvkInt, pvkDecimal]))
+     or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
+    exit(true);
+
+  result := isAtomicSubType(commonNonBlockedClass(a.getClassType,b.getClassType));
+  {if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
+    commonClass();
+    if decidedByUniqueTypeClass(TXQValue_duration) then exit;
+    if decidedByUniqueTypeClass(TXQValue_time) then exit;
+    if decidedByUniqueTypeClass(TXQValue_date) then exit;
+    if decidedByUniqueTypeClass(TXQValue_gDay) then exit;
+
+    if decidedByUniqueTypeClass(TXQValueDateTime) then exit; //won't reach this if any of them is time or date
+    exit;
+  end;                               .....                                    }
+
+
+end;
+
+
 function qnameSplit(s: string): TStringArray;
 begin
   //splits URL #2 PREFIX : NAME
@@ -1966,13 +2004,13 @@ begin
   if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
   else collation := context.collation;
   if args[0].kind <> pvkSequence then begin
-    if xqvalueEqualAtomicBase(args[0], args[1], collation, context.sender.ImplicitTimezone) then result := xqvalue(1)
+    if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.sender.ImplicitTimezone) then result := xqvalue(1)
     //else := result = undefined
   end else begin
     i := 0;
     for v in args[0] do begin
       i += 1;
-      if xqvalueEqualAtomicBase(v, args[1], collation, context.sender.ImplicitTimezone) then
+      if xqvalueComparableTypes(v, args[1]) and xqvalueEqualAtomicBase(v, args[1], collation, context.sender.ImplicitTimezone) then
         xqvalueSeqAdd(result, xqvalue(i));
     end;
   end;
@@ -2029,7 +2067,7 @@ begin
   for v in args[0] do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if xqvalueEqualAtomicBase(resseq.seq[i], v, collation, context.sender.ImplicitTimezone,true) then begin
+      if xqvalueComparableTypes(resseq.seq[i], v) and xqvalueEqualAtomicBase(resseq.seq[i], v, collation, context.sender.ImplicitTimezone,true) then begin
         found := true;
         break;
       end;
@@ -2173,7 +2211,8 @@ begin
   enum1 := args[0].GetEnumerator; enum1.MoveNext;
   enum2 := args[1].GetEnumerator; enum2.MoveNext;
   for i := 0 to args[0].getSequenceCount - 1 do begin
-    if not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.sender.ImplicitTimezone,true) then begin //todo: nan? nodes?
+    if not xqvalueComparableTypes(enum1.Current, enum2.Current)
+       or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.sender.ImplicitTimezone,true) then begin //todo:   nodes?
       result := xqvalue(false);
       exit;
     end;

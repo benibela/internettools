@@ -712,7 +712,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('deep-equal((1), ())', 'false', '');
   t('deep-equal((1), (1))', 'true', '');
   t('deep-equal((1), (1,1))', 'false', '');
-  t('deep-equal((1), ("1"))', 'true', '');
+  t('deep-equal((1), ("1"))', 'false', '');
+  t('deep-equal((1), (1.0))', 'true', '');
+  t('deep-equal((xs:unsignedInt(1)), (xs:float(1)))', 'true', '');
+  t('deep-equal((1), (xs:float(1)))', 'true', '');
   t('deep-equal((1,1), (1))', 'false', '');
   t('deep-equal((1,1), (1,1.0))', 'true', '');
   t('deep-equal((1,2,3,4), (1,2,3,4))', 'true', '');
@@ -2305,6 +2308,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('xs:float(1.2) = "1.2"', 'true'); //extension: weak typing.
   t('xs:double(1.2) = "1.2"', 'true'); //extension: weak typing.
   t('1.2 = "1.2"', 'true'); //extension: weak typing.
+  t('string-join(index-of((0,1,2,3),"1"), ":")', '');
+  t('string-join(distinct-values((1, "1", 2, 2.0)),":")', '1:1:2');
+  t('deep-equal(1, current-dateTime())', 'false');
+  t('deep-equal((1,2,3), ("1", "2", "3"))', 'false');
+
 
 
   performUnitTest('$abc','alphabet','');

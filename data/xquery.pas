@@ -177,8 +177,10 @@ type
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     class function classTypeName: string; virtual;   //**< XPath type name
-    function instanceOfInternal(const typ: TXQValueClass): boolean; virtual; //**< If the XPath expression "self instance of typ" should return true
+    function instanceOfInternal(const typ: TXQValueClass): boolean;  //**< If the XPath expression "self instance of typ" should return true
+    class function instanceOf(const testType: TXQValueClass): boolean; virtual; //**< If the XPath expression "self instance of typ" should return true
     class function castableFromInternal(const v: IXQValue): boolean; virtual; //**< If the XPath expression "v castable as self" should return true (only handles special cases here, most is handled in canConvertToType)
+    class function classParentNonBlocked: TXQValueClass; virtual; //**< This returns the class of the parent type of the current type in the scheme type hierarchy. (which is often the same as fpc's classParent, but also often skips a parent or even jumps to an unrelated class. It is then used to implement instanceOf )
 
   private
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (private because it wraps the object instance in a IXQValue. which may free it, if there is not another interface variable pointing to it )
@@ -191,7 +193,6 @@ type
   TXQValue_AnySimpleType = class(TXQValue)
   protected
     class function classTypeName: string; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   end;
 
   { TXQValue_AnyAtomicType }
@@ -200,7 +201,6 @@ type
   TXQValue_AnyAtomicType = class(TXQValue_AnySimpleType)
   protected
     class function classTypeName: string; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
   end;
 
   { TXQValueUndefined }
@@ -235,7 +235,6 @@ type
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
     class function createFromValue(const args: array of IXQValue): IXQValue; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -258,8 +257,8 @@ type
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
     class function createFromValue(const args: array of IXQValue): IXQValue; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
     class function canCreateFromInt65(const i: int65): boolean; virtual;
+    class function classParentNonBlocked: TXQValueClass; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal: boolean; override;
@@ -284,7 +283,6 @@ type
 
     constructor create(const aflt: decimal = 0); reintroduce; virtual;
     class function createFromValue(const args: array of IXQValue): IXQValue; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
     class function canCreateFromDecimal(const v:decimal): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
@@ -331,7 +329,6 @@ type
 
     function clone: IXQValue; override;
 
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
     class function castableFromInternal(const v: IXQValue): boolean; override;
   end;
   TXQValueStringClass = class of TXQValueString;
@@ -360,7 +357,6 @@ type
     constructor create(const dt: TXQValueDateTimeData); reintroduce; virtual; //**< Create from a splitted ordinary datetime
     constructor create(const dt: TDateTime); reintroduce; virtual; //**< Create from an ordinary datetime
     class function createFromValue(const args: array of IXQValue): IXQValue; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
     class function canCreateFromDateTime(const s: string): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
@@ -455,7 +451,6 @@ type
 
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal: boolean; override;
@@ -492,7 +487,6 @@ type
     class function createFromValue(const args: array of IXQValue): IXQValue; override;
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
 
     function getClonedValue(const name: string): IXQValue; //**< Returns a clone of a certain property
     procedure setMutable(const name: string; const v: IXQValue); //**< Changes a property
@@ -526,7 +520,6 @@ type
 
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
-    function instanceOfInternal(const typ: TXQValueClass): boolean; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal: boolean; override;
@@ -1370,7 +1363,7 @@ TXQValue_Binary = class (TXQValueString)
   function canConvertToInt65: boolean; override;
   function canConvertToDecimal: boolean; override;
   function canConvertToBoolean: boolean; override;
-  function instanceOfInternal(const typ: TXQValueClass): boolean; override;
+  class function classParentNonBlocked: TXQValueClass; override;
 end;
 
   {$DEFINE PXP_DERIVED_TYPES_INTERFACE}
@@ -1588,9 +1581,29 @@ begin
   exit(TXQValue);
 end;
 
+
 function commonClass(a,b: IXQValue): TXQValueClass; overload; inline;
 begin
   result := commonClass(a.getClassType, b.getClassType);
+end;
+
+function commonNonBlockedClass(a,b: TXQValueClass): TXQValueClass;
+var ta: TXQValueClass;
+begin
+  if a = b then exit(a);
+  if a.instanceOf(b) then exit(b);
+  if b.instanceOf(a) then exit(a);
+  ta := a;
+  while ta <> nil do begin
+    ta := ta.classParentNonBlocked;
+    if b.instanceOf(ta) then exit(ta);
+  end;
+  exit(TXQValue);
+end;
+
+function isAtomicSubType(temp: TXQValueClass): boolean;
+begin
+  result := (temp <> nil) and (temp <> TXQValue_AnyAtomicType) and (temp <> TXQValue) and (temp <> TXQValue_AnySimpleType) ;
 end;
 
 function getIntegerClass(a: IXQValue): TXQValueInt65Class; inline;

@@ -118,6 +118,11 @@ begin
   result := 'anyType';
 end;
 
+function TXQValue.instanceOfInternal(const typ: TXQValueClass): boolean;
+begin
+  result := instanceOf(typ);
+end;
+
 function TXQValue.getClassType: TXQValueClass;
 begin
   result := TXQValueClass(ClassType);
@@ -130,23 +135,12 @@ begin
   Result:='anyAtomicType';
 end;
 
-function TXQValue_AnyAtomicType.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:=(inherited) or (typ = TXQValue_AnyAtomicType);
-end;
-
 { TXQValue_AnySimpleType }
 
 class function TXQValue_AnySimpleType.classTypeName: string;
 begin
   Result:='anySimpleType';
 end;
-
-function TXQValue_AnySimpleType.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:=(inherited) or (typ = TXQValue_AnySimpleType);
-end;
-
 
 { TXQValue_DatePart }
 
@@ -188,9 +182,9 @@ begin
   Result:=false;
 end;
 
-function TXQValue_Binary.instanceOfInternal(const typ: TXQValueClass): boolean;
+class function TXQValue_Binary.classParentNonBlocked: TXQValueClass;
 begin
-  Result:=typ = TXQValue_Binary;
+  Result:=TXQValue_AnyAtomicType;
 end;
 
 class function TXQValue.createFromValue(const args: array of IXQValue): IXQValue;
@@ -199,14 +193,26 @@ begin
   raise Exception.Create('Invalid constructor called');
 end;
 
-function TXQValue.instanceOfInternal(const typ: TXQValueClass): boolean;
+class function TXQValue.instanceOf(const testType: TXQValueClass): boolean;
+var selfType: TXQValueClass;
 begin
-  result := typ = TXQValue;
+  selfType := TXQValueClass(ClassType);
+  while selfType <> nil do begin
+    if selfType = testType then exit(true);
+    selfType := selfType.classParentNonBlocked;
+  end;
+  exit(false);
 end;
 
 class function TXQValue.castableFromInternal(const v: IXQValue): boolean;
 begin
   result := true;
+end;
+
+class function TXQValue.classParentNonBlocked: TXQValueClass;
+begin
+  if ClassType = TXQValue then exit(nil);
+  result := TXQValueClass(ClassParent);
 end;
 
 function TXQValue.canConvertToType(v: TXQValueClass): boolean;
@@ -359,11 +365,6 @@ begin
   result := TXQValueBoolean.create(args[0].toBoolean);
 end;
 
-function TXQValueBoolean.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:=(typ = TXQValueBoolean) or (inherited);
-end;
-
 function TXQValueBoolean.toBoolean: boolean;
 begin
   result := bool;
@@ -418,14 +419,15 @@ begin
   result := TXQValueInt65.create(args[0].toInt65);
 end;
 
-function TXQValueInt65.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  result := (typ = TXQValueInt65) or (typ = TXQValueDecimal) or (inherited);
-end;
-
 class function TXQValueInt65.canCreateFromInt65(const i: int65): boolean;
 begin
   result := true;
+end;
+
+class function TXQValueInt65.classParentNonBlocked: TXQValueClass;
+begin
+  if ClassType = TXQValueInt65 then Result:=TXQValueDecimal
+  else result := TXQValueClass(ClassParent);
 end;
 
 function TXQValueInt65.canConvertToInt65: boolean;
@@ -490,11 +492,6 @@ class function TXQValueDecimal.createFromValue(const args: array of IXQValue): I
 begin
   requiredArgCount(args, 1);
   result := TXQValueDecimal.create(args[0].toDecimal);
-end;
-
-function TXQValueDecimal.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:=(typ = TXQValueDecimal) or (inherited);
 end;
 
 class function TXQValueDecimal.canCreateFromDecimal(const v: decimal): boolean;
@@ -588,10 +585,6 @@ begin
   result := TXQValueString.create(args[0].toString);
 end;
 
-function TXQValueString.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:=(typ = TXQValueString) or (inherited);
-end;
 
 class function TXQValueString.canCreateFromString(const v: string): boolean;
 begin
@@ -697,11 +690,6 @@ begin
     requiredArgCount(args, 1, 1);
     result := TXQValueDateTimeClass(self.ClassType).create(args[0].toString);
   end;
-end;
-
-function TXQValueDateTime.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:=(typ = TXQValueDateTime) or (inherited);
 end;
 
 constructor TXQValueDateTime.create(const str, format: string);
@@ -1278,11 +1266,6 @@ begin
   result := 'node';
 end;
 
-function TXQValueNode.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:=typ = TXQValueNode;
-end;
-
 function TXQValueNode.canConvertToInt65: boolean;
 var
   temp: int64;
@@ -1407,11 +1390,6 @@ end;
 class function TXQValueObject.classtypeName: string;
 begin
   Result:='object';
-end;
-
-function TXQValueObject.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  result := typ = TXQValueObject;
 end;
 
 function TXQValueObject.getClonedValue(const name: string): IXQValue;
@@ -1612,11 +1590,6 @@ end;
 class function TXQValueFunction.classtypeName: string;
 begin
   Result:='function';
-end;
-
-function TXQValueFunction.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  Result:= typ = TXQValueFunction;
 end;
 
 function TXQValueFunction.canConvertToInt65: boolean;
