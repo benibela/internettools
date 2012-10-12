@@ -2940,6 +2940,7 @@ begin
 
   end;}
   cxt := TXQParsingContext.Create;
+  cxt.encoding:=eUTF8;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
   cxt.AllowObjects:=VariableChangelog.allowObjects;
   cxt.parsingModel:=model;

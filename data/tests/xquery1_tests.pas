@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, xquery, simplehtmltreeparser;
 
-//test for xquery 1 expressions that are not also xpath 2 expressions
+//test for xquery 1 expressions that are not also xpath 2 expressions, or are listed in the XQuery standard
 procedure unittests;
 
 implementation
@@ -62,6 +62,39 @@ begin
   xml := TTreeParser.Create;
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
+
+  t('"12.5"', '12.5');
+  t('12', '12');
+  t('12.5', '12.5');
+  t('125E2', '12500');
+  t('"12.5" instance of xs:string', 'true');
+  t('12 instance of xs:integer', 'true');
+  t('12.5 instance of xs:decimal', 'true');
+  t('125E2 instance of xs:double', 'true');
+  t('12.5 instance of xs:double', 'false');
+  t('125E2 instance of xs:decimal', 'false');
+  t('"&quot;"',                   '"',                        ''); //XQuery has different string literals!
+  t('''&quot;''',                 '"',                        '');
+  t('"x&quot;y"',                   'x"y',                        '');
+  t('''x&quot;y''',                 'x"y',                        '');
+  t('"Ben &amp; Jerry&apos;s"', 'Ben & Jerry''s');
+  t('"&#8364;99.50"', '€99.50'); //assuming utf 8 encoding
+
+  t('xs:date("2001-08-25")', '2001-08-25');
+  t('(10, (1, 2), (), (3, 4))', '10 1 2 3 4');
+  t('(1 to 100)[. mod 5 eq 0]', '5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100');
+  t('(21 to 29)[5]', '25');
+
+  t('r/(a-b)', '1', '<r><a-b>1</a-b><a>10</a><b>20</b></r>');
+  t('r/(a - b)', '-10', '');
+  t('r/(a -b)', '-10', '');
+
+  t('let $bellcost := 10, $whistlecost := 20 return -$bellcost + $whistlecost', '10');
+  t('let $bellcost := 10, $whistlecost := 20 return -($bellcost + $whistlecost)', '-30');
+
+  t('fn:QName("http://example.com/ns1", "this:color")  eq fn:QName("http://example.com/ns1", "that:color")', 'true');
+  t('fn:QName("http://example.com/ns1", "this:color")  eq fn:QName("http://example.com/ns2", "that:color")', 'false');
+
 
 
   t('for $i in () where $i < 3 return $i', '');
@@ -138,6 +171,13 @@ begin
   t('for $b in /books/book stable order by $b/title collation "http://www.w3.org/2005/xpath-functions/collation/codepoint",  $b/price descending empty greatest return $b','753Caesar 75.3Caesar Das Kapital 6Das Kapital 1101010How to use binary 42The Hitchhiker''s Guide to the Galaxy');
   t('for $b in /books/book stable order by $b/title collation "http://www.w3.org/2005/xpath-functions/collation/codepoint",  $b/price empty greatest return $b','75.3Caesar 753Caesar 6Das Kapital Das Kapital 1101010How to use binary 42The Hitchhiker''s Guide to the Galaxy');
 
+
+{  <a>5</a> eq <a>5</a>
+
+<a>5</a> eq <b>5</b>
+
+<a>5</a> is <a>5</a>
+ }
 
 
 

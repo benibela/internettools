@@ -73,6 +73,7 @@ type
   AllowVariableUseInStringLiterals: boolean;
   AllowObjects: boolean;
   parsingModel: TXQParsingModel;
+  encoding: TEncoding;
 
   str: string;
   pos: pchar;
@@ -88,9 +89,11 @@ type
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
 
+
   function parseSequenceLike(target: TXQTerm): TXQTerm;
   function parseQNameContinuation: string;
   function parseSequenceType(): TXQTermSequenceType;
+  function replaceEntities(s: string; enc: TEncoding): string;
 
   function parseFlower(akind: string): TXQTermFlower;
 
@@ -402,6 +405,37 @@ begin
   result.returned := parse;
 end;
 
+function TXQParsingContext.replaceEntities(s: string; enc: TEncoding): string;
+var
+  n, p: Integer;
+  temp: string;
+begin
+  p := 1;
+  n := strIndexOf(s, '&');
+  while n > 0 do begin
+    result += copy(s, p, n - p);
+    p := n + 1;
+    n := strIndexOf(s, ';', p);
+    temp := copy(s, p, n - p);
+    case temp of
+      'lt': result += '<';
+      'gt': result += '>';
+      'amp': result += '&';
+      'quot': result += '"';
+      'apos': result += '''';
+      else begin
+        if temp[1] <> '#' then raiseParsingError('Invalid entity');
+        delete(temp,1,1);
+        if temp[1] = 'x' then result += strGetUnicodeCharacter(StrToInt('$'+strcopyfrom(temp,2)), enc)
+        else result += strGetUnicodeCharacter(StrToInt(temp), enc);
+      end;
+    end;
+    p := n + 1;
+    n := strIndexOf(s, '&', n);
+  end;
+  result += strcopyfrom(s, p);
+end;
+
 function TXQParsingContext.parseValue: TXQTerm;
 
   function parseString(const w: string): TXQTerm;
@@ -409,6 +443,7 @@ function TXQParsingContext.parseValue: TXQTerm;
       lastStrStart, i: integer;
   begin
     s := StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]);
+    if parsingModel in [xqpmXQuery1] then s := replaceEntities(s, encoding);
     if (not AllowVariableUseInStringLiterals) or (w[1] = '''') or (system.Pos('$', s) <= 0)  then
       exit(TXQTermString.create(s));
 
