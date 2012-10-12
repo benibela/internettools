@@ -386,9 +386,15 @@ begin
           mypxpoutput := pxp.evaluate();
           timing := now - timing;
           myoutput := mytostring(mypxpoutput);
-          if (myoutput = output) or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
+          if (myoutput = output)
+             or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
              or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
              or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18')))
+             or ((striEqual('text', outputcomparator)
+                  and (frac(StrToFloatDef(myoutput, 0.1)) = 0) and (frac(StrToFloatDef(output, 0.1)) = 0)
+                  and (     (StrToFloatDef(myoutput, -10.1) = StrToInt64Def(output, 7))
+                         or (StrToFloatDef(output, -10.1)   = StrToInt64Def(myoutput, 7)))
+                ))
              or ((striEqual('xml', outputcomparator) or striEqual('fragment', outputcomparator)) and (trim(myoutput) = trim(output)))
              or ((striEqual('xml', outputcomparator) and xmlEqual(myoutput, output)))
              or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
@@ -433,7 +439,7 @@ begin
     skipped += skippedErrorsLocal;
   end;
   mylogger.LOG_END(correct, wrong, exceptions, skipped);
-  //writeln(stderr, 'Correct:', correctLocal, ' Wrong: ',wrongLocal, ' Skipped: ',skippedErrorsLocal,' Crashed: ', exceptionLocal,' / ', totalLocal);
+  if mylogger <> TPlainLogger then  writeln(stderr, 'Correct:', correct, ' Wrong: ',wrong, ' Errors: ', exceptions,' / ', correct+wrong+exceptions, ' Skipped: ',         skipped);
 
 
   finally
