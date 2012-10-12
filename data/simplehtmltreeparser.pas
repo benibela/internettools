@@ -22,6 +22,7 @@ TAttributeList = TStringList; //TODO: use a map
 
 //**The type of a tree element. <Open>, text, or </close>
 TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttributeValue, tetAttributeName);
+TTreeElementTypes = set of TTreeElementType;
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
 //**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
@@ -112,6 +113,7 @@ TTreeElement = class
   function getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeTry(a: string; out valueout: TTreeElement; cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttributeCount(): integer;
 
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
@@ -127,6 +129,7 @@ TTreeElement = class
 
   property defaultProperty[name: string]: string read getAttribute; default;
 
+  function isDeepEqual(cmpTo: TTreeElement; ignoredTypes: TTreeElementTypes = [tetComment, tetProcessingInstruction]; cmpFunction: TStringComparisonFunc = nil): boolean;
 
   procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next+previous, not reverse+parent)
   procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
@@ -501,6 +504,18 @@ begin
   end;
 end;
 
+function TTreeElement.getAttributeCount: integer;
+var
+  temp: TTreeElement;
+begin
+  result := 0;
+  temp := attributes;
+  while temp <> nil do begin
+    result += 1;
+    temp := temp.next;
+  end;
+end;
+
 function TTreeElement.getNextSibling(): TTreeElement;
 begin
   case typ of
@@ -582,6 +597,45 @@ begin
     n := n.getParent();
   end;
   exit('');
+end;
+
+function TTreeElement.isDeepEqual(cmpTo: TTreeElement; ignoredTypes: TTreeElementTypes; cmpFunction: TStringComparisonFunc): boolean;
+var
+  attrib: TTreeElement;
+  temp1, temp2: TTreeElement;
+begin
+  //this follows the XPath deep-equal function
+  result := false;
+  if typ <> cmpTo.typ then exit();
+  if not cmpFunction(value, cmpTo.value) then exit;
+  case typ of
+    tetAttributeName, tetAttributeValue: if not cmpFunction(reverse.value, cmpTo.reverse.value) then exit;
+    tetProcessingInstruction: if getAttribute('') <> cmpTo.getAttribute('') then exit;
+    tetOpen: begin
+      if (next = reverse) <> (cmpTo.next = cmpTo.reverse) then exit;
+      if getAttributeCount <> cmpTo.getAttributeCount then exit;
+      attrib := attributes;
+      while attrib <> nil do begin
+        if not cmpTo.getAttributeTry(attrib.value, temp1, cmpFunction) then exit;
+        if not cmpFunction(temp1.value, attrib.reverse.value) then exit;
+        attrib := attrib.next;
+      end;
+
+      temp1 := next; temp2 := cmpTo.next;
+      while (temp1 <> nil) and (temp1.typ in ignoredTypes) do temp1 := temp1.getNextSibling();
+      while (temp2 <> nil) and (temp2.typ in ignoredTypes) do temp2 := temp2.getNextSibling();
+      while (temp1 <> nil) and (temp2 <> nil) do begin
+        if not temp1.isDeepEqual(temp2, ignoredTypes, cmpFunction) then exit;
+        temp1 := temp1.getNextSibling();
+        temp2 := temp2.getNextSibling();
+        while (temp1 <> nil) and (temp1.typ in ignoredTypes) do temp1 := temp1.getNextSibling();
+        while (temp2 <> nil) and (temp2.typ in ignoredTypes) do temp2 := temp2.getNextSibling();
+      end;
+    end;
+    tetComment, tetText, tetClose: ;
+    else raise ETreeParseException.Create('Invalid node type');
+  end;
+  result := true;
 end;
 
 procedure TTreeElement.insert(el: TTreeElement);

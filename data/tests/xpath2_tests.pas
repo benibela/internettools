@@ -2317,6 +2317,33 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('index-of(./r/a, ./r/@foo)', '3');
   t('string-join(distinct-values((./r/a, ./r/@foo)), ":")', 'X:Y:Z');
   t('string-join(distinct-values((./r/@foo, ./r/a)), ":")', 'z:X:Y');
+  t('deep-equal(r/a[1], r/a[2])', 'false');
+  t('deep-equal(r/a[1], r/a[1])', 'true');
+  t('deep-equal(r/a[1], "X")', 'false');
+  t('deep-equal("Y", r/a[2])', 'false');
+  t('deep-equal(r//a, r//a)', 'true');
+  t('deep-equal(r/@foo, r/a[3])', 'false');
+  t('', '', '!<attendees> <name last="Parker" first="Peter"/> <name last="Barker" first="Bob"/> <name last="Parker"  first="Peter"/> </attendees>'); //taken from the standard
+  t('deep-equal(attendees, attendees/*)', 'false');
+  t('deep-equal(attendees, attendees)', 'true');
+  t('deep-equal(attendees/name[1], attendees/name[1])', 'true');
+  t('deep-equal(attendees/name[1], attendees/name[2])', 'false');
+  t('deep-equal(attendees/name[1], attendees/name[3])', 'true');
+  t('deep-equal(attendees/name[1], "Peter Parker")', 'false');
+  t('deep-equal(attendees/name[1]/@last, "Parker")', 'false');
+  t('attendees/name[1]/@last eq "Parker"', 'true');
+  t('deep-equal((attendees/name[1],attendees/name[2]), (attendees/name[1],attendees/name[2]))', 'true');
+  t('deep-equal((attendees/name[1],attendees/name[2]), (attendees/name[3],attendees/name[2]))', 'true');
+  t('deep-equal((attendees/name[3],attendees/name[2]), (attendees/name[3],attendees/name[2]))', 'true');
+  t('deep-equal((attendees/name[2],attendees/name[3]), (attendees/name[3],attendees/name[2]))', 'false');
+  t('deep-equal(/r/a[1],  /r/a[1])', 'true', '!<r foo="z"><a>1<b>2</b>3</a> <a>1<b>2</b>3</a> <a>1<b>X</b>3</a> <a>1<B>2</B>3</a> <a>1<b x="z">2</b>3</a>  </r>');
+  t('deep-equal(/r/a[1],  /r/a[2])', 'true');
+  t('deep-equal(/r/a[1],  /r/a[3])', 'false');
+  t('deep-equal(/r/a[1],  /r/a[4])', 'true');
+  t('deep-equal(/r/a[1],  /r/a[5])', 'false');
+  t('deep-equal(/r/a[5],  /r/a[1])', 'false');
+
+
 
 
 

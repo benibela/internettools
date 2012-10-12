@@ -2206,10 +2206,21 @@ begin
   enum1 := args[0].GetEnumerator; enum1.MoveNext;
   enum2 := args[1].GetEnumerator; enum2.MoveNext;
   for i := 0 to args[0].getSequenceCount - 1 do begin
-    if not xqvalueComparableTypes(enum1.Current, enum2.Current)
-       or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.sender.ImplicitTimezone,true) then begin //todo:   nodes?
-      result := xqvalue(false);
-      exit;
+
+    if enum1.Current is TXQValue_AnyAtomicType then begin
+      if not (enum2.Current is TXQValue_AnyAtomicType)
+         or not xqvalueComparableTypes(enum1.Current, enum2.Current)
+         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.sender.ImplicitTimezone,true) then begin //todo:   nodes?
+        result := xqvalue(false);
+        exit;
+      end;
+    end else begin
+      if (enum2.Current is TXQValue_AnyAtomicType) or
+         (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
+            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.nodeCollation.equal)) then begin
+        result := xqvalue(false);
+        exit;
+      end;
     end;
     enum1.MoveNext;
     enum2.MoveNext;
