@@ -2283,7 +2283,28 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('1.2 eq xs:float(1.3)', 'false');
   t('1.2 eq xs:double(1.3)', 'false');
   t('xs:float(1.2) eq xs:double(1.3)', 'false');
-
+  t('xs:float(1.2) < 1.2', 'false');
+  t('xs:float(1.2) <= 1.2', 'true');
+  t('xs:float(1.2) = 1.2', 'true');
+  t('xs:float(1.2) >= 1.2', 'true');
+  t('xs:float(1.2) > 1.2', 'false');
+  t('xs:float(1.2) < xs:double("INF")', 'true');
+  t('xs:float(1.2) <= xs:double("INF")', 'true');
+  t('xs:float(1.2) = xs:double("INF")', 'false');
+  t('xs:float(1.2) >= xs:double("INF")', 'false');
+  t('xs:float(1.2) > xs:double("INF")', 'false');
+  t('xs:float(-1.2) < xs:double("INF")', 'true');
+  t('xs:float(-1.2) <= xs:double("INF")', 'true');
+  t('xs:float(-1.2) = xs:double("INF")', 'false');
+  t('xs:float(-1.2) >= xs:double("INF")', 'false');
+  t('xs:float(-1.2) > xs:double("INF")', 'false');
+  t('xs:float("INF") eq xs:double("INF")', 'true');
+  t('xs:float("INF") eq xs:double("-INF")', 'false');
+  t('xs:float("-INF") eq xs:double("INF")', 'false');
+  t('xs:float("-INF") eq xs:double("-INF")', 'true');
+  t('xs:float(1.2) = "1.2"', 'true'); //extension: weak typing.
+  t('xs:double(1.2) = "1.2"', 'true'); //extension: weak typing.
+  t('1.2 = "1.2"', 'true'); //extension: weak typing.
 
 
   performUnitTest('$abc','alphabet','');
