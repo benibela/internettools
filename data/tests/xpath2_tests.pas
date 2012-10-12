@@ -2312,6 +2312,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(distinct-values((1, "1", 2, 2.0)),":")', '1:1:2');
   t('deep-equal(1, current-dateTime())', 'false');
   t('deep-equal((1,2,3), ("1", "2", "3"))', 'false');
+  t('string-join(fn:distinct-values((xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))),":")', 'P0M');
 
 
 

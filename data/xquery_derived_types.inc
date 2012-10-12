@@ -1365,7 +1365,8 @@ end;
 
 class function TXQValue_float.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_float then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -1479,7 +1480,8 @@ end;
 
 class function TXQValue_double.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_double then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -1592,7 +1594,8 @@ end;
 
 class function TXQValue_untypedAtomic.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_untypedAtomic then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -2547,7 +2550,8 @@ end;
 
 class function TXQValue_anyURI.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_anyURI then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -2674,7 +2678,8 @@ end;
 
 class function TXQValue_QName.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_QName then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -2801,7 +2806,8 @@ end;
 
 class function TXQValue_NOTATION.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_NOTATION then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3167,7 +3173,8 @@ end;
 
 class function TXQValue_time.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_time then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3276,7 +3283,8 @@ end;
 
 class function TXQValue_date.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_date then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3385,7 +3393,8 @@ end;
 
 class function TXQValue_gYear.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_gYear then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3494,7 +3503,8 @@ end;
 
 class function TXQValue_gYearMonth.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_gYearMonth then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3603,7 +3613,8 @@ end;
 
 class function TXQValue_gMonthDay.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_gMonthDay then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3712,7 +3723,8 @@ end;
 
 class function TXQValue_gMonth.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_gMonth then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3821,7 +3833,8 @@ end;
 
 class function TXQValue_gDay.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_gDay then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
@@ -3930,7 +3943,8 @@ end;
 
 class function TXQValue_duration.classParentNonBlocked: TXQValueClass;
 begin
-  result := txqvalue_anyatomictype;
+  if classtype = TXQValue_duration then result := txqvalue_anyatomictype
+  else result := TXQValueClass(classParent);
 end;
 
 
