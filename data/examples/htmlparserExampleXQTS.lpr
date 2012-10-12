@@ -57,7 +57,7 @@ var
   wasnode: boolean;
 begin
   if (v is TXQValueSequence) and (v.getSequenceCount > 0) then begin
-    seq :=  v.toSequence;
+    seq :=  v.toXQVList;
     wasnode := seq[0] is TXQValueNode;
     result := mytostring(seq[0]);
     for i:=1 to seq.count-1 do begin
@@ -143,8 +143,8 @@ begin
     output:=StringReplace(output, '<', '&lt;', [rfReplaceAll]);
     output:=StringReplace(output, '>', '&gt;', [rfReplaceAll]);
 
-    desc += '<br><a href="http://dev.w3.org/cvsweb/2006/xquery-test-suite/TestSuiteStagingArea/'+queryfile+'?rev=1.1;content-type=text%2Fplain">Query</a>, ';
-    desc += '<a href="http://dev.w3.org/cvsweb/2006/xquery-test-suite/TestSuiteStagingArea/TestSources/'+inputfile+'.xml?rev=1.1;content-type=text%2Fplain">XML-Input</a>';
+    desc += '<br><a href="http://dev.w3.org/cvsweb/2006/xquery-test-suite/TestSuiteStagingArea/'+queryfile+'?rev=HEAD;content-type=text%2Fplain">Query</a>, ';
+    desc += '<a href="http://dev.w3.org/cvsweb/2006/xquery-test-suite/TestSuiteStagingArea/TestSources/'+inputfile+'.xml?rev=HEAD;content-type=text%2Fplain">XML-Input</a>';
 
 
     case state of
