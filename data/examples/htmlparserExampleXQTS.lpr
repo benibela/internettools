@@ -126,7 +126,7 @@ end;
 
 class procedure THTMLLogger.LOG_GROUP_START(filen, title, desc: string);
 begin
-  buffer2.add('<h3><a name="'+title+'">'+title+'</a></h3>');
+  buffer2.add('<h3><a name="'+StringReplace(StringReplace(title, '"', '_', [rfReplaceAll]), ' ', '_', [rfReplaceAll]) +'">'+title+'</a></h3>');
   buffer2.add(filen+': ' +desc+'<br><br>');
 
 
@@ -161,7 +161,7 @@ var
   color: String;
 begin
   lastGroup := lastgroupStart.findChild(tetOpen, 'title').deepNodeText();
-  if startlogged then lastGroup := '<a href="#'+lastGroup+'">'+lastGroup+'</a>';
+  if startlogged then lastGroup := '<a href="#'+ StringReplace(StringReplace(lastGroup, '"', '_', [rfReplaceAll]), ' ', '_', [rfReplaceAll]) +'">'+lastGroup+'</a>';
 
   if correct+wrong+exceptions = 0 then color := ''
   else begin
