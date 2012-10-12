@@ -525,6 +525,11 @@ begin
   Result:=true;
 end;
 
+class function TXQValueDecimal.truncateRange(const v: decimal): Decimal;
+begin
+  result := v;
+end;
+
 function TXQValueDecimal.toBoolean: boolean;
 begin
  Result:=(not IsNan(value)) and (value <> 0);

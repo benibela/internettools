@@ -292,6 +292,7 @@ type
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal: boolean; override;
+    class function truncateRange(const v: decimal): Decimal; virtual;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -1626,12 +1627,53 @@ begin
 end;
 
 function commonDecimalClass(a,b: TXQValueClass): TXQValueDecimalClass;
+   //checks if one of the values has the given type. if yes, it sets its caller result to the least common ancestor, derived from that type
+  function becomesType(typ: TXQValueDecimalClass): boolean;
+  var amatch, bmatch: boolean;
+  begin
+    amatch:=a.InheritsFrom(typ);
+    bmatch:=b.InheritsFrom(typ);
+    if not amatch and not bmatch then exit(false);
+    result := true;
+    if not amatch or not bmatch then commonDecimalClass := typ
+    else if a = b then commonDecimalClass := TXQValueDecimalClass(a)
+    else commonDecimalClass := TXQValueDecimalClass(commonClass(a, b)); //check for possible user defined types both derived from typ
+  end;
+
 var temp: TClass;
   aDecimal: Boolean;
   bDecimal: Boolean;
 begin
-  aDecimal := a.InheritsFrom(TXQValueDecimal);
-  bDecimal := b.InheritsFrom(TXQValueDecimal);
+  //Decimal conversion is complicated.
+  //Official type promotion after: http://www.w3.org/TR/xpath20/#promotion:
+  //  float~ -> double
+  //  decimal~ -> float,  decimal~ -> double
+  // also sub type substitution:
+  //  integer -> decimal
+  //That's the opposite of my type hierarchy (float -> decimal, double -> decimal), so handle all cases separately
+
+  if a = b then
+    if a.InheritsFrom(TXQValueDecimal) then exit(TXQValueDecimalClass(a))
+    else if a.InheritsFrom(TXQValueInt65) then exit(TXQValueDecimal)
+    else exit(TXQValueDecimal);
+
+  if becomesType(TXQValue_double) then
+    exit; //all values can be converted to double, but double can not be converted to anything
+
+  //(decimal, float, integer) bases remaining
+
+  if becomesType(TXQValue_float) then
+    exit(); //all of them can be converted to float
+
+  //(decimal, integer) remaining
+
+  result := TXQValueDecimal;
+  becomesType(TXQValueDecimal)
+
+
+   (*
+  aDecimal := a.InheritsFrom(TXQValueDecimal) or a.InheritsFrom(TXQValueInt65);
+  bDecimal := b.InheritsFrom(TXQValueDecimal) or b.InheritsFrom(TXQValueInt65);
   if (not aDecimal) and (not bDecimal) then exit(TXQValueDecimal);
   if a = b then exit(TXQValueDecimalClass(a));
   if (not aDecimal) or (not bDecimal) then begin
@@ -1639,11 +1681,6 @@ begin
     if bDecimal then exit(TXQValueDecimalClass(b));
     assert(false);
   end;
-  //Decimal conversion is complicated.
-  //Official conversion after: http://www.w3.org/TR/xpath20/#promotion:
-  //  float~ -> double
-  //  decimal~ -> float,  decimal~ -> double
-  //That's the opposite of my type hierarchy (float -> decimal, double -> decimal), so handle all cases separately
   if a = TXQValueDecimal then begin
     if (b = TXQValueDecimal) then exit(TXQValueDecimal);
     if (b = TXQValue_Double) then exit(TXQValue_Double);
@@ -1660,14 +1697,13 @@ begin
   //handle unexpectected cases (i.e. user restriced decimals)
   temp := commonClass(a,b);
   if temp = TXQValue then exit(TXQValueDecimal);
-  result := TXQValueDecimalClass(temp);
+  result := TXQValueDecimalClass(temp);*)
 end;
 
 function commonDecimalClass(a,b: IXQValue): TXQValueDecimalClass; inline;
 begin
   result := commonDecimalClass(a.getClassType, b.getClassType);
 end;
-
 
 function xqvalue: IXQValue;
 begin

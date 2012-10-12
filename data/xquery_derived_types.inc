@@ -71,7 +71,6 @@ begin
   
 
   
-  
 
   
 
@@ -113,7 +112,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -180,7 +183,6 @@ begin
   
 
   
-  
 
   
 
@@ -222,7 +224,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -293,7 +299,6 @@ begin
   
 
   
-  
 
   
 
@@ -335,7 +340,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -406,7 +415,6 @@ begin
   
 
   
-  
 
   
 
@@ -448,7 +456,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -515,7 +527,6 @@ begin
   
 
   
-  
 
   
 
@@ -557,7 +568,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -622,7 +637,6 @@ begin
   
 
   
-  
 
   
 
@@ -664,7 +678,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -724,7 +742,6 @@ begin
   
 
   
-  
 
   
 
@@ -766,7 +783,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -826,7 +847,6 @@ begin
   
 
   
-  
 
   
 
@@ -868,7 +888,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -928,7 +952,6 @@ begin
   
 
   
-  
 
   
 
@@ -970,7 +993,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1039,7 +1066,6 @@ begin
   
 
   
-  
 
   
 
@@ -1081,7 +1107,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1152,7 +1182,6 @@ begin
   
 
   
-  
 
   
 
@@ -1194,7 +1223,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1265,7 +1298,6 @@ begin
   
 
   
-  
 
   
 
@@ -1307,7 +1339,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1352,7 +1388,10 @@ type TXQValue_float = class (TXQValueDecimal)
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
   
+  
+  class function truncateRange(const v: TXQ_decimal): TXQ_decimal;override;
   function toString: string; override;
+  
 end;
 {$endif}
 
@@ -1364,7 +1403,8 @@ constructor TXQValue_float.create(const v: TXQ_decimal);
 begin
   
 
-  value := single(v); 
+  
+  value := truncateRange(v);
   
 
   
@@ -1404,18 +1444,26 @@ end;
 
 
 
+class function TXQValue_float.truncateRange(const v: TXQ_decimal): TXQ_decimal;
+begin
+  result := single  (v);
+end;
+
 function TXQValue_float.toString: string;
 begin
   if isnan(value) then result:='NaN'
   else if isPosInf(value) then result:='INF'
   else if isNegInf(value) then result:='-INF'
-  else result := myDecimalToStr(single  (value));
+  else result := myDecimalToStr(single  (value)); //this is needed to call the correct overloaded toStr function to print a correctly rounded value
 end;
 
 
 
 
+
 {$endif}
+
+
 
 
 
@@ -1456,7 +1504,10 @@ type TXQValue_double = class (TXQValueDecimal)
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
   
+  
+  class function truncateRange(const v: TXQ_decimal): TXQ_decimal;override;
   function toString: string; override;
+  
 end;
 {$endif}
 
@@ -1469,7 +1520,8 @@ begin
   
 
   
-  value := double(v); 
+  value := truncateRange(v);
+  
 
   
 
@@ -1508,18 +1560,26 @@ end;
 
 
 
+class function TXQValue_double.truncateRange(const v: TXQ_decimal): TXQ_decimal;
+begin
+  result :=  double (v);
+end;
+
 function TXQValue_double.toString: string;
 begin
   if isnan(value) then result:='NaN'
   else if isPosInf(value) then result:='INF'
   else if isNegInf(value) then result:='-INF'
-  else result := myDecimalToStr( double (value));
+  else result := myDecimalToStr( double (value)); //this is needed to call the correct overloaded toStr function to print a correctly rounded value
 end;
 
 
 
 
+
 {$endif}
+
+
 
 
 
@@ -1573,7 +1633,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -1621,7 +1680,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1672,7 +1735,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -1718,7 +1780,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1769,7 +1835,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -1815,7 +1880,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1866,7 +1935,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -1912,7 +1980,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -1963,7 +2035,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -2009,7 +2080,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2060,7 +2135,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -2106,7 +2180,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2157,7 +2235,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -2203,7 +2280,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2254,7 +2335,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -2300,7 +2380,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2351,7 +2435,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -2397,7 +2480,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2448,7 +2535,6 @@ begin
   
 
   
-  
 
   
   str := trim(v); //trim all derived types
@@ -2494,7 +2580,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2544,7 +2634,6 @@ constructor TXQValue_anyURI.create(const v: TXQ_string);
 begin
   
 
-  
   
 
   
@@ -2620,7 +2709,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2670,7 +2763,6 @@ constructor TXQValue_QName.create(const v: TXQ_string);
 begin
   
 
-  
   
 
   
@@ -2746,7 +2838,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2796,7 +2892,6 @@ constructor TXQValue_NOTATION.create(const v: TXQ_string);
 begin
   
 
-  
   
 
   
@@ -2872,7 +2967,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -2922,7 +3021,6 @@ constructor TXQValue_hexBinary.create(const v: TXQ_string);
 begin
   
 
-  
   
 
   
@@ -2996,7 +3094,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3043,7 +3145,6 @@ constructor TXQValue_base64Binary.create(const v: TXQ_string);
 begin
   
 
-  
   
 
   
@@ -3117,7 +3218,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3169,7 +3274,6 @@ constructor TXQValue_time.create(const v: TXQ_datetime);
 begin
   
 
-  
   
 
   
@@ -3223,7 +3327,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3278,7 +3386,6 @@ begin
   
 
   
-  
 
   
 
@@ -3331,7 +3438,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3386,7 +3497,6 @@ begin
   
 
   
-  
 
   
 
@@ -3439,7 +3549,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3494,7 +3608,6 @@ begin
   
 
   
-  
 
   
 
@@ -3547,7 +3660,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3602,7 +3719,6 @@ begin
   
 
   
-  
 
   
 
@@ -3655,7 +3771,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3710,7 +3830,6 @@ begin
   
 
   
-  
 
   
 
@@ -3763,7 +3882,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3818,7 +3941,6 @@ begin
   
 
   
-  
 
   
 
@@ -3871,7 +3993,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -3926,7 +4052,6 @@ begin
   
 
   
-  
 
   
 
@@ -3979,7 +4104,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -4034,7 +4163,6 @@ begin
   
 
   
-  
 
   
 
@@ -4085,7 +4213,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 
@@ -4140,7 +4272,6 @@ begin
   
 
   
-  
 
   
 
@@ -4191,7 +4322,11 @@ end;
 
 
 
+
+
 {$endif}
+
+
 
 
 

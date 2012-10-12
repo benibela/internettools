@@ -2277,6 +2277,12 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(.//c except .//d, ":")', 'C');
   t('string-join(.//c except .//c/@att, ":")', 'C');
   t('string-join(.//d except .//c, ":")', '');
+  t('1.2 eq xs:float(1.2)', 'true');
+  t('1.2 eq xs:double(1.2)', 'true');
+  t('xs:float(1.2) eq xs:double(1.2)', 'false'); //??? Zorba agrees
+  t('1.2 eq xs:float(1.3)', 'false');
+  t('1.2 eq xs:double(1.3)', 'false');
+  t('xs:float(1.2) eq xs:double(1.3)', 'false');
 
 
 

@@ -270,6 +270,17 @@ end;
 
 function xqvalueCompareAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
 var ak, bk: TXQValueKind;
+
+  function compareAsDecimals(): integer;
+  var
+    cmpClass: TXQValueDecimalClass;
+  begin
+    if ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) or ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)) then
+      exit(-2);
+    cmpClass := commonDecimalClass(a, b);
+    result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal));
+  end;
+
 begin
   ak := a.kind; bk := b.kind;
   result:=-2;
@@ -284,8 +295,7 @@ begin
           if TXQValueInt65(a).value = TXQValueInt65(b).value then result := 0
           else if TXQValueInt65(a).value < TXQValueInt65(b).value then result := -1
           else result := 1;
-        pvkDecimal:
-          result := compareValue(TXQValueDecimal(a).value, TXQValueDecimal(b).value );
+        pvkDecimal: result := compareAsDecimals();
         pvkDateTime: begin
           if (a is TXQValue_duration) <> (b is TXQValue_duration) then exit(-2);
           if (a is TXQValue_duration) and (b is TXQValue_duration) then begin
@@ -297,7 +307,7 @@ begin
         end;
       end;
     end else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then
-      result := compareValue(a.toDecimal, b.toDecimal)
+      result := compareAsDecimals()
     else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
       result := CompareStr(TXQValue_Binary(a).toRawBinary, TXQValue_Binary(b).toRawBinary)
     else if (a is TXQValue_QName) or (b is TXQValue_QName) then raise EXQEvaluationException.Create('QName compared')
@@ -318,7 +328,26 @@ end;
 
 function xqvalueEqualAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
 var
+  ak: TXQValueKind;
+  bk: TXQValueKind;
+begin
+  result:=false;
+  ak := a.kind; bk := b.kind;
+  if ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) or ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)) then
+    exit(acceptNAN and ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) and ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)));
+  if (ak = pvkString) or (bk = pvkString) then
+    if (a is TXQValue_QName) or (b is TXQValue_QName) then begin
+      if (a is TXQValue_QName) <> (b is TXQValue_QName) then raise EXQEvaluationException.Create('QNames can only be compared with QNames');
+      exit(qnameEqual(TXQValue_QName(a).str, TXQValue_QName(b).str));
+    end;
+  result := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone)=0;
+end;
+
+                                                           (*
+function xqvalueEqualAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
+var
   ak, bk: TXQValueKind;
+  cmpClass: TXQValueDecimalClass;
 begin
   result:=false;
   ak := a.kind; bk := b.kind;
@@ -327,14 +356,21 @@ begin
       case ak of
         pvkBoolean: result := TXQValueBoolean(a).bool = TXQValueBoolean(b).bool;
         pvkInt: result := TXQValueInt65(a).value = TXQValueInt65(b).value;
-        pvkDecimal: result := (acceptNAN and IsNan(TXQValueDecimal(a).value) and IsNan(TXQValueDecimal(b).value)) or
-                               (compareValue(TXQValueDecimal(a).value, TXQValueDecimal(b).value) = 0);
+        pvkDecimal: begin
+          if IsNan(TXQValueDecimal(a).value) or IsNan(TXQValueDecimal(b).value) then
+            exit(acceptNAN and (IsNan(TXQValueDecimal(a).value) and IsNan(TXQValueDecimal(b).value)));
+          cmpClass := commonDecimalClass(a, b);
+          result := compareValue(cmpClass.truncateRange(TXQValueDecimal(a).value), cmpClass.truncateRange(TXQValueDecimal(b).value)) = 0;
+        end;
         pvkDateTime: result :=  (xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone) = 0);
         else raise EXQEvaluationException.Create('Impossible type');
       end;
-    end else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then
-      result :=  compareValue(a.toDecimal, b.toDecimal) = 0
-    else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
+    end else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then begin
+      if ((a is TXQValueDecimal) and IsNan(TXQValueDecimal(a).value)) or ((b is TXQValueDecimal) and IsNan(TXQValueDecimal(b).value)) then
+        exit(acceptNAN and ((a is TXQValueDecimal) and IsNan(TXQValueDecimal(a).value)) and ((b is TXQValueDecimal) and IsNan(TXQValueDecimal(b).value)));
+      cmpClass := commonDecimalClass(a, b);
+      result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal)) = 0;
+    end else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
       result := TXQValue_Binary(a).toRawBinary = TXQValue_Binary(b).toRawBinary
     else if (a is TXQValue_QName) or (b is TXQValue_QName) then begin
       if (a is TXQValue_QName) <> (b is TXQValue_QName) then raise EXQEvaluationException.Create('QNames can only be compared with QNames');
@@ -345,7 +381,7 @@ begin
       result := TXQueryEngine.getDefaultCollation.equal(a.toString,b.toString)
 
   end;
-end;
+end;                                                      *)
 
 function xqvalueEqualAtomicBase(a, b: IXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
 begin
