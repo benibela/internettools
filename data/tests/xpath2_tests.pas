@@ -2393,6 +2393,12 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('every $x in (1,2,3) satisfies "true"', 'true');
   t('every $x in (1,2,3) satisfies "false"', 'true');
   t('every $x in (1,2,3) satisfies ""', 'false');
+  t('xs:integer(1.1)', '1');
+  t('xs:integer(1.5)', '1');
+  t('xs:integer(-1.5)', '-1');
+  t('xs:integer(1.9999)', '1');
+  t('-1.9999 cast as xs:integer', '-1');
+  t('1.9999 cast as xs:integer', '1');
 
 
 

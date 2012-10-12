@@ -543,7 +543,7 @@ begin
   if IsNan(value) then result := 0
   else if isPosInf(value) then result:=high(Int64)
   else if value = -Infinity then result:=low(Int64)
-  else result := xqround(value);
+  else result := truncToInt65(value);
 end;
 
 function TXQValueDecimal.toDecimal: decimal;

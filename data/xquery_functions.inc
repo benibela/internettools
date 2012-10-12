@@ -839,6 +839,20 @@ begin
   else result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal), args[0])
 end;
 
+function xqvalueRounded(const v: IXQValue): TXQ_Decimal;
+var
+  f, ff: Decimal;
+begin
+  if v is TXQValueInt65 then exit(v.toDecimal);
+  f := v.toDecimal;
+  ff := frac(f);
+  if ff = 0 then exit(f);
+  f := f + 0.5;
+  ff := frac(f);
+  if ff >= 0 then result := f - ff
+  else result := f - ff - 1;
+end;
+
 procedure xqFunctionRound(args: array of IXQValue; var result: IXQValue);
 var
   f,ff: Decimal;
@@ -848,14 +862,7 @@ begin
   if args[0] is TXQValueInt65 then begin result := xqvalue(args[0].toInt65); exit; end;
   f := args[0].toDecimal;
   if IsNan(f) or IsInfinite(f) then begin result := args[0]; exit; end;
-  ff := frac(f);
-  if ff = 0 then result := xqvalueBaseDecimalType(f, args[0])
-  else begin
-    f := f + 0.5;
-    ff := frac(f);
-    if ff >= 0 then result := xqvalueBaseDecimalType(f - ff, args[0])
-    else result := xqvalueBaseDecimalType(f - ff  - 1, args[0])
-  end;
+  result := xqvalueBaseDecimalType(xqvalueRounded(args[0]), args[0]);
 end;
 
 procedure xqFunctionRound_Half_To_Even(args: array of IXQValue; var result: IXQValue);
@@ -1152,14 +1159,14 @@ begin
       exit;
     end;
 
-  from := args[1].toInt64;
+  from := round(xqvalueRounded(args[1]));
   if length(args) = 3 then begin
     if args[2].kind <> pvkDecimal then unti :=from + args[2].toInt64
     else if IsNan(args[2].toDecimal) or isNegInf(args[2].toDecimal) then begin //Since -INF + INF returns NaN, no characters are selected.
        len := 0;
        exit();
     end else if isPosInf(args[2].toDecimal) then unti := maxLen+1
-    else unti := from + args[2].toInt64;
+    else unti := from + round(xqvalueRounded(args[2]));
   end else unti := maxLen + 1;
 
   if from < 1 then from := 1;
