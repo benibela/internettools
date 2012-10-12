@@ -1646,7 +1646,7 @@ begin
   result := commonIntegerClass(a.getClassType, b.getClassType);
 end;
 
-function commonDecimalClass(a,b: TXQValueClass): TXQValueDecimalClass;
+function commonDecimalClass(a,b: TXQValueClass; failureClass: TXQValueDecimalClass): TXQValueDecimalClass;
    //checks if one of the values has the given type. if yes, it sets its caller result to the least common ancestor, derived from that type
   function becomesType(typ: TXQValueDecimalClass): boolean;
   var amatch, bmatch: boolean;
@@ -1675,7 +1675,7 @@ begin
   if a = b then
     if a.InheritsFrom(TXQValueDecimal) then exit(TXQValueDecimalClass(a))
     else if a.InheritsFrom(TXQValueInt65) then exit(TXQValueDecimal)
-    else exit(TXQValueDecimal);
+    else exit(failureClass);
 
   if becomesType(TXQValue_double) then
     exit; //all values can be converted to double, but double can not be converted to anything
@@ -1687,7 +1687,7 @@ begin
 
   //(decimal, integer) remaining
 
-  result := TXQValueDecimal;
+  result := failureClass;
   becomesType(TXQValueDecimal)
 
 
@@ -1722,7 +1722,7 @@ end;
 
 function commonDecimalClass(a,b: IXQValue): TXQValueDecimalClass; inline;
 begin
-  result := commonDecimalClass(a.getClassType, b.getClassType);
+  result := commonDecimalClass(a.getClassType, b.getClassType, TXQValue_Double);
 end;
 
 function xqvalue: IXQValue;
@@ -2222,7 +2222,7 @@ begin
   if count = 1 then exit(getDecimalClass(items[0]));
   result := commonDecimalClass(items[0], items[1]);
   for i:=2 to count - 1 do
-    result := commonDecimalClass(result, items[i].getClassType);
+    result := commonDecimalClass(result, items[i].getClassType, TXQValue_Double);
 end;
 
 function TXQVList.getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass;

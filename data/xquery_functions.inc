@@ -15,8 +15,7 @@ begin
      (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit();
 
-  if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and (a.canConvertToInt65))) and
-     ((bk = pvkInt) or ((bk in [pvkString,pvkNode]) and (b.canConvertToInt65))) then begin
+  if (ak = pvkInt) and (bk = pvkInt) then begin
     result := commonIntegerClass(a,b).create(a.toInt65 + b.toInt65);
     exit;
   end;
@@ -54,8 +53,7 @@ begin
      (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit();
 
-  if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and (a.canConvertToInt65))) and
-     ((bk = pvkInt) or ((bk in [pvkString,pvkNode]) and (b.canConvertToInt65))) then begin
+  if (ak = pvkInt) and (bk = pvkInt) then begin
     result := commonIntegerClass(a, b).create(a.toInt65 - b.toInt65);
     exit;
   end;
@@ -96,6 +94,7 @@ var i, f,t: int65;
     len: Int65;
     resseq: TXQValueSequence;
 begin
+  if a.isUndefined or b.isUndefined then exit;
   typ := commonIntegerClass(a,b);
   f := a.toInt65();
   t := b.toInt65();
@@ -137,8 +136,7 @@ begin
     exit;
   end;
 
-  if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and (a.canConvertToInt65))) and
-     ((bk = pvkInt) or ((bk in [pvkString,pvkNode]) and (b.canConvertToInt65))) then begin
+  if (ak = pvkInt) and (bk = pvkInt) then begin
     result := commonIntegerClass(a,b).create(a.toInt65 * b.toInt65);
     exit;
   end;
@@ -231,8 +229,7 @@ begin
      (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
     exit();
 
-  if ((ak = pvkInt) or ((ak = pvkString) and (a.canConvertToInt65))) and
-     ((bk = pvkInt) or ((bk = pvkString) and (b.canConvertToInt65))) then begin
+  if (ak = pvkInt) and (bk = pvkInt) then begin
     i := b.toInt65;
     if i = 0 then result := a
     else result := xqvalue(a.toInt65 mod i);
@@ -314,6 +311,7 @@ var ak, bk: TXQValueKind;
     result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal));
   end;
 
+var tempDateTime: TXQValueDateTime;
 begin
   ak := a.kind; bk := b.kind;
   result:=-2;
@@ -339,12 +337,22 @@ begin
             result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
         end;
       end;
+      //This also implements the generic comparison type conversion rules (in those case where it would affect the result, a type error should be raised)
     end else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then
       result := compareAsDecimals()
     else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
       result := CompareStr(TXQValue_Binary(a).toRawBinary, TXQValue_Binary(b).toRawBinary)
     else if (a is TXQValue_QName) or (b is TXQValue_QName) then raise EXQEvaluationException.Create('QName compared')
-    else if collation <> nil then result := collation.compare(a.toString,b.toString)
+    else if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
+      if ak = pvkDateTime then begin
+        tempDateTime := TXQValueDateTimeClass(a.ClassType).create(b.toString);
+        result := xqvalueCompareAtomicBase(a, tempDateTime, collation, implicitTimezone);
+      end else if bk = pvkDateTime then begin
+        tempDateTime := TXQValueDateTimeClass(b.ClassType).create(a.toString);
+        result := xqvalueCompareAtomicBase(tempDateTime, b, collation, implicitTimezone);
+      end;
+      tempDateTime.free;
+    end else if collation <> nil then result := collation.compare(a.toString,b.toString)
     else result := TXQueryEngine.getDefaultCollation.compare(a.toString, b.toString);
   end;
 end;
@@ -558,6 +566,7 @@ end;
 
 procedure xqvalueSameNode(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  if ta.isUndefined or tb.isUndefined then exit;
   result := xqvalue(xqvalueToSingleNode(ta) = xqvalueToSingleNode(tb));
 end;
 procedure xqvalueNodeBefore(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
@@ -565,6 +574,7 @@ var
   na, nb: TTreeElement;
   da, db: TTreeDocument;
 begin
+  if ta.isUndefined or tb.isUndefined then exit;
   na := xqvalueToSingleNode(ta); nb := xqvalueToSingleNode(tb);
   da := na.getDocument(); db := nb.getDocument();
   result := xqvalue( ((na.offset < nb.offset) and (da = db)) or (pointer(da) < pointer(db)));
@@ -574,6 +584,7 @@ var
   na, nb: TTreeElement;
   da, db: TTreeDocument;
 begin
+  if ta.isUndefined or tb.isUndefined then exit;
   na := xqvalueToSingleNode(ta); nb := xqvalueToSingleNode(tb);
   da := na.getDocument(); db := nb.getDocument();
   result := xqvalue( ((na.offset > nb.offset) and (da = db)) or (pointer(da) > pointer(db)));

@@ -98,6 +98,10 @@ begin
   t('''$abc;''',                   '$abc;',                        ''); //no variable matching in '
   t('"$abc;"',                   'alphabet',                        ''); //variable matching in "
   t('"$ABC;"',                   '',                        '');
+  t('"&quot;"',                   '&quot;',                        '');
+  t('''&quot;''',                 '&quot;',                        '');
+  t('"x&quot;y"',                   'x&quot;y',                        '');
+  t('''x&quot;y''',                 'x&quot;y',                        '');
 
   //change base xml used for tests
   t('','', '<html attrib1="FIRST ATTRIBUTE" attrib2="SECOND ATTRIBUTE" attrib3="THIRD ATTRIBUTE">test:last text<!--comment!--><deep>:BEEP</deep>'#13#10+
@@ -2400,6 +2404,71 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('-1.9999 cast as xs:integer', '-1');
   t('1.9999 cast as xs:integer', '1');
 
+
+  //more precise type tests
+  t('() * 1', '');
+  t('() + 1', '');
+  t('() - 1', '');
+  t('() div 1', '');
+  t('() idiv 1', '');
+  t('() mod 1', '');
+  t('() to 1', '');
+  t('1  * () ', '');
+  t('1  + () ', '');
+  t('1  -  ()', '');
+  t('1  div () ', '');
+  t('1  idiv ()  ', '');
+  t('1  mod  ()' , '');
+  t('1  to  ()' , '');
+  t('xs:untypedAtomic("1") * 7', '7');
+  t('type-of(xs:untypedAtomic("1e6") * 7)', 'double');
+  t('type-of(xs:untypedAtomic("1.0") * 7)', 'double');
+  t('type-of(xs:untypedAtomic("1") * 7)', 'double');
+  t('xs:untypedAtomic("1") div 8', '0.125');
+  t('type-of(xs:untypedAtomic("1e6") div 8)', 'double');
+  t('type-of(xs:untypedAtomic("1.0") div 8)', 'double');
+  t('type-of(xs:untypedAtomic("1") div 8)', 'double');
+  t('1 div 8', '0.125');
+  t('type-of(1 div 8)', 'decimal');
+  t('xs:untypedAtomic("1") idiv 8', '0');
+  t('type-of(xs:untypedAtomic("1e6") idiv 8)', 'integer');
+  t('type-of(xs:untypedAtomic("1.0") idiv 8)', 'integer');
+  t('type-of(xs:untypedAtomic("1") idiv 8)', 'integer');
+  t('xs:untypedAtomic("1") mod 8', '1');
+  t('type-of(xs:untypedAtomic("1e6") mod 8)', 'double');
+  t('type-of(xs:untypedAtomic("1.0") mod 8)', 'double');
+  t('type-of(xs:untypedAtomic("1") mod 8)', 'double');
+  t('xs:untypedAtomic("1") + 7', '8');
+  t('xs:string("1") + 7', '8');
+  t('type-of(xs:untypedAtomic("1e6") + 7)', 'double');
+  t('type-of(xs:untypedAtomic("1.0") + 7)', 'double');
+  t('type-of(xs:untypedAtomic("1") + 7)', 'double');
+  t('xs:untypedAtomic("1") - 7', '-6');
+  t('xs:string("1") - 7', '-6');
+  t('type-of(xs:untypedAtomic("1e6") - 7)', 'double');
+  t('type-of(xs:untypedAtomic("1.0") - 7)', 'double');
+  t('type-of(xs:untypedAtomic("1") - 7)', 'double');
+  t('type-of(1 - 7)', 'integer');
+
+  t('1 = xs:untypedAtomic("1")', 'true');
+  t('1 = xs:untypedAtomic("1.0")', 'true');
+  t('xs:dayTimeDuration("P1D") = xs:untypedAtomic("P0DT23H")', 'false');
+  t('xs:dayTimeDuration("P1D") = xs:untypedAtomic("P0DT24H")', 'true');
+  t('xs:dayTimeDuration("P1D") < xs:untypedAtomic("P0DT23H")', 'false');
+  t('xs:dayTimeDuration("P1D") >= xs:untypedAtomic("P0DT24H")', 'true');
+  t('xs:dayTimeDuration("-P1D") >= xs:untypedAtomic("P0DT24H")', 'false');
+  t('xs:dayTimeDuration("P1D") != xs:untypedAtomic("P0DT24H")', 'false');
+  t('xs:untypedAtomic("false") = false()', 'true');
+  t('xs:untypedAtomic("true") = false()', 'false');
+
+  t('/a is ()',  '', '!<a/>');
+  t('() is /a ', '');
+  t('/a << ()',  '');
+  t('() << /a ', '');
+  t('/a >> ()',  '');
+  t('() >> /a ', '');
+
+  //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
 
 
   performUnitTest('$abc','alphabet','');
