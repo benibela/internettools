@@ -2313,6 +2313,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('deep-equal(1, current-dateTime())', 'false');
   t('deep-equal((1,2,3), ("1", "2", "3"))', 'false');
   t('string-join(fn:distinct-values((xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))),":")', 'P0M');
+  t('index-of(./r/a, "y")', '2', '<r foo="z"><a>X</a><a>Y</a><a>Z</a></r>');
+  t('index-of(./r/a, ./r/@foo)', '3');
+  t('string-join(distinct-values((./r/a, ./r/@foo)), ":")', 'X:Y:Z');
+  t('string-join(distinct-values((./r/@foo, ./r/a)), ":")', 'z:X:Y');
 
 
 

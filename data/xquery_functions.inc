@@ -264,6 +264,8 @@ function xqvalueComparableTypes(const a, b: IXQValue): boolean;
 var
   ak: TXQValueKind;
   bk: TXQValueKind;
+  ac: TXQValueClass;
+  bc: TXQValueClass;
 begin
   ak := a.kind;
   bk := b.kind;
@@ -271,19 +273,12 @@ begin
      or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
     exit(true);
 
-  result := isAtomicSubType(commonNonBlockedClass(a.getClassType,b.getClassType));
-  {if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
-    commonClass();
-    if decidedByUniqueTypeClass(TXQValue_duration) then exit;
-    if decidedByUniqueTypeClass(TXQValue_time) then exit;
-    if decidedByUniqueTypeClass(TXQValue_date) then exit;
-    if decidedByUniqueTypeClass(TXQValue_gDay) then exit;
+  ac := a.getClassType;
+  if ac.InheritsFrom(TXQValueNode) then ac := TXQValueString;
+  bc := b.getClassType;
+  if bc.InheritsFrom(TXQValueNode) then bc := TXQValueString;
 
-    if decidedByUniqueTypeClass(TXQValueDateTime) then exit; //won't reach this if any of them is time or date
-    exit;
-  end;                               .....                                    }
-
-
+  result := isAtomicSubType(commonNonBlockedClass(ac, bc));
 end;
 
 
