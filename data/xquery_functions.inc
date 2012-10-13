@@ -2079,16 +2079,18 @@ var
  resseq: TXQValueSequence;
  collation: TXQCollation;
  found: Boolean;
+ atom: IXQValue;
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 2 then collation := context.sender.getCollation(args[1].toString)
   else collation := context.collation;
-  if args[0].kind <> pvkSequence then begin
-    result := args[0];
+  atom := xqvalueAtomize(args[0]);
+  if atom.kind <> pvkSequence then begin
+    result := xqvalueAtomize(atom);
     exit;
   end;
-  resseq := TXQValueSequence.create(args[0].getSequenceCount);
-  for v in args[0] do begin
+  resseq := TXQValueSequence.create(atom.getSequenceCount);
+  for v in atom do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
       if xqvalueComparableTypes(resseq.seq[i], v) and xqvalueEqualAtomicBase(resseq.seq[i], v, collation, context.sender.ImplicitTimezone,true) then begin
