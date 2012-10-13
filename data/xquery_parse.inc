@@ -72,6 +72,7 @@ type
  TXQParsingContext = class
   AllowVariableUseInStringLiterals: boolean;
   AllowObjects: boolean;
+  StripBoundarySpace: boolean;
   parsingModel: TXQParsingModel;
   encoding: TEncoding;
 
@@ -422,15 +423,27 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
       if length(s) = 0 then exit;
       parent.push(TXQTermString.create(s));
     end;
+    function strIsWhitespace(p: pchar; l: longint): boolean;
+    begin
+      if l = 0 then exit(true);
+      strlTrimRight(p, l, WHITE_SPACE);
+      result := l = 0;
+    end;
+
   var marker: PChar;
+    atBoundary: Boolean;
   begin
+    atBoundary := (border = '<') and StripBoundarySpace;
     while pos^ <> #0 do begin
       marker := pos;
       while not (pos^ in [#0, '{', '}', '&']) and (pos^ <> border) do pos+=1;
 
       if pos^ = #0 then raiseParsingError('Unexpected end');
 
-      pushElementContent(strFromPchar(marker, pos - marker));
+      if not atBoundary or (pos^ in ['}', '&']) or not strIsWhitespace(marker, pos - marker) then begin
+        pushElementContent(strFromPchar(marker, pos - marker));
+        atBoundary := false;
+      end;
 
       if pos^ = border then begin
         if (pos^ in ['''', '"']) and ((pos+1)^ = border) then begin
@@ -445,6 +458,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
           pos += 1;
           parent.push(parsePrimaryLevel);
           expect('}');
+          atBoundary := (border = '<') and StripBoundarySpace;
         end else begin
           pushElementContent('{');
           pos+=2;
@@ -452,6 +466,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
         '}': begin
           if (pos+1)^ <> '}' then raiseParsingError('Invalid closing parenthesis');
           pushElementContent('}');
+          atBoundary:=false;
           pos += 2;
         end;
         '&': begin
@@ -460,6 +475,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
           if pos^ = #0 then raiseParsingError('Unexpected end');
           pos += 1;
           pushElementContent(replaceEntities(strFromPchar(marker, pos - marker), encoding));
+          atBoundary:=false;
         end;
       end;
     end;

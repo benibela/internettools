@@ -1087,7 +1087,9 @@ type
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
+
     AllowVariableUseInStringLiterals: boolean; //**< If "...$var.. " should be replaced by the value of var, or remain a string literal
+    StripBoundarySpace: boolean;
 
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
@@ -2975,6 +2977,7 @@ begin
   cxt.encoding:=eUTF8;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
   cxt.AllowObjects:=VariableChangelog.allowObjects;
+  cxt.StripBoundarySpace:=StripBoundarySpace;
   cxt.parsingModel:=model;
   try
     cxt.str := str;

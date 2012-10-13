@@ -333,7 +333,7 @@ begin
   t('<a>{5}</a> instance of xs:integer', 'false');
   t('(5, 6) instance of xs:integer+', 'true');
 
-  t('every $x in (for $i in (1 to 100) return let $a := <a/>, $b := <b/> return (($a << $b) or ($a >> $b))) satisfies $x', 'true');
+  t('every $x in (for $i in (1 to 100) return let $a := <a/>, $b := <b/> return ((($a << $b) or ($a >> $b))) and not((($a << $b) and ($a >> $b))))  satisfies $x', 'true');
 
   //some examples from wikibooks
   t('let $doc := <doc><books>  <book><title>HHGTTG</title><price>42</price></book>  <book><title>Mistborn</title><price>123</price></book>  <book><title>Das Kapital</title><price>0</price></book>  <book><title>Pinguin</title><price>57</price></book> </books></doc> '+
@@ -348,6 +348,21 @@ begin
                    'return  <tr> {if ($count mod 2) then (attribute bgcolor {''Lavender''}) else ()} <td>{$term/term-name/text()}</td>  <td>{$term/definition/text()}</td>  </tr>       }</tbody>  </table> </body> </html>)',
     '<html><head><title>Terms</title> </head>  <body> <table border="1"> <thead> <tr>  <th>Term</th>  <th>Definition</th>  </tr> </thead><tbody><tr bgcolor="Lavender">  <td>Object</td>  <td>A set of ideas...</td>  </tr><tr>  <td>Organization</td>  <td>A unit...</td>  </tr><tr bgcolor="Lavender">  <td>Organization</td>  <td>BankOfAmerica</td>  </tr></tbody>  </table> </body> </html>');
 
+  ps.StripBoundarySpace := true;
+
+  t('outer-xml(<a>  {1}  </a>)', '<a>1</a>');
+  t('outer-xml(<a> {1} {2} {3} </a>)', '<a>123</a>');
+  t('outer-xml(<a>{1,2,3} </a>)', '<a>1 2 3</a>');
+  t('outer-xml(<a>  <empty/>  </a>)', '<a><empty/></a>');
+  t('outer-xml(<a>  <b> as </b>  </a>)', '<a><b> as </b></a>');
+  t('outer-xml(<a>  {1} {"  "} {3}  </a>)', '<a>1  3</a>');
+  t('outer-xml(<a><empty att="  hallo  "/></a>)', '<a><empty att="  hallo  "/></a>');
+  t('outer-xml(<a><empty att="  {''hallo''}  "/></a>)', '<a><empty att="  hallo  "/></a>');
+
+  t('outer-xml(<a>  {"abc"}  </a>)', '<a>abc</a>');
+  t('outer-xml(<a> z {"abc"}</a>)', '<a> z abc</a>');
+  t('outer-xml(<a>&#x20;{"abc"}</a>)', '<a> abc</a>');
+  t('outer-xml(<a>{"  "}</a>)', '<a>  </a>');
 
   xml.free;
   ps.free;
