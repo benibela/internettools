@@ -2828,8 +2828,11 @@ begin
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}FInternet.Free;{$endif}
   clear;
   if FExternalDocuments <> nil then begin;
-    for i:= 0 to FExternalDocuments.count - 1 do
+    for i:= 0 to FExternalDocuments.count - 1 do begin
+      if TTreeElement(FExternalDocuments.Objects[i]).typ = tetAttributeName then
+        TTreeElement(FExternalDocuments.Objects[i]).reverse.deleteAll();
       TTreeElement(FExternalDocuments.Objects[i]).deleteAll();
+    end;
     FExternalDocuments.Free;
   end;
   inherited Destroy;

@@ -99,6 +99,7 @@ type
 
   function parseFlower(akind: string): TXQTermFlower;
   function parseDirectConstructor(name: string): TXQTermConstructor;
+  function parseComputedConstructor(name: string): TXQTermConstructor;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -550,6 +551,53 @@ begin
   raiseParsingError('Unexpected end')
 end;
 
+function TXQParsingContext.parseComputedConstructor(name: string): TXQTermConstructor;
+var
+  token: String;
+  tempSeq: TXQTerm;
+  onlyConstructors: Boolean;
+  i: Integer;
+  expectName: Boolean;
+begin
+  token := name;
+  if (token = 'element') or (token = 'document') then result := TXQTermConstructor.create(tetOpen)
+  else if (token = 'attribute') then result := TXQTermConstructor.create(tetAttributeName)
+  else if (token = 'text') then result := TXQTermConstructor.create(tetText)
+  else if (token = 'processing-instruction') then result := TXQTermConstructor.create(tetProcessingInstruction)
+  else if (token = 'comment') then result := TXQTermConstructor.create(tetComment)
+  else raiseParsingError('Unknown constructor name');
+  expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttributeName]) and (token <> 'document');
+  if expectName then begin
+    token := nextToken();
+    if token = '{' then begin
+      result.nameValue := parse;
+      expect('}');
+    end else result.nameValue := TXQTermString.create(token);
+  end;
+  expect('{');
+  skipWhitespaceAndComment();
+  if pos^ <> '}' then begin
+    if result.typ in [tetOpen, tetProcessingInstruction, tetAttributeName] then begin
+      tempSeq := parsePrimaryLevel;
+      if tempSeq is TXQTermSequence then begin
+        onlyConstructors := true;
+        for i:= 0 to high(tempseq.children) do
+          if not (tempSeq.children[i] is TXQTermConstructor) then begin
+            onlyConstructors:=false;
+            break;
+          end;
+        if onlyConstructors then begin
+          result.children := tempseq.children;
+          tempseq.children := nil;
+          tempSeq.free;
+        end else result.push(tempSeq); //that's really slow for nodes because it makes a deep copy of them if they are taken from a subsequence. But if it's mixing atomic/nodes flattening the sequences makes the separator spaces wrong
+      end else result.push(tempSeq);
+    end else result.nameValue := parsePrimaryLevel;
+  end else if not expectName then
+    raiseParsingError('This type of node must not be empty ');
+  expect('}');
+end;
+
 function TXQParsingContext.replaceEntities(s: string; enc: TEncoding): string;
 var
   n, p: Integer;
@@ -613,6 +661,8 @@ function TXQParsingContext.parseValue: TXQTerm;
 var
   word: String;
   wordlookahead: String;
+  temp: PChar;
+  constr: Boolean;
 begin
   result := nil;
   word:=nextToken();
@@ -713,6 +763,20 @@ begin
       if strBeginsWith(word,'attribute::') then
         exit(TXQTermReadAttribute.Create(strcopyfrom(word,length('attribute::')+1)));
 
+      if (word = 'element') or (word = 'attribute') or (word = 'document') or (word = 'text') or (word = 'processing-instruction') or (word = 'comment') then begin
+        constr := wordlookahead = '{';
+        if not constr then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)
+          temp := pos;
+          nextToken();
+          if nextToken() = '{' then constr := true;
+          pos := temp;
+        end;
+        if constr then begin
+          requireXQuery('to use constructors');
+          exit(parseComputedConstructor(word));
+        end;
+      end;
+
       result := TXQTermNodeMatcher.Create(word);
     end;
   end;
@@ -791,7 +855,8 @@ begin
           replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
          else
           raiseParsingError('Unexpected .');
-      end else raise exception.Create('Unknown or unexpected operator: '+word);
+      end else
+        raiseParsingError('Unknown or unexpected operator: '+word);
     end;
   end;
   result := astroot;

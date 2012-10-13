@@ -267,7 +267,89 @@ begin
   t('<hallo foo="bar" maus="haus">welt</hallo>/@*', 'bar haus');
   t('outer-xml(let $x := (1,2,<a>s</a>,<a>t</a> / text(),3) return <t h="{$x}">(: ass :){(: ass :)$x}</t>)', '<t h="1 2 s t 3">(: ass :)1 2<a>s</a>t3</t>');
   t('outer-xml(<t h="{(1,2,<a>s</a>,<a>t</a> / text(),3)}">(: ass :){(: ass :)(1,2,<a>s</a>,<a>t</a> / text(),3)(:?:)(::)}</t>)', '<t h="1 2 s t 3">(: ass :)1 2<a>s</a>t3</t>');
+
+
+
+
+  t('outer-xml(element empty {})', '<empty/>');
+  t('outer-xml(element main {"haus"})', '<main>haus</main>');
+  t('outer-xml(element main { element foobar {} })', '<main><foobar/></main>');
+  t('outer-xml(element main { element foobar {1+2,3+4} })', '<main><foobar>3 7</foobar></main>');
+  t('outer-xml(element {"niam"} { element {concat("foo", "BAR")} {1+2,3+4} })', '<niam><fooBAR>3 7</fooBAR></niam>');
+
+  t('outer-xml(element empty {attribute test {} })', '<empty test=""/>');
+  t('outer-xml(element empty {attribute test {1+2+3} })', '<empty test="6"/>');
+  t('outer-xml(element empty {attribute test {1 to 3} })', '<empty test="1 2 3"/>');
+  t('outer-xml(element empty {attribute test {1 to 3}, attribute maus {16} })', '<empty test="1 2 3" maus="16"/>');
+
+  t('outer-xml(element a { text { 13 } })', '<a>13</a>');
+  t('outer-xml(element a { text { 13 }, text{ 17 } })', '<a>1317</a>');
+  t('outer-xml(element a { text { 13, 17 }, text{18,19,20} })', '<a>13 1718 19 20</a>');
+  t('outer-xml(element a { text { 13, <el>*</el> }, text{18,19,20} })', '<a>13 *18 19 20</a>');
+  t('outer-xml(element a { text { 13, <el>*</el>, <el>?</el> }, text{18,19,20} })', '<a>13 * ?18 19 20</a>');
+  t('count(element a {  } / text())', '0');
+  t('count(<a>{ () }</a> / text())', '0');
+  t('count(<a>{ text { 13 }, "23", text{ 17 } }</a> / text())', '1');
+  t('count(<a> a {1} b {2} c  </a> / text())', '1');
+  t('count(<a> a {1} b <foobar/>{2} c  </a> / text())', '2');
+  t('count(element a { text { 13 } } / text())', '1');
+  t('count(element a { text { 13 }, text{ 17 } } / text())', '1');
+  t('count(element a { text { 13 }, "23", text{ 17 } } / text())', '1');
+
+  t('outer-xml(element a { processing-instruction pipi {  } })', '<a><?pipi ?></a>');
+  t('outer-xml(element a { processing-instruction pipi { 13 } })', '<a><?pipi 13?></a>');
+  t('outer-xml(element a { processing-instruction pipi { 13, 14, 15 } })', '<a><?pipi 13 14 15?></a>');
+  t('outer-xml(  processing-instruction pipi {  })', '<?pipi ?>');
+  t('outer-xml(  processing-instruction pipi { 13  })', '<?pipi 13?>');
+  t('outer-xml( processing-instruction pipi { 13, 14, 15  })', '<?pipi 13 14 15?>');
+  t('outer-xml(  processing-instruction {concat("pi", "PI") } { "lang" })', '<?piPI lang?>');
+
+  t('outer-xml(element a { comment { () } })', '<a><!----></a>');
+  t('outer-xml(element a { comment { 13 } })', '<a><!--13--></a>');
+  t('outer-xml(element a { comment { 13, 14, 15 } })', '<a><!--13 14 15--></a>');
+  t('outer-xml(  comment { 13  })', '<!--13-->');
+  t('outer-xml( comment { 13, 14, 15  })', '<!--13 14 15-->');
+
+  t('outer-xml(let $e := <foo bar="bacon" a="tla" appa="jipjip">21</foo> return element {fn:node-name($e)} {$e/@*, 2 * fn:data($e)})', '<foo bar="bacon" a="tla" appa="jipjip">42</foo>');
+  t('let $e := <address>123 Roosevelt Ave. Flushing, NY 11368</address> return   name($e)', 'address');
+  t('let $e := <address>123 Roosevelt Ave. Flushing, NY 11368</address> return   $e/node()', '123 Roosevelt Ave. Flushing, NY 11368');
+  t('let $dict := <dictionary><entry word="address"><variant xml:lang="de">Adresse</variant><variant xml:lang="it">indirizzo</variant></entry></dictionary> return $dict/entry/@word', 'address');
+  t('let $dict := <dictionary><entry word="address"><variant xml:lang="de">Adresse</variant><variant xml:lang="it">indirizzo</variant></entry></dictionary> return $dict/entry/variant/@xml:lang', 'de it');
+  t('outer-xml(let $dict := <dictionary><entry word="address"><variant xml:lang="de">Adresse</variant><variant xml:lang="it">indirizzo</variant></entry></dictionary>, $e := <address>123 Roosevelt Ave. Flushing, NY 11368</address> return   element{$dict/entry[@word=name($e)]/variant[@xml:lang="it"]}    {$e/@*, $e/node()})',
+    '<indirizzo>123 Roosevelt Ave. Flushing, NY 11368</indirizzo>');
+  t('outer-xml(<r> { let $sex := "M" return attribute   { if ($sex = "M") then "husband" else "wife" }   { <a>Hello</a>, 1 to 3, <b>Goodbye</b> } } </r>)', '<r husband="Hello 1 2 3 Goodbye">  </r>');
+  t('outer-xml(<r> { let $sex := "www" return attribute   { if ($sex = "M") then "husband" else "wife" }   { <a>Hello</a>, 1 to 3, <b>Goodbye</b> } } </r>)', '<r wife="Hello 1 2 3 Goodbye">  </r>');
+  t('outer-xml(document{  <author-list>{ "ralf isau" }</author-list> })', '<author-list>ralf isau</author-list>');
+  t('outer-xml(let $target := "audio-output", $content := "beep" return processing-instruction {$target} {$content})', '<?audio-output beep?>');
+  t('outer-xml(let $homebase := "Houston" return comment {fn:concat($homebase, ", we have a problem.")})', '<!--Houston, we have a problem.-->');
+
+
+  t('let $s := (<one/>, <two/>, <three/>) return outer-xml(<out>{$s}</out>)', '<out><one/><two/><three/></out>');
+  t('for $s in (<one/>, <two/>, <three/>) return outer-xml(<out>{$s}</out>)', '<out><one/></out> <out><two/></out> <out><three/></out>');
+  t('outer-xml(let $bib := <bib>   <book>     <title>TCP/IP Illustrated</title>     <author>Stevens</author>     <publisher>Addison-Wesley</publisher>   </book>   <book>     <title>Advanced Programming in the Unix Environment</title>     <author>Stevens</author>     <publisher>Addison-Wesley</publisher>   </book>   <book>     <title>Data on the Web</title>     <author>Abiteboul</author>     <author>Buneman</author>     <author>Suciu</author>   </book> </bib>' +
+    'return <authlist>  {    for $a in fn:distinct-values($bib/book/author)    order by $a    return      <author>         <name> {$a} </name>         <books>           {             for $b in $bib/book[author = $a]             order by $b/title             return $b/title            }         </books>      </author>  } </authlist>)',
+    '<authlist>  <author>         <name> Abiteboul </name>         <books>           <title>Data on the Web</title>         </books>      </author><author>         <name> Buneman </name>         <books>           <title>Data on the Web</title>         </books>      </author><author>         <name> Stevens </name>         <books>           <title>Advanced Programming in the Unix Environment</title><title>TCP/IP Illustrated</title>         </books>      </author><author>         <name> Suciu </name>         <books>           <title>Data on the Web</title>         </books>      </author> </authlist>');
+
+  t('<a>{5}</a> instance of xs:integer', 'false');
+  t('(5, 6) instance of xs:integer+', 'true');
+
+  //some examples from wikibooks
+  t('let $doc := <doc><books>  <book><title>HHGTTG</title><price>42</price></book>  <book><title>Mistborn</title><price>123</price></book>  <book><title>Das Kapital</title><price>0</price></book>  <book><title>Pinguin</title><price>57</price></book> </books></doc> '+
+     'for $book in $doc/books/book let $title := $book/title/text() let $price := $book/price/text() where xs:decimal($price) gt 50.00  order by $title '+
+     'return outer-xml(<book><title>{$title}</title><price>{$price}</price></book>)',
+     '<book><title>Mistborn</title><price>123</price></book> <book><title>Pinguin</title><price>57</price></book>');
+  t('outer-xml(let $message := ''Hello World!'' return <results><message>{$message}</message></results>)', '<results><message>Hello World!</message></results>');
+  t('outer-xml(<list>{for $i in (1 to 10)  return <value>{$i}</value> }</list>)', '<list><value>1</value><value>2</value><value>3</value><value>4</value><value>5</value><value>6</value><value>7</value><value>8</value><value>9</value><value>10</value></list>');
+  t('outer-xml(let $my-doc := <doc><terms><term><term-name>Object</term-name><definition>A set of ideas...</definition></term><term><term-name>Organization</term-name><definition>A unit...</definition></term><term><term-name>Organization</term-name><definition>BankOfAmerica</definition></term></terms></doc>'+
+    'return <html><head><title>Terms</title> </head>  <body> <table border="1"> <thead> <tr>  <th>Term</th>  <th>Definition</th>  </tr> </thead>'+
+           '<tbody>{ for $term at $count in  for $item in $my-doc/terms/term  let $term-name := $item/term-name/text()  order by upper-case($term-name)  return $item ' +
+                   'return  <tr> {if ($count mod 2) then (attribute bgcolor {''Lavender''}) else ()} <td>{$term/term-name/text()}</td>  <td>{$term/definition/text()}</td>  </tr>       }</tbody>  </table> </body> </html>)',
+    '<html><head><title>Terms</title> </head>  <body> <table border="1"> <thead> <tr>  <th>Term</th>  <th>Definition</th>  </tr> </thead><tbody><tr bgcolor="Lavender">  <td>Object</td>  <td>A set of ideas...</td>  </tr><tr>  <td>Organization</td>  <td>A unit...</td>  </tr><tr bgcolor="Lavender">  <td>Organization</td>  <td>BankOfAmerica</td>  </tr></tbody>  </table> </body> </html>');
+
+
+
   //TODO: fix list insert, fix list sort with multiple document
+
 
 
 

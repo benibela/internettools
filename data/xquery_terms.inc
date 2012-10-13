@@ -857,11 +857,18 @@ var
   begin
     if tree.next = nil then tree.next := kid
     else begin
+      if (kid.typ = tetText) and (lastKid.typ = tetText) then begin
+        lastKid.value += kid.value;
+        kid.free;
+        exit;
+      end;
       lastKid.next := kid;
       kid.previous := lastKid;
     end;
     kid.offset := baseOffset;
     baseOffset += 1;
+    if kid.reverse <> nil then lastKid := kid.reverse
+    else lastKid := kid;
   end;
   procedure addNodeAsKid;
   begin
@@ -881,14 +888,8 @@ var
         kid.reverse.offset:=baseOffset;
         baseOffset+=1;
       end;
-      tetOpen: begin
+      tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
-        lastKid := kid.reverse;
-      end;
-      tetComment, tetText, tetProcessingInstruction: begin
-        addKid;
-        lastKid := kid;
-      end;
       else raiseEvaluationError('Unknown child node');
     end;
   end;
@@ -897,6 +898,7 @@ var
   var x: IXQValue;
   begin
     case v.kind of
+      pvkUndefined:;
       pvkNode: begin
         kid := v.toNode.clone;
         addNodeAsKid;
@@ -914,7 +916,6 @@ var
         kid.parent := tree;
         kid.value := v.toString;
         addKid;
-        lastKid := kid;
       end else begin
         if lastKid.typ <> tetText then raiseEvaluationError('Internal error: No atomic value before this one exist, but this one is not the first atomic value.');
         lastKid.value += ' ' + v.toString;
@@ -935,8 +936,10 @@ var
       first := false;
     end;
   end;
+
 begin
-  tree := TTreeElement.create(typ);
+  if (typ = tetOpen) and (nameValue = nil) then tree := TTreeDocument.create(typ)
+  else tree := TTreeElement.create(typ);
   if baseOffset = 0 then begin
     if context.sender.FExternalDocuments = nil then context.sender.FExternalDocuments := TStringList.Create;
     context.sender.FExternalDocuments.AddObject('', tree);
@@ -944,9 +947,11 @@ begin
   baseOffset += 1;
   lastAttribute := nil;
   nextEnd:=@tree.next;
-  tree.value := nameValue.evaluate(context).toString;
   case typ of
     tetAttributeName: begin
+      tree.value := nameValue.evaluate(context).toString;
+      if pos(':', tree.value) > 0 then
+        tree.namespace:=strSplitGet(':', tree.value);
       tree.reverse := TTreeElement.create();
       tree.reverse.reverse := tree;
       tree.reverse.typ := tetAttributeValue;
@@ -954,6 +959,11 @@ begin
         tree.reverse.value := tree.reverse.value + valueToString(children[i].evaluate(context));
     end;
     tetOpen: begin
+      if nameValue <> nil then begin
+        tree.value := nameValue.evaluate(context).toString;
+        if pos(':', tree.value) > 0 then
+          tree.namespace:=strSplitGet(':', tree.value);
+      end;
       for i:=0 to high(children) do
         if children[i] is TXQTermConstructor then begin
           kid := TXQTermConstructor(children[i]).evaluate(context, baseOffset).toNode;
@@ -966,10 +976,12 @@ begin
       tree.reverse := kid; kid.reverse := tree;
     end;
     tetProcessingInstruction: begin
-      if length(children) = 0 then raiseEvaluationError('No content for processing instruction');
-      tree.addAttribute('', children[0].evaluate(context).toString);
+      tree.value := nameValue.evaluate(context).toString;
+      if length(children) = 0 then tree.addAttribute('', '')
+      else tree.addAttribute('', valueToString(children[0].evaluate(context)));
     end;
-    tetComment:;
+    tetText: tree.value := valueToString(nameValue.evaluate(context));
+    tetComment: tree.value := valueToString(nameValue.evaluate(context));
     else raiseEvaluationError('Invalid type for constructor');
   end;
   result := xqvalue(tree);
