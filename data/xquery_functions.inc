@@ -570,24 +570,14 @@ begin
   result := xqvalue(xqvalueToSingleNode(ta) = xqvalueToSingleNode(tb));
 end;
 procedure xqvalueNodeBefore(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
-var
-  na, nb: TTreeElement;
-  da, db: TTreeDocument;
 begin
   if ta.isUndefined or tb.isUndefined then exit;
-  na := xqvalueToSingleNode(ta); nb := xqvalueToSingleNode(tb);
-  da := na.getDocument(); db := nb.getDocument();
-  result := xqvalue( ((na.offset < nb.offset) and (da = db)) or (pointer(da) < pointer(db)));
+  result := xqvalue(compareNodes(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) < 0);
 end;
 procedure xqvalueNodeAfter(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
-var
-  na, nb: TTreeElement;
-  da, db: TTreeDocument;
 begin
   if ta.isUndefined or tb.isUndefined then exit;
-  na := xqvalueToSingleNode(ta); nb := xqvalueToSingleNode(tb);
-  da := na.getDocument(); db := nb.getDocument();
-  result := xqvalue( ((na.offset > nb.offset) and (da = db)) or (pointer(da) > pointer(db)));
+  result := xqvalue(compareNodes(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) > 0);
 end;
 
 

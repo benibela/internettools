@@ -82,6 +82,7 @@ TTreeElement = class
   next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   previous: TTreeElement; //**< previous element (self.next.previous = self)
   parent: TTreeElement;
+  document: TTreeElement;
   reverse: TTreeElement; //**<element paired by open/closing, or corresponding attributes
   namespace: string; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
 
@@ -551,18 +552,14 @@ end;
 
 function TTreeElement.getRoot: TTreeElement;
 begin
-  result := self;
-  if result = nil then exit;
-  if result.parent = nil then //document node
-    exit(findChild(tetOpen,'',[tefoIgnoreText]));
-
-  while (result <> nil) and ((result.previous <> nil) or (result.typ in [tetAttributeName, tetAttributeValue])) and (result.parent.parent <> nil) do
-    result := result.parent;
+  result := document;
+  if (result = nil) or (result.value <> '') then exit;
+  exit(result.findChild(tetOpen,'',[tefoIgnoreText]));
 end;
 
 function TTreeElement.getDocument: TTreeDocument;
 begin
-  result := TTreeDocument(getRoot().getParent());
+  result := document as TTreeDocument;
 end;
 
 function TTreeElement.getNodeName: string;
@@ -726,6 +723,7 @@ begin
     if pos(':', attrib.value) > 0 then
       attrib.namespace := strSplitGet(':', attrib.value);
     attrib.parent := self;
+    attrib.document := document;
     if prev <> nil then prev.next := attrib
     else attributes := attrib;
     attrib.previous := prev;
@@ -734,6 +732,7 @@ begin
 
     attrib.reverse := TTreeElement.create(tetAttributeValue, strFromPchar(props[i].value, props[i].valueLen));
     attrib.reverse.parent := self;
+    attrib.reverse.document := document;
     attrib.reverse.reverse := attrib;
     if prev <> nil then begin
       prev.reverse.next := attrib.reverse ;
@@ -970,6 +969,7 @@ begin
   result:=treeElementClass.Create;
   result.typ := typ;
   result.value := s;
+  result.document := FCurrentTree;
   FTemplateCount+=1;
 
   FCurrentElement.next := result;
@@ -1318,6 +1318,7 @@ begin
   FCurrentTree.FCreator:=self;
   FCurrentTree.typ := tetOpen;
   FCurrentTree.FBaseURI:=uri;
+  FCurrentTree.document := FCurrentTree;
   FCurrentElement:=FCurrentTree;
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);

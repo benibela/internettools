@@ -40,7 +40,7 @@ var
 //    writeln(ps.debugtermToString(ps.FCurTerm));
     got := ps.evaluate().toString;
     if got<>s2 then
-       raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
+        raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
   end;
 
   procedure t(a,b: string; c: string = '');

@@ -841,10 +841,10 @@ end;
 
 function TXQTermConstructor.evaluate(const context: TEvaluationContext): IXQValue;
 begin
-  result := evaluate(context, 0);
+  result := evaluate(context, nil, 0);
 end;
 
-function TXQTermConstructor.evaluate(const context: TEvaluationContext; baseOffset: longint): IXQValue;
+function TXQTermConstructor.evaluate(const context: TEvaluationContext; root: TTreeElement; baseOffset: longint): IXQValue;
 var
   tree: TTreeElement;
   i: Integer;
@@ -865,6 +865,7 @@ var
       lastKid.next := kid;
       kid.previous := lastKid;
     end;
+    kid.document := root;
     kid.offset := baseOffset;
     baseOffset += 1;
     if kid.reverse <> nil then lastKid := kid.reverse
@@ -896,12 +897,26 @@ var
 
   procedure addValue(const v: IXQValue; firstAtomic: boolean = true);
   var x: IXQValue;
+      temp: TTreeElement;
   begin
     case v.kind of
       pvkUndefined:;
       pvkNode: begin
         kid := v.toNode.clone;
         addNodeAsKid;
+        if root = tree then begin
+          if kid.getFirstChild() = nil then kid.document := root
+          else begin
+            temp := kid;
+            while (temp <> nil) and (temp <> kid.reverse) do begin
+              temp.document := root;
+              temp.offset := baseOffset;
+              if (temp.next = nil) or (temp.next.offset <= temp.offset) then baseOffset+=8
+              else baseOffset += temp.next.offset - temp.offset;
+              temp := temp.next;
+            end;
+          end;
+        end;
       end;
       pvkSequence: begin
         firstAtomic := true;
@@ -914,6 +929,7 @@ var
       else if firstAtomic then begin
         kid := TTreeElement.create(tetText);
         kid.parent := tree;
+        kid.document := root;
         kid.value := v.toString;
         addKid;
       end else begin
@@ -940,9 +956,11 @@ var
 begin
   if (typ = tetOpen) and (nameValue = nil) then tree := TTreeDocument.create(typ)
   else tree := TTreeElement.create(typ);
+  if root = nil then root := tree;
+  tree.document := root;
   if baseOffset = 0 then begin
-    if context.sender.FExternalDocuments = nil then context.sender.FExternalDocuments := TStringList.Create;
-    context.sender.FExternalDocuments.AddObject('', tree);
+    if context.sender.FInternalDocuments = nil then context.sender.FInternalDocuments := TFPList.Create;
+    context.sender.FInternalDocuments.Add(tree);
   end;
   baseOffset += 1;
   lastAttribute := nil;
@@ -953,6 +971,7 @@ begin
       if pos(':', tree.value) > 0 then
         tree.namespace:=strSplitGet(':', tree.value);
       tree.reverse := TTreeElement.create();
+      tree.reverse.document := root;
       tree.reverse.reverse := tree;
       tree.reverse.typ := tetAttributeValue;
       for i:= 0 to high(children) do
@@ -966,7 +985,7 @@ begin
       end;
       for i:=0 to high(children) do
         if children[i] is TXQTermConstructor then begin
-          kid := TXQTermConstructor(children[i]).evaluate(context, baseOffset).toNode;
+          kid := TXQTermConstructor(children[i]).evaluate(context, root, baseOffset).toNode;
           addNodeAsKid;
         end else
           addValue(children[i].evaluate(context));

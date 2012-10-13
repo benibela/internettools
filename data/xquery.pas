@@ -546,9 +546,9 @@ type
     procedure reserve(cap: integer); //**< Allocates new memory with list if necessary
     procedure compress; //**< Deallocates memory by shorting list
     procedure setCount(c: integer); //**< Forces a count
+    procedure insertSingle(i: integer; child: IXQValue); //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
   public
     constructor create(capacity: integer = 0);
-    procedure insert(i: integer; child: IXQValue); //**< Inserts a IXQValue to the sequence.
     procedure add(child: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addMerging(child: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
@@ -891,7 +891,7 @@ type
     nameValue: TXQTerm;
     constructor create(atype: TTreeElementType; aname: txqterm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
-    function evaluate(const context: TEvaluationContext; baseOffset: longint): IXQValue;
+    function evaluate(const context: TEvaluationContext; root: TTreeElement; baseOffset: longint): IXQValue;
     destructor destroy; override;
   end;
 
@@ -1130,6 +1130,7 @@ type
   private
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
+    FInternalDocuments: TFPList;
     {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
     FInternet: TInternetAccess;
     {$endif}
@@ -1913,6 +1914,13 @@ begin
   result := pvkUndefined;
 end;
 
+function compareNodes(a, b: TTreeElement): integer;
+begin
+  if a.document = b.document then
+    exit(a.offset - b.offset);
+  if pointer(a.document) < pointer(b.document) then exit(-1)
+  else exit(1);
+end;
 
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}
@@ -2043,31 +2051,32 @@ end;
 procedure TXQVList.addMerging(child: IXQValue);
 var
  i: Integer;
- a,b,m, offset, tempoffset: Integer;
+ a,b,m, cmp: Integer;
  s: IXQValue;
+ childnode: TTreeElement;
 begin
   case child.kind of
     pvkNode: begin
-      offset:=(child as TXQValueNode).node.offset;
-      if (Count = 0) or (offset > (Items[count-1] as TXQValueNode).node.offset) then
+      childnode:=(child as TXQValueNode).node;
+      if (Count = 0) or (compareNodes(childnode, (Items[count-1] as TXQValueNode).node) > 0) then
         add(child)
-      else if (offset < (Items[0] as TXQValueNode).node.offset) then
-        insert(0, child)
+      else if (compareNodes(childnode, (Items[0] as TXQValueNode).node) < 0) then
+        insertSingle(0, child)
       else begin
         a := 0;
         b := count-1;
         while a < b do begin
           m := (a+b) div 2;
-          tempoffset:=(Items[m] as TXQValueNode).node.offset;
-          if offset = tempoffset then begin exit; end
-          else if offset < tempoffset then b := m-1
+          cmp:=compareNodes(childnode, (Items[m] as TXQValueNode).node);
+          if cmp = 0 then begin exit; end
+          else if cmp < 0 then b := m-1
           else a := m + 1;
         end;
         for m := b to a do begin
-          tempoffset:=(Items[m] as TXQValueNode).node.offset;
-          if offset = tempoffset then begin exit; end
-          else if offset < tempoffset then begin insert(m, child); exit; end
-          else begin insert(m + 1, child); exit; end;
+          cmp:=compareNodes(childnode, (Items[m] as TXQValueNode).node);
+          if cmp = 0 then begin exit; end
+          else if cmp < 0 then begin insertSingle(m, child); exit; end
+          else begin insertSingle(m + 1, child); exit; end;
         end;
         raise Exception.Create('binary insert failed');
       end;
@@ -2175,7 +2184,7 @@ begin
   fcount := 0;
 end;
 
-procedure TXQVList.insert(i: integer; child: IXQValue);
+procedure TXQVList.insertSingle(i: integer; child: IXQValue);
 var
   j: Integer;
 begin
@@ -2827,14 +2836,15 @@ begin
   VariableChangelog.Free;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}FInternet.Free;{$endif}
   clear;
-  if FExternalDocuments <> nil then begin;
-    for i:= 0 to FExternalDocuments.count - 1 do begin
-      if TTreeElement(FExternalDocuments.Objects[i]).typ = tetAttributeName then
-        TTreeElement(FExternalDocuments.Objects[i]).reverse.deleteAll();
-      TTreeElement(FExternalDocuments.Objects[i]).deleteAll();
+  if FInternalDocuments <> nil then begin;
+    for i:= 0 to FInternalDocuments.count - 1 do begin
+      if TTreeElement(FInternalDocuments[i]).typ = tetAttributeName then
+        TTreeElement(FInternalDocuments[i]).reverse.deleteAll();
+      TTreeElement(FInternalDocuments[i]).deleteAll();
     end;
-    FExternalDocuments.Free;
+    FInternalDocuments.Free;
   end;
+  FExternalDocuments.Free;
   inherited Destroy;
 end;
 
