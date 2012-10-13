@@ -171,14 +171,103 @@ begin
   t('for $b in /books/book stable order by $b/title collation "http://www.w3.org/2005/xpath-functions/collation/codepoint",  $b/price descending empty greatest return $b','753Caesar 75.3Caesar Das Kapital 6Das Kapital 1101010How to use binary 42The Hitchhiker''s Guide to the Galaxy');
   t('for $b in /books/book stable order by $b/title collation "http://www.w3.org/2005/xpath-functions/collation/codepoint",  $b/price empty greatest return $b','75.3Caesar 753Caesar 6Das Kapital Das Kapital 1101010How to use binary 42The Hitchhiker''s Guide to the Galaxy');
 
+  t('outer-xml(<hallo/>)', '<hallo/>');
+  t('outer-xml(<hallo a="b"/>)', '<hallo a="b"/>');
+  t('outer-xml(<hallo a="b" foo="bar"   triple = ''middle''/>)', '<hallo a="b" foo="bar" triple="middle"/>');
+  t('outer-xml(<hallo>innertext</hallo>)', '<hallo>innertext</hallo>');
+  t('outer-xml(<hallo>  preserved space  </hallo>)', '<hallo>  preserved space  </hallo>');
+  t('outer-xml(<hallo><nestling/></hallo>)', '<hallo><nestling/></hallo>');
+  t('outer-xml(<hallo> surrounded <nestling/> surrounded2 </hallo>)', '<hallo> surrounded <nestling/> surrounded2 </hallo>');
+  t('outer-xml(<hallo> surrounded <nestling>double</nestling> surrounded2 </hallo>)', '<hallo> surrounded <nestling>double</nestling> surrounded2 </hallo>');
+  t('outer-xml(<hallo> surrounded <nestling atti = "matti">double</nestling> surrounded2 </hallo>)', '<hallo> surrounded <nestling atti="matti">double</nestling> surrounded2 </hallo>');
+  t('outer-xml(<hallo>&quot;</hallo>)', '<hallo>"</hallo>');
+  t('outer-xml(<hallo> inline entity: &quot;</hallo>)', '<hallo> inline entity: "</hallo>');
+  t('outer-xml(<hallo> inline entities: &lt;&amp;&gt;</hallo>)', '<hallo> inline entities: &lt;&></hallo>'); //lt is escaped again (todo: also escape amp again)
+  t('outer-xml(<hallo>{{brackets}}</hallo>)', '<hallo>{brackets}</hallo>');
+  t('outer-xml(<hallo>surr{{brackets}}ounded</hallo>)', '<hallo>surr{brackets}ounded</hallo>');
+  t('outer-xml(<hallo>1 + 2 + 3</hallo>)', '<hallo>1 + 2 + 3</hallo>');
+  t('outer-xml(<hallo>{1 + 2 + 3}</hallo>)', '<hallo>6</hallo>');
+  t('outer-xml(<hallo>{1} {2 + 3}</hallo>)', '<hallo>1 5</hallo>');
+  t('outer-xml(<hallo>{1}{2 + 3}</hallo>)', '<hallo>15</hallo>');
+  t('outer-xml(<hallo>{1}{2}{3}</hallo>)', '<hallo>123</hallo>');
+  t('outer-xml(<book isbn="isbn-0060229357"><title>Harold and the Purple Crayon</title><author><first>Crockett</first><last>Johnson</last></author></book>)',
+               '<book isbn="isbn-0060229357"><title>Harold and the Purple Crayon</title><author><first>Crockett</first><last>Johnson</last></author></book>');
+  t('let $b := <book isbn="isbn-0060229357"><title>Harold and the Purple Crayon</title><author><first>Crockett</first><last>Johnson</last></author></book> return outer-xml($b)',
+              '<book isbn="isbn-0060229357"><title>Harold and the Purple Crayon</title><author><first>Crockett</first><last>Johnson</last></author></book>');
+  t('let $b := <book isbn="isbn-0060229357"><title>Harold and the Purple Crayon</title><author><first>Crockett</first><last>Johnson</last></author></book> return $b/title', 'Harold and the Purple Crayon');
+  t('let $b := <book isbn="isbn-0060229357"><title>Harold and the Purple Crayon</title><author><first>Crockett</first><last>Johnson</last></author></book> return outer-xml(<example> <p> Here is a query. </p>  <eg> $b/title </eg>  <p> Here is the result of the query. </p>  <eg>{ $b/title }</eg>  </example>)',
+         '<example> <p> Here is a query. </p>  <eg> $b/title </eg>  <p> Here is the result of the query. </p>  <eg><title>Harold and the Purple Crayon</title></eg>  </example>');
+  t('let $a := <hallo>test</hallo>, $b := <def>{$a}</def> return outer-xml($b)', '<def><hallo>test</hallo></def>');
+  t('let $a := <hallo foo="bar">test</hallo>, $b := <def>{$a}</def> return outer-xml($b)', '<def><hallo foo="bar">test</hallo></def>');
+  t('let $a := <hallo foo="bar">test</hallo>, $b := <def>{$a/@*}</def> return outer-xml($b)', '<def foo="bar"/>');
+  t('let $a := <hallo foo="bar" do="little" do2="more">test</hallo> return $a/@do', 'little');
+  t('/hallo/@*', 'bar little more', '<hallo foo="bar" do="little" do2="more">test</hallo>');
+  t('let $a := <hallo foo="bar" do="little" do2="more">test</hallo> return $a/@*', 'bar little more');
+  t('let $a := <hallo foo="bar" do="little" do2="more">test</hallo>, $b := <def>{$a/@*}</def> return outer-xml($b)', '<def foo="bar" do="little" do2="more"/>');
+  t('<a>5</a> eq <a>5</a>', 'true');
+  t('<a>5</a> eq <b>5</b>', 'true');
+  t('<a>5</a> is <a>5</a>', 'false');
+  t('outer-xml(<a test="{1+2}">5</a>)', '<a test="3">5</a>');
+  t('outer-xml(<a test="MAUS{1+2}HAUS">5</a>)', '<a test="MAUS3HAUS">5</a>');
+  t('outer-xml(<a test="{1}{2}{3}">5</a>)', '<a test="123">5</a>');
+  t('outer-xml(<a test="&apos;">5</a>)', '<a test="''">5</a>');
+  t('outer-xml(<a test="foo&apos;bar">5</a>)', '<a test="foo''bar">5</a>');
+  t('outer-xml(<a test=''{1+2}''>5</a>)', '<a test="3">5</a>');
+  t('outer-xml(<a test=''MAUS{1+2}HAUS''>5</a>)', '<a test="MAUS3HAUS">5</a>');
+  t('outer-xml(<a test  =  ''MAUS{1+2}HAUS''   >5</a>)', '<a test="MAUS3HAUS">5</a>');
+  t('outer-xml(<a test=''{1}{2}{3}''>5</a>)', '<a test="123">5</a>');
+  t('outer-xml(<a test=''&apos;''>5</a>)', '<a test="''">5</a>');
+  t('outer-xml(<a test=''foo&apos;bar''>5</a>)', '<a test="foo''bar">5</a>');
+  t('outer-xml(<a test="xpa""th">5</a>)', '<a test="xpa"th">5</a>');        //TODO: fix tree output
+  t('outer-xml(<a test=''xpa''''th''>5</a>)', '<a test="xpa''th">5</a>');
+  t('outer-xml(<a test="{<temp>dingdong</temp>}">5</a>)', '<a test="dingdong">5</a>');
+  t('outer-xml(<a test="foo{{123}}bar">5</a>)', '<a test="foo{123}bar">5</a>');
+  t('outer-xml(<a test="&#x61;&#x20;&#x61;{61}">&#x61;&#x20;&#x61;{61}</a>)', '<a test="a a61">a a61</a>');
+  t('outer-xml(<a><![CDATA[]]></a>)', '<a></a>');
+  t('outer-xml(<a><![CDATA[123]]></a>)', '<a>123</a>');
+  t('outer-xml(<a>foo<![CDATA[123]]>bar</a>)', '<a>foo123bar</a>');
+  t('outer-xml(<a>{1+2}<![CDATA[{1+2}]]>{1+3}</a>)', '<a>3{1+2}4</a>');
+  t('outer-xml(<a>&#x7d;{1+2}<![CDATA[{1+2}]]>{1+3}&#x7b;</a>)', '<a>}3{1+2}4{</a>');
+  t('outer-xml(<a>{1, 2, 3}</a>)', '<a>1 2 3</a>');
 
-{  <a>5</a> eq <a>5</a>
+  t('outer-xml(<shoe size="7"/>)', '<shoe size="7"/>');
+  t('outer-xml(<shoe size="{7}"/>)', '<shoe size="7"/>');
+  t('outer-xml(<shoe size="{()}"/>)', '<shoe size=""/>');
+  t('outer-xml(<chapter ref="[{1, 5 to 7, 9}]"/>)', '<chapter ref="[1 5 6 7 9]"/>');
+  t('outer-xml(let $hat := <ham size="123"/> return <shoe size="As big as {$hat/@size}"/>)', '<shoe size="As big as 123"/>');
+  t('outer-xml(<a>{1}</a>)', '<a>1</a>');
+  t('outer-xml(<a>{1, 2, 3}</a>)', '<a>1 2 3</a>');
+  t('outer-xml(<c>{1}{2}{3}</c>)', '<c>123</c>');
+  t('outer-xml(<b>{1, "2", "3"}</b>)', '<b>1 2 3</b>');
+  t('outer-xml(<fact>I saw 8 cats.</fact>)', '<fact>I saw 8 cats.</fact>');
+  t('outer-xml(<fact>I saw {5 + 3} cats.</fact>)', '<fact>I saw 8 cats.</fact>');
+  t('outer-xml(<fact>I saw <howmany>{5 + 3}</howmany> cats.</fact>)', '<fact>I saw <howmany>8</howmany> cats.</fact>');
 
-<a>5</a> eq <b>5</b>
+  t('outer-xml(<!--comment-->)', '<!--comment-->');
+  t('outer-xml(<a><!--comment--></a>)', '<a><!--comment--></a>');
+  t('outer-xml(<a><!-- comment -->{1,2,3}</a>)', '<a><!-- comment -->1 2 3</a>');
+  t('outer-xml(<a><!-- co<! <? <aas aas asa sas mment -->{1,2,3}</a>)', '<a><!-- co<! <? <aas aas asa sas mment -->1 2 3</a>');
+  t('outer-xml(<!-- Tags are ignored in the following section -->)', '<!-- Tags are ignored in the following section -->');
 
-<a>5</a> is <a>5</a>
- }
+  t('outer-xml(<?piempty?>)', '<?piempty ?>');
+  t('outer-xml(<?piempty       ?>)', '<?piempty ?>');
+  t('outer-xml(<?pifull     foobar?>)', '<?pifull foobar?>');
+  t('outer-xml(<?pispace     balls   ?>)', '<?pispace balls   ?>');
+  t('outer-xml(<a><?piempty?></a>)', '<a><?piempty ?></a>');
+  t('outer-xml(<a><?piempty       ?></a>)', '<a><?piempty ?></a>');
+  t('outer-xml(<a><?pispace     balls   ?></a>)', '<a><?pispace balls   ?></a>');
+  t('outer-xml(<a>{1,2}<?pispace     balls   ?>8</a>)', '<a>1 2<?pispace balls   ?>8</a>');
+  t('outer-xml(<?format role="output" ?>)', '<?format role="output" ?>');
 
+
+  t('<hallo>welt</hallo> / text()', 'welt');
+  t('<hallo>welt</hallo>/text()', 'welt');
+  t('<hallo>welt</hallo> /text()', 'welt');
+  t('<hallo foo="bar" maus="haus">welt</hallo> / @*', 'bar haus');
+  t('<hallo foo="bar" maus="haus">welt</hallo>/@*', 'bar haus');
+  t('outer-xml(let $x := (1,2,<a>s</a>,<a>t</a> / text(),3) return <t h="{$x}">(: ass :){(: ass :)$x}</t>)', '<t h="1 2 s t 3">(: ass :)1 2<a>s</a>t3</t>');
+  t('outer-xml(<t h="{(1,2,<a>s</a>,<a>t</a> / text(),3)}">(: ass :){(: ass :)(1,2,<a>s</a>,<a>t</a> / text(),3)(:?:)(::)}</t>)', '<t h="1 2 s t 3">(: ass :)1 2<a>s</a>t3</t>');
+  //TODO: fix list insert, fix list sort with multiple document
 
 
 

@@ -884,6 +884,17 @@ type
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   end;
 
+  { TXQTermConstructor }
+
+  TXQTermConstructor = class(TXQTerm)
+    typ: TTreeElementType;
+    nameValue: TXQTerm;
+    constructor create(atype: TTreeElementType; aname: txqterm = nil);
+    function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function evaluate(const context: TEvaluationContext; baseOffset: longint): IXQValue;
+    destructor destroy; override;
+  end;
+
   IXQuery = interface
     function evaluate(const tree: TTreeElement = nil): IXQValue;
     function evaluate(const context: TEvaluationContext): IXQValue;
@@ -1069,6 +1080,7 @@ type
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
 
     VariableChangelog: TXQVariableChangeLog;  //**< All variables that have been set (if a variable was overriden, it stores the old and new value)
+    TreeStorage: TTreeParser; //**< Object storing all trees generated during by an XQuery expression
 
     OnEvaluateVariable: TEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
     OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
@@ -1787,6 +1799,7 @@ begin
   if v = nil then exit(xqvalue());
   result := TXQValueNode.Create(v);
 end;
+
 
 { TXQValueEnumerator }
 
@@ -2808,11 +2821,17 @@ begin
 end;
 
 destructor TXQueryEngine.Destroy;
+var
+  i: Integer;
 begin
   VariableChangelog.Free;
-  FExternalDocuments.free;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}FInternet.Free;{$endif}
   clear;
+  if FExternalDocuments <> nil then begin;
+    for i:= 0 to FExternalDocuments.count - 1 do
+      TTreeElement(FExternalDocuments.Objects[i]).deleteAll();
+    FExternalDocuments.Free;
+  end;
   inherited Destroy;
 end;
 
@@ -2947,12 +2966,8 @@ begin
   try
     cxt.str := str;
     cxt.pos := @cxt.str[1];
-    result := cxt.parse;
-    if cxt.nextToken(true) = ',' then begin
-      result := TXQTermSequence.Create.push([result]);
-      while cxt.nextToken() = ',' do
-        result.push(cxt.parse);
-    end;
+    result := cxt.parsePrimaryLevel;
+    if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   finally
     cxt.free;
   end;

@@ -137,11 +137,15 @@ TTreeElement = class
 
   function addAttribute(aname, avalue: string): TTreeElement; //adds a single attribute. Returns the element of the last inserted attribute. (runs in O(|attributes|) => do not use for multiple attributes)
   function addAttributes(const props: array of THTMLProperty): TTreeElement; //adds an array of properties to the attributes. Returns the element of the last inserted attribute.
+  procedure addChild(child: TTreeElement);
 
   procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
   function deleteElementFromDoubleLinkedList: TTreeElement; //removes the element from the double linked list (only updates previous/next), frees it and returns next  (mostly useful for attribute nodes)
 
+  function clone: TTreeElement;
 protected
+  function cloneShallow: TTreeElement;
+
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
   procedure removeElementKeepChildren; //**< removes/frees the current element, but keeps the children (i.e. removes self and possible self.reverse. Will not remove the opening tag, if called on a closing tag)
 
@@ -746,6 +750,23 @@ begin
 
 end;
 
+procedure TTreeElement.addChild(child: TTreeElement);
+var
+  oldprev: TTreeElement;
+begin
+  child.parent := self;
+  oldprev := reverse.previous;
+  oldprev.next := child;
+  child.previous := oldprev;
+  if child.reverse = nil then begin
+    reverse.previous := child;
+    child.next := reverse;
+  end else begin
+    reverse.previous := child.reverse;
+    child.reverse.next := reverse;
+  end;
+end;
+
 procedure TTreeElement.removeElementFromDoubleLinkedList;
 begin
   if previous <> nil then previous.next := next;
@@ -757,6 +778,74 @@ begin
   result := next;
   removeElementFromDoubleLinkedList;
   free;
+end;
+
+
+function TTreeElement.cloneShallow: TTreeElement;
+var
+  newattribtail: TTreeElement;
+  attrib: TTreeElement;
+begin
+  result := TTreeElement.create();
+  result.typ := typ;
+  result.value := value;
+  result.attributes := attributes;
+  result.next := nil;
+  result.previous := nil;
+  result.parent := nil;
+  result.reverse := nil;
+  result.namespace := namespace;
+  result.offset := offset;
+
+  if typ = tetAttributeName then begin
+    result.reverse := reverse.cloneShallow;
+    result.reverse.next := nil;
+    result.reverse.previous := nil;
+  end;
+
+  if attributes <> nil then begin
+    result.attributes := attributes.cloneShallow;
+    newattribtail := result.attributes;
+    attrib := attributes.next;
+    while attrib <> nil do begin
+      newattribtail.next := attrib.cloneShallow;
+      newattribtail.reverse.next := newattribtail.next.reverse;
+      newattribtail.next.previous := newattribtail;
+      newattribtail.next.reverse.previous := newattribtail.reverse;
+
+      attrib := attrib.next;
+      newattribtail := newattribtail.next;
+    end;
+  end;
+end;
+
+function TTreeElement.clone: TTreeElement;
+var
+  kid, attrib: TTreeElement;
+  newattribhead, newattribtailend: TTreeElement;
+begin
+  case typ of
+    tetOpen: begin
+      result := cloneShallow;
+      result.reverse := reverse.cloneShallow;
+      result.reverse.reverse := result;
+      result.next := result.reverse;
+      result.reverse.previous := result;
+
+      kid := getFirstChild();
+      while kid <> nil do begin
+        result.addChild(kid.clone);
+        kid := kid.getNextSibling();
+      end;
+    end;
+    tetText, tetComment, tetProcessingInstruction, tetAttributeName: result := cloneShallow;
+    tetAttributeValue: result := reverse.cloneShallow;
+    tetClose: raise ETreeParseException.Create('Cannot clone closing tag');
+    else raise ETreeParseException.Create('Unknown tag');
+  end;
+  result.previous := nil;
+  if result.reverse <> nil then Result.reverse.next := nil
+  else result.next := next;
 end;
 
 procedure TTreeElement.removeAndFreeNext();

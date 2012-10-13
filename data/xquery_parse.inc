@@ -81,8 +81,9 @@ type
   procedure raiseParsingError(s: string);
   procedure raiseInvalidModel(s: string);
 
-  procedure requireXQuery;
+  procedure requireXQuery(s: string = '');
 
+  procedure skipWhitespace();
   procedure skipComment();
   procedure skipWhitespaceAndComment();
   procedure expect(c: char);
@@ -94,8 +95,10 @@ type
   function parseQNameContinuation: string;
   function parseSequenceType(): TXQTermSequenceType;
   function replaceEntities(s: string; enc: TEncoding): string;
+  function parseString(const w: string): TXQTerm;
 
   function parseFlower(akind: string): TXQTermFlower;
+  function parseDirectConstructor(name: string): TXQTermConstructor;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -103,6 +106,7 @@ type
   //**(observation: that kind of looks like it parses everything except binary operators)
   function parseValue: TXQTerm;
   function parse: TXQTerm;
+  function parsePrimaryLevel: TXQTerm;
 end;
 
 
@@ -119,9 +123,14 @@ begin
   raiseParsingError('This language feature is not available in the selected language. '+s);
 end;
 
-procedure TXQParsingContext.requireXQuery;
+procedure TXQParsingContext.requireXQuery(s: string);
 begin
-  if parsingModel <> xqpmXQuery1 then raiseInvalidModel('XQuery is required');
+  if parsingModel <> xqpmXQuery1 then raiseInvalidModel('XQuery is required '+s);
+end;
+
+procedure TXQParsingContext.skipWhitespace;
+begin
+  while pos^ in WHITE_SPACE do pos += 1;
 end;
 
 procedure TXQParsingContext.skipComment;
@@ -171,7 +180,7 @@ end;
 
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
-const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*']; // $ and ; are no symbols
+const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?']; // $ and ; are no symbols
 const START_SYMBOLS = ['-'];
 var start:pchar;
    numberE, numberPoint: boolean;
@@ -405,6 +414,142 @@ begin
   result.returned := parse;
 end;
 
+function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstructor;
+  procedure parseCommonContent(parent: TXQTermConstructor; border: char);
+    procedure pushElementContent(s: string);
+    begin
+      if length(s) = 0 then exit;
+      parent.push(TXQTermString.create(s));
+    end;
+  var marker: PChar;
+  begin
+    while pos^ <> #0 do begin
+      marker := pos;
+      while not (pos^ in [#0, '{', '}', '&']) and (pos^ <> border) do pos+=1;
+
+      if pos^ = #0 then raiseParsingError('Unexpected end');
+
+      pushElementContent(strFromPchar(marker, pos - marker));
+
+      if pos^ = border then begin
+        if (pos^ in ['''', '"']) and ((pos+1)^ = border) then begin
+          pushElementContent(border);
+          pos+=2;
+          continue;
+        end else exit;
+      end;
+
+      case pos^ of
+        '{': if (pos+1)^ <> '{' then begin
+          pos += 1;
+          parent.push(parsePrimaryLevel);
+          expect('}');
+        end else begin
+          pushElementContent('{');
+          pos+=2;
+        end;
+        '}': begin
+          if (pos+1)^ <> '}' then raiseParsingError('Invalid closing parenthesis');
+          pushElementContent('}');
+          pos += 2;
+        end;
+        '&': begin
+          marker := pos;
+          while not (pos^ in [#0, ';']) do pos += 1;
+          if pos^ = #0 then raiseParsingError('Unexpected end');
+          pos += 1;
+          pushElementContent(replaceEntities(strFromPchar(marker, pos - marker), encoding));
+        end;
+      end;
+    end;
+  end;
+
+  function parsePIConstructor: TXQTermConstructor;
+  var marker: PChar;
+  begin
+    result := TXQTermConstructor.create(tetProcessingInstruction, txqtermstring.create(nextToken()));
+    skipWhitespace();
+    marker := pos;
+    while (pos^ <> #0) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do pos+=1;
+    result.push(txqtermstring.create(strFromPchar(marker, pos - marker)));
+    if pos^ = #0 then raiseParsingError('Unexpected end');
+    expect('?>');
+  end;
+
+  function parseCommentConstructor: TXQTermConstructor;
+  var marker: PChar;
+  begin
+    expect('--');
+    marker := pos;
+    while (pos^ <> #0) and ((pos^ <> '-') or ((pos+1)^ <> '-')) do pos+=1;
+    if pos^ = #0 then raiseParsingError('Unexpected end');
+    result := TXQTermConstructor.create(tetComment, txqtermstring.create(strFromPchar(marker, pos - marker)));
+    expect('-->');
+  end;
+
+var
+  token: String;
+  marker: PChar;
+  attribute: TXQTermConstructor;
+begin
+  name := nextToken();
+  if name = '!' then exit(parseCommentConstructor)
+  else if name = '?' then exit(parsePIConstructor);
+  result := TXQTermConstructor.create(tetOpen, TXQTermString.create(name));
+  token := nextToken();
+  while (token <> '>') and (token <> '/') and (token <> '') do begin
+    attribute := TXQTermConstructor.create(tetAttributeName, TXQTermString.create(token));
+    result.push(attribute);
+    expect('=');
+    skipWhitespaceAndComment();
+    if not (pos^ in ['''', '"']) then raiseParsingError('Expected attribute value');
+    marker := pos;
+    pos+=1;
+    parseCommonContent(attribute, marker^);
+    expect(marker^);
+    token := nextToken();
+  end;
+  if token = '' then raiseParsingError('Attribute expected');
+  if token = '/' then begin
+    expect('>');
+    exit;
+  end;
+
+  while pos^ <> #0 do begin
+    parseCommonContent(result, '<');
+
+    if pos^ = #0 then raiseParsingError('Unexpected end');
+    if pos^ = '<' then begin
+      pos += 1;
+      case pos^ of
+        '/': begin
+          pos += 1;
+          if nextToken <> name then raiseParsingError('Expected matching closing tag');
+          expect('>');
+          exit;
+        end;
+        '!': if strBeginsWith(pos, '![CDATA[') then begin
+          pos += length('![CDATA[');
+          marker := pos;
+          while (pos^ <> #0) and not strBeginsWith(pos, ']]>') do pos+=1;
+          if pos^ = #0 then raiseParsingError('Unexpected end');
+          result.push(TXQTermString.create(strFromPchar(marker, pos - marker)));
+          pos+=3;
+        end else if strBeginsWith(pos, '!--') then begin
+          pos += 1;
+          result.push(parseCommentConstructor);
+        end else raiseParsingError('Invalid character combination after <!');
+        '?': begin
+          pos += 1;
+          result.push(parsePIConstructor);
+        end;
+        else result.push(parseDirectConstructor('<'));
+      end;
+    end;
+  end;
+  raiseParsingError('Unexpected end')
+end;
+
 function TXQParsingContext.replaceEntities(s: string; enc: TEncoding): string;
 var
   n, p: Integer;
@@ -436,9 +581,7 @@ begin
   result += strcopyfrom(s, p);
 end;
 
-function TXQParsingContext.parseValue: TXQTerm;
-
-  function parseString(const w: string): TXQTerm;
+function TXQParsingContext.parseString(const w: string): TXQTerm;
   var s: string;
       lastStrStart, i: integer;
   begin
@@ -466,6 +609,7 @@ function TXQParsingContext.parseValue: TXQTerm;
     if lastStrStart < length(str) then result.push(TXQTermString.Create(copy(s, lastStrStart, i - lastStrStart)));
   end;
 
+function TXQParsingContext.parseValue: TXQTerm;
 var
   word: String;
   wordlookahead: String;
@@ -506,6 +650,11 @@ begin
          else if word = '..' then exit(TXQTermNodeMatcher.Create(word))
          else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermNumber.Create(word))
          else raiseParsingError('Unknown term: '+word);
+
+    '<': begin
+      requireXQuery('to use constructors (this error can also mean an invalid < )');
+      result := parseDirectConstructor(word);
+    end
 
     else begin
       wordlookahead := nextToken(true);
@@ -614,7 +763,7 @@ begin
   while true do begin
     word := nextToken(true);
     case word of
-      '', ',', ')', ']', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation':
+      '', ',', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation':
         exit(astroot);
       //'=', '+', '-', '*': pushBinaryOp(word);
       '!': pushBinaryOp('!=');
@@ -646,5 +795,17 @@ begin
     end;
   end;
   result := astroot;
+end;
+
+function TXQParsingContext.parsePrimaryLevel: TXQTerm;
+begin
+  result := parse;
+  if nextToken(true) = ',' then begin
+    result := TXQTermSequence.Create.push([result]);
+    while nextToken(true) = ',' do begin
+      expect(',');
+      result.push(parse);
+    end;
+  end;
 end;
 

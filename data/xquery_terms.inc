@@ -831,3 +831,152 @@ begin
 end;
 
 
+{ TXQTermConstructor }
+
+constructor TXQTermConstructor.create(atype: TTreeElementType; aname: txqterm = nil);
+begin
+  typ := atype;
+  nameValue := aname;
+end;
+
+function TXQTermConstructor.evaluate(const context: TEvaluationContext): IXQValue;
+begin
+  result := evaluate(context, 0);
+end;
+
+function TXQTermConstructor.evaluate(const context: TEvaluationContext; baseOffset: longint): IXQValue;
+var
+  tree: TTreeElement;
+  i: Integer;
+  kid: TTreeElement;
+  lastAttribute: TTreeElement;
+  nextEnd: ^TTreeElement;
+  lastKid: TTreeElement;
+  temp: IXQValue;
+  procedure addKid;
+  begin
+    if tree.next = nil then tree.next := kid
+    else begin
+      lastKid.next := kid;
+      kid.previous := lastKid;
+    end;
+    kid.offset := baseOffset;
+    baseOffset += 1;
+  end;
+  procedure addNodeAsKid;
+  begin
+    kid.parent := tree;
+    case kid.typ of
+      tetAttributeName: begin
+        if lastAttribute = nil then tree.attributes := kid
+        else begin
+          lastAttribute.next := kid;
+          kid.previous := lastAttribute;
+          lastAttribute.reverse.next := kid.reverse;
+          kid.reverse.previous := lastAttribute.reverse;
+        end;
+        kid.reverse.parent := tree;
+        lastAttribute := kid;
+        kid.offset:=baseOffset;
+        kid.reverse.offset:=baseOffset;
+        baseOffset+=1;
+      end;
+      tetOpen: begin
+        addKid;
+        lastKid := kid.reverse;
+      end;
+      tetComment, tetText, tetProcessingInstruction: begin
+        addKid;
+        lastKid := kid;
+      end;
+      else raiseEvaluationError('Unknown child node');
+    end;
+  end;
+
+  procedure addValue(const v: IXQValue; firstAtomic: boolean = true);
+  var x: IXQValue;
+  begin
+    case v.kind of
+      pvkNode: begin
+        kid := v.toNode.clone;
+        addNodeAsKid;
+      end;
+      pvkSequence: begin
+        firstAtomic := true;
+        for x in v do begin
+          addValue(x, firstAtomic);
+          if x is TXQValueNode then firstAtomic := true
+          else firstAtomic:=false;
+        end;
+      end
+      else if firstAtomic then begin
+        kid := TTreeElement.create(tetText);
+        kid.parent := tree;
+        kid.value := v.toString;
+        addKid;
+        lastKid := kid;
+      end else begin
+        if lastKid.typ <> tetText then raiseEvaluationError('Internal error: No atomic value before this one exist, but this one is not the first atomic value.');
+        lastKid.value += ' ' + v.toString;
+      end;
+    end;
+  end;
+
+  function valueToString(v: IXQValue): string;
+  var
+    first: Boolean;
+    x: IXQValue;
+  begin
+    first := true;
+    result := '';
+    for x in v do begin
+      if not first then result += ' ';
+      result += x.toString;
+      first := false;
+    end;
+  end;
+begin
+  tree := TTreeElement.create(typ);
+  if baseOffset = 0 then begin
+    if context.sender.FExternalDocuments = nil then context.sender.FExternalDocuments := TStringList.Create;
+    context.sender.FExternalDocuments.AddObject('', tree);
+  end;
+  baseOffset += 1;
+  lastAttribute := nil;
+  nextEnd:=@tree.next;
+  tree.value := nameValue.evaluate(context).toString;
+  case typ of
+    tetAttributeName: begin
+      tree.reverse := TTreeElement.create();
+      tree.reverse.reverse := tree;
+      tree.reverse.typ := tetAttributeValue;
+      for i:= 0 to high(children) do
+        tree.reverse.value := tree.reverse.value + valueToString(children[i].evaluate(context));
+    end;
+    tetOpen: begin
+      for i:=0 to high(children) do
+        if children[i] is TXQTermConstructor then begin
+          kid := TXQTermConstructor(children[i]).evaluate(context, baseOffset).toNode;
+          addNodeAsKid;
+        end else
+          addValue(children[i].evaluate(context));
+
+      kid := TTreeElement.create(tetClose, tree.value);
+      addKid;
+      tree.reverse := kid; kid.reverse := tree;
+    end;
+    tetProcessingInstruction: begin
+      if length(children) = 0 then raiseEvaluationError('No content for processing instruction');
+      tree.addAttribute('', children[0].evaluate(context).toString);
+    end;
+    tetComment:;
+    else raiseEvaluationError('Invalid type for constructor');
+  end;
+  result := xqvalue(tree);
+end;
+
+destructor TXQTermConstructor.destroy;
+begin
+  nameValue.Free;
+  inherited destroy;
+end;
