@@ -2468,6 +2468,19 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('/a >> ()',  '');
   t('() >> /a ', '');
 
+  t('element', 'E1aT1E1bD1aA1D1bC1PI1E1c', '!<element>E1a<text>T1</text>E1b<document>D1a<attribute>A1</attribute>D1b<comment>C1</comment><processing-instruction>PI1</processing-instruction></document>E1c</element>');
+  t('string-join(for $a in element return $a / text(), ":")', 'E1a:E1b:E1c');
+  t('string-join(for $a in element return $a / text, ":")', 'T1');
+  t('string-join(for $a in element return $a / document, ":")', 'D1aA1D1bC1PI1');
+  t('//(text)', 'T1');
+  t('//((text))', 'T1');
+  t('//document', 'D1aA1D1bC1PI1');
+  t('//((document))', 'D1aA1D1bC1PI1');
+  t('string-join(for $a in element return $a / document / comment, ":")', 'C1');
+  t('string-join(for $a in element return $a / document / processing-instruction, ":")', 'PI1');
+  t('string-join(for $a in element return $a / document / (comment | processing-instruction), ":")', 'C1:PI1');
+
+
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
 
 
