@@ -733,24 +733,22 @@ type
   { TXQTermSequenceType }
 
   TXQTermSequenceType = class(TXQTerm)
-    serializedValue: string;
-
     name: string;
     allowNone, allowMultiple: boolean;
     kind: TXQTypeInformationKind;
     atomicTypeInfo: TXQValueClass; //only for tikAtomic
-    matchedTypes: TTreeElementTypes; //only for tikElementTest
+    nodeMatching: TXQPathMatchingStep; //only for tikElementTest
 
-    constructor create(const avalue: string);
+    constructor create();
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function serialize: string;
   protected
-    procedure init(const s: string);
+    procedure init(const s: string; functionLike: boolean);
     function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
     function castableAsBase(v: IXQValue): boolean;
     function castAs(v: IXQValue): IXQValue;
     function castableAs(v: IXQValue): boolean;
-    function instanceOfBase(ta: IXQValue): boolean;
-    function instanceOf(ta: IXQValue): boolean;
+    function instanceOf(ta: IXQValue; equalFunction: TStringComparisonFunc): boolean;
   end;
 
   { TXQTermVariable }
@@ -1927,6 +1925,44 @@ begin
     exit(a.offset - b.offset);
   if pointer(a.document) < pointer(b.document) then exit(-1)
   else exit(1);
+end;
+
+function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
+begin
+  if select = 'node' then
+    exit([qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute])
+  else if select = 'text' then exit([qmText])
+  else if select = 'comment' then exit([qmComment])
+  else if select = 'element' then exit([qmElement,qmExcludeRoot])
+  else if select = 'processing-instruction' then exit([qmProcessingInstruction])
+  else raise Exception.Create('Unknown element test: '+select);
+end;
+
+
+function convertElementTestToPathMatchingStep(const select: string; const children: array of TXQTerm): TXQPathMatchingStep;
+begin
+  result.typ:=qcDirectChild;
+  result.matching:=convertElementTestToMatchingOptions(select);
+  if (length(children) = 0) then exit;
+  if (result.matching = [qmProcessingInstruction])  then begin
+    if children[0] is TXQTermNodeMatcher then begin;
+      if TXQTermNodeMatcher(children[0]).axis <> '' then raise EXQEvaluationException.Create('axis within element test is not allowed');
+      result.value := TXQTermNodeMatcher(children[0]).select;
+    end else if children[0] is TXQTermString then
+      result.value:=TXQTermString(children[0]).value
+    else raise EXQEvaluationException.Create('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
+    include(result.matching, qmValue) ;
+  end else if select = 'element' then begin
+    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('Invalid element test.');
+    if TXQTermNodeMatcher(children[0]).select <> '*' then begin
+      Include(result.matching, qmValue);
+      result.value:=TXQTermNodeMatcher(children[0]).select;
+      if TXQTermNodeMatcher(children[0]).namespace <> '*' then begin
+        Include(result.matching, qmCheckNamespace);
+        result.namespace:=TXQTermNodeMatcher(children[0]).namespace;
+      end;
+    end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('Namespace:wildcard not allowed in element test') ;
+  end else raise EXQEvaluationException.Create('Children not allowed for element test "'+select+'"');
 end;
 
 {$I xquery_parse.inc}
@@ -3667,9 +3703,16 @@ begin
 end;
 
 class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeElement; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition);
+  function convertMatchingOptionsToMatchedTypes(const qmt: TXQPathMatchingKinds): TTreeElementTypes;
+  begin
+    result := [];
+    if qmText in qmt then include(result, tetText);
+    if qmElement in qmt then include(result, tetOpen);
+    if qmComment in qmt then include(result, tetComment);
+    if qmProcessingInstruction in qmt then include(result, tetProcessingInstruction);
+    if qmAttribute in qmt then begin result += [tetAttributeName, tetAttributeValue]; end;
+  end;
 begin
-  nodeCondition.start := contextnode;
-  nodeCondition.endnode := contextnode.reverse;
   nodeCondition.findOptions:=[];
   nodeCondition.initialFindOptions:=[];
   nodeCondition.matchStartNode:=false;
@@ -3678,6 +3721,12 @@ begin
   nodeCondition.requiredValue:=command.value;
   nodeCondition.checkNamespace:=qmCheckNamespace in command.matching;
   nodeCondition.requiredNamespace:=command.namespace;
+  nodeCondition.searchedTypes:=convertMatchingOptionsToMatchedTypes(command.matching);
+
+  if contextNode = nil then exit;
+
+  nodeCondition.start := contextnode;
+  nodeCondition.endnode := contextnode.reverse;
 
   case command.typ of
     qcSameNode: begin
@@ -3746,8 +3795,6 @@ begin
 
   include(nodeCondition.findOptions,tefoIgnoreText); //text matching is done on our level
   include(nodeCondition.initialFindOptions,tefoIgnoreText);
-
-  nodeCondition.searchedTypes:=convertMatchingOptionsToMatchedTypes(command.matching);
 end;
 
 

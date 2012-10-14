@@ -1,23 +1,3 @@
-function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
-begin
-  if select = 'node' then
-    exit([qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute])
-  else if select = 'text' then exit([qmText])
-  else if select = 'comment' then exit([qmComment])
-  else if select = 'element' then exit([qmElement,qmExcludeRoot])
-  else if select = 'processing-instruction' then exit([qmProcessingInstruction])
-  else raise Exception.Create('Unknown element test: '+select);
-end;
-
-function convertMatchingOptionsToMatchedTypes(const qmt: TXQPathMatchingKinds): TTreeElementTypes;
-begin
-  result := [];
-  if qmText in qmt then include(result, tetText);
-  if qmElement in qmt then include(result, tetOpen);
-  if qmComment in qmt then include(result, tetComment);
-  if qmProcessingInstruction in qmt then include(result, tetProcessingInstruction);
-  if qmAttribute in qmt then begin result += [tetAttributeName, tetAttributeValue]; end;
-end;
 
 { TXQTermReadProperty }
 
@@ -103,9 +83,8 @@ end;
 
 { TXQTermType }
 
-constructor TXQTermSequenceType.create(const avalue: string);
+constructor TXQTermSequenceType.create();
 begin
-  init(avalue);
 end;
 
 function TXQTermSequenceType.evaluate(const context: TEvaluationContext): IXQValue;
@@ -113,41 +92,14 @@ begin
   result := TXQValueFunction.create(self); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
 end;
 
-procedure TXQTermSequenceType.init(const s: string);
-var occurenceLength: integer;
-  index: Integer;
+function TXQTermSequenceType.serialize: string;
 begin
-  if s = '' then raise Exception.Create('no type');
-  serializedValue:=s;
-  if pos('(', s) > 0 then begin
-    if pos('()', s) = 0 then raise Exception.Create('Element tests with arguments are not supported');
-  end;
-  allowNone:=false;
-  allowMultiple:=false;
-  if s = 'empty-sequence()' then kind:=tikNone
-  else begin
-    occurenceLength := 1;
-    case s[length(s)] of
-      '?': allowNone:=true;
-      '+': allowMultiple:=true;
-      '*': begin allowNone:=true; allowMultiple:=true; end;
-      else occurenceLength := 0;
-    end;
-    if strBeginsWith(s, 'item()') then
-      kind:=tikAny
-    else if pos('()', s) > 0 then begin
-      kind:=tikElementTest;
-      name:=copy(s,1,length(s)-occurenceLength);
-      delete(name, pos('(', name), 2);
-      matchedTypes := convertMatchingOptionsToMatchedTypes(convertElementTestToMatchingOptions(name));
-    end else begin
-      kind:=tikAtomic;
-      name:=copy(s,1,length(s)-occurenceLength);
-      index := types.IndexOf(name);
-      if index < 0 then raise Exception.Create('Unknown type: '+name);
-      atomicTypeInfo := TXQValueClass(types.Objects[index]);
-    end;
-  end;
+  result := name;
+end;
+
+procedure TXQTermSequenceType.init(const s: string; functionLike: boolean);
+begin
+
 end;
 
 function TXQTermSequenceType.isSingleType(): boolean;
@@ -178,21 +130,15 @@ begin
   result := castableAsBase(v);
 end;
 
-function TXQTermSequenceType.instanceOf(ta: IXQValue): boolean;
-begin
-  result := instanceOfBase(ta);
-end;
+function TXQTermSequenceType.instanceOf(ta: IXQValue; equalFunction: TStringComparisonFunc): boolean;
+var nodeCondition: TXQPathNodeCondition;
 
-function TXQTermSequenceType.instanceOfBase(ta: IXQValue): boolean;
   function instanceOfSingleType(sub: IXQValue): boolean;
   begin
     case kind of
       //tikAny, tikNone: ; //handled before
       tikAtomic: result := sub.instanceOfInternal(atomicTypeInfo);
-      tikElementTest: begin
-        if (not (sub is TXQValueNode)) or (sub.toNode = nil) then exit(false);
-        result  := sub.toNode.typ in matchedTypes;
-      end;
+      tikElementTest: result  := TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, sub.toNode);
     end;
   end;
 var
@@ -210,7 +156,10 @@ begin
   //compare item type
   if kind = tikAny then
     exit(true);
-
+  if kind = tikElementTest then begin
+    TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
+    nodeCondition.equalFunction := equalFunction;
+  end;
   result := true;
   for v in ta do begin
     result := result and instanceOfSingleType(v);
@@ -344,8 +293,8 @@ var
       tempContext.temporaryVariables.pushAll;
       //sequenceTyp: TXQTermType;
       tempContext.temporaryVariables.addVariable(vars[pos].varname, v);
-      if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOfBase(v)) then
-        raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serializedValue+' got value '+v.toString);
+      if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, @context.nodeCollation.equal)) then
+        raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
       if vars[pos].positionVarname <> '' then ;
         tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index));
       evaluateForLoop(pos+1);
@@ -655,28 +604,8 @@ function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
 
 begin
   if func then begin
+    result := convertElementTestToPathMatchingStep(select, children);
     result.typ:=getAxis(axis);
-    result.matching:=convertElementTestToMatchingOptions(select);
-    if (length(children) > 0) then
-      if (result.matching = [qmProcessingInstruction])  then begin
-        if children[0] is TXQTermNodeMatcher then begin;
-          if TXQTermNodeMatcher(children[0]).axis <> '' then raiseEvaluationError('axis within element test is not allowed');
-          result.value := TXQTermNodeMatcher(children[0]).select;
-        end else if children[0] is TXQTermString then
-          result.value:=TXQTermString(children[0]).value
-        else raiseEvaluationError('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
-        include(result.matching, qmValue) ;
-      end else if select = 'element' then begin
-        if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('Invalid element test.');
-        if TXQTermNodeMatcher(children[0]).select <> '*' then begin
-          Include(result.matching, qmValue);
-          result.value:=TXQTermNodeMatcher(children[0]).select;
-          if TXQTermNodeMatcher(children[0]).hadNamespace then begin
-            Include(result.matching, qmCheckNamespace);
-            result.namespace:=TXQTermNodeMatcher(children[0]).namespace;
-          end;
-        end else if TXQTermNodeMatcher(children[0]).hadNamespace then raiseEvaluationError('Namespace:wildcard not allowed in element test') ;
-      end else raiseEvaluationError('Children not allowed for element test "'+select+'"');
     exit;
   end;
   case select of
@@ -865,7 +794,7 @@ begin
     if children[i].children[0] is TXQTermVariable then start := 1
     else start := 0;
     for j := start to high(children[i].children) - 1 do
-      if (children[i].children[j] as TXQTermSequenceType).instanceOf(v) then
+      if (children[i].children[j] as TXQTermSequenceType).instanceOf(v, @context.nodeCollation.equal) then
         exit(evaluateWithChangedVariable(children[i].children[high(children[i].children)], children[i].children[0], v));
   end;
   i := high(children);

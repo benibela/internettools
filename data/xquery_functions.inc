@@ -682,13 +682,13 @@ end;
 
 procedure xqvalueInstanceOf(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
-  result := xqvalue(getTypeInfo(tb).instanceOf(ta));
+  result := xqvalue(getTypeInfo(tb).instanceOf(ta, @cxt.nodeCollation.equal));
 end;
 
 procedure xqvalueTreatAs(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
   result := ta;
-  if not getTypeInfo(tb).instanceOfBase(result) then
+  if not getTypeInfo(tb).instanceOf(result, @cxt.nodeCollation.equal) then
     raise Exception.Create('treat as type not matched');
 end;
 

@@ -273,28 +273,50 @@ begin
             or (word = 'element') or (word = 'document-node') or (word = 'schema-element') or (word = 'attribute') or (word = 'schema-attribute');
 end;
 
-function TXQParsingContext.parseSequenceType: TXQTermSequenceType; //read SequenceType of the xpathebnf and pushes it as tType ()
+function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
 var word, sequenceType: string;
+  index: Integer;
 begin
   word := nextToken();
-  sequenceType := word;
-  if (isKindTestFunction(word)) or (word = 'empty-sequence') then begin
-    repeat
-      word := nextToken();
-      sequenceType += word;
-    until (word = ')') or (word = '');
-  end else begin
-    if sequenceType = 'item' then begin
-      expect('('); expect(')');
-      sequenceType+='()';
-    end else if strBeginsWith(sequenceType, 'xs:') then delete(sequenceType, 1, 3);
-    word := nextToken(true);
-    if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin
-      sequenceType+=word;
-      expect(word);
+
+  result := TXQTermSequenceType.Create();
+  result.allowNone:=false;
+  result.allowMultiple:=false;
+
+  result.name:=word;
+  if (isKindTestFunction(word)) or (word = 'empty-sequence') or (word = 'item') then begin
+    expect('(');
+    parseSequenceLike(result);
+    if (word = 'empty-sequence') then begin
+      result.kind:=tikNone;
+      if length(result.children) <> 0 then raiseParsingError('invalid sequence type');
+      exit
+    end else if word = 'item' then begin
+      result.kind:=tikAny;
+      if length(result.children) <> 0 then raiseParsingError('invalid sequence type');
+    end else begin
+       result.kind:=tikElementTest;
+       result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
     end;
+  end else begin;
+    if strBeginsWith(word, 'xs:') then delete(word, 1, 3);
+
+    result.kind:=tikAtomic;
+    index := types.IndexOf(word);
+    if index < 0 then raise Exception.Create('Unknown type: '+word);
+    result.atomicTypeInfo := TXQValueClass(types.Objects[index]);
   end;
-  result := TXQTermSequenceType.Create(sequenceType);
+
+
+  word := nextToken(true);
+  if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin
+    case word[1] of
+      '?': result.allowNone:=true;
+      '+': result.allowMultiple:=true;
+      '*': begin result.allowNone:=true; result.allowMultiple:=true; end;
+    end;
+    pos+=1;
+  end;
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
