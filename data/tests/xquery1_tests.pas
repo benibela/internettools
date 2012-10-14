@@ -420,6 +420,13 @@ begin
   t('<abc:element>123</abc:element> instance of element(*:element)', 'true');
   t('<abc:element>123</abc:element> instance of element(abc:element)', 'true');
 
+
+  t('unordered { <element>abc</element> }', 'abc');
+  t('ordered { <element>abc</element> }', 'abc');
+  t('for $i in unordered { <element>abc</element> } return string-length($i/text())', '3');
+  t('for $i in ordered { <element>abc</element> } return string-length($i/text())', '3');
+  //t('validate strict { <element>abc</element> }', 'abc');
+
   xml.free;
   ps.free;
   vars.free

@@ -744,6 +744,8 @@ begin
       result := parseDirectConstructor(word);
     end
 
+
+
     else begin
       wordlookahead := nextToken(true);
       if wordlookahead='::' then word+=nextToken();
@@ -756,6 +758,7 @@ begin
         word += nextToken();
         wordlookahead := nextToken(true);
       end;
+
 
       if wordlookahead = '(' then begin
         expect('(');
@@ -806,6 +809,7 @@ begin
         exit(parseSequenceLike(result));
       end;
 
+
       if (wordlookahead<>'') and (wordlookahead[1]='$') then begin
         if (word = 'for') or (word = 'let') then
           exit(parseFlower(word));
@@ -824,8 +828,11 @@ begin
         end;
       end;
 
+
       if strBeginsWith(word,'attribute::') then
         exit(TXQTermReadAttribute.Create(strcopyfrom(word,length('attribute::')+1)));
+
+
 
       if (word = 'element') or (word = 'attribute') or (word = 'document') or (word = 'text') or (word = 'processing-instruction') or (word = 'comment') then begin
         constr := wordlookahead = '{';
@@ -840,6 +847,23 @@ begin
           exit(parseComputedConstructor(word));
         end;
       end;
+
+      if wordlookahead = '{' then begin
+        if (word = 'unordered') or (word = 'ordered') then begin //TODO: actually use that
+          requireXQuery();
+          expect('{'); result := parse(); expect('}');
+          exit;
+        end;
+      end;
+
+      if (word = 'validate') and ((wordlookahead = 'lax') or (wordlookahead = 'strict')) then begin
+        requireXQuery('for schema validation');
+        expect(wordlookahead);
+        expect('{');
+        raiseParsingError('Schema validaton is not supported');
+      end;
+
+
 
 
       result := TXQTermNodeMatcher.Create(word);
