@@ -101,6 +101,7 @@ type
   function parseFlower(akind: string): TXQTermFlower;
   function parseDirectConstructor(name: string): TXQTermConstructor;
   function parseComputedConstructor(name: string): TXQTermConstructor;
+  function parseExtension: TXQTerm;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -182,7 +183,7 @@ end;
 
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
-const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?']; // $ and ; are no symbols
+const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#']; // $ and ; are no symbols
 const START_SYMBOLS = ['-'];
 var start:pchar;
    numberE, numberPoint: boolean;
@@ -636,6 +637,21 @@ begin
   expect('}');
 end;
 
+function TXQParsingContext.parseExtension: TXQTerm;
+var
+  pragma: String;
+begin
+  requireXQuery('for extensions');
+  expect('#');
+  pragma := nextToken();
+  if system.pos(':', pragma) = 0 then raiseParsingError('Extension name requires namespace');
+  while (pos^ <> #0) and ((pos^ <> '#') and ((pos+1)^ <> ')')) do
+    pos += 1;
+  if pos^ = #0 then raiseParsingError('Unexpected end');
+  pos += 2;
+  expect('{'); result := parsePrimaryLevel; expect('}');
+end;
+
 function TXQParsingContext.replaceEntities(s: string; enc: TEncoding): string;
 var
   n, p: Integer;
@@ -723,7 +739,10 @@ begin
         exit(TXQTermUnaryOp.create(word, parseValue()));
     end;
 
-    '(': exit(parseSequenceLike(TXQTermSequence.Create)); //only sequence or priority brackets
+    '(': begin
+      if pos^ = '#' then exit(parseExtension);
+      exit(parseSequenceLike(TXQTermSequence.Create)); //only sequence or priority brackets
+    end;
 
     '*': exit(TXQTermNodeMatcher.Create(word + parseQNameContinuation));
     '/': begin

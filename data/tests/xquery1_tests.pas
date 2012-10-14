@@ -427,6 +427,11 @@ begin
   t('for $i in ordered { <element>abc</element> } return string-length($i/text())', '3');
   //t('validate strict { <element>abc</element> }', 'abc');
 
+
+
+  t('(# foobar:def abc #) {7}', '7');
+  t('(#foobar:def#) {7, 8}', '7 8');
+
   xml.free;
   ps.free;
   vars.free
