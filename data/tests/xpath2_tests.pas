@@ -2480,7 +2480,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(for $a in element return $a / document / processing-instruction, ":")', 'PI1');
   t('string-join(for $a in element return $a / document / (comment | processing-instruction), ":")', 'C1:PI1');
 
+  t('if (1,2,3) then 5 else 6', '6');
+  t('if (/a,2,3) then 5 else 6',  '5', '!<a>..</a>');
 
+  //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
 
 

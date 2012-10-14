@@ -761,7 +761,7 @@ begin
         expect('(');
         if word = 'if' then begin
           result := TXQTermIf.Create();
-          result.push(parse());
+          result.push(parsePrimaryLevel);
           expect(')'); expect('then');
           result.push(parse());
           expect('else');
