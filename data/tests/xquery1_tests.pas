@@ -364,6 +364,26 @@ begin
   t('outer-xml(<a>&#x20;{"abc"}</a>)', '<a> abc</a>');
   t('outer-xml(<a>{"  "}</a>)', '<a>  </a>');
 
+
+
+  t('typeswitch (1) case xs:integer return "int" case xs:decimal return "deci" case xs:double return "double" default return "unknown"', 'int');
+  t('typeswitch (1.0) case xs:integer return "int" case xs:decimal return "deci" case xs:double return "double" default return "unknown"', 'deci');
+  t('typeswitch (1.0E1) case xs:integer return "int" case xs:decimal return "deci" case xs:double return "double" default return "unknown"', 'double');
+  t('typeswitch ("as") case xs:integer return "int" case xs:decimal return "deci" case xs:double return "double" default return "unknown"', 'unknown');
+  t('typeswitch (1) default return "defalone"', 'defalone');
+  t('typeswitch (1) default $var return "defalone: $var;"', 'defalone: 1');
+  t('typeswitch (1) case $i as xs:integer return "int: $i;" default $var return "def: $var;"', 'int: 1');
+  t('typeswitch (1.0) case $i as xs:integer return "int: $i;" default $var return "def: $var;"', 'def: 1');
+  t('typeswitch (1) case xs:integer return "int" default return "unknown"', 'int');
+  t('typeswitch (1) case integer return "int" default return "unknown"', 'int');
+  t('let $a := 1 return typeswitch($a) case $x as integer return $x * 20 default $b return $b', '20');
+  t('let $a := 1.0 return typeswitch($a) case $x as integer return $x * 20 default $b return $b', '1');
+  t('let $a := 1 return typeswitch($a) case integer return $a * 20 default return $a', '20');
+  t('let $a := 1.0 return typeswitch($a) case integer return $a * 20 default return $a', '1');
+  t('typeswitch(<element>123</element>) case $x as element() return outer-xml($x) default $y return "atomic: $y;"', '<element>123</element>');
+  t('typeswitch(12345) case $x as element() return outer-xml($x) default $y return "atomic: $y;"', 'atomic: 12345');
+
+
   xml.free;
   ps.free;
   vars.free

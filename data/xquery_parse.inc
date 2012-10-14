@@ -747,6 +747,32 @@ begin
           exit;
         end;
 
+        if word = 'typeswitch' then begin
+          requireXQuery('for typeswitch statement');
+          result := TXQTermTypeSwitch.Create;
+          result.push(parsePrimaryLevel());
+          expect(')');
+
+          word := nextToken();
+          while word = 'case' do begin
+            skipWhitespaceAndComment();
+            result.push(TXQTermSequence.Create);
+            if pos^ = '$' then begin result.children[high(result.children)].push(TXQTermVariable.create(nextToken())); expect('as'); end;
+            result.children[high(result.children)].push(parseSequenceType());
+            expect('return');
+            result.children[high(result.children)].push(parse());
+            word := nextToken();
+          end;
+          if word <> 'default' then raiseParsingError('expected "default" clause');
+          skipWhitespaceAndComment();
+          result.push(TXQTermSequence.Create);
+          if pos^ = '$' then result.children[high(result.children)].push(TXQTermVariable.create(nextToken()));
+          expect('return');
+          result.children[high(result.children)].push(parse());
+
+          exit;
+        end;
+
         result := TXQTermNamedFunction.createIfExists(word, strBeginsWith(word, 'op:'));
         if (result = nil) and
            (isKindTestFunction(word)
@@ -792,6 +818,7 @@ begin
           exit(parseComputedConstructor(word));
         end;
       end;
+
 
       result := TXQTermNodeMatcher.Create(word);
     end;
@@ -843,7 +870,7 @@ begin
   while true do begin
     word := nextToken(true);
     case word of
-      '', ',', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation':
+      '', ',', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
         exit(astroot);
       //'=', '+', '-', '*': pushBinaryOp(word);
       '!': pushBinaryOp('!=');

@@ -876,6 +876,12 @@ type
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   end;
 
+  { TXQTermTypeSwitch }
+
+  TXQTermTypeSwitch = class(TXQTerm)
+    function evaluate(const context: TEvaluationContext): IXQValue; override;
+  end;
+
   { TXQTermReadObjectProperty }
 
   TXQTermReadObjectProperty = class(TXQTerm)
@@ -1802,7 +1808,6 @@ begin
   if v = nil then exit(xqvalue());
   result := TXQValueNode.Create(v);
 end;
-
 
 { TXQValueEnumerator }
 

@@ -831,6 +831,47 @@ begin
 end;
 
 
+
+
+{ TXQTermTypeSwitch }
+
+function TXQTermTypeSwitch.evaluate(const context: TEvaluationContext): IXQValue;
+  function evaluateWithChangedVariable(eval, vari: TXQTerm; const value: IXQValue): IXQValue;
+  var
+    tempContext: TEvaluationContext;
+  begin
+    tempContext := context;
+    if vari is TXQTermVariable then begin
+      if tempContext.temporaryVariables = nil then tempContext.temporaryVariables := TXQVariableChangeLog.create();
+      tempContext.temporaryVariables.pushAll;
+      tempContext.temporaryVariables.addVariable(TXQTermVariable(vari).value, value);
+    end;
+    result := eval.evaluate(tempContext);
+    if vari is TXQTermVariable then begin
+      tempContext.temporaryVariables.popAll();
+      if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables);
+    end;
+  end;
+
+var
+  v: IXQValue;
+  start: integer;
+  i, j: Integer;
+  tempContext: TEvaluationContext;
+begin
+  v := children[0].evaluate(context);
+  for i:=1 to high(children) - 1 do begin
+    if not (children[i] is TXQTermSequence) then raiseEvaluationError('Invalid case clause');
+    if children[i].children[0] is TXQTermVariable then start := 1
+    else start := 0;
+    for j := start to high(children[i].children) - 1 do
+      if (children[i].children[j] as TXQTermSequenceType).instanceOf(v) then
+        exit(evaluateWithChangedVariable(children[i].children[high(children[i].children)], children[i].children[0], v));
+  end;
+  i := high(children);
+  result := evaluateWithChangedVariable(children[i].children[high(children[i].children)], children[i].children[0], v);
+end;
+
 { TXQTermConstructor }
 
 constructor TXQTermConstructor.create(atype: TTreeElementType; aname: txqterm = nil);
