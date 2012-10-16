@@ -60,6 +60,32 @@ var
       raise;
     end end;
   end;
+
+  procedure timing(s1, s2: string; s3: string = '');
+  var
+    starttime: TDateTime;
+    i: Integer;
+    got: string;
+  begin
+    if s3 <> '' then begin
+      xml.parseTree(s3);
+      ps.RootElement := xml.getLastTree;
+    end;
+    ps.parseXQuery1(s1);
+  //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
+    ps.ParentElement := xml.getLastTree;
+  //    writeln(s1);
+  //    writeln('??');
+  //    writeln(ps.debugtermToString(ps.FCurTerm));
+    starttime := now;
+    writeln(stderr, 'Timing '+s1+': ');
+    for i := 1 to 10000 do ps.evaluate(); //.toString;
+    writeln('   => ', (now - starttime) * MSecsPerDay  );
+    got := ps.evaluate().toString;
+    if got<>s2 then
+       raise Exception.Create('XPath Test failed: '+IntToStr(count)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
+  end;
+
 var vars: TXQVariableChangeLog;
 begin
 //  time := Now;
@@ -473,6 +499,10 @@ begin
   m('declare function wrapper($a as integer) { $var * $a }; declare variable $var := 123;  wrapper(3) ', '369'); //back variable reference (if i read the standard correctly that is not allowed. But it is easier to implement this way and in Zorba it also works)
   m('declare function odd($a as integer) { if ($a = 0) then false() else even($a - 1)}; declare function even($a as integer) { if ($a = 0) then true() else odd($a - 1)}; string-join(for $i in 0 to 9 return odd($i), " ") ', 'false true false true false true false true false true');
 
+
+  //some realworld examples from stackoverflow
+  t('let $x := 1, $seq := (2,4,7,11,16) for $temp at $pos in $seq return $seq[$pos] - if ($pos eq 1) then $x else $seq[$pos - 1]', '1 2 3 4 5');
+  t('let $pVal := 1, $vList := (2,4,7,11,16), $vList2 := ($pVal, subsequence($vList, 1, count($vList)-1)) return for $i in 1 to count($vList) return $vList[$i] - $vList2[$i]', '1 2 3 4 5');
 
 
   xml.free;
