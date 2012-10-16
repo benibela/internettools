@@ -34,9 +34,13 @@ type
   TXQVList=class;
   IXQValue=interface;
   TXQVArray = array of IXQValue;
+  TXQValueFunction = class;
   TXQCollation=class;
   TXQVariableChangeLog=class;
   TXQTerm=class;
+  TXQTermSequenceType = class;
+  TXQuery = class;
+
 
   { TXQValueEnumerator }
   //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
@@ -55,6 +59,46 @@ type
   TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkFunction);
 
   Decimal = Extended;
+
+  TXQTermFlowerOrderEmpty = (xqfoStatic, xqfoEmptyLeast, xqfoEmptyGreatest);
+
+  TXQStaticContext = record
+    stripBoundarySpace: boolean;
+    moduleVariables: TXQVariableChangeLog;
+    functions: array of TXQValueFunction;
+    //TODO: use these values
+    collation: string;
+    emptyOrderSpec: TXQTermFlowerOrderEmpty;
+    functionNamespace, elementNamespace: string;
+    baseURI: string;
+    constructionPreserve: boolean;
+    ordering: boolean;
+    copyNamespacePreserve, copyNamespaceInherit: boolean;
+  end;
+
+  { TEvaluationContext }
+
+  (***
+  @abstract(evaluation context, internal used)
+
+  Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
+  *)
+  TEvaluationContext = record
+    sender: TXQueryEngine;
+    ParentElement: TTreeElement; //**< associated tree element (= context item if context item is a node)
+    RootElement: TTreeElement;
+    collation: TXQCollation; //**< Default collation used for string comparisons
+    nodeCollation: TXQCollation; //**< Default collation used for node string comparisons
+
+    SeqValue: IXQValue; //**<Context item / value of @code(.),  if a sequence is processed (nil otherwise)
+    SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
+
+    temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
+
+    staticContext: ^TXQStaticContext;
+
+    function compareAtomicBase(const a,b: IXQValue): integer;
+  end;
 
 
   TXQValueClass = class of TXQValue;
@@ -517,10 +561,18 @@ type
   end;
 
   { TXQValueFunction }
+  TXQFunctionParameter = record
+    name: string;
+    seqtype: TXQTermSequenceType;
+  end;
 
   //** A function. Currenlty only wraps a TXQTerm and can not be called (some kind of hack to store types without having a metatype value)
   TXQValueFunction = class(TXQValue)
+    name: string;
+    parameters: array of TXQFunctionParameter;
+    resulttype: txqtermsequencetype;
     body: TXQTerm;
+    context: TEvaluationContext;
 
     constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
 
@@ -567,33 +619,6 @@ type
     function getPromotedIntegerType: TXQValueInt65Class; //**< Returns the lowest type derived by integer that all items in the list can be converted to
     function getPromotedDecimalType: TXQValueDecimalClass; //**< Returns the lowest type derived by decimal that all items in the list can be converted to
     function getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass; //**< Returns the lowest type derived by datetime that all items in the list can be converted to
-  end;
-
-  TXQTermFlowerOrderEmpty = (xqfoStatic, xqfoEmptyLeast, xqfoEmptyGreatest);
-
-  (***
-  @abstract(evaluation context, internal used)
-
-  Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
-  *)
-
-  { TEvaluationContext }
-
-  TEvaluationContext = record
-    sender: TXQueryEngine;
-    ParentElement: TTreeElement; //**< associated tree element (= context item if context item is a node)
-    RootElement: TTreeElement;
-    collation: TXQCollation; //**< Default collation used for string comparisons
-    nodeCollation: TXQCollation; //**< Default collation used for node string comparisons
-
-    SeqValue: IXQValue; //**<Context item / value of @code(.),  if a sequence is processed (nil otherwise)
-    SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
-
-    temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
-
-    function emptyOrderSpec: TXQTermFlowerOrderEmpty;
-
-    function compareAtomicBase(const a,b: IXQValue): integer;
   end;
 
   (***
@@ -763,8 +788,20 @@ type
 
   TXQTermDefineVariable = class(TXQTerm)
     variablename: string;
-    constructor create(varname: TXQTerm; value: TXQTerm);
+    constructor create(avarname: string);
+    constructor create(varname: TXQTerm; value: TXQTerm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+  end;
+
+  { TXQTermDefineVariable }
+
+  { TXQTermDefineFunction }
+
+  TXQTermDefineFunction = class(TXQTerm)
+    funcname: string;
+    constructor create(aname: string);
+    function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function define(): TXQValueFunction;
   end;
 
   { TXQTermNodeMatcher }
@@ -797,13 +834,14 @@ type
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   end;
 
-  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkWrappedOperator, xqfkTypeConstructor);
+  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkWrappedOperator, xqfkTypeConstructor, xqfkLocal);
 
   { TXQTermNamedFunction }
 
   TXQTermNamedFunction = class(TXQTerm)
     kind: TXQTermNamedFunctionKind;
     index: integer;
+    funcname: string;
     constructor create(const akind: TXQTermNamedFunctionKind; const aindex: integer);
     constructor create(const name: string);
     constructor create(const name: string; args: array of TXQTerm);
@@ -899,6 +937,14 @@ type
     destructor destroy; override;
   end;
 
+  { TXQTermModule }
+
+  TXQTermModule = class(TXQTerm)
+    name, url: string;
+    procedure initializeStaticContext(const context: TEvaluationContext); //will change context.staticContext^, just const so it is not copied
+    function evaluate(const context: TEvaluationContext): IXQValue; override;
+  end;
+
   IXQuery = interface
     function evaluate(const tree: TTreeElement = nil): IXQValue;
     function evaluate(const context: TEvaluationContext): IXQValue;
@@ -907,7 +953,7 @@ type
   { TXQuery }
 
   TXQuery = class(TInterfacedObject, IXQuery)
-    constructor Create(aengine: TXQueryEngine; aterm: TXQTerm);
+    constructor Create(aengine: TXQueryEngine; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeElement = nil): IXQValue;
     function evaluate(const context: TEvaluationContext): IXQValue;
 
@@ -915,6 +961,9 @@ type
   private
     term: txqterm;
     engine: TXQueryEngine;
+    staticContextInitialized: boolean;
+    staticContext: TXQStaticContext;
+    procedure initializeStaticContext(const context: TEvaluationContext);
   end;
 
   //**Exception raised the evaluation of an expression causes an error
@@ -1078,7 +1127,7 @@ type
     RootElement: TTreeElement; //**< Root element
     ParentElement: TTreeElement; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
     TextElement: TTreeElement; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
-    StaticBaseUri: string;     //**< URI of the current document. Not actually used by anything in the class, but you can call static-base-uri() to read it.
+    StaticContext: TXQStaticContext;
 
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
@@ -1093,7 +1142,6 @@ type
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
 
     AllowVariableUseInStringLiterals: boolean; //**< If "...$var.. " should be replaced by the value of var, or remain a string literal
-    StripBoundarySpace: boolean;
 
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
@@ -1145,7 +1193,7 @@ type
     class procedure registerBinaryOp(const name: string; const func: TXQBinaryOp; const priority: integer; const returnType: TXQValueKind=pvkUndefined);
     class procedure registerBinaryOpFunction(const name: string; const func: TXQBinaryOp);
 
-    function parseTerm(str:string; model: TXQParsingModel): TXQTerm;
+    function parseTerm(str:string; model: TXQParsingModel): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
     function getEvaluationContext(): TEvaluationContext;
 
@@ -1807,6 +1855,52 @@ begin
   result := TXQValueNode.Create(v);
 end;
 
+{ TXQTermModule }
+
+
+function TXQTermModule.evaluate(const context: TEvaluationContext): IXQValue;
+begin
+  if name <> '' then raiseEvaluationError('A module cannot be evaluated');
+  result := children[high(children)].evaluate(context);
+end;
+
+procedure TXQTermModule.initializeStaticContext(const context: TEvaluationContext);
+var
+  truemodule: Boolean;
+  i: Integer;
+  tempDefVar: TXQTermDefineVariable;
+  functions: array of TXQValueFunction;
+  functionCount: Integer;
+  vars: TXQVariableChangeLog;
+  truechildcount: Integer;
+begin
+  truechildcount := length(children);
+  if name = '' then truechildcount-=1;
+
+  functionCount := 0;
+  for i:=0 to truechildcount - 1 do if children[i] is TXQTermDefineFunction then functionCount += 1;
+  setlength(context.staticContext^.functions, functionCount);
+  functions := context.staticContext^.functions;
+  functionCount := 0;
+  for i:=0 to high(children) - 1 do
+    if children[i] is TXQTermDefineFunction then begin
+      functions[functionCount] := TXQTermDefineFunction(children[i]).define();
+      functions[functionCount].context := context;
+      functionCount+=1;
+    end;
+
+  if context.staticContext^.moduleVariables = nil then context.staticContext^.moduleVariables := TXQVariableChangeLog.create();
+  vars := context.staticContext^.moduleVariables;
+  for i:=0 to high(children) - 1 do
+    if children[i] is TXQTermDefineVariable then begin
+      tempDefVar := TXQTermDefineVariable(children[i]);
+      vars.addVariable(tempDefVar.variablename, tempDefVar.children[high(tempDefVar.children)].evaluate(context));
+      if length(tempDefVar.children) > 1 then
+        if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(vars.vars[high(vars.vars)].value, @context.collation.equal) then
+          raiseEvaluationError('Variable '+tempDefVar.variablename + ' with value ' +vars.vars[high(vars.vars)].value.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
+    end;
+end;
+
 { TXQValueEnumerator }
 
 function TXQValueEnumerator.MoveNext: Boolean;
@@ -1822,11 +1916,6 @@ end;
 
 
 { TEvaluationContext }
-
-function TEvaluationContext.emptyOrderSpec: TXQTermFlowerOrderEmpty;
-begin
-  result := xqfoEmptyGreatest; //TODO: changable
-end;
 
 function TEvaluationContext.compareAtomicBase(const a, b: IXQValue): integer;
 begin
@@ -1846,23 +1935,42 @@ var context: TEvaluationContext;
 begin
   if term = nil then exit(xqvalue());
   context := engine.getEvaluationContext;
+  context.staticContext:=@staticContext;
   if tree <> nil then begin
     context.ParentElement := tree;
     context.RootElement := tree;
   end;
+  initializeStaticContext(context);
   result := term.evaluate(context);
 end;
 
 function TXQuery.evaluate(const context: TEvaluationContext): IXQValue;
+var tempcontext: TEvaluationContext;
 begin
   if term = nil then exit(xqvalue());
-  result := term.evaluate(context);
+  tempcontext:=context;
+  tempcontext.staticContext:=@staticContext;
+  initializeStaticContext(tempcontext);
+  result := term.evaluate(tempcontext);
 end;
 
 destructor TXQuery.Destroy;
+var
+  i: Integer;
 begin
   term.Free;
+  FreeAndNil(staticContext.moduleVariables);
+  for i := 0 to high(staticContext.functions) do
+    staticContext.functions[i].free;
   inherited Destroy;
+end;
+
+procedure TXQuery.initializeStaticContext(const context: TEvaluationContext);
+begin
+  if staticContextInitialized then exit;
+  staticContextInitialized:=true;
+  if term is TXQTermModule then
+    TXQTermModule(term).initializeStaticContext(context);
 end;
 
 procedure xqvalueSeqSqueeze(var v: IXQValue);
@@ -2823,13 +2931,13 @@ end;
 
 function TXQueryEngine.parseXPath2(s: string): IXQuery;
 begin
-  FLastQuery:=TXQuery.Create(self, parseTerm(s, xqpmXPath2));
+  FLastQuery:=parseTerm(s, xqpmXPath2);
   result := FLastQuery;
 end;
 
 function TXQueryEngine.parseXQuery1(s: string): IXQuery;
 begin
-  FLastQuery:=TXQuery.Create(self, parseTerm(s, xqpmXQuery1));
+  FLastQuery:=parseTerm(s, xqpmXQuery1);
   result := FLastQuery;
 end;
 
@@ -2999,11 +3107,11 @@ begin
   binaryOpFunctions.AddObject(name, TObject(func));
 end;
 
-function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQTerm;
+function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQuery;
 var cxt: TXQParsingContext;
   i: Integer;
 begin
-  if str = '' then exit(TXQTermSequence.Create);
+  if str = '' then exit(TXQuery.Create(self, TXQTermSequence.Create));
 {  if pos(#13, str) > 0 then begin
     i := 1;
     while i < length(str) do begin
@@ -3018,12 +3126,14 @@ begin
   cxt.encoding:=eUTF8;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
   cxt.AllowObjects:=VariableChangelog.allowObjects;
-  cxt.StripBoundarySpace:=StripBoundarySpace;
+  cxt.staticContext := StaticContext;
   cxt.parsingModel:=model;
   try
     cxt.str := str;
     cxt.pos := @cxt.str[1];
-    result := cxt.parsePrimaryLevel;
+    result := TXQuery.Create(self);
+    result.term := cxt.parseModule();
+    result.staticContext := cxt.staticContext;
     if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   finally
     cxt.free;

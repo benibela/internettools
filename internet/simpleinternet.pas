@@ -164,7 +164,7 @@ begin
     pxpParser.parseXPath2(query);
     pxpparser.ParentElement := tree.getLastTree;
     pxpparser.RootElement := tree.getLastTree;
-    pxpparser.StaticBaseUri:=dataFileName;
+    pxpparser.StaticContext.baseURI:=dataFileName;
     result := pxpParser.evaluate().toString;
   end;
 end;

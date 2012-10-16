@@ -64,7 +64,7 @@ begin
   vars.addVariable('eval', '''abc'' = ''abc''');
 
   ps := TXQueryEngine.Create;
-  ps.StaticBaseUri := 'pseudo://test';
+  ps.StaticContext.baseURI := 'pseudo://test';
   ps.ImplicitTimezone:=-5 / HoursPerDay;
   ps.OnEvaluateVariable:=@vars.evaluateVariable;
   ps.OnDefineVariable:=@vars.defineVariable;
@@ -90,9 +90,9 @@ begin
   t('">$unknown;<"',           '><',                           '');
   t('"$test;>$unknown;<"',     'tset><',                       '');
   t('"$test;$unknown;$abc;"',  'tsetalphabet',                 '');
-  t('$abc;',                     'alphabet',                     '');
+ // t('$abc;',                     'alphabet',                     '');
   t('$abc',                     'alphabet',                     '');
-  t('$ABC;',                     '',                           ''); //case sensitive
+ // t('$ABC;',                     '',                           ''); //case sensitive
   t('$ABC',                     '',                            '');
   t('concat(">",$abc,''<'')',  '>alphabet<',                     '');
   t('''$abc;''',                   '$abc;',                        ''); //no variable matching in '
@@ -195,8 +195,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
                 //Eval,
   t('''html/text()''', 'html/text()', '');
   t('eval(''html/text()'')', 'test:last text', '');
-  t('$eval;', '''abc'' = ''abc''', '');
-  t('eval($eval;)', 'true', '');
+  t('$eval', '''abc'' = ''abc''', '');
+  t('eval($eval)', 'true', '');
 
                 //All together
   t('filter(concat(''abc'', ''def''), concat(''[^a'',''d]+'' ))', 'bc','');
@@ -1218,7 +1218,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('for $x in (1,2,3), $y in (1,2) return $y*$x', '1', '');
   t('for $x in 1 to 3, $y in (1,2) return $y*$x', '1', '');
   t('string-join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
-  t('string-join(for $x in 1 to 3, $y in (1,2) return $y*$x;,",")', '1,2,2,4,3,6', '');
+  t('string-join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
   t('some $x in 1 to 3, $y in (1,2) satisfies $x = $y', 'true', '');
   t('every $x in 1 to 3, $y in (1,2) satisfies $x = $y', 'false', '');
   t('some $x in 1 to 3, $y in (1,2) satisfies $x > $y', 'true', '');
@@ -1328,7 +1328,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$maus', 'haus2', '');
   t('$maus:= "haus3"', 'haus3', '');
   t('$maus', 'haus3', '');
-  t('$maus;:= "haus4"', 'haus4', '');
+  t('$maus:= "haus4"', 'haus4', '');
   t('$maus', 'haus4', '');
   t('a := 1, b:= 2', '1', '');
   t('$a', '1', '');

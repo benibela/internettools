@@ -1079,7 +1079,7 @@ var //node: TTreeElement;
 
 
       {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-      value := strResolveURI(value, context.sender.StaticBaseUri);
+      value := strResolveURI(value, context.staticContext^.baseURI);
       {$ENDIF}
       (result as TXQValueObject).setMutable('url', value);
     end;
@@ -1702,7 +1702,7 @@ end;
 procedure xqFunctionStatic_Base_Uri(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
 begin
   requiredArgCount(args,0);
-  if context.sender.StaticBaseUri <> '' then result := xqvalue(context.sender.StaticBaseUri);
+  if context.staticContext^.baseURI <> '' then result := xqvalue(context.staticContext^.baseURI);
   //else empty seq if undef
 end;
 
@@ -1900,7 +1900,7 @@ var rel, base: string;
 begin
   requiredArgCount(args, 1,2);
   if length(args) = 2 then base := args[1].toString
-  else base := context.sender.StaticBaseUri;
+  else base := context.staticContext^.baseURI;
   if args[0].isUndefined then exit;
   rel := args[0].toString;
   if strIsAbsoluteURI(rel) then begin result := xqvalue(rel); exit; end;
@@ -1947,7 +1947,7 @@ begin
     exit;
   end;
 
-  if (url[1] = '/') and (context.sender.StaticBaseUri <> '') then url := strResolveURI(url, context.sender.StaticBaseUri);
+  if (url[1] = '/') and (context.staticContext^.baseURI <> '') then url := strResolveURI(url, context.staticContext^.baseURI);
   if strBeginsWith(url, 'file:') then begin
     delete(url, 1, 5);
     while (url[1] = '/') and (url[2] = '/') do delete(url,1,1);

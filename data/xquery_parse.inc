@@ -72,9 +72,9 @@ type
  TXQParsingContext = class
   AllowVariableUseInStringLiterals: boolean;
   AllowObjects: boolean;
-  StripBoundarySpace: boolean;
   parsingModel: TXQParsingModel;
   encoding: TEncoding;
+  staticContext: TXQStaticContext;
 
   str: string;
   pos: pchar;
@@ -90,6 +90,8 @@ type
   procedure expect(c: char);
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
+  function nextTokenNCName(lookahead: boolean=false): string;
+  function nextTokenQName(lookahead: boolean=false): string;
 
 
   function parseSequenceLike(target: TXQTerm): TXQTerm;
@@ -97,6 +99,7 @@ type
   function parseSequenceType(): TXQTermSequenceType;
   function replaceEntities(s: string; enc: TEncoding): string;
   function parseString(const w: string): TXQTerm;
+  function parseStringLiteral: string;
 
   function parseFlower(akind: string): TXQTermFlower;
   function parseDirectConstructor(name: string): TXQTermConstructor;
@@ -107,9 +110,10 @@ type
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
   //**from @code(1 + 2) it will parse @code(1) (since @code(1) is complete), from @code(function(1,2,3)) it will parse everything (since @code(function) can not be evaluated without its parameters))@br
   //**(observation: that kind of looks like it parses everything except binary operators)
-  function parseValue: TXQTerm;
-  function parse: TXQTerm;
-  function parsePrimaryLevel: TXQTerm;
+  function parseValue: TXQTerm;        //left most token of an ExprSingle
+  function parse: TXQTerm;             //ExprSingle
+  function parsePrimaryLevel: TXQTerm; //Expr
+  function parseModule(): TXQTerm;
 end;
 
 
@@ -183,7 +187,7 @@ end;
 
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
-const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#']; // $ and ; are no symbols
+const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';']; // $ is no symbols
 const START_SYMBOLS = ['-'];
 var start:pchar;
    numberE, numberPoint: boolean;
@@ -243,6 +247,16 @@ begin
   assert(start<pos);
   result:=strslice(start,pos-1);
   if lookahead then pos:=start;
+end;
+
+function TXQParsingContext.nextTokenNCName(lookahead: boolean): string;
+begin
+  result := nextToken(lookahead);
+end;
+
+function TXQParsingContext.nextTokenQName(lookahead: boolean): string;
+begin
+  result := nextToken(lookahead);
 end;
 
 function TXQParsingContext.parseSequenceLike(target: TXQTerm): TXQTerm;
@@ -456,7 +470,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
   var marker: PChar;
     atBoundary: Boolean;
   begin
-    atBoundary := (border = '<') and StripBoundarySpace;
+    atBoundary := (border = '<') and staticContext.stripBoundarySpace;
     while pos^ <> #0 do begin
       marker := pos;
       while not (pos^ in [#0, '{', '}', '&']) and (pos^ <> border) do pos+=1;
@@ -481,7 +495,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
           pos += 1;
           parent.push(parsePrimaryLevel);
           expect('}');
-          atBoundary := (border = '<') and StripBoundarySpace;
+          atBoundary := (border = '<') and staticContext.stripBoundarySpace;
         end else begin
           pushElementContent('{');
           pos+=2;
@@ -711,6 +725,19 @@ function TXQParsingContext.parseString(const w: string): TXQTerm;
     if lastStrStart < length(str) then result.push(TXQTermString.Create(copy(s, lastStrStart, i - lastStrStart)));
   end;
 
+function TXQParsingContext.parseStringLiteral: string;
+var
+  temp: TXQTerm;
+begin
+  temp := parseValue;
+  try
+    if not (temp is TXQTermString) then raiseParsingError('Expected string');
+    result := TXQTermString(temp).value;
+  finally
+    temp.free;
+  end;
+end;
+
 function TXQParsingContext.parseValue: TXQTerm;
 var
   word: String;
@@ -817,14 +844,14 @@ begin
           exit;
         end;
 
-        result := TXQTermNamedFunction.createIfExists(word, strBeginsWith(word, 'op:'));
-        if (result = nil) and
-           (isKindTestFunction(word)
+        if (isKindTestFunction(word)
            or (strContains(word, '::') and (isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2))))) then begin
           if strContains(word, 'attribute') then result := TXQTermReadAttribute.create(word, true)
           else result := TXQTermNodeMatcher.Create(word, true);
+        end else begin
+          result := TXQTermNamedFunction.createIfExists(word, strBeginsWith(word, 'op:'));
+          if result = nil then raise Exception.Create('unknown function: '+word);
         end;
-        if result = nil then raise Exception.Create('unknown function: '+word);
         exit(parseSequenceLike(result));
       end;
 
@@ -935,7 +962,7 @@ begin
   while true do begin
     word := nextToken(true);
     case word of
-      '', ',', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
+      '', ',', ';', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
         exit(astroot);
       //'=', '+', '-', '*': pushBinaryOp(word);
       '!': pushBinaryOp('!=');
@@ -980,5 +1007,229 @@ begin
       result.push(parse);
     end;
   end;
+end;
+
+function TXQParsingContext.parseModule(): TXQTerm;
+  procedure requireModule;
+  begin
+    if result <> nil then exit;
+    requireXQuery();
+    result := TXQTermModule.Create;
+  end;
+
+  procedure importSchema; //has read import schema
+  var
+    prefix, url: String;
+  begin
+    prefix := '';
+    case nextToken() of
+      'default': begin
+        expect('element');
+        expect('namespace');
+      end;
+      'namespace': begin
+        prefix := nextTokenNCName();
+        expect('=');
+      end
+      else raiseParsingError('Invalid schema import');
+    end;
+    url := parseStringLiteral();
+    //TODO
+    if nextToken(true) = 'at' then begin
+      //discard schema addresses
+      parseStringLiteral;
+      while nextToken(true) = ',' do begin expect(','); parseStringLiteral; end;
+    end;
+  end;
+  procedure importModule; //has read import module
+  var
+    moduleName: String;
+    moduleURL: String;
+  begin
+    skipWhitespaceAndComment();
+    moduleName := '';
+    if pos^ = 'n' then begin
+      expect('namespace'); moduleName:=nextTokenNCName(); expect('=');
+    end;
+    moduleURL := parseStringLiteral;
+    if nextToken(true) = 'at' then begin
+      parseStringLiteral;
+      while nextToken(true) = ',' do begin expect(','); parseStringLiteral; end;
+    end;
+  end;
+
+  function parseQNameWithType(out typ: TXQTermSequenceType): string;
+  begin
+    result := nextTokenQName();
+    if nextToken(true) = 'as' then begin
+      expect('as');
+      typ := parseSequenceType();
+    end else typ := nil;
+  end;
+
+  procedure declareVariable;
+  var vari: TXQTermDefineVariable;
+    tempTyp: TXQTermSequenceType;
+  begin
+    requireModule;
+    expect('$');
+    vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp));
+    result.push(vari);
+    if tempTyp <> nil then vari.push(tempTyp);
+    case nextToken() of
+      ':=': vari.push(parse());
+      'external': ;
+      else raiseParsingError('Invalid variable declaration');
+    end;
+
+  end;
+
+  procedure declareFunction;
+  var
+    funcTerm: TXQTermDefineFunction;
+    tempType: TXQTermSequenceType;
+    tempVar: TXQTermDefineVariable;
+  begin
+    funcTerm := TXQTermDefineFunction.create(nextTokenQName());
+    expect('(');
+    skipWhitespaceAndComment();
+    while nextToken(true) <> ')' do begin
+      expect('$');
+      tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType));
+      if tempType <> nil then tempVar.push(tempType);
+      funcTerm.push(tempVar);
+      skipWhitespaceAndComment();
+      if not (pos^ in [',', ')']) then raiseParsingError('Missing , or )');
+      if pos^ = ',' then pos+=1;
+    end;
+    pos+=1;
+    if nextToken(true) = 'as' then begin
+      expect('as');
+      funcTerm.push(parseSequenceType());
+    end;
+    case nextToken() of
+      '{': begin
+        funcTerm.push(parsePrimaryLevel);
+        expect('}');
+      end;
+      'external': ;
+    end;
+    result.push(funcTerm);
+  end;
+
+
+
+var
+  temp: TXQTerm;
+  token: String;
+  collation: String;
+  nameSpaceName: String;
+  nameSpaceURL: String;
+begin
+  result := nil;
+  token := nextToken(true);
+  if token = 'xquery' then begin
+    requireXQuery();
+    expect(token); expect('version');
+    expect('"1.0"');
+    token := nextToken(true);
+    if token = 'encoding' then begin
+      expect(token);
+      encoding := strEncodingFromName(parseStringLiteral);
+      expect(';');
+      token := nextToken(true);
+    end else if token = ';' then expect(token)
+    else raiseParsingError('expected encoding or ;');
+  end;
+
+  if token = 'module' then begin
+    requireModule;
+    expect(token); expect('namespace');
+    TXQTermModule(result).name := nextToken(); if system.pos(':', token) > 0 then raiseParsingError('Namespace id must not begin with a namespace prefix itself');
+    TXQTermModule(result).url := parseStringLiteral;
+    //what now?  TODO
+    expect(';');
+    token := nextToken(true);
+  end;
+
+  while (token = 'declare') or (token = 'import') do begin
+    requireModule;
+    expect(token);
+    if token = 'import' then begin
+      case nextToken() of
+        'schema': importSchema;
+        'module': importModule;
+      end;
+    end else case nextToken() of //declare ...
+      'boundary-space':
+        case nextToken() of
+          'preserve': staticContext.StripBoundarySpace:=false;
+          'strip': staticContext.StripBoundarySpace:=true;
+          else raiseParsingError('unknown boundary-space declaration');
+        end;
+      'default': begin
+        token := nextToken();
+        case token of
+          'collation': staticContext.collation := parseStringLiteral;
+          'order': begin
+            expect('empty');
+            case nextToken() of
+              'greatest': staticContext.emptyOrderSpec:=xqfoEmptyGreatest;
+              'least': staticContext.emptyOrderSpec:=xqfoEmptyLeast;
+            end;
+          end;
+          'element', 'function': begin
+            expect('namespace');
+            if token = 'element' then staticContext.elementNamespace:=parseStringLiteral
+            else staticContext.functionNamespace:=parseStringLiteral;
+          end;
+          else raiseParsingError('Unknown default value');
+        end;
+      end;
+      'base-uri': staticContext.baseUri := parseStringLiteral;
+      'construction':
+        case nextToken() of
+          'strip': staticContext.constructionPreserve := false;
+          'preserve': staticContext.constructionPreserve := true
+          else raiseParsingError('invalid construction declaration');
+        end;
+      'ordering':
+        case nextToken() of
+          'unordered': staticContext.ordering:=false;
+          'ordered': staticContext.ordering:=true;
+          else raiseParsingError('invalid ordering mode');
+        end;
+      'copy-namespaces': begin
+         case nextToken() of
+           'preserve': staticContext.copyNamespacePreserve:=true;
+           'no-preserve': staticContext.copyNamespacePreserve:=false;
+           else raiseParsingError('Invalid copy-namespace');
+         end;
+         expect(',');
+         case nextToken() of
+           'inherit': staticContext.copyNamespaceInherit:=true;
+           'no-inherit': staticContext.copyNamespaceInherit:=false;
+           else raiseParsingError('Invalid copy-namespace');
+         end;
+       end;
+      'namespace': begin
+         nameSpaceName := nextTokenNCName();
+         expect('=');
+         nameSpaceURL := parseStringLiteral;
+         //TODO
+      end;
+      'variable': declareVariable();
+      'function': declareFunction;
+      'option': begin
+        nextTokenQName();
+        parseStringLiteral; //TODO
+      end;
+      else raiseParsingError('Unknown declaration');
+    end;
+    expect(';');
+    token := nextToken(true);
+  end;
+  if result <> nil then result.push(parsePrimaryLevel)
+  else result := parsePrimaryLevel();
 end;
 

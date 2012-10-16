@@ -62,13 +62,18 @@ end;
 
 { TXQTermDefineVariable }
 
+constructor TXQTermDefineVariable.create(avarname: string);
+begin
+  variablename := avarname;
+end;
+
 constructor TXQTermDefineVariable.create(varname: TXQTerm; value: TXQTerm);
 begin
   if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).debugTermToString
   else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
   else raiseParsingError('Invalid term to assign a variable to: '+varname.debugTermToString);
   varname.Free;
-  push(value);
+  if value <> nil then push(value);
 end;
 
 function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): IXQValue;
@@ -273,7 +278,7 @@ begin
   result := 0;
 
   for i := 0 to high(orders) do begin
-    emptyLeast := (orders[i].emptyOrder = xqfoEmptyLeast) or ((orders[i].emptyOrder = xqfoStatic) and (meta^.context^.emptyOrderSpec = xqfoEmptyLeast));
+    emptyLeast := (orders[i].emptyOrder = xqfoEmptyLeast) or ((orders[i].emptyOrder = xqfoStatic) and (meta^.context^.staticContext^.emptyOrderSpec = xqfoEmptyLeast));
     if isGreaterThan(a.orders[i], b.orders[i], emptyLeast, meta^.collations[i]) then result := 1
     else if isGreaterThan(b.orders[i], a.orders[i], emptyLeast, meta^.collations[i]) then result := -1;
     if orders[i].descending then result := -Result;
@@ -401,7 +406,10 @@ end;
 
 constructor TXQTermNamedFunction.create(const name: string);
 begin
-  if not findKindIndex(name, kind, index, true) then raiseParsingError('Unknown function: '+name);
+  if not findKindIndex(name, kind, index, true) then begin//raiseParsingError('Unknown function: '+name);
+    kind := xqfkLocal;
+    funcname:=name;
+  end;
 end;
 
 constructor TXQTermNamedFunction.create(const name: string; args: array of TXQTerm);
@@ -414,17 +422,21 @@ class function TXQTermNamedFunction.createIfExists(const name: string; checkForO
 var akind: TXQTermNamedFunctionKind;
     aindex: integer;
 begin
-  if not findKindIndex(name, akind, aindex, checkForOperators) then exit(nil);
+  if not findKindIndex(name, akind, aindex, checkForOperators) then
+    exit(TXQTermNamedFunction.create(name)); //TODO: check static context
   result := TXQTermNamedFunction.Create(akind, aindex);
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): IXQValue;
 var
   evilkids: TXQVArray;
+  tempcontext: TEvaluationContext;
+  i: Integer;
+  j: Integer;
 begin
   evaluateChildren(context, evilkids);
 
-  assert(index >= 0);
+  assert((kind = xqfkLocal) or (index >= 0));
 
   case kind of
     xqfkBasic: begin
@@ -442,7 +454,19 @@ begin
     end;
     xqfkTypeConstructor:
       result := TXQValueClass(types.Objects[index]).createFromValue(evilkids);
-
+    xqfkLocal: begin
+      for i := 0 to high(context.staticContext^.functions) do
+        if (context.staticContext^.functions[i].name = funcname) and  (length(context.staticContext^.functions[i].parameters) = length(children)) then begin
+          tempcontext := context.staticContext^.functions[i].context;
+          tempcontext.temporaryVariables := TXQVariableChangeLog.create();
+          for j := 0 to high(context.staticContext^.functions[i].parameters) do
+            tempcontext.temporaryVariables.addVariable(context.staticContext^.functions[i].parameters[j].name, evilkids[j]);
+          result := context.staticContext^.functions[i].body.evaluate(tempcontext);
+          tempcontext.temporaryVariables.free;
+          exit;
+        end;
+      raiseEvaluationError('Local function '+funcname+' not found');
+    end;
   end;
 end;
 
@@ -742,6 +766,14 @@ begin
       exit();
     end;
   end;
+  if context.staticContext^.moduleVariables <> nil then begin
+    temp := nil;
+    if context.staticContext^.moduleVariables.hasVariableOrObject(value, @temp) then begin
+      if temp = nil then result := xqvalue()
+      else result := temp;
+      exit();
+    end;
+  end;
   if value = '$' then result := xqvalue('$') //default $$; as $
   else if value = 'line-ending' then result := xqvalue(LineEnding) //default $line-ending; as #13#10
   else result := xqvalue();
@@ -981,3 +1013,55 @@ begin
   nameValue.Free;
   inherited destroy;
 end;
+
+
+{ TXQTermDefineFunction }
+
+constructor TXQTermDefineFunction.create(aname: string);
+begin
+  funcname:=aname;
+end;
+
+function TXQTermDefineFunction.evaluate(const context: TEvaluationContext): IXQValue;
+var
+  resfunc: TXQValueFunction;
+  i: Integer;
+begin
+  resfunc := TXQValueFunction.create();
+  i := 0;
+  while (i < high(children)) and (children[i] is TXQTermDefineVariable) do begin
+    setlength(resfunc.parameters, length(resfunc.parameters) + 1);
+    resfunc.parameters[high(resfunc.parameters)].name:=TXQTermDefineVariable(children[i]).variablename;
+    if length(children[i].children) > 0 then
+      resfunc.parameters[high(resfunc.parameters)].seqtype := TXQTermDefineVariable(children[i]).children[0] as TXQTermSequenceType;
+    i+=1;
+  end;
+  if children[i] is TXQTermSequenceType then begin
+    resfunc.resulttype := children[i] as TXQTermSequenceType;
+    i+=1;
+  end;
+  if i <> high(children) then raiseEvaluationError('Invalid function definition');
+  resfunc.body:=children[i];
+  resfunc.context:=context;
+  result := resfunc;
+end;
+
+function TXQTermDefineFunction.define(): TXQValueFunction;
+var
+  i: Integer;
+begin
+  result := TXQValueFunction.create();
+  result.name:=funcname;
+  if (length(children) > 1) and not (children[high(children)-1] is TXQTermSequenceType) then
+    setlength(result.parameters, length(children) - 1 )
+  else if Length(children) > 1  then
+    SetLength(result.parameters, length(children) - 2);
+  for i := 0 to high(result.parameters) do begin
+    result.parameters[i].name:=(children[i] as TXQTermDefineVariable).variablename;
+    result.parameters[i].seqtype:=(children[i] as TXQTermDefineVariable).children[0] as TXQTermSequenceType;
+  end;
+  if length(result.parameters) = length(children) - 2 then result.resulttype := children[high(children)-1] as TXQTermSequenceType
+  else result.resulttype := nil;
+  result.body := children[high(children)];
+end;
+

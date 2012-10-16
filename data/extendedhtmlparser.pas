@@ -1198,7 +1198,7 @@ begin
 
   FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
   FQueryEngine.RootElement := FHtmlTree;
-  FQueryEngine.StaticBaseUri := FHtmlTree.baseURI;
+  FQueryEngine.StaticContext.baseURI := FHtmlTree.baseURI;
 
   result:=matchTemplateTree(FHtmlTree, FHtmlTree.next, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
 

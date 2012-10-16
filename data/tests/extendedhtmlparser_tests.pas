@@ -162,7 +162,7 @@ var data: array[1..285] of array[1..3] of string = (
    '<a><x>Hallo!<a></a><c></c><b>piquadrat</b>welt</x></a>',
    'test=piquadrat'),
  //multiple loops+concat
-  ('<a><s><template:read source="text()" var="test"/></s><template:loop><b><template:read source="concat($test;,text())" var="test"/></b></template:loop></a>',
+  ('<a><s><template:read source="text()" var="test"/></s><template:loop><b><template:read source="concat($test,text())" var="test"/></b></template:loop></a>',
    '<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>',
    'test=los:'#13'test=los:1'#13'test=los:12'#13'test=los:123'),
   ('<a><s><template:read source="text()" var="test"/></s><template:loop><c><template:loop><b><template:read source=''concat("$test;",text())'' var="test"/></b></template:loop></c></template:loop></a>',

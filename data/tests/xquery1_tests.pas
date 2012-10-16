@@ -48,6 +48,18 @@ var
       raise;
     end end;
   end;
+
+  procedure m(a,b: string; c: string = '');
+  begin
+    try
+    count+=1;
+    performUnitTest(a,b,c);
+
+    except on e:exception do begin
+      writeln('Error @ "',a, '"');
+      raise;
+    end end;
+  end;
 var vars: TXQVariableChangeLog;
 begin
 //  time := Now;
@@ -55,7 +67,7 @@ begin
 
   count:=0;
   ps := TXQueryEngine.Create;
-  ps.StaticBaseUri := 'pseudo://test';
+  ps.StaticContext.baseURI := 'pseudo://test';
   ps.ImplicitTimezone:=-5 / HoursPerDay;
   ps.OnEvaluateVariable:=@vars.evaluateVariable;
   ps.OnDefineVariable:=@vars.defineVariable;
@@ -348,7 +360,7 @@ begin
                    'return  <tr> {if ($count mod 2) then (attribute bgcolor {''Lavender''}) else ()} <td>{$term/term-name/text()}</td>  <td>{$term/definition/text()}</td>  </tr>       }</tbody>  </table> </body> </html>)',
     '<html><head><title>Terms</title> </head>  <body> <table border="1"> <thead> <tr>  <th>Term</th>  <th>Definition</th>  </tr> </thead><tbody><tr bgcolor="Lavender">  <td>Object</td>  <td>A set of ideas...</td>  </tr><tr>  <td>Organization</td>  <td>A unit...</td>  </tr><tr bgcolor="Lavender">  <td>Organization</td>  <td>BankOfAmerica</td>  </tr></tbody>  </table> </body> </html>');
 
-  ps.StripBoundarySpace := true;
+  ps.StaticContext.StripBoundarySpace := true;
 
   t('outer-xml(<a>  {1}  </a>)', '<a>1</a>');
   t('outer-xml(<a> {1} {2} {3} </a>)', '<a>123</a>');
@@ -428,9 +440,38 @@ begin
   //t('validate strict { <element>abc</element> }', 'abc');
 
 
-
   t('(# foobar:def abc #) {7}', '7');
   t('(#foobar:def#) {7, 8}', '7 8');
+
+  m('xquery version "1.0"; 7', '7');
+  m('xquery version "1.0" encoding "utf-8"; 7', '7');
+
+  m('declare boundary-space preserve ; outer-xml(<a>  {7}  </a>)', '<a>  7  </a>');
+  m('declare boundary-space strip ; outer-xml(<a>  {7}  </a>)', '<a>7</a>');
+  m('declare boundary-space preserve; outer-xml(<a>  {7}  </a>)', '<a>  7  </a>');
+  m('declare boundary-space strip; outer-xml(<a>  {7}  </a>)', '<a>7</a>');
+
+  m('declare variable $x := 7.5; $x', '7.5');
+  m('declare variable $x as xs:integer := 7; $x', '7');
+  m('declare variable $x as xs:string := "abc"; $x', 'abc');
+
+  m('declare function foobar() { 17 }; foobar() ', '17');
+  m('declare function succi($a as integer) { $a + 1 }; succi(20) ', '21');
+  m('declare function summi($a as integer, $b as integer) { $a + $b }; summi(20, 10) ', '30');
+  m('declare function mul($a as integer, $b as integer) { $a * $b }; mul(20, 10) ', '200');
+  m('declare function succi($a as integer) { $a + 1 }; declare function mul($a as integer, $b as integer) { $a * $b }; succi(mul(2,3)) ', '7');
+  m('declare function succi($a as integer) { $a + 1 }; declare function mulsucc($a as integer, $b as integer) { succi($a * $b) }; mulsucc(5,6) ', '31');
+  m('declare function fac($a as integer) { if ($a = 0) then 1 else $a * fac($a - 1)  }; fac(4) ', '24');
+  m('declare function fac($a as integer) { if ($a = 0) then 1 else $a * fac($a - 1)  }; fac(10) ', '3628800');
+  m('declare function fibi($a as integer) { if ($a <= 0) then 1 else fibi($a - 1) + fibi($a - 2)  }; fibi(5) ', '13');
+  m('declare function fibi($a as integer) { if ($a <= 0) then 1 else fibi($a - 1) + fibi($a - 2)  }; fibi(6) ', '21');
+
+  m('declare variable $var := 123;  declare function wrapper($a as integer) { $var * $a }; wrapper(1) ', '123');
+  m('declare variable $var := 123;  declare function wrapper($a as integer) { $var * $a }; wrapper(2) ', '246');
+  m('declare function wrapper($a as integer) { $var * $a }; declare variable $var := 123;  wrapper(3) ', '369'); //back variable reference (if i read the standard correctly that is not allowed. But it is easier to implement this way and in Zorba it also works)
+  m('declare function odd($a as integer) { if ($a = 0) then false() else even($a - 1)}; declare function even($a as integer) { if ($a = 0) then true() else odd($a - 1)}; string-join(for $i in 0 to 9 return odd($i), " ") ', 'false true false true false true false true false true');
+
+
 
   xml.free;
   ps.free;
