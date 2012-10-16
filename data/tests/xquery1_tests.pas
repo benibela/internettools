@@ -426,6 +426,8 @@ begin
   t('(<foobar/>, <foobar/>) instance of element(foobar)*', 'true');
   t('(<foobar/>, <foobar/>) instance of element(foobar)  +', 'true');
   t('(<foobar/>, <foobar/>, <abc/>) instance of element(foobar)+', 'false');
+
+  ps.GlobalNamespaces.Add(TNamespace.Create('test://abc', 'abc'));
   t('<abc:element>123</abc:element> instance of element()', 'true');
   t('<abc:element>123</abc:element> instance of element(*)', 'true');
   t('<abc:element>123</abc:element> instance of element(element)', 'false');
@@ -474,6 +476,7 @@ begin
 
 
   xml.free;
+  FreeAndNil(ps.GlobalNamespaces);
   ps.free;
   vars.free
 end;

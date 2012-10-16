@@ -35,6 +35,30 @@ TTreeDocument = class;
 
 TStringComparisonFunc = function (const a,b: string): boolean of object;
 
+{ TNamespace }
+
+TNamespace = class
+  url: string;
+  prefix: string;
+  constructor create(const aurl: string; aprefix: string);
+end;
+
+{ TNamespaceList }
+
+TNamespaceList = class(TFPList)
+private
+  function getNamespace(const prefix: string): TNamespace;
+  function getNamespace(i: integer): TNamespace;
+public
+  function hasNamespacePrefix(const prefix: string; out ns: TNamespace): boolean;
+
+  procedure freeAll;
+  destructor Destroy; override;
+
+  property namespaces[prefix: string]: TNamespace read getNamespace;
+  property items[i: integer]: TNamespace read getNamespace;
+end;
+
 //**@abstract This class representates an element of the html file
 //**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
 //**E.g. a xml file like @code(<foo><bar>x</bar></foo>) is stored as a quadro-linked list:
@@ -84,7 +108,7 @@ TTreeElement = class
   parent: TTreeElement;
   document: TTreeElement;
   reverse: TTreeElement; //**<element paired by open/closing, or corresponding attributes
-  namespace: string; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
+  namespace: TNamespace; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
 
   offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
@@ -125,7 +149,7 @@ TTreeElement = class
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
   function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
-  function getNamespaceURL(cmpFunction: TStringComparisonFunc = nil): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute) cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getNamespaceURL(): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute) cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
 
   property defaultProperty[name: string]: string read getAttribute; default;
@@ -219,6 +243,7 @@ private
   FCurrentTree: TTreeDocument;
   FXmlHeaderEncoding: TEncoding;
 
+
   function newTreeElement(typ:TTreeElementType; text: pchar; len:longint):TTreeElement;
   function newTreeElement(typ:TTreeElementType; s: string):TTreeElement;
   procedure autoCloseLastTag();
@@ -228,11 +253,19 @@ private
   function readText(text: pchar; textLen: longint):TParsingResult;
   function readComment(text: pchar; textLen: longint):TParsingResult;
 
+private
+  FCurrentNamespace: TNamespace;
+  FCurrentNamespaces: TNamespaceList;
+  FCurrentNamespaceDefinitions: TList;
+  FNamespaceGarbage: TNamespaceList;
+  function pushNamespace(const url, prefix: string): TNamespace;
+  function findNamespace(const prefix: string): TNamespace;
 
   function htmlTagWeight(s:string): integer;
   function htmlTagAutoClosed(s:string): boolean;
 public
   treeElementClass: TTreeElementClass; //**< Class of the tree nodes. You can subclass TTreeElement if you need to store additional data at every node
+  globalNamespaces: TNamespaceList;
 
   constructor Create;
   destructor destroy;override;
@@ -261,8 +294,61 @@ end;
 
 
 function xmlStrEscape(s: string):string;
+
+const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
+      XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
+var
+   XMLNamespace_XMLNS, XMLNamespace_XML: TNamespace;
+
 implementation
 uses xquery;
+
+{ TNamespaceList }
+
+function TNamespaceList.getNamespace(const prefix: string): TNamespace;
+begin
+  hasNamespacePrefix(prefix, result);
+end;
+
+function TNamespaceList.getNamespace(i: integer): TNamespace;
+begin
+  result := TNamespace(inherited get(i));
+end;
+
+function TNamespaceList.hasNamespacePrefix(const prefix: string; out ns: TNamespace): boolean;
+var
+  i: Integer;
+begin
+  for i := Count - 1 downto 0 do
+    if TNamespace(Items[i]).prefix = prefix then begin
+      ns := TNamespace(items[i]);
+      exit(true);
+    end;
+  ns := nil;
+  exit(false);
+end;
+
+procedure TNamespaceList.freeAll;
+var
+  i: Integer;
+begin
+  for i := 0 to Count - 1 do items[i].free;
+  Clear;
+end;
+
+destructor TNamespaceList.Destroy;
+begin
+  freeAll;
+  inherited Destroy;
+end;
+
+{ TNamespace }
+
+constructor TNamespace.create(const aurl: string; aprefix: string);
+begin
+  url := aurl;
+  prefix := aprefix;
+end;
 
 { TTreeDocument }
 
@@ -413,7 +499,7 @@ begin
       while attrib <> nil do begin
         assert(attrib.reverse <> nil);
         result += ' ';
-        if attrib.namespace <> '' then result += attrib.namespace+':';
+        if attrib.namespace <> nil then result += attrib.getNamespacePrefix()+':';
         result += attrib.value+'="'+attrib.reverse.value+'"'; //todo fix escaping & < >
         attrib := attrib.next;
       end;
@@ -501,7 +587,7 @@ begin
   if cmpFunction = nil then cmpFunction:=@caseInsensitiveCompare;
 
   while attrib <> nil do begin
-    if cmpFunction(attrib.value, a) and (not checkNamespace or cmpFunction(ns, attrib.namespace)) then begin
+    if cmpFunction(attrib.value, a) and (not checkNamespace or cmpFunction(ns, attrib.getNamespacePrefix())) then begin
       valueout := attrib.reverse;
       exit(true);
     end;
@@ -566,8 +652,8 @@ function TTreeElement.getNodeName: string;
 begin
   case typ of
     tetOpen, tetAttributeName, tetClose: begin
-      if namespace = '' then exit(value);
-      exit(namespace + ':' + value);
+      if (namespace = nil) or (namespace.prefix = '') then exit(value);
+      exit(getNamespacePrefix() + ':' + value);
     end;
     tetAttributeValue: result := reverse.getNodeName();
     else result := '';
@@ -576,12 +662,14 @@ end;
 
 function TTreeElement.getNamespacePrefix: string;
 begin
-  result := namespace;
+  if namespace = nil then exit('');
+  result := namespace.prefix;
 end;
 
-function TTreeElement.getNamespaceURL(cmpFunction: TStringComparisonFunc = nil): string;
+function TTreeElement.getNamespaceURL(): string;
 begin
-  result := getNamespaceURL(getNamespacePrefix(), cmpFunction);
+  if namespace = nil then exit('');
+  result := namespace.url;
 end;
 
 function TTreeElement.getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string;
@@ -589,6 +677,7 @@ var
   n: TTreeElement;
   attrib: String;
 begin
+  if (namespace <> nil) and (namespace.prefix = prefixOverride) then exit(namespace.url) ;
   if prefixOverride <> '' then prefixOverride:=':'+prefixOverride;
   attrib := 'xmlns' + prefixOverride;
   n := self;
@@ -720,8 +809,6 @@ begin
 
   for i := 0 to high(props) do begin
     attrib := TTreeElement.create(tetAttributeName, strFromPchar(props[i].name, props[i].nameLen));
-    if pos(':', attrib.value) > 0 then
-      attrib.namespace := strSplitGet(':', attrib.value);
     attrib.parent := self;
     attrib.document := document;
     if prev <> nil then prev.next := attrib
@@ -978,9 +1065,6 @@ begin
 
   if typ <> tetClose then result.parent := TTreeElement(FElementStack.Last)
   else result.parent := TTreeElement(FElementStack.Last).getParent();
-
-  if (typ in [tetOpen, tetClose]) and (pos(':', result.value) > 0) then
-    result.namespace := strSplitGet(':', result.value);
   //FCurrentElement.id:=FTemplateCount;
 end;
 
@@ -1013,6 +1097,7 @@ var
   j: Integer;
   enc: String;
   first,last: PChar;
+  attrib: TTreeElement;
 begin
   result:=prContinue;
 
@@ -1077,7 +1162,28 @@ begin
     FAutoCloseTag:=htmlTagAutoClosed(new.value);
 
   FElementStack.Add(new);
-  if length(properties)>0 then new.addAttributes(properties);
+  if length(properties)>0 then begin
+    new.addAttributes(properties);
+    attrib := new.attributes;
+    while attrib <> nil do begin
+      if strBeginsWith(attrib.value, 'xmlns') then begin
+        if attrib.value = 'xmlns' then
+           pushNamespace(attrib.reverse.value, '')
+         else if strBeginsWith(attrib.value, 'xmlns:') then begin
+           attrib.value:=strCopyFrom(attrib.value, 7);
+           pushNamespace(attrib.reverse.value, attrib.value);
+           attrib.namespace := XMLNamespace_XMLNS;
+         end;
+      end else if pos(':', attrib.value) > 0 then
+        attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
+      attrib := attrib.next;
+    end;
+  end;
+  if (pos(':', new.value) > 0) then
+    new.namespace := findNamespace(strSplitGet(':', new.value))
+   else
+    new.namespace := FCurrentNamespace;;
+
   new.initialized;
 end;
 
@@ -1089,6 +1195,7 @@ var
   weight: LongInt;
   parenDelta: integer;
   name: String;
+  removedCurrentNamespace: Boolean;
 begin
   result:=prContinue;
 
@@ -1101,6 +1208,7 @@ begin
   if FAutoCloseTag and (not strliequal(tagName, last.value, tagNameLen)) then autoCloseLastTag();
   FAutoCloseTag:=false;
 
+  new := nil;
   if (strliequal(tagName, last.getNodeName, tagNameLen)) then begin
     new := newTreeElement(tetClose, tagName, tagNameLen);
     new.reverse := last; last.reverse := new;
@@ -1163,6 +1271,20 @@ begin
 
     //if no opening tag can be found the closing tag is ignored (not contained in tree)
   end;
+
+  if new <> nil then begin
+    if pos(':', new.value) > 0 then new.namespace := findNamespace(strSplitGet(':', new.value))
+    else new.namespace := FCurrentNamespace;
+    removedCurrentNamespace := false;
+    while (FCurrentNamespaceDefinitions.Count > 0) and (FCurrentNamespaceDefinitions[FCurrentNamespaceDefinitions.Count-1] = pointer(new.reverse)) do begin
+      if FCurrentNamespaces.items[FCurrentNamespaces.Count - 1].prefix = '' then
+        removedCurrentNamespace := true;
+      FCurrentNamespaceDefinitions.Delete(FCurrentNamespaceDefinitions.Count-1);
+      FCurrentNamespaces.Delete(FCurrentNamespaces.Count-1);
+    end;
+    if removedCurrentNamespace then
+      FCurrentNamespace := findNamespace('');
+  end;
 end;
 
 function TTreeParser.readText(text: pchar; textLen: longint): TParsingResult;
@@ -1197,6 +1319,33 @@ begin
   if textLen <= 0 then
     exit;
   newTreeElement(tetComment, text, textLen).initialized;
+end;
+
+function TTreeParser.pushNamespace(const url, prefix: string): TNamespace;
+var
+  ns: TNamespace;
+begin
+  ns := TNamespace.Create(url, prefix);
+  FCurrentNamespaces.Add(ns);
+  FNamespaceGarbage.Add(ns);
+  FCurrentNamespaceDefinitions.Add(FCurrentElement);
+  if prefix = '' then FCurrentNamespace := ns;
+  result := ns;
+end;
+
+function TTreeParser.findNamespace(const prefix: string): TNamespace;
+var
+  i: Integer;
+begin
+  result := nil;
+  if FCurrentNamespaces.hasNamespacePrefix(prefix, result) then exit;
+  if globalNamespaces.hasNamespacePrefix(prefix, result) then exit;
+  case prefix of
+    'xml': result := XMLNamespace_XML;
+    'xmlns': result := XMLNamespace_XMLNS;
+    '': result := FCurrentNamespace;
+    else if parsingModel = pmStrict then raise ETreeParseException.Create('Unknown namespace: '+prefix);
+  end;
 end;
 
 function TTreeParser.htmlTagWeight(s: string): integer;
@@ -1239,6 +1388,11 @@ begin
   FReadProcessingInstructions:=false;
   FAutoDetectHTMLEncoding:=true;
   FTrees := TList.Create;
+
+  FCurrentNamespaceDefinitions := TList.Create;
+  FCurrentNamespaces := TNamespaceList.Create;
+  FNamespaceGarbage := TNamespaceList.Create;
+  globalNamespaces := TNamespaceList.Create;
   //FConvertEntities := true;
 end;
 
@@ -1247,6 +1401,10 @@ begin
   clearTrees;
   FElementStack.free;
   ftrees.Free;
+  FCurrentNamespaces.Free;
+  FCurrentNamespaceDefinitions.Free;
+  FNamespaceGarbage.free;
+  globalNamespaces.free;
   inherited destroy;
 end;
 
@@ -1257,6 +1415,9 @@ begin
   for i:=0 to FTrees.Count-1 do
     TTreeDocument(FTrees[i]).deleteAll();
   ftrees.Clear;
+  for i:=0 to FNamespaceGarbage.Count-1 do
+    tobject(FNamespaceGarbage[i]).free;
+  FNamespaceGarbage.Clear;
 end;
 
 
@@ -1308,6 +1469,7 @@ begin
 
   FCurrentFile:=html;
   FAutoCloseTag:=false;
+  FCurrentNamespace := nil;
 
   //initialize root element
   //there are two reasons for an empty root element which doesn't exists in the file
@@ -1375,6 +1537,8 @@ begin
 
   FTrees.Add(FCurrentTree);
   result := FCurrentTree;
+  FCurrentNamespaces.Clear;
+  FCurrentNamespaceDefinitions.Clear;
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
 end;
@@ -1420,5 +1584,11 @@ begin
   result := StringReplace(s, '<', '&lt;', [rfReplaceAll]); //TODO: escape all
 end;
 
+initialization
+  XMLNamespace_XML := TNamespace.Create(XMLNamespaceUrl_XML, 'xml');
+  XMLNamespace_XMLNS := TNamespace.Create(XMLNamespaceUrl_XMLNS, 'xmlns');
+finalization
+  XMLNamespace_XML.free;
+  XMLNamespace_XMLNS.free;
 end.
 

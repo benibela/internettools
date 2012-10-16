@@ -65,6 +65,7 @@ type
   TXQStaticContext = record
     stripBoundarySpace: boolean;
     moduleVariables: TXQVariableChangeLog;
+    namespaces: TNamespaceList;
     functions: array of TXQValueFunction;
     //TODO: use these values
     collation: string;
@@ -94,10 +95,13 @@ type
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
 
     temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
+    namespaces: TNamespaceList;
 
     staticContext: ^TXQStaticContext;
 
     function compareAtomicBase(const a,b: IXQValue): integer;
+    function findNamespace(const nsprefix: string): TNamespace;
+    function findNamespaceURL(const nsprefix: string): string;
   end;
 
 
@@ -682,7 +686,7 @@ type
   //***@abstract(Step of a query in a tree)
   //***You can use it to use queries, but it is intended for internal use
   TXQPathMatchingStep = record
-    namespace: string; //**< Namespace the matched node must be in (only used if qmCheckNamespace is set)
+    namespacePrefix: string; //**< Namespace the matched node must be in (only used if qmCheckNamespace is set)
     value: string; //**< If @code(value <> ''), only nodes with the corresponding value are found (value = node-name for element node, value = text for text/comment nodes)
     filters: array of TXQTerm; //**< expressions a matched node must satisfy
     case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
@@ -704,7 +708,7 @@ type
     checkValue: boolean; //**< If the name of the element matters
     requiredValue: string; //**< Required node name (if checkValue)
     checkNamespace: boolean;  //**< If the namespace matters
-    requiredNamespace: string; //**< Required namespace (if checkNamespace)
+    requiredNamespaceURL: string; //**< Required namespace (if checkNamespace)
     equalFunction: TStringComparisonFunc; //**< Function used to compare node values with the required values
   end;
 
@@ -773,7 +777,7 @@ type
     function castableAsBase(v: IXQValue): boolean;
     function castAs(v: IXQValue): IXQValue;
     function castableAs(v: IXQValue): boolean;
-    function instanceOf(ta: IXQValue; equalFunction: TStringComparisonFunc): boolean;
+    function instanceOf(ta: IXQValue; const context: TEvaluationContext): boolean;
   end;
 
   { TXQTermVariable }
@@ -1142,6 +1146,7 @@ type
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
 
     AllowVariableUseInStringLiterals: boolean; //**< If "...$var.. " should be replaced by the value of var, or remain a string literal
+    GlobalNamespaces: TNamespaceList;
 
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
@@ -1896,7 +1901,7 @@ begin
       tempDefVar := TXQTermDefineVariable(children[i]);
       vars.addVariable(tempDefVar.variablename, tempDefVar.children[high(tempDefVar.children)].evaluate(context));
       if length(tempDefVar.children) > 1 then
-        if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(vars.vars[high(vars.vars)].value, @context.collation.equal) then
+        if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(vars.vars[high(vars.vars)].value, context) then
           raiseEvaluationError('Variable '+tempDefVar.variablename + ' with value ' +vars.vars[high(vars.vars)].value.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
     end;
 end;
@@ -1920,6 +1925,32 @@ end;
 function TEvaluationContext.compareAtomicBase(const a, b: IXQValue): integer;
 begin
   result := xqvalueCompareAtomicBase(a, b, collation, sender.ImplicitTimezone);
+end;
+
+function TEvaluationContext.findNamespace(const nsprefix: string): TNamespace;
+var
+  i: Integer;
+begin
+  if (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
+  if (staticContext^.namespaces <> nil) and (staticContext^.namespaces.hasNamespacePrefix(nsprefix, result)) then exit;
+  if (sender.GlobalNamespaces <> nil) and (sender.GlobalNamespaces.hasNamespacePrefix(nsprefix, result)) then exit;
+  case nsprefix of
+    'xml': result := XMLNamespace_XML;
+    'xmlns': result := XMLNamespace_XMLNS;
+    else result := nil;
+  end;
+end;
+
+function TEvaluationContext.findNamespaceURL(const nsprefix: string): string;
+var
+  temp: TNamespace;
+begin
+  temp := findNamespace(nsprefix);
+  if temp = nil then begin
+    if nsprefix <> '' then raise EXQEvaluationException.Create('Unknown namespace: '+nsprefix);
+    exit;
+  end;
+  result := temp.url;
 end;
 
 { TXQuery }
@@ -2067,7 +2098,7 @@ begin
       result.value:=TXQTermNodeMatcher(children[0]).select;
       if TXQTermNodeMatcher(children[0]).namespace <> '*' then begin
         Include(result.matching, qmCheckNamespace);
-        result.namespace:=TXQTermNodeMatcher(children[0]).namespace;
+        result.namespacePrefix:=TXQTermNodeMatcher(children[0]).namespace;
       end;
     end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('Namespace:wildcard not allowed in element test') ;
   end else raise EXQEvaluationException.Create('Children not allowed for element test "'+select+'"');
@@ -2968,6 +2999,7 @@ begin
   result.SeqValue:=nil;
   result.SeqIndex:=-1;
   result.temporaryVariables:=nil;
+  Result.namespaces := nil;
 end;
 
 constructor TXQueryEngine.create;
@@ -2978,6 +3010,7 @@ begin
   VariableChangelog := TXQVariableChangeLog.create();
   OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   OnDefineVariable:= @VariableChangelog.defineVariable;
+  GlobalNamespaces := TNamespaceList.Create;
 end;
 
 destructor TXQueryEngine.Destroy;
@@ -2996,6 +3029,7 @@ begin
     FInternalDocuments.Free;
   end;
   FExternalDocuments.Free;
+  GlobalNamespaces.free;
   inherited Destroy;
 end;
 
@@ -3601,6 +3635,8 @@ var
   n : IXQValue;
   newSequenceSeq: TXQVList;
   resultSeq: TXQValueSequence;
+  cachedNamespace: boolean;
+  cachedNamespaceURL: string;
 
   procedure add(const v: IXQValue); inline;
   begin
@@ -3620,6 +3656,7 @@ begin
     tempContext := context;
 
   newSequence := nil;
+  cachedNamespace := false;
   nodeCondition.equalFunction:=@context.nodeCollation.equal;
   onlyNodes := false;
   for n in previous do begin
@@ -3634,6 +3671,13 @@ begin
       assert(n.toNode <> nil);
       oldnode := n.toNode;
       unifyQuery(oldnode, command, nodeCondition);
+      if nodeCondition.checkNamespace then begin
+        if not cachedNamespace then begin
+          cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix);
+          cachedNamespace:=true;
+        end;
+        nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
+      end;
       newnode := getNextQueriedNode(nil, nodeCondition);
       j:=0;
       if (newSequence = nil) or not (newSequence is TXQValueSequence) then newSequence := TXQValueSequence.create(0);
@@ -3766,7 +3810,7 @@ begin
   result :=  assigned(node)
              and (node.typ in nodeCondition.searchedTypes)
              and (not (nodeCondition.checkValue) or nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
-             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespace, node.getNamespacePrefix));
+             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL()));
 end;
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement;
@@ -3830,7 +3874,7 @@ begin
   nodeCondition.checkValue:=qmValue in command.matching;
   nodeCondition.requiredValue:=command.value;
   nodeCondition.checkNamespace:=qmCheckNamespace in command.matching;
-  nodeCondition.requiredNamespace:=command.namespace;
+  nodeCondition.requiredNamespaceURL:=command.namespacePrefix; //is resolved later
   nodeCondition.searchedTypes:=convertMatchingOptionsToMatchedTypes(command.matching);
 
   if contextNode = nil then exit;

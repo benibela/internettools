@@ -389,7 +389,6 @@ THtmlTemplateParser=class
 
     FOutputEncoding: TEncoding;
     FKeepOldVariables: TKeepPreviousVariables;
-    FNamespaces: TStringList;
 
     FTemplate, FHTML: TTreeParser;
     FHtmlTree: TTreeDocument;
@@ -404,6 +403,7 @@ THtmlTemplateParser=class
     function GetVariables: TXQVariableChangeLog;
     function getHTMLTree: TTreeElement;
     function getTemplateTree: TTreeElement;
+    function GetTemplateNamespace: TNamespaceList;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -439,7 +439,7 @@ THtmlTemplateParser=class
     property oldVariableChangeLog: TXQVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
     property VariableChangeLogCondensed: TXQVariableChangeLog read GetVariableLogCondensed; //**<oldVariableChangeLog (no, no, no, it's the new one) with duplicated objects removed (i.e. if you have obj := object(), obj.a := 1, obj.b := 2, obj := object(); the normal change log will contain 4 objects (like {}, {a:1}, {a:1,b:2}, {}), but the condensed log only two {a:1,b:2}, {})
 
-    property templateNamespaces: TStringList read FNamespaces write FNamespaces; //**< Namespace prefixes which are recognized as template commands. Default is template: and t: @br Namespaces defined in a template with the xmlns: notation are automatically added to this property (actually added, so they will also recognized in later documents. Since this behaviour is a violation of the xml standard, it might change in future). @br Remark: This property contains the complete namespace prefix, including the final :
+    property templateNamespaces: TNamespaceList read GetTemplateNamespace; //**< Global namespaces to set the commands that will be recognized as template commands. Default prefixes are template: and t: @br Namespaces can also be defined in a template with the xmlns: notation and the namespace url  'http://www.benibela.de/2011/templateparser'
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
@@ -451,6 +451,7 @@ THtmlTemplateParser=class
     property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
     property TemplateParser: TTreeParser read FTemplate; //**< X/HTML parser used to read the templates (public so you can change the parsing behaviour, if you really need it)
+    property QueryEngine: TXQueryEngine read FQueryEngine; //**< XQuery engine used for evaluating query expressions contained in the template
   end;
 
 //** xml compatible namespace url to define new template prefixes
@@ -466,13 +467,12 @@ const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
 
 { TTemplateElement }
 
-function strToCommand(ns, s:string; treeTyp: TTreeElementType; commandnamespaces: TStringList): TTemplateElementType;
+function strToCommand(ns, s:string; treeTyp: TTreeElementType): TTemplateElementType;
 var  t: TTemplateElementType;
      i: Integer;
 begin
   if ((treeTyp = tetOpen) or (treeTyp = tetClose)) then begin
-    i := commandnamespaces.IndexOf(ns);
-    if i >= 0 then begin
+    if ns = HTMLPARSER_NAMESPACE_URL then begin
       for t:=low(COMMAND_STR) to high(COMMAND_STR) do
         if striequal(s,COMMAND_STR[t]) then begin
           if treeTyp = tetOpen then exit(t)
@@ -529,9 +529,7 @@ begin
   //inherited initialized;
   attrib := attributes;
   while attrib <> nil do begin
-    if attrib.namespace = 'xmlns' then begin
-      if attrib.reverse.value = HTMLPARSER_NAMESPACE_URL then
-        parser.FNamespaces.add(attrib.value);
+    if attrib.getNamespaceURL() = XMLNamespaceUrl_XMLNS then begin
       if attributes = attrib then attributes := attrib.next;
       attrib.reverse.deleteElementFromDoubleLinkedList;
       attrib := attrib.deleteElementFromDoubleLinkedList;
@@ -540,11 +538,11 @@ begin
     attrib := attrib.next;
   end;
 
-  templateType:=strToCommand(namespace, value, typ, parser.FNamespaces);
+  templateType:=strToCommand(getNamespaceURL(), value, typ);
 
   attrib := attributes;
   while attrib <> nil do begin
-    if (templateType >= firstRealTemplateType) or (parser.FNamespaces.IndexOf(attrib.namespace) >= 0) then begin;
+    if (templateType >= firstRealTemplateType) or (attrib.getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin;
       if templateAttributes = nil then templateAttributes := TAttributeList.Create;
       templateAttributes.Add(attrib.value+'='+attrib.reverse.value);
       if attributes = attrib then attributes := attrib.next;
@@ -678,6 +676,11 @@ function THtmlTemplateParser.createXQuery(const expression: string): IXQuery;
 begin
   if expression = '' then raise ETemplateParseException.Create('no expression given');
   result := FQueryEngine.parseXPath2(expression);
+end;
+
+function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;
+begin
+  result := FTemplate.globalNamespaces;
 end;
 
 function THtmlTemplateParser.GetVariableLogCondensed: TXQVariableChangeLog;
@@ -1096,12 +1099,11 @@ begin
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
   FTemplate.treeElementClass:=TTemplateElement;
+  FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
+  FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
   FHTML.readComments:=true;
-  FNamespaces := TStringList.Create;
-  FNamespaces.Add('template');
-  FNamespaces.Add('t');
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
@@ -1124,7 +1126,6 @@ begin
   FQueryEngine.Free;
   FAttributeMatching.Free;
   FRepetitionRegEx.Free;
-  FNamespaces.Free;
   FreeAndNil(FVariables);
   FVariableLogCondensed.free;
   FVariableLog.Free;

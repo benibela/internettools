@@ -682,13 +682,13 @@ end;
 
 procedure xqvalueInstanceOf(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
-  result := xqvalue(getTypeInfo(tb).instanceOf(ta, @cxt.nodeCollation.equal));
+  result := xqvalue(getTypeInfo(tb).instanceOf(ta, cxt));
 end;
 
 procedure xqvalueTreatAs(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
   result := ta;
-  if not getTypeInfo(tb).instanceOf(result, @cxt.nodeCollation.equal) then
+  if not getTypeInfo(tb).instanceOf(result, cxt) then
     raise Exception.Create('treat as type not matched');
 end;
 
@@ -1792,6 +1792,7 @@ begin
   name := args[0].toString;
   ns := '';
   if pos(':', name) > 0 then ns := copy(name, 1, pos(':', name) - 1);
+  if args[1].toNode = nil then exit();
   ns := args[1].toNode.getNamespaceURL(ns, @context.nodeCollation.equal);
   if ns <> '' then ns := ns + #2;
   result := TXQValue_QName.create(ns + name);
@@ -1865,12 +1866,13 @@ begin
   sl := TStringList.Create;
   try
     while el <> nil do begin
+      //if (el.namespace <> nil) and (sl.IndexOf(el.namespace.prefix) = -1) then sl.Add(el.namespace.prefix);
       if el.attributes <> nil then begin
         attrib := el.attributes;
         while attrib <> nil do begin
-          if (attrib.namespace = '') and context.nodeCollation.equal(attrib.value, 'xmlns') then begin
+          if attrib.value = 'xmlns' then begin
             if sl.IndexOf('') = -1 then sl.add('');
-          end else if context.nodeCollation.equal(attrib.namespace, 'xmlns') then
+          end else if attrib.getNamespaceURL() = XMLNamespaceURL_XMLNS then
             if sl.IndexOf(attrib.value) = -1 then sl.add(attrib.value);
           attrib := attrib.next;
         end;
@@ -2495,7 +2497,7 @@ begin
   if (node = nil) or (node.typ <> tetOpen) then result := TXQValue_anyURI.create('')
   else begin
     //if node.getNamespacePrefix() = '' then result := xqvalue(TXQValue_anyURI.create(''));
-    result := TXQValue_anyURI.create(node.getNamespaceURL(@context.nodeCollation.equal));
+    result := TXQValue_anyURI.create(node.getNamespaceURL());
   end;
 end;
 

@@ -135,7 +135,7 @@ begin
   result := castableAsBase(v);
 end;
 
-function TXQTermSequenceType.instanceOf(ta: IXQValue; equalFunction: TStringComparisonFunc): boolean;
+function TXQTermSequenceType.instanceOf(ta: IXQValue; const context: TEvaluationContext): boolean;
 var nodeCondition: TXQPathNodeCondition;
 
   function instanceOfSingleType(sub: IXQValue): boolean;
@@ -163,7 +163,9 @@ begin
     exit(true);
   if kind = tikElementTest then begin
     TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
-    nodeCondition.equalFunction := equalFunction;
+    if nodeCondition.checkNamespace then
+      nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL);
+    nodeCondition.equalFunction := @context.collation.equal;
   end;
   result := true;
   for v in ta do begin
@@ -298,7 +300,7 @@ var
       tempContext.temporaryVariables.pushAll;
       //sequenceTyp: TXQTermType;
       tempContext.temporaryVariables.addVariable(vars[pos].varname, v);
-      if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, @context.nodeCollation.equal)) then
+      if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, context)) then
         raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
       if vars[pos].positionVarname <> '' then ;
         tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index));
@@ -647,7 +649,7 @@ begin
       result.matching:=[qmElement,qmAttribute, qmExcludeRoot];
       if (hadNamespace) and (namespace <> '*') then begin
         Include(Result.matching, qmCheckNamespace);
-        result.namespace:=namespace;
+        result.namespacePrefix:=namespace;
       end;
     end;
     else begin
@@ -656,7 +658,7 @@ begin
       result.value:=select;
       if (namespace <> '*') then begin
         Include(Result.matching, qmCheckNamespace);
-        result.namespace:=namespace;
+        result.namespacePrefix:=namespace;
       end;
     end;
   end;
@@ -714,6 +716,7 @@ var
   testNS: Boolean;
   readvalue: String;
   readnamespace: String;
+  temp: TNamespace;
 begin
   if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
     tempEl := context.SeqValue.toNode
@@ -734,9 +737,13 @@ begin
   tempEl := tempEl.attributes;
   testValue := readvalue <> '*';
   testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
+  if testNS then begin
+    temp := context.findNamespace(readnamespace);
+    if temp <> nil then readnamespace:=temp.url;
+  end;
   while tempEl <> nil do begin
     if      (not testValue or striEqual(tempEl.value, readvalue))
-        and (not testNS or striEqual(tempEl.namespace, readnamespace)) then
+        and (not testNS or ( tempEl.getNamespaceURL() = readnamespace))  then
       xqvalueSeqAdd(result, xqvalue(tempEl.reverse));
     tempEl := tempEl.next;
   end;
@@ -826,7 +833,7 @@ begin
     if children[i].children[0] is TXQTermVariable then start := 1
     else start := 0;
     for j := start to high(children[i].children) - 1 do
-      if (children[i].children[j] as TXQTermSequenceType).instanceOf(v, @context.nodeCollation.equal) then
+      if (children[i].children[j] as TXQTermSequenceType).instanceOf(v, context) then
         exit(evaluateWithChangedVariable(children[i].children[high(children[i].children)], children[i].children[0], v));
   end;
   i := high(children);
@@ -855,6 +862,7 @@ var
   nextEnd: ^TTreeElement;
   lastKid: TTreeElement;
   temp: IXQValue;
+  subcontext: ^TEvaluationContext;
   procedure addKid;
   begin
     if tree.next = nil then tree.next := kid
@@ -877,20 +885,31 @@ var
   begin
     kid.parent := tree;
     case kid.typ of
-      tetAttributeName: begin
-        if lastAttribute = nil then tree.attributes := kid
-        else begin
-          lastAttribute.next := kid;
-          kid.previous := lastAttribute;
-          lastAttribute.reverse.next := kid.reverse;
-          kid.reverse.previous := lastAttribute.reverse;
+      tetAttributeName:
+        if ((kid.namespace = nil) and (kid.value = 'xmlns')) or ((kid.namespace <> nil) and (kid.namespace.url = XMLNamespaceUrl_XMLNS)) then begin
+          if (subcontext^.namespaces = nil) then begin
+            new(subcontext);
+            subcontext^ := context;
+            subcontext^.namespaces := TNamespaceList.Create;
+          end;
+          if kid.namespace = nil then subcontext^.namespaces.Add(TNamespace.Create(kid.reverse.value, ''))
+          else subcontext^.namespaces.Add(TNamespace.Create(kid.reverse.value, kid.value));
+          kid.free;
+          kid.reverse.Free;
+        end else begin
+          if lastAttribute = nil then tree.attributes := kid
+          else begin
+            lastAttribute.next := kid;
+            kid.previous := lastAttribute;
+            lastAttribute.reverse.next := kid.reverse;
+            kid.reverse.previous := lastAttribute.reverse;
+          end;
+          kid.reverse.parent := tree;
+          lastAttribute := kid;
+          kid.offset:=baseOffset;
+          kid.reverse.offset:=baseOffset;
+          baseOffset+=1;
         end;
-        kid.reverse.parent := tree;
-        lastAttribute := kid;
-        kid.offset:=baseOffset;
-        kid.reverse.offset:=baseOffset;
-        baseOffset+=1;
-      end;
       tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
       else raiseEvaluationError('Unknown child node');
@@ -955,7 +974,12 @@ var
     end;
   end;
 
+var oldnamespacecount: integer;
 begin
+  subcontext:=@context;
+  oldnamespacecount := 0;
+  if subcontext^.namespaces <> nil then oldnamespacecount := subcontext^.namespaces.Count;
+
   if (typ = tetOpen) and (nameValue = nil) then tree := TTreeDocument.create(typ)
   else tree := TTreeElement.create(typ);
   if root = nil then root := tree;
@@ -969,43 +993,49 @@ begin
   nextEnd:=@tree.next;
   case typ of
     tetAttributeName: begin
-      tree.value := nameValue.evaluate(context).toString;
+      tree.value := nameValue.evaluate(subcontext^).toString;
       if pos(':', tree.value) > 0 then
-        tree.namespace:=strSplitGet(':', tree.value);
+        tree.namespace:=subcontext^.findNamespace(strSplitGet(':', tree.value));
       tree.reverse := TTreeElement.create();
       tree.reverse.document := root;
       tree.reverse.reverse := tree;
       tree.reverse.typ := tetAttributeValue;
       for i:= 0 to high(children) do
-        tree.reverse.value := tree.reverse.value + valueToString(children[i].evaluate(context));
+        tree.reverse.value := tree.reverse.value + valueToString(children[i].evaluate(subcontext^));
     end;
     tetOpen: begin
-      if nameValue <> nil then begin
-        tree.value := nameValue.evaluate(context).toString;
-        if pos(':', tree.value) > 0 then
-          tree.namespace:=strSplitGet(':', tree.value);
-      end;
       for i:=0 to high(children) do
         if children[i] is TXQTermConstructor then begin
-          kid := TXQTermConstructor(children[i]).evaluate(context, root, baseOffset).toNode;
+          kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
           addNodeAsKid;
         end else
-          addValue(children[i].evaluate(context));
+          addValue(children[i].evaluate(subcontext^));
 
+      if nameValue <> nil then begin
+        tree.value := nameValue.evaluate(subcontext^).toString;
+        if pos(':', tree.value) > 0 then tree.namespace:=subcontext^.findNamespace(strSplitGet(':', tree.value))
+        else tree.namespace := subcontext^.findNamespace('');
+      end;
       kid := TTreeElement.create(tetClose, tree.value);
       addKid;
       tree.reverse := kid; kid.reverse := tree;
     end;
     tetProcessingInstruction: begin
-      tree.value := nameValue.evaluate(context).toString;
+      tree.value := nameValue.evaluate(subcontext^).toString;
       if length(children) = 0 then tree.addAttribute('', '')
-      else tree.addAttribute('', valueToString(children[0].evaluate(context)));
+      else tree.addAttribute('', valueToString(children[0].evaluate(subcontext^)));
     end;
-    tetText: tree.value := valueToString(nameValue.evaluate(context));
-    tetComment: tree.value := valueToString(nameValue.evaluate(context));
+    tetText: tree.value := valueToString(nameValue.evaluate(subcontext^));
+    tetComment: tree.value := valueToString(nameValue.evaluate(subcontext^));
     else raiseEvaluationError('Invalid type for constructor');
   end;
   result := xqvalue(tree);
+  if subcontext <> @context then begin
+    subcontext^.namespaces.free;
+    Dispose(subcontext);
+  end else if context.namespaces <> nil then
+    for i:=oldnamespacecount to context.namespaces.Count-1 do
+      context.namespaces.Delete(i);
 end;
 
 destructor TXQTermConstructor.destroy;

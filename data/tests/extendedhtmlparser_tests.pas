@@ -11,7 +11,7 @@ procedure unitTests();
 
 implementation
 
-uses extendedhtmlparser, xquery, bbutils;
+uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser;
 
 
 procedure unitTests();
@@ -398,7 +398,7 @@ var data: array[1..285] of array[1..3] of string = (
       '      stormy to someone who has gone through what'#13#10 +
       '      <emph>I</emph> have.</p>'#13#10 +
       '      <definition-list>'#13#10 +
-      '        <my:title>additional title</my:title>'#13#10 +
+      '        <my:title xmlns:my="uri:mynamespace">additional title</my:title>'#13#10 +
       '        <term>Trenton</term>'#13#10 +
       '        <definition>misery</definition>'#13#10 +
       '      </definition-list>'#13#10 +
@@ -487,8 +487,8 @@ var data: array[1..285] of array[1..3] of string = (
       ,('<a>as<template:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a>','a=asx')
       ,('<a>as<t:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
       ,('<a>as<t:read source="text()" var="a"/></a><b t:optional="true"></b>','<a>asx</a>','a=asx')
-      ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b bb:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
-      ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b bb:optional="true"></b>','<a>asx</a>','a=asx')
+      ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b xmlns:bb="http://www.benibela.de/2011/templateparser" bb:optional="true"></b>','<a>asx</a><x/>', 'a=asx')
+      ,('<a xmlns:bb="http://www.benibela.de/2011/templateparser">as<bb:read source="text()" var="a"/></a><b xmlns:bb="http://www.benibela.de/2011/templateparser" bb:optional="true"></b>','<a>asx</a>','a=asx')
 
       //test attribute
       ,('<a><t:if test="text()=''hallo''"><t:read var="res" source="b/text()"/></t:if></a>', '<a>hallo<b>gx</b></a>', 'res=gx')
@@ -729,6 +729,7 @@ var previoushtml: string;
 
 begin
   extParser:=THtmlTemplateParser.create;
+  extParser.QueryEngine.GlobalNamespaces.Add(TNamespace.create('uri:mynamespace', 'my'));
   sl:=TStringList.Create;
   for i:=low(data)to high(data) do
     performTest(data[i,1],data[i,2],data[i,3]);

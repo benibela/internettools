@@ -1550,13 +1550,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('data(/abc/y)', 'as', '');
   t('string-join(data(/abc/y),",")', 'as', '');
   t('type-of(data(/abc/y))', 'untypedAtomic', '');
-  t('namespace-uri-from-QName(resolve-QName("t:abc", r/sub))', 'test', '<r xmlns="default" xmlns:t="test"><sub></sub><override xmlns:t="test2"><sub/></override></r>');
-  t('namespace-uri-from-QName(resolve-QName("t:abc", r/override/sub))', 'test2', '');
-  t('namespace-uri-from-QName(resolve-QName("abc", r/override/sub))', 'default', '');
-  t('namespace-uri-from-QName(resolve-QName((), r/override/sub))', '', '');
-  t('namespace-uri-for-prefix("t", r/override/sub)', 'test2', '');
-  t('namespace-uri-for-prefix((), r/override/sub)', 'default', '');
-  t('string-join(in-scope-prefixes(r/override/sub),",")', 't,', '');
+  t('namespace-uri-from-QName(resolve-QName("t:abc", *:r/*:sub))', 'test', '<r xmlns="default" xmlns:t="test"><sub></sub><override xmlns:t="test2"><sub/></override></r>');
+  t('namespace-uri-from-QName(resolve-QName("t:abc", *:r/*:override/*:sub))', 'test2', '');
+  t('namespace-uri-from-QName(resolve-QName("abc", *:r/*:override/*:sub))', 'default', '');
+  t('namespace-uri-from-QName(resolve-QName((), *:r/*:override/*:sub))', '', '');
+  t('namespace-uri-for-prefix("t", *:r/*:override/*:sub)', 'test2', '');
+  t('namespace-uri-for-prefix((), *:r/*:override/*:sub)', 'default', '');
+  t('string-join(in-scope-prefixes(*:r/*:override/*:sub),",")', 't,', '');
   t('trace(152, "a")', '152', '');
   t('resolve-uri("/def", "http://www.example.com/a/b/c")', 'http://www.example.com/def', '');
   t('resolve-uri("#frag", "http://www.example.com/a/b/c")', 'http://www.example.com/a/b/c#frag', '');
@@ -1578,7 +1578,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('fn:iri-to-uri ("http://www.example.com/~bébé")', 'http://www.example.com/~b%C3%A9b%C3%A9', '');
   t('fn:escape-html-uri ("http://www.example.com/00/Weather/CA/Los Angeles#ocean")', 'http://www.example.com/00/Weather/CA/Los Angeles#ocean', '');
   t('fn:escape-html-uri ("javascript:if (navigator.browserLanguage == ''fr'') window.open(''http://www.example.com/~bébé'');")', 'javascript:if (navigator.browserLanguage == ''fr'') window.open(''http://www.example.com/~b%C3%A9b%C3%A9'');', '');
-  t('base-uri(doc/paragraph/link)', 'http://example.org/today/xy/', '<doc xml:base="http://example.org/today/"><paragraph xml:base="xy"><link xlink:type="simple" xlink:href="new.xml"></link>!</paragraph></doc>');
+  t('base-uri(doc/paragraph/link)', 'http://example.org/today/xy/', '<doc xmlns:xlink="http://www.w3.org/1999/xlink" xml:base="http://example.org/today/"><paragraph xml:base="xy"><link xlink:type="simple" xlink:href="new.xml"></link>!</paragraph></doc>');
   t('name(./tmp/*)', 'pr:abc', '<tmp xmlns:pr="http://www.example.com"><pr:abc></pr:abc></tmp>');
   t('name(./tmp/element())', 'pr:abc', '');
   t('local-name(./tmp/element())', 'abc', '');
@@ -2167,7 +2167,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(//b[/a/@take=@id], ",")', 'B', '!<a take="2"><b id="1">A</b><b id="2">B</b><b id="3">C</b></a>');
 
   //some namespaces
-  t('string-join(/r/b, ",")',   'xB', '!<r><a:b>AB</a:b><b>xB</b><a:c>AC</a:c><b:a>BA</b:a><b:b>BB</b:b></r>');
+  ps.GlobalNamespaces.Add(TNamespace.Create('test://a', 'a'));
+  ps.GlobalNamespaces.Add(TNamespace.Create('test://b', 'b'));
+  t('string-join(/r/b, ",")',   'xB', '!<r xmlns:a="test://a" xmlns:b="test://b"><a:b>AB</a:b><b>xB</b><a:c>AC</a:c><b:a>BA</b:a><b:b>BB</b:b></r>');
   t('string-join(/r/a:b, ",")', 'AB', '');
   t('string-join(/r/b:b, ",")', 'BB', '');
   t('string-join(/r/*:b, ",")', 'AB,xB,BB', '');
@@ -2193,34 +2195,34 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(/r/child::element(*), ",")', 'AB,xB,AC,BA,BB', '');
   t('string-join(/r/child::element(a:b), ",")', 'AB', '');
 
-  t('string-join(/r/b, ",")',   '', '!<r a:b="AB" b="xB" a:c="AC" b:a="BA" b:b="BB"/>');
-  t('string-join(/r/a:b, ",")', '', '');
-  t('string-join(/r/@b, ",")',   'xB', '');
-  t('string-join(/r/@a:b, ",")',   'AB', '');
-  t('string-join(/r/@b:b, ",")', 'BB', '');
-  t('string-join(/r/@*:b, ",")', 'AB,xB,BB', '');
-  t('string-join(/r/@b:*, ",")', 'BA,BB', '');
-  t('string-join(/r/@a:*, ",")', 'AB,AC', '');
-  t('string-join(/r/@a, ",")', '', '');
-  t('string-join(/r/@*:a, ",")', 'BA', '');
-  t('string-join(/r/@*, ",")', 'AB,xB,AC,BA,BB', '');
+  t('string-join(/r/x/b, ",")',   '', '!<r xmlns:a="test://a" xmlns:b="test://b"><x a:b="AB" b="xB" a:c="AC" b:a="BA" b:b="BB"/></r>');
+  t('string-join(/r/x/a:b, ",")', '', '');
+  t('string-join(/r/x/@b, ",")',   'xB', '');
+  t('string-join(/r/x/@a:b, ",")',   'AB', '');
+  t('string-join(/r/x/@b:b, ",")', 'BB', '');
+  t('string-join(/r/x/@*:b, ",")', 'AB,xB,BB', '');
+  t('string-join(/r/x/@b:*, ",")', 'BA,BB', '');
+  t('string-join(/r/x/@a:*, ",")', 'AB,AC', '');
+  t('string-join(/r/x/@a, ",")', '', '');
+  t('string-join(/r/x/@*:a, ",")', 'BA', '');
+  t('string-join(/r/x/@*, ",")', 'AB,xB,AC,BA,BB', '');
 
-  t('string-join(/r/attribute::b, ",")',   'xB', '');
-  t('string-join(/r/attribute::a:b, ",")',   'AB', '');
-  t('string-join(/r/attribute::b:b, ",")', 'BB', '');
-  t('string-join(/r/attribute::*:b, ",")', 'AB,xB,BB', '');
-  t('string-join(/r/attribute::b:*, ",")', 'BA,BB', '');
-  t('string-join(/r/attribute::a:*, ",")', 'AB,AC', '');
-  t('string-join(/r/attribute::a, ",")', '', '');
-  t('string-join(/r/attribute::*:a, ",")', 'BA', '');
-  t('string-join(/r/attribute::*, ",")', 'AB,xB,AC,BA,BB', '');
+  t('string-join(/r/x/attribute::b, ",")',   'xB', '');
+  t('string-join(/r/x/attribute::a:b, ",")',   'AB', '');
+  t('string-join(/r/x/attribute::b:b, ",")', 'BB', '');
+  t('string-join(/r/x/attribute::*:b, ",")', 'AB,xB,BB', '');
+  t('string-join(/r/x/attribute::b:*, ",")', 'BA,BB', '');
+  t('string-join(/r/x/attribute::a:*, ",")', 'AB,AC', '');
+  t('string-join(/r/x/attribute::a, ",")', '', '');
+  t('string-join(/r/x/attribute::*:a, ",")', 'BA', '');
+  t('string-join(/r/x/attribute::*, ",")', 'AB,xB,AC,BA,BB', '');
 
-  t('string-join(/r/attribute(), ",")', 'AB,xB,AC,BA,BB', '');
-  t('string-join(/r/attribute(*), ",")', 'AB,xB,AC,BA,BB', '');
-  t('string-join(/r/attribute(a:b), ",")', 'AB', '');
-  t('string-join(/r/attribute::attribute(), ",")', 'AB,xB,AC,BA,BB', '');
-  t('string-join(/r/attribute::attribute(*), ",")', 'AB,xB,AC,BA,BB', '');
-  t('string-join(/r/attribute::attribute(a:b), ",")', 'AB', '');
+  t('string-join(/r/x/attribute(), ",")', 'AB,xB,AC,BA,BB', '');
+  t('string-join(/r/x/attribute(*), ",")', 'AB,xB,AC,BA,BB', '');
+  t('string-join(/r/x/attribute(a:b), ",")', 'AB', '');
+  t('string-join(/r/x/attribute::attribute(), ",")', 'AB,xB,AC,BA,BB', '');
+  t('string-join(/r/x/attribute::attribute(*), ",")', 'AB,xB,AC,BA,BB', '');
+  t('string-join(/r/x/attribute::attribute(a:b), ",")', 'AB', '');
 
   t('string-join(for $i in (1, 2), $j in (3, 4) return ($i, $j), ":")', '1:3:1:4:2:3:2:4');
 
