@@ -1,5 +1,5 @@
 {%REPEAT (__NAME__, __VALUE__), [(Year, year), (Month, month), (Day, day), (Hours, hour), (Minutes, min) ]}
-procedure xqFunction__NAME___From_Datetime(args: array of IXQValue; var result: IXQValue);
+procedure xqFunction__NAME___From_Datetime(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit;
@@ -8,7 +8,7 @@ begin
 end;
 {%END-REPEAT}
 
-procedure xqFunctionSeconds_From_Datetime(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionSeconds_From_Datetime(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit;
@@ -16,17 +16,17 @@ begin
   result := xqvalue(RoundTo(decimal((args[0] as TXQValueDateTime).value.sec + (args[0] as TXQValueDateTime).value.secfraction), -6));
 end;
 
-procedure xqFunctionTimezone_From_Datetime(args: array of IXQValue; var result: IXQValue);
-var temp: TXQValueDateTimeData;
+procedure xqFunctionTimezone_From_Datetime(args: TXQVArray; var result: IXQValue);
+var tempCorrectlyInitialized: TXQValueDateTimeData;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit;
   if (not (args[0] is TXQValueDateTime)) or (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('Expected date, got: '+args[0].toString);
   if IsNan((args[0] as TXQValueDateTime).value.timezone) then exit;
-  fillchar(temp, sizeof(temp), 0);
-  temp.min:=round(MinsPerDay*(args[0] as TXQValueDateTime).value.timezone);
-  temp.hour:=temp.min div 60; temp.min:=temp.min mod 60;
-  temp.timezone:=getNaN;
-  result := TXQValueDateTimeClass(TXQValue_dayTimeDuration).create(temp);
+  fillchar(tempCorrectlyInitialized, sizeof(tempCorrectlyInitialized), 0);
+  tempCorrectlyInitialized.min:=round(MinsPerDay*(args[0] as TXQValueDateTime).value.timezone);
+  tempCorrectlyInitialized.hour:=tempCorrectlyInitialized.min div 60; tempCorrectlyInitialized.min:=tempCorrectlyInitialized.min mod 60;
+  tempCorrectlyInitialized.timezone:=getNaN;
+  result := TXQValueDateTimeClass(TXQValue_dayTimeDuration).create(tempCorrectlyInitialized);
 end;
 

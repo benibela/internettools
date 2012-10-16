@@ -42,11 +42,13 @@ end;
 
 function TXQValueUndefined.jsonSerialize(xmlTextOnly: boolean): string;
 begin
+  ignore(xmlTextOnly);
   Result:='null';
 end;
 
 function TXQValueUndefined.xmlSerialize(xmlTextOnly: boolean; sequenceTag: string; elementTag: string; objectTag: string): string;
 begin
+  ignore(xmlTextOnly); ignore(elementTag); ignore(objectTag);
   Result:='<'+sequenceTag+'/>';
 end;
 
@@ -149,12 +151,12 @@ end;
 
 { TXQValue_DatePart }
 
-class function TXQValue_Binary.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_Binary.createFromValue(const v: IXQValue): IXQValue;
 begin
-  if (args[0].getClassType <> self.ClassType) and (args[0] is TXQValue_Binary) then
-    result := TXQValueStringClass(self.ClassType).Create(fromRawBinary((args[0] as TXQValue_Binary).toRawBinary))
+  if (v.getClassType <> self.ClassType) and (v is TXQValue_Binary) then
+    result := TXQValueStringClass(self.ClassType).Create(fromRawBinary((v as TXQValue_Binary).toRawBinary))
    else
-    result := TXQValueStringClass(self.ClassType).Create(args[0].toString);
+    result := TXQValueStringClass(self.ClassType).Create(v.toString);
 end;
 
 
@@ -179,6 +181,7 @@ end;
 
 function TXQValue_Binary.canConvertToDecimal(pure: boolean): boolean;
 begin
+  ignore(pure);
   Result:=false;
 end;
 
@@ -192,8 +195,9 @@ begin
   Result:=TXQValue_AnyAtomicType;
 end;
 
-class function TXQValue.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue.createFromValue(const v: IXQValue): IXQValue;
 begin
+  ignore(v);
   result := nil;
   raise Exception.Create('Invalid constructor called');
 end;
@@ -211,6 +215,7 @@ end;
 
 class function TXQValue.castableFromInternal(const v: IXQValue): boolean;
 begin
+  ignore(v);
   result := true;
 end;
 
@@ -259,6 +264,7 @@ end;
 
 function TXQValue.canConvertToDecimal(pure: boolean): boolean;
 begin
+  ignore(pure);
   result := false;
 end;
 
@@ -285,9 +291,9 @@ end;
 
 function TXQValue.GetEnumerator: TXQValueEnumerator;
 begin
-  result.FCurrent:=self;
-  result.fcurrentidx:=-1;
-  result.flist:=nil;
+  result.FCurrent := self;
+  result.fcurrentidx := -1;
+  result.flist := nil;
 end;
 
 function TXQValue.debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
@@ -323,17 +329,20 @@ end;
 
 function TXQValue.jsonSerialize(xmlTextOnly: boolean): string;
 begin
+  ignore(xmlTextOnly);
   result := jsonStrEscape(toString);
 end;
 
 function TXQValue.xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
 begin
+  ignore(xmlTextOnly); ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
   result := xmlStrEscape(toString);
 end;
 
 function TXQValue.clone: IXQValue;
 begin
-
+  raise EXQEvaluationException.Create('Clone on "abstract" base class called.');
+  result := nil;
 end;
 
 { TXQValueBoolean }
@@ -351,6 +360,7 @@ end;
 
 function TXQValueBoolean.canConvertToDecimal(pure: boolean): boolean;
 begin
+  ignore(pure);
   Result:=true;
 end;
 
@@ -364,10 +374,9 @@ begin
   result := 'boolean';
 end;
 
-class function TXQValueBoolean.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValueBoolean.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
-  result := TXQValueBoolean.create(args[0].toBoolean);
+  result := TXQValueBoolean.create(v.toBoolean);
 end;
 
 function TXQValueBoolean.toBoolean: boolean;
@@ -397,6 +406,7 @@ end;
 
 function TXQValueBoolean.jsonSerialize(xmlTextOnly: boolean): string;
 begin
+  ignore(xmlTextOnly);
   if bool then result := 'true' else result := 'false';
 end;
 
@@ -418,20 +428,20 @@ begin
   result := 'integer';
 end;
 
-class function TXQValueInt65.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValueInt65.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
-  result := TXQValueInt65.create(args[0].toInt65);
+  result := TXQValueInt65.create(v.toInt65);
 end;
 
 class function TXQValueInt65.canCreateFromInt65(const i: int65): boolean;
 begin
+  ignore(i);
   result := true;
 end;
 
 class function TXQValueInt65.classParentNonBlocked: TXQValueClass;
 begin
-  if ClassType = TXQValueInt65 then Result:=TXQValueDecimal
+  if ClassType = TXQValueInt65 then Result := TXQValueDecimal
   else result := TXQValueClass(ClassParent);
 end;
 
@@ -442,6 +452,7 @@ end;
 
 function TXQValueInt65.canConvertToDecimal(pure: boolean): boolean;
 begin
+  ignore(pure);
   result := true;
 end;
 
@@ -472,6 +483,7 @@ end;
 
 function TXQValueInt65.jsonSerialize(xmlTextOnly: boolean): string;
 begin
+  ignore(xmlTextOnly);
   Result:=Int65ToStr(value);
 end;
 
@@ -493,10 +505,9 @@ begin
   value := aflt;
 end;
 
-class function TXQValueDecimal.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValueDecimal.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
-  result := TXQValueDecimal.create(args[0].toDecimal);
+  result := TXQValueDecimal.create(v.toDecimal);
 end;
 
 class function TXQValueDecimal.canCreateFromDecimal(const v: decimal): boolean;
@@ -566,6 +577,7 @@ end;
 
 function TXQValueDecimal.jsonSerialize(xmlTextOnly: boolean): string;
 begin
+  ignore(xmlTextOnly);
   if isnan(value) then result:='"NaN"'
   else if isPosInf(value) then result:='"INF"'
   else if isNegInf(value) then result:='"-INF"'
@@ -585,15 +597,15 @@ begin
   str := astr;
 end;
 
-class function TXQValueString.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValueString.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
-  result := TXQValueString.create(args[0].toString);
+  result := TXQValueString.create(v.toString);
 end;
 
 
 class function TXQValueString.canCreateFromString(const v: string): boolean;
 begin
+  ignore(v);
   result := true;
 end;
 
@@ -693,14 +705,12 @@ begin
     raise exception.Create('Invalid conversion from '+str+' to date format ' + dateFormat);
 end;
 
-class function TXQValueDateTime.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValueDateTime.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1, 1);
-  if args[0] is TXQValueDateTime then begin
-    result := TXQValueDateTimeClass(self.ClassType).create((args[0] as TXQValueDateTime).value);
+  if v is TXQValueDateTime then begin
+    result := TXQValueDateTimeClass(self.ClassType).create((v as TXQValueDateTime).value);
   end else begin
-    requiredArgCount(args, 1, 1);
-    result := TXQValueDateTimeClass(self.ClassType).create(args[0].toString);
+    result := TXQValueDateTimeClass(self.ClassType).create(v.toString);
   end;
 end;
 
@@ -744,6 +754,7 @@ end;
 
 function TXQValueDateTime.canConvertToDecimal(pure: boolean): boolean;
 begin
+  ignore(pure);
   Result:=false;
 end;
 
@@ -760,6 +771,7 @@ end;
 function TXQValueDateTime.toBooleanEffective: boolean;
 begin
   raise EXQEvaluationException.Create('A datetime cannot be used a boolean');
+  Result := false;
 end;
 
 function TXQValueDateTime.toInt65: int65;
@@ -1051,7 +1063,7 @@ var
   adt, bdt: TDateTime;
   i: Integer;
   adelta,bdelta: Extended;
-  ams: word;
+
   overlap: Integer;
 begin
   result := 0;
@@ -1088,18 +1100,6 @@ begin
   else if not IsNan(implicitTimezone) then bdelta -= implicitTimezone;
 
   adt+=adelta; bdt+=bdelta;
-  //don't handle handle overflow by fractions pr timezone
-    {setDateTime(adt, av);
-    setDateTime(bdt, bv);
-    for i := 1 to 6 do begin
-      if (pos(formatIds[i], adf) > 0) and (pos(formatIds[i], bdf) > 0) then continue;
-      av.values[i] := componentFiller[i];
-      bv.values[i] := componentFiller[i];
-    end;
-    adt := dateEncode(av.year, av.month, av.day) + (av.hour * 3600 + av.min *60 + av.sec + av.secfraction)/SecsPerDay ;
-    bdt := dateEncode(bv.year, bv.month, bv.day) + (bv.hour * 3600 + bv.min *60 + bv.sec + bv.secfraction)/SecsPerDay;
-    }
-  //end;
   result := CompareValue(TXQ_Decimal(adt),TXQ_Decimal(bdt),0.000001/SecsPerDay);
 end;
 
@@ -1371,6 +1371,7 @@ end;
 
 function TXQValueNode.xmlSerialize(xmlTextOnly: boolean; sequenceTag: string; elementTag: string; objectTag: string): string;
 begin
+  ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
   if node = nil then exit('');
   if xmlTextOnly then result := xmlStrEscape(toString)
   else result := node.outerXML();
@@ -1390,17 +1391,16 @@ begin
   inherited Destroy;
 end;
 
-class function TXQValueObject.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValueObject.createFromValue(const v: IXQValue): IXQValue;
 var
   seq: TXQVList;
   i: Integer;
   obj: TXQValueObject;
 begin
-  requiredArgCount(args,0,1);
   obj := TXQValueObject.create();
-  if length(args) = 1 then begin
-    if (args[0].kind <> pvkSequence) or (args[0].getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('Argument to object constructor must be a sequence with an even number of elements');
-    seq := args[0].toXQVList;
+  if v <> nil then begin
+    if (v.kind <> pvkSequence) or (v.getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('Argument to object constructor must be a sequence with an even number of elements');
+    seq := v.toXQVList;
     for i:=0 to (seq.Count-1) div 2 do begin
       if not (seq[2*i].kind = pvkString) then raise EXQEvaluationException.Create('Only string values are allowed as property names');
       obj.setMutable(seq[2*i].toString, seq[2*i+1]);
@@ -1627,6 +1627,7 @@ end;
 
 function TXQValueFunction.canConvertToDecimal(pure: boolean): boolean;
 begin
+  ignore(pure);
   Result:=false;
 end;
 

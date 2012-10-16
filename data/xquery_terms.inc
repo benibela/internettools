@@ -92,19 +92,16 @@ constructor TXQTermSequenceType.create();
 begin
 end;
 
+
 function TXQTermSequenceType.evaluate(const context: TEvaluationContext): IXQValue;
 begin
+  ignore(context);
   result := TXQValueFunction.create(self); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
 end;
 
 function TXQTermSequenceType.serialize: string;
 begin
   result := name;
-end;
-
-procedure TXQTermSequenceType.init(const s: string; functionLike: boolean);
-begin
-
 end;
 
 function TXQTermSequenceType.isSingleType(): boolean;
@@ -455,7 +452,9 @@ begin
       TXQBinaryOp(binaryOpFunctions.Objects[index])(context, evilkids[0], evilkids[1], result);
     end;
     xqfkTypeConstructor:
-      result := TXQValueClass(types.Objects[index]).createFromValue(evilkids);
+      if length(evilkids) = 0 then result := TXQValueClass(types.Objects[index]).createFromValue(nil)
+      else if length(evilkids) = 1 then result := TXQValueClass(types.Objects[index]).createFromValue(evilkids[0])
+      else raiseEvaluationError('Invalid argument count for constructor function');
     xqfkLocal: begin
       for i := 0 to high(context.staticContext^.functions) do
         if (context.staticContext^.functions[i].name = funcname) and  (length(context.staticContext^.functions[i].parameters) = length(children)) then begin
@@ -472,7 +471,7 @@ begin
   end;
 end;
 
-procedure xqFunctionGeneralConstructor(args: array of IXQValue; var result: IXQValue);forward;
+procedure xqFunctionGeneralConstructor(args: TXQVArray; var result: IXQValue);forward;
 
 class function TXQTermNamedFunction.findKindIndex(const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer; checkForOps: boolean): boolean;
 var
@@ -692,6 +691,7 @@ end;
 
 function TXQTermNumber.evaluate(const context: TEvaluationContext): IXQValue;
 begin
+  ignore(context);
   result := value.clone;
 end;
 
@@ -795,6 +795,7 @@ end;
 
 function TXQTermString.evaluate(const context: TEvaluationContext): IXQValue;
 begin
+  ignore(context);
   Result := xqvalue(value);
 end;
 
@@ -825,7 +826,6 @@ var
   v: IXQValue;
   start: integer;
   i, j: Integer;
-  tempContext: TEvaluationContext;
 begin
   v := children[0].evaluate(context);
   for i:=1 to high(children) - 1 do begin
@@ -859,9 +859,7 @@ var
   i: Integer;
   kid: TTreeElement;
   lastAttribute: TTreeElement;
-  nextEnd: ^TTreeElement;
   lastKid: TTreeElement;
-  temp: IXQValue;
   subcontext: ^TEvaluationContext;
   procedure addKid;
   begin
@@ -990,7 +988,6 @@ begin
   end;
   baseOffset += 1;
   lastAttribute := nil;
-  nextEnd:=@tree.next;
   case typ of
     tetAttributeName: begin
       tree.value := nameValue.evaluate(subcontext^).toString;

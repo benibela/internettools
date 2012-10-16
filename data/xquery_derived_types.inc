@@ -49,7 +49,7 @@ const RegExpr_QName = '^('+RegExpr_anyURIRaw+'['+#2+'])?'+RegExpr_XMLNameRaw+'$'
 type TXQValue_long = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -80,12 +80,11 @@ class function TXQValue_long.classTypeName: string;
 begin
   result := 'long';
 end;
-class function TXQValue_long.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_long.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_long.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_long.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -93,7 +92,7 @@ end;
 
 class function TXQValue_long.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -147,7 +146,7 @@ TXQueryEngine.registerType(TXQValue_long);
 type TXQValue_int = class (TXQValue_Long)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -187,12 +186,11 @@ class function TXQValue_int.classTypeName: string;
 begin
   result := 'int';
 end;
-class function TXQValue_int.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_int.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_int.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_int.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -200,7 +198,7 @@ end;
 
 class function TXQValue_int.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < -2147483648 then exit(false); 
   if v > 2147483647 then exit(false); 
@@ -258,7 +256,7 @@ t('type-of(xs:int(2147483647))', 'int', '');
 type TXQValue_short = class (TXQValue_Int)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -298,12 +296,11 @@ class function TXQValue_short.classTypeName: string;
 begin
   result := 'short';
 end;
-class function TXQValue_short.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_short.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_short.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_short.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -311,7 +308,7 @@ end;
 
 class function TXQValue_short.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < -32768 then exit(false); 
   if v > 32767 then exit(false); 
@@ -369,7 +366,7 @@ t('type-of(xs:short(32767))', 'short', '');
 type TXQValue_byte = class (TXQValue_Short)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -409,12 +406,11 @@ class function TXQValue_byte.classTypeName: string;
 begin
   result := 'byte';
 end;
-class function TXQValue_byte.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_byte.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_byte.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_byte.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -422,7 +418,7 @@ end;
 
 class function TXQValue_byte.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < -128 then exit(false); 
   if v > 127 then exit(false); 
@@ -480,7 +476,7 @@ t('type-of(xs:byte(127))', 'byte', '');
 type TXQValue_nonPositiveInteger = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -516,12 +512,11 @@ class function TXQValue_nonPositiveInteger.classTypeName: string;
 begin
   result := 'nonPositiveInteger';
 end;
-class function TXQValue_nonPositiveInteger.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_nonPositiveInteger.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_nonPositiveInteger.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_nonPositiveInteger.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -529,7 +524,7 @@ end;
 
 class function TXQValue_nonPositiveInteger.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if v > 0 then exit(false); 
@@ -585,7 +580,7 @@ t('type-of(xs:nonPositiveInteger(0))', 'nonPositiveInteger', '');
 type TXQValue_negativeInteger = class (TXQValue_NonPositiveInteger)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -621,12 +616,11 @@ class function TXQValue_negativeInteger.classTypeName: string;
 begin
   result := 'negativeInteger';
 end;
-class function TXQValue_negativeInteger.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_negativeInteger.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_negativeInteger.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_negativeInteger.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -634,7 +628,7 @@ end;
 
 class function TXQValue_negativeInteger.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if v > -1 then exit(false); 
@@ -690,7 +684,7 @@ t('type-of(xs:negativeInteger(-1))', 'negativeInteger', '');
 type TXQValue_nonNegativeInteger = class (TXQValueInt65)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -721,12 +715,11 @@ class function TXQValue_nonNegativeInteger.classTypeName: string;
 begin
   result := 'nonNegativeInteger';
 end;
-class function TXQValue_nonNegativeInteger.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_nonNegativeInteger.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_nonNegativeInteger.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_nonNegativeInteger.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -734,7 +727,7 @@ end;
 
 class function TXQValue_nonNegativeInteger.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < 0 then exit(false); 
   
@@ -790,7 +783,7 @@ t('type-of(xs:nonNegativeInteger(0))', 'nonNegativeInteger', '');
 type TXQValue_positiveInteger = class (TXQValue_NonNegativeInteger)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -821,12 +814,11 @@ class function TXQValue_positiveInteger.classTypeName: string;
 begin
   result := 'positiveInteger';
 end;
-class function TXQValue_positiveInteger.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_positiveInteger.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_positiveInteger.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_positiveInteger.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -834,7 +826,7 @@ end;
 
 class function TXQValue_positiveInteger.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < 1 then exit(false); 
   
@@ -890,7 +882,7 @@ t('type-of(xs:positiveInteger(1))', 'positiveInteger', '');
 type TXQValue_unsignedLong = class (TXQValue_NonNegativeInteger)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -921,12 +913,11 @@ class function TXQValue_unsignedLong.classTypeName: string;
 begin
   result := 'unsignedLong';
 end;
-class function TXQValue_unsignedLong.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_unsignedLong.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_unsignedLong.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_unsignedLong.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -934,7 +925,7 @@ end;
 
 class function TXQValue_unsignedLong.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < 0 then exit(false); 
   
@@ -990,7 +981,7 @@ t('type-of(xs:unsignedLong(0))', 'unsignedLong', '');
 type TXQValue_unsignedInt = class (TXQValue_unsignedLong)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -1030,12 +1021,11 @@ class function TXQValue_unsignedInt.classTypeName: string;
 begin
   result := 'unsignedInt';
 end;
-class function TXQValue_unsignedInt.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_unsignedInt.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_unsignedInt.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_unsignedInt.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -1043,7 +1033,7 @@ end;
 
 class function TXQValue_unsignedInt.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < 0 then exit(false); 
   if v > 4294967295 then exit(false); 
@@ -1101,7 +1091,7 @@ t('type-of(xs:unsignedInt(4294967295))', 'unsignedInt', '');
 type TXQValue_unsignedShort = class (TXQValue_unsignedInt)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -1141,12 +1131,11 @@ class function TXQValue_unsignedShort.classTypeName: string;
 begin
   result := 'unsignedShort';
 end;
-class function TXQValue_unsignedShort.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_unsignedShort.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_unsignedShort.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_unsignedShort.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -1154,7 +1143,7 @@ end;
 
 class function TXQValue_unsignedShort.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < 0 then exit(false); 
   if v > 65536 then exit(false); 
@@ -1212,7 +1201,7 @@ t('type-of(xs:unsignedShort(65536))', 'unsignedShort', '');
 type TXQValue_unsignedByte = class (TXQValue_unsignedShort)
   constructor create(const v: TXQ_int65); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromint65(const v: TXQ_int65): boolean; override;
@@ -1252,12 +1241,11 @@ class function TXQValue_unsignedByte.classTypeName: string;
 begin
   result := 'unsignedByte';
 end;
-class function TXQValue_unsignedByte.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_unsignedByte.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_unsignedByte.create(args[0].toint65));
-  result := inherited;
+  exit(TXQValue_unsignedByte.create(v.toint65));
+  result := inherited; ignore(v);
 end;
 
 
@@ -1265,7 +1253,7 @@ end;
 
 class function TXQValue_unsignedByte.canCreateFromint65(const v: TXQ_int65): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   if v < 0 then exit(false); 
   if v > 255 then exit(false); 
@@ -1323,7 +1311,7 @@ t('type-of(xs:unsignedByte(255))', 'unsignedByte', '');
 type TXQValue_float = class (TXQValueDecimal)
   constructor create(const v: TXQ_decimal); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
@@ -1355,12 +1343,11 @@ class function TXQValue_float.classTypeName: string;
 begin
   result := 'float';
 end;
-class function TXQValue_float.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_float.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_float.create(args[0].todecimal));
-  result := inherited;
+  exit(TXQValue_float.create(v.todecimal));
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_float.classParentNonBlocked: TXQValueClass;
@@ -1374,7 +1361,7 @@ end;
 
 class function TXQValue_float.canCreateFromdecimal(const v: TXQ_decimal): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -1438,7 +1425,7 @@ TXQueryEngine.registerType(TXQValue_float);
 type TXQValue_double = class (TXQValueDecimal)
   constructor create(const v: TXQ_decimal); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdecimal(const v: TXQ_decimal): boolean; override;
@@ -1470,12 +1457,11 @@ class function TXQValue_double.classTypeName: string;
 begin
   result := 'double';
 end;
-class function TXQValue_double.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_double.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_double.create(args[0].todecimal));
-  result := inherited;
+  exit(TXQValue_double.create(v.todecimal));
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_double.classParentNonBlocked: TXQValueClass;
@@ -1489,7 +1475,7 @@ end;
 
 class function TXQValue_double.canCreateFromdecimal(const v: TXQ_decimal): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -1553,7 +1539,7 @@ TXQueryEngine.registerType(TXQValue_double);
 type TXQValue_untypedAtomic = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -1584,12 +1570,11 @@ class function TXQValue_untypedAtomic.classTypeName: string;
 begin
   result := 'untypedAtomic';
 end;
-class function TXQValue_untypedAtomic.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_untypedAtomic.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_untypedAtomic.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_untypedAtomic.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_untypedAtomic.classParentNonBlocked: TXQValueClass;
@@ -1603,7 +1588,7 @@ end;
 
 class function TXQValue_untypedAtomic.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExpruntypedAtomic = nil) then RegExpruntypedAtomic := tregexpr.create('.*');
@@ -1654,7 +1639,7 @@ t('type-of(xs:untypedAtomic(''abc''))', 'untypedAtomic', '');
 type TXQValue_normalizedString = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -1685,12 +1670,11 @@ class function TXQValue_normalizedString.classTypeName: string;
 begin
   result := 'normalizedString';
 end;
-class function TXQValue_normalizedString.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_normalizedString.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_normalizedString.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_normalizedString.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -1698,7 +1682,7 @@ end;
 
 class function TXQValue_normalizedString.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprnormalizedString = nil) then RegExprnormalizedString := tregexpr.create('^[^'#9#13#10']*$');
@@ -1749,7 +1733,7 @@ t('type-of(xs:normalizedString(''abc''))', 'normalizedString', '');
 type TXQValue_token = class (TXQValue_normalizedString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -1780,12 +1764,11 @@ class function TXQValue_token.classTypeName: string;
 begin
   result := 'token';
 end;
-class function TXQValue_token.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_token.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_token.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_token.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -1793,7 +1776,7 @@ end;
 
 class function TXQValue_token.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprtoken = nil) then RegExprtoken := tregexpr.create('^(([^'#9#13#10' ]+|[^'#9#13#10' ] )*[^'#9#13#10' ])?$');
@@ -1844,7 +1827,7 @@ t('type-of(xs:token(''abc''))', 'token', '');
 type TXQValue_language = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -1875,12 +1858,11 @@ class function TXQValue_language.classTypeName: string;
 begin
   result := 'language';
 end;
-class function TXQValue_language.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_language.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_language.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_language.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -1888,7 +1870,7 @@ end;
 
 class function TXQValue_language.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprlanguage = nil) then RegExprlanguage := tregexpr.create(RegExpr__language);
@@ -1939,7 +1921,7 @@ t('type-of(xs:language(''abc''))', 'language', '');
 type TXQValue_NMTOKEN = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -1970,12 +1952,11 @@ class function TXQValue_NMTOKEN.classTypeName: string;
 begin
   result := 'NMTOKEN';
 end;
-class function TXQValue_NMTOKEN.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_NMTOKEN.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_NMTOKEN.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_NMTOKEN.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -1983,7 +1964,7 @@ end;
 
 class function TXQValue_NMTOKEN.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprNMTOKEN = nil) then RegExprNMTOKEN := tregexpr.create('^('+RegExpr_XMLNameChar+')+$');
@@ -2034,7 +2015,7 @@ t('type-of(xs:NMTOKEN(''abc''))', 'NMTOKEN', '');
 type TXQValue_Name = class (TXQValue_token)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2065,12 +2046,11 @@ class function TXQValue_Name.classTypeName: string;
 begin
   result := 'Name';
 end;
-class function TXQValue_Name.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_Name.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_Name.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_Name.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -2078,7 +2058,7 @@ end;
 
 class function TXQValue_Name.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprName = nil) then RegExprName := tregexpr.create(RegExpr_XMLName);
@@ -2129,7 +2109,7 @@ t('type-of(xs:Name(''abc''))', 'Name', '');
 type TXQValue_NCName = class (TXQValue_Name)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2160,12 +2140,11 @@ class function TXQValue_NCName.classTypeName: string;
 begin
   result := 'NCName';
 end;
-class function TXQValue_NCName.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_NCName.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_NCName.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_NCName.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -2173,7 +2152,7 @@ end;
 
 class function TXQValue_NCName.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprNCName = nil) then RegExprNCName := tregexpr.create(RegExpr_XMLNCName);
@@ -2224,7 +2203,7 @@ t('type-of(xs:NCName(''abc''))', 'NCName', '');
 type TXQValue_ID = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2255,12 +2234,11 @@ class function TXQValue_ID.classTypeName: string;
 begin
   result := 'ID';
 end;
-class function TXQValue_ID.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_ID.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_ID.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_ID.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -2268,7 +2246,7 @@ end;
 
 class function TXQValue_ID.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprID = nil) then RegExprID := tregexpr.create(RegExpr_XMLNCName);
@@ -2319,7 +2297,7 @@ t('type-of(xs:ID(''abc''))', 'ID', '');
 type TXQValue_IDREF = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2350,12 +2328,11 @@ class function TXQValue_IDREF.classTypeName: string;
 begin
   result := 'IDREF';
 end;
-class function TXQValue_IDREF.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_IDREF.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_IDREF.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_IDREF.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -2363,7 +2340,7 @@ end;
 
 class function TXQValue_IDREF.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprIDREF = nil) then RegExprIDREF := tregexpr.create(RegExpr_XMLNCName);
@@ -2414,7 +2391,7 @@ t('type-of(xs:IDREF(''abc''))', 'IDREF', '');
 type TXQValue_ENTITY = class (TXQValue_NCNAME)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2445,12 +2422,11 @@ class function TXQValue_ENTITY.classTypeName: string;
 begin
   result := 'ENTITY';
 end;
-class function TXQValue_ENTITY.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_ENTITY.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_ENTITY.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_ENTITY.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -2458,7 +2434,7 @@ end;
 
 class function TXQValue_ENTITY.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprENTITY = nil) then RegExprENTITY := tregexpr.create(RegExpr_XMLNCName);
@@ -2509,7 +2485,7 @@ t('type-of(xs:ENTITY(''abc''))', 'ENTITY', '');
 type TXQValue_anyURI = class (TXQValueString)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2540,12 +2516,11 @@ class function TXQValue_anyURI.classTypeName: string;
 begin
   result := 'anyURI';
 end;
-class function TXQValue_anyURI.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_anyURI.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_anyURI.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_anyURI.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_anyURI.classParentNonBlocked: TXQValueClass;
@@ -2586,7 +2561,7 @@ end;
 
 class function TXQValue_anyURI.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExpranyURI = nil) then RegExpranyURI := tregexpr.create('^'+RegExpr_anyURIRaw+'$');
@@ -2637,7 +2612,7 @@ t('type-of(xs:anyURI(''abc''))', 'anyURI', '');
 type TXQValue_QName = class (TXQValue_anyURI)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2668,12 +2643,11 @@ class function TXQValue_QName.classTypeName: string;
 begin
   result := 'QName';
 end;
-class function TXQValue_QName.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_QName.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_QName.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_QName.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_QName.classParentNonBlocked: TXQValueClass;
@@ -2714,7 +2688,7 @@ end;
 
 class function TXQValue_QName.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprQName = nil) then RegExprQName := tregexpr.create(RegExpr_QName);
@@ -2765,7 +2739,7 @@ t('type-of(xs:QName(''abc''))', 'QName', '');
 type TXQValue_NOTATION = class (TXQValue_QName)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2796,12 +2770,11 @@ class function TXQValue_NOTATION.classTypeName: string;
 begin
   result := 'NOTATION';
 end;
-class function TXQValue_NOTATION.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_NOTATION.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
-  exit(TXQValue_NOTATION.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_NOTATION.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_NOTATION.classParentNonBlocked: TXQValueClass;
@@ -2842,7 +2815,7 @@ end;
 
 class function TXQValue_NOTATION.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprNOTATION = nil) then RegExprNOTATION := tregexpr.create(RegExpr_QName);
@@ -2893,7 +2866,7 @@ t('type-of(xs:NOTATION(''abc''))', 'NOTATION', '');
 type TXQValue_hexBinary = class (TXQValue_Binary)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -2924,12 +2897,11 @@ class function TXQValue_hexBinary.classTypeName: string;
 begin
   result := 'hexBinary';
 end;
-class function TXQValue_hexBinary.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_hexBinary.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   exit(inherited);
-  exit(TXQValue_hexBinary.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_hexBinary.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -2964,7 +2936,7 @@ end;
 
 class function TXQValue_hexBinary.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprhexBinary = nil) then RegExprhexBinary := tregexpr.create('^([0-9A-Fa-f][0-9A-Fa-f])*$');
@@ -3012,7 +2984,7 @@ TXQueryEngine.registerType(TXQValue_hexBinary);
 type TXQValue_base64Binary = class (TXQValue_Binary)
   constructor create(const v: TXQ_string); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   class function castableFromInternal(const v: IXQValue): boolean; override;
   class function canCreateFromstring(const v: TXQ_string): boolean; override;
@@ -3043,12 +3015,11 @@ class function TXQValue_base64Binary.classTypeName: string;
 begin
   result := 'base64Binary';
 end;
-class function TXQValue_base64Binary.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_base64Binary.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   exit(inherited);
-  exit(TXQValue_base64Binary.create(args[0].tostring));
-  result := inherited;
+  exit(TXQValue_base64Binary.create(v.tostring));
+  result := inherited; ignore(v);
 end;
 
 
@@ -3083,7 +3054,7 @@ end;
 
 class function TXQValue_base64Binary.canCreateFromstring(const v: TXQ_string): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   if (RegExprbase64Binary = nil) then RegExprbase64Binary := tregexpr.create('^([A-Za-z0-9+/] *)*(|[AEIMQUYcgkosw048] *=|[AQgw] *= *=)$');
@@ -3131,7 +3102,7 @@ TXQueryEngine.registerType(TXQValue_base64Binary);
 type TXQValue_time = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3163,12 +3134,11 @@ class function TXQValue_time.classTypeName: string;
 begin
   result := 'time';
 end;
-class function TXQValue_time.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_time.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_time.classParentNonBlocked: TXQValueClass;
@@ -3182,7 +3152,7 @@ end;
 
 class function TXQValue_time.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -3241,7 +3211,7 @@ TXQueryEngine.registerType(TXQValue_time);
 type TXQValue_date = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3273,12 +3243,11 @@ class function TXQValue_date.classTypeName: string;
 begin
   result := 'date';
 end;
-class function TXQValue_date.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_date.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_date.classParentNonBlocked: TXQValueClass;
@@ -3292,7 +3261,7 @@ end;
 
 class function TXQValue_date.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -3351,7 +3320,7 @@ TXQueryEngine.registerType(TXQValue_date);
 type TXQValue_gYear = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3383,12 +3352,11 @@ class function TXQValue_gYear.classTypeName: string;
 begin
   result := 'gYear';
 end;
-class function TXQValue_gYear.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_gYear.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_gYear.classParentNonBlocked: TXQValueClass;
@@ -3402,7 +3370,7 @@ end;
 
 class function TXQValue_gYear.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -3461,7 +3429,7 @@ TXQueryEngine.registerType(TXQValue_gYear);
 type TXQValue_gYearMonth = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3493,12 +3461,11 @@ class function TXQValue_gYearMonth.classTypeName: string;
 begin
   result := 'gYearMonth';
 end;
-class function TXQValue_gYearMonth.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_gYearMonth.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_gYearMonth.classParentNonBlocked: TXQValueClass;
@@ -3512,7 +3479,7 @@ end;
 
 class function TXQValue_gYearMonth.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -3571,7 +3538,7 @@ TXQueryEngine.registerType(TXQValue_gYearMonth);
 type TXQValue_gMonthDay = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3603,12 +3570,11 @@ class function TXQValue_gMonthDay.classTypeName: string;
 begin
   result := 'gMonthDay';
 end;
-class function TXQValue_gMonthDay.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_gMonthDay.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_gMonthDay.classParentNonBlocked: TXQValueClass;
@@ -3622,7 +3588,7 @@ end;
 
 class function TXQValue_gMonthDay.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -3681,7 +3647,7 @@ TXQueryEngine.registerType(TXQValue_gMonthDay);
 type TXQValue_gMonth = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3713,12 +3679,11 @@ class function TXQValue_gMonth.classTypeName: string;
 begin
   result := 'gMonth';
 end;
-class function TXQValue_gMonth.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_gMonth.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_gMonth.classParentNonBlocked: TXQValueClass;
@@ -3732,7 +3697,7 @@ end;
 
 class function TXQValue_gMonth.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -3791,7 +3756,7 @@ TXQueryEngine.registerType(TXQValue_gMonth);
 type TXQValue_gDay = class (TXQValue_datepart)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3823,12 +3788,11 @@ class function TXQValue_gDay.classTypeName: string;
 begin
   result := 'gDay';
 end;
-class function TXQValue_gDay.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_gDay.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_gDay.classParentNonBlocked: TXQValueClass;
@@ -3842,7 +3806,7 @@ end;
 
 class function TXQValue_gDay.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -3901,7 +3865,7 @@ TXQueryEngine.registerType(TXQValue_gDay);
 type TXQValue_duration = class (TXQValueDateTime)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classParentNonBlocked: TXQValueClass; override; 
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -3933,12 +3897,11 @@ class function TXQValue_duration.classTypeName: string;
 begin
   result := 'duration';
 end;
-class function TXQValue_duration.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_duration.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 class function TXQValue_duration.classParentNonBlocked: TXQValueClass;
@@ -3952,7 +3915,7 @@ end;
 
 class function TXQValue_duration.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -4011,7 +3974,7 @@ TXQueryEngine.registerType(TXQValue_duration);
 type TXQValue_dayTimeDuration = class (TXQValue_duration)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -4043,12 +4006,11 @@ class function TXQValue_dayTimeDuration.classTypeName: string;
 begin
   result := 'dayTimeDuration';
 end;
-class function TXQValue_dayTimeDuration.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_dayTimeDuration.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 
@@ -4056,7 +4018,7 @@ end;
 
 class function TXQValue_dayTimeDuration.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   
@@ -4115,7 +4077,7 @@ TXQueryEngine.registerType(TXQValue_dayTimeDuration);
 type TXQValue_yearMonthDuration = class (TXQValue_duration)
   constructor create(const v: TXQ_datetime); override;
   class function classTypeName: string; override;
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   
   
   class function canCreateFromdatetime(const v: TXQ_datetime): boolean; override;
@@ -4147,12 +4109,11 @@ class function TXQValue_yearMonthDuration.classTypeName: string;
 begin
   result := 'yearMonthDuration';
 end;
-class function TXQValue_yearMonthDuration.createFromValue(const args: array of IXQValue): IXQValue;
+class function TXQValue_yearMonthDuration.createFromValue(const v: IXQValue): IXQValue;
 begin
-  requiredArgCount(args,1);
   
   
-  result := inherited;
+  result := inherited; ignore(v);
 end;
 
 
@@ -4160,7 +4121,7 @@ end;
 
 class function TXQValue_yearMonthDuration.canCreateFromdatetime(const v: TXQ_datetime): boolean;
 begin
-  result := true;
+  result := true; ignore(v);
   
   
   

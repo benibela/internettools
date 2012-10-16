@@ -8,6 +8,7 @@ var
   ad: Decimal;
   bd: Decimal;
 begin
+  ignore(cxt);
   ak := a.kind;
   bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
@@ -46,6 +47,8 @@ var
   bd: Decimal;
   xqtempdt: TXQValueDateTime;
 begin
+  ignore(cxt);
+
   ak := a.kind;
   bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
@@ -94,6 +97,7 @@ var i, f,t: int65;
     len: Int65;
     resseq: TXQValueSequence;
 begin
+  ignore(cxt);
   if a.isUndefined or b.isUndefined then exit;
   typ := commonIntegerClass(a,b);
   f := a.toInt65();
@@ -121,6 +125,7 @@ var
   ad: Decimal;
   bd: Decimal;
 begin
+  ignore(cxt);
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
@@ -156,6 +161,7 @@ var f: decimal;
   ak, bk: TXQValueKind;
   e: Decimal;
 begin
+  ignore(cxt);
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
@@ -196,6 +202,7 @@ var f: decimal;
  i: int65;
  ak, bk: TXQValueKind;
 begin
+  ignore(cxt);
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
@@ -223,6 +230,7 @@ var f,e: decimal;
  i: int65;
  ak, bk: TXQValueKind;
 begin
+  ignore(cxt);
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
@@ -566,16 +574,19 @@ end;
 
 procedure xqvalueSameNode(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt);
   if ta.isUndefined or tb.isUndefined then exit;
   result := xqvalue(xqvalueToSingleNode(ta) = xqvalueToSingleNode(tb));
 end;
 procedure xqvalueNodeBefore(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt);
   if ta.isUndefined or tb.isUndefined then exit;
   result := xqvalue(compareNodes(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) < 0);
 end;
 procedure xqvalueNodeAfter(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt);
   if ta.isUndefined or tb.isUndefined then exit;
   result := xqvalue(compareNodes(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) > 0);
 end;
@@ -583,12 +594,14 @@ end;
 
 procedure xqvalueAnd(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt);
   if a.toBooleanEffective then result := xqvalue(b.toBooleanEffective)
   else result := xqvalue(false);
 end;
 
 procedure xqvalueOr(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt);
   if a.toBooleanEffective then result := xqvalue(true)
   else result := xqvalue(b.toBooleanEffective);
 end;
@@ -623,6 +636,7 @@ end;
 procedure xqvalueUnion(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 var a, b: TXQValueSequence;
 begin
+  ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
     raise EXQEvaluationException.Create('invalid type for union');
   a := xqvalueToNormalizedNodeSeq(ta); //todo: optimize
@@ -637,6 +651,7 @@ var a,b, resseq: TXQValueSequence;
     ah, bh: IXQValue;
     ia,ib,offseta,offsetb: integer;
 begin
+  ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
     raise EXQEvaluationException.Create('invalid type for intersect');
   ah := xqvalueToNormalizedNodeSeq(ta);
@@ -670,11 +685,13 @@ end;
 
 procedure xqvalueCastAs(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt);
   result := getTypeInfo(tb).castAs(ta);
 end;
 
 procedure xqvalueCastableAs(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt);
   result := xqvalue(getTypeInfo(tb).castableAs(ta));
 end;
 
@@ -699,6 +716,7 @@ var ah,bh: IXQValue;
     i: Integer;
     resseq: TXQValueSequence;
 begin
+  ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
     raise EXQEvaluationException.Create('invalid type for intersect');
   ah := xqvalueToNormalizedNodeSeq(ta);
@@ -733,7 +751,7 @@ end;
 //==============================Functions===================================
 
 
-procedure xqFunctionError(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionError(args: TXQVArray; var result: IXQValue);
 var temp: string;
  i: Integer;
 begin
@@ -778,10 +796,7 @@ begin
   end;
 end;
 
-procedure xqFunctionData(args: array of IXQValue; var result: IXQValue);
-var
-  resseq: TXQValueSequence;
-  x: IXQValue;
+procedure xqFunctionData(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1, 1);
   result := xqvalueAtomize(args[0]);
@@ -789,7 +804,7 @@ end;
 
 //Number functions
 
-procedure xqFunctionNumber(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNumber(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
   procedure numberize(v: IXQValue);
   begin
     if v.getClassType = TXQValue_double then result := v
@@ -812,7 +827,7 @@ begin
   result := TXQValueDecimalClass(typeref.getClassType).create(v); //this assumes there are no user defined float/double/decimal types!
 end;
 
-procedure xqFunctionAbs(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionAbs(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit();
@@ -822,7 +837,7 @@ begin
   end else result := xqvalueBaseDecimalType(abs(args[0].toDecimal), args[0]);
 end;
 
-procedure xqFunctionCeiling(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionCeiling(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit();
@@ -831,7 +846,7 @@ begin
   else result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal), args[0]);
 end;
 
-procedure xqFunctionFloor(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionFloor(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit();
@@ -854,9 +869,9 @@ begin
   else result := f - ff - 1;
 end;
 
-procedure xqFunctionRound(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionRound(args: TXQVArray; var result: IXQValue);
 var
-  f,ff: Decimal;
+  f: Decimal;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit();
@@ -866,7 +881,7 @@ begin
   result := xqvalueBaseDecimalType(xqvalueRounded(args[0]), args[0]);
 end;
 
-procedure xqFunctionRound_Half_To_Even(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionRound_Half_To_Even(args: TXQVArray; var result: IXQValue);
   //reimplement rounding to avoid precision lose due to int64/65 <-> extended conversions
   function intRoundHalfToEven(const i: int65; prec: integer): Int65;
   var rpower: int65;
@@ -930,7 +945,7 @@ begin
 end;
 
 //String functions
-procedure xqFunctionString(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionString(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
@@ -940,7 +955,7 @@ begin
   if length(args) = 1 then result := xqvalue(args[0].toString);
 end;
 
-procedure xqFunctionDeep_Node_Text(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDeep_Node_Text(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var sep: string;
 begin
   requiredArgCount(args, 0, 1);
@@ -952,7 +967,7 @@ begin
     result := xqvalue(treeElementAsString(context.ParentElement,sep))
 end;
 
-procedure xqFunctionOuter_XML(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionOuter_XML(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var node: TTreeElement;
 begin
   requiredArgCount(args, 0, 1);
@@ -961,7 +976,7 @@ begin
   result := xqvalue(node.outerXML())
 end;
 
-procedure xqFunctionInner_XML(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionInner_XML(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var node: TTreeElement;
 begin
   requiredArgCount(args, 0, 1);
@@ -970,7 +985,7 @@ begin
   result := xqvalue(node.innerXML())
 end;
 
-procedure xqFunctionForm(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionForm(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 
 { string-join(
     for $i in $form//* return
@@ -1107,7 +1122,7 @@ begin
   replace.free;
 end;
 
-procedure xqFunctionContextItem(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionContextItem(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
   if context.SeqValue <> nil then result := context.SeqValue
@@ -1115,7 +1130,7 @@ begin
   else raise EXQEvaluationException.Create('no context item');
 end;
 
-procedure xqFunctionCodepoints_to_string(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionCodepoints_to_string(args: TXQVArray; var result: IXQValue);
 var temp: string;
  v: IXQValue;
 begin
@@ -1126,7 +1141,7 @@ begin
   result := xqvalue(temp);
 end;
 
-procedure xqFunctionString_to_codepoints(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionString_to_codepoints(args: TXQVArray; var result: IXQValue);
 var temp: string;
  i: Integer;
  cp: Integer;
@@ -1146,7 +1161,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-procedure xpathRangeDefinition(args: array of IXQValue; const maxLen: longint; out from, len: integer);
+procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
 begin
   if (args[1].kind = pvkDecimal) then
@@ -1174,7 +1189,7 @@ begin
   len := unti-from;
 end;
 
-procedure xqFunctionString_join(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionString_join(args: TXQVArray; var result: IXQValue);
 var sep,resstr: string;
  v: IXQValue;
  first: Boolean;
@@ -1191,7 +1206,7 @@ begin
   result := xqvalue(resstr);
 end;
 
-procedure xqFunctionSubstring(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionSubstring(args: TXQVArray; var result: IXQValue);
 var s:string;
 var from, len: integer;
 
@@ -1202,7 +1217,7 @@ begin
   result := xqvalue(copy(s,from,len));
 end;
 
-procedure xqFunctionString_length(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionString_length(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   if length(args) = 0 then begin
     if context.SeqValue <> nil then result := xqvalue(length(context.SeqValue.toString))
@@ -1213,7 +1228,7 @@ begin
   result := xqvalue(length(args[0].toString));
 end;
 
-procedure xqFunctionNormalize_space(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNormalize_space(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var temp: string;
 begin
   requiredArgCount(args, 0, 1);
@@ -1225,19 +1240,19 @@ begin
   result := xqvalue(strTrimAndNormalize(temp));
 end;
 
-procedure xqFunctionUpper_Case(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionUpper_Case(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   result := xqvalue(UpperCase(args[0].toString));
 end;
 
-procedure xqFunctionLower_case(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionLower_case(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   result := xqvalue(LowerCase(args[0].toString));
 end;
 
-procedure xqFunctionCompare(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionCompare(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   collation: TXQCollation;
 begin
@@ -1248,7 +1263,7 @@ begin
   result := xqvalue(collation.compare(args[0].toString, args[1].toString));
 end;
 
-procedure xqFunctionCodePoint_Equal(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionCodePoint_Equal(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 2);
   if args[0].isUndefined  or args[1].isUndefined then exit;
@@ -1256,7 +1271,7 @@ begin
 end;
 
 
-procedure xqFunctionContains(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionContains(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var s, t: string;
   collation: TXQCollation;
 begin
@@ -1269,7 +1284,7 @@ begin
   else result := xqvalue(collation.contains(s,t));
 end;
 
-procedure xqFunctionStarts_with(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionStarts_with(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   collation: TXQCollation;
 begin
@@ -1279,7 +1294,7 @@ begin
   result := xqvalue(collation.startsWith(args[0].toString,args[1].toString));
 end;
 
-procedure xqFunctionEnds_with(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionEnds_with(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   collation: TXQCollation;
 begin
@@ -1289,7 +1304,7 @@ begin
   result := xqvalue(collation.endsWith(args[0].toString, args[1].toString));
 end;
 
-procedure xqFunctionSubstring_before(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionSubstring_before(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var a,b: string;
   collation: TXQCollation;
 begin
@@ -1302,7 +1317,7 @@ begin
   else result := xqvalue(copy(a,1,collation.indexOf(a,b)-1));
 end;
 
-procedure xqFunctionSubstring_after(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionSubstring_after(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var a,b: string;
     i:integer;
     collation: TXQCollation;
@@ -1321,7 +1336,7 @@ begin
 end;
 
 
-procedure xqFunctionConcat(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionConcat(args: TXQVArray; var result: IXQValue);
 var temp:string;
  i: Integer;
 begin
@@ -1330,7 +1345,7 @@ begin
   result := xqvalue(temp);
 end;
 
-procedure xqFunctionFilter(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionFilter(args: TXQVArray; var result: IXQValue);
 var
  regEx: TRegExpr;
 begin
@@ -1351,7 +1366,7 @@ begin
   end;
 end;
 
-procedure xqFunctionSplitEqual(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionSplitEqual(args: TXQVArray; var result: IXQValue);
 var
   searched: String;
   list: String;
@@ -1375,7 +1390,7 @@ begin
   result := xqvalue(false);
 end;
 
-procedure xqFunctionReplace(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionReplace(args: TXQVArray; var result: IXQValue);
 var
  regEx: TRegExpr;
 begin
@@ -1393,7 +1408,7 @@ begin
 
 end;
 
-procedure xqFunctionMatches(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionMatches(args: TXQVArray; var result: IXQValue);
 var
  regEx: TRegExpr;
 begin
@@ -1410,7 +1425,7 @@ begin
   end;
 end;
 
-procedure xqFunctionTokenize(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionTokenize(args: TXQVArray; var result: IXQValue);
 var
   regEx: TRegExpr;
   sl: TStringList;
@@ -1446,7 +1461,7 @@ begin
   end;
 end;
 
-procedure xqFunctionTranslate(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionTranslate(args: TXQVArray; var result: IXQValue);
 var
  temp3: String;
  temp: String;
@@ -1470,19 +1485,19 @@ begin
 end;
 
 
-procedure xqFunctionEval(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionEval(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   result := context.sender.evaluateXPath2(args[0].toString);
 end;
 
-procedure xqFunctionCSS(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionCSS(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   result := context.sender.evaluateCSS3(args[0].toString);
 end;
 
-procedure xqFunctionIs_Nth(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionIs_Nth(args: TXQVArray; var result: IXQValue);
 var
   i,a,b,n: int65;
 begin
@@ -1498,62 +1513,62 @@ begin
   end;
 end;
 
-procedure xqFunctionType_of(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionType_of(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   result := xqvalue(args[0].typeName);
 end;
 
 //Boolean functions
-procedure xqFunctionBoolean(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionBoolean(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   result := xqvalue(args[0].toBooleanEffective);
 end;
 
-procedure xqFunctionTrue(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionTrue(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
   result := xqvalue(true);
 end;
 
-procedure xqFunctionFalse(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionFalse(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
   //todo: boolean('true') = false in xpath :(
   result := xqvalue(false);
 end;
 
-procedure xqFunctionNot(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNot(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   result := xqvalue(not args[0].toBooleanEffective);
 end;
 
 //Datetime functions
-procedure xqFunctionParse_datetime(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionParse_datetime(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 2);;
   result := TXQValueDateTime.create(args[0].toString, args[1].toString);
 end;
-procedure xqFunctionParse_date(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionParse_date(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 2);;
   result := (TXQValueDateTimeClass(TXQValue_Date).create(args[0].toString, args[1].toString));
 end;
-procedure xqFunctionParse_time(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionParse_time(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 2);;
   result := (TXQValueDateTimeClass(TXQValue_Time).create(args[0].toString, args[1].toString));
 end;
 
-procedure xqFunctionDateTime(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDateTime(args: TXQVArray; var result: IXQValue);
 var
   dt0, dt1, resdt: TXQValueDateTime;
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 1 then begin
-    result := (TXQValueDateTime.createFromValue(args));
+    result := (TXQValueDateTime.createFromValue(args[0]));
     exit;
   end;
 
@@ -1579,7 +1594,7 @@ end;
 
 
 
-procedure xqFunctionYear_From_Duration(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionYear_From_Duration(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit;
@@ -1587,7 +1602,7 @@ begin
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() div 12);
 end;
 
-procedure xqFunctionMonth_From_Duration(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionMonth_From_Duration(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit;
@@ -1595,7 +1610,7 @@ begin
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() mod 12);
 end;
 
-procedure getCanonicalValueFromDayTimeDuration(v: integer; args: array of IXQValue; var result: IXQValue);
+procedure getCanonicalValueFromDayTimeDuration(v: integer; args: TXQVArray; var result: IXQValue);
 var
   tempValue: TXQValueDateTimeData;
 begin
@@ -1608,28 +1623,28 @@ begin
   else  result := xqvalue(roundto(tempValue.values[v]  + TXQ_Decimal(tempValue.secfraction), -6));
 end;
 
-procedure xqFunctionDay_From_Duration(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDay_From_Duration(args: TXQVArray; var result: IXQValue);
 begin
   getCanonicalValueFromDayTimeDuration(3, args, result);
 end;
 
-procedure xqFunctionHours_From_Duration(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionHours_From_Duration(args: TXQVArray; var result: IXQValue);
 begin
   getCanonicalValueFromDayTimeDuration(4, args, result);
 end;
 
-procedure xqFunctionMinutes_From_Duration(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionMinutes_From_Duration(args: TXQVArray; var result: IXQValue);
 begin
   getCanonicalValueFromDayTimeDuration(5, args, result);
 end;
 
-procedure xqFunctionSeconds_From_Duration(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionSeconds_From_Duration(args: TXQVArray; var result: IXQValue);
 begin
   getCanonicalValueFromDayTimeDuration(6, args, result);
 end;
 
 
-procedure xqFunctionAdjustDateTimeToTimeZone(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionAdjustDateTimeToTimeZone(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var tz: double;
   resdt: TXQValueDateTime;
 begin
@@ -1656,7 +1671,7 @@ begin
   result := resdt;
 end;
 
-procedure xqFunctionImplicit_Timezone(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionImplicit_Timezone(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
   if isnan(context.sender.ImplicitTimezone) then exit;
@@ -1664,34 +1679,34 @@ begin
   (result as TXQValue_dayTimeDuration).value.sec:=round(context.sender.ImplicitTimezone * SecsPerDay);
 end;
 
-procedure xqFunctionCurrent_Datetime(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionCurrent_Datetime(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
   result := TXQValueDateTime.create(context.sender.CurrentDateTime); //stable during evaluation
   if not IsNan(context.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.sender.ImplicitTimezone;
 end;
 
-procedure xqFunctionCurrent_Date(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
-var targs: array of IXQValue;
+procedure xqFunctionCurrent_Date(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
+var
+  temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  setlength(targs, 1);
-  targs[0] := TXQValueDateTime.create(context.sender.currentDateTime);
-  result := TXQValue_Date.createFromValue(targs                       );
+  temp := TXQValueDateTime.create(context.sender.currentDateTime); //force auto free
+  result := TXQValue_Date.createFromValue(temp);
   if not IsNan(context.sender.ImplicitTimezone) then (result as TXQValue_date).value.timezone := context.sender.ImplicitTimezone;
 end;
 
-procedure xqFunctionCurrent_Time(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
-var targs: array of IXQValue;
+procedure xqFunctionCurrent_Time(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
+var
+  temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  setlength(targs, 1);
-  targs[0] := TXQValueDateTime.create(context.sender.currentDateTime);
-  result := TXQValue_Time.createFromValue(targs);
+  temp := TXQValueDateTime.create(context.sender.currentDateTime); //force auto free
+  result := TXQValue_Time.createFromValue(temp);
   if not IsNan(context.sender.ImplicitTimezone) then (result as TXQValue_time).value.timezone := context.sender.ImplicitTimezone;
 end;
 
-procedure xqFunctionTrace(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionTrace(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,2);
   result := args[0];
@@ -1699,14 +1714,14 @@ begin
 end;
 
 
-procedure xqFunctionStatic_Base_Uri(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionStatic_Base_Uri(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,0);
   if context.staticContext^.baseURI <> '' then result := xqvalue(context.staticContext^.baseURI);
   //else empty seq if undef
 end;
 
-procedure xqFunctionBase_Uri(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionBase_Uri(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var uri: string;
   node: TTreeElement;
   temp: String;
@@ -1727,7 +1742,7 @@ begin
   result := xqvalue(uri);
 end;
 
-procedure xqFunctionDocument_Uri(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDocument_Uri(args: TXQVArray; var result: IXQValue);
 var
   node: TTreeElement;
 begin
@@ -1738,7 +1753,7 @@ begin
   result := xqvalue(TTreeDocument(node).baseURI);
 end;
 
-procedure xqFunctionRoot(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionRoot(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   temp: TTreeElement;
 begin
@@ -1755,7 +1770,7 @@ begin
   else result := xqvalue(temp);
 end;
 
-procedure xqFunctionLang(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionLang(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   node: TTreeElement;
   rlang, testlang: string;
@@ -1782,7 +1797,7 @@ end;
 
 
 
-procedure xqFunctionResolve_QName(const context: TEvaluationContext;  args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionResolve_QName(const context: TEvaluationContext;  args: TXQVArray; var result: IXQValue);
 
 var
   name, ns: String;
@@ -1793,12 +1808,12 @@ begin
   ns := '';
   if pos(':', name) > 0 then ns := copy(name, 1, pos(':', name) - 1);
   if args[1].toNode = nil then exit();
-  ns := args[1].toNode.getNamespaceURL(ns, @context.nodeCollation.equal);
+  ns := args[1].toNode.getNamespaceURL(ns, @context.nodeCollation.equal);  ignore(context);
   if ns <> '' then ns := ns + #2;
   result := TXQValue_QName.create(ns + name);
 end;
 
-procedure xqFunctionQName(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionQName(args: TXQVArray; var result: IXQValue);
 var ns: string;
 begin
   requiredArgCount(args,1,2);
@@ -1811,7 +1826,7 @@ begin
   result := TXQValue_QName.create(ns+#2+args[1].toString);
 end;
 
-procedure xqFunctionPrefix_From_QName(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionPrefix_From_QName(args: TXQVArray; var result: IXQValue);
 var
   splitted: TStringArray;
 begin
@@ -1823,7 +1838,7 @@ begin
   result := TXQValue_NCName.create(splitted[1]);
 end;
 
-procedure xqFunctionLocal_Name_From_QName(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionLocal_Name_From_QName(args: TXQVArray; var result: IXQValue);
 var
   splitted: TStringArray;
 begin
@@ -1834,7 +1849,7 @@ begin
   result := TXQValue_NCName.create(splitted[2]);
 end;
 
-procedure xqFunctionNamespace_URI_from_QName(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNamespace_URI_from_QName(args: TXQVArray; var result: IXQValue);
 var
   splitted: TStringArray;
 begin
@@ -1845,17 +1860,17 @@ begin
   result := TXQValue_anyURI.create(splitted[0]);
 end;
 
-procedure xqFunctionNamespace_URI_For_Prefix(const context: TEvaluationContext;  args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNamespace_URI_For_Prefix(const context: TEvaluationContext;  args: TXQVArray; var result: IXQValue);
 var
   res: String;
 begin
   requiredArgCount(args, 2);
-  res := args[1].toNode.getNamespaceURL(args[0].toString, @context.nodeCollation.equal);
+  res := args[1].toNode.getNamespaceURL(args[0].toString, @context.nodeCollation.equal);  ignore(context);
   if res = '' then exit;
   result := xqvalue(res);
 end;
 
-procedure xqFunctionIn_Scope_prefixes(const context: TEvaluationContext;  args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionIn_Scope_prefixes(args: TXQVArray; var result: IXQValue);
 var
   el: TTreeElement;
   sl: TStringList;
@@ -1897,7 +1912,7 @@ begin
 end;
 {$ENDIF}
 
-procedure xqFunctionResolve_Uri(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionResolve_Uri(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var rel, base: string;
 begin
   requiredArgCount(args, 1,2);
@@ -1912,23 +1927,23 @@ end;
 
 
 
-procedure xqFunctionEncode_For_Uri(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionEncode_For_Uri(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   result := xqvalue(urlHexEncode(args[0].toString, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']));
 end;
-procedure xqFunctionIri_To_Uri(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionIri_To_Uri(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   result := xqvalue(urlHexEncode(args[0].toString, [#$20..#$7E] - ['<','>','"',' ','{','}','|','\','^','`']));
 end;
-procedure xqFunctionEscape_Html_Uri(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionEscape_Html_Uri(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   result := xqvalue(urlHexEncode(args[0].toString, [#32..#126]));
 end;
 
-procedure xqFunctionDoc(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDoc(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   url: String;
   node: TTreeElement;
@@ -1976,7 +1991,7 @@ begin
   {$endif}
 end;
 
-procedure xqFunctionDoc_Available(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDoc_Available(args: TXQVArray; var result: IXQValue);
 var
   url: String;
 begin
@@ -1991,7 +2006,7 @@ begin
   {$endif}
 end;
 
-procedure xqFunctionCollection(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionCollection(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var url: string;
 begin
   requiredArgCount(args, 0, 1);
@@ -2000,7 +2015,7 @@ begin
   if assigned(context.sender.OnCollection) then context.sender.OnCollection(context.sender, url, result);
 end;
 
-procedure xqFunctionConcatenate(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionConcatenate(args: TXQVArray; var result: IXQValue);
 var
  i: Integer;
  resseq: TXQValueSequence;
@@ -2011,7 +2026,7 @@ begin
   result := resseq;
 end;
 
-procedure xqFunctionIndex_of(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionIndex_of(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var  i: Integer;
      collation: TXQCollation;
      v: IXQValue;
@@ -2032,7 +2047,7 @@ begin
   end;
 end;
 
-procedure xqFunctionExists(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionExists(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   case args[0].kind of
@@ -2043,7 +2058,7 @@ begin
   end;
 end;
 
-procedure xqFunctionEmpty(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionEmpty(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   case args[0].kind of
@@ -2054,17 +2069,17 @@ begin
   end;
 end;
 
-procedure xqFunctionNilled(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNilled(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   if args[0].getSequenceCount <> 1 then exit;
   if args[0] is TXQValueSequence then args[0] := (args[0] as TXQValueSequence).seq[0];
   if (args[0].toNode <> nil) and (args[0].toNode.typ = tetOpen) and not (args[0].toNode is TTreeDocument) then
     result := xqvalue((args[0].toNode.getAttribute('xml:nil', @context.nodeCollation.equal) = 'true')
-                       and (args[0].toNode.deepNodeText() = ''));
+                       and (args[0].toNode.deepNodeText() = ''));    ignore(context);
 end;
 
-procedure xqFunctionDistinct_values(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDistinct_values(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
  i: Integer;
  v: IXQValue;
@@ -2095,7 +2110,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-procedure xqFunctionInsert_before(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionInsert_before(args: TXQVArray; var result: IXQValue);
 var
  index: Integer;
  a: IXQValue;
@@ -2117,7 +2132,7 @@ begin
   result := resseq;
 end;
 
-procedure xqFunctionRemove(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionRemove(args: TXQVArray; var result: IXQValue);
 var
  i, j: Integer;
  oldseq, resseq: TXQValueSequence;
@@ -2143,7 +2158,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-procedure xqFunctionreverse(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionreverse(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   result := args[0].clone;
@@ -2151,7 +2166,7 @@ begin
   (result as TXQValueSequence).seq.revert;
 end;
 
-procedure xqFunctionsubsequence(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionsubsequence(args: TXQVArray; var result: IXQValue);
 var from,len,reallen: Integer;
  i: Integer;
  resseq, oldseq: TXQValueSequence;
@@ -2181,13 +2196,13 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-procedure xqFunctionUnordered(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionUnordered(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   result := args[0];
 end;
 
-procedure xqFunctionZero_or_one(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionZero_or_one(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   if args[0].getSequenceCount > 1 then
@@ -2195,7 +2210,7 @@ begin
   result := args[0];
 end;
 
-procedure xqFunctionOne_or_more(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionOne_or_more(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   if args[0].getSequenceCount = 0 then
@@ -2203,7 +2218,7 @@ begin
   result := args[0];
 end;
 
-procedure xqFunctionexactly_one(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionexactly_one(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   if args[0].getSequenceCount <> 1 then
@@ -2211,7 +2226,7 @@ begin
   result := args[0];
 end;
 
-procedure xqFunctionDeep_equal(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDeep_equal(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 //contract: always return TXQValueBoolean
 var i:integer;
     collation: TXQCollation;
@@ -2251,13 +2266,13 @@ begin
   result := xqvalue(true);
 end;
 
-procedure xqFunctioncount(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctioncount(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,1);
   result := xqvalue(args[0].getSequenceCount);
 end;
 
-procedure xqFunctionSum(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionSum(args: TXQVArray; var result: IXQValue);
 var
  tempf: decimal;
  tempi: Int65;
@@ -2304,7 +2319,7 @@ begin
   end;
 end;
 
-procedure xqFunctionavg(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionavg(args: TXQVArray; var result: IXQValue);
 var tempf: decimal;
  i: Integer;
  tempf2: decimal;
@@ -2342,7 +2357,7 @@ begin
   end;
 end;
 
-procedure xqFunctionminmax(args: array of IXQValue; var result: IXQValue; const context: TEvaluationContext; const asmin: boolean);
+procedure xqFunctionminmax(args: TXQVArray; var result: IXQValue; const context: TEvaluationContext; const asmin: boolean);
 var tempf: decimal;
  tempi: int65;
  temps: string;
@@ -2421,18 +2436,18 @@ begin
   end;
 end;
 
-procedure xqFunctionmin(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionmin(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   xqFunctionminmax(args, result, context, true);
 end;
 
-procedure xqFunctionmax(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionmax(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   xqFunctionminmax(args, result, context, false);
 end;
 
 
-procedure xqFunctionDefault_Collation(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionDefault_Collation(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,0);
   if strBeginsWith(context.collation.id, 'http://') then result := xqvalue(context.collation.id)
@@ -2440,7 +2455,7 @@ begin
 end;
 
 
-procedure xqFunctionNode_name(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNode_name(args: TXQVArray; var result: IXQValue);
 var
   node: TTreeElement;
 begin
@@ -2454,7 +2469,7 @@ begin
     end;
 end;
 
-function simpleNode(const context: TEvaluationContext; args: array of IXQValue): TTreeElement;
+function simpleNode(const context: TEvaluationContext; args: TXQVArray): TTreeElement;
 begin
   requiredArgCount(args,0, 1);
   if length(args) = 0 then exit(xqvalueContextNode(context))
@@ -2462,7 +2477,7 @@ begin
   else exit(xqvalueToSingleNode(args[0]));
 end;
 
-function simpleNodeName(const context: TEvaluationContext; args: array of IXQValue): string;
+function simpleNodeName(const context: TEvaluationContext; args: TXQVArray): string;
 var
   node: TTreeElement;
 begin
@@ -2471,7 +2486,7 @@ begin
   result := node.getNodeName();
 end;
 
-procedure xqFunctionName(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionName(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   s: String;
 begin
@@ -2479,7 +2494,7 @@ begin
   result := xqvalue(s);
 end;
 
-procedure xqFunctionLocal_Name(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionLocal_Name(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   s: String;
 begin
@@ -2488,7 +2503,7 @@ begin
   result := xqvalue(s);
 end;
 
-procedure xqFunctionNamespace_URI(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionNamespace_URI(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   node: TTreeElement;
 //  prefix: String;
@@ -2501,21 +2516,21 @@ begin
   end;
 end;
 
-procedure xqFunctionPosition(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionPosition(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,0,0);
   if context.SeqValue = nil then raise EXQEvaluationException.Create('position() called but no sequence available');
   result := xqvalue(context.SeqIndex);
 end;
 
-procedure xqFunctionLast(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionLast(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,0,0);
   if context.SeqValue = nil then raise EXQEvaluationException.Create('last() called but no sequence available');
   result := xqvalue(context.SeqLength);
 end;
 
-procedure xqFunctionId(const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionId(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var sl: TStringList;
 procedure addSplitted(s: string);
 var

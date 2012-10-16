@@ -465,11 +465,11 @@ const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of longint=(0,0,0,0,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
       COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of string=('match-text','meta','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized');
 
+
 { TTemplateElement }
 
 function strToCommand(ns, s:string; treeTyp: TTreeElementType): TTemplateElementType;
 var  t: TTemplateElementType;
-     i: Integer;
 begin
   if ((treeTyp = tetOpen) or (treeTyp = tetClose)) then begin
     if ns = HTMLPARSER_NAMESPACE_URL then begin
@@ -488,6 +488,8 @@ begin
     tetText: exit(tetHTMLText);
   end;
 end;
+
+procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
 
 function TTemplateElement.templateReverse: TTemplateElement;
 begin
@@ -521,11 +523,10 @@ end;
 
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
- i: Integer;
- j: Integer;
  curChild: TTreeElement;
- attrib, temp: TTreeElement;
+ attrib: TTreeElement;
 begin
+  ignore(parser);
   //inherited initialized;
   attrib := attributes;
   while attrib <> nil do begin
@@ -702,6 +703,7 @@ procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variabl
 var
   temp: TXQValue;
 begin
+  ignore(sender);
   if not FVariableLog.hasVariable(variable, @temp) then
     if not FOldVariableLog.hasVariable(variable, @temp) then exit;
   value := temp;
@@ -711,7 +713,7 @@ function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
   template: TTemplateElement): Boolean;
 var
   name, strategy: string;
-  i, j, k, strategyi: Integer;
+  j, k, strategyi: Integer;
   templateList: TStringArray;
   htmlList: TStringArray;
   found: Boolean;

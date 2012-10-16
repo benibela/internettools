@@ -197,7 +197,7 @@ type
     function typeName: string;      //**< XPath type name (actually just wraps classTypeName. Since you can't define class functions in the interface, but we need to do calculations with types itself)
     function getClassType: TXQValueClass; //**< Returns the actual class type of the value. (just wraps classType, but can be called through the interface)
 
-    class function createFromValue(const args: array of IXQValue): IXQValue; virtual; //**< Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
+    class function createFromValue(const v: IXQValue): IXQValue; virtual; //**< Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
 
     function canConvertToInt65: boolean;    virtual; //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
     function canConvertToDecimal(pure: boolean): boolean;  virtual; //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
@@ -284,7 +284,7 @@ type
 
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
-    class function createFromValue(const args: array of IXQValue): IXQValue; override;
+    class function createFromValue(const v: IXQValue): IXQValue; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -306,7 +306,7 @@ type
 
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
-    class function createFromValue(const args: array of IXQValue): IXQValue; override;
+    class function createFromValue(const v: IXQValue): IXQValue; override;
     class function canCreateFromInt65(const i: int65): boolean; virtual;
     class function classParentNonBlocked: TXQValueClass; override;
 
@@ -332,7 +332,7 @@ type
     value:  decimal;   //*< plain decimal value
 
     constructor create(const aflt: decimal = 0); reintroduce; virtual;
-    class function createFromValue(const args: array of IXQValue): IXQValue; override;
+    class function createFromValue(const v: IXQValue): IXQValue; override;
     class function canCreateFromDecimal(const v:decimal): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
@@ -361,7 +361,7 @@ type
     str:  string;
 
     constructor create(const astr: string = ''); reintroduce; virtual;
-    class function createFromValue(const args: array of IXQValue): IXQValue; override;
+    class function createFromValue(const v: IXQValue): IXQValue; override;
     class function canCreateFromString(const v: string): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
@@ -407,7 +407,7 @@ type
     constructor create(const str, format: string); reintroduce; virtual; //**< Create from a date/time with a certain format (see bbutils.dateParseParts)
     constructor create(const dt: TXQValueDateTimeData); reintroduce; virtual; //**< Create from a splitted ordinary datetime
     constructor create(const dt: TDateTime); reintroduce; virtual; //**< Create from an ordinary datetime
-    class function createFromValue(const args: array of IXQValue): IXQValue; override;
+    class function createFromValue(const v: IXQValue): IXQValue; override;
     class function canCreateFromDateTime(const s: string): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
@@ -538,7 +538,7 @@ type
     constructor create(); reintroduce; virtual;
     destructor Destroy; override;
 
-    class function createFromValue(const args: array of IXQValue): IXQValue; override;
+    class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
 
@@ -595,7 +595,7 @@ type
   TXQVList = class
   protected
     fcount: integer; //**< count
-    list: array of IXQValue; //**< Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
+    list: TXQVArray; //**< Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
     function everyIsNodeOrNot(checkForNode: boolean): boolean; //**< checks: every $n in (self) satisfies (($n is node) = checkForNode)
     procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
     procedure checkIndex(i: integer); inline; //**< Range check
@@ -637,12 +637,12 @@ type
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
-  TXQBasicFunction = procedure (args: array of IXQValue; var result: IXQValue);
+  TXQBasicFunction = procedure (args: TXQVArray; var result: IXQValue);
   (***
     @abstract(Function, taking some TXQValue-arguments and returning a new TXQValue which can depend on the current context state)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
-  TXQComplexFunction = procedure (const context: TEvaluationContext; args: array of IXQValue; var result: IXQValue);
+  TXQComplexFunction = procedure (const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
   (***
     @abstract(Binary operator of TXQValues)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
@@ -772,7 +772,6 @@ type
     function evaluate(const context: TEvaluationContext): IXQValue; override;
     function serialize: string;
   protected
-    procedure init(const s: string; functionLike: boolean);
     function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
     function castableAsBase(v: IXQValue): boolean;
     function castAs(v: IXQValue): IXQValue;
@@ -1266,7 +1265,7 @@ type
   function xqvalue(const v: Int64):IXQValue; inline; //**< Creates an integer IXQValue
   function xqvalue(v: decimal):IXQValue; inline; //**< Creates an decimal IXQValue
   function xqvalue(v: string):IXQValue; inline; //**< Creates an string IXQValue
-  function xqvalue(v: TDateTime):IXQValue; inline; //**< Creates an TDateTime IXQValue
+  function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Creates an TDateTime IXQValue
   function xqvalue(v: TTreeElement):IXQValue; inline; //**< Creates an node TXQValue
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes a IXQValue (single element seq => single element, empty seq => undefined)
@@ -1435,7 +1434,7 @@ end;
 
 //**(Abstract) Class containing binary data
 TXQValue_Binary = class (TXQValueString)
-  class function createFromValue(const args: array of IXQValue): IXQValue; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
   function toRawBinary: string; virtual;
   class function fromRawBinary(s: string): string; virtual;
   function canConvertToInt65: boolean; override;
@@ -1485,6 +1484,15 @@ var basicFunctions: TStringList;
     collations: TStringList;
 
 const MY_STUPID_COLLATION_URL = 'http://www.benibela.de/2012/pxp/';
+
+procedure ignore(const intentionallyUnusedParameter: TEvaluationContext); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: string); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: boolean); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: int65); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: IXQValue); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: Decimal); inline; begin end;
 
 {$I disableRangeOverflowChecks.inc}
 
@@ -1632,7 +1640,7 @@ end;
 
 
 
-procedure requiredArgCount(const args: array of IXQValue; minc: integer; maxc: integer = -2);
+procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
 begin
   if maxc = -2 then maxc := minc;
   if (length(args) >= minc) and (length(args) <= maxc) then exit;
@@ -1732,9 +1740,6 @@ function commonDecimalClass(a,b: TXQValueClass; failureClass: TXQValueDecimalCla
     else commonDecimalClass := TXQValueDecimalClass(commonClass(a, b)); //check for possible user defined types both derived from typ
   end;
 
-var temp: TClass;
-  aDecimal: Boolean;
-  bDecimal: Boolean;
 begin
   //Decimal conversion is complicated.
   //Official type promotion after: http://www.w3.org/TR/xpath20/#promotion:
@@ -1761,35 +1766,6 @@ begin
 
   result := failureClass;
   becomesType(TXQValueDecimal)
-
-
-   (*
-  aDecimal := a.InheritsFrom(TXQValueDecimal) or a.InheritsFrom(TXQValueInt65);
-  bDecimal := b.InheritsFrom(TXQValueDecimal) or b.InheritsFrom(TXQValueInt65);
-  if (not aDecimal) and (not bDecimal) then exit(TXQValueDecimal);
-  if a = b then exit(TXQValueDecimalClass(a));
-  if (not aDecimal) or (not bDecimal) then begin
-    if aDecimal then exit(TXQValueDecimalClass(a));
-    if bDecimal then exit(TXQValueDecimalClass(b));
-    assert(false);
-  end;
-  if a = TXQValueDecimal then begin
-    if (b = TXQValueDecimal) then exit(TXQValueDecimal);
-    if (b = TXQValue_Double) then exit(TXQValue_Double);
-    if (b = TXQValue_float) then exit(TXQValue_float);
-  end;
-  if b = TXQValueDecimal then begin
-    //if (a = TXQValueDecimal) then exit(TXQValueDecimal);
-    if (a = TXQValue_Double) then exit(TXQValue_Double);
-    if (a = TXQValue_float) then exit(TXQValue_float);
-  end;
-  if (a = TXQValue_double) or (b = TXQValue_double) then
-    exit(TXQValue_Double);
-
-  //handle unexpectected cases (i.e. user restriced decimals)
-  temp := commonClass(a,b);
-  if temp = TXQValue then exit(TXQValueDecimal);
-  result := TXQValueDecimalClass(temp);*)
 end;
 
 function commonDecimalClass(a,b: IXQValue): TXQValueDecimalClass; inline;
@@ -1848,10 +1824,10 @@ begin
   result := TXQValueDateTime.Create(v);
 end;}
 
-function xqvalue(v: TDateTime): IXQValue;
+function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
 begin
   result := nil;
-  raise Exception.Create('ups');
+  raise Exception.Create('Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
 end;
 
 function xqvalue(v: TTreeElement): IXQValue;
@@ -1871,7 +1847,6 @@ end;
 
 procedure TXQTermModule.initializeStaticContext(const context: TEvaluationContext);
 var
-  truemodule: Boolean;
   i: Integer;
   tempDefVar: TXQTermDefineVariable;
   functions: array of TXQValueFunction;
@@ -1928,8 +1903,6 @@ begin
 end;
 
 function TEvaluationContext.findNamespace(const nsprefix: string): TNamespace;
-var
-  i: Integer;
 begin
   if (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
   if (staticContext^.namespaces <> nil) and (staticContext^.namespaces.hasNamespacePrefix(nsprefix, result)) then exit;
@@ -2212,7 +2185,6 @@ end;
 
 procedure TXQVList.add(child: IXQValue);
 var
- i: Integer;
  v: IXQValue;
 begin
   assert(child <> nil);
@@ -2232,7 +2204,6 @@ end;
 
 procedure TXQVList.addMerging(child: IXQValue);
 var
- i: Integer;
  a,b,m, cmp: Integer;
  s: IXQValue;
  childnode: TTreeElement;
@@ -2323,6 +2294,7 @@ end;
 function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): integer;
 type PIXQValue = ^IXQValue;
 begin
+  ignore(temp);
   result:=TTreeElement.compareInDocumentOrder(PIXQValue(p1)^.toNode,PIXQValue(p2)^.toNode);
 end;
 
@@ -2583,12 +2555,14 @@ procedure TXQVariableChangeLog.evaluateVariable(sender: TObject; const variable:
 var
   temp: TXQValue;
 begin
+  ignore(sender);
   if not hasVariable(variable, @temp) then exit;
   value := temp;
 end;
 
 procedure TXQVariableChangeLog.defineVariable(sender: TObject; const variable: string; const value: IXQValue);
 begin
+  ignore(sender);
   addVariable(variable,value);
 end;
 
@@ -2685,7 +2659,7 @@ begin
 end;
 
 procedure TXQVariableChangeLog.popAll(level: integer = -1);
-var s,i: integer;
+var s: integer;
  l: Integer;
 begin
   if readonly then raise Exception.Create('readonly variable change log modified');
@@ -2949,8 +2923,9 @@ end;
 
 
 
-procedure xqFunctionGeneralConstructor(args: array of IXQValue; var result: IXQValue);
+procedure xqFunctionGeneralConstructor(args: TXQVArray; var result: IXQValue);
 begin
+  ignore(args); result := nil;
   raise Exception.Create('Abstract function called');
 end;
 
@@ -2979,7 +2954,6 @@ begin
 end;
 
 function TXQueryEngine.evaluate(tree: TTreeElement): IXQValue;
-var context: TEvaluationContext;
 begin
   if FLastQuery = nil then exit(xqvalue())
   else if tree = nil then exit(FLastQuery.evaluate())
@@ -3143,19 +3117,8 @@ end;
 
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQuery;
 var cxt: TXQParsingContext;
-  i: Integer;
 begin
   if str = '' then exit(TXQuery.Create(self, TXQTermSequence.Create));
-{  if pos(#13, str) > 0 then begin
-    i := 1;
-    while i < length(str) do begin
-      if str[i] = #13 then
-        if (i+1 < length(str)) and (str[i+1] = #10) then delete(str, i, 1)
-        else str[i] := #10;
-      i += 1;
-    end;
-
-  end;}
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
@@ -3276,7 +3239,7 @@ var pos: pchar;
   var
     namespace: string;
     element: string;
-    token: String;
+    token: string;
   begin
     namespace := '*';
     element := '*';
@@ -3628,7 +3591,6 @@ var oldnode,newnode: TTreeElement;
     newSequence: IXQValue;
     nodeCondition: TXQPathNodeCondition;
 var
-  i: Integer;
   j: Integer;
   tempContext: TEvaluationContext;
   onlyNodes: boolean;
@@ -3757,11 +3719,13 @@ end;
 
 procedure xqvalueNodeStepChild(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt); ignore(ta); ignore(tb); ignore(result);
   raise EXQEvaluationException.Create('placeholder op:/ called');
 end;
 
 procedure xqvalueNodeStepDescendant(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
+  ignore(cxt); ignore(ta); ignore(tb); ignore(result);
   raise EXQEvaluationException.Create('placeholder op: // called');
 end;
 

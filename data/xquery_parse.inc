@@ -289,7 +289,7 @@ begin
 end;
 
 function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
-var word, sequenceType: string;
+var word: string;
   index: Integer;
 begin
   word := nextToken();
@@ -1120,9 +1120,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
 
 
 var
-  temp: TXQTerm;
   token: String;
-  collation: String;
   nameSpaceName: String;
   nameSpaceURL: String;
 begin

@@ -404,7 +404,6 @@ procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: 
   end;
 
 var tree: TTreeElement;
-  s: String;
   attrib: TTreeElement;
 begin
   if (from = eUnknown) or (toe = eUnknown) then exit;
@@ -479,8 +478,7 @@ begin
 end;
 
 function TTreeElement.outerXML(insertLineBreaks: boolean = false): string;
-var i: Integer;
-  attrib: TTreeElement;
+var attrib: TTreeElement;
 begin
   if self = nil then exit;
   case typ of
@@ -785,7 +783,7 @@ begin
   temp[0].nameLen:=length(aname);
   temp[0].value:=pchar(avalue);
   temp[0].valueLen:=length(avalue);
-  addAttributes(temp);
+  result := addAttributes(temp);
 end;
 
 function TTreeElement.addAttributes(const props: array of THTMLProperty): TTreeElement;
@@ -907,8 +905,7 @@ end;
 
 function TTreeElement.clone: TTreeElement;
 var
-  kid, attrib: TTreeElement;
-  newattribhead, newattribtailend: TTreeElement;
+  kid: TTreeElement;
 begin
   case typ of
     tetOpen: begin
@@ -986,7 +983,6 @@ end;
 
 function TTreeElement.toString(): string;
 var
-  i: Integer;
   attrib: TTreeElement;
 begin
   if self = nil then exit('');
@@ -1334,8 +1330,6 @@ begin
 end;
 
 function TTreeParser.findNamespace(const prefix: string): TNamespace;
-var
-  i: Integer;
 begin
   result := nil;
   if FCurrentNamespaces.hasNamespacePrefix(prefix, result) then exit;
