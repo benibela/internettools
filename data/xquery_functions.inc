@@ -1122,14 +1122,6 @@ begin
   replace.free;
 end;
 
-procedure xqFunctionContextItem(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
-begin
-  requiredArgCount(args, 0);
-  if context.SeqValue <> nil then result := context.SeqValue
-  else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
-  else raise EXQEvaluationException.Create('no context item');
-end;
-
 procedure xqFunctionCodepoints_to_string(args: TXQVArray; var result: IXQValue);
 var temp: string;
  v: IXQValue;

@@ -3949,8 +3949,6 @@ XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
 XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
 XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocalFunctions, 'local');
 
-//dom standard functions
-TXQueryEngine.registerFunction('.',@xqFunctionContextItem);
 //my functions
 TXQueryEngine.registerFunction('filter',@xqFunctionFilter);
 TXQueryEngine.registerFunction('split-equal',@xqFunctionSplitEqual,pvkString);

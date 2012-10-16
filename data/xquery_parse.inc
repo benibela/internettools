@@ -780,8 +780,7 @@ begin
     end;
 
     '0'..'9': exit(TXQTermNumber.Create(word));
-    '.': if word = '.' then exit(TXQTermNamedFunction.Create('.'))
-         else if word = '..' then exit(TXQTermNodeMatcher.Create(word))
+    '.': if (word = '.') or (word = '..') then exit(TXQTermNodeMatcher.Create(word))
          else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermNumber.Create(word))
          else raiseParsingError('Unknown term: '+word);
 
