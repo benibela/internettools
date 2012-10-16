@@ -1483,6 +1483,16 @@ var basicFunctions: TStringList;
     types: TStringList;
     collations: TStringList;
 
+const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
+      XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
+      XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
+      XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
+var   XMLNamespace_XPathFunctions: TNamespace;
+      XMLNamespace_XMLSchema: TNamespace;
+      XMLNamespace_XMLSchemaInstance: TNamespace;
+      XMLNamespace_XQueryLocalFunctions: TNamespace;
+
+
 const MY_STUPID_COLLATION_URL = 'http://www.benibela.de/2012/pxp/';
 
 procedure ignore(const intentionallyUnusedParameter: TEvaluationContext); inline; begin end;
@@ -1910,6 +1920,10 @@ begin
   case nsprefix of
     'xml': result := XMLNamespace_XML;
     'xmlns': result := XMLNamespace_XMLNS;
+    'xs': result := XMLNamespace_XMLSchema;
+    'xsi': result := XMLNamespace_XMLSchemaInstance;
+    'fn': result := XMLNamespace_XPathFunctions;
+    'local': result := XMLNamespace_XQueryLocalFunctions;
     else result := nil;
   end;
 end;
@@ -3929,6 +3943,12 @@ binaryOps.Sorted := true;
 basicFunctions.Sorted := true;
 complexFunctions.Sorted := true;
 types.Sorted:=true;
+//namespaces
+XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
+XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
+XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
+XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocalFunctions, 'local');
+
 //dom standard functions
 TXQueryEngine.registerFunction('.',@xqFunctionContextItem);
 //my functions
@@ -4182,6 +4202,10 @@ basicFunctions.Free;
 complexFunctions.Free;
 collations.Free;
 types.free;
+XMLNamespace_XPathFunctions.free;
+XMLNamespace_XMLSchema.free;
+XMLNamespace_XMLSchemaInstance.free;
+XMLNamespace_XQueryLocalFunctions.free;
 {$DEFINE PXP_DERIVED_TYPES_FINALIZATION}
 {$I xquery_derived_types.inc}
 end.
