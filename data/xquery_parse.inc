@@ -1207,7 +1207,7 @@ begin
             else begin
               temp := parseStringLiteral;
               staticContext.defaultFunctionNamespace := engine.findNamespace(temp);
-              if staticContext.defaultFunctionNamespace = nil then staticContext.defaultFunctionNamespace := TNamespace.create(temp, '');
+              if staticContext.defaultFunctionNamespace = nil then raiseParsingError('Unknown namespace: '+temp);
             end;
           end;
           else raiseParsingError('Unknown default value');

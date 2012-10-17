@@ -64,25 +64,30 @@ type
 
   { TXQStaticContext }
 
+  //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   TXQStaticContext = class
     sender: TXQueryEngine;
 
-    stripBoundarySpace: boolean;
-    moduleVariables: TXQVariableChangeLog;
-    namespaces: TNamespaceList;
-    functions: array of TXQValueFunction;
-    importedModules: TStringList;
-    moduleNamespace: TNamespace;
-    defaultFunctionNamespace: TNamespace;
+    //The following values map directly to XQuery options declarable in a Prolog
+    moduleNamespace: TNamespace; //**< The namespace of this module or nil (owned by context)
+    namespaces: TNamespaceList;  //**< All declared namespaces. (namespace objects owned by the context)
+    moduleVariables: TXQVariableChangeLog;  //**< All declared variables.
+    functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
+    importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
+    stripBoundarySpace: boolean;  //**< If <a>  </a> is equivallent to <a/>. Only used during parsing of the query, ignored during evaluation
+    defaultFunctionNamespace: TNamespace; //**< Default function namespace (shared namespace object)
+
+    baseURI: string;
+
     //TODO: use these values
     collation: string;
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
     elementNamespace: string;
-    baseURI: string;
     constructionPreserve: boolean;
-    ordering: boolean;
     copyNamespacePreserve, copyNamespaceInherit: boolean;
 
+    //**ignored
+    ordering: boolean;
 
     function clone(): TXQStaticContext;
     destructor Destroy; override;
