@@ -1256,6 +1256,11 @@ begin
         if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
           case token of
             'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp);
+            'extended-strings': case temp of
+              'on': AllowVariableUseInStringLiterals:=true;
+              'off': AllowVariableUseInStringLiterals:=false;
+              'toggle': AllowVariableUseInStringLiterals:=not AllowVariableUseInStringLiterals;
+            end;
           end;
         end;
       end;

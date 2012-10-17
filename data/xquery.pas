@@ -3907,6 +3907,7 @@ begin
     'xsi': result := XMLNamespace_XMLSchemaInstance;
     'fn': result := XMLNamespace_XPathFunctions;
     'local': result := XMLNamespace_XQueryLocalFunctions;
+    'pxp': result := XMLNamespace_MyExtensions;
     else result := nil;
   end;
 end;
