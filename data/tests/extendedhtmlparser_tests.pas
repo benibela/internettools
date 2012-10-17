@@ -499,8 +499,8 @@ var data: array[1..285] of array[1..3] of string = (
       //short test
       ,('<a><t:s>x:=text()</t:s></a>', '<a>hallo</a>', 'x=hallo')
       ,('<a><t:s>x:=.</t:s></a>', '<a>hallo</a>', 'x=hallo')
-      ,('<a><t:s>a:b:=.</t:s></a>', '<a>123</a>', 'a:b=123')
-      ,('<a><t:s>a:b := .</t:s></a>', '<a>123456</a>', 'a:b=123456')
+      ,('<a><t:s>ab:=.</t:s></a>', '<a>123</a>', 'ab=123')
+      ,('<a><t:s>ab := .</t:s></a>', '<a>123456</a>', 'ab=123456')
       ,('<a><xxx></xxx><b><t:s>x:=.</t:s></b><yyy></yyy></a>', '<a>adas<xxx>asfas</xxx><b>here</b><yyy>asas</yyy>asfasf</a>', 'x=here')
 
       //switch

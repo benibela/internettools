@@ -62,19 +62,19 @@ end;
 
 { TXQTermDefineVariable }
 
-constructor TXQTermDefineVariable.create(avarname: string);
+constructor TXQTermDefineVariable.create(avarname: string; anamespace: TNamespace);
 begin
   variablename := avarname;
-  if pos(':', variablename) > 0 then namespaceprefix:=strSplitGet(':', variablename);
+  namespace := anamespace;
 end;
 
-constructor TXQTermDefineVariable.create(varname: TXQTerm; value: TXQTerm);
+constructor TXQTermDefineVariable.create(varname: TXQTerm; anamespace: TNamespace; value: TXQTerm);
 begin
   if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).debugTermToString
   else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
   else raiseParsingError('Invalid term to assign a variable to: '+varname.debugTermToString);
   varname.Free;
-  if pos(':', variablename) > 0 then namespaceprefix:=strSplitGet(':', variablename);
+  namespace := anamespace;
   if value <> nil then push(value);
 end;
 
@@ -86,7 +86,7 @@ begin
   if length(children) > 1 then raiseEvaluationError('Only one value can be assigned to a variable');
   result := children[0].evaluate(context);
 
-  if namespaceprefix <> '' then context.staticContext.sender.OnDefineVariable(self, namespaceprefix + ':' + variablename, result)
+  if namespace <> nil then context.staticContext.sender.OnDefineVariable(self, namespace.getPrefix + ':' + variablename, result)
   else context.staticContext.sender.OnDefineVariable(self, variablename, result);
 end;
 
@@ -207,7 +207,7 @@ var tempContext:TEvaluationContext;
     result := isEvery;
     for v in children[pos+1].evaluate(tempContext) do begin
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, v, context.findNamespace(TXQTermVariable(children[pos]).namespaceprefix));
+      tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
       if evaluateSomeEvery(pos+2) <> (isEvery) then begin
         tempContext.temporaryVariables.popAll;
         result := not isEvery;
@@ -774,14 +774,14 @@ end;
 
 { TXQTermVariable }
 
-constructor TXQTermVariable.create(const avalue: string);
+constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
 begin
   value := avalue;
   if value = '' then raiseEvaluationError('variable with empty name');
   if value[1] <> '$' then raiseEvaluationError('variable name does not start with $:  ' + value);
   delete(value,1,1);
   if value[length(value)] = ';' then delete(value, length(value), 1);
-  if pos(':', value) > 0 then namespaceprefix:=strSplitGet(':', value);
+  if (staticContext <> nil) and (pos(':', value) > 0) then namespace := staticContext.findNamespace(strSplitGet(':', value));
 end;
 
 function TXQTermVariable.evaluate(const context: TEvaluationContext): IXQValue;
@@ -790,8 +790,7 @@ var
   sc: TXQStaticContext;
   ns: TNamespace;
 begin
-  if namespaceprefix = '' then ns := nil  //"Variable names that have no namespace prefix are in no namespace. "
-  else ns := context.findNamespace(namespaceprefix);
+  ns := namespace;
   if context.temporaryVariables <> nil then begin
     temp := nil;
     if context.temporaryVariables.hasVariableOrObject(value, @temp, ns) then begin

@@ -721,7 +721,7 @@ function TXQParsingContext.parseString(const w: string): TXQTerm;
         while (i <= length(s)) and not (s[i] in [';',' ',#9,#13,#10]) do i+=1;
         if i > length(s) then raiseParsingError('Variable without terminating ; in '+s);
         if lastStrStart  = i then raiseParsingError('Variable without name ($;) in '+s);
-        result.push(TXQTermVariable.create(copy(s, lastStrStart, i-lastStrStart)));
+        result.push(TXQTermVariable.create(copy(s, lastStrStart, i-lastStrStart), staticContext));
         i+=1;
         lastStrStart:=i;
       end else i+=1;
@@ -756,7 +756,7 @@ begin
     '''', '"':  exit(parseString(word));
     '$': begin
       if length(word) < 2 then raiseParsingError('Variable must have at least 2 characters: '+word);
-      exit(TXQTermVariable.Create(word));
+      exit(TXQTermVariable.Create(word, staticContext));
     end;
     '@': exit(TXQTermReadAttribute.create(strcopyfrom(word,2) + parseQNameContinuation));
     '+', '-': begin
@@ -831,7 +831,7 @@ begin
           while word = 'case' do begin
             skipWhitespaceAndComment();
             result.push(TXQTermSequence.Create);
-            if pos^ = '$' then begin result.children[high(result.children)].push(TXQTermVariable.create(nextToken())); expect('as'); end;
+            if pos^ = '$' then begin result.children[high(result.children)].push(TXQTermVariable.create(nextToken(), staticContext)); expect('as'); end;
             result.children[high(result.children)].push(parseSequenceType());
             expect('return');
             result.children[high(result.children)].push(parse());
@@ -840,7 +840,7 @@ begin
           if word <> 'default' then raiseParsingError('expected "default" clause');
           skipWhitespaceAndComment();
           result.push(TXQTermSequence.Create);
-          if pos^ = '$' then result.children[high(result.children)].push(TXQTermVariable.create(nextToken()));
+          if pos^ = '$' then result.children[high(result.children)].push(TXQTermVariable.create(nextToken(), staticContext));
           expect('return');
           result.children[high(result.children)].push(parse());
 
@@ -865,10 +865,10 @@ begin
 
         if (word = 'some') or (word = 'every') then begin
           result := TXQTermSomeEvery.Create(word = 'every');
-          result.push(TXQTermVariable.Create(nextToken())); expect('in'); result.push(parse());
+          result.push(TXQTermVariable.Create(nextToken(), staticContext)); expect('in'); result.push(parse());
           word := nextToken();
           while word = ',' do begin
-            result.push(TXQTermVariable.Create(nextToken())); expect('in'); result.push(parse());
+            result.push(TXQTermVariable.Create(nextToken(), staticContext)); expect('in'); result.push(parse());
             word := nextToken();
           end;
           Assert(word = 'satisfies');
@@ -984,7 +984,12 @@ begin
         replace^ := TXQTermFilterSequence.Create(replace^, parse());
         expect(']');
       end;
-      ':=': begin expect(':='); exit(TXQTermDefineVariable.Create(astroot, parse())); end;
+      ':=': begin
+        expect(':=');
+        result := TXQTermDefineVariable.Create(astroot, nil, parse());
+        if system.pos(':', TXQTermDefineVariable(result).variablename) > 0 then TXQTermDefineVariable(result).namespace:=staticContext.findNamespace(strSplitGet(':', TXQTermDefineVariable(result).variablename));
+        exit;
+      end;
       else if binaryOps.IndexOf(word) >= 0 then pushBinaryOp(word)
       else if (word[1] = '.') and AllowObjects then begin
         expect(word);
@@ -1085,7 +1090,9 @@ function TXQParsingContext.parseModule(): TXQTerm;
   begin
     requireModule;
     expect('$');
-    vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp));
+    vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp), nil);
+    if system.pos(':', vari.variablename) > 0 then vari.namespace:=staticContext.findNamespace(strSplitGet(':', vari.variablename));
+
     result.push(vari);
     if tempTyp <> nil then vari.push(tempTyp);
     case nextToken() of
@@ -1110,7 +1117,8 @@ function TXQParsingContext.parseModule(): TXQTerm;
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
       expect('$');
-      tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType));
+      tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType), nil);
+      if system.pos(':', tempVar.variablename) > 0 then tempVar.namespace := staticContext.findNamespace(strSplitGet(':', tempVar.variablename));
       if tempType <> nil then tempVar.push(tempType);
       funcTerm.push(tempVar);
       skipWhitespaceAndComment();
@@ -1163,7 +1171,6 @@ begin
     if system.pos(':', staticContext.moduleNamespace.prefix) > 0 then raiseParsingError('Namespace id must not begin with a namespace prefix itself');
     expect('=');
     staticContext.moduleNamespace.url := parseStringLiteral;
-    //what now?  TODO
     expect(';');
     token := nextToken(true);
   end;

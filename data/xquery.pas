@@ -795,19 +795,19 @@ type
   { TXQTermVariable }
 
   TXQTermVariable = class(TXQTerm)
-    namespaceprefix: string;
+    namespace: TNamespace;
     value: string;
-    constructor create(const avalue: string);
+    constructor create(const avalue: string; staticContext: TXQStaticContext);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   end;
 
   { TXQTermDefineVariable }
 
   TXQTermDefineVariable = class(TXQTerm)
-    namespaceprefix: string;
+    namespace: TNamespace;
     variablename: string;
-    constructor create(avarname: string);
-    constructor create(varname: TXQTerm; value: TXQTerm = nil);
+    constructor create(avarname: string; anamespace: TNamespace);
+    constructor create(varname: TXQTerm; anamespace: TNamespace; value: TXQTerm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   end;
 
@@ -1969,12 +1969,11 @@ begin
     if children[i] is TXQTermDefineVariable then begin
       tempDefVar := TXQTermDefineVariable(children[i]);
 
-      if tempDefVar.namespaceprefix = '' then ns := nil
-      else ns := context.findNamespace(tempDefVar.namespaceprefix);
+      ns := tempDefVar.namespace;
       if (ns = nil) and (context.staticContext.moduleNamespace <> nil) then
-        raiseEvaluationError('Unknown namespace prefix for variable: '+tempDefVar.namespaceprefix+ ':'+tempDefVar.variablename);
+        raiseEvaluationError('Unknown namespace prefix for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
       if (context.staticContext.moduleNamespace  <> nil) and (context.staticContext.moduleNamespace  <> ns ) and (context.staticContext.moduleNamespace.url  <> ns.url ) then
-         raiseEvaluationError('Invalid namespace for variable: '+tempDefVar.namespaceprefix+ ':'+tempDefVar.variablename);
+         raiseEvaluationError('Invalid namespace for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
 
       vars.addVariable(tempDefVar.variablename, tempDefVar.children[high(tempDefVar.children)].evaluate(context), ns);
       if length(tempDefVar.children) > 1 then
@@ -3494,7 +3493,7 @@ var pos: pchar;
 
         TXQTermFlower(result).returned := TXQTermFilterSequence.create(
           axisTerm,
-          newBinOp(newFunction('node-name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('$__csstemp'))
+          newBinOp(newFunction('node-name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('$__csstemp', StaticContext))
         );
       end;
     end;

@@ -41,6 +41,8 @@ TNamespace = class
   url: string;
   prefix: string;
   constructor create(const aurl: string; aprefix: string);
+  function getPrefix: string;
+  function getURL: string;
 end;
 
 { TNamespaceList }
@@ -348,6 +350,18 @@ constructor TNamespace.create(const aurl: string; aprefix: string);
 begin
   url := aurl;
   prefix := aprefix;
+end;
+
+function TNamespace.getPrefix: string;
+begin
+  if self = nil then exit('');
+  result := prefix;
+end;
+
+function TNamespace.getURL: string;
+begin
+  if self = nil then exit('');
+  result := url;
 end;
 
 { TTreeDocument }
