@@ -372,7 +372,7 @@ end;
 
 function xqvalueCompareAtomicBase(const cxt: TEvaluationContext; a, b: IXQValue): integer; inline;
 begin
-  result := xqvalueCompareAtomicBase(a,b,cxt.collation,cxt.sender.ImplicitTimezone);
+  result := xqvalueCompareAtomicBase(a,b,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 
 function xqvalueEqualAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
@@ -440,13 +440,13 @@ end;
 
 procedure xqvalueEqualAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.collation, cxt.sender.ImplicitTimezone)); //contract: always return TXQValueBoolean
+  result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.collation, cxt.staticContext.sender.ImplicitTimezone)); //contract: always return TXQValueBoolean
 end;
 
 procedure xqvalueUnequalAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
   if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then
-    result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.collation, cxt.sender.ImplicitTimezone))
+    result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
     result := xqvalue(false);
 end;
@@ -464,19 +464,19 @@ end;
 
 procedure xqvalueLessThanAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,-1,9999,cxt.collation,cxt.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,-1,9999,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 procedure xqvalueGreaterThanAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,1,9999,cxt.collation,cxt.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,1,9999,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 procedure xqvalueLessEqualAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,-1,0,cxt.collation,cxt.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,-1,0,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 procedure xqvalueGreaterEqualAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,1,0,cxt.collation,cxt.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,1,0,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 
 function xqvalueCompareGenericBase(a, b: TXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
@@ -524,7 +524,7 @@ end;
 
 procedure xqvalueCompareGeneric(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue; accept1: integer; accept2: integer = 9999);
 begin
-  result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.collation,cxt.sender.ImplicitTimezone));
+  result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.collation,cxt.staticContext.sender.ImplicitTimezone));
 end;
 
 procedure xqvalueEqualGeneric(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
@@ -556,9 +556,9 @@ function xqvalueContextNode(const context: TEvaluationContext): TTreeElement;
 begin
   if context.ParentElement <> nil then exit(context.ParentElement);
   if context.RootElement <> nil then exit(context.RootElement);
-  if context.sender = nil then raise EXQEvaluationException.Create('Context sender is nil');
-  if context.sender.ParentElement <> nil then exit(context.sender.ParentElement);
-  if context.sender.RootElement <> nil then exit(context.sender.RootElement);
+  if context.staticContext.sender = nil then raise EXQEvaluationException.Create('Context sender is nil');
+  if context.staticContext.sender.ParentElement <> nil then exit(context.staticContext.sender.ParentElement);
+  if context.staticContext.sender.RootElement <> nil then exit(context.staticContext.sender.RootElement);
   result := nil;
 end;
 
@@ -1094,7 +1094,7 @@ var //node: TTreeElement;
 
 
       {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-      value := strResolveURI(value, context.staticContext^.baseURI);
+      value := strResolveURI(value, context.staticContext.baseURI);
       {$ENDIF}
       (result as TXQValueObject).setMutable('url', value);
     end;
@@ -1249,7 +1249,7 @@ var
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
   if args[0].isUndefined  or args[1].isUndefined then exit;
   result := xqvalue(collation.compare(args[0].toString, args[1].toString));
@@ -1268,7 +1268,7 @@ var s, t: string;
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
   s :=args[0].toString;
   t :=args[1].toString;
@@ -1281,7 +1281,7 @@ var
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
   result := xqvalue(collation.startsWith(args[0].toString,args[1].toString));
 end;
@@ -1291,7 +1291,7 @@ var
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
   result := xqvalue(collation.endsWith(args[0].toString, args[1].toString));
 end;
@@ -1301,7 +1301,7 @@ var a,b: string;
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
   a := args[0].toString;
   b := args[1].toString;
@@ -1315,7 +1315,7 @@ var a,b: string;
     collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
   a := args[0].toString;
   b := args[1].toString;
@@ -1480,13 +1480,13 @@ end;
 procedure xqFunctionEval(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
-  result := context.sender.evaluateXPath2(args[0].toString);
+  result := context.staticContext.sender.evaluateXPath2(args[0].toString);
 end;
 
 procedure xqFunctionCSS(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
-  result := context.sender.evaluateCSS3(args[0].toString);
+  result := context.staticContext.sender.evaluateCSS3(args[0].toString);
 end;
 
 procedure xqFunctionIs_Nth(args: TXQVArray; var result: IXQValue);
@@ -1647,7 +1647,7 @@ begin
       if not (args[1] is TXQValue_duration) then raise EXQEvaluationException.Create('Expected duration, got: '+args[1].toString + ', when conerting '+args[0].toString);
       tz := (args[1] as TXQValue_duration).toDayTime() / SecsPerDay;
     end;
-  end else tz := context.sender.implicitTimezone;
+  end else tz := context.staticContext.sender.implicitTimezone;
 
   if args[0].isUndefined then exit;
   if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('Expected datetime, got: '+args[0].toString);
@@ -1666,16 +1666,16 @@ end;
 procedure xqFunctionImplicit_Timezone(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
-  if isnan(context.sender.ImplicitTimezone) then exit;
+  if isnan(context.staticContext.sender.ImplicitTimezone) then exit;
   result := TXQValueDateTimeClass(TXQValue_dayTimeDuration).create();
-  (result as TXQValue_dayTimeDuration).value.sec:=round(context.sender.ImplicitTimezone * SecsPerDay);
+  (result as TXQValue_dayTimeDuration).value.sec:=round(context.staticContext.sender.ImplicitTimezone * SecsPerDay);
 end;
 
 procedure xqFunctionCurrent_Datetime(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
-  result := TXQValueDateTime.create(context.sender.CurrentDateTime); //stable during evaluation
-  if not IsNan(context.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.sender.ImplicitTimezone;
+  result := TXQValueDateTime.create(context.staticContext.sender.CurrentDateTime); //stable during evaluation
+  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.sender.ImplicitTimezone;
 end;
 
 procedure xqFunctionCurrent_Date(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
@@ -1683,9 +1683,9 @@ var
   temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  temp := TXQValueDateTime.create(context.sender.currentDateTime); //force auto free
+  temp := TXQValueDateTime.create(context.staticContext.sender.currentDateTime); //force auto free
   result := TXQValue_Date.createFromValue(temp);
-  if not IsNan(context.sender.ImplicitTimezone) then (result as TXQValue_date).value.timezone := context.sender.ImplicitTimezone;
+  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValue_date).value.timezone := context.staticContext.sender.ImplicitTimezone;
 end;
 
 procedure xqFunctionCurrent_Time(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
@@ -1693,23 +1693,23 @@ var
   temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  temp := TXQValueDateTime.create(context.sender.currentDateTime); //force auto free
+  temp := TXQValueDateTime.create(context.staticContext.sender.currentDateTime); //force auto free
   result := TXQValue_Time.createFromValue(temp);
-  if not IsNan(context.sender.ImplicitTimezone) then (result as TXQValue_time).value.timezone := context.sender.ImplicitTimezone;
+  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValue_time).value.timezone := context.staticContext.sender.ImplicitTimezone;
 end;
 
 procedure xqFunctionTrace(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,2);
   result := args[0];
-  if assigned(context.sender.OnTrace) then context.sender.OnTrace(context.sender, args[0], args[1]);
+  if assigned(context.staticContext.sender.OnTrace) then context.staticContext.sender.OnTrace(context.staticContext.sender, args[0], args[1]);
 end;
 
 
 procedure xqFunctionStatic_Base_Uri(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,0);
-  if context.staticContext^.baseURI <> '' then result := xqvalue(context.staticContext^.baseURI);
+  if context.staticContext.baseURI <> '' then result := xqvalue(context.staticContext.baseURI);
   //else empty seq if undef
 end;
 
@@ -1754,8 +1754,8 @@ begin
     temp := args[0].toNode.getRoot
   else begin
     if context.ParentElement <> nil then temp := context.ParentElement.getRoot
-    else if context.sender.ParentElement <> nil then temp := context.sender.ParentElement.getRoot
-    else if context.sender.RootElement <> nil then temp := context.sender.RootElement
+    else if context.staticContext.sender.ParentElement <> nil then temp := context.staticContext.sender.ParentElement.getRoot
+    else if context.staticContext.sender.RootElement <> nil then temp := context.staticContext.sender.RootElement
     else raise Exception.Create('no root element');
   end;
   if temp.parent is TTreeDocument then result := xqvalue(temp.parent)
@@ -1909,7 +1909,7 @@ var rel, base: string;
 begin
   requiredArgCount(args, 1,2);
   if length(args) = 2 then base := args[1].toString
-  else base := context.staticContext^.baseURI;
+  else base := context.staticContext.baseURI;
   if args[0].isUndefined then exit;
   rel := args[0].toString;
   if strIsAbsoluteURI(rel) then begin result := xqvalue(rel); exit; end;
@@ -1949,14 +1949,14 @@ begin
   node := xqvalueContextNode(context);
   if node = nil then raise Exception.Create('Need  a loaded document to load a new one');
 
-  if context.sender.FExternalDocuments = nil then context.sender.FExternalDocuments := TStringList.Create;
+  if context.staticContext.sender.FExternalDocuments = nil then context.staticContext.sender.FExternalDocuments := TStringList.Create;
 
-  if context.sender.FExternalDocuments.IndexOf(url) >= 0 then begin
-    result := xqvalue(TTreeElement(context.sender.FExternalDocuments.Objects[context.sender.FExternalDocuments.IndexOf(url)]));
+  if context.staticContext.sender.FExternalDocuments.IndexOf(url) >= 0 then begin
+    result := xqvalue(TTreeElement(context.staticContext.sender.FExternalDocuments.Objects[context.staticContext.sender.FExternalDocuments.IndexOf(url)]));
     exit;
   end;
 
-  if (url[1] = '/') and (context.staticContext^.baseURI <> '') then url := strResolveURI(url, context.staticContext^.baseURI);
+  if (url[1] = '/') and (context.staticContext.baseURI <> '') then url := strResolveURI(url, context.staticContext.baseURI);
   if strBeginsWith(url, 'file:') then begin
     delete(url, 1, 5);
     while (url[1] = '/') and (url[2] = '/') do delete(url,1,1);
@@ -1964,17 +1964,17 @@ begin
 
   if url[1] = '/' then node := node.getDocument().getCreator.parseTreeFromFile(url)
   else begin
-    if context.sender.FInternet = nil then begin
+    if context.staticContext.sender.FInternet = nil then begin
       if defaultInternetAccessClass = nil then
         raise Exception.Create('To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
-      context.sender.FInternet := defaultInternetAccessClass.create();
+      context.staticContext.sender.FInternet := defaultInternetAccessClass.create();
     end;
-    node := node.getDocument().getCreator.parseTree(context.sender.FInternet.get(url), url);
+    node := node.getDocument().getCreator.parseTree(context.staticContext.sender.FInternet.get(url), url);
   end;
 
   //writeln(strFromPtr(node));
 
-  context.sender.FExternalDocuments.AddObject(url, node);
+  context.staticContext.sender.FExternalDocuments.AddObject(url, node);
 
   result := xqvalue(node);
 
@@ -2004,7 +2004,7 @@ begin
   requiredArgCount(args, 0, 1);
   if (length(args) = 0) or (args[0].isUndefined) then url := ''
   else url := args[0].toString;
-  if assigned(context.sender.OnCollection) then context.sender.OnCollection(context.sender, url, result);
+  if assigned(context.staticContext.sender.OnCollection) then context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
 end;
 
 procedure xqFunctionConcatenate(args: TXQVArray; var result: IXQValue);
@@ -2024,16 +2024,16 @@ var  i: Integer;
      v: IXQValue;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
   if args[0].kind <> pvkSequence then begin
-    if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.sender.ImplicitTimezone) then result := xqvalue(1)
+    if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.staticContext.sender.ImplicitTimezone) then result := xqvalue(1)
     //else := result = undefined
   end else begin
     i := 0;
     for v in args[0] do begin
       i += 1;
-      if xqvalueComparableTypes(v, args[1]) and xqvalueEqualAtomicBase(v, args[1], collation, context.sender.ImplicitTimezone) then
+      if xqvalueComparableTypes(v, args[1]) and xqvalueEqualAtomicBase(v, args[1], collation, context.staticContext.sender.ImplicitTimezone) then
         xqvalueSeqAdd(result, xqvalue(i));
     end;
   end;
@@ -2081,7 +2081,7 @@ var
  atom: IXQValue;
 begin
   requiredArgCount(args, 1, 2);
-  if length(args) = 2 then collation := context.sender.getCollation(args[1].toString)
+  if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString)
   else collation := context.collation;
   atom := xqvalueAtomize(args[0]);
   if atom.kind <> pvkSequence then begin
@@ -2092,7 +2092,7 @@ begin
   for v in atom do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if xqvalueComparableTypes(resseq.seq[i], v) and xqvalueEqualAtomicBase(resseq.seq[i], v, collation, context.sender.ImplicitTimezone,true) then begin
+      if xqvalueComparableTypes(resseq.seq[i], v) and xqvalueEqualAtomicBase(resseq.seq[i], v, collation, context.staticContext.sender.ImplicitTimezone,true) then begin
         found := true;
         break;
       end;
@@ -2225,7 +2225,7 @@ var i:integer;
     enum1, enum2: TXQValueEnumerator;
 begin
   requiredArgCount(args,2, 3);
-  if length(args) = 3 then collation := context.sender.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
   else collation := context.collation;
 
   if args[0].getSequenceCount <> args[1].getSequenceCount then begin
@@ -2240,7 +2240,7 @@ begin
     if enum1.Current is TXQValue_AnyAtomicType then begin
       if not (enum2.Current is TXQValue_AnyAtomicType)
          or not xqvalueComparableTypes(enum1.Current, enum2.Current)
-         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.sender.ImplicitTimezone,true) then begin //todo:   nodes?
+         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.sender.ImplicitTimezone,true) then begin //todo:   nodes?
         result := xqvalue(false);
         exit;
       end;

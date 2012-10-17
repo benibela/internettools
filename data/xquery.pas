@@ -62,19 +62,31 @@ type
 
   TXQTermFlowerOrderEmpty = (xqfoStatic, xqfoEmptyLeast, xqfoEmptyGreatest);
 
-  TXQStaticContext = record
+  { TXQStaticContext }
+
+  TXQStaticContext = class
+    sender: TXQueryEngine;
+
     stripBoundarySpace: boolean;
     moduleVariables: TXQVariableChangeLog;
     namespaces: TNamespaceList;
     functions: array of TXQValueFunction;
+    importedModules: TStringList;
+    moduleNamespace: TNamespace;
+    defaultFunctionNamespace: TNamespace;
     //TODO: use these values
     collation: string;
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
-    functionNamespace, elementNamespace: string;
+    elementNamespace: string;
     baseURI: string;
     constructionPreserve: boolean;
     ordering: boolean;
     copyNamespacePreserve, copyNamespaceInherit: boolean;
+
+
+    function clone(): TXQStaticContext;
+    destructor Destroy; override;
+    function findNamespace(const nsprefix: string): TNamespace;
   end;
 
   { TEvaluationContext }
@@ -85,7 +97,6 @@ type
   Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
   *)
   TEvaluationContext = record
-    sender: TXQueryEngine;
     ParentElement: TTreeElement; //**< associated tree element (= context item if context item is a node)
     RootElement: TTreeElement;
     collation: TXQCollation; //**< Default collation used for string comparisons
@@ -97,11 +108,12 @@ type
     temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
     namespaces: TNamespaceList;
 
-    staticContext: ^TXQStaticContext;
+    staticContext: TXQStaticContext;
 
     function compareAtomicBase(const a,b: IXQValue): integer;
     function findNamespace(const nsprefix: string): TNamespace;
     function findNamespaceURL(const nsprefix: string): string;
+    function findModuleStaticContext(const namespace: TNamespace): TXQStaticContext;
   end;
 
 
@@ -573,6 +585,7 @@ type
   //** A function. Currenlty only wraps a TXQTerm and can not be called (some kind of hack to store types without having a metatype value)
   TXQValueFunction = class(TXQValue)
     name: string;
+    namespace: TNamespace;
     parameters: array of TXQFunctionParameter;
     resulttype: txqtermsequencetype;
     body: TXQTerm;
@@ -782,6 +795,7 @@ type
   { TXQTermVariable }
 
   TXQTermVariable = class(TXQTerm)
+    namespaceprefix: string;
     value: string;
     constructor create(const avalue: string);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
@@ -790,6 +804,7 @@ type
   { TXQTermDefineVariable }
 
   TXQTermDefineVariable = class(TXQTerm)
+    namespaceprefix: string;
     variablename: string;
     constructor create(avarname: string);
     constructor create(varname: TXQTerm; value: TXQTerm = nil);
@@ -801,6 +816,7 @@ type
   { TXQTermDefineFunction }
 
   TXQTermDefineFunction = class(TXQTerm)
+    namespace: TNamespace;
     funcname: string;
     constructor create(aname: string);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
@@ -837,14 +853,14 @@ type
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   end;
 
-  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkWrappedOperator, xqfkTypeConstructor, xqfkLocal);
+  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown);
 
   { TXQTermNamedFunction }
 
   TXQTermNamedFunction = class(TXQTerm)
     kind: TXQTermNamedFunctionKind;
     index: integer;
-    funcname: string;
+    funcname, namespacePrefix: string;
     constructor create(const akind: TXQTermNamedFunctionKind; const aindex: integer);
     constructor create(const name: string);
     constructor create(const name: string; args: array of TXQTerm);
@@ -877,9 +893,11 @@ type
   { TXQTermFlower }
   TXQTermFlowerVariable = record
     kind: (xqfkFor, xqfkLet);
+    namespace: TNamespace;
     varname: string;
     sequenceTyp: TXQTermSequenceType;
     //allowingEmpty: boolean;
+    positionVarNamespace: TNamespace;
     positionVarname: string;
     expr: TXQTerm;
   end;
@@ -943,7 +961,6 @@ type
   { TXQTermModule }
 
   TXQTermModule = class(TXQTerm)
-    name, url: string;
     procedure initializeStaticContext(const context: TEvaluationContext); //will change context.staticContext^, just const so it is not copied
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   end;
@@ -956,14 +973,13 @@ type
   { TXQuery }
 
   TXQuery = class(TInterfacedObject, IXQuery)
-    constructor Create(aengine: TXQueryEngine; aterm: TXQTerm = nil);
+    constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeElement = nil): IXQValue;
     function evaluate(const context: TEvaluationContext): IXQValue;
 
     destructor Destroy; override;
   private
     term: txqterm;
-    engine: TXQueryEngine;
     staticContextInitialized: boolean;
     staticContext: TXQStaticContext;
     procedure initializeStaticContext(const context: TEvaluationContext);
@@ -1130,10 +1146,11 @@ type
     RootElement: TTreeElement; //**< Root element
     ParentElement: TTreeElement; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
     TextElement: TTreeElement; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
-    StaticContext: TXQStaticContext;
-
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
+
+    StaticContext: TXQStaticContext;
+
 
     VariableChangelog: TXQVariableChangeLog;  //**< All variables that have been set (if a variable was overriden, it stores the old and new value)
     TreeStorage: TTreeParser; //**< Object storing all trees generated during by an XQuery expression
@@ -1170,6 +1187,9 @@ type
     //** Evaluates an expression with a certain tree element as current node.
     class function evaluateStaticCSS3(expression: string; tree:TTreeElement = nil): IXQValue;
 
+    procedure registerModule(module: IXQuery);
+    function findModule(const namespaceURL: string; at: array of string): TXQuery;
+
     //** Registers an custom, pure function with a certain name
     class procedure registerFunction(const name: string; const func: TXQBasicFunction; const returnType: TXQValueKind=pvkUndefined);
     //** Registers an custom, complex function with a certain name
@@ -1192,6 +1212,7 @@ type
     {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
     FInternet: TInternetAccess;
     {$endif}
+    FModules: TInterfaceList;
 
   protected
     class procedure registerBinaryOp(const name: string; const func: TXQBinaryOp; const priority: integer; const returnType: TXQValueKind=pvkUndefined);
@@ -1217,10 +1238,12 @@ type
     class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;const context: TEvaluationContext): IXQValue;
 
     //**< Evaluates a path expression, created from the given term in the given context.
-    procedure evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
+    class procedure evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
 
     //**< Returns the collation for an url id
     class function getCollation(id:string): TXQCollation;
+
+    function findNamespace(const nsprefix: string): TNamespace;
   end;
 
   { TXQQueryIterator }
@@ -1292,6 +1315,7 @@ type
 
   *)
   TXQVariable = record
+    namespace: TNamespace;
     name: string; //**< Name of the variable
     value: IXQValue;
     fullname: string; //**< Name used to change the variable (i.e. when changing @code(obj.property), @code(name) will be @code(obj), and @code(fullname) will be @code(obj.property)  )
@@ -1316,26 +1340,28 @@ type
     readonly: boolean; //**< If true, modifying the variable value raises an error
     allowObjects: boolean;  //**< If true, object properties can be changed by assigning something to e.g. @code(obj.property)
 
-    procedure addVariable(name: string; const value: IXQValue); //**< Add a variable
+    procedure addVariable(name: string; const value: IXQValue; const namespace: TNamespace = nil); //**< Add a variable
     procedure addVariable(name: string; const value: string); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: integer); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: decimal); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: boolean); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: TDateTime); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: TTreeElement); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure addVariable(name: string; const value: string; const namespace: TNamespace); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure addVariable(name: string; const value: integer; const namespace: TNamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure addVariable(name: string; const value: decimal; const namespace: TNamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure addVariable(name: string; const value: boolean; const namespace: TNamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure addVariable(name: string; const value: TDateTime; const namespace: TNamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure addVariable(name: string; const value: TTreeElement; const namespace: TNamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
 
-    function getVariableValue(name: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
+    function getVariableValue(name: string; const namespace: TNamespace = nil): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
 
-    function getVariableValueBoolean(const name: string): boolean; //**< Last value of the variable with name @code(name) as boolean
-    function getVariableValueInteger(const name: string): integer; //**< Last value of the variable with name @code(name) as integer
-    function getVariableValueDecimal(const name: string): decimal; //**< Last value of the variable with name @code(name) as decimal
-    function getVariableValueDateTime(const name: string): TDateTime; //**< Last value of the variable with name @code(name) as datetime
+    function getVariableValueBoolean(const name: string; const namespace: TNamespace = nil): boolean; //**< Last value of the variable with name @code(name) as boolean
+    function getVariableValueInteger(const name: string; const namespace: TNamespace = nil): integer; //**< Last value of the variable with name @code(name) as integer
+    function getVariableValueDecimal(const name: string; const namespace: TNamespace = nil): decimal; //**< Last value of the variable with name @code(name) as decimal
+    function getVariableValueDateTime(const name: string; const namespace: TNamespace = nil): TDateTime; //**< Last value of the variable with name @code(name) as datetime
     function getVariableValueString(const name: string): string; //**< Last value of the variable with name @code(name) as string
-    function getVariableValueNode(const name: string): TTreeElement; //**< Last value of the variable with name @code(name) as ttreeelement
-    function getVariableValueArray(const name: string): TXQVArray; //**< Last value of the variable with name @code(name) as array of txqvalue. It uses an array instead of an list, so you don't have to free it.
-    function getVariableValueObject(const name: string): TXQValueObject; //**< Last value of the variable with name @code(name) as object
+    function getVariableValueString(const name: string; const namespace: TNamespace): string; //**< Last value of the variable with name @code(name) as string
+    function getVariableValueNode(const name: string; const namespace: TNamespace = nil): TTreeElement; //**< Last value of the variable with name @code(name) as ttreeelement
+    function getVariableValueArray(const name: string; const namespace: TNamespace = nil): TXQVArray; //**< Last value of the variable with name @code(name) as array of txqvalue. It uses an array instead of an list, so you don't have to free it.
+    function getVariableValueObject(const name: string; const namespace: TNamespace = nil): TXQValueObject; //**< Last value of the variable with name @code(name) as object
 
-    function getVariableIndex(name: string): integer; //**< Returns the last index of the variable @code(name) in the internal list. (Warning: doesn't support objects, yet??) It is recommended to use hasVariable instead, the index is an implementation detail
+    function getVariableIndex(name: string; const namespace: TNamespace = nil): integer; //**< Returns the last index of the variable @code(name) in the internal list. (Warning: doesn't support objects, yet??) It is recommended to use hasVariable instead, the index is an implementation detail
 
     function count: integer; //**< Returns the number of stored values (>= count of variables)
 
@@ -1353,8 +1379,8 @@ type
 
     function getAllVariableValues(name: string): TXQVArray; //**< Returns all values of the variable with name @name(name) as array
 
-    function hasVariable(const variable: string; value: PXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
-    function hasVariableOrObject(const variable: string; value: PXQValue): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+    function hasVariable(const variable: string; value: PXQValue; const namespace: TNamespace = nil): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+    function hasVariableOrObject(const variable: string; value: PXQValue; const namespace: TNamespace = nil): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
 
     //property Values[name:string]:TXQValue read getVariableValueClone write addVariable;
     property ValuesString[name:string]:string read getVariableValueString write addVariable;
@@ -1846,12 +1872,69 @@ begin
   result := TXQValueNode.Create(v);
 end;
 
+{ TXQStaticContext }
+
+function TXQStaticContext.clone: TXQStaticContext;
+begin
+  Result := TXQStaticContext.Create;
+  result.sender := sender;
+  result.stripboundaryspace := stripboundaryspace;
+  result.modulevariables := modulevariables;
+  result.namespaces := namespaces;
+  result.functions := functions;
+  result.importedmodules := importedmodules;
+  result.collation := collation;
+  result.emptyorderspec := emptyorderspec;
+  result.defaultFunctionNamespace := defaultFunctionNamespace;
+  result.elementnamespace := elementnamespace;
+  result.baseuri := baseuri;
+  result.constructionpreserve := constructionpreserve;
+  result.ordering := ordering;
+  result.copynamespacepreserve := copynamespacepreserve;
+  result.copynamespaceinherit := copynamespaceinherit;
+end;
+
+destructor TXQStaticContext.Destroy;
+var
+  i: Integer;
+begin
+  FreeAndNil(moduleVariables);
+  if importedModules <> nil then
+  FreeAndNil(importedModules);
+  for i := 0 to high(functions) do
+    functions[i].free;
+  FreeAndNil(moduleNamespace);
+  if namespaces <> nil then begin
+    namespaces.freeAll;
+    namespaces.free;
+  end;
+  inherited Destroy;
+end;
+
+function TXQStaticContext.findNamespace(const nsprefix: string): TNamespace;
+var
+  i: Integer;
+begin
+  result := nil;
+  if (moduleNamespace <> nil) and (moduleNamespace.prefix = nsprefix) then
+    exit(moduleNamespace);
+  if (defaultFunctionNamespace <> nil) and (defaultFunctionNamespace.prefix = nsprefix) then
+    exit(defaultFunctionNamespace);
+  if (namespaces <> nil) and (namespaces.hasNamespacePrefix(nsprefix, result)) then
+    exit;
+  if importedModules <> nil then begin
+    i := importedModules.IndexOf(nsprefix);
+    if i >= 0 then exit(TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace);
+  end;
+  result := sender.findNamespace(nsprefix);
+end;
+
 { TXQTermModule }
 
 
 function TXQTermModule.evaluate(const context: TEvaluationContext): IXQValue;
 begin
-  if name <> '' then raiseEvaluationError('A module cannot be evaluated');
+  if context.staticContext.moduleNamespace <> nil then raiseEvaluationError('A module cannot be evaluated');
   result := children[high(children)].evaluate(context);
 end;
 
@@ -1863,14 +1946,15 @@ var
   functionCount: Integer;
   vars: TXQVariableChangeLog;
   truechildcount: Integer;
+  ns: TNamespace;
 begin
   truechildcount := length(children);
-  if name = '' then truechildcount-=1;
+  if context.staticContext.moduleNamespace <> nil then truechildcount-=1;
 
   functionCount := 0;
   for i:=0 to truechildcount - 1 do if children[i] is TXQTermDefineFunction then functionCount += 1;
-  setlength(context.staticContext^.functions, functionCount);
-  functions := context.staticContext^.functions;
+  setlength(context.staticContext.functions, functionCount);
+  functions := context.staticContext.functions;
   functionCount := 0;
   for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineFunction then begin
@@ -1879,12 +1963,20 @@ begin
       functionCount+=1;
     end;
 
-  if context.staticContext^.moduleVariables = nil then context.staticContext^.moduleVariables := TXQVariableChangeLog.create();
-  vars := context.staticContext^.moduleVariables;
+  if context.staticContext.moduleVariables = nil then context.staticContext.moduleVariables := TXQVariableChangeLog.create();
+  vars := context.staticContext.moduleVariables;
   for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineVariable then begin
       tempDefVar := TXQTermDefineVariable(children[i]);
-      vars.addVariable(tempDefVar.variablename, tempDefVar.children[high(tempDefVar.children)].evaluate(context));
+
+      if tempDefVar.namespaceprefix = '' then ns := nil
+      else ns := context.findNamespace(tempDefVar.namespaceprefix);
+      if (ns = nil) and (context.staticContext.moduleNamespace <> nil) then
+        raiseEvaluationError('Unknown namespace prefix for variable: '+tempDefVar.namespaceprefix+ ':'+tempDefVar.variablename);
+      if (context.staticContext.moduleNamespace  <> nil) and (context.staticContext.moduleNamespace  <> ns ) and (context.staticContext.moduleNamespace.url  <> ns.url ) then
+         raiseEvaluationError('Invalid namespace for variable: '+tempDefVar.namespaceprefix+ ':'+tempDefVar.variablename);
+
+      vars.addVariable(tempDefVar.variablename, tempDefVar.children[high(tempDefVar.children)].evaluate(context), ns);
       if length(tempDefVar.children) > 1 then
         if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(vars.vars[high(vars.vars)].value, context) then
           raiseEvaluationError('Variable '+tempDefVar.variablename + ' with value ' +vars.vars[high(vars.vars)].value.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
@@ -1909,23 +2001,15 @@ end;
 
 function TEvaluationContext.compareAtomicBase(const a, b: IXQValue): integer;
 begin
-  result := xqvalueCompareAtomicBase(a, b, collation, sender.ImplicitTimezone);
+  result := xqvalueCompareAtomicBase(a, b, collation, staticContext.sender.ImplicitTimezone);
 end;
 
 function TEvaluationContext.findNamespace(const nsprefix: string): TNamespace;
+var
+  i: Integer;
 begin
   if (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
-  if (staticContext^.namespaces <> nil) and (staticContext^.namespaces.hasNamespacePrefix(nsprefix, result)) then exit;
-  if (sender.GlobalNamespaces <> nil) and (sender.GlobalNamespaces.hasNamespacePrefix(nsprefix, result)) then exit;
-  case nsprefix of
-    'xml': result := XMLNamespace_XML;
-    'xmlns': result := XMLNamespace_XMLNS;
-    'xs': result := XMLNamespace_XMLSchema;
-    'xsi': result := XMLNamespace_XMLSchemaInstance;
-    'fn': result := XMLNamespace_XPathFunctions;
-    'local': result := XMLNamespace_XQueryLocalFunctions;
-    else result := nil;
-  end;
+  result := staticContext.findNamespace(nsprefix);
 end;
 
 function TEvaluationContext.findNamespaceURL(const nsprefix: string): string;
@@ -1940,20 +2024,34 @@ begin
   result := temp.url;
 end;
 
+function TEvaluationContext.findModuleStaticContext(const namespace: TNamespace): TXQStaticContext;
+var
+  i: Integer;
+begin
+  if staticContext = nil then exit(nil);
+
+  if (staticContext.importedModules <> nil) and (namespace <> nil) then
+    for i := 0 to staticContext.importedModules.count - 1 do
+      if TXQuery(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace.url = namespace.url then
+        exit(TXQuery(staticContext.importedModules.Objects[i]).staticContext);
+
+  result := staticContext;
+end;
+
 { TXQuery }
 
-constructor TXQuery.Create(aengine: TXQueryEngine; aterm: TXQTerm);
+constructor TXQuery.Create(asStaticContext: TXQStaticContext; aterm: TXQTerm);
 begin
   term := aterm;
-  engine := aengine;
+  staticContext := asStaticContext;
 end;
 
 function TXQuery.evaluate(const tree: TTreeElement = nil): IXQValue;
 var context: TEvaluationContext;
 begin
   if term = nil then exit(xqvalue());
-  context := engine.getEvaluationContext;
-  context.staticContext:=@staticContext;
+  context := staticContext.sender.getEvaluationContext;
+  context.staticContext:=staticContext;
   if tree <> nil then begin
     context.ParentElement := tree;
     context.RootElement := tree;
@@ -1967,7 +2065,7 @@ var tempcontext: TEvaluationContext;
 begin
   if term = nil then exit(xqvalue());
   tempcontext:=context;
-  tempcontext.staticContext:=@staticContext;
+  tempcontext.staticContext:=staticContext;
   initializeStaticContext(tempcontext);
   result := term.evaluate(tempcontext);
 end;
@@ -1977,9 +2075,8 @@ var
   i: Integer;
 begin
   term.Free;
-  FreeAndNil(staticContext.moduleVariables);
-  for i := 0 to high(staticContext.functions) do
-    staticContext.functions[i].free;
+  if staticContext<> nil then
+    FreeAndNil(staticContext);
   inherited Destroy;
 end;
 
@@ -2433,7 +2530,8 @@ end;
 
 { TXQVariableStorage }
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: IXQValue);
+
+procedure TXQVariableChangeLog.addVariable(name: string; const value: IXQValue; const namespace: TNamespace = nil);
 var
  point: Integer;
  base: String;
@@ -2453,9 +2551,11 @@ begin
   SetLength(vars, length(vars)+1);
   vars[high(vars)].fullname:=name;
   if point = 0 then begin
+    vars[high(vars)].namespace := namespace;
     vars[high(vars)].name:=name;
     vars[high(vars)].value:=value;
   end else begin
+    vars[high(vars)].namespace := namespace;
     vars[high(vars)].name:=base;
     vars[high(vars)].value:=(getVariableValue(i) as TXQValueObject).setImmutable(strCopyFrom(name, point + 1), value);;
   end;
@@ -2474,38 +2574,43 @@ end;
 
 procedure TXQVariableChangeLog.addVariable(name: string; const value: string);
 begin
-  addVariable(name, xqvalue(value));
+  addVariable(name, xqvalue(value), nil);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: integer);
+procedure TXQVariableChangeLog.addVariable(name: string; const value: string; const namespace: TNamespace);
 begin
-  addVariable(name, xqvalue(value));
+  addVariable(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: decimal);
+procedure TXQVariableChangeLog.addVariable(name: string; const value: integer; const namespace: TNamespace = nil);
 begin
-  addVariable(name, xqvalue(value));
+  addVariable(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: boolean);
+procedure TXQVariableChangeLog.addVariable(name: string; const value: decimal; const namespace: TNamespace = nil);
 begin
-  addVariable(name, xqvalue(value));
+  addVariable(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: TDateTime);
+procedure TXQVariableChangeLog.addVariable(name: string; const value: boolean; const namespace: TNamespace = nil);
 begin
-  addVariable(name, xqvalue(value));
+  addVariable(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: TTreeElement);
+procedure TXQVariableChangeLog.addVariable(name: string; const value: TDateTime; const namespace: TNamespace = nil);
 begin
-  addVariable(name, xqvalue(value));
+  addVariable(name, xqvalue(value), namespace);
 end;
 
-function TXQVariableChangeLog.getVariableValue(name: string): IXQValue;
+procedure TXQVariableChangeLog.addVariable(name: string; const value: TTreeElement; const namespace: TNamespace = nil);
+begin
+  addVariable(name, xqvalue(value), namespace);
+end;
+
+function TXQVariableChangeLog.getVariableValue(name: string; const namespace: TNamespace): IXQValue;
 var i:integer;
 begin
-  i := getVariableIndex(name);
+  i := getVariableIndex(name, namespace);
   if i = -1 then begin
     if temporaryUndefined = nil then temporaryUndefined := xqvalue();
     exit(temporaryUndefined);
@@ -2513,55 +2618,62 @@ begin
   result := vars[i].value;
 end;
 
-function TXQVariableChangeLog.getVariableValueBoolean(const name: string): boolean;
+function TXQVariableChangeLog.getVariableValueBoolean(const name: string; const namespace: TNamespace): boolean;
 begin
-  result := getVariableValue(name).toBoolean;
+  result := getVariableValue(name, namespace).toBoolean;
 end;
 
-function TXQVariableChangeLog.getVariableValueInteger(const name: string): integer;
+function TXQVariableChangeLog.getVariableValueInteger(const name: string; const namespace: TNamespace): integer;
 begin
-  result := getVariableValue(name).toInt64;
+  result := getVariableValue(name, namespace).toInt64;
 end;
 
-function TXQVariableChangeLog.getVariableValueDecimal(const name: string): decimal;
+function TXQVariableChangeLog.getVariableValueDecimal(const name: string; const namespace: TNamespace): decimal;
 begin
-  result := getVariableValue(name).toDecimal;
+  result := getVariableValue(name, namespace).toDecimal;
 end;
 
-function TXQVariableChangeLog.getVariableValueDateTime(const name: string): TDateTime;
+function TXQVariableChangeLog.getVariableValueDateTime(const name: string; const namespace: TNamespace): TDateTime;
 begin
-  result := getVariableValue(name).toDateTime;
+  result := getVariableValue(name, namespace).toDateTime;
 end;
 
 function TXQVariableChangeLog.getVariableValueString(const name: string): string;
 begin
+  result := getVariableValueString(name, nil);
+end;
+
+function TXQVariableChangeLog.getVariableValueString(const name: string; const namespace: TNamespace): string;
+begin
   result := getVariableValue(name).toString;
 end;
 
-function TXQVariableChangeLog.getVariableValueNode(const name: string): TTreeElement;
+function TXQVariableChangeLog.getVariableValueNode(const name: string; const namespace: TNamespace): TTreeElement;
 begin
-  result := getVariableValue(name).toNode;
+  result := getVariableValue(name, namespace).toNode;
 end;
 
-function TXQVariableChangeLog.getVariableValueArray(const name: string): TXQVArray;
+function TXQVariableChangeLog.getVariableValueArray(const name: string; const namespace: TNamespace): TXQVArray;
 begin
-  result := getVariableValue(name).toArray;
+  result := getVariableValue(name, namespace).toArray;
 end;
 
-function TXQVariableChangeLog.getVariableValueObject(const name: string): TXQValueObject;
+function TXQVariableChangeLog.getVariableValueObject(const name: string; const namespace: TNamespace): TXQValueObject;
 begin
-  result := getVariableValueObject(getVariableIndex(name));
+  result := getVariableValueObject(getVariableIndex(name, namespace));
 end;
 
-function TXQVariableChangeLog.getVariableIndex(name: string): integer;
+function TXQVariableChangeLog.getVariableIndex(name: string; const namespace: TNamespace): integer;
 var i:longint;
 begin
   if caseSensitive then begin
     for i:=high(vars) downto 0 do
-      if vars[i].name = name then exit(i);
+      if (vars[i].name = name)
+         and (vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.url = namespace.url)) then exit(i);
   end else
   for i:=high(vars) downto 0 do
-    if striequal(vars[i].name, name) then exit(i);
+    if striequal(vars[i].name, name)
+       and (vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.url = namespace.url)) then exit(i);
   exit(-1);
 end;
 
@@ -2799,7 +2911,7 @@ begin
   setlength(result.vars,p);
 end;
 
-function TXQVariableChangeLog.hasVariable(const variable: string; value: PXQValue): boolean;
+function TXQVariableChangeLog.hasVariable(const variable: string; value: PXQValue; const namespace: TNamespace): boolean;
 var temp: txqvalue;
   base: string;
   varname: string;
@@ -2807,30 +2919,30 @@ var temp: txqvalue;
 begin
   if allowObjects then begin
     if splitVariableName(variable, base, varname) then begin
-      result := hasVariable(base, @temp);
+      result := hasVariable(base, @temp, namespace);
       if not result then exit;
       if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
       result := (temp as TXQValueObject).hasProperty(varname, value);
       exit;
     end;
   end;
-  i := getVariableIndex(variable);
+  i := getVariableIndex(variable, namespace);
   if i = -1 then exit(false);
   if assigned(value) then value^ := vars[i].value as txqvalue;
   result := true;
 end;
 
-function TXQVariableChangeLog.hasVariableOrObject(const variable: string; value: PXQValue): boolean;
+function TXQVariableChangeLog.hasVariableOrObject(const variable: string; value: PXQValue; const namespace: TNamespace): boolean;
 var temp: txqvalue;
   base: string;
   varname: string;
 begin
   if not allowObjects then
-    exit(hasVariable(variable, value));
+    exit(hasVariable(variable, value, namespace));
   if not splitVariableName(variable, base, varname) then
-    exit(hasVariable(variable, value));
+    exit(hasVariable(variable, value, namespace));
 
-  result := hasVariable(base, @temp);
+  result := hasVariable(base, @temp, namespace);
   if not result then exit;
   if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
 
@@ -2963,7 +3075,7 @@ end;
 
 function TXQueryEngine.parseCSS3(s: string): IXQuery;
 begin
-  FLastQuery := TXQuery.Create(self, parseCSSTerm(s));
+  FLastQuery := TXQuery.Create(StaticContext.clone(), parseCSSTerm(s));
   result := FLastQuery;
 end;
 
@@ -2978,7 +3090,7 @@ var defaultNodeCollation: TXQCollation = nil;
 
 function TXQueryEngine.getEvaluationContext: TEvaluationContext;
 begin
-  result.sender:=self;
+  result.staticContext:=StaticContext;
   result.collation := TXQueryEngine.getDefaultCollation;
   result.nodeCollation := defaultnodeCollation;
   if result.nodeCollation = nil then result.nodeCollation := result.collation;
@@ -2999,6 +3111,10 @@ begin
   OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   OnDefineVariable:= @VariableChangelog.defineVariable;
   GlobalNamespaces := TNamespaceList.Create;
+  StaticContext := TXQStaticContext.Create;
+  StaticContext.defaultFunctionNamespace := XMLNamespace_XPathFunctions;
+  StaticContext.sender := self;
+  FModules := TInterfaceList.Create;
 end;
 
 destructor TXQueryEngine.Destroy;
@@ -3018,6 +3134,8 @@ begin
   end;
   FExternalDocuments.Free;
   GlobalNamespaces.free;
+  FModules.Free;
+  StaticContext.Free;
   inherited Destroy;
 end;
 
@@ -3059,6 +3177,28 @@ begin
   finally
     engine.Free;
   end;
+end;
+
+procedure TXQueryEngine.registerModule(module: IXQuery);
+var
+  modobj: TXQuery;
+  context: TEvaluationContext;
+begin
+  modobj := module as TXQuery;
+  context := getEvaluationContext();
+  context.staticContext := modobj.staticContext;
+  modobj.initializeStaticContext(context);
+  FModules.Add(module);
+end;
+
+function TXQueryEngine.findModule(const namespaceURL: string; at: array of string): TXQuery;
+var
+  i: Integer;
+begin
+  for i := 0 to FModules.Count - 1 do
+    if (FModules.Items[i] as TXQuery).staticContext.moduleNamespace.url = namespaceURL then
+      exit((FModules.Items[i] as TXQuery));
+  exit(nil);
 end;
 
 function recordClone(p: pointer; s: Integer): pointer;
@@ -3132,19 +3272,19 @@ end;
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQuery;
 var cxt: TXQParsingContext;
 begin
-  if str = '' then exit(TXQuery.Create(self, TXQTermSequence.Create));
+  if str = '' then exit(TXQuery.Create(StaticContext.clone(), TXQTermSequence.Create));
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
   cxt.AllowObjects:=VariableChangelog.allowObjects;
-  cxt.staticContext := StaticContext;
+  cxt.staticContext := StaticContext.clone();
   cxt.parsingModel:=model;
+  cxt.engine := self;
   try
     cxt.str := str;
     cxt.pos := @cxt.str[1];
-    result := TXQuery.Create(self);
+    result := TXQuery.Create(cxt.staticContext);
     result.term := cxt.parseModule();
-    result.staticContext := cxt.staticContext;
     if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   finally
     cxt.free;
@@ -3660,7 +3800,7 @@ begin
       newSequenceSeq := (newSequence as TXQValueSequence).seq;
       newSequenceSeq.count := 0;
       while newnode <> nil do begin
-        if not (qmExcludeRoot in command.matching) or ((newnode <> context.RootElement) and (newnode <> context.sender.RootElement))  then
+        if not (qmExcludeRoot in command.matching) or ((newnode <> context.RootElement) and (newnode <> context.staticContext.sender.RootElement))  then
           newSequenceSeq.add(xqvalue(newnode));
         newnode := getNextQueriedNode(newnode, nodeCondition);
       end;
@@ -3691,7 +3831,7 @@ begin
   case query.typ of
     qcDocumentRoot: begin
       if context.RootElement <> nil then result := xqvalue(context.RootElement)
-      else if context.sender.RootElement <> nil then result := xqvalue(context.sender.RootElement)
+      else if context.staticContext.sender.RootElement <> nil then result := xqvalue(context.staticContext.sender.RootElement)
       else raise EXQEvaluationException.Create('Need root element');
       filterSequence(result, query.filters, context);
     end;
@@ -3702,7 +3842,7 @@ begin
     else begin
       if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
-      else if context.sender.ParentElement <> nil then result := xqvalue(context.sender.ParentElement)
+      else if context.staticContext.sender.ParentElement <> nil then result := xqvalue(context.staticContext.sender.ParentElement)
       else raise EXQEvaluationException.Create('No context');
       result := expandSequence(result,query, context);
     end;
@@ -3717,7 +3857,7 @@ end;
 //   a/b[x][y][z]/c
 //   =>  (  (/a)  /  ( b [:] x, y, z )  ) / c
 //   or:  (  (/a)  /  ( ( (b [:] x) [:] y) [:] z  )  ) / c
-procedure TXQueryEngine.evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
+class procedure TXQueryEngine.evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
 var
   query: TXQPathMatching;
   i:integer;
@@ -3756,6 +3896,20 @@ begin
   i := collations.IndexOf(id);
   if i < 0 then raise EXQEvaluationException.Create('Collation ' + id + ' is not defined');
   result:=TXQCollation(collations.Objects[i]);
+end;
+
+function TXQueryEngine.findNamespace(const nsprefix: string): TNamespace;
+begin
+  if (GlobalNamespaces <> nil) and (GlobalNamespaces.hasNamespacePrefix(nsprefix, result)) then exit;
+  case nsprefix of
+    'xml': result := XMLNamespace_XML;
+    'xmlns': result := XMLNamespace_XMLNS;
+    'xs': result := XMLNamespace_XMLSchema;
+    'xsi': result := XMLNamespace_XMLSchemaInstance;
+    'fn': result := XMLNamespace_XPathFunctions;
+    'local': result := XMLNamespace_XQueryLocalFunctions;
+    else result := nil;
+  end;
 end;
 
 class function TXQueryEngine.getDefaultCollation: TXQCollation;

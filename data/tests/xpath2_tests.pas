@@ -1619,9 +1619,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$test.t3', '3', '');
   t('$test.t4', '4', '');
   t('test.foo:bar := 123', '123', '');
-  t('$test.foo:bar', '123', '');
+  {t('$test.foo:bar', '123', '');
   t('$test.foo:bar := 456', '456', ''); //good idea to allow both??
-  t('$test.foo:bar', '456', '');
+  t('$test.foo:bar', '456', '');}
   t('obj := xs:object(("a", "b", "c", 123))', '', '');
   t('$obj.a', 'b', '');
   t('$obj.b', '', '');

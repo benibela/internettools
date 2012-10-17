@@ -49,7 +49,7 @@ var
     end end;
   end;
 
-  procedure m(a,b: string; c: string = '');
+  procedure m(a,b: string; c: string = ''); //main module
   begin
     try
     count+=1;
@@ -57,6 +57,16 @@ var
 
     except on e:exception do begin
       writeln('Error @ "',a, '"');
+      raise;
+    end end;
+  end;
+
+  procedure mr(s1: string); //module register
+  begin
+    try
+      ps.registerModule(ps.parseXQuery1(s1));
+    except on e:exception do begin
+      writeln('Error @ "',s1, '"');
       raise;
     end end;
   end;
@@ -496,13 +506,62 @@ begin
 
   m('declare variable $var := 123;  declare function wrapper($a as integer) { $var * $a }; wrapper(1) ', '123');
   m('declare variable $var := 123;  declare function wrapper($a as integer) { $var * $a }; wrapper(2) ', '246');
-  m('declare function wrapper($a as integer) { $var * $a }; declare variable $var := 123;  wrapper(3) ', '369'); //back variable reference (if i read the standard correctly that is not allowed. But it is easier to implement this way and in Zorba it also works)
+  m('declare function wrapper($a as integer) { $var * $a }; declare variable $var := 123;  wrapper(3) ', '369'); //forward variable reference (if i read the standard correctly that is not allowed. But it is easier to implement this way and in Zorba it also works)
   m('declare function odd($a as integer) { if ($a = 0) then false() else even($a - 1)}; declare function even($a as integer) { if ($a = 0) then true() else odd($a - 1)}; string-join(for $i in 0 to 9 return odd($i), " ") ', 'false true false true false true false true false true');
-
 
   //some realworld examples from stackoverflow
   t('let $x := 1, $seq := (2,4,7,11,16) for $temp at $pos in $seq return $seq[$pos] - if ($pos eq 1) then $x else $seq[$pos - 1]', '1 2 3 4 5');
   t('let $pVal := 1, $vList := (2,4,7,11,16), $vList2 := ($pVal, subsequence($vList, 1, count($vList)-1)) return for $i in 1 to count($vList) return $vList[$i] - $vList2[$i]', '1 2 3 4 5');
+
+
+  mr('module namespace test = "pseudo://test-module"; declare function test:internalref(){ concat($test:var, ":", test:func()) } declare variable $test:var := 123; declare function test:func(){ 456 }');
+  m('import module "pseudo://test-module"; $test:var', '123');
+  m('import module "pseudo://test-module"; test:func()', '456');
+  m('import module "pseudo://test-module"; test:internalref()', '123:456');
+  m('import module namespace rename = "pseudo://test-module"; $rename:var', '123');
+  m('import module namespace rename = "pseudo://test-module"; rename:func()', '456');
+  m('import module namespace rename = "pseudo://test-module"; rename:internalref()', '123:456');
+  m('import module namespace rename = "pseudo://test-module"; $test:var', ''); //or raise error?
+
+  mr('module namespace test2 = "pseudo://test-module2"; import module "pseudo://test-module"; declare function test2:sumcalc($param){ concat("SUM: ", sum($param)) } declare function test2:wrapwrap() { test:internalref() } ');
+  m('import module "pseudo://test-module2"; test2:sumcalc((1,2,3))', 'SUM: 6');
+  m('import module "pseudo://test-module2"; test2:wrapwrap()', '123:456');
+  m('import module namespace renamed = "pseudo://test-module2"; renamed:sumcalc((1,2,3))', 'SUM: 6');
+  m('import module namespace renamed = "pseudo://test-module2"; renamed:wrapwrap()', '123:456');
+  m('import module "pseudo://test-module2"; declare namespace indirect = "pseudo://test-module2"; indirect:sumcalc((90,1))', 'SUM: 91');
+  m('import module "pseudo://test-module2"; declare namespace indirect = "pseudo://test-module2"; indirect:wrapwrap()', '123:456');
+  m('import module "pseudo://test-module2"; declare namespace indirect = "pseudo://test-module2"; concat(test2:wrapwrap(), indirect:sumcalc((90,1)))', '123:456SUM: 91');
+
+  m('declare function local:test(){15}; local:test()', '15');
+  m('declare namespace xyz = "foobar"; declare function xyz:test(){-6}; xyz:test()', '-6');
+  m('declare namespace xyz = "foobar"; declare namespace alias = "foobar"; declare function xyz:test(){"assaa"}; alias:test()', 'assaa');
+  m('declare namespace xyz = "foobar"; declare namespace alias = "foobar"; declare function alias:test(){"aqe"}; xyz:test()', 'aqe');
+
+  m('declare variable $local:test := 123; $local:test', '123');
+  m('declare namespace xyz = "foobar"; declare variable $xyz:test := -666; $xyz:test', '-666');
+  m('declare namespace xyz = "foobar"; declare namespace alias = "foobar"; declare variable $xyz:test := "oddy"; $alias:test', 'oddy');
+  m('declare namespace xyz = "foobar"; declare namespace alias = "foobar"; declare variable $alias:test := "nemo"; $xyz:test', 'nemo');
+
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; string-join(for $xsy:abc in (1,2,3) return $xsy:abc, " ")', '1 2 3');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; string-join(for $xsy:abc in (1,2,3, 4) return $foobar:abc, " ")', '1 2 3 4');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; string-join(for $foobar:abc in (1,2,3) return $xsy:abc, " ")', '1 2 3');
+
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; every $xsy:abc in (1,2,3) satisfies $xsy:abc mod 2 = 1', 'false');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; every $xsy:abc in (1,3) satisfies $xsy:abc mod 2 = 1', 'true');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; every $xsy:abc in (1,2,3) satisfies $foobar:abc mod 2 = 1', 'false');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; every $xsy:abc in (1,3) satisfies $foobar:abc mod 2 = 1', 'true');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; every $foobar:abc in (1,2,3) satisfies $xsy:abc mod 2 = 1', 'false');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; every $foobar:abc in (1,3) satisfies $xsy:abc mod 2 = 1', 'true');
+
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $xsy:abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'true');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $xsy:abc in (1,3) satisfies $xsy:abc mod 2 = 0', 'false');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $xsy:abc in (1,2,3) satisfies $foobar:abc mod 2 = 0', 'true');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $xsy:abc in (1,3) satisfies $foobar:abc mod 2 = 0', 'false');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'true');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,3) satisfies $xsy:abc mod 2 = 0', 'false');
+
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $abc mod 2 = 0', 'false');
+  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'false');
 
 
   xml.free;

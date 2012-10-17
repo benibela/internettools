@@ -70,6 +70,8 @@ type
 { TXQParsingContext }
 
  TXQParsingContext = class
+  engine: TXQueryEngine;
+
   AllowVariableUseInStringLiterals: boolean;
   AllowObjects: boolean;
   parsingModel: TXQParsingModel;
@@ -335,12 +337,14 @@ begin
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
-  function parseVariableName: string;
+  procedure parseVariableName(out name: string; out namespace: TNamespace);
   begin
-    Result := nextToken;
-    if result = '' then raiseParsingError('Expected variable name');
-    if result[1] <> '$' then raiseParsingError('Expected variable name starting with $, but got "'+result+'"');
-    delete(result, 1, 1);
+    name := nextToken;
+    if name = '' then raiseParsingError('Expected variable name');
+    if name[1] <> '$' then raiseParsingError('Expected variable name starting with $, but got "'+name+'"');
+    delete(name, 1, 1);
+    if system.pos(':', name) = 0 then namespace := nil
+    else namespace := staticContext.findNamespace(strSplitGet(':', name));
   end;
 
   procedure parseVarBinding;
@@ -354,7 +358,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
       if (kind = xqfkLet) and (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
 
-      varname := parseVariableName;
+      parseVariableName(varname, namespace);
 
       temp := nextToken;
       if temp = 'as' then begin
@@ -373,7 +377,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
         if temp = 'at' then begin
           requireXQuery;
-          positionVarname := parseVariableName;
+          parseVariableName(positionVarname, positionVarNamespace);
           temp := nextToken;
         end;
 
@@ -1044,6 +1048,8 @@ function TXQParsingContext.parseModule(): TXQTerm;
   var
     moduleName: String;
     moduleURL: String;
+    at: array of string;
+    module: TXQuery;
   begin
     skipWhitespaceAndComment();
     moduleName := '';
@@ -1052,9 +1058,16 @@ function TXQParsingContext.parseModule(): TXQTerm;
     end;
     moduleURL := parseStringLiteral;
     if nextToken(true) = 'at' then begin
-      parseStringLiteral;
-      while nextToken(true) = ',' do begin expect(','); parseStringLiteral; end;
+      arrayAdd(at, parseStringLiteral);
+      while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseStringLiteral); end;
     end;
+
+    module := engine.findModule(moduleURL, at);
+    if module = nil then raiseParsingError('Unknown module: '+moduleURL);
+    if staticContext.importedModules = nil then
+      staticContext.importedModules := TStringList.Create;
+    if moduleName = '' then moduleName := module.staticContext.moduleNamespace.prefix;
+    staticContext.importedModules.AddObject(moduleName, module);
   end;
 
   function parseQNameWithType(out typ: TXQTermSequenceType): string;
@@ -1090,6 +1103,9 @@ function TXQParsingContext.parseModule(): TXQTerm;
     tempVar: TXQTermDefineVariable;
   begin
     funcTerm := TXQTermDefineFunction.create(nextTokenQName());
+    if system.pos(':', functerm.funcname) > 0 then begin
+      funcTerm.namespace:=staticContext.findNamespace(strSplitGet(':', functerm.funcname));
+    end;
     expect('(');
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
@@ -1122,6 +1138,7 @@ var
   token: String;
   nameSpaceName: String;
   nameSpaceURL: String;
+  temp: String;
 begin
   result := nil;
   token := nextToken(true);
@@ -1142,8 +1159,10 @@ begin
   if token = 'module' then begin
     requireModule;
     expect(token); expect('namespace');
-    TXQTermModule(result).name := nextToken(); if system.pos(':', token) > 0 then raiseParsingError('Namespace id must not begin with a namespace prefix itself');
-    TXQTermModule(result).url := parseStringLiteral;
+    staticContext.moduleNamespace := TNamespace.create('', nextToken());
+    if system.pos(':', staticContext.moduleNamespace.prefix) > 0 then raiseParsingError('Namespace id must not begin with a namespace prefix itself');
+    expect('=');
+    staticContext.moduleNamespace.url := parseStringLiteral;
     //what now?  TODO
     expect(';');
     token := nextToken(true);
@@ -1178,7 +1197,11 @@ begin
           'element', 'function': begin
             expect('namespace');
             if token = 'element' then staticContext.elementNamespace:=parseStringLiteral
-            else staticContext.functionNamespace:=parseStringLiteral;
+            else begin
+              temp := parseStringLiteral;
+              staticContext.defaultFunctionNamespace := engine.findNamespace(temp);
+              if staticContext.defaultFunctionNamespace = nil then staticContext.defaultFunctionNamespace := TNamespace.create(temp, '');
+            end;
           end;
           else raiseParsingError('Unknown default value');
         end;
@@ -1213,7 +1236,8 @@ begin
          nameSpaceName := nextTokenNCName();
          expect('=');
          nameSpaceURL := parseStringLiteral;
-         //TODO
+         if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+         staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
       end;
       'variable': declareVariable();
       'function': declareFunction;
@@ -1223,7 +1247,8 @@ begin
       end;
       else raiseParsingError('Unknown declaration');
     end;
-    expect(';');
+    token := nextToken(true);
+    if token = ';' then expect(';');
     token := nextToken(true);
   end;
   if result <> nil then result.push(parsePrimaryLevel)

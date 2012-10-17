@@ -38,7 +38,7 @@ function TXQTermFilterSequence.evaluate(const context: TEvaluationContext): IXQV
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
   result := children[0].evaluate(context);
-  context.sender.filterSequence(result, children[1], context);
+  TXQueryEngine.filterSequence(result, children[1], context);
   if result = nil then result := xqvalue()
   else xqvalueSeqSqueeze(result);
 end;
@@ -65,6 +65,7 @@ end;
 constructor TXQTermDefineVariable.create(avarname: string);
 begin
   variablename := avarname;
+  if pos(':', variablename) > 0 then namespaceprefix:=strSplitGet(':', variablename);
 end;
 
 constructor TXQTermDefineVariable.create(varname: TXQTerm; value: TXQTerm);
@@ -73,17 +74,20 @@ begin
   else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
   else raiseParsingError('Invalid term to assign a variable to: '+varname.debugTermToString);
   varname.Free;
+  if pos(':', variablename) > 0 then namespaceprefix:=strSplitGet(':', variablename);
   if value <> nil then push(value);
 end;
 
 function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): IXQValue;
 begin
-  if not assigned(context.sender.OnDefineVariable) then raiseEvaluationError(':= can''t be used without a method assigned to the OnDefineVariable event');
+  //this is never called for true XQuery variables, they are handled from the module term.
+  if not assigned(context.staticContext.sender.OnDefineVariable) then raiseEvaluationError(':= can''t be used without a method assigned to the OnDefineVariable event');
   if length(children) = 0 then raiseEvaluationError('Value missing');
   if length(children) > 1 then raiseEvaluationError('Only one value can be assigned to a variable');
   result := children[0].evaluate(context);
 
-  context.sender.OnDefineVariable(self, variablename, result);
+  if namespaceprefix <> '' then context.staticContext.sender.OnDefineVariable(self, namespaceprefix + ':' + variablename, result)
+  else context.staticContext.sender.OnDefineVariable(self, variablename, result);
 end;
 
 { TXQTermType }
@@ -203,7 +207,7 @@ var tempContext:TEvaluationContext;
     result := isEvery;
     for v in children[pos+1].evaluate(tempContext) do begin
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, v);
+      tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, v, context.findNamespace(TXQTermVariable(children[pos]).namespaceprefix));
       if evaluateSomeEvery(pos+2) <> (isEvery) then begin
         tempContext.temporaryVariables.popAll;
         result := not isEvery;
@@ -217,7 +221,7 @@ begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
     tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-    tempContext.temporaryVariables.allowObjects:=tempContext.sender.VariableChangelog.allowObjects;
+    tempContext.temporaryVariables.allowObjects:=context.staticContext.sender.VariableChangelog.allowObjects;
   end;
   result:=xqvalue(evaluateSomeEvery(0));
   xqvalueSeqSqueeze(result);
@@ -277,7 +281,7 @@ begin
   result := 0;
 
   for i := 0 to high(orders) do begin
-    emptyLeast := (orders[i].emptyOrder = xqfoEmptyLeast) or ((orders[i].emptyOrder = xqfoStatic) and (meta^.context^.staticContext^.emptyOrderSpec = xqfoEmptyLeast));
+    emptyLeast := (orders[i].emptyOrder = xqfoEmptyLeast) or ((orders[i].emptyOrder = xqfoStatic) and (meta^.context^.staticContext.emptyOrderSpec = xqfoEmptyLeast));
     if isGreaterThan(a.orders[i], b.orders[i], emptyLeast, meta^.collations[i]) then result := 1
     else if isGreaterThan(b.orders[i], a.orders[i], emptyLeast, meta^.collations[i]) then result := -1;
     if orders[i].descending then result := -Result;
@@ -296,11 +300,11 @@ var
     begin
       tempContext.temporaryVariables.pushAll;
       //sequenceTyp: TXQTermType;
-      tempContext.temporaryVariables.addVariable(vars[pos].varname, v);
+      tempContext.temporaryVariables.addVariable(vars[pos].varname, v, vars[pos].namespace);
       if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, context)) then
         raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
       if vars[pos].positionVarname <> '' then ;
-        tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index));
+        tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
       evaluateForLoop(pos+1);
       tempContext.temporaryVariables.popAll;
     end;
@@ -346,7 +350,7 @@ begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
     tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-    tempContext.temporaryVariables.allowObjects:=tempContext.sender.VariableChangelog.allowObjects;
+    tempContext.temporaryVariables.allowObjects:=context.staticContext.sender.VariableChangelog.allowObjects;
   end;
 
   //oldVarCount := tempContext.temporaryVariables.count;
@@ -364,7 +368,7 @@ begin
       setlength(sortingData.collations, length(orders));
       for i := 0 to high(orders) do
         if orders[i].collation = '' then sortingData.collations[i] := nil
-        else sortingData.collations[i] := context.sender.getCollation(orders[i].collation);
+        else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation);
       stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
       for i := 0 to sortingCache.Count - 1 do begin
         xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
@@ -406,8 +410,10 @@ end;
 constructor TXQTermNamedFunction.create(const name: string);
 begin
   if not findKindIndex(name, kind, index, true) then begin//raiseParsingError('Unknown function: '+name);
-    kind := xqfkLocal;
+    kind := xqfkUnknown;
     funcname:=name;
+    if pos(':', funcname) > 0 then
+      namespacePrefix := strSplitGet(':', funcname);
   end;
 end;
 
@@ -432,10 +438,14 @@ var
   tempcontext: TEvaluationContext;
   i: Integer;
   j: Integer;
+  func: TXQValueFunction;
+  moduleIndex: Integer;
+  sc: TXQStaticContext;
+  ns: TNamespace;
 begin
   evaluateChildren(context, evilkids);
 
-  assert((kind = xqfkLocal) or (index >= 0));
+  assert((kind = xqfkUnknown) or (index >= 0));
 
   case kind of
     xqfkBasic: begin
@@ -455,18 +465,30 @@ begin
       if length(evilkids) = 0 then result := TXQValueClass(types.Objects[index]).createFromValue(nil)
       else if length(evilkids) = 1 then result := TXQValueClass(types.Objects[index]).createFromValue(evilkids[0])
       else raiseEvaluationError('Invalid argument count for constructor function');
-    xqfkLocal: begin
-      for i := 0 to high(context.staticContext^.functions) do
-        if (context.staticContext^.functions[i].name = funcname) and  (length(context.staticContext^.functions[i].parameters) = length(children)) then begin
-          tempcontext := context.staticContext^.functions[i].context;
-          tempcontext.temporaryVariables := TXQVariableChangeLog.create();
-          for j := 0 to high(context.staticContext^.functions[i].parameters) do
-            tempcontext.temporaryVariables.addVariable(context.staticContext^.functions[i].parameters[j].name, evilkids[j]);
-          result := context.staticContext^.functions[i].body.evaluate(tempcontext);
-          tempcontext.temporaryVariables.free;
-          exit;
-        end;
-      raiseEvaluationError('Local function '+funcname+' not found');
+    xqfkUnknown: begin
+      func := nil;
+      ns := context.findNamespace(namespacePrefix);
+      if (ns = nil) and (namespacePrefix <> '') then raiseEvaluationError('Unknown namespace: '+namespacePrefix);
+      sc := context.findModuleStaticContext(ns);
+      if sc <> nil then
+        for i := 0 to high(sc.functions) do
+          if (sc.functions[i].name = funcname)
+             and  (length(sc.functions[i].parameters) = length(children))
+             and ((sc.functions[i].namespace = ns) or ((ns <> nil) and (sc.functions[i].namespace <> nil) and (sc.functions[i].namespace.url = ns.url))) then begin
+            func := sc.functions[i];
+            break;
+          end;
+      if func = nil then
+        raiseEvaluationError('Function '+funcname+' not found');
+
+      tempcontext := context;
+      tempcontext.temporaryVariables := TXQVariableChangeLog.create();
+      tempcontext.staticContext := sc;
+      for j := 0 to high(func.parameters) do
+        tempcontext.temporaryVariables.addVariable(func.parameters[j].name, evilkids[j]);
+      result := func.body.evaluate(tempcontext);
+      tempcontext.temporaryVariables.free;
+      exit;
     end;
   end;
 end;
@@ -533,7 +555,7 @@ begin
   result := xqvalue();
 
   if (index = binaryOps.IndexOf('/')) or (index = binaryOps.IndexOf('//')) then begin
-    context.sender.evaluateAccessList(self, context, result);
+    TXQueryEngine.evaluateAccessList(self, context, result);
     exit;
   end;
 
@@ -591,9 +613,9 @@ end;
 function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
-  else if func and (axis = '') and (select = 'text') and (context.sender.TextElement<>nil) then result := xqvalue(context.sender.TextElement)
+  else if func and (axis = '') and (select = 'text') and (context.staticContext.sender.TextElement<>nil) then result := xqvalue(context.staticContext.sender.TextElement)
   else begin
-    result := context.sender.evaluateSingleStepQuery(toQueryCommand,context);
+    result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
   end;
 end;
@@ -759,23 +781,29 @@ begin
   if value[1] <> '$' then raiseEvaluationError('variable name does not start with $:  ' + value);
   delete(value,1,1);
   if value[length(value)] = ';' then delete(value, length(value), 1);
+  if pos(':', value) > 0 then namespaceprefix:=strSplitGet(':', value);
 end;
 
 function TXQTermVariable.evaluate(const context: TEvaluationContext): IXQValue;
 var
   temp: TXQValue;
+  sc: TXQStaticContext;
+  ns: TNamespace;
 begin
+  if namespaceprefix = '' then ns := nil  //"Variable names that have no namespace prefix are in no namespace. "
+  else ns := context.findNamespace(namespaceprefix);
   if context.temporaryVariables <> nil then begin
     temp := nil;
-    if context.temporaryVariables.hasVariableOrObject(value, @temp) then begin
+    if context.temporaryVariables.hasVariableOrObject(value, @temp, ns) then begin
       if temp = nil then result := xqvalue()
       else result := temp;
       exit();
     end;
   end;
-  if context.staticContext^.moduleVariables <> nil then begin
+  sc := context.findModuleStaticContext(ns);
+  if (sc <> nil) and (sc.moduleVariables <> nil) then begin
     temp := nil;
-    if context.staticContext^.moduleVariables.hasVariableOrObject(value, @temp) then begin
+    if sc.moduleVariables.hasVariableOrObject(value, @temp, ns) then begin
       if temp = nil then result := xqvalue()
       else result := temp;
       exit();
@@ -784,7 +812,7 @@ begin
   if value = '$' then result := xqvalue('$') //default $$; as $
   else if value = 'line-ending' then result := xqvalue(LineEnding) //default $line-ending; as #13#10
   else result := xqvalue();
-  if assigned(context.sender.OnEvaluateVariable) then context.sender.OnEvaluateVariable(self, value, result );
+  if assigned(context.staticContext.sender.OnEvaluateVariable) then context.staticContext.sender.OnEvaluateVariable(self, value, result );
 end;
 { TXQTermString }
 
@@ -983,8 +1011,8 @@ begin
   if root = nil then root := tree;
   tree.document := root;
   if baseOffset = 0 then begin
-    if context.sender.FInternalDocuments = nil then context.sender.FInternalDocuments := TFPList.Create;
-    context.sender.FInternalDocuments.Add(tree);
+    if context.staticContext.sender.FInternalDocuments = nil then context.staticContext.sender.FInternalDocuments := TFPList.Create;
+    context.staticContext.sender.FInternalDocuments.Add(tree);
   end;
   baseOffset += 1;
   lastAttribute := nil;
@@ -1068,6 +1096,7 @@ begin
     i+=1;
   end;
   if i <> high(children) then raiseEvaluationError('Invalid function definition');
+  resfunc.namespace := namespace;
   resfunc.body:=children[i];
   resfunc.context:=context;
   result := resfunc;
@@ -1085,10 +1114,14 @@ begin
     SetLength(result.parameters, length(children) - 2);
   for i := 0 to high(result.parameters) do begin
     result.parameters[i].name:=(children[i] as TXQTermDefineVariable).variablename;
-    result.parameters[i].seqtype:=(children[i] as TXQTermDefineVariable).children[0] as TXQTermSequenceType;
+    if length((children[i] as TXQTermDefineVariable).children) > 0 then
+      result.parameters[i].seqtype:=(children[i] as TXQTermDefineVariable).children[0] as TXQTermSequenceType
+     else
+      result.parameters[i].seqtype:=nil;
   end;
   if length(result.parameters) = length(children) - 2 then result.resulttype := children[high(children)-1] as TXQTermSequenceType
   else result.resulttype := nil;
+  result.namespace := namespace;
   result.body := children[high(children)];
 end;
 
