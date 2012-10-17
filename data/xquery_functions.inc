@@ -361,7 +361,7 @@ begin
       end;
       tempDateTime.free;
     end else if collation <> nil then result := collation.compare(a.toString,b.toString)
-    else result := TXQueryEngine.getDefaultCollation.compare(a.toString, b.toString);
+    else result := CompareStr(a.toString, b.toString);
   end;
 end;
 
@@ -372,7 +372,7 @@ end;
 
 function xqvalueCompareAtomicBase(const cxt: TEvaluationContext; a, b: IXQValue): integer; inline;
 begin
-  result := xqvalueCompareAtomicBase(a,b,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
+  result := xqvalueCompareAtomicBase(a,b,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 
 function xqvalueEqualAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
@@ -440,13 +440,13 @@ end;
 
 procedure xqvalueEqualAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.collation, cxt.staticContext.sender.ImplicitTimezone)); //contract: always return TXQValueBoolean
+  result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone)); //contract: always return TXQValueBoolean
 end;
 
 procedure xqvalueUnequalAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
   if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then
-    result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.collation, cxt.staticContext.sender.ImplicitTimezone))
+    result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
     result := xqvalue(false);
 end;
@@ -464,19 +464,19 @@ end;
 
 procedure xqvalueLessThanAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,-1,9999,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,-1,9999,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 procedure xqvalueGreaterThanAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,1,9999,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,1,9999,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 procedure xqvalueLessEqualAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,-1,0,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,-1,0,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 procedure xqvalueGreaterEqualAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
-  xqvalueCompareAtomic(a,b,result,1,0,cxt.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,1,0,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 
 function xqvalueCompareGenericBase(a, b: TXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
@@ -524,7 +524,7 @@ end;
 
 procedure xqvalueCompareGeneric(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue; accept1: integer; accept2: integer = 9999);
 begin
-  result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.collation,cxt.staticContext.sender.ImplicitTimezone));
+  result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone));
 end;
 
 procedure xqvalueEqualGeneric(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
@@ -1106,7 +1106,7 @@ begin
   if args[0].getSequenceCount = 0 then
     exit;
 
-  cmp := @context.nodeCollation.equal;
+  cmp := @context.staticContext.nodeCollation.equal;
 
   replace := TStringList.Create;
   if length(args) = 2 then begin
@@ -1250,7 +1250,7 @@ var
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   if args[0].isUndefined  or args[1].isUndefined then exit;
   result := xqvalue(collation.compare(args[0].toString, args[1].toString));
 end;
@@ -1269,7 +1269,7 @@ var s, t: string;
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   s :=args[0].toString;
   t :=args[1].toString;
   if t = '' then result := xqvalue(true)
@@ -1282,7 +1282,7 @@ var
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   result := xqvalue(collation.startsWith(args[0].toString,args[1].toString));
 end;
 
@@ -1292,7 +1292,7 @@ var
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   result := xqvalue(collation.endsWith(args[0].toString, args[1].toString));
 end;
 
@@ -1302,7 +1302,7 @@ var a,b: string;
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   a := args[0].toString;
   b := args[1].toString;
   if b = '' then result := xqvalue('')
@@ -1316,7 +1316,7 @@ var a,b: string;
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   a := args[0].toString;
   b := args[1].toString;
   if b = '' then result := xqvalue(a)
@@ -1358,7 +1358,7 @@ begin
   end;
 end;
 
-procedure xqFunctionSplitEqual(args: TXQVArray; var result: IXQValue);
+procedure xqFunctionSplitEqual(const cxt: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 var
   searched: String;
   list: String;
@@ -1374,7 +1374,7 @@ begin
 
   splitted := strSplit(list, split);
   for i:=0 to high(splitted) do
-    if TXQueryEngine.getDefaultCollation.equal(splitted[i], searched) then begin
+    if cxt.staticContext.collation.equal(splitted[i], searched) then begin
       result := xqvalue(true);
       exit;
     end;
@@ -1724,7 +1724,7 @@ begin
   else node := xqvalueToSingleNode(args[0]);
   uri := '';
   while node <> nil do begin
-    if node.getAttributeTry('xml:base', temp, @context.nodeCollation.equal) then begin
+    if node.getAttributeTry('xml:base', temp, @context.staticContext.nodeCollation.equal) then begin
       if temp <> '' then
         if temp[length(temp)] = '/' then uri := temp + uri
         else uri := temp + '/' + uri;
@@ -1776,8 +1776,8 @@ begin
   testlang := lowercase(args[0].toString);
   if node.getParent() = nil then node := node.findNext(tetOpen,'',[tefoIgnoreText]);
   while node <> nil do begin
-    if node.hasAttribute('lang', @context.nodeCollation.equal) then begin
-      rlang := node.getAttribute('lang', @context.nodeCollation.equal);
+    if node.hasAttribute('lang', @context.staticContext.nodeCollation.equal) then begin
+      rlang := node.getAttribute('lang', @context.staticContext.nodeCollation.equal);
       rlang := lowercase(rlang); //that for one is supposed to be case in sensitive in the spec
       result := xqvalue(strEqual(rlang, testlang) or (strBeginsWith(rlang, testlang + '-')));
       exit;
@@ -1800,7 +1800,7 @@ begin
   ns := '';
   if pos(':', name) > 0 then ns := copy(name, 1, pos(':', name) - 1);
   if args[1].toNode = nil then exit();
-  ns := args[1].toNode.getNamespaceURL(ns, @context.nodeCollation.equal);  ignore(context);
+  ns := args[1].toNode.getNamespaceURL(ns, @context.staticContext.nodeCollation.equal);  ignore(context);
   if ns <> '' then ns := ns + #2;
   result := TXQValue_QName.create(ns + name);
 end;
@@ -1857,7 +1857,7 @@ var
   res: String;
 begin
   requiredArgCount(args, 2);
-  res := args[1].toNode.getNamespaceURL(args[0].toString, @context.nodeCollation.equal);  ignore(context);
+  res := args[1].toNode.getNamespaceURL(args[0].toString, @context.staticContext.nodeCollation.equal);  ignore(context);
   if res = '' then exit;
   result := xqvalue(res);
 end;
@@ -2025,7 +2025,7 @@ var  i: Integer;
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   if args[0].kind <> pvkSequence then begin
     if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.staticContext.sender.ImplicitTimezone) then result := xqvalue(1)
     //else := result = undefined
@@ -2067,7 +2067,7 @@ begin
   if args[0].getSequenceCount <> 1 then exit;
   if args[0] is TXQValueSequence then args[0] := (args[0] as TXQValueSequence).seq[0];
   if (args[0].toNode <> nil) and (args[0].toNode.typ = tetOpen) and not (args[0].toNode is TTreeDocument) then
-    result := xqvalue((args[0].toNode.getAttribute('xml:nil', @context.nodeCollation.equal) = 'true')
+    result := xqvalue((args[0].toNode.getAttribute('xml:nil', @context.staticContext.nodeCollation.equal) = 'true')
                        and (args[0].toNode.deepNodeText() = ''));    ignore(context);
 end;
 
@@ -2082,7 +2082,7 @@ var
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
   atom := xqvalueAtomize(args[0]);
   if atom.kind <> pvkSequence then begin
     result := xqvalueAtomize(atom);
@@ -2226,7 +2226,7 @@ var i:integer;
 begin
   requiredArgCount(args,2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
 
   if args[0].getSequenceCount <> args[1].getSequenceCount then begin
     result := xqvalue(false);
@@ -2247,7 +2247,7 @@ begin
     end else begin
       if (enum2.Current is TXQValue_AnyAtomicType) or
          (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
-            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.nodeCollation.equal)) then begin
+            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.staticContext.nodeCollation.equal)) then begin
         result := xqvalue(false);
         exit;
       end;
@@ -2362,7 +2362,7 @@ var tempf: decimal;
 begin
   requiredArgCount(args,1, 3);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString)
-  else collation := context.collation;
+  else collation := context.staticContext.collation;
 
   if args[0].kind <> pvkSequence then begin
     result := args[0];
@@ -2442,8 +2442,8 @@ end;
 procedure xqFunctionDefault_Collation(const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args,0);
-  if strBeginsWith(context.collation.id, 'http://') then result := xqvalue(context.collation.id)
-  else result := xqvalue(MY_STUPID_COLLATION_URL + context.collation.id);
+  if strBeginsWith(context.staticContext.collation.id, 'http://') then result := xqvalue(context.staticContext.collation.id)
+  else result := xqvalue(MY_NAMESPACE_PREFIX_URL + context.staticContext.collation.id);
 end;
 
 
@@ -2540,7 +2540,7 @@ var
   i: Integer;
 begin
   for i:=0 to sl.count-1 do
-    if context.nodeCollation.equal(sl[i], s) then exit(true);
+    if context.staticContext.nodeCollation.equal(sl[i], s) then exit(true);
   result := false;
 end;
 
@@ -2571,7 +2571,7 @@ begin
     while node <> nil do begin
       attrib := node.attributes;
       while attrib <> nil do begin
-        if context.nodeCollation.equal(attrib.value, 'id') then ;
+        if context.staticContext.nodeCollation.equal(attrib.value, 'id') then ;
           if isSearchedId(attrib.reverse.value) then begin
             xqvalueSeqAdd(result, xqvalue(node));
             break;

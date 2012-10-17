@@ -166,7 +166,7 @@ begin
     TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
     if nodeCondition.checkNamespace then
       nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL);
-    nodeCondition.equalFunction := @context.collation.equal;
+    nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
   end;
   result := true;
   for v in ta do begin

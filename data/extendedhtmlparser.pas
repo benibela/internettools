@@ -950,7 +950,7 @@ var xpathText: TTreeElement;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
-        result := xqvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, FQueryEngine.getDefaultCollation, FQueryEngine.ImplicitTimezone);
+        result := xqvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, FQueryEngine.StaticContext.collation, FQueryEngine.ImplicitTimezone);
       end;
 
     begin

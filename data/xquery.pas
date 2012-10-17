@@ -78,9 +78,10 @@ type
     defaultFunctionNamespace: TNamespace; //**< Default function namespace (shared namespace object)
 
     baseURI: string;
+    collation: TXQCollation;
+    nodeCollation: TXQCollation; //**< default collation used for node name comparisons (extension, does not exist in XQuery)
 
     //TODO: use these values
-    collation: string;
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
     elementNamespace: string;
     constructionPreserve: boolean;
@@ -104,8 +105,6 @@ type
   TEvaluationContext = record
     ParentElement: TTreeElement; //**< associated tree element (= context item if context item is a node)
     RootElement: TTreeElement;
-    collation: TXQCollation; //**< Default collation used for string comparisons
-    nodeCollation: TXQCollation; //**< Default collation used for node string comparisons
 
     SeqValue: IXQValue; //**<Context item / value of @code(.),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
@@ -1204,12 +1203,8 @@ type
     //** Registers a collation for custom string comparisons
     class procedure registerCollation(const collation: TXQCollation);
 
-    class function getDefaultCollation: TXQCollation;
-    //** Changes the default collation, e.g. to switch between case/in/sensitive or un/localized. (see registerCollation at the end pseudoxpath.pas for possible values.)
-    class procedure setDefaultCollation(id: string);
-    class function getDefaultNodeCollation: TXQCollation;
-    //** Changes the default collation used for node name comparisons, e.g. to switch between case/in/sensitive or un/localized. (see registerCollation at the end pseudoxpath.pas for possible values.)
-    class procedure setDefaultNodeCollation(id: string);
+    //**< Returns the collation for an url id
+    class function getCollation(id:string): TXQCollation;
   private
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
@@ -1225,7 +1220,7 @@ type
 
     function parseTerm(str:string; model: TXQParsingModel): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
-    function getEvaluationContext(): TEvaluationContext;
+    function getEvaluationContext(staticContextOverride: TXQStaticContext): TEvaluationContext;
 
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: TXQTerm; const context: TEvaluationContext);
@@ -1245,8 +1240,6 @@ type
     //**< Evaluates a path expression, created from the given term in the given context.
     class procedure evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
 
-    //**< Returns the collation for an url id
-    class function getCollation(id:string): TXQCollation;
 
     function findNamespace(const nsprefix: string): TNamespace;
   end;
@@ -1514,17 +1507,21 @@ var basicFunctions: TStringList;
     types: TStringList;
     collations: TStringList;
 
+const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
+
 const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
       XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
       XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
       XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
+      XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
+
 var   XMLNamespace_XPathFunctions: TNamespace;
       XMLNamespace_XMLSchema: TNamespace;
       XMLNamespace_XMLSchemaInstance: TNamespace;
       XMLNamespace_XQueryLocalFunctions: TNamespace;
+      XMLNamespace_MyExtensions: TNamespace;
 
 
-const MY_STUPID_COLLATION_URL = 'http://www.benibela.de/2012/pxp/';
 
 procedure ignore(const intentionallyUnusedParameter: TEvaluationContext); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: string); inline; begin end;
@@ -1889,6 +1886,7 @@ begin
   result.functions := functions;
   result.importedmodules := importedmodules;
   result.collation := collation;
+  result.nodeCollation := nodeCollation;
   result.emptyorderspec := emptyorderspec;
   result.defaultFunctionNamespace := defaultFunctionNamespace;
   result.elementnamespace := elementnamespace;
@@ -2005,12 +2003,10 @@ end;
 
 function TEvaluationContext.compareAtomicBase(const a, b: IXQValue): integer;
 begin
-  result := xqvalueCompareAtomicBase(a, b, collation, staticContext.sender.ImplicitTimezone);
+  result := xqvalueCompareAtomicBase(a, b, staticContext.collation, staticContext.sender.ImplicitTimezone);
 end;
 
 function TEvaluationContext.findNamespace(const nsprefix: string): TNamespace;
-var
-  i: Integer;
 begin
   if (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
   result := staticContext.findNamespace(nsprefix);
@@ -2054,8 +2050,7 @@ function TXQuery.evaluate(const tree: TTreeElement = nil): IXQValue;
 var context: TEvaluationContext;
 begin
   if term = nil then exit(xqvalue());
-  context := staticContext.sender.getEvaluationContext;
-  context.staticContext:=staticContext;
+  context := staticContext.sender.getEvaluationContext(staticContext);
   if tree <> nil then begin
     context.ParentElement := tree;
     context.RootElement := tree;
@@ -2075,8 +2070,6 @@ begin
 end;
 
 destructor TXQuery.Destroy;
-var
-  i: Integer;
 begin
   term.Free;
   if staticContext<> nil then
@@ -2226,8 +2219,8 @@ begin
   fendsWith:=aEndsWith;
   fcontains:=aContains;
   fequal:=aEqual;
-  if strBeginsWith(id, MY_STUPID_COLLATION_URL) then
-    id := strCopyFrom(id, length(MY_STUPID_COLLATION_URL)+1);
+  if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then
+    id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
 end;
 
 constructor TXQCollation.create(const aid: string; const acompare: TXQCollationIntFunction;
@@ -2236,7 +2229,7 @@ begin
   id := aid;
   fcompare:=acompare;
   fpointercompare:=aPointerCompare;
-  if strBeginsWith(id, MY_STUPID_COLLATION_URL) then id := strCopyFrom(id, length(MY_STUPID_COLLATION_URL)+1);
+  if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
 end;
 
 function TXQCollation.compare(const a, b: string): integer;
@@ -3078,8 +3071,12 @@ begin
 end;
 
 function TXQueryEngine.parseCSS3(s: string): IXQuery;
+var
+  sc: TXQStaticContext;
 begin
-  FLastQuery := TXQuery.Create(StaticContext.clone(), parseCSSTerm(s));
+  sc := StaticContext.clone();
+  if sc.nodeCollation = nil then sc.nodeCollation := sc.collation;
+  FLastQuery := TXQuery.Create(sc, parseCSSTerm(s));
   result := FLastQuery;
 end;
 
@@ -3090,14 +3087,11 @@ begin
   else exit(FLastQuery.evaluate(tree));
 end;
 
-var defaultNodeCollation: TXQCollation = nil;
 
-function TXQueryEngine.getEvaluationContext: TEvaluationContext;
+function TXQueryEngine.getEvaluationContext(staticContextOverride: TXQStaticContext): TEvaluationContext;
 begin
-  result.staticContext:=StaticContext;
-  result.collation := TXQueryEngine.getDefaultCollation;
-  result.nodeCollation := defaultnodeCollation;
-  if result.nodeCollation = nil then result.nodeCollation := result.collation;
+  if staticContextOverride = nil then result.staticContext:=StaticContext
+  else result.staticContext := staticContextOverride;
   result.ParentElement := ParentElement;
   result.RootElement := RootElement;
   result.SeqValue:=nil;
@@ -3118,6 +3112,7 @@ begin
   StaticContext := TXQStaticContext.Create;
   StaticContext.defaultFunctionNamespace := XMLNamespace_XPathFunctions;
   StaticContext.sender := self;
+  StaticContext.collation := TXQCollation(collations.Objects[0]);
   FModules := TInterfaceList.Create;
 end;
 
@@ -3189,8 +3184,7 @@ var
   context: TEvaluationContext;
 begin
   modobj := module as TXQuery;
-  context := getEvaluationContext();
-  context.staticContext := modobj.staticContext;
+  context := getEvaluationContext(modobj.staticContext);
   modobj.initializeStaticContext(context);
   FModules.Add(module);
 end;
@@ -3289,6 +3283,7 @@ begin
     cxt.pos := @cxt.str[1];
     result := TXQuery.Create(cxt.staticContext);
     result.term := cxt.parseModule();
+    if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
     if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   finally
     cxt.free;
@@ -3777,7 +3772,7 @@ begin
 
   newSequence := nil;
   cachedNamespace := false;
-  nodeCondition.equalFunction:=@context.nodeCollation.equal;
+  nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
   onlyNodes := false;
   for n in previous do begin
     if command.typ = qcFunctionSpecialCase then begin
@@ -3895,8 +3890,8 @@ var
   i: Integer;
 begin
   if strEndsWith(id, '/') then delete(id, length(id), 1);
-  if strBeginsWith(id, MY_STUPID_COLLATION_URL) then
-    id := strCopyFrom(id, length(MY_STUPID_COLLATION_URL)+1);
+  if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then
+    id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
   i := collations.IndexOf(id);
   if i < 0 then raise EXQEvaluationException.Create('Collation ' + id + ' is not defined');
   result:=TXQCollation(collations.Objects[i]);
@@ -3914,31 +3909,6 @@ begin
     'local': result := XMLNamespace_XQueryLocalFunctions;
     else result := nil;
   end;
-end;
-
-class function TXQueryEngine.getDefaultCollation: TXQCollation;
-begin
-  result := TXQCollation(collations.Objects[0]);
-end;
-
-class procedure TXQueryEngine.setDefaultCollation(id: string);
-var
-  i: Integer;
-begin
-  i := collations.IndexOf(id);
-  if i < 0 then raise Exception.Create('Unknown collation: '+id);
-  collations.Move(i, 0);
-end;
-
-
-class function TXQueryEngine.getDefaultNodeCollation: TXQCollation;
-begin
-  result := defaultNodeCollation;
-end;
-
-class procedure TXQueryEngine.setDefaultNodeCollation(id: string);
-begin
-  defaultNodeCollation := getCollation(id);
 end;
 
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
@@ -4106,6 +4076,7 @@ XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, '
 XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
 XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
 XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocalFunctions, 'local');
+XMLNamespace_MyExtensions:=TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
 
 //my functions
 TXQueryEngine.registerFunction('filter',@xqFunctionFilter);
@@ -4334,11 +4305,11 @@ TXQueryEngine.registerBinaryOpFunction('node-after',@xqvalueNodeAfter);
 
 
 
-TXQueryEngine.registerCollation(TXQCollation.create(MY_STUPID_COLLATION_URL+'case-insensitive-clever', @striCompareClever, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_STUPID_COLLATION_URL+'case-sensitive-clever', @strCompareClever, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-insensitive-clever', @striCompareClever, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-sensitive-clever', @strCompareClever, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
 TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/codepoint', @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_STUPID_COLLATION_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_STUPID_COLLATION_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
 
 {$DEFINE PXP_DERIVED_TYPES_REGISTRATION}
 {$I xquery_derived_types.inc}
@@ -4362,6 +4333,7 @@ XMLNamespace_XPathFunctions.free;
 XMLNamespace_XMLSchema.free;
 XMLNamespace_XMLSchemaInstance.free;
 XMLNamespace_XQueryLocalFunctions.free;
+XMLNamespace_MyExtensions.free;
 {$DEFINE PXP_DERIVED_TYPES_FINALIZATION}
 {$I xquery_derived_types.inc}
 end.

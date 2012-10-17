@@ -1147,6 +1147,7 @@ var
   nameSpaceName: String;
   nameSpaceURL: String;
   temp: String;
+  namespace: TNamespace;
 begin
   result := nil;
   token := nextToken(true);
@@ -1193,7 +1194,7 @@ begin
       'default': begin
         token := nextToken();
         case token of
-          'collation': staticContext.collation := parseStringLiteral;
+          'collation': staticContext.collation := staticContext.sender.getCollation(parseStringLiteral);
           'order': begin
             expect('empty');
             case nextToken() of
@@ -1249,8 +1250,14 @@ begin
       'variable': declareVariable();
       'function': declareFunction;
       'option': begin
-        nextTokenQName();
-        parseStringLiteral; //TODO
+        token := nextTokenQName();
+        temp := parseStringLiteral;
+        namespace := staticContext.findNamespace(strSplitGet(':', token));
+        if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
+          case token of
+            'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp);
+          end;
+        end;
       end;
       else raiseParsingError('Unknown declaration');
     end;

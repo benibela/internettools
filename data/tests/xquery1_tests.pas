@@ -563,6 +563,27 @@ begin
   m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $abc mod 2 = 0', 'false'); //undefined variable becomes (). Raise error?
   m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'false');
 
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; "abc" eq "ABC"', 'true');
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-sensitive-clever"; "abc" eq "ABC"', 'false');
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; "ABCx" eq "ABC"', 'false');
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; "ABC" eq "ABC"', 'true');
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-sensitive-clever"; "ABC" eq "ABC"', 'true');
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; "9foobar" lt "10foobar"', 'true');
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; "9foobar" gt "10foobar"', 'false');
+  m('declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; "9foobar" lt "10foobar"', 'false');
+  m('declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; "9foobar" gt "10foobar"', 'true');
+
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'first second');
+  m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first second');
+  m('declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'second');
+  m('declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first');
+
+  m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever" string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'first second');
+  m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first second');
+  m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'second');
+  m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first');
+
+
 
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
