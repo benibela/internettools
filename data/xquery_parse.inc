@@ -404,11 +404,11 @@ var
         token := nextToken;
       end;
 
-      emptyOrder := xqfoStatic;
+      emptyOrder := xqeoStatic;
       if token = 'empty' then begin
         token := nextToken;
-        if token = 'greatest' then emptyOrder := xqfoEmptyGreatest
-        else if token = 'least' then emptyOrder := xqfoEmptyLeast
+        if token = 'greatest' then emptyOrder := xqeoEmptyGreatest
+        else if token = 'least' then emptyOrder := xqeoEmptyLeast
         else raiseParsingError('Expected "greatest" or "least"');
         token := nextToken;
       end;
@@ -1198,8 +1198,8 @@ begin
           'order': begin
             expect('empty');
             case nextToken() of
-              'greatest': staticContext.emptyOrderSpec:=xqfoEmptyGreatest;
-              'least': staticContext.emptyOrderSpec:=xqfoEmptyLeast;
+              'greatest': staticContext.emptyOrderSpec:=xqeoEmptyGreatest;
+              'least': staticContext.emptyOrderSpec:=xqeoEmptyLeast;
             end;
           end;
           'element', 'function': begin

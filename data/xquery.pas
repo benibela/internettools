@@ -60,7 +60,7 @@ type
 
   Decimal = Extended;
 
-  TXQTermFlowerOrderEmpty = (xqfoStatic, xqfoEmptyLeast, xqfoEmptyGreatest);
+  TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
 
   { TXQStaticContext }
 
@@ -74,15 +74,16 @@ type
     moduleVariables: TXQVariableChangeLog;  //**< All declared variables.
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
-    stripBoundarySpace: boolean;  //**< If <a>  </a> is equivallent to <a/>. Only used during parsing of the query, ignored during evaluation
     defaultFunctionNamespace: TNamespace; //**< Default function namespace (shared namespace object)
 
     baseURI: string;
     collation: TXQCollation;
     nodeCollation: TXQCollation; //**< default collation used for node name comparisons (extension, does not exist in XQuery)
 
-    //TODO: use these values
+    stripBoundarySpace: boolean;  //**< If <a>  </a> is equivallent to <a/>. Only used during parsing of the query, ignored during evaluation
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
+
+    //TODO: use these values
     elementNamespace: string;
     constructionPreserve: boolean;
     copyNamespacePreserve, copyNamespaceInherit: boolean;
@@ -3113,6 +3114,7 @@ begin
   StaticContext.defaultFunctionNamespace := XMLNamespace_XPathFunctions;
   StaticContext.sender := self;
   StaticContext.collation := TXQCollation(collations.Objects[0]);
+  StaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
   FModules := TInterfaceList.Create;
 end;
 

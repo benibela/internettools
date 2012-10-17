@@ -591,6 +591,14 @@ begin
   m('declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; "var is $foobar;."', 'var is 123.');
 
 
+  m('declare default order empty least; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty least return $i, " ")', '1 2 3 4 5');
+  m('declare default order empty least; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty greatest return $i, " ")', '3 4 5 1 2');
+  m('declare default order empty least; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 return $i, " ")', '1 2 3 4 5');
+  m('declare default order empty greatest; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty least return $i, " ")', '1 2 3 4 5');
+  m('declare default order empty greatest; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty greatest return $i, " ")', '3 4 5 1 2');
+  m('declare default order empty greatest; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 return $i, " ")', '3 4 5 1 2');
+
+
 
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
