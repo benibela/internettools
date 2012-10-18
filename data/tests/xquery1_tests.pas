@@ -12,6 +12,15 @@ procedure unittests;
 
 implementation
 
+type
+
+{ THelper }
+
+ THelper = class
+  procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const variable: string; var value: IXQValue);
+  procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const functionName: string; var value: TXQValueFunction);
+end;
+
 procedure unittests;
 var
   count: integer;
@@ -97,6 +106,7 @@ var
   end;
 
 var vars: TXQVariableChangeLog;
+  helper: THelper;
 begin
 //  time := Now;
   vars:= TXQVariableChangeLog.create();
@@ -607,10 +617,44 @@ begin
   m('import schema namespace foobar="http://www.w3.org/2001/XMLSchema"; 5 instance of foobar:double', 'false');
   m('import schema namespace foobar="xyz"; 5 instance of foobar:double', 'false'); //TODO: arbitrary schemas
 
+  helper := THelper.Create;
+  ps.OnDeclareExternalVariable:=@helper.DeclareExternalVariableEvent;
+  ps.OnDeclareExternalFunction:=@helper.DeclareExternalFunctionEvent;
+
+  m('declare variable $test-import1 external; $test-import1', '42');
+  m('declare variable $test-import1 as xs:integer external; $test-import1', '42');
+  m('declare variable $test-import1 as xs:decimal external; $test-import1', '42');
+  m('declare variable $test-import2 external; $test-import2', 'hallo');
+  m('declare variable $test-import1 external; declare variable $test-import2 as xs:string external; concat($test-import1, $test-import2)', '42hallo');
+  m('declare variable $test-importNS external; $test-importNS', '');
+  m('declare namespace foobar = "xyz"; declare variable $foobar:test-importNS external; $foobar:test-importNS', 'xyz');
+  m('declare namespace foobar = "tripple"; declare variable $foobar:test-importNS external; $foobar:test-importNS', 'tripple');
+
+  helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
   ps.free;
   vars.free
+end;
+
+{ THelper }
+
+procedure THelper.DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;
+  const variable: string; var value: IXQValue);
+begin
+  case variable of
+  'test-import1': value := xqvalue(42);
+  'test-import2': value := xqvalue('hallo');
+  'test-importNS':
+    if namespace = nil then value := xqvalue()
+    else value := xqvalue(namespace.url);
+  end;
+end;
+
+procedure THelper.DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;
+  const functionName: string; var value: TXQValueFunction);
+begin
+
 end;
 
 end.

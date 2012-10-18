@@ -654,6 +654,14 @@ type
   *)
   TDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
   (***
+    @abstract(Event call back that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
+  *)
+  TDeclareExternalVariableEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const variable: string; var value: IXQValue) of object;
+  (***
+  @abstract(Event call back that is called to set a function @code(value) of a XQuery function declared as "declare function ... external").
+  *)
+  TDeclareExternalFunctionEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const functionName: string; var value: TXQValueFunction) of object;
+  (***
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
@@ -1165,6 +1173,8 @@ type
 
     OnEvaluateVariable: TEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
     OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
+    OnDeclareExternalVariable: TDeclareExternalVariableEvent; //**< Event called to import a variable that is declared as "declare variable ... external" in a XQuery expression
+    OnDeclareExternalFunction: TDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
@@ -1971,6 +1981,9 @@ var
   vars: TXQVariableChangeLog;
   truechildcount: Integer;
   ns: TNamespace;
+  hasTypeDeclaration: Boolean;
+  hasExpression: Boolean;
+  tempValue: IXQValue;
 begin
   truechildcount := length(children);
   if context.staticContext.moduleNamespace <> nil then truechildcount-=1;
@@ -1999,10 +2012,21 @@ begin
       if (context.staticContext.moduleNamespace  <> nil) and (context.staticContext.moduleNamespace  <> ns ) and (context.staticContext.moduleNamespace.url  <> ns.url ) then
          raiseEvaluationError('Invalid namespace for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
 
-      vars.addVariable(tempDefVar.variablename, tempDefVar.children[high(tempDefVar.children)].evaluate(context), ns);
-      if length(tempDefVar.children) > 1 then
-        if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(vars.vars[high(vars.vars)].value, context) then
-          raiseEvaluationError('Variable '+tempDefVar.variablename + ' with value ' +vars.vars[high(vars.vars)].value.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
+      hasTypeDeclaration := (length(tempDefVar.children) > 0) and (tempDefVar.children[0] is TXQTermSequenceType);
+      hasExpression := (length(tempDefVar.children) > 0) and not (tempDefVar.children[high(tempDefVar.children)] is TXQTermSequenceType);
+
+      tempValue := nil;
+      if hasExpression then tempValue := tempDefVar.children[high(tempDefVar.children)].evaluate(context)
+      else begin
+        if not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('External variable declared, but no callback registered to OnDeclareExternalVariable.');
+        context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, tempDefVar.variablename, tempValue);
+        if tempValue = nil then raiseEvaluationError('No value for external variable ' + tempDefVar.variablename+ ' given.');
+      end;
+      vars.addVariable(tempDefVar.variablename, tempValue, ns);
+
+      if hasTypeDeclaration then
+        if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(tempValue, context) then
+          raiseEvaluationError('Variable '+tempDefVar.variablename + ' with value ' +tempValue.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
     end;
 end;
 
