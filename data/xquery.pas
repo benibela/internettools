@@ -74,7 +74,10 @@ type
     moduleVariables: TXQVariableChangeLog;  //**< All declared variables.
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
+    importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: TODO.
     defaultFunctionNamespace: TNamespace; //**< Default function namespace (shared namespace object)
+    defaultElementTypeNamespace: TNamespace; //**< Default function namespace (shared namespace object)
+    defaultTypeNamespace: TNamespace; //**< Extension: default type namespace (shared namespace object)
 
     baseURI: string;
     collation: TXQCollation;
@@ -84,7 +87,6 @@ type
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
 
     //TODO: use these values
-    elementNamespace: string;
     constructionPreserve: boolean;
     copyNamespacePreserve, copyNamespaceInherit: boolean;
 
@@ -1878,6 +1880,8 @@ end;
 { TXQStaticContext }
 
 function TXQStaticContext.clone: TXQStaticContext;
+var
+  i: Integer;
 begin
   Result := TXQStaticContext.Create;
   result.sender := sender;
@@ -1886,11 +1890,18 @@ begin
   result.namespaces := namespaces;
   result.functions := functions;
   result.importedmodules := importedmodules;
+  if result.importedModules <> nil then begin
+    result.importedModules := TStringList.Create;
+    for i:=0 to importedModules.count - 1 do result.importedModules.AddObject(importedModules[i], importedModules.Objects[i]);
+  end;
+  result.importedSchemas := importedSchemas;
+  if result.importedSchemas <> nil then result.importedSchemas := importedSchemas.clone;
   result.collation := collation;
   result.nodeCollation := nodeCollation;
   result.emptyorderspec := emptyorderspec;
   result.defaultFunctionNamespace := defaultFunctionNamespace;
-  result.elementnamespace := elementnamespace;
+  result.defaultElementTypeNamespace := defaultElementTypeNamespace;
+  result.defaultTypeNamespace := defaultTypeNamespace;
   result.baseuri := baseuri;
   result.constructionpreserve := constructionpreserve;
   result.ordering := ordering;
@@ -1912,6 +1923,10 @@ begin
     namespaces.freeAll;
     namespaces.free;
   end;
+  if importedSchemas <> nil then begin
+    importedSchemas.freeAll;
+    importedSchemas.Free;
+  end;
   inherited Destroy;
 end;
 
@@ -1930,6 +1945,8 @@ begin
     i := importedModules.IndexOf(nsprefix);
     if i >= 0 then exit(TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace);
   end;
+  if (importedSchemas <> nil) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
+    exit;
   result := sender.findNamespace(nsprefix);
 end;
 
@@ -3115,6 +3132,7 @@ begin
   StaticContext.sender := self;
   StaticContext.collation := TXQCollation(collations.Objects[0]);
   StaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
+  StaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
   FModules := TInterfaceList.Create;
 end;
 

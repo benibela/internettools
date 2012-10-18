@@ -598,7 +598,14 @@ begin
   m('declare default order empty greatest; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty greatest return $i, " ")', '3 4 5 1 2');
   m('declare default order empty greatest; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 return $i, " ")', '3 4 5 1 2');
 
-
+  m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of test:integer', 'true');
+  m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of xs:integer', 'true');
+  m('import schema namespace foobar="http://www.w3.org/2001/XMLSchema"; 5 instance of foobar:integer', 'true');
+  m('import schema namespace foobar="xyz"; 5 instance of foobar:integer', 'true'); //TODO: arbitrary schemas
+  m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of test:double', 'false');
+  m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of xs:double', 'false');
+  m('import schema namespace foobar="http://www.w3.org/2001/XMLSchema"; 5 instance of foobar:double', 'false');
+  m('import schema namespace foobar="xyz"; 5 instance of foobar:double', 'false'); //TODO: arbitrary schemas
 
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);

@@ -43,6 +43,7 @@ TNamespace = class
   constructor create(const aurl: string; aprefix: string);
   function getPrefix: string;
   function getURL: string;
+  function clone: TNamespace;
 end;
 
 { TNamespaceList }
@@ -56,6 +57,8 @@ public
 
   procedure freeAll;
   destructor Destroy; override;
+
+  function clone: TNamespaceList;
 
   property namespaces[prefix: string]: TNamespace read getNamespace;
   property items[i: integer]: TNamespace read getNamespace;
@@ -344,6 +347,15 @@ begin
   inherited Destroy;
 end;
 
+function TNamespaceList.clone: TNamespaceList;
+var
+  i: Integer;
+begin
+  result := TNamespaceList.Create;
+  for i := 0 to count - 1 do
+    result.Add(items[i].clone);
+end;
+
 { TNamespace }
 
 constructor TNamespace.create(const aurl: string; aprefix: string);
@@ -362,6 +374,11 @@ function TNamespace.getURL: string;
 begin
   if self = nil then exit('');
   result := url;
+end;
+
+function TNamespace.clone: TNamespace;
+begin
+  result := TNamespace.Create(url, prefix);
 end;
 
 { TTreeDocument }

@@ -293,6 +293,7 @@ end;
 function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
 var word: string;
   index: Integer;
+  namespace: TNamespace;
 begin
   word := nextToken();
 
@@ -316,8 +317,11 @@ begin
        result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
     end;
   end else begin;
-    if strBeginsWith(word, 'xs:') then delete(word, 1, 3);
-
+    if system.pos(':', word) > 0 then namespace := staticContext.findNamespace(strSplitGet(':', word))
+    else if staticContext.defaultElementTypeNamespace <> nil then namespace := staticContext.defaultElementTypeNamespace
+    else namespace := staticContext.defaultTypeNamespace;
+    if (namespace = nil) then raiseParsingError('No schemas loaded for type '+word);
+    if namespace.url <> XMLNamespaceURL_XMLSchema then raiseParsingError('Invalid schema loaded: '+namespace.url+' by '+word);
     result.kind:=tikAtomic;
     index := types.IndexOf(word);
     if index < 0 then raise Exception.Create('Unknown type: '+word);
@@ -1042,7 +1046,8 @@ function TXQParsingContext.parseModule(): TXQTerm;
       else raiseParsingError('Invalid schema import');
     end;
     url := parseStringLiteral();
-    //TODO
+    if staticContext.importedSchemas = nil then staticContext.importedSchemas := TNamespaceList.Create;
+    staticContext.importedSchemas.add(TNamespace.Create(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
     if nextToken(true) = 'at' then begin
       //discard schema addresses
       parseStringLiteral;
@@ -1204,11 +1209,14 @@ begin
           end;
           'element', 'function': begin
             expect('namespace');
-            if token = 'element' then staticContext.elementNamespace:=parseStringLiteral
-            else begin
-              temp := parseStringLiteral;
-              staticContext.defaultFunctionNamespace := engine.findNamespace(temp);
-              if staticContext.defaultFunctionNamespace = nil then raiseParsingError('Unknown namespace: '+temp);
+            if token = 'element' then begin
+              staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseStringLiteral, '');
+              if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+              staticContext.namespaces.Add(staticContext.defaultElementTypeNamespace);
+            end else begin
+              staticContext.defaultFunctionNamespace := TNamespace.Create(parseStringLiteral, '');
+              if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+              staticContext.namespaces.add(staticContext.defaultFunctionNamespace);
             end;
           end;
           else raiseParsingError('Unknown default value');
