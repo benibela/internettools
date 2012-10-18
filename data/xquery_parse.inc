@@ -1130,6 +1130,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
       if pos^ = ',' then pos+=1;
     end;
     pos+=1;
+    funcTerm.parameterCount:=length(funcTerm.children);
     if nextToken(true) = 'as' then begin
       expect('as');
       funcTerm.push(parseSequenceType());

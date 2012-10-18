@@ -1097,7 +1097,8 @@ var
   resfunc: TXQValueFunction;
   i: Integer;
 begin
-  resfunc := TXQValueFunction.create();
+  raiseEvaluationError('Dead branch called');
+{  resfunc := TXQValueFunction.create();
   i := 0;
   while (i < high(children)) and (children[i] is TXQTermDefineVariable) do begin
     setlength(resfunc.parameters, length(resfunc.parameters) + 1);
@@ -1114,7 +1115,7 @@ begin
   resfunc.namespace := namespace;
   resfunc.body:=children[i];
   resfunc.context:=context;
-  result := resfunc;
+  result := resfunc;          }
 end;
 
 function TXQTermDefineFunction.define(): TXQValueFunction;
@@ -1122,11 +1123,9 @@ var
   i: Integer;
 begin
   result := TXQValueFunction.create();
+  result.namespace := namespace;
   result.name:=funcname;
-  if (length(children) > 1) and not (children[high(children)-1] is TXQTermSequenceType) then
-    setlength(result.parameters, length(children) - 1 )
-  else if Length(children) > 1  then
-    SetLength(result.parameters, length(children) - 2);
+  setlength(result.parameters, parameterCount);
   for i := 0 to high(result.parameters) do begin
     result.parameters[i].name:=(children[i] as TXQTermDefineVariable).variablename;
     if length((children[i] as TXQTermDefineVariable).children) > 0 then
@@ -1134,9 +1133,12 @@ begin
      else
       result.parameters[i].seqtype:=nil;
   end;
-  if length(result.parameters) = length(children) - 2 then result.resulttype := children[high(children)-1] as TXQTermSequenceType
-  else result.resulttype := nil;
-  result.namespace := namespace;
-  result.body := children[high(children)];
+  if length(children) > parameterCount then begin
+    if (length(children) > 1) and (children[high(children) - 1] is TXQTermSequenceType) then result.resulttype := children[high(children)-1] as TXQTermSequenceType
+    else if children[high(children)] is TXQTermSequenceType then result.resulttype := children[high(children)] as TXQTermSequenceType;
+
+    if not (children[high(children)] is TXQTermSequenceType) then
+      result.body := children[high(children)];
+  end;
 end;
 

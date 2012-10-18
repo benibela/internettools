@@ -655,12 +655,17 @@ type
   TDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
   (***
     @abstract(Event call back that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
+
+    The return value can be created with one of the xqvalue(..) functions.
   *)
   TDeclareExternalVariableEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const variable: string; var value: IXQValue) of object;
   (***
   @abstract(Event call back that is called to set a function @code(value) of a XQuery function declared as "declare function ... external").
+
+  The function in @code(result) has already been initialized with the parameters and result type, only the term in @code(result.body) has to be set.@br
+  You can either create an syntax tree for the function with the respective TXQTerm classes or derive a class from TXQTerm and override the evaluate function to calculate it natively.
   *)
-  TDeclareExternalFunctionEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const functionName: string; var value: TXQValueFunction) of object;
+  TDeclareExternalFunctionEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const functionName: string; var result: TXQValueFunction) of object;
   (***
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
@@ -833,6 +838,7 @@ type
   TXQTermDefineFunction = class(TXQTerm)
     namespace: TNamespace;
     funcname: string;
+    parameterCount: integer;
     constructor create(aname: string);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
     function define(): TXQValueFunction;
@@ -1174,7 +1180,7 @@ type
     OnEvaluateVariable: TEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
     OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
     OnDeclareExternalVariable: TDeclareExternalVariableEvent; //**< Event called to import a variable that is declared as "declare variable ... external" in a XQuery expression
-    OnDeclareExternalFunction: TDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression
+    OnDeclareExternalFunction: TDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression.
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
@@ -1997,6 +2003,11 @@ begin
     if children[i] is TXQTermDefineFunction then begin
       functions[functionCount] := TXQTermDefineFunction(children[i]).define();
       functions[functionCount].context := context;
+      if functions[functionCount].body = nil then begin
+        if not assigned(context.staticContext.sender.OnDeclareExternalFunction) then raiseParsingError('External function declared, but no callback registered to OnDeclareExternalFunction.');
+        context.staticContext.sender.OnDeclareExternalFunction(context.staticContext.sender, context.staticContext, TXQTermDefineFunction(children[i]).namespace, TXQTermDefineFunction(children[i]).funcname, functions[functionCount]);
+        if functions[functionCount].body = nil then raiseEvaluationError('No function for external function ' + TXQTermDefineFunction(children[i]).funcname + ' given.');
+      end;
       functionCount+=1;
     end;
 

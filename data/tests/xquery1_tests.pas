@@ -17,6 +17,9 @@ type
 { THelper }
 
  THelper = class
+  func1, func2, func3: TXQTerm;
+  constructor create;
+  destructor Destroy; override;
   procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const variable: string; var value: IXQValue);
   procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const functionName: string; var value: TXQValueFunction);
 end;
@@ -630,6 +633,15 @@ begin
   m('declare namespace foobar = "xyz"; declare variable $foobar:test-importNS external; $foobar:test-importNS', 'xyz');
   m('declare namespace foobar = "tripple"; declare variable $foobar:test-importNS external; $foobar:test-importNS', 'tripple');
 
+  m('declare function test-importfunc1() external; test-importfunc1()', 'func-result');
+  m('declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2(5,6)', '30');
+  m('declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2(4,10)', '40');
+  m('declare function test-importfunc1()  as xs:string external; test-importfunc1()', 'func-result');
+  m('declare function test-importfunc2($a as integer, $b as integer) as xs:integer external; test-importfunc2(5,6)', '30');
+  m('declare function test-importfunc3() external; test-importfunc3()', 'native!');
+
+  m('declare variable $test-import1 external;  declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2($test-import1, 10)', '420');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
@@ -637,7 +649,38 @@ begin
   vars.free
 end;
 
+
+type
+
+{ TTermExtension }
+
+ TTermExtension = class(TXQTerm)
+  function evaluate(const context: TEvaluationContext): IXQValue; override;
+end;
+
+{ TTermExtension }
+
+function TTermExtension.evaluate(const context: TEvaluationContext): IXQValue;
+begin
+  result := xqvalue('native!');
+end;
+
 { THelper }
+
+constructor THelper.create;
+begin
+  func1 := TXQTermString.create('func-result');
+  func2 := TXQTermBinaryOp.create('*', TXQTermVariable.Create('$a', nil), TXQTermVariable.Create('$b', nil));;
+  func3 := TTermExtension.Create;
+end;
+
+destructor THelper.Destroy;
+begin
+  func1.free;
+  func2.free;
+  func3.free;
+  inherited Destroy;
+end;
 
 procedure THelper.DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;
   const variable: string; var value: IXQValue);
@@ -654,7 +697,11 @@ end;
 procedure THelper.DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;
   const functionName: string; var value: TXQValueFunction);
 begin
-
+  case functionName of
+  'test-importfunc1': value.body := func1;
+  'test-importfunc2': value.body := func2;
+  'test-importfunc3': value.body := func3;
+  end;
 end;
 
 end.
