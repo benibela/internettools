@@ -2722,11 +2722,11 @@ begin
   if caseSensitive then begin
     for i:=high(vars) downto 0 do
       if (vars[i].name = name)
-         and (vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.url = namespace.url)) then exit(i);
+         and ((vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.url = namespace.url))) then exit(i);
   end else
   for i:=high(vars) downto 0 do
     if striequal(vars[i].name, name)
-       and (vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.url = namespace.url)) then exit(i);
+       and ((vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.url = namespace.url))) then exit(i);
   exit(-1);
 end;
 
