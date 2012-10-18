@@ -407,29 +407,32 @@ begin
   index := aindex;
 end;
 
-constructor TXQTermNamedFunction.create(const name: string);
+constructor TXQTermNamedFunction.create(const ns: TNamespace; const name: string);
 begin
-  if not findKindIndex(name, kind, index, true) then begin//raiseParsingError('Unknown function: '+name);
+  if not findKindIndex(ns, name, kind, index) then begin
     kind := xqfkUnknown;
     funcname:=name;
-    if pos(':', funcname) > 0 then
-      namespacePrefix := strSplitGet(':', funcname);
+    namespace := ns;
   end;
 end;
 
-constructor TXQTermNamedFunction.create(const name: string; args: array of TXQTerm);
+constructor TXQTermNamedFunction.create(const ns: TNamespace; const name: string; args: array of TXQTerm);
 begin
-  create(name);
+  create(ns, name);
   push(args);
 end;
 
-class function TXQTermNamedFunction.createIfExists(const name: string; checkForOperators: boolean): TXQTermNamedFunction;
+class function TXQTermNamedFunction.createIfExists(const name: string; const sc: TXQStaticContext): TXQTermNamedFunction;
 var akind: TXQTermNamedFunctionKind;
     aindex: integer;
+    localName: string;
+    ns: TNamespace;
 begin
-  if not findKindIndex(name, akind, aindex, checkForOperators) then
-    exit(TXQTermNamedFunction.create(name)); //TODO: check static context
-  result := TXQTermNamedFunction.Create(akind, aindex);
+  localName:=name;
+  if pos(':', name) > 0 then ns := sc.findNamespace(strSplitGet(':', localName))
+  else ns := sc.defaultFunctionNamespace;
+  if findKindIndex(ns, localName, akind, aindex) then result := TXQTermNamedFunction.Create(akind, aindex)
+  else result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): IXQValue;
@@ -467,8 +470,7 @@ begin
       else raiseEvaluationError('Invalid argument count for constructor function');
     xqfkUnknown: begin
       func := nil;
-      ns := context.findNamespace(namespacePrefix);
-      if (ns = nil) and (namespacePrefix <> '') then raiseEvaluationError('Unknown namespace: '+namespacePrefix);
+      ns := namespace;
       sc := context.findModuleStaticContext(ns);
       if sc <> nil then
         for i := 0 to high(sc.functions) do
@@ -495,28 +497,42 @@ end;
 
 procedure xqFunctionGeneralConstructor(args: TXQVArray; var result: IXQValue);forward;
 
-class function TXQTermNamedFunction.findKindIndex(const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer; checkForOps: boolean): boolean;
+class function TXQTermNamedFunction.findKindIndex(const ns: TNamespace; const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer): boolean;
 var
   i: Integer;
 begin
-  aindex := basicFunctions.IndexOf(name);
-  if aindex >= 0 then begin
-    if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
-      akind:=xqfkTypeConstructor;
-      aindex:=types.indexof(name);;
+  if (ns = nil) then exit(false);
+
+  if (ns.url = XMLNamespaceURL_XPathFunctions) or (ns.url = XMLNamespaceURL_MyExtensions) then begin
+    aindex := basicFunctions.IndexOf(name);
+    if aindex >= 0 then begin
+      if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
+        if ns.url <> XMLNamespaceURL_MyExtensions then exit(false);
+        akind:=xqfkTypeConstructor;
+        aindex:=types.indexof(name);;
+        exit(true);
+      end;
+      akind:=xqfkBasic;
       exit(true);
     end;
-    akind:=xqfkBasic;
-    exit(true);
-  end;
 
-  aindex := complexFunctions.IndexOf(name);
-  if aindex >= 0 then begin
-    akind:=xqfkComplex;
-    exit(true);
+    aindex := complexFunctions.IndexOf(name);
+    if aindex >= 0 then begin
+      akind:=xqfkComplex;
+      exit(true);
+    end;
   end;
+  if (ns.url = XMLNamespaceURL_XMLSchema) or (ns.url = XMLNamespaceURL_MyExtensions)  then begin
+    aindex := basicFunctions.IndexOf('xs:'+name);
+    if aindex >= 0 then
+      if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
+        akind:=xqfkTypeConstructor;
+        aindex:=types.indexof(name);;
+        exit(true);
+      end;
 
-  if checkForOps then begin
+    exit(false);
+  end else if ns.url = XMLNamespaceURL_MyExtensionOperators then begin;
     aindex := -1;
     for i:=0 to  binaryOpFunctions.Count-1 do
       if strContains(name, binaryOpFunctions[i]) then begin

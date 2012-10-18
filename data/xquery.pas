@@ -865,16 +865,17 @@ type
   { TXQTermNamedFunction }
 
   TXQTermNamedFunction = class(TXQTerm)
+    namespace: TNamespace;
     kind: TXQTermNamedFunctionKind;
     index: integer;
-    funcname, namespacePrefix: string;
+    funcname: string;
     constructor create(const akind: TXQTermNamedFunctionKind; const aindex: integer);
-    constructor create(const name: string);
-    constructor create(const name: string; args: array of TXQTerm);
-    class function createIfExists(const name: string; checkForOperators: boolean = false): TXQTermNamedFunction;
+    constructor create(const ns: TNamespace; const name: string);
+    constructor create(const ns: TNamespace; const name: string; args: array of TXQTerm);
+    class function createIfExists(const name: string; const sc: TXQStaticContext): TXQTermNamedFunction;
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   private
-    class function findKindIndex(const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer; checkForOps: boolean): boolean;
+    class function findKindIndex(const ns: TNamespace; const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer): boolean;
   end;
 
   { TXQTermUnaryOp }
@@ -1517,12 +1518,14 @@ const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
       XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
       XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
       XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
+      XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
 
 var   XMLNamespace_XPathFunctions: TNamespace;
       XMLNamespace_XMLSchema: TNamespace;
       XMLNamespace_XMLSchemaInstance: TNamespace;
       XMLNamespace_XQueryLocalFunctions: TNamespace;
       XMLNamespace_MyExtensions: TNamespace;
+      XMLNamespace_MyExtensionOperators: TNamespace;
 
 
 
@@ -3128,7 +3131,7 @@ begin
   OnDefineVariable:= @VariableChangelog.defineVariable;
   GlobalNamespaces := TNamespaceList.Create;
   StaticContext := TXQStaticContext.Create;
-  StaticContext.defaultFunctionNamespace := XMLNamespace_XPathFunctions;
+  StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensions;
   StaticContext.sender := self;
   StaticContext.collation := TXQCollation(collations.Objects[0]);
   StaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
@@ -3255,7 +3258,6 @@ begin
     registerFunction(name, @xqFunctionGeneralConstructor, typ.classKind);
   registerFunction('xs:' + name, @xqFunctionGeneralConstructor, typ.classKind);
   types.AddObject(name, TObject(typ));
-  types.AddObject('xs:' + name, TObject(typ));
 end;
 
 class procedure TXQueryEngine.registerCollation(const collation: TXQCollation);
@@ -3334,7 +3336,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
 
   function newFunction(f: string; args: array of TXQTerm): TXQTerm;
   begin
-    result := TXQTermNamedFunction.Create(f, args);
+    result := TXQTermNamedFunction.Create(XMLNamespace_MyExtensions, f, args);
   end;
 
   function newOne: TXQTerm;
@@ -3928,6 +3930,7 @@ begin
     'fn': result := XMLNamespace_XPathFunctions;
     'local': result := XMLNamespace_XQueryLocalFunctions;
     'pxp': result := XMLNamespace_MyExtensions;
+    'op': result := XMLNamespace_MyExtensionOperators;
     else result := nil;
   end;
 end;
@@ -4098,6 +4101,7 @@ XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
 XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
 XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocalFunctions, 'local');
 XMLNamespace_MyExtensions:=TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
+XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
 
 //my functions
 TXQueryEngine.registerFunction('filter',@xqFunctionFilter);
@@ -4355,6 +4359,7 @@ XMLNamespace_XMLSchema.free;
 XMLNamespace_XMLSchemaInstance.free;
 XMLNamespace_XQueryLocalFunctions.free;
 XMLNamespace_MyExtensions.free;
+XMLNamespace_MyExtensionOperators.free;
 {$DEFINE PXP_DERIVED_TYPES_FINALIZATION}
 {$I xquery_derived_types.inc}
 end.

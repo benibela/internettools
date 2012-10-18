@@ -714,7 +714,7 @@ function TXQParsingContext.parseString(const w: string): TXQTerm;
     if (not AllowVariableUseInStringLiterals) or (w[1] = '''') or (system.Pos('$', s) <= 0)  then
       exit(TXQTermString.create(s));
 
-    result := TXQTermNamedFunction.create('concat');
+    result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'concat');
     i := 1;
     lastStrStart := 1;
     while  i <= length(s) do begin
@@ -856,7 +856,7 @@ begin
           if strContains(word, 'attribute') then result := TXQTermReadAttribute.create(word, true)
           else result := TXQTermNodeMatcher.Create(word, true);
         end else begin
-          result := TXQTermNamedFunction.createIfExists(word, strBeginsWith(word, 'op:'));
+          result := TXQTermNamedFunction.createIfExists(word, staticContext);
           if result = nil then raise Exception.Create('unknown function: '+word);
         end;
         exit(parseSequenceLike(result));
@@ -1115,9 +1115,8 @@ function TXQParsingContext.parseModule(): TXQTerm;
     tempVar: TXQTermDefineVariable;
   begin
     funcTerm := TXQTermDefineFunction.create(nextTokenQName());
-    if system.pos(':', functerm.funcname) > 0 then begin
-      funcTerm.namespace:=staticContext.findNamespace(strSplitGet(':', functerm.funcname));
-    end;
+    if system.pos(':', functerm.funcname) > 0 then funcTerm.namespace:=staticContext.findNamespace(strSplitGet(':', functerm.funcname))
+    else functerm.namespace := staticContext.defaultFunctionNamespace;
     expect('(');
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
