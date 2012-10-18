@@ -277,7 +277,7 @@ begin
   pxp.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
   pxp.AllowVariableUseInStringLiterals := false;
   pxp.VariableChangelog.allowObjects:=false;
-  pxp.setDefaultCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint');
+  pxp.StaticContext.collation := pxp.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint');
   tree := TTreeParser.Create;
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
@@ -313,9 +313,10 @@ begin
     htp.parseHTMLFile(ParamStr(CAT));
 
 
-    //writeln(htp.variableChangeLog.debugTextRepresentation);
     varlog := htp.VariableChangeLogCondensed;
+    //writeln(varlog.debugTextRepresentation);
     for i:=0 to varlog.count-1 do begin
+      writeln('::',varlog.getVariableName(i));
       if varlog.getVariableName(i) = 'gi' then begin begin
         groupStart := varlog.getVariableValueNode(i); lastGroupStart := groupStart; end;
         pxp.VariableChangelog.clear;
@@ -351,6 +352,7 @@ begin
         error := varlog.getVariableValueObject(i).getAsString('error');
         path := varlog.getVariableValueObject(i).getAsString('path');
 
+        writeln(desc, ' . ',queryname, ' . ', outputfile, ' ',outputcomparator);
 
         totalLocal += 1;
         if (error <> '') or (striEqual(outputcomparator, 'Inspect')) then begin

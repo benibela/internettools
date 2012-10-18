@@ -718,7 +718,7 @@ var i:longint;
            end;
   end;
 var previoushtml: string;
-    procedure performTest(const template, html, expected: string);
+    procedure t(const template, html, expected: string);
     begin
       if html<>'' then previoushtml:=html;
       if template='' then exit;
@@ -727,16 +727,23 @@ var previoushtml: string;
       checklog(expected);
     end;
 
+
+
 begin
   extParser:=THtmlTemplateParser.create;
   extParser.QueryEngine.GlobalNamespaces.Add(TNamespace.create('uri:mynamespace', 'my'));
   sl:=TStringList.Create;
   for i:=low(data)to high(data) do
-    performTest(data[i,1],data[i,2],data[i,3]);
+    t(data[i,1],data[i,2],data[i,3]);
+
+  t('<a><b>{.}</b></a>', '<a><b>12</b><b>34</b><c>56</c></a>', '_result=12');
+  t('<a><b>{.}</b>*</a>', '<a><b>12</b><b>34</b><c>56</c></a>', '_result=12'#13#10'_result=34');
+  //t('<a>{obj := object()}<b>{obj.b:=.}</b><c>{obj.c:=.}</c>{final := $obj.c}</a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'obj='#10'obj.b=12'#10'obj.c=56'#10'final=56');
+
   for i:=low(whiteSpaceData) to high(whiteSpaceData) do begin
     extParser.trimTextNodes:=TTrimTextNodes(StrToInt(whiteSpaceData[i,0][1]));
     XQGlobalTrimNodes:=whiteSpaceData[i,0][2] <> 'f';
-    performTest(whiteSpaceData[i,1],whiteSpaceData[i,2],whiteSpaceData[i,3]);
+    t(whiteSpaceData[i,1],whiteSpaceData[i,2],whiteSpaceData[i,3]);
   end;
   XQGlobalTrimNodes:=true;
 
