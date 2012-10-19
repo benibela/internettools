@@ -2938,6 +2938,7 @@ var
   p: Integer;
   found: Boolean;
   i,j: Integer;
+  k: Integer;
 begin
   result := TXQVariableChangeLog.create();
   result.shared:=true;
@@ -2950,7 +2951,11 @@ begin
         if result.vars[j].name = vars[i].name then begin
           found:=true;
           //result.vars[j].value := vars[i].value;
+          {result.vars[j].value := nil;
           move(result.vars[j + 1], result.vars[j], sizeof(result.vars[j]) * (p-j));
+          FillChar(result.vars[p-1], sizeof(result.vars[p-1]), 0);
+          result.vars[p-1] := vars[i];                            }
+          for k := j + 1 to p - 1 do result.vars[k-1] := result.vars[k];
           result.vars[p-1] := vars[i];
           result.vars[p-1].fullname := vars[i].name;
           break;
