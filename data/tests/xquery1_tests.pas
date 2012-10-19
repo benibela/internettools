@@ -501,6 +501,8 @@ begin
   m('declare boundary-space strip ; outer-xml(<a>  {7}  </a>)', '<a>7</a>');
   m('declare boundary-space preserve; outer-xml(<a>  {7}  </a>)', '<a>  7  </a>');
   m('declare boundary-space strip; outer-xml(<a>  {7}  </a>)', '<a>7</a>');
+  m('declare boundary-space preserve; outer-xml(<a>  7  </a>)', '<a>  7  </a>');
+  m('declare boundary-space strip; outer-xml(<a>  7  </a>)', '<a>  7  </a>');
 
   m('declare variable $x := 7.5; $x', '7.5');
   m('declare variable $x as xs:integer := 7; $x', '7');
@@ -641,6 +643,25 @@ begin
   m('declare function test-importfunc3() external; test-importfunc3()', 'native!');
 
   m('declare variable $test-import1 external;  declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2($test-import1, 10)', '420');
+
+
+  m('declare namespace xx = "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/xx:bing', 'Lentils'); //global trim trims returned values even if the tree contains the whitespace
+  m('declare namespace xx = "http://example.org/"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/xx:bing', '');
+  m('declare namespace xx = "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return namespace-uri($i/xx:bing)', 'http://example.org');
+  m('declare namespace foo = "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/foo:bing', 'Lentils');
+  m('declare namespace foo = "http://example.org/"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/foo:bing', '');
+  m('declare default element namespace "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/bing', 'Lentils');
+  m('declare default element namespace "http://example.org/"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/bing', '');
+  m('declare default element namespace "http://example.org"; let $i := <bar> <bing> Lentils </bing>  </bar> return $i/bing', 'Lentils');
+  m('declare default element namespace "http://example.org"; let $i := <bar> <bing> Lentils </bing>  </bar> return fn:namespace-uri($i/bing)', 'http://example.org');
+  m('declare default element namespace "http://example.org"; let $i := <bar> <bing> Lentils </bing>  </bar> return namespace-uri($i/bing)', 'http://example.org');
+  m('declare default element namespace "http://example.org"; let $i := <bar xmlns="override"> <bing> Lentils </bing>  </bar> return $i/bing', '');
+  m('declare default element namespace "http://example.org"; declare namespace test = "override"; let $i := <bar xmlns="override"> <bing> Lentils </bing>  </bar> return $i/test:bing', 'Lentils');
+  m('declare default element namespace "http://example.org"; declare namespace test = "override"; let $i := <bar xmlns="override"> <bing xmlns="override2"> Lentils </bing>  </bar> return $i/test:bing', '');
+  m('declare default element namespace "http://example.org"; declare namespace test = "override"; declare namespace foobar = "override2"; let $i := <bar xmlns="override"> <bing xmlns="override2"> Lentils </bing>  </bar> return $i/test:bing', '');
+  m('declare default element namespace "http://example.org"; declare namespace test = "override"; declare namespace foobar = "override2"; let $i := <bar xmlns="override"> <bing xmlns="override2"> Lentils </bing>  </bar> return $i/foobar:bing', 'Lentils');
+  m('declare default element namespace "http://example.org"; declare namespace test = "override";  let $i := <bar xmlns="http://example.org"> <bing> Lentils </bing>  </bar> return $i/test:bing', '');
+
 
   helper.free;
   xml.free;

@@ -718,6 +718,7 @@ var i:longint;
            end;
   end;
 var previoushtml: string;
+  tempobj: TXQValueObject;
     procedure t(const template, html, expected: string);
     begin
       if html<>'' then previoushtml:=html;
@@ -727,7 +728,10 @@ var previoushtml: string;
       checklog(expected);
     end;
 
-
+   procedure cmp(a,b: string);
+   begin
+     if a <> b then raise Exception.Create('Test failed: '+a+' <> '+b);
+   end;
 
 begin
   extParser:=THtmlTemplateParser.create;
@@ -738,6 +742,29 @@ begin
 
   t('<a><b>{.}</b></a>', '<a><b>12</b><b>34</b><c>56</c></a>', '_result=12');
   t('<a><b>{.}</b>*</a>', '<a><b>12</b><b>34</b><c>56</c></a>', '_result=12'#13#10'_result=34');
+
+  extParser.variableChangeLog.clear;
+  tempobj := TXQValueObject.create();
+  tempobj.setMutable('a', xqvalue('Hallo'));
+  tempobj.setMutable('b', xqvalue(17));
+  extParser.variableChangeLog.addVariable('test', tempobj);
+  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('a'), 'Hallo');
+  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('b'), '17');
+  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('a'), 'Hallo');
+  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('b'), '17');
+
+  extParser.parseTemplate('<a/>');
+  extParser.parseHTML('<a/>');
+
+  tempobj := TXQValueObject.create();
+  tempobj.setMutable('a', xqvalue('Hallo2'));
+  tempobj.setMutable('b', xqvalue(18));
+  extParser.variableChangeLog.addVariable('test', tempobj);
+  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('a'), 'Hallo2');
+  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('b'), '18');
+  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('a'), 'Hallo2');
+  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('b'), '18');
+
   //t('<a>{obj := object()}<b>{obj.b:=.}</b><c>{obj.c:=.}</c>{final := $obj.c}</a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'obj='#10'obj.b=12'#10'obj.c=56'#10'final=56');
 
   for i:=low(whiteSpaceData) to high(whiteSpaceData) do begin

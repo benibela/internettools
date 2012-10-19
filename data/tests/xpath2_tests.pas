@@ -1435,6 +1435,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(id(("a       b", "c")),",")', 'singleC,singleA,doubleB,doubleB2', '');
   t('string-join(id(" "),",")', '', '');
   t('static-base-uri()', 'pseudo://test', '');
+  t('string-join(id("b", html/y),",")', 'doubleB,doubleB2', '');
+  t('string-join(id("z", html/y),",")', '', '');
 
                //http://www.dpawson.co.uk/xsl/rev2/exampler2.html
                //http://www.w3.org/TR/xslt20/#function-function-available?? that's xsl not xpath
@@ -2484,6 +2486,12 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   t('if (1,2,3) then 5 else 6', '6');
   t('if (/a,2,3) then 5 else 6',  '5', '!<a>..</a>');
+
+  t('/r', 'test', '!<r>test</r>');
+  t('/r', '', '!<r xmlns="foobar">test</r>');
+  ps.StaticContext.defaultElementTypeNamespace := TNamespace.create('foobar', '');
+  t('/r', 'test');
+  FreeAndNil(ps.StaticContext.defaultElementTypeNamespace);
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
