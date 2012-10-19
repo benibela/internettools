@@ -569,7 +569,7 @@ begin
   k := v.kind;
   if k = pvkNode then exit(v.toNode)
   else if (k = pvkSequence) and (v.getSequenceCount=1) and ((v as TXQValueSequence).seq[0].kind = pvkNode) then exit((v as TXQValueSequence).seq[0].toNode)
-  else raise EXQEvaluationException.Create('Expected node, got: '+v.toString);
+  else raise EXQEvaluationException.Create('Expected node, got: '+v.debugAsStringWithTypeAnnotation());
 end;
 
 procedure xqvalueSameNode(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
