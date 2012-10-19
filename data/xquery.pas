@@ -1960,7 +1960,7 @@ begin
     exit(defaultElementTypeNamespace);
   if (defaultTypeNamespace <> nil) and (defaultNamespaceKind = xqdnkType) and (defaultTypeNamespace.prefix = nsprefix) then
     exit(defaultTypeNamespace);
-  if (namespaces <> nil) and ((nsprefix <> '') or (defaultNamespaceKind <> xqdnkFunction)) and (namespaces.hasNamespacePrefix(nsprefix, result)) then
+  if (namespaces <> nil) and ((nsprefix <> '') or (defaultNamespaceKind = xqdnkElementType)) and (namespaces.hasNamespacePrefix(nsprefix, result)) then
     exit;
   if importedModules <> nil then begin
     i := importedModules.IndexOf(nsprefix);
