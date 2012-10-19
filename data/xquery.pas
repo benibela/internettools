@@ -1178,7 +1178,7 @@ type
 
 
     VariableChangelog: TXQVariableChangeLog;  //**< All variables that have been set (if a variable was overriden, it stores the old and new value)
-    TreeStorage: TTreeParser; //**< Object storing all trees generated during by an XQuery expression
+    //TreeStorage: TTreeParser; //**< Object storing all trees generated during by an XQuery expression
 
     OnEvaluateVariable: TEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
     OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
@@ -1232,6 +1232,7 @@ type
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
+    FGarbageNamespaces: TNamespaceList;
     {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
     FInternet: TInternetAccess;
     {$endif}
@@ -1941,14 +1942,8 @@ begin
   for i := 0 to high(functions) do
     functions[i].free;
   FreeAndNil(moduleNamespace);
-  if namespaces <> nil then begin
-    namespaces.freeAll;
-    namespaces.free;
-  end;
-  if importedSchemas <> nil then begin
-    importedSchemas.freeAll;
-    importedSchemas.Free;
-  end;
+  namespaces.free;
+  importedSchemas.Free;
   inherited Destroy;
 end;
 
@@ -3226,6 +3221,7 @@ begin
     end;
     FInternalDocuments.Free;
   end;
+  FGarbageNamespaces.Free;
   FExternalDocuments.Free;
   GlobalNamespaces.free;
   FModules.Free;

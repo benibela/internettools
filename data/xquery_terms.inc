@@ -934,8 +934,10 @@ var
           end;
           if kid.namespace = nil then subcontext^.namespaces.Add(TNamespace.Create(kid.reverse.value, ''))
           else subcontext^.namespaces.Add(TNamespace.Create(kid.reverse.value, kid.value));
-          kid.free;
+          if subcontext^.staticContext.sender.FGarbageNamespaces = nil then subcontext^.staticContext.sender.FGarbageNamespaces := TNamespaceList.Create;
+          subcontext^.staticContext.sender.FGarbageNamespaces.Add(subcontext^.namespaces[subcontext^.namespaces.Count-1]);
           kid.reverse.Free;
+          kid.free;
         end else begin
           if lastAttribute = nil then tree.attributes := kid
           else begin
@@ -1054,6 +1056,7 @@ begin
         subcontext^.splitRawQName(tree.namespace, tree.value, xqdnkElementType);
       end;
       kid := TTreeElement.create(tetClose, tree.value);
+      kid.namespace := tree.namespace;
       addKid;
       tree.reverse := kid; kid.reverse := tree;
     end;
@@ -1068,6 +1071,7 @@ begin
   end;
   result := xqvalue(tree);
   if subcontext <> @context then begin
+    subcontext^.namespaces.clearNoFree;
     subcontext^.namespaces.free;
     Dispose(subcontext);
   end else if context.namespaces <> nil then

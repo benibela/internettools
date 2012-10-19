@@ -55,7 +55,8 @@ private
 public
   function hasNamespacePrefix(const prefix: string; out ns: TNamespace): boolean;
 
-  procedure freeAll;
+  procedure clear;
+  procedure clearNoFree;
   destructor Destroy; override;
 
   function clone: TNamespaceList;
@@ -333,17 +334,23 @@ begin
   exit(false);
 end;
 
-procedure TNamespaceList.freeAll;
+
+procedure TNamespaceList.clear;
 var
   i: Integer;
 begin
   for i := 0 to Count - 1 do items[i].free;
-  Clear;
+  inherited Clear;
+end;
+
+procedure TNamespaceList.clearNoFree;
+begin
+  inherited clear;
 end;
 
 destructor TNamespaceList.Destroy;
 begin
-  freeAll;
+  clear;
   inherited Destroy;
 end;
 
@@ -1440,8 +1447,6 @@ begin
   for i:=0 to FTrees.Count-1 do
     TTreeDocument(FTrees[i]).deleteAll();
   ftrees.Clear;
-  for i:=0 to FNamespaceGarbage.Count-1 do
-    tobject(FNamespaceGarbage[i]).free;
   FNamespaceGarbage.Clear;
 end;
 
@@ -1562,7 +1567,7 @@ begin
 
   FTrees.Add(FCurrentTree);
   result := FCurrentTree;
-  FCurrentNamespaces.Clear;
+  FCurrentNamespaces.clearNoFree;
   FCurrentNamespaceDefinitions.Clear;
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
