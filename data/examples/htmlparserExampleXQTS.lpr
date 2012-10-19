@@ -228,8 +228,8 @@ begin
 end;
 
 const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{('+
-                         'test:=xs:object(), test.path:=@FilePath,test.desc:=description,test.queryname:=query/@name,' +
-                         'test.outputfile:=output-file,test.outputcomparator:=output-file/@compare, test.error:=expected-error)}' +
+                         'test:=xs:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name,' +
+                         'test.outputfile:=*:output-file,test.outputcomparator:=*:output-file/@*:compare, test.error:=*:expected-error)}' +
                          '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
 
 var htp: THtmlTemplateParser;
@@ -316,7 +316,6 @@ begin
     varlog := htp.VariableChangeLogCondensed;
     //writeln(varlog.debugTextRepresentation);
     for i:=0 to varlog.count-1 do begin
-      writeln('::',varlog.getVariableName(i));
       if varlog.getVariableName(i) = 'gi' then begin begin
         groupStart := varlog.getVariableValueNode(i); lastGroupStart := groupStart; end;
         pxp.VariableChangelog.clear;
@@ -351,8 +350,6 @@ begin
         outputcomparator := varlog.getVariableValueObject(i).getAsString('outputcomparator');
         error := varlog.getVariableValueObject(i).getAsString('error');
         path := varlog.getVariableValueObject(i).getAsString('path');
-
-        writeln(desc, ' . ',queryname, ' . ', outputfile, ' ',outputcomparator);
 
         totalLocal += 1;
         if (error <> '') or (striEqual(outputcomparator, 'Inspect')) then begin
