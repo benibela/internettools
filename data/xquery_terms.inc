@@ -165,7 +165,7 @@ begin
   if kind = tikElementTest then begin
     TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
     if nodeCondition.checkNamespace then
-      nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL);
+      nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkElementType);
     nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
   end;
   result := true;
@@ -429,8 +429,7 @@ var akind: TXQTermNamedFunctionKind;
     ns: TNamespace;
 begin
   localName:=name;
-  if pos(':', name) > 0 then ns := sc.findNamespace(strSplitGet(':', localName))
-  else ns := sc.defaultFunctionNamespace;
+  sc.splitRawQName(ns, localName, xqdnkFunction);
   if findKindIndex(ns, localName, akind, aindex) then result := TXQTermNamedFunction.Create(akind, aindex)
   else result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet
 end;
@@ -776,7 +775,7 @@ begin
   testValue := readvalue <> '*';
   testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
   if testNS then begin
-    temp := context.findNamespace(readnamespace);
+    temp := context.findNamespace(readnamespace, xqdnkUnknown);
     if temp <> nil then readnamespace:=temp.url;
   end;
   while tempEl <> nil do begin
@@ -797,7 +796,7 @@ begin
   if value[1] <> '$' then raiseEvaluationError('variable name does not start with $:  ' + value);
   delete(value,1,1);
   if value[length(value)] = ';' then delete(value, length(value), 1);
-  if (staticContext <> nil) and (pos(':', value) > 0) then namespace := staticContext.findNamespace(strSplitGet(':', value));
+  if staticContext <> nil then staticContext.splitRawQName(namespace, value, xqdnkUnknown);
 end;
 
 function TXQTermVariable.evaluate(const context: TEvaluationContext): IXQValue;
@@ -1034,8 +1033,7 @@ begin
   case typ of
     tetAttributeName: begin
       tree.value := nameValue.evaluate(subcontext^).toString;
-      if pos(':', tree.value) > 0 then
-        tree.namespace:=subcontext^.findNamespace(strSplitGet(':', tree.value));
+      subcontext^.splitRawQName(tree.namespace, tree.value, xqdnkUnknown);
       tree.reverse := TTreeElement.create();
       tree.reverse.document := root;
       tree.reverse.reverse := tree;
@@ -1053,8 +1051,7 @@ begin
 
       if nameValue <> nil then begin
         tree.value := nameValue.evaluate(subcontext^).toString;
-        if pos(':', tree.value) > 0 then tree.namespace:=subcontext^.findNamespace(strSplitGet(':', tree.value))
-        else tree.namespace := subcontext^.findNamespace('');
+        subcontext^.splitRawQName(tree.namespace, tree.value, xqdnkElementType);
       end;
       kid := TTreeElement.create(tetClose, tree.value);
       addKid;

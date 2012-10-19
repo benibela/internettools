@@ -317,9 +317,7 @@ begin
        result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
     end;
   end else begin;
-    if system.pos(':', word) > 0 then namespace := staticContext.findNamespace(strSplitGet(':', word))
-    else if staticContext.defaultElementTypeNamespace <> nil then namespace := staticContext.defaultElementTypeNamespace
-    else namespace := staticContext.defaultTypeNamespace;
+    staticContext.splitRawQName(namespace, word, xqdnkType);
     if (namespace = nil) then raiseParsingError('No schemas loaded for type '+word);
     if namespace.url <> XMLNamespaceURL_XMLSchema then raiseParsingError('Invalid schema loaded: '+namespace.url+' by '+word);
     result.kind:=tikAtomic;
@@ -347,8 +345,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
     if name = '' then raiseParsingError('Expected variable name');
     if name[1] <> '$' then raiseParsingError('Expected variable name starting with $, but got "'+name+'"');
     delete(name, 1, 1);
-    if system.pos(':', name) = 0 then namespace := nil
-    else namespace := staticContext.findNamespace(strSplitGet(':', name));
+    staticContext.splitRawQName(namespace, name, xqdnkUnknown);
   end;
 
   procedure parseVarBinding;
@@ -991,7 +988,7 @@ begin
       ':=': begin
         expect(':=');
         result := TXQTermDefineVariable.Create(astroot, nil, parse());
-        if system.pos(':', TXQTermDefineVariable(result).variablename) > 0 then TXQTermDefineVariable(result).namespace:=staticContext.findNamespace(strSplitGet(':', TXQTermDefineVariable(result).variablename));
+        staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
         exit;
       end;
       else if binaryOps.IndexOf(word) >= 0 then pushBinaryOp(word)
@@ -1096,8 +1093,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     requireModule;
     expect('$');
     vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp), nil);
-    if system.pos(':', vari.variablename) > 0 then vari.namespace:=staticContext.findNamespace(strSplitGet(':', vari.variablename));
-
+    staticContext.splitRawQName(vari.namespace, vari.variablename, xqdnkUnknown);
     result.push(vari);
     if tempTyp <> nil then vari.push(tempTyp);
     case nextToken() of
@@ -1115,14 +1111,13 @@ function TXQParsingContext.parseModule(): TXQTerm;
     tempVar: TXQTermDefineVariable;
   begin
     funcTerm := TXQTermDefineFunction.create(nextTokenQName());
-    if system.pos(':', functerm.funcname) > 0 then funcTerm.namespace:=staticContext.findNamespace(strSplitGet(':', functerm.funcname))
-    else functerm.namespace := staticContext.defaultFunctionNamespace;
+    staticContext.splitRawQName(funcTerm.namespace, funcTerm.funcname, xqdnkFunction);
     expect('(');
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
       expect('$');
       tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType), nil);
-      if system.pos(':', tempVar.variablename) > 0 then tempVar.namespace := staticContext.findNamespace(strSplitGet(':', tempVar.variablename));
+      staticContext.splitRawQName(tempVar.namespace, tempVar.variablename, xqdnkFunction);
       if tempType <> nil then tempVar.push(tempType);
       funcTerm.push(tempVar);
       skipWhitespaceAndComment();
@@ -1260,7 +1255,7 @@ begin
       'option': begin
         token := nextTokenQName();
         temp := parseStringLiteral;
-        namespace := staticContext.findNamespace(strSplitGet(':', token));
+        namespace := staticContext.findNamespace(strSplitGet(':', token), xqdnkUnknown);
         if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
           case token of
             'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp);

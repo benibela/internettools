@@ -61,6 +61,7 @@ type
   Decimal = Extended;
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
+  TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkElementType,  xqdnkType, xqdnkFunction);
 
   { TXQStaticContext }
 
@@ -95,7 +96,8 @@ type
 
     function clone(): TXQStaticContext;
     destructor Destroy; override;
-    function findNamespace(const nsprefix: string): TNamespace;
+    function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
+    procedure splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
   end;
 
   { TEvaluationContext }
@@ -118,9 +120,10 @@ type
     staticContext: TXQStaticContext;
 
     function compareAtomicBase(const a,b: IXQValue): integer;
-    function findNamespace(const nsprefix: string): TNamespace;
-    function findNamespaceURL(const nsprefix: string): string;
+    function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
+    function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     function findModuleStaticContext(const namespace: TNamespace): TXQStaticContext;
+    procedure splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
   end;
 
 
@@ -1949,15 +1952,19 @@ begin
   inherited Destroy;
 end;
 
-function TXQStaticContext.findNamespace(const nsprefix: string): TNamespace;
+function TXQStaticContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 var
   i: Integer;
 begin
   result := nil;
   if (moduleNamespace <> nil) and (moduleNamespace.prefix = nsprefix) then
     exit(moduleNamespace);
-  if (defaultFunctionNamespace <> nil) and (defaultFunctionNamespace.prefix = nsprefix) then
+  if (defaultFunctionNamespace <> nil) and (defaultNamespaceKind = xqdnkFunction) and (defaultFunctionNamespace.prefix = nsprefix) then
     exit(defaultFunctionNamespace);
+  if (defaultElementTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkElementType, xqdnkType]) and (defaultElementTypeNamespace.prefix = nsprefix) then
+    exit(defaultElementTypeNamespace);
+  if (defaultTypeNamespace <> nil) and (defaultNamespaceKind = xqdnkType) and (defaultTypeNamespace.prefix = nsprefix) then
+    exit(defaultTypeNamespace);
   if (namespaces <> nil) and (namespaces.hasNamespacePrefix(nsprefix, result)) then
     exit;
   if importedModules <> nil then begin
@@ -1967,6 +1974,23 @@ begin
   if (importedSchemas <> nil) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
     exit;
   result := sender.findNamespace(nsprefix);
+  if result = nil then
+    case defaultNamespaceKind of
+      xqdnkUnknown: result := nil;
+      xqdnkFunction : result := defaultFunctionNamespace;
+      xqdnkElementType:
+        result := defaultElementTypeNamespace;
+      xqdnkType:
+        if defaultElementTypeNamespace <> nil then result := defaultElementTypeNamespace
+        else result := defaultTypeNamespace;
+    end;
+
+end;
+
+procedure TXQStaticContext.splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
+begin
+  if system.pos(':', name) > 0 then namespace := findNamespace(strSplitGet(':', name), defaultNamespaceKind)
+  else namespace := findNamespace('', defaultNamespaceKind);
 end;
 
 { TXQTermModule }
@@ -2062,17 +2086,18 @@ begin
   result := xqvalueCompareAtomicBase(a, b, staticContext.collation, staticContext.sender.ImplicitTimezone);
 end;
 
-function TEvaluationContext.findNamespace(const nsprefix: string): TNamespace;
+function TEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 begin
-  if (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
-  result := staticContext.findNamespace(nsprefix);
+  if (defaultNamespaceKind = xqdnkElementType) {<- dynamic namespaces are only created from node constructors}
+     and (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
+  result := staticContext.findNamespace(nsprefix, defaultNamespaceKind);
 end;
 
-function TEvaluationContext.findNamespaceURL(const nsprefix: string): string;
+function TEvaluationContext.findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
 var
   temp: TNamespace;
 begin
-  temp := findNamespace(nsprefix);
+  temp := findNamespace(nsprefix, defaultNamespaceKind);
   if temp = nil then begin
     if nsprefix <> '' then raise EXQEvaluationException.Create('Unknown namespace: '+nsprefix);
     exit;
@@ -2092,6 +2117,13 @@ begin
         exit(TXQuery(staticContext.importedModules.Objects[i]).staticContext);
 
   result := staticContext;
+end;
+
+procedure TEvaluationContext.splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind
+  );
+begin
+  if system.pos(':', name) > 0 then namespace := findNamespace(strSplitGet(':', name), defaultNamespaceKind)
+  else namespace := findNamespace('', defaultNamespaceKind);
 end;
 
 { TXQuery }
@@ -3850,7 +3882,7 @@ begin
       unifyQuery(oldnode, command, nodeCondition);
       if nodeCondition.checkNamespace then begin
         if not cachedNamespace then begin
-          cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix);
+          cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix, xqdnkElementType);
           cachedNamespace:=true;
         end;
         nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
