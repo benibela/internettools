@@ -324,7 +324,8 @@ begin
         node := varlog.getVariableValueNode(i);
         inputfilevar := node.getAttribute('variable');
         inputfile := node.deepNodeText();
-        if inputfile = 'id-idref-dtd' then inputfile:='id';
+        if inputfile = 'id-idref-dtd' then begin inputfile:='id'; pxp.StaticContext.defaultElementTypeNamespace := TNamespace.create('http://www.w3.org/XQueryTest/ididrefs', ''); end
+        else freeandnil(pxp.StaticContext.defaultElementTypeNamespace);
         if striEqual(node.getNodeName(), 'input-URI') then
           pxp.VariableChangelog.addVariable(inputfilevar,  GetCurrentDir + DirectorySeparator + 'TestSources/'+inputfile+'.xml')
         else begin
@@ -451,6 +452,7 @@ begin
   buffer3.free;
   inputfiles.Free;
   tree.free;
+  freeandnil(pxp.StaticContext.defaultElementTypeNamespace);
   pxp.free;
   htp.free;
   end;
