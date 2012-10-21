@@ -679,6 +679,20 @@ begin
   t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root()) instance of element()', 'false');
   t('<foobar>abcxyz</foobar> / (root()) / (/) / (root()) instance of document-node()', 'false');
   t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root()) instance of document-node()', 'true');
+  t('count(<a/> | <a/>)' , '2');
+  t('let $a := <a/> return count($a | $a)' , '1');
+  t('let $a := <a/> return count($a | $a | $a)' , '1');
+  t('let $a := <a/> return count($a | $a | $a | <a/> | <a/>)' , '3');
+  t('node-name(<pre:foobarx xmlns:pre="testNSX"/>) instance of xs:QName', 'true');
+  t('node-name(<pre:foobarx xmlns:pre="testNSX"/>)', 'pre:foobarx');
+  t('local-name-from-QName(node-name(<foobar xmlns="testNS"/>))', 'foobar');
+  t('prefix-from-QName(node-name(<foobar xmlns="testNS"/>))', '');
+  t('namespace-uri-from-QName(node-name(<foobar xmlns="testNS"/>))', 'testNS');
+  t('local-name-from-QName(node-name(<pre:foobarx xmlns:pre="testNSX"/>))', 'foobarx');
+  t('prefix-from-QName(node-name(<pre:foobarx xmlns:pre="testNSX"/>))', 'pre');
+  t('namespace-uri-from-QName(node-name(<pre:foobarx xmlns:pre="testNSX"/>))', 'testNSX');
+//  t('QName("http://www.w3.org/2005/xpath-functions", "prefix:local") eq xs:QName("fn:local")', 'true');
+//  t('QName("http://www.w3.org/2005/xpath-functionsX", "prefix:local") eq xs:QName("fn:local")', 'false');
 
   helper.free;
   xml.free;

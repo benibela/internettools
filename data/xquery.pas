@@ -3606,11 +3606,11 @@ var pos: pchar;
         TXQTermFlower(result).vars[0].kind:=xqfkFor;
         TXQTermFlower(result).vars[0].varname := '__csstemp';
         TXQTermFlower(result).vars[0].sequenceTyp := nil;
-        TXQTermFlower(result).vars[0].expr := newFunction('node-name', [TXQTermNodeMatcher.Create('.')]);
+        TXQTermFlower(result).vars[0].expr := newFunction('name', [TXQTermNodeMatcher.Create('.')]);
 
         TXQTermFlower(result).returned := TXQTermFilterSequence.create(
           axisTerm,
-          newBinOp(newFunction('node-name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('$__csstemp', StaticContext))
+          newBinOp(newFunction('name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('$__csstemp', StaticContext))
         );
       end;
     end;

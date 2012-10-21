@@ -2128,7 +2128,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('(//a/@*/../@att1)', 'v1', '');
   t('(//a/@*/../@att1/..)', 'a node', '');
   t('(//a/@*/../attribute::att2/..)', 'a node', '');
-  t('(//a/@*[node-name(.) = "att2"])', 'v2', '');
+  t('(//a/@*[node-name(.) = QName("","att2") ])', 'v2', '');
   t('(//a/@*[local-name() = "att3"])', 'v3', '');
   t('(//a/@*[local-name(.) = "att4"])', 'v4', '');
   t('(//a/@*[name(.) = "att1"])', 'v1', '');

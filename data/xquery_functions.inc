@@ -296,6 +296,18 @@ begin
   result[2] := s;
 end;
 
+function qnameMake(const uri, prefix, local: string): TXQValue_QName;overload;
+begin
+  result := TXQValue_QName.create(uri + #2 + prefix + ':' + local);
+end;
+
+function qnameMake(const ns: TNamespace; const local: string): TXQValue_QName; overload;
+begin
+  if ns <> nil then result := qnameMake(ns.url, ns.prefix, local)
+  else if local <> '' then result := TXQValue_QName.create(local)
+  else result := TXQValue_QName(TXQValueStringClass(TXQValue_QName).create(''));
+end;
+
 function qnameEqual(a,b: string): boolean;
 var
   at: TStringArray;
@@ -350,8 +362,13 @@ begin
       result := compareAsDecimals()
     else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
       result := CompareStr(TXQValue_Binary(a).toRawBinary, TXQValue_Binary(b).toRawBinary)
-    else if (a is TXQValue_QName) or (b is TXQValue_QName) then raise EXQEvaluationException.Create('QName compared')
-    else if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
+    else if (a is TXQValue_QName) or (b is TXQValue_QName) then begin
+      if (a is TXQValue_QName) and (b is TXQValue_QName) then begin
+        if qnameEqual(TXQValue_QName(a).str, TXQValue_QName(b).str) then exit(0)
+        else exit(-2);
+      end;
+      raise EXQEvaluationException.Create('QName compared');
+    end else if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
       if ak = pvkDateTime then begin
         tempDateTime := TXQValueDateTimeClass(a.ClassType).create(b.toString);
         result := xqvalueCompareAtomicBase(a, tempDateTime, collation, implicitTimezone);
@@ -384,11 +401,6 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) or ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)) then
     exit(acceptNAN and ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) and ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)));
-  if (ak = pvkString) or (bk = pvkString) then
-    if (a is TXQValue_QName) or (b is TXQValue_QName) then begin
-      if (a is TXQValue_QName) <> (b is TXQValue_QName) then raise EXQEvaluationException.Create('QNames can only be compared with QNames');
-      exit(qnameEqual(TXQValue_QName(a).str, TXQValue_QName(b).str));
-    end;
   result := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone)=0;
 end;
 
@@ -1799,17 +1811,23 @@ begin
   result := TXQValue_QName.create(ns + name);
 end;
 
-procedure xqFunctionQName(args: TXQVArray; var result: IXQValue);
-var ns: string;
+procedure xqFunctionQName(const context: TEvaluationContext;  args: TXQVArray; var result: IXQValue);
+var ns: tnamespace;
+  local: String;
 begin
   requiredArgCount(args,1,2);
   if length(args) = 1 then begin
     result := TXQValue_QName.create(args[0].toString);
     exit();
   end;
-  if args[0].isUndefined then ns:=''
-  else ns := args[0].toString;
-  result := TXQValue_QName.create(ns+#2+args[1].toString);
+  if not args[0].isUndefined then result := TXQValue_QName.create(args[0].toString+#2+args[1].toString)
+  else begin
+    local := args[0].toString;
+    context.splitRawQName(ns, local, xqdnkElementType);
+    if ns = nil then context.splitRawQName(ns, local, xqdnkFunction);
+    result := qnameMake(ns, local);
+  end;
+
 end;
 
 procedure xqFunctionPrefix_From_QName(args: TXQVArray; var result: IXQValue);
@@ -2448,11 +2466,11 @@ begin
   requiredArgCount(args,1);
   if args[0].isUndefined then exit;
   node := args[0].toNode;
-  if node <> nil then
-    case node.typ of
-      tetOpen,tetProcessingInstruction,tetAttributeName: result := xqvalue(node.value);
-      tetAttributeValue: result := xqvalue(node.reverse.value);
-    end;
+  if node <> nil then begin
+    if node.typ = tetAttributeValue then node := node.reverse;
+    if (node.typ in [tetOpen,tetProcessingInstruction,tetAttributeName]) and not (node is TTreeDocument) then
+      result := qnameMake(node.namespace, node.value);
+  end;
 end;
 
 function simpleNode(const context: TEvaluationContext; args: TXQVArray): TTreeElement;
