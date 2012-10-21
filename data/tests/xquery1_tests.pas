@@ -691,8 +691,10 @@ begin
   t('local-name-from-QName(node-name(<pre:foobarx xmlns:pre="testNSX"/>))', 'foobarx');
   t('prefix-from-QName(node-name(<pre:foobarx xmlns:pre="testNSX"/>))', 'pre');
   t('namespace-uri-from-QName(node-name(<pre:foobarx xmlns:pre="testNSX"/>))', 'testNSX');
-//  t('QName("http://www.w3.org/2005/xpath-functions", "prefix:local") eq xs:QName("fn:local")', 'true');
-//  t('QName("http://www.w3.org/2005/xpath-functionsX", "prefix:local") eq xs:QName("fn:local")', 'false');
+  t('QName("http://www.w3.org/2005/xpath-functions", "prefix:local") eq xs:QName("fn:local")', 'true');
+  t('QName("http://www.w3.org/2005/xpath-functionsX", "prefix:local") eq xs:QName("fn:local")', 'false');
+  t('QName("http://www.w3.org/2005/xpath-functions", "prefix:local") eq ("fn:local" cast as xs:QName)', 'true');
+  t('QName("http://www.w3.org/2005/xpath-functionsX", "prefix:local") eq ("fn:local" cast as xs:QName)', 'false');
 
   helper.free;
   xml.free;

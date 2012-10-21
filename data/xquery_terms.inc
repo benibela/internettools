@@ -142,12 +142,20 @@ begin
   else result := v.canConvertToType(atomicTypeInfo)
 end;
 
-function TXQTermSequenceType.castAs(v: IXQValue): IXQValue;
+function TXQTermSequenceType.castAs(v: IXQValue; const context: TEvaluationContext): IXQValue;
+var
+  temp: String;
+  ns: TNamespace;
 begin
   if not isSingleType() then raiseEvaluationError('need singletype for cast as');
   v := xqvalueAtomize(v);
   if not castableAsBase(v) then raiseEvaluationError('impossible cast as');
-  result := atomicTypeInfo.createFromValue(v);
+  if not atomicTypeInfo.InheritsFrom(TXQValue_QName) then result := atomicTypeInfo.createFromValue(v)
+  else begin
+    temp := v.toString;
+    context.splitRawQName(ns, temp, xqdnkAny);
+    result := qnameMake(ns, temp, TXQValueStringClass(atomicTypeInfo));
+  end;
 end;
 
 function TXQTermSequenceType.castableAs(v: IXQValue): boolean;
@@ -473,6 +481,7 @@ var
   moduleIndex: Integer;
   sc: TXQStaticContext;
   ns: TNamespace;
+  temp: String;
 begin
   evaluateChildren(context, evilkids);
 
@@ -493,7 +502,11 @@ begin
       TXQBinaryOp(binaryOpFunctions.Objects[index])(context, evilkids[0], evilkids[1], result);
     end;
     xqfkTypeConstructor:
-      if length(evilkids) = 0 then result := TXQValueClass(types.Objects[index]).createFromValue(nil)
+      if TXQValueClass(types.Objects[index]).InheritsFrom(TXQValue_QName) then begin
+        temp := evilkids[0].toString;
+        context.splitRawQName(ns, temp, xqdnkAny);
+        result := qnameMake(ns, temp,  TXQValueStringClass(types.Objects[index]));
+      end else if length(evilkids) = 0 then result := TXQValueClass(types.Objects[index]).createFromValue(nil)
       else if length(evilkids) = 1 then result := TXQValueClass(types.Objects[index]).createFromValue(evilkids[0])
       else raiseEvaluationError('Invalid argument count for constructor function');
     xqfkUnknown: begin

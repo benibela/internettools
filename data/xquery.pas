@@ -61,7 +61,7 @@ type
   Decimal = Extended;
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
-  TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkElementType,  xqdnkType, xqdnkFunction);
+  TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkAny, xqdnkElementType,  xqdnkType, xqdnkFunction);
 
   { TXQStaticContext }
 
@@ -822,7 +822,7 @@ type
   protected
     function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
     function castableAsBase(v: IXQValue): boolean;
-    function castAs(v: IXQValue): IXQValue;
+    function castAs(v: IXQValue; const context: TEvaluationContext): IXQValue;
     function castableAs(v: IXQValue): boolean;
     function instanceOf(ta: IXQValue; const context: TEvaluationContext): boolean;
   end;
@@ -1974,13 +1974,13 @@ begin
   result := nil;
   if (moduleNamespace <> nil) and (moduleNamespace.prefix = nsprefix) then
     exit(moduleNamespace);
-  if (defaultFunctionNamespace <> nil) and (defaultNamespaceKind = xqdnkFunction) and (defaultFunctionNamespace.prefix = nsprefix) then
-    exit(defaultFunctionNamespace);
   if (defaultElementTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkElementType, xqdnkType]) and (defaultElementTypeNamespace.prefix = nsprefix) then
     exit(defaultElementTypeNamespace);
-  if (defaultTypeNamespace <> nil) and (defaultNamespaceKind = xqdnkType) and (defaultTypeNamespace.prefix = nsprefix) then
+  if (defaultTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkType]) and (defaultTypeNamespace.prefix = nsprefix) then
     exit(defaultTypeNamespace);
-  if (namespaces <> nil) and ((nsprefix <> '') or (defaultNamespaceKind = xqdnkElementType)) and (namespaces.hasNamespacePrefix(nsprefix, result)) then
+  if (defaultFunctionNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkFunction]) and (defaultFunctionNamespace.prefix = nsprefix) then
+    exit(defaultFunctionNamespace);
+  if (namespaces <> nil) and ((nsprefix <> '') or (defaultNamespaceKind in [xqdnkAny, xqdnkElementType])) and (namespaces.hasNamespacePrefix(nsprefix, result)) then
     exit;
   if importedModules <> nil then begin
     i := importedModules.IndexOf(nsprefix);
@@ -1991,7 +1991,7 @@ begin
   result := sender.findNamespace(nsprefix);
   if result = nil then
     case defaultNamespaceKind of
-      xqdnkUnknown: result := nil;
+      xqdnkUnknown, xqdnkAny : result := nil;
       xqdnkFunction : result := defaultFunctionNamespace;
       xqdnkElementType:
         result := defaultElementTypeNamespace;
@@ -2103,7 +2103,7 @@ end;
 
 function TEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 begin
-  if (defaultNamespaceKind = xqdnkElementType) {<- dynamic namespaces are only created from node constructors}
+  if (defaultNamespaceKind in [xqdnkAny, xqdnkElementType]) {<- dynamic namespaces are only created from node constructors}
      and (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
   result := staticContext.findNamespace(nsprefix, defaultNamespaceKind);
 end;
@@ -2294,6 +2294,37 @@ begin
     end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('Namespace:wildcard not allowed in element test') ;
   end else raise EXQEvaluationException.Create('Children not allowed for element test "'+select+'"');
 end;
+
+function qnameSplit(s: string): TStringArray;
+begin
+  //splits URL #2 PREFIX : NAME
+  setlength(result, 3);
+  if strContains(s, #2) then result[0] := strSplitGet(#2, s);
+  if strContains(s, ':') then result[1] := strSplitGet(':', s);
+  result[2] := s;
+end;
+
+function qnameMake(const uri, prefix, local: string; c: TXQValueStringClass): TXQValue_QName;overload;
+begin
+  result := TXQValue_QName(c.create(uri + #2 + prefix + ':' + local));
+end;
+
+function qnameMake(const ns: TNamespace; const local: string; c: TXQValueStringClass): TXQValue_QName; overload;
+begin
+  if ns <> nil then result := qnameMake(ns.url, ns.prefix, local, c)
+  else result := TXQValue_QName(c.create(local))
+end;
+
+function qnameEqual(a,b: string): boolean;
+var
+  at: TStringArray;
+  bt: TStringArray;
+begin
+  at := qnameSplit(a);
+  bt := qnameSplit(b);
+  result := (at[0] = bt[0]) and (at[2] = bt[2]); //ignore prefix
+end;
+
 
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}

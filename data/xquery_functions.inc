@@ -287,36 +287,6 @@ begin
 end;
 
 
-function qnameSplit(s: string): TStringArray;
-begin
-  //splits URL #2 PREFIX : NAME
-  setlength(result, 3);
-  if strContains(s, #2) then result[0] := strSplitGet(#2, s);
-  if strContains(s, ':') then result[1] := strSplitGet(':', s);
-  result[2] := s;
-end;
-
-function qnameMake(const uri, prefix, local: string): TXQValue_QName;overload;
-begin
-  result := TXQValue_QName.create(uri + #2 + prefix + ':' + local);
-end;
-
-function qnameMake(const ns: TNamespace; const local: string): TXQValue_QName; overload;
-begin
-  if ns <> nil then result := qnameMake(ns.url, ns.prefix, local)
-  else if local <> '' then result := TXQValue_QName.create(local)
-  else result := TXQValue_QName(TXQValueStringClass(TXQValue_QName).create(''));
-end;
-
-function qnameEqual(a,b: string): boolean;
-var
-  at: TStringArray;
-  bt: TStringArray;
-begin
-  at := qnameSplit(a);
-  bt := qnameSplit(b);
-  result := (at[0] = bt[0]) and (at[2] = bt[2]); //ignore prefix
-end;
 
 function xqvalueCompareAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
 var ak, bk: TXQValueKind;
@@ -698,7 +668,7 @@ end;
 procedure xqvalueCastAs(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
   ignore(cxt);
-  result := getTypeInfo(tb).castAs(ta);
+  result := getTypeInfo(tb).castAs(ta, cxt);
 end;
 
 procedure xqvalueCastableAs(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
@@ -1820,14 +1790,10 @@ begin
     result := TXQValue_QName.create(args[0].toString);
     exit();
   end;
-  if not args[0].isUndefined then result := TXQValue_QName.create(args[0].toString+#2+args[1].toString)
-  else begin
-    local := args[0].toString;
-    context.splitRawQName(ns, local, xqdnkElementType);
-    if ns = nil then context.splitRawQName(ns, local, xqdnkFunction);
-    result := qnameMake(ns, local);
-  end;
-
+  if args[0].isUndefined or (args[0].toString = '') then begin
+    if pos(':', args[1].toString) > 0 then raise EXQEvaluationException.Create('Need namespace uri for '+args[1].toString);
+    result := TXQValue_QName.create(args[1].toString);
+  end else result := TXQValue_QName.create(args[0].toString+#2+args[1].toString)
 end;
 
 procedure xqFunctionPrefix_From_QName(args: TXQVArray; var result: IXQValue);
@@ -2469,7 +2435,7 @@ begin
   if node <> nil then begin
     if node.typ = tetAttributeValue then node := node.reverse;
     if (node.typ in [tetOpen,tetProcessingInstruction,tetAttributeName]) and not (node is TTreeDocument) then
-      result := qnameMake(node.namespace, node.value);
+      result := qnameMake(node.namespace, node.value, TXQValue_QName);
   end;
 end;
 
