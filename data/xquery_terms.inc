@@ -632,14 +632,14 @@ begin
   if isDoubleSlash then begin
     setlength(path, length(path) + 1);
     path[high(path)].typ:=qcSameOrDescendant;
-    path[high(path)].matching:=[qmElement, qmText, qmComment, qmProcessingInstruction];
+    path[high(path)].matching:=[qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction];
   end;
   children[1].addToQueryList(path);
 
   //optimization
   //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
   last := high(path);
-  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
+  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
       and (path[last].typ in [qcDirectChild, qcDescendant]) and (length(path[last].filters) = 0) then begin
     path[last - 1] := path[last];
     path[last - 1].typ := qcDescendant;
@@ -713,15 +713,15 @@ begin
     '/': result.typ := qcDocumentRoot;
     '.': begin
       result.typ:=qcSameNode; //same node /./
-      result.matching:=[qmElement, qmAttribute];
+      result.matching:=[qmDocument, qmElement, qmAttribute];
     end;
     '..': begin
       result.typ:=qcDirectParent; //parent /../
-      result.matching:=[qmElement];
+      result.matching:=[qmDocument, qmElement];
     end;
     '*': begin
       result.typ:=getAxis(axis); //any child /*/
-      result.matching:=[qmElement,qmAttribute, qmExcludeRoot];
+      result.matching:=[qmElement,qmAttribute];
       if (hadNamespace) and (namespace <> '*') then begin
         Include(Result.matching, qmCheckNamespace);
         result.namespacePrefix:=namespace;

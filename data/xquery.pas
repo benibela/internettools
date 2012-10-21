@@ -717,7 +717,7 @@ type
                           qcAncestor, qcPrecedingSibling, qcPreceding, qcSameOrAncestor,
                           qcDocumentRoot,
                           qcFunctionSpecialCase);
-  TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmExcludeRoot, qmCheckNamespace);
+  TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument, qmCheckNamespace);
   TXQPathMatchingKinds = set of TXQPathMatchingKind;
   //***@abstract(Step of a query in a tree)
   //***You can use it to use queries, but it is intended for internal use
@@ -740,6 +740,7 @@ type
     iteration: TXQPathNodeConditionIteration; //**< The axis to search
     start,endnode: TTreeElement; //**< Start end node for the search
     searchedTypes: TTreeElementTypes; //**< Treeelement types matched by the query
+    acceptDocument: boolean;
     matchStartNode: boolean; //**< If the search begins at start or at start.next
     checkValue: boolean; //**< If the name of the element matters
     requiredValue: string; //**< Required node name (if checkValue)
@@ -2250,11 +2251,13 @@ end;
 function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
 begin
   if select = 'node' then
-    exit([qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute])
+    exit([qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument])
   else if select = 'text' then exit([qmText])
   else if select = 'comment' then exit([qmComment])
-  else if select = 'element' then exit([qmElement,qmExcludeRoot])
+  else if select = 'element' then exit([qmElement])
   else if select = 'processing-instruction' then exit([qmProcessingInstruction])
+  else if select = 'document-node' then exit([qmDocument])
+  else if select = 'attribute' then exit([qmAttribute])
   else raise Exception.Create('Unknown element test: '+select);
 end;
 
@@ -3910,8 +3913,7 @@ begin
       newSequenceSeq := (newSequence as TXQValueSequence).seq;
       newSequenceSeq.count := 0;
       while newnode <> nil do begin
-        if not (qmExcludeRoot in command.matching) or ((newnode <> context.RootElement) and (newnode <> context.staticContext.sender.RootElement))  then
-          newSequenceSeq.add(xqvalue(newnode));
+        newSequenceSeq.add(xqvalue(newnode));
         newnode := getNextQueriedNode(newnode, nodeCondition);
       end;
       if command.typ = qcPrecedingSibling then
@@ -4027,9 +4029,10 @@ end;
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
 begin
   result :=  assigned(node)
-             and (node.typ in nodeCondition.searchedTypes)
+             and ((node.typ in nodeCondition.searchedTypes) or ((nodeCondition.searchedTypes = []) and (node is TTreeDocument) and nodeCondition.acceptDocument))
              and (not (nodeCondition.checkValue) or nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
-             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL()));
+             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL()))
+             and (nodeCondition.acceptDocument or not (node is TTreeDocument)) ;
 end;
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement;
@@ -4091,6 +4094,7 @@ begin
   nodeCondition.matchStartNode:=false;
   nodeCondition.iteration := qcnciNext;
   nodeCondition.checkValue:=qmValue in command.matching;
+  nodeCondition.acceptDocument := qmDocument in command.matching;
   nodeCondition.requiredValue:=command.value;
   nodeCondition.checkNamespace:=qmCheckNamespace in command.matching;
   nodeCondition.requiredNamespaceURL:=command.namespacePrefix; //is resolved later

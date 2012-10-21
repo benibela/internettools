@@ -666,6 +666,12 @@ begin
   //Tests based on failed XQTS tests
   t('empty(text {"some text"}/..)', 'true');
   t('empty(document-uri(attribute name {"content"}))', 'true');
+  t('attribute "foobar" {} instance of attribute()', 'true');
+  t('attribute "foobar" {} instance of element()', 'false');
+  t('attribute "foobar" {} instance of document-node()', 'false');
+  t('document {element "a" {}} instance of attribute()', 'false');
+  t('document {element "a" {}} instance of element()', 'false');
+  t('document {element "a" {}} instance of document-node()', 'true');
 
   helper.free;
   xml.free;
