@@ -7,7 +7,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, extendedhtmlparser, simplehtmltreeparser, xquery, bbutils , sysutils, internetaccess
+  Classes, extendedhtmlparser, simplehtmltreeparser, xquery, bbutils , sysutils, internetaccess, strutils
   ,{$ifdef win32}w32internetaccess{$else}synapseinternetaccess{$endif};
   { you can add units after this }
 
@@ -137,7 +137,8 @@ end;
 
 class procedure THTMLLogger.LOG_RESULT(state: integer; desc, queryname, query, inputfile, queryfile, myoutput, output: string;timing: TDateTime);
 begin
-
+    if length(myoutput) > 2048 then myoutput:=copy(myoutput,1,2048) + (' ...skipped '+IntToStr(length(myoutput))+' characters...');
+    if length(output) > 2048 then output:=copy(output,1,2048) + (' ...skipped '+IntToStr(length(output))+' characters...');
     myoutput:=StringReplace(myoutput, '<', '&lt;', [rfReplaceAll]);
     myoutput:=StringReplace(myoutput, '>', '&gt;', [rfReplaceAll]);
     output:=StringReplace(output, '<', '&lt;', [rfReplaceAll]);
@@ -227,10 +228,15 @@ begin
   end;
 end;
 
-const CATALOG_TEMPLATE = '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case is-XPath2="true" >{('+
-                         'test:=xs:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name,' +
-                         'test.outputfile:=*:output-file,test.outputcomparator:=*:output-file/@*:compare, test.error:=*:expected-error)}' +
-                         '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
+type
+
+{ TVariableProvider }
+
+ TVariableProvider = class
+  procedure getvar(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const variable: string; var value: IXQValue);
+end;
+
+var CATALOG_TEMPLATE: string;
 
 var htp: THtmlTemplateParser;
     desc, queryname, outputfile, error, path: string;
@@ -256,6 +262,18 @@ var htp: THtmlTemplateParser;
     j: Integer;
     varlog: TXQVariableChangeLog;
     outputcomparator: String;
+    onlyxpath: Boolean;
+    isxpath2: Boolean;
+    extvars: TVariableProvider;
+
+{ TVariableProvider }
+
+procedure TVariableProvider.getvar(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace; const variable: string;
+  var value: IXQValue);
+begin
+  value := pxp.VariableChangelog.getVariableValue(variable);
+end;
+
 begin
   {$ifdef win32}defaultInternetAccessClass := TW32InternetAccess.create{$else}defaultInternetAccessClass:=TSynapseInternetAccess{$endif};
 
@@ -264,6 +282,13 @@ begin
 
   logCorrect := (paramstr(1) = '--correct') or (paramstr(2) = '--correct');
 
+  onlyxpath := paramstr(1) = '--only-xpath';
+
+  CATALOG_TEMPLATE :=
+    '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case ' + IfThen(onlyxpath, ' is-XPath2="true" ', '')+'>{('+
+    'test:=xs:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name, test.isXPath2 := @*:is-XPath2,' +
+    'test.outputfile:=*:output-file,test.outputcomparator:=*:output-file/@*:compare, test.error:=*:expected-error)}' +
+    '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
 
   compareTree := TTreeParser.Create;
   compareTree.parsingModel:= pmStrict;
@@ -278,6 +303,8 @@ begin
   pxp.AllowVariableUseInStringLiterals := false;
   pxp.VariableChangelog.allowObjects:=false;
   pxp.StaticContext.collation := pxp.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint');
+  extvars := TVariableProvider.Create;
+  pxp.OnDeclareExternalVariable:=@extvars.getvar;
   tree := TTreeParser.Create;
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
@@ -300,6 +327,7 @@ begin
     writeln(mytostring(pxp.evaluate()));
     exit;
   end;
+
 
   mylogger.LOG_START();
   startLogged:=false; //start of a group, not the start in the line above
@@ -351,7 +379,7 @@ begin
         outputcomparator := varlog.getVariableValueObject(i).getAsString('outputcomparator');
         error := varlog.getVariableValueObject(i).getAsString('error');
         path := varlog.getVariableValueObject(i).getAsString('path');
-
+        isxpath2 := varlog.getVariableValueObject(i).getAsString('isXPath2') = 'true';
         totalLocal += 1;
         if (error <> '') or (striEqual(outputcomparator, 'Inspect')) then begin
           skippedErrorsLocal+=1;
@@ -360,25 +388,27 @@ begin
         query := strLoadFromFile('Queries/XQuery/'+path+'/'+queryname+'.xq');
         output := strDecodeHTMLEntities(strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile),eUTF8);
         try
+          if isxpath2 then begin
+            query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
 
-          query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
-
-          query := StringReplace(query, '(: insert-start :)', '(:insert-start:)',  []);
-          query := StringReplace(query, '(: insert-end :)', '(:insert-end:)',  []);
-          if strContains(query, '(:insert-start:)') and strContains(query, '(:insert-end:)') then begin
-            from := pos('(:insert-start:)', query);
-            delete(query, from, pos('(:insert-end:)', query) + length('(:insert-end:)')- from);
+            query := StringReplace(query, '(: insert-start :)', '(:insert-start:)',  []);
+            query := StringReplace(query, '(: insert-end :)', '(:insert-end:)',  []);
+            if strContains(query, '(:insert-start:)') and strContains(query, '(:insert-end:)') then begin
+              from := pos('(:insert-start:)', query);
+              delete(query, from, pos('(:insert-end:)', query) + length('(:insert-end:)')- from);
+            end;
           end;
-
           if fileOpenFailed <> '' then raise EFOpenError.Create(fileOpenFailed);
 
           if (inputfile = 'emptydoc') or (inputfile='') then begin
             pxp.RootElement:=nil;
             pxp.ParentElement:=nil;
-            pxp.parseXPath2('('+query+')');
+            if isxpath2 then pxp.parseXPath2('('+query+')')
+            else pxp.parseXQuery1(query);
           end else begin
             //query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
-            pxp.parseXPath2('('+query+')');
+            if isxpath2 then pxp.parseXPath2('('+query+')')
+            else pxp.parseXQuery1(query);
             pxp.RootElement:=currentTree;
             pxp.ParentElement:=currentTree;
           end;
