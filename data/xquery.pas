@@ -2255,14 +2255,6 @@ begin
   result := pvkUndefined;
 end;
 
-function compareNodes(a, b: TTreeElement): integer;
-begin
-  if a.document = b.document then
-    exit(a.offset - b.offset);
-  if pointer(a.document) < pointer(b.document) then exit(-1)
-  else exit(1);
-end;
-
 function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
 begin
   if select = 'node' then
@@ -2437,22 +2429,22 @@ begin
   case child.kind of
     pvkNode: begin
       childnode:=(child as TXQValueNode).node;
-      if (Count = 0) or (compareNodes(childnode, (Items[count-1] as TXQValueNode).node) > 0) then
+      if (Count = 0) or (TTreeElement.compareInDocumentOrder(childnode, (Items[count-1] as TXQValueNode).node) > 0) then
         add(child)
-      else if (compareNodes(childnode, (Items[0] as TXQValueNode).node) < 0) then
+      else if (TTreeElement.compareInDocumentOrder(childnode, (Items[0] as TXQValueNode).node) < 0) then
         insertSingle(0, child)
       else begin
         a := 0;
         b := count-1;
         while a < b do begin
           m := (a+b) div 2;
-          cmp:=compareNodes(childnode, (Items[m] as TXQValueNode).node);
+          cmp:=TTreeElement.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
           if cmp = 0 then begin exit; end
           else if cmp < 0 then b := m-1
           else a := m + 1;
         end;
         for m := b to a do begin
-          cmp:=compareNodes(childnode, (Items[m] as TXQValueNode).node);
+          cmp:=TTreeElement.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
           if cmp = 0 then begin exit; end
           else if cmp < 0 then begin insertSingle(m, child); exit; end
           else begin insertSingle(m + 1, child); exit; end;

@@ -582,13 +582,13 @@ procedure xqvalueNodeBefore(const cxt: TEvaluationContext; ta, tb: IXQValue; var
 begin
   ignore(cxt);
   if ta.isUndefined or tb.isUndefined then exit;
-  result := xqvalue(compareNodes(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) < 0);
+  result := xqvalue(TTreeElement.compareInDocumentOrder(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) < 0);
 end;
 procedure xqvalueNodeAfter(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 begin
   ignore(cxt);
   if ta.isUndefined or tb.isUndefined then exit;
-  result := xqvalue(compareNodes(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) > 0);
+  result := xqvalue(TTreeElement.compareInDocumentOrder(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) > 0);
 end;
 
 

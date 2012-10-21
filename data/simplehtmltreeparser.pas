@@ -193,7 +193,7 @@ public
   function caseInsensitiveCompare(const a,b: string): boolean; //**< returns true if a=b case insensitive. Can be passed to getAttribute
   function caseSensitiveCompare(const a,b: string): boolean;   //**< returns true if a=b case sensitive. Can be passed to getAttribute
 
-  class function compareInDocumentOrder(p1, p2: Pointer): integer;
+  class function compareInDocumentOrder(const a,b: TTreeElement): integer; static;
 end;
 TTreeElementClass = class of TTreeElement;
 
@@ -1072,13 +1072,14 @@ begin
 
 end;
 
-class function TTreeElement.compareInDocumentOrder(p1, p2: Pointer): integer;
+class function TTreeElement.compareInDocumentOrder(const a,b: TTreeElement): integer;
 begin
-  if TTreeElement(p1).offset < TTreeElement(p2).offset then exit(-1)
-  else if TTreeElement(p1).offset > TTreeElement(p2).offset then exit(1)
-  else if p1 = p2 then exit(0)
-  else raise Exception.Create('invalid comparison');
+  if a.document = b.document then
+    exit(a.offset - b.offset);
+  if pointer(a.document) < pointer(b.document) then exit(-1)
+  else exit(1);
 end;
+
 
 
 
