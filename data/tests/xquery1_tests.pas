@@ -663,6 +663,10 @@ begin
   m('declare default element namespace "http://example.org"; declare namespace test = "override";  let $i := <bar xmlns="http://example.org"> <bing> Lentils </bing>  </bar> return $i/test:bing', '');
 
 
+  //Tests based on failed XQTS tests
+  t('empty(text {"some text"}/..)', 'true');
+  t('empty(document-uri(attribute name {"content"}))', 'true');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);

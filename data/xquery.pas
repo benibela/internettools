@@ -4161,6 +4161,7 @@ begin
 
   //prevent search in certain cases, to prevent it from reading following elements as children from nodes that cannot have children
   if (nodeCondition.iteration = qcnciNext)                                           //only qcnciNext is concerned with children
+     and (nodeCondition.start <> nil)
      and (not (contextnode.typ in [tetOpen]) or (contextnode.reverse = nil))         //open elements (which btw. should always have a reverse element) have actual children, so this prevention is not needed / harmful
      and (not (command.typ in [qcFollowing, qcFollowingSibling, qcPrecedingSibling]) //following/sibling should match following/sibling so there is also no problem
            or (contextNode.typ in [tetAttributeName,tetAttributeValue]))  then            //except the node is an attribute, then should following/sibling shouldn't match anything

@@ -1741,7 +1741,7 @@ begin
   requiredArgCount(args,1);
   if args[0].isUndefined then exit;
   node := xqvalueToSingleNode(args[0]);
-  if node.getParent() <> nil then exit;
+  if (node = nil) or not (node is TTreeDocument) then exit;
   result := xqvalue(TTreeDocument(node).baseURI);
 end;
 
