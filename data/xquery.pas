@@ -749,6 +749,10 @@ type
   end;
 
 
+  TXQContextDependency = (xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther);
+  TXQContextDependencies = set of TXQContextDependency;
+
+
   //**@abstract Internally used xpath term
 
   { TXQTerm }
@@ -756,6 +760,7 @@ type
   TXQTerm = class
     children: array of TXQTerm;
     function evaluate(const context: TEvaluationContext): IXQValue; virtual; abstract;
+    function getContextDependencies: TXQContextDependencies; virtual;
     function debugTermToString: string; virtual;
     destructor destroy; override;
   protected
@@ -774,6 +779,7 @@ type
     value: string;
     constructor create(avalue: string = '');
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermNumber }
@@ -782,12 +788,14 @@ type
     value: IXQValue;
     constructor create(const avalue: string);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermSequence }
 
   TXQTermSequence = class(TXQTerm)
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermType }
@@ -806,6 +814,7 @@ type
 
     constructor create();
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
     function serialize: string;
   protected
     function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
@@ -822,6 +831,7 @@ type
     value: string;
     constructor create(const avalue: string; staticContext: TXQStaticContext);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermDefineVariable }
@@ -832,6 +842,7 @@ type
     constructor create(avarname: string; anamespace: TNamespace);
     constructor create(varname: TXQTerm; anamespace: TNamespace; value: TXQTerm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermDefineVariable }
@@ -845,6 +856,7 @@ type
     constructor create(aname: string);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
     function define(): TXQValueFunction;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermNodeMatcher }
@@ -854,6 +866,7 @@ type
     hadNamespace, func: boolean;
     constructor Create(const avalue: string; asfunction: boolean = false);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
   protected
     function toQueryCommand: TXQPathMatchingStep; override;
@@ -864,6 +877,7 @@ type
   TXQTermFilterSequence = class(TXQTerm)
     constructor create(seq: TXQTerm; filter: TXQTerm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   protected
     function toQueryCommand: TXQPathMatchingStep; override;
     procedure addToQueryList(var path: TXQPathMatching); override;
@@ -875,6 +889,7 @@ type
     value, namespace: string;
     constructor create(avalue: string; func: boolean = false);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown);
@@ -901,6 +916,7 @@ type
     index: integer;
     constructor create(const op: string; arg: TXQTerm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermBinaryOp }
@@ -910,6 +926,7 @@ type
     constructor create(const op: string; arg1: TXQTerm = nil; arg2: TXQTerm = nil);
     constructor create(arg1: TXQTerm; const op: string; arg2: TXQTerm);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
     function operatorInfo: PXQOperatorInfo;
   protected
     procedure addToQueryList(var path: TXQPathMatching); override;
@@ -3785,22 +3802,26 @@ var
  tempContext: TEvaluationContext;
  v, previous: IXQValue;
  i: Integer;
+ value: IXQValue;
 begin
   if result = nil then exit;
   if (result is TXQValueUndefined) then exit;
 
-  if filter is TXQTermNumber then begin
+  if not (xqcdFocusOther in filter.getContextDependencies) then begin
+    value := filter.evaluate(context);
     //optimization for a single number
-    if TXQTermNumber(filter).value.kind = pvkDecimal then
-      if frac(TXQTermNumber(filter).value.toDecimal) <> 0 then begin
+    if value.kind in [pvkDecimal, pvkInt] then begin
+      if frac(value.toDecimal) <> 0 then begin
         result := xqvalue();
         exit;
       end;
-    i := TXQTermNumber(filter).value.toInt65;
-    if result is TXQValueSequence then begin
-      if (i < 1) or (i > result.getSequenceCount) then result := xqvalue()
-      else result := (result as TXQValueSequence).seq[i - 1];
-    end else if i <> 1 then result := xqvalue();
+      i := value.toInt65;
+      if result is TXQValueSequence then begin
+        if (i < 1) or (i > result.getSequenceCount) then result := xqvalue()
+        else result := (result as TXQValueSequence).seq[i - 1];
+      end else if i <> 1 then result := xqvalue();
+    end else if not value.toBooleanEffective then
+      result := xqvalue();
     exit;
   end; //end optimization
 

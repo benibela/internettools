@@ -43,6 +43,15 @@ begin
   else xqvalueSeqSqueeze(result);
 end;
 
+function TXQTermFilterSequence.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i := 0 to high(children) do
+    result += children[i].getContextDependencies;
+end;
+
 function TXQTermFilterSequence.toQueryCommand: TXQPathMatchingStep;
 begin
   if length(children) <> 2 then raiseEvaluationError('invalid [] construct');
@@ -90,6 +99,13 @@ begin
   else context.staticContext.sender.OnDefineVariable(self, variablename, result);
 end;
 
+function TXQTermDefineVariable.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=[];
+  if length(children) > 1 then result := children[high(children)].getContextDependencies;
+  result += [xqcdContextVariables];
+end;
+
 { TXQTermType }
 
 constructor TXQTermSequenceType.create();
@@ -106,6 +122,11 @@ end;
 function TXQTermSequenceType.serialize: string;
 begin
   result := name;
+end;
+
+function TXQTermSequenceType.getContextDependencies: TXQContextDependencies;
+begin
+  result := [];
 end;
 
 function TXQTermSequenceType.isSingleType(): boolean;
@@ -187,6 +208,14 @@ begin
   for i := 0 to high(children) do
     tempSeq.addChild(children[i].evaluate(context));
   result := tempSeq;
+end;
+
+function TXQTermSequence.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i:= 0 to high(children) do result += children[i].getContextDependencies;
 end;
 
 { TXQTermSomeEvery }
@@ -577,6 +606,11 @@ begin
   operatorInfo^.func(context, children[0].evaluate(context), children[1].evaluate(context),result);
 end;
 
+function TXQTermBinaryOp.getContextDependencies: TXQContextDependencies;
+begin
+    result := [xqcdContextCollation, xqcdContextTime, xqcdContextOther] + children[0].getContextDependencies + children[1].getContextDependencies;
+end;
+
 function TXQTermBinaryOp.operatorInfo: PXQOperatorInfo;
 begin
   if (index < 0) or (index >= binaryOps.Count) then raiseEvaluationError('Invalid bin op index');
@@ -633,6 +667,11 @@ begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
   end;
+end;
+
+function TXQTermNodeMatcher.getContextDependencies: TXQContextDependencies;
+begin
+    result := [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextOther];
 end;
 
 function TXQTermNodeMatcher.debugTermToString: string;
@@ -717,6 +756,11 @@ begin
   PXQOperatorInfo(binaryOps.Objects[index])^.func(context, xqvalue(0),children[0].evaluate(context),result);
 end;
 
+function TXQTermUnaryOp.getContextDependencies: TXQContextDependencies;
+begin
+  result := children[0].getContextDependencies;
+end;
+
 { TXQTermNumber }
 
 constructor TXQTermNumber.create(const avalue: string);
@@ -730,6 +774,11 @@ function TXQTermNumber.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   ignore(context);
   result := value.clone;
+end;
+
+function TXQTermNumber.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=[];
 end;
 
 { TXQTermReadAttribute }
@@ -787,6 +836,11 @@ begin
   if result = nil then result:=xqvalue();
 end;
 
+function TXQTermReadAttribute.getContextDependencies: TXQContextDependencies;
+begin
+    result := [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextOther];
+end;
+
 { TXQTermVariable }
 
 constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
@@ -828,6 +882,12 @@ begin
   else result := xqvalue();
   if assigned(context.staticContext.sender.OnEvaluateVariable) then context.staticContext.sender.OnEvaluateVariable(self, value, result );
 end;
+
+function TXQTermVariable.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=[xqcdContextVariables];
+end;
+
 { TXQTermString }
 
 constructor TXQTermString.create(avalue: string);
@@ -839,6 +899,11 @@ function TXQTermString.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   ignore(context);
   Result := xqvalue(value);
+end;
+
+function TXQTermString.getContextDependencies: TXQContextDependencies;
+begin
+  result := [];
 end;
 
 
@@ -1141,5 +1206,10 @@ begin
     if not (children[high(children)] is TXQTermSequenceType) then
       result.body := children[high(children)];
   end;
+end;
+
+function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;
+begin
+  result := [xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 end;
 

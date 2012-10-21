@@ -2,6 +2,11 @@
 
 { TXQTerm }
 
+function TXQTerm.getContextDependencies: TXQContextDependencies;
+begin
+  result := [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+end;
+
 function TXQTerm.debugTermToString: string;
 var
   i: Integer;
