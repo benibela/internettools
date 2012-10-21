@@ -1166,7 +1166,7 @@ begin
       encoding := strEncodingFromName(parseStringLiteral);
       expect(';');
       token := nextToken(true);
-    end else if token = ';' then expect(token)
+    end else if token = ';' then begin expect(token); token := nextToken(true); end
     else raiseParsingError('expected encoding or ;');
   end;
 

@@ -604,6 +604,7 @@ begin
   m('declare option pxp:extended-strings "off"; declare variable $foobar := 123; "var is $foobar;."', 'var is $foobar;.');
   m('declare option pxp:extended-strings "on"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; "var is $foobar;."', 'var is $foobar;.');
   m('declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; "var is $foobar;."', 'var is 123.');
+  m('xquery version "1.0"; declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; "var is $foobar;."', 'var is 123.');
 
 
   m('declare default order empty least; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty least return $i, " ")', '1 2 3 4 5');
@@ -616,6 +617,7 @@ begin
   m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of test:integer', 'true');
   m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of xs:integer', 'true');
   m('import schema namespace foobar="http://www.w3.org/2001/XMLSchema"; 5 instance of foobar:integer', 'true');
+  m('xquery version "1.0"; import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of test:integer', 'true');
   m('import schema namespace foobar="xyz"; 5 instance of foobar:integer', 'true'); //TODO: arbitrary schemas
   m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of test:double', 'false');
   m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of xs:double', 'false');
@@ -643,9 +645,12 @@ begin
   m('declare function test-importfunc3() external; test-importfunc3()', 'native!');
 
   m('declare variable $test-import1 external;  declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2($test-import1, 10)', '420');
+  m('xquery version "1.0"; declare variable $test-import1 external;  declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2($test-import1, 10)', '420');
 
 
   m('declare namespace xx = "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/xx:bing', 'Lentils'); //global trim trims returned values even if the tree contains the whitespace
+  m('declare namespace xx="http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/xx:bing', 'Lentils'); //global trim trims returned values even if the tree contains the whitespace
+  m('xquery version "1.0"; declare namespace xx="http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/xx:bing', 'Lentils'); //global trim trims returned values even if the tree contains the whitespace
   m('declare namespace xx = "http://example.org/"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/xx:bing', '');
   m('declare namespace xx = "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return namespace-uri($i/xx:bing)', 'http://example.org');
   m('declare namespace foo = "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/foo:bing', 'Lentils');
@@ -661,6 +666,7 @@ begin
   m('declare default element namespace "http://example.org"; declare namespace test = "override"; declare namespace foobar = "override2"; let $i := <bar xmlns="override"> <bing xmlns="override2"> Lentils </bing>  </bar> return $i/test:bing', '');
   m('declare default element namespace "http://example.org"; declare namespace test = "override"; declare namespace foobar = "override2"; let $i := <bar xmlns="override"> <bing xmlns="override2"> Lentils </bing>  </bar> return $i/foobar:bing', 'Lentils');
   m('declare default element namespace "http://example.org"; declare namespace test = "override";  let $i := <bar xmlns="http://example.org"> <bing> Lentils </bing>  </bar> return $i/test:bing', '');
+
 
 
   //Tests based on failed XQTS tests
