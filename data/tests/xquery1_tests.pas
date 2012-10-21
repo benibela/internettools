@@ -701,6 +701,10 @@ begin
   t('QName("http://www.w3.org/2005/xpath-functionsX", "prefix:local") eq xs:QName("fn:local")', 'false');
   t('QName("http://www.w3.org/2005/xpath-functions", "prefix:local") eq ("fn:local" cast as xs:QName)', 'true');
   t('QName("http://www.w3.org/2005/xpath-functionsX", "prefix:local") eq ("fn:local" cast as xs:QName)', 'false');
+  t('outer-xml(element {"elem"} {"text"})', '<elem>text</elem>');
+  t('outer-xml(element {(), "elem"} {"text"})', '<elem>text</elem>');
+  t('outer-xml(element {"elem", ()} {"text"})', '<elem>text</elem>');
+
 
   helper.free;
   xml.free;

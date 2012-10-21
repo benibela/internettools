@@ -633,7 +633,7 @@ begin
   if expectName then begin
     token := nextToken();
     if token = '{' then begin
-      result.nameValue := parse;
+      result.nameValue := parsePrimaryLevel;
       expect('}');
     end else result.nameValue := TXQTermString.create(token);
   end;
