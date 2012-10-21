@@ -1750,14 +1750,8 @@ var
   temp: TTreeElement;
 begin
   requiredArgCount(args,0, 1);
-  if length(args) = 1 then
-    temp := args[0].toNode.getRoot
-  else begin
-    if context.ParentElement <> nil then temp := context.ParentElement.getRoot
-    else if context.staticContext.sender.ParentElement <> nil then temp := context.staticContext.sender.ParentElement.getRoot
-    else if context.staticContext.sender.RootElement <> nil then temp := context.staticContext.sender.RootElement
-    else raise Exception.Create('no root element');
-  end;
+  if length(args) = 1 then temp := args[0].toNode.getRootHighest()
+  else temp := context.getRootHighest;
   if temp.parent is TTreeDocument then result := xqvalue(temp.parent)
   else result := xqvalue(temp);
 end;
@@ -2566,7 +2560,7 @@ begin
     if length(args) = 2 then node := xqvalueToSingleNode(args[1])
     else node := xqvalueContextNode(context);
 
-    node := node.getRoot();
+    node := node.getRootElement();
 
     while node <> nil do begin
       attrib := node.attributes;

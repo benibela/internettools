@@ -150,7 +150,8 @@ TTreeElement = class
   function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
   function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
-  function getRoot(): TTreeElement;    //**< Returns the highest element node ancestor (not the document root, that is returned by getDocument)
+  function getRootHighest(): TTreeElement;    //**< Returns the highest node ancestor
+  function getRootElement(): TTreeElement;    //**< Returns the highest element node ancestor
   function getDocument(): TTreeDocument; //**< Returns the document node containing this node
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
@@ -672,7 +673,12 @@ begin
   result := previous
 end;
 
-function TTreeElement.getRoot: TTreeElement;
+function TTreeElement.getRootHighest: TTreeElement;
+begin
+  result := document;
+end;
+
+function TTreeElement.getRootElement: TTreeElement;
 begin
   result := document;
   if (result = nil) or (result.value <> '') then exit;

@@ -672,6 +672,13 @@ begin
   t('document {element "a" {}} instance of attribute()', 'false');
   t('document {element "a" {}} instance of element()', 'false');
   t('document {element "a" {}} instance of document-node()', 'true');
+  t('<foobar>abcxyz</foobar> / (/) / (/)', 'abcxyz');
+  t('<foobar>abcxyz</foobar> / (root()) / (/) / (root())', 'abcxyz');
+  t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root())', 'abcxyz');
+  t('<foobar>abcxyz</foobar> / (root()) / (/) / (root()) instance of element()', 'true');
+  t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root()) instance of element()', 'false');
+  t('<foobar>abcxyz</foobar> / (root()) / (/) / (root()) instance of document-node()', 'false');
+  t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root()) instance of document-node()', 'true');
 
   helper.free;
   xml.free;

@@ -124,6 +124,8 @@ type
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     function findModuleStaticContext(const namespace: TNamespace): TXQStaticContext;
     procedure splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
+
+    function getRootHighest: TTreeElement;
   end;
 
 
@@ -2139,6 +2141,19 @@ begin
   else namespace := findNamespace('', defaultNamespaceKind);
 end;
 
+function TEvaluationContext.getRootHighest: TTreeElement;
+begin
+  if (SeqValue <> nil) then begin
+    if (SeqValue.kind = pvkNode) then result := SeqValue.toNode.document
+    else raise EXQEvaluationException.Create('Need context item that is a node to get root element');
+  end;
+  if ParentElement <> nil then exit(ParentElement.getRootHighest)
+  else if RootElement <> nil then exit(RootElement)
+  else if staticContext.sender.ParentElement <> nil then exit(staticContext.sender.ParentElement.getRootHighest)
+  else if staticContext.sender.RootElement <> nil then exit(staticContext.sender.RootElement)
+  else raise EXQEvaluationException.Create('no root element');
+end;
+
 { TXQuery }
 
 constructor TXQuery.Create(asStaticContext: TXQStaticContext; aterm: TXQTerm);
@@ -3942,9 +3957,7 @@ class function TXQueryEngine.evaluateSingleStepQuery(const query: TXQPathMatchin
 begin
   case query.typ of
     qcDocumentRoot: begin
-      if context.RootElement <> nil then result := xqvalue(context.RootElement)
-      else if context.staticContext.sender.RootElement <> nil then result := xqvalue(context.staticContext.sender.RootElement)
-      else raise EXQEvaluationException.Create('Need root element');
+      result := xqvalue(context.getRootHighest);
       filterSequence(result, query.filters, context);
     end;
     qcFunctionSpecialCase: begin
