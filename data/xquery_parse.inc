@@ -669,10 +669,15 @@ begin
   expect('#');
   pragma := nextToken();
   if system.pos(':', pragma) = 0 then raiseParsingError('Extension name requires namespace');
-  while (pos^ <> #0) and ((pos^ <> '#') and ((pos+1)^ <> ')')) do
+  while (pos^ <> #0) and ((pos^ <> '#') or ((pos+1)^ <> ')')) do
     pos += 1;
   if pos^ = #0 then raiseParsingError('Unexpected end');
   pos += 2;
+  skipWhitespaceAndComment();
+  if (pos^ = '(') and ((pos+1)^ = '#') then begin
+    expect('(');
+    exit(parseExtension());
+  end;
   expect('{'); result := parsePrimaryLevel; expect('}');
 end;
 

@@ -704,7 +704,15 @@ begin
   t('outer-xml(element {"elem"} {"text"})', '<elem>text</elem>');
   t('outer-xml(element {(), "elem"} {"text"})', '<elem>text</elem>');
   t('outer-xml(element {"elem", ()} {"text"})', '<elem>text</elem>');
+  t('(# abc:def #) {123}', '123');
+  t('(# abc:def "afas" #) {123}', '123');
+  t('(# abc:def "afas#" #) {123}', '123');
+  t('(# abc:def # # ) # ) #) {123}', '123');
+  t('(# abc:def # # ) # ) #) (# h:k #) {123}', '123');
+  t('(# abc:def # # ) # ) #) (: ..(#. :) (# h:k #) {123}', '123');
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
+
+
 
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');
 
