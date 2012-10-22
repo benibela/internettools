@@ -109,6 +109,7 @@ type
   function parseStringLiteral: string;
 
   function parseFlower(akind: string): TXQTermFlower;
+  function parseSomeEvery(const akind: string): TXQTermSomeEvery;
   function parseDirectConstructor(name: string): TXQTermConstructor;
   function parseComputedConstructor(name: string): TXQTermConstructor;
   function parseExtension: TXQTerm;
@@ -461,6 +462,27 @@ begin
   end;
 
   result.returned := parse;
+end;
+
+function TXQParsingContext.parseSomeEvery(const akind: string): TXQTermSomeEvery;
+var
+  word: String;
+begin
+  result := TXQTermSomeEvery.Create(akind = 'every');
+  result.push(TXQTermVariable.Create(nextToken(), staticContext));
+  skipWhitespaceAndComment();
+  if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
+  expect('in'); result.push(parse());
+  word := nextToken();
+  while word = ',' do begin
+    result.push(TXQTermVariable.Create(nextToken(), staticContext));
+    skipWhitespaceAndComment();
+    if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
+    expect('in'); result.push(parse());
+    word := nextToken();
+  end;
+  Assert(word = 'satisfies');
+  result.push(parse());
 end;
 
 function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstructor;
@@ -875,18 +897,8 @@ begin
         if (word = 'for') or (word = 'let') then
           exit(parseFlower(word));
 
-        if (word = 'some') or (word = 'every') then begin
-          result := TXQTermSomeEvery.Create(word = 'every');
-          result.push(TXQTermVariable.Create(nextToken(), staticContext)); expect('in'); result.push(parse());
-          word := nextToken();
-          while word = ',' do begin
-            result.push(TXQTermVariable.Create(nextToken(), staticContext)); expect('in'); result.push(parse());
-            word := nextToken();
-          end;
-          Assert(word = 'satisfies');
-          result.push(parse());
-          exit;
-        end;
+        if (word = 'some') or (word = 'every') then
+          exit(parseSomeEvery(word));
       end;
 
 

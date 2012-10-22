@@ -235,17 +235,23 @@ end;
 
 function TXQTermSomeEvery.evaluate(const context: TEvaluationContext): IXQValue;
 var tempContext:TEvaluationContext;
-  function evaluateSomeEvery(const pos:integer): boolean;
+  function evaluateSomeEvery(pos:integer): boolean;
   var v: IXQValue;
+      typeDelta: integer;
   begin
     if pos = high(children) then exit(children[pos].evaluate(tempContext).toBooleanEffective);
     if not (children[pos] is TXQTermVariable) then raiseEvaluationError('Expected variable, but got '+children[pos].debugTermToString);
+    if children[pos + 1] is TXQTermSequenceType then typeDelta:=1
+    else typeDelta:=0;
 
     result := isEvery;
-    for v in children[pos+1].evaluate(tempContext) do begin
+    for v in children[pos+1+typeDelta].evaluate(tempContext) do begin
+      if typeDelta <> 0 then
+        if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v, context) then
+          raiseEvaluationError('Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
       tempContext.temporaryVariables.pushAll;
       tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
-      if evaluateSomeEvery(pos+2) <> (isEvery) then begin
+      if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then begin
         tempContext.temporaryVariables.popAll;
         result := not isEvery;
         break;

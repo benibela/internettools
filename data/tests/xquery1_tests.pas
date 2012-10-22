@@ -719,6 +719,12 @@ begin
   t('empty(<e/>/../ (/) / ..)', 'true');
   t('empty(<e/>/../ (/) / .. / root() / .. / . / (/) / ..)', 'true');
   t('empty(fn:root(<e/>/..))', 'true');
+  t('some $i in (1,2,3) satisfies $i eq 2', 'true');
+  t('every $i in (1,2,3) satisfies $i eq 2', 'false');
+  t('some $i as xs:integer in (1,2,3) satisfies $i eq 2', 'true');
+  t('every $i as xs:integer  in (1,2,3) satisfies $i eq 2', 'false');
+  t('some $i as xs:integer  in (1,2,3), $j as xs:integer  in (1,2,3)  satisfies $i eq $j', 'true');
+  t('every $i as xs:integer  in (1,2,3), $j as xs:integer  in (1,2,3)  satisfies $i eq $j', 'false');
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
 
