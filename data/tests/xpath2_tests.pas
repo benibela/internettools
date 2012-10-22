@@ -711,6 +711,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(subsequence((1,2,3,4,5), 4), ",")', '4,5', '');
   t('subsequence((), 1)', '', '');
   t('subsequence((), 1, 2)', '', '');
+  t('subsequence((6), 1, 2)', '6', '');
+  t('subsequence(6, 1, 2)', '6', '');
+  t('subsequence(6, 1, 1)', '6', '');
+  t('subsequence(6, 0, 1)', '', '');
+  t('subsequence((6,7), 2, 1)', '7', '');
+  t('subsequence((6), 2, 1)', '', '');
+  t('subsequence(6, 2, 1)', '', '');
   t('string-join(subsequence((1,2,3,4,5), 3, 2), ",")', '3,4', '');
   t('string-join(unordered((1,2,3,4,5)), ",")', '1,2,3,4,5', '');
   t('deep-equal(1, 2)', 'false', '');

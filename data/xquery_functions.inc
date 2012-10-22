@@ -96,6 +96,9 @@ var i, f,t: int65;
     typ: TXQValueInt65Class;
     len: Int65;
     resseq: TXQValueSequence;
+    idx: Integer;
+    resseqseq: TXQVList;
+    fsmall: integer;
 begin
   ignore(cxt);
   if a.isUndefined or b.isUndefined then exit;
@@ -109,13 +112,23 @@ begin
   end;
   len := t - f + 1;
   if len > MaxInt then raise EXQEvaluationException.Create('Too large to operation ');
-  resseq := TXQValueSequence.create(len);
-  i := f;
-  while i < t do begin
-    resseq.addChild(typ.create(i));
-    i += 1;
+  resseq := TXQValueSequence.create(0);
+  resseqseq := resseq.seq;
+  resseqseq.setCount(len);
+  if (f  > -$3fffffff) and (t < $3fffffff) then begin
+    fsmall := f;
+    for idx := 0 to len - 1 do
+      resseqseq.list[idx] := typ.create(idx+fsmall);
+  end else begin
+    idx := 0;
+    i := f;
+    while i < t do begin
+      resseqseq.list[idx] := typ.create(i);
+      i += 1;
+      idx+=1;
+    end;
+    resseqseq.list[idx] := typ.create(t);
   end;
-  resseq.addChild(typ.create(t));
   result := resseq;
 end;
 
@@ -1160,6 +1173,8 @@ begin
   end else unti := maxLen + 1;
 
   if from < 1 then from := 1;
+  if from > maxLen then begin len := 0; exit; end;
+  if unti > maxLen + 1 then unti := maxLen + 1;
   len := unti-from;
 end;
 
@@ -2133,17 +2148,18 @@ begin
 end;
 
 procedure xqFunctionsubsequence(args: TXQVArray; var result: IXQValue);
-var from,len,reallen: Integer;
+var from,len,oldlen: Integer;
  i: Integer;
- resseq, oldseq: TXQValueSequence;
+ resseq: TXQValueSequence;
+ resseqseq, oldseqseq: TXQVList;
 begin
   requiredArgCount(args,2,3);
   case args[0].kind of
     pvkUndefined: exit;
-    pvkSequence: reallen := args[0].getSequenceCount
-    else reallen := 1;
+    pvkSequence: oldlen := args[0].getSequenceCount
+    else oldlen := 1;
   end;
-  xpathRangeDefinition(args,reallen,from,len);
+  xpathRangeDefinition(args,oldlen,from,len);
   from-=1;
 
   if len <= 0 then exit;
@@ -2153,13 +2169,18 @@ begin
     exit;
   end;
 
-  resseq := TXQValueSequence.create(reallen);
-  oldseq := args[0] as TXQValueSequence;
-  for i := 0 to oldseq.seq.count - 1 do
-    if (i >= from) and (i < from + len) then
-      resseq.addChild(oldseq.seq[i]);
+  if len = 1 then begin
+    result := (args[0] as TXQValueSequence).seq[from];
+    exit;
+  end;
+
+  oldseqseq := (args[0] as TXQValueSequence).seq;
+  resseq := TXQValueSequence.create(0);
+  resseqseq := resseq.seq;
+  resseqseq.setCount(len);
+  for i := from to from + len - 1 do
+    resseqseq.list[i - from] := oldseqseq[i];
   result := resseq;
-  xqvalueSeqSqueeze(result);
 end;
 
 procedure xqFunctionUnordered(args: TXQVArray; var result: IXQValue);

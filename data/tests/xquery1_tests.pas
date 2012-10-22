@@ -101,8 +101,8 @@ var
   //    writeln(ps.debugtermToString(ps.FCurTerm));
     starttime := now;
     writeln(stderr, 'Timing '+s1+': ');
-    for i := 1 to 10000 do ps.evaluate(); //.toString;
-    writeln('   => ', (now - starttime) * MSecsPerDay  );
+    for i := 1 to 1000 do ps.evaluate(); //.toString;
+    writeln('   => ', (now - starttime) * MSecsPerDay:5:5  );
     got := ps.evaluate().toString;
     if got<>s2 then
        raise Exception.Create('XPath Test failed: '+IntToStr(count)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
@@ -706,6 +706,7 @@ begin
   t('outer-xml(element {"elem", ()} {"text"})', '<elem>text</elem>');
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
+  //timing('subsequence((1 to 1000), 200, 600)[0]', '');
 
   helper.free;
   xml.free;
