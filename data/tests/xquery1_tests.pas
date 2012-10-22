@@ -754,8 +754,23 @@ begin
   t('count(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:*)', '0');
   t('count(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:foo)', '0');
   t('count(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @*:foo)', '0');
-
-
+  t('outer-xml(element {"hallo"} {()})', '<hallo/>');
+  m('declare namespace xyz = "foobar"; outer-xml(element {"xyz:hallo"} {()})', '<xyz:hallo xmlns:xyz="foobar"/>');
+  m('declare namespace abc = "123"; outer-xml(element {"abc:hallo"} {()})', '<abc:hallo xmlns:abc="123"/>');
+  t('outer-xml(element {fn:QName("ans", "pref:hallo")} {()})', '<pref:hallo xmlns:pref="ans"/>');
+  t('outer-xml(element {fn:QName("ans", "hallo")} {()})', '<hallo xmlns="ans"/>');
+  m('declare namespace xyz = "foobar"; outer-xml(element {"hallo"} {attribute {"xyz:test"} {123} })', '<hallo xmlns:xyz="foobar" xyz:test="123"/>');
+  m('declare namespace abc = "123"; outer-xml(element {"hallo"} {attribute {"abc:test"} {1234}})', '<hallo xmlns:abc="123" abc:test="1234"/>');
+  t('outer-xml(element hallo {attribute {fn:QName("ans", "pref:test")} {1234}})', '<hallo xmlns:pref="ans" pref:test="1234"/>');
+  t('outer-xml(element hallo {attribute {fn:QName("ans", "test")} {1234}})', '<hallo xmlns:XXX="ans" XXX:test="1234"/>');
+  m('declare namespace xyz = "foobar"; outer-xml(element {"hallo"} {attribute {"xyz:test"} {123} ,"#" })', '<hallo xmlns:xyz="foobar" xyz:test="123">#</hallo>');
+  m('declare namespace abc = "123"; outer-xml(element {"hallo"} {attribute {"abc:test"} {1234} ,"#"})', '<hallo xmlns:abc="123" abc:test="1234">#</hallo>');
+  t('outer-xml(element hallo {attribute {fn:QName("ans", "pref:test")} {1234} ,"#"})', '<hallo xmlns:pref="ans" pref:test="1234">#</hallo>');
+  t('outer-xml(element hallo {attribute {fn:QName("ans", "test")} {1234} ,"#"})', '<hallo xmlns:XXX="ans" XXX:test="1234">#</hallo>');
+  m('declare namespace xyz = "foobar"; outer-xml(<hallo>{attribute {"xyz:test"} {123} ,"#" }</hallo>)', '<hallo xmlns:xyz="foobar" xyz:test="123">#</hallo>');
+  m('declare namespace abc = "123"; outer-xml(<hallo>{attribute {"abc:test"} {1234} ,"#"}</hallo>)', '<hallo xmlns:abc="123" abc:test="1234">#</hallo>');
+  t('outer-xml(<hallo>{attribute {fn:QName("ans", "pref:test")} {1234} ,"#"}</hallo>)', '<hallo xmlns:pref="ans" pref:test="1234">#</hallo>');
+  t('outer-xml(<hallo>{attribute {fn:QName("ans", "test")} {1234} ,"#"}</hallo>)', '<hallo xmlns:XXX="ans" XXX:test="1234">#</hallo>');
 
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');
 

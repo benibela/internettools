@@ -1009,6 +1009,24 @@ var
     if kid.reverse <> nil then lastKid := kid.reverse
     else lastKid := kid;
   end;
+  function declareNewNamespace(const url, prefix: string): TNamespace;
+  begin
+    if (subcontext^.namespaces = nil) then begin
+      new(subcontext);
+      subcontext^ := context;
+      subcontext^.namespaces := TNamespaceList.Create;
+    end;
+    result := subcontext^.findNamespace(prefix, xqdnkAny);
+    if (result <> nil) and (result.url = url) then begin
+      subcontext^.namespaces.Add(result);
+      exit;
+    end;
+    result := TNamespace.Create(url, prefix);
+    subcontext^.namespaces.Add(result);
+    if subcontext^.staticContext.sender.FGarbageNamespaces = nil then subcontext^.staticContext.sender.FGarbageNamespaces := TNamespaceList.Create;
+    subcontext^.staticContext.sender.FGarbageNamespaces.Add(result);
+  end;
+
   procedure addNodeAsKid;
   var
     doc: TTreeElement;
@@ -1017,15 +1035,8 @@ var
     case kid.typ of
       tetAttribute: begin
         if ((kid.namespace = nil) and (kid.value = 'xmlns')) or ((kid.namespace <> nil) and (kid.namespace.url = XMLNamespaceUrl_XMLNS)) then begin
-          if (subcontext^.namespaces = nil) then begin
-            new(subcontext);
-            subcontext^ := context;
-            subcontext^.namespaces := TNamespaceList.Create;
-          end;
-          if kid.namespace = nil then subcontext^.namespaces.Add(TNamespace.Create(TTreeAttribute(kid).realvalue, ''))
-          else subcontext^.namespaces.Add(TNamespace.Create(TTreeAttribute(kid).realvalue, kid.value));
-          if subcontext^.staticContext.sender.FGarbageNamespaces = nil then subcontext^.staticContext.sender.FGarbageNamespaces := TNamespaceList.Create;
-          subcontext^.staticContext.sender.FGarbageNamespaces.Add(subcontext^.namespaces[subcontext^.namespaces.Count-1]);
+          if kid.namespace = nil then declareNewNamespace(TTreeAttribute(kid).realvalue, '')
+          else declareNewNamespace(TTreeAttribute(kid).realvalue, kid.value);
         end;
 
         if tree.attributes = nil then tree.attributes := TAttributeList.Create;
@@ -1110,6 +1121,29 @@ var
     end;
   end;
 
+  procedure setTreeNodeNameFromTerm(term: txqterm; defkind: TXQDefaultNamespaceKind);
+    function chooseRandomPrefix(): string;
+    begin
+      result := 'XXX'; //just like Zorba
+      while subcontext^.findNamespace(result, xqdnkAny) <> nil do result += 'X';
+    end;
+
+  var
+    v: IXQValue;
+    tempqname: TStringArray;
+  begin
+    v := term.evaluate(subcontext^);
+    if (v is TXQValue_QName) and strContains((v as TXQValueString).str, #2) then begin
+      tempqname := qnameSplit((v as TXQValueString).str);
+      if (tempqname[1] = '') and (defkind <> xqdnkElementType) then tempqname[1] := chooseRandomPrefix;
+      tree.namespace := declareNewNamespace(tempqname[0], tempqname[1]);
+      tree.value:=tempqname[2];
+    end else begin
+      tree.value := v.toString;
+      subcontext^.splitRawQName(tree.namespace, tree.value, defkind);
+    end;
+  end;
+
 var oldnamespacecount: integer;
 begin
   subcontext:=@context;
@@ -1128,8 +1162,7 @@ begin
   baseOffset += 1;
   case typ of
     tetAttribute: begin
-      tree.value := nameValue.evaluate(subcontext^).toString;
-      subcontext^.splitRawQName(tree.namespace, tree.value, xqdnkUnknown);
+      setTreeNodeNameFromTerm(nameValue, xqdnkUnknown);
       for i:= 0 to high(children) do
         TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
     end;
@@ -1141,10 +1174,8 @@ begin
         end else
           addValue(children[i].evaluate(subcontext^));
 
-      if nameValue <> nil then begin
-        tree.value := nameValue.evaluate(subcontext^).toString;
-        subcontext^.splitRawQName(tree.namespace, tree.value, xqdnkElementType);
-      end;
+      if nameValue <> nil then
+        setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
       kid := TTreeElement.create(tetClose, tree.value);
       kid.namespace := tree.namespace;
       addKid;
