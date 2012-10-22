@@ -74,13 +74,15 @@ EHTMLParseException = class(Exception);
 EHTMLParseMatchingException = class(EHTMLParseException);
 THtmlTemplateParser=class;
 
+TStringAttributeList = tStringList;
+
 { TTemplateElement }
 //**@abstract Interally used template tree element @exclude
 TTemplateElement=class(TTreeElement)
   //constant template
   templateType: TTemplateElementType;
   flags: TTemplateElementFlags;
-  templateAttributes: TAttributeList;
+  templateAttributes: tStringAttributeList;
 
   //matching information
   contentRepetitions: integer;
@@ -524,35 +526,24 @@ end;
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
  curChild: TTreeElement;
- attrib: TTreeElement;
+ i: Integer;
 begin
   ignore(parser);
   //inherited initialized;
-  attrib := attributes;
-  while attrib <> nil do begin
-    if attrib.getNamespaceURL() = XMLNamespaceUrl_XMLNS then begin
-      if attributes = attrib then attributes := attrib.next;
-      attrib.reverse.deleteElementFromDoubleLinkedList;
-      attrib := attrib.deleteElementFromDoubleLinkedList;
-      continue;
-    end;
-    attrib := attrib.next;
-  end;
+  if attributes <> nil then
+    for i := attributes.Count - 1 downto 0 do
+      if attributes.Items[i].getNamespaceURL() = XMLNamespaceUrl_XMLNS then
+        attributes.delete(i);
 
   templateType:=strToCommand(getNamespaceURL(), value, typ);
 
-  attrib := attributes;
-  while attrib <> nil do begin
-    if (templateType >= firstRealTemplateType) or (attrib.getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin;
-      if templateAttributes = nil then templateAttributes := TAttributeList.Create;
-      templateAttributes.Add(attrib.value+'='+attrib.reverse.value);
-      if attributes = attrib then attributes := attrib.next;
-      attrib.reverse.deleteElementFromDoubleLinkedList;
-      attrib := attrib.deleteElementFromDoubleLinkedList;
-      continue;
-    end;
-    attrib := attrib.next;
-  end;
+  if attributes <> nil then
+    for i := attributes.Count - 1 downto 0 do
+      if (templateType >= firstRealTemplateType) or (attributes.Items[i].getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin
+        if templateAttributes = nil then templateAttributes := tStringAttributeList.Create;
+        templateAttributes.Add(attributes.Items[i].value+'='+attributes.Items[i].realvalue);
+        attributes.Delete(i);
+      end;
 
   if templateAttributes <> nil then
     if templateAttributes.Values['optional'] = 'true' then flags+=[tefOptional];
@@ -717,28 +708,27 @@ var
   templateList: TStringArray;
   htmlList: TStringArray;
   found: Boolean;
-  attrib: TTreeElement;
+  attrib: TTreeAttribute;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
        exit(false);
   if (template.attributes = nil) and (template.templateAttributes = nil) then
     exit(true);
-  attrib := template.attributes;
-  while attrib <> nil do begin
+  for attrib in template.attributes do begin
     name := attrib.value;
     if html.attributes = nil then exit(false);
     strategyi := FAttributeMatching.IndexOfName(attrib.value);
     if strategyi = -1 then begin
-      if not striequal(html.getAttribute(name), attrib.reverse.value) then
+      if not striequal(html.getAttribute(name), attrib.realvalue) then
         exit(false);
     end else begin
       strategy := FAttributeMatching.ValueFromIndex[strategyi];
       if strategy = 'is' then begin
-        if not striequal(html.getAttribute(name), attrib.reverse.value) then
+        if not striequal(html.getAttribute(name), attrib.realvalue) then
           exit(false);
       end else if strategy = 'list-contains' then begin
-        templateList := strSplit(attrib.reverse.value, ' ', false);
+        templateList := strSplit(attrib.realvalue, ' ', false);
         htmlList := strSplit(html.getAttribute(name), ' ', false);
         for j:=0 to high(templateList) do begin
           found := false;
@@ -752,7 +742,6 @@ begin
       cacheRegExpr('contains', '', '', true);
       cacheRegExpr('is', '^', '$', true);}
     end;
-    attrib := attrib.next;
   end;
   if template.templateAttributes = nil then exit(true);
   if template.condition = nil then exit(true);
@@ -832,7 +821,7 @@ var xpathText: TTreeElement;
    regexp: TRegExpr;
    oldvarcount: Integer;
    varnameindex: Integer;
-   attribs: TAttributeList;
+   attribs: tStringAttributeList;
    submatch: Integer;
    regex: String;
   begin

@@ -771,8 +771,8 @@ begin
     tetOpen: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
     tetClose: result := xqvalue();
     tetText: result := xqvalue(v.tonode.value);
-    tetComment, tetAttributeValue: result := TXQValue_untypedAtomic.create(v.tonode.value);
-    tetAttributeName: result := TXQValue_untypedAtomic.create(v.tonode.reverse.value);
+    tetComment: result := TXQValue_untypedAtomic.create(v.tonode.value);
+    tetAttribute: result := TXQValue_untypedAtomic.create(TTreeAttribute(v.tonode).realvalue);
     tetProcessingInstruction: result := xqvalue(v.tonode.getAttribute(''));
     else raise EXQEvaluationException.Create('Impossible node type');
   end;
@@ -1754,7 +1754,7 @@ begin
   while node <> nil do begin
     if node.hasAttribute('lang', @context.staticContext.nodeCollation.equal) then begin
       rlang := node.getAttribute('lang', @context.staticContext.nodeCollation.equal);
-      rlang := lowercase(rlang); //that for one is supposed to be case in sensitive in the spec
+      rlang := lowercase(rlang); //that for one is supposed to be case insensitive in the spec
       result := xqvalue(strEqual(rlang, testlang) or (strBeginsWith(rlang, testlang + '-')));
       exit;
     end;
@@ -1844,7 +1844,7 @@ procedure xqFunctionIn_Scope_prefixes(args: TXQVArray; var result: IXQValue);
 var
   el: TTreeElement;
   sl: TStringList;
-  attrib: TTreeElement;
+  attrib: TTreeAttribute;
 begin
   requiredArgCount(args, 1);
   el := args[0].toNode;
@@ -1852,16 +1852,12 @@ begin
   try
     while el <> nil do begin
       //if (el.namespace <> nil) and (sl.IndexOf(el.namespace.prefix) = -1) then sl.Add(el.namespace.prefix);
-      if el.attributes <> nil then begin
-        attrib := el.attributes;
-        while attrib <> nil do begin
+      if el.attributes <> nil then
+        for attrib in el.attributes do
           if attrib.value = 'xmlns' then begin
             if sl.IndexOf('') = -1 then sl.add('');
           end else if attrib.getNamespaceURL() = XMLNamespaceURL_XMLNS then
             if sl.IndexOf(attrib.value) = -1 then sl.add(attrib.value);
-          attrib := attrib.next;
-        end;
-      end;
       el := el.getParent();
     end;
     if sl.count = 0 then exit
@@ -2433,8 +2429,7 @@ begin
   if args[0].isUndefined then exit;
   node := args[0].toNode;
   if node <> nil then begin
-    if node.typ = tetAttributeValue then node := node.reverse;
-    if (node.typ in [tetOpen,tetProcessingInstruction,tetAttributeName]) and not (node is TTreeDocument) then
+    if (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) and not (node is TTreeDocument) then
       result := qnameMake(node.namespace, node.value, TXQValue_QName);
   end;
 end;
@@ -2526,7 +2521,7 @@ var
   seq: TXQVList;
   i: Integer;
   node: TTreeElement;
-  attrib: TTreeElement;
+  attrib: TTreeAttribute;
 begin
   requiredArgCount(args,1, 2);
 
@@ -2547,15 +2542,13 @@ begin
     node := node.getRootElement();
 
     while node <> nil do begin
-      attrib := node.attributes;
-      while attrib <> nil do begin
-        if context.staticContext.nodeCollation.equal(attrib.value, 'id') then ;
-          if isSearchedId(attrib.reverse.value) then begin
-            xqvalueSeqAdd(result, xqvalue(node));
-            break;
-          end;
-        attrib := attrib.next;
-      end;
+      if node.attributes <> nil then
+        for attrib in node.attributes do
+          if context.staticContext.nodeCollation.equal(attrib.value, 'id') then
+            if isSearchedId(attrib.realvalue) then begin
+              xqvalueSeqAdd(result, xqvalue(node));
+              break;
+            end;
       node := node.next;
     end;
   finally

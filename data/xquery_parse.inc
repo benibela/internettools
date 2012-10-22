@@ -562,7 +562,7 @@ begin
   result := TXQTermConstructor.create(tetOpen, TXQTermString.create(name));
   token := nextToken();
   while (token <> '>') and (token <> '/') and (token <> '') do begin
-    attribute := TXQTermConstructor.create(tetAttributeName, TXQTermString.create(token));
+    attribute := TXQTermConstructor.create(tetAttribute, TXQTermString.create(token));
     result.push(attribute);
     expect('=');
     skipWhitespaceAndComment();
@@ -624,12 +624,12 @@ var
 begin
   token := name;
   if (token = 'element') or (token = 'document') then result := TXQTermConstructor.create(tetOpen)
-  else if (token = 'attribute') then result := TXQTermConstructor.create(tetAttributeName)
+  else if (token = 'attribute') then result := TXQTermConstructor.create(tetAttribute)
   else if (token = 'text') then result := TXQTermConstructor.create(tetText)
   else if (token = 'processing-instruction') then result := TXQTermConstructor.create(tetProcessingInstruction)
   else if (token = 'comment') then result := TXQTermConstructor.create(tetComment)
   else raiseParsingError('Unknown constructor name');
-  expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttributeName]) and (token <> 'document');
+  expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute]) and (token <> 'document');
   if expectName then begin
     token := nextToken();
     if token = '{' then begin
@@ -640,7 +640,7 @@ begin
   expect('{');
   skipWhitespaceAndComment();
   if pos^ <> '}' then begin
-    if result.typ in [tetOpen, tetProcessingInstruction, tetAttributeName] then begin
+    if result.typ in [tetOpen, tetProcessingInstruction, tetAttribute] then begin
       tempSeq := parsePrimaryLevel;
       if tempSeq is TXQTermSequence then begin
         onlyConstructors := true;

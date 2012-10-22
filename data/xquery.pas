@@ -3272,11 +3272,9 @@ begin
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}FInternet.Free;{$endif}
   clear;
   if FInternalDocuments <> nil then begin;
-    for i:= 0 to FInternalDocuments.count - 1 do begin
-      if TTreeElement(FInternalDocuments[i]).typ = tetAttributeName then
-        TTreeElement(FInternalDocuments[i]).reverse.deleteAll();
+    for i:= 0 to FInternalDocuments.count - 1 do
       TTreeElement(FInternalDocuments[i]).deleteAll();
-    end;
+
     FInternalDocuments.Free;
   end;
   FGarbageNamespaces.Free;
@@ -4122,7 +4120,7 @@ class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeElement; const 
     if qmElement in qmt then include(result, tetOpen);
     if qmComment in qmt then include(result, tetComment);
     if qmProcessingInstruction in qmt then include(result, tetProcessingInstruction);
-    if qmAttribute in qmt then begin result += [tetAttributeName, tetAttributeValue]; end;
+    if qmAttribute in qmt then begin result += [tetAttribute]; end;
   end;
 begin
   nodeCondition.findOptions:=[];
@@ -4189,7 +4187,7 @@ begin
     end;
     qcPreceding: begin
       nodeCondition.iteration:=qcnciPreceding;
-      if contextNode.typ in [tetAttributeName,tetAttributeValue] then begin
+      if contextNode.typ in [tetAttribute] then begin
         nodeCondition.start := nil;  //preceding shall not match attributes
         nodeCondition.endnode := nil;
       end else begin
@@ -4204,7 +4202,7 @@ begin
      and (nodeCondition.start <> nil)
      and (not (contextnode.typ in [tetOpen]) or (contextnode.reverse = nil))         //open elements (which btw. should always have a reverse element) have actual children, so this prevention is not needed / harmful
      and (not (command.typ in [qcFollowing, qcFollowingSibling, qcPrecedingSibling]) //following/sibling should match following/sibling so there is also no problem
-           or (contextNode.typ in [tetAttributeName,tetAttributeValue]))  then            //except the node is an attribute, then should following/sibling shouldn't match anything
+           or (contextNode.typ in [tetAttribute]))  then            //except the node is an attribute, then should following/sibling shouldn't match anything
     nodeCondition.endnode := nodeCondition.start.next; //prevent search
 
   include(nodeCondition.findOptions,tefoIgnoreText); //text matching is done on our level

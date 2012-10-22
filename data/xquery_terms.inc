@@ -816,6 +816,7 @@ var
   readvalue: String;
   readnamespace: String;
   temp: TNamespace;
+  i: Integer;
 begin
   if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
     tempEl := context.SeqValue.toNode
@@ -833,18 +834,17 @@ begin
   end;
 
   result := nil;
-  tempEl := tempEl.attributes;
-  testValue := readvalue <> '*';
-  testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
-  if testNS then begin
-    temp := context.findNamespace(readnamespace, xqdnkUnknown);
-    if temp <> nil then readnamespace:=temp.url;
-  end;
-  while tempEl <> nil do begin
-    if      (not testValue or striEqual(tempEl.value, readvalue))
-        and (not testNS or ( tempEl.getNamespaceURL() = readnamespace))  then
-      xqvalueSeqAdd(result, xqvalue(tempEl.reverse));
-    tempEl := tempEl.next;
+  if tempEl.attributes <> nil then begin
+    testValue := readvalue <> '*';
+    testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
+    if testNS then begin
+      temp := context.findNamespace(readnamespace, xqdnkUnknown);
+      if temp <> nil then readnamespace:=temp.url;
+    end;
+    for i := 0 to tempel.attributes.Count - 1 do
+      if      (not testValue or striEqual(tempel.attributes.items[i].value, readvalue))
+          and (not testNS or ( tempel.attributes.items[i].getNamespaceURL() = readnamespace))  then
+        xqvalueSeqAdd(result, xqvalue(tempEl.attributes.Items[i]));
   end;
   if result = nil then result:=xqvalue();
 end;
@@ -978,7 +978,6 @@ var
   tree: TTreeElement;
   i: Integer;
   kid: TTreeElement;
-  lastAttribute: TTreeElement;
   lastKid: TTreeElement;
   subcontext: ^TEvaluationContext;
   procedure addKid;
@@ -1003,31 +1002,24 @@ var
   begin
     kid.parent := tree;
     case kid.typ of
-      tetAttributeName:
+      tetAttribute:
         if ((kid.namespace = nil) and (kid.value = 'xmlns')) or ((kid.namespace <> nil) and (kid.namespace.url = XMLNamespaceUrl_XMLNS)) then begin
           if (subcontext^.namespaces = nil) then begin
             new(subcontext);
             subcontext^ := context;
             subcontext^.namespaces := TNamespaceList.Create;
           end;
-          if kid.namespace = nil then subcontext^.namespaces.Add(TNamespace.Create(kid.reverse.value, ''))
-          else subcontext^.namespaces.Add(TNamespace.Create(kid.reverse.value, kid.value));
+          if kid.namespace = nil then subcontext^.namespaces.Add(TNamespace.Create(TTreeAttribute(kid).realvalue, ''))
+          else subcontext^.namespaces.Add(TNamespace.Create(TTreeAttribute(kid).realvalue, kid.value));
           if subcontext^.staticContext.sender.FGarbageNamespaces = nil then subcontext^.staticContext.sender.FGarbageNamespaces := TNamespaceList.Create;
           subcontext^.staticContext.sender.FGarbageNamespaces.Add(subcontext^.namespaces[subcontext^.namespaces.Count-1]);
-          kid.reverse.Free;
           kid.free;
         end else begin
-          if lastAttribute = nil then tree.attributes := kid
-          else begin
-            lastAttribute.next := kid;
-            kid.previous := lastAttribute;
-            lastAttribute.reverse.next := kid.reverse;
-            kid.reverse.previous := lastAttribute.reverse;
-          end;
-          kid.reverse.parent := tree;
-          lastAttribute := kid;
+          if tree.attributes = nil then tree.attributes := TAttributeList.Create;
+          tree.attributes.add(kid);
           kid.offset:=baseOffset;
-          kid.reverse.offset:=baseOffset;
+          kid.parent:=tree;
+          kid.document:=tree.document;
           baseOffset+=1;
         end;
       tetOpen, tetComment, tetText, tetProcessingInstruction:
@@ -1101,6 +1093,7 @@ begin
   if subcontext^.namespaces <> nil then oldnamespacecount := subcontext^.namespaces.Count;
 
   if (typ = tetOpen) and (nameValue = nil) then tree := TTreeDocument.create(typ)
+  else if typ = tetAttribute then tree := TTreeAttribute.create('','')
   else tree := TTreeElement.create(typ);
   if root = nil then root := tree;
   tree.document := root;
@@ -1109,17 +1102,12 @@ begin
     context.staticContext.sender.FInternalDocuments.Add(tree);
   end;
   baseOffset += 1;
-  lastAttribute := nil;
   case typ of
-    tetAttributeName: begin
+    tetAttribute: begin
       tree.value := nameValue.evaluate(subcontext^).toString;
       subcontext^.splitRawQName(tree.namespace, tree.value, xqdnkUnknown);
-      tree.reverse := TTreeElement.create();
-      tree.reverse.document := root;
-      tree.reverse.reverse := tree;
-      tree.reverse.typ := tetAttributeValue;
       for i:= 0 to high(children) do
-        tree.reverse.value := tree.reverse.value + valueToString(children[i].evaluate(subcontext^));
+        TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
     end;
     tetOpen: begin
       for i:=0 to high(children) do

@@ -704,6 +704,7 @@ begin
   t('outer-xml(element {"elem"} {"text"})', '<elem>text</elem>');
   t('outer-xml(element {(), "elem"} {"text"})', '<elem>text</elem>');
   t('outer-xml(element {"elem", ()} {"text"})', '<elem>text</elem>');
+  //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
 
   helper.free;

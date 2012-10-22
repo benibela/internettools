@@ -6,7 +6,7 @@
 unit simplehtmltreeparser;
 
 {$mode objfpc} {$H+}
-
+{$modeswitch advancedrecords}
 interface
 
 uses
@@ -16,12 +16,9 @@ type
 
 { TAttributeMap }
 
-//**@abstract A list of attributes.
-//**Currently this is a simple string list, and you can get the values with the values property. (with c++ I would have used map<string, string> but this doesn't exist in Pascal)
-TAttributeList = TStringList; //TODO: use a map
 
 //**The type of a tree element. <Open>, text, or </close>
-TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttributeValue, tetAttributeName);
+TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute);
 TTreeElementTypes = set of TTreeElementType;
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
@@ -63,6 +60,47 @@ public
 
   property namespaces[prefix: string]: TNamespace read getNamespace;
   property items[i: integer]: TNamespace read getNamespace;
+end;
+
+TTreeElement = class;
+TTreeAttribute = class;
+
+TAttributeList = class;
+
+{ TAttributeEnumerator }
+
+TAttributeEnumerator = record
+  list: TAttributeList;
+  index: integer;
+  function GetCurrent: TTreeAttribute;
+public
+  function MoveNext: Boolean;
+  property Current: TTreeAttribute read GetCurrent;
+end;
+
+//**@abstract A list of attributes.
+//**Currently this is a simple string list, and you can get the values with the values property. (with c++ I would have used map<string, string> but this doesn't exist in Pascal)
+
+{ TAttributeList }
+
+TAttributeList = class(TStringList)
+public
+  constructor Create;
+  function getAttribute(i: integer): TTreeAttribute;
+  function getAttributeIgnoringNS(const name: string; const cmpFunction: TStringComparisonFunc): TTreeAttribute;
+  function getAttributeWithNSPrefix(const namespaceprefix, localname: string; const cmpFunction: TStringComparisonFunc): TTreeAttribute;
+  function getValue(i: integer): string;
+
+  procedure add(const name, value: string; const namespace: TNamespace = nil);
+  procedure add(att: TTreeElement);
+
+  function clone: TAttributeList;
+
+  function GetEnumerator: TAttributeEnumerator;
+  destructor Destroy; override;
+
+  property Items[i: integer]: TTreeAttribute read getAttribute;
+  property Values[i: integer]: string read getValue;
 end;
 
 //**@abstract This class representates an element of the html file
@@ -108,7 +146,7 @@ TTreeElement = class
 //use the fields if you know what you're doing
   typ: TTreeElementType; //**<open, close, text or comment node
   value: string; //**< tag name for open/close nodes, text for text/comment nodes
-  attributes: TTreeElement;  //**<nil if there are no attributes
+  attributes: TAttributeList;  //**<nil if there are no attributes
   next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   previous: TTreeElement; //**< previous element (self.next.previous = self)
   parent: TTreeElement;
@@ -143,7 +181,7 @@ TTreeElement = class
   function getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
-  function getAttributeTry(a: string; out valueout: TTreeElement; cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttributeTry(a: string; out valueout: TTreeAttribute; cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeCount(): integer;
 
   function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
@@ -167,8 +205,8 @@ TTreeElement = class
   procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
-  function addAttribute(aname, avalue: string): TTreeElement; //adds a single attribute. Returns the element of the last inserted attribute. (runs in O(|attributes|) => do not use for multiple attributes)
-  function addAttributes(const props: array of THTMLProperty): TTreeElement; //adds an array of properties to the attributes. Returns the element of the last inserted attribute.
+  procedure addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil); inline;
+  procedure addAttributes(const props: array of THTMLProperty);
   procedure addChild(child: TTreeElement);
 
   procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
@@ -196,6 +234,13 @@ public
   class function compareInDocumentOrder(const a,b: TTreeElement): integer; static;
 end;
 TTreeElementClass = class of TTreeElement;
+
+{ TTreeAttribute }
+
+TTreeAttribute = class(TTreeElement)
+  realvalue: string;
+  constructor create(const aname, avalue: string; const anamespace: TNamespace = nil);
+end;
 
 { TTreeDocument }
 
@@ -309,6 +354,100 @@ var
 
 implementation
 uses xquery;
+
+{ TAttributeEnumerator }
+
+function TAttributeEnumerator.GetCurrent: TTreeAttribute;
+begin
+  result := list.items[index];
+end;
+
+function TAttributeEnumerator.MoveNext: Boolean;
+begin
+  index += 1;
+  result := index < list.Count;
+end;
+
+{ TTreeAttribute }
+
+constructor TTreeAttribute.create(const aname, avalue: string; const anamespace: TNamespace = nil);
+begin
+  inherited create(tetAttribute, aname);
+  realvalue := avalue;
+  namespace := anamespace;
+end;
+
+{ TAttributeList }
+
+constructor TAttributeList.Create;
+begin
+  OwnsObjects:=true;
+end;
+
+function TAttributeList.getAttribute(i: integer): TTreeAttribute;
+begin
+  result := TTreeAttribute(Objects[i]);
+end;
+
+function TAttributeList.getAttributeIgnoringNS(const name: string; const cmpFunction: TStringComparisonFunc): TTreeAttribute;
+var
+  i: Integer;
+begin
+  for i := 0 to count - 1 do
+    if cmpFunction(Items[i].value, name) then
+      exit(items[i]);
+  exit(nil);
+end;
+
+function TAttributeList.getAttributeWithNSPrefix(const namespaceprefix, localname: string; const cmpFunction: TStringComparisonFunc
+  ): TTreeAttribute;
+var
+  i: Integer;
+begin
+  for i := 0 to count - 1 do
+    if cmpFunction(Items[i].value, localname) and cmpFunction(namespaceprefix, items[i].getNamespacePrefix()) then
+      exit(items[i]);
+  exit(nil);
+end;
+
+function TAttributeList.getValue(i: integer): string;
+begin
+  result := TTreeAttribute(Objects[i]).value;
+end;
+
+procedure TAttributeList.add(const name, value: string; const namespace: TNamespace = nil);
+begin
+  AddObject(name, TTreeAttribute.create(name, value, namespace));
+end;
+
+procedure TAttributeList.add(att: TTreeElement);
+begin
+  AddObject(TTreeAttribute(att).value, att);
+end;
+
+function TAttributeList.clone: TAttributeList;
+var
+  i: Integer;
+begin
+  result := TAttributeList.Create;
+  for i:= 0 to count - 1 do
+    Result.add(items[i].clone);
+end;
+
+
+function TAttributeList.GetEnumerator: TAttributeEnumerator;
+begin
+  result.list := self;
+  Result.index:=-1;
+end;
+
+destructor TAttributeList.Destroy;
+var
+  i: Integer;
+begin
+  for i:= 0 to count - 1 do Items[i].Free;
+  inherited Destroy;
+end;
 
 { TNamespaceList }
 
@@ -443,7 +582,7 @@ procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: 
   end;
 
 var tree: TTreeElement;
-  attrib: TTreeElement;
+  attrib: TTreeAttribute;
 begin
   if (from = eUnknown) or (toe = eUnknown) then exit;
   if (from = toe) and not substituteEntities then exit;
@@ -454,13 +593,11 @@ begin
       tetComment: tree.value:=strChangeEncoding(tree.value, from, toe);
       tetOpen, tetClose: begin
         tree.value := change(tree.value);
-        attrib := tree.attributes;
-        while attrib <> nil do begin
-          attrib.value := change(attrib.value);
-          assert(attrib.reverse <> nil);
-          attrib.reverse.value := change(attrib.reverse.value);
-          attrib := attrib.next;
-        end;
+        if tree.attributes <> nil then
+          for attrib in tree.attributes do begin
+            attrib.value := change(attrib.value);
+            attrib.realvalue := change(attrib.realvalue);
+          end;
       end;
       else raise Exception.Create('Unkown tree element: '+tree.outerXML());
     end;
@@ -517,7 +654,7 @@ begin
 end;
 
 function TTreeElement.outerXML(insertLineBreaks: boolean = false): string;
-var attrib: TTreeElement;
+var attrib: TTreeAttribute;
 begin
   if self = nil then exit;
   case typ of
@@ -526,21 +663,18 @@ begin
     tetComment: result := '<!--'+value+'-->';
     tetProcessingInstruction: begin
       result := '<?'+value;
-      if attributes <> nil then result += ' '+attributes.reverse.value;
+      if attributes <> nil then result += ' '+getAttribute('');
       result += '?>';
     end;
     tetOpen: begin
       if (value = '') and (self is TTreeDocument) then exit(innerXML());
       result := '<' + getNodeName();
-      attrib := attributes;
-      while attrib <> nil do begin
-        assert(attrib.reverse <> nil);
-        result += ' ';
-        if attrib.namespace <> nil then result += attrib.getNamespacePrefix()+':';
-        result += attrib.value+'="'+attrib.reverse.value+'"'; //todo fix escaping & < >
-        attrib := attrib.next;
-      end;
-
+      if attributes <> nil then
+        for attrib in attributes do begin
+          result += ' ';
+          if attrib.namespace <> nil then result += attrib.getNamespacePrefix()+':';
+          result += attrib.value+'="'+attrib.realvalue+'"'; //todo fix escaping & < >
+        end;
       if next = reverse then begin
         result += '/>';
         if insertLineBreaks then Result+=LineEnding;
@@ -583,7 +717,7 @@ begin
 end;
 
 function TTreeElement.hasAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
-var temp: TTreeElement;
+var temp: TTreeAttribute;
 begin
   exit(getAttributeTry(a, temp, cmpFunction));
 end;
@@ -601,47 +735,33 @@ begin
 end;
 
 function TTreeElement.getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
-var temp: TTreeElement;
+var temp: TTreeAttribute;
 begin
   result := getAttributeTry(a, temp, cmpFunction);
   if not result then exit;
-  valueout := temp.value;
+  valueout := temp.realvalue;
 end;
 
-function TTreeElement.getAttributeTry(a: string; out valueout: TTreeElement; cmpFunction: TStringComparisonFunc = nil): boolean;
+function TTreeElement.getAttributeTry(a: string; out valueout: TTreeAttribute; cmpFunction: TStringComparisonFunc = nil): boolean;
 var
-  attrib: TTreeElement;
-  checkNamespace: Boolean;
   ns: string;
 begin
   result := false;
-  if self = nil then exit;
-  attrib := attributes;
-  checkNamespace := pos(':', a) > 0;
-  if checkNamespace then
-    ns := strSplitGet(':', a);
-
+  if (self = nil) or (attributes = nil) then exit;
   if cmpFunction = nil then cmpFunction:=@caseInsensitiveCompare;
-
-  while attrib <> nil do begin
-    if cmpFunction(attrib.value, a) and (not checkNamespace or cmpFunction(ns, attrib.getNamespacePrefix())) then begin
-      valueout := attrib.reverse;
-      exit(true);
-    end;
-    attrib := attrib.next;
+  if pos(':', a) = 0 then
+    valueout := attributes.getAttributeIgnoringNS(a, cmpFunction)
+  else begin
+    ns := strSplitGet(':', a);
+    valueout := attributes.getAttributeWithNSPrefix(ns, a, cmpFunction)
   end;
+  result := valueout <> nil;
 end;
 
 function TTreeElement.getAttributeCount: integer;
-var
-  temp: TTreeElement;
 begin
-  result := 0;
-  temp := attributes;
-  while temp <> nil do begin
-    result += 1;
-    temp := temp.next;
-  end;
+  if (self = nil) or (attributes = nil) then exit(0);
+  result := attributes.Count;
 end;
 
 function TTreeElement.getNextSibling(): TTreeElement;
@@ -693,11 +813,10 @@ end;
 function TTreeElement.getNodeName: string;
 begin
   case typ of
-    tetOpen, tetAttributeName, tetClose: begin
+    tetOpen, tetAttribute, tetClose: begin
       if (namespace = nil) or (namespace.prefix = '') then exit(value);
       exit(getNamespacePrefix() + ':' + value);
     end;
-    tetAttributeValue: result := reverse.getNodeName();
     else result := '';
   end;
 end;
@@ -733,25 +852,25 @@ end;
 
 function TTreeElement.isDeepEqual(cmpTo: TTreeElement; ignoredTypes: TTreeElementTypes; cmpFunction: TStringComparisonFunc): boolean;
 var
-  attrib: TTreeElement;
+  attrib, tempattrib: TTreeAttribute;
   temp1, temp2: TTreeElement;
 begin
   //this follows the XPath deep-equal function
   result := false;
   if typ <> cmpTo.typ then exit();
   if not cmpFunction(value, cmpTo.value) then exit;
+  if not cmpFunction(getNamespaceURL(), cmpto.getNamespaceURL()) then exit;
   case typ of
-    tetAttributeName, tetAttributeValue: if not cmpFunction(reverse.value, cmpTo.reverse.value) then exit;
+    tetAttribute: if not cmpFunction(value, TTreeAttribute(cmpTo).value) or not cmpFunction(TTreeAttribute(self).realvalue, TTreeAttribute(cmpTo).realvalue) then exit;
     tetProcessingInstruction: if getAttribute('') <> cmpTo.getAttribute('') then exit;
     tetOpen: begin
       if (next = reverse) <> (cmpTo.next = cmpTo.reverse) then exit;
       if getAttributeCount <> cmpTo.getAttributeCount then exit;
-      attrib := attributes;
-      while attrib <> nil do begin
-        if not cmpTo.getAttributeTry(attrib.value, temp1, cmpFunction) then exit;
-        if not cmpFunction(temp1.value, attrib.reverse.value) then exit;
-        attrib := attrib.next;
-      end;
+      if attributes <> nil then
+        for attrib in attributes do begin
+          if not cmpTo.getAttributeTry(attrib.value, tempattrib, cmpFunction) then exit;
+          if not cmpFunction(attrib.realvalue, tempattrib.realvalue) then exit;
+        end;
 
       temp1 := next; temp2 := cmpTo.next;
       while (temp1 <> nil) and (temp1.typ in ignoredTypes) do temp1 := temp1.getNextSibling();
@@ -819,63 +938,28 @@ begin
   insertSurrounding(basetag, closing);
 end;
 
-function TTreeElement.addAttribute(aname, avalue: string): TTreeElement;
-var temp: THTMLProperties;
+procedure TTreeElement.addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil);
 begin
-  SetLength(temp, 1);
-  temp[0].name:=pchar(aname);
-  temp[0].nameLen:=length(aname);
-  temp[0].value:=pchar(avalue);
-  temp[0].valueLen:=length(avalue);
-  result := addAttributes(temp);
+  if attributes = nil then attributes := TAttributeList.Create;
+  attributes.add(aname, avalue, anamespace);
+  attributes.Items[attributes.count - 1].parent := self;
+  attributes.Items[attributes.count - 1].offset := offset + 1;
+  attributes.Items[attributes.count - 1].document := document;
 end;
 
-function TTreeElement.addAttributes(const props: array of THTMLProperty): TTreeElement;
+procedure TTreeElement.addAttributes(const props: array of THTMLProperty);
 var
-  prev: TTreeElement;
-  attrib: TTreeElement;
   i: Integer;
-  newoffset: Integer;
 begin
-  if length(props) = 0 then exit(nil);
-
-  newoffset := offset + 1;
-
-  prev := attributes;
-  if prev <> nil then begin
-    while prev.next <> nil do
-      prev := prev.next;
-    newoffset := prev.offset + 1;
-  end;
-
-
+  if length(props) = 0 then exit();
+  if attributes = nil then attributes := TAttributeList.Create;
+  attributes.Capacity:=attributes.count + length(props);
   for i := 0 to high(props) do begin
-    attrib := TTreeElement.create(tetAttributeName, strFromPchar(props[i].name, props[i].nameLen));
-    attrib.parent := self;
-    attrib.document := document;
-    if prev <> nil then prev.next := attrib
-    else attributes := attrib;
-    attrib.previous := prev;
-    attrib.offset:=newoffset; //offset hack to sort attributes after their parent elements in result sequence
-
-
-    attrib.reverse := TTreeElement.create(tetAttributeValue, strFromPchar(props[i].value, props[i].valueLen));
-    attrib.reverse.parent := self;
-    attrib.reverse.document := document;
-    attrib.reverse.reverse := attrib;
-    if prev <> nil then begin
-      prev.reverse.next := attrib.reverse ;
-      attrib.reverse.previous := prev.reverse;
-    end;
-    attrib.reverse.offset:=newoffset;
-
-    newoffset+=1;
-    prev := attrib;
+    attributes.add(strFromPchar(props[i].name, props[i].nameLen), strFromPchar(props[i].value, props[i].valueLen));
+    attributes.Items[attributes.Count - 1].offset := offset + attributes.Count+1; //offset hack to sort attributes after their parent elements in result sequence
+    attributes.Items[attributes.count - 1].parent := self;
+    attributes.Items[attributes.count - 1].document := document;
   end;
-
-  exit(attrib);
-
-
 end;
 
 procedure TTreeElement.addChild(child: TTreeElement);
@@ -910,11 +994,21 @@ end;
 
 
 function TTreeElement.cloneShallow: TTreeElement;
-var
-  newattribtail: TTreeElement;
-  attrib: TTreeElement;
 begin
-  result := TTreeElement.create();
+  case typ of
+    tetAttribute: begin
+      result := TTreeAttribute.create(value, TTreeAttribute(self).realvalue);
+    end;
+    tetOpen: begin
+      if self is TTreeDocument then begin
+        result := TTreeDocument.create();
+        TTreeDocument(result).FEncoding:=TTreeDocument(self).FEncoding;
+        TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
+        TTreeDocument(result).FCreator:=TTreeDocument(self).FCreator;
+      end else result := ttreeelement.create;
+    end
+    else result := TTreeElement.create();
+  end;
   result.typ := typ;
   result.value := value;
   result.attributes := attributes;
@@ -924,27 +1018,6 @@ begin
   result.reverse := nil;
   result.namespace := namespace;
   result.offset := offset;
-
-  if typ = tetAttributeName then begin
-    result.reverse := reverse.cloneShallow;
-    result.reverse.next := nil;
-    result.reverse.previous := nil;
-  end;
-
-  if attributes <> nil then begin
-    result.attributes := attributes.cloneShallow;
-    newattribtail := result.attributes;
-    attrib := attributes.next;
-    while attrib <> nil do begin
-      newattribtail.next := attrib.cloneShallow;
-      newattribtail.reverse.next := newattribtail.next.reverse;
-      newattribtail.next.previous := newattribtail;
-      newattribtail.next.reverse.previous := newattribtail.reverse;
-
-      attrib := attrib.next;
-      newattribtail := newattribtail.next;
-    end;
-  end;
 end;
 
 function TTreeElement.clone: TTreeElement;
@@ -964,9 +1037,10 @@ begin
         result.addChild(kid.clone);
         kid := kid.getNextSibling();
       end;
+
+      if attributes <> nil then result.attributes := attributes.clone;
     end;
-    tetText, tetComment, tetProcessingInstruction, tetAttributeName: result := cloneShallow;
-    tetAttributeValue: result := reverse.cloneShallow;
+    tetText, tetComment, tetProcessingInstruction, tetAttribute: result := cloneShallow;
     tetClose: raise ETreeParseException.Create('Cannot clone closing tag');
     else raise ETreeParseException.Create('Unknown tag');
   end;
@@ -1027,7 +1101,7 @@ end;
 
 function TTreeElement.toString(): string;
 var
-  attrib: TTreeElement;
+  attrib: TTreeAttribute;
 begin
   if self = nil then exit('');
   case typ of
@@ -1036,11 +1110,9 @@ begin
     tetOpen: begin
       if (value = '') and (self is TTreeDocument) then exit(innerXML());
       result := '<'+value;
-      attrib := attributes;
-      while attrib <> nil do begin
-        result += ' '+attrib.value + '="'+attrib.reverse.value+'"';
-        attrib := attrib.next;
-      end;
+      if attributes <> nil then
+        for attrib in attributes do
+          result += ' '+attrib.value + '="'+attrib.reverse.value+'"';
       result+='>';
     end;
     tetComment: exit('<!--'+value+'-->');
@@ -1060,10 +1132,7 @@ end;
 
 destructor TTreeElement.destroy();
 begin
-  if attributes <> nil then begin
-    if attributes.reverse <> nil then attributes.reverse.deleteAll();
-    attributes.deleteAll();
-  end;
+  attributes.Free;
   inherited destroy();
 end;
 
@@ -1138,7 +1207,7 @@ var
   j: Integer;
   enc: String;
   first,last: PChar;
-  attrib: TTreeElement;
+  attrib: TTreeAttribute;
 begin
   result:=prContinue;
 
@@ -1205,20 +1274,17 @@ begin
   FElementStack.Add(new);
   if length(properties)>0 then begin
     new.addAttributes(properties);
-    attrib := new.attributes;
-    while attrib <> nil do begin
+    for attrib in new.attributes do
       if strBeginsWith(attrib.value, 'xmlns') then begin
         if attrib.value = 'xmlns' then
-           pushNamespace(attrib.reverse.value, '')
+           pushNamespace(attrib.realvalue, '')
          else if strBeginsWith(attrib.value, 'xmlns:') then begin
            attrib.value:=strCopyFrom(attrib.value, 7);
-           pushNamespace(attrib.reverse.value, attrib.value);
+           pushNamespace(attrib.realvalue, attrib.value);
            attrib.namespace := XMLNamespace_XMLNS;
          end;
       end else if pos(':', attrib.value) > 0 then
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
-      attrib := attrib.next;
-    end;
   end;
   if (pos(':', new.value) > 0) then
     new.namespace := findNamespace(strSplitGet(':', new.value))
@@ -1494,7 +1560,8 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
   end;
 
 var
-  el, attrib: TTreeElement;
+  el: TTreeElement;
+  attrib: TTreeAttribute;
   encMeta, encHeader: TEncoding;
 begin
   FTemplateCount:=0;
@@ -1554,15 +1621,12 @@ begin
             FCurrentTree.FEncoding:=eWindows1252;
             break;
           end;
-          tetOpen: begin
-            attrib := el.attributes;
-            while attrib <> nil do begin
-              if isInvalidUTF8(attrib.value) or isInvalidUTF8(attrib.reverse.value) then begin
+          tetOpen: if el.attributes <> nil then begin
+            for attrib in el.attributes do
+              if isInvalidUTF8(attrib.value) or isInvalidUTF8(attrib.realvalue) then begin
                 FCurrentTree.FEncoding:=eWindows1252;
                 break;
               end;
-              attrib := attrib.next;
-            end;
             if FCurrentTree.FEncoding <> eUTF8 then break;
           end;
         end;

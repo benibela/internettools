@@ -1333,8 +1333,8 @@ function treeElementAsString(node: TTreeElement; deepSeparator: string = ''): st
 begin
   if (node = nil) then exit('');
   case node.typ of
-    tetText, tetComment, tetAttributeValue: result:=node.value;
-    tetAttributeName: result := node.reverse.value;
+    tetText, tetComment: result:=node.value;
+    tetAttribute: result := TTreeAttribute(node).realvalue;
     tetOpen: result := node.deepNodeText(deepSeparator);
     tetProcessingInstruction: exit(node.getAttribute(''));
     else exit('');
