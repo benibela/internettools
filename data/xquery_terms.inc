@@ -1024,6 +1024,13 @@ var
         end;
       tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
+      tetDocument: begin
+        kid := kid.getFirstChild();
+        while kid <> nil do begin
+          addKid;
+          kid := kid.getNextSibling();
+        end;
+      end
       else raiseEvaluationError('Unknown child node');
     end;
   end;
@@ -1092,7 +1099,7 @@ begin
   oldnamespacecount := 0;
   if subcontext^.namespaces <> nil then oldnamespacecount := subcontext^.namespaces.Count;
 
-  if (typ = tetOpen) and (nameValue = nil) then tree := TTreeDocument.create(typ)
+  if (typ = tetDocument) then tree := TTreeDocument.create(typ)
   else if typ = tetAttribute then tree := TTreeAttribute.create('','')
   else tree := TTreeElement.create(typ);
   if root = nil then root := tree;
@@ -1109,7 +1116,7 @@ begin
       for i:= 0 to high(children) do
         TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
     end;
-    tetOpen: begin
+    tetOpen, tetDocument: begin
       for i:=0 to high(children) do
         if children[i] is TXQTermConstructor then begin
           kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;

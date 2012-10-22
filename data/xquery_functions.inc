@@ -781,7 +781,7 @@ begin
   if v is TXQValue_AnyAtomicType then exit(v);
   if not (v is TXQValueNode) then raise EXQEvaluationException.Create('Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
   case v.toNode.typ of
-    tetOpen: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
+    tetOpen, tetDocument: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
     tetClose: result := xqvalue();
     tetText: result := xqvalue(v.tonode.value);
     tetComment: result := TXQValue_untypedAtomic.create(v.tonode.value);
@@ -2055,7 +2055,7 @@ begin
   requiredArgCount(args, 1);
   if args[0].getSequenceCount <> 1 then exit;
   if args[0] is TXQValueSequence then args[0] := (args[0] as TXQValueSequence).seq[0];
-  if (args[0].toNode <> nil) and (args[0].toNode.typ = tetOpen) and not (args[0].toNode is TTreeDocument) then
+  if (args[0].toNode <> nil) and (args[0].toNode.typ = tetOpen) then
     result := xqvalue((args[0].toNode.getAttribute('xml:nil', @context.staticContext.nodeCollation.equal) = 'true')
                        and (args[0].toNode.deepNodeText() = ''));    ignore(context);
 end;
@@ -2450,7 +2450,7 @@ begin
   if args[0].isUndefined then exit;
   node := args[0].toNode;
   if node <> nil then begin
-    if (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) and not (node is TTreeDocument) then
+    if (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) then
       result := qnameMake(node.namespace, node.value, TXQValue_QName);
   end;
 end;

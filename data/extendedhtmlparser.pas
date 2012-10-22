@@ -485,7 +485,7 @@ begin
     end;
   end;
   case treeTyp of
-    tetOpen: exit(tetHTMLOpen);
+    tetOpen, tetDocument: exit(tetHTMLOpen);
     tetClose: exit(tetHTMLClose);
     tetText: exit(tetHTMLText);
   end;
@@ -1048,7 +1048,7 @@ begin
             if tefSwitchChild in templateStart.flags then begin
               if switchCommandAccepted then switchCommandAccepted:=false
               else begin //try other switch children (?)
-                if templateStart.typ = tetOpen then templateStart := templateStart.templateReverse.templateNext
+                if templateStart.typ in TreeNodesWithChildren then templateStart := templateStart.templateReverse.templateNext
                 else templateStart := templateStart.templateNext;
                 continue;
               end;
@@ -1372,7 +1372,7 @@ var res: TStringArray;
 
   procedure updateIndentation(element: TTreeElement; var count: integer; var cache: string);
   begin
-    if element.typ = tetOpen then count+=1
+    if element.typ in TreeNodesWithChildren then count+=1
     else if element.typ = tetClose then count-=1;
     cache := strDup(' ', min(width div 2, count));
   end;

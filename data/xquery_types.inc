@@ -1335,7 +1335,7 @@ begin
   case node.typ of
     tetText, tetComment: result:=node.value;
     tetAttribute: result := TTreeAttribute(node).realvalue;
-    tetOpen: result := node.deepNodeText(deepSeparator);
+    tetOpen, tetDocument: result := node.deepNodeText(deepSeparator);
     tetProcessingInstruction: exit(node.getAttribute(''));
     else exit('');
   end;

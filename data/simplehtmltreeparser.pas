@@ -18,7 +18,7 @@ type
 
 
 //**The type of a tree element. <Open>, text, or </close>
-TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute);
+TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument);
 TTreeElementTypes = set of TTreeElementType;
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
@@ -349,6 +349,8 @@ function xmlStrEscape(s: string):string;
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
       XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
+const TreeNodesWithChildren = [tetOpen, tetDocument];
+
 var
    XMLNamespace_XMLNS, XMLNamespace_XML: TNamespace;
 
@@ -591,7 +593,7 @@ begin
     case tree.typ of
       tetText, tetProcessingInstruction: tree.value := change(tree.value);
       tetComment: tree.value:=strChangeEncoding(tree.value, from, toe);
-      tetOpen, tetClose: begin
+      tetDocument, tetOpen, tetClose: begin
         tree.value := change(tree.value);
         if tree.attributes <> nil then
           for attrib in tree.attributes do begin
@@ -616,7 +618,7 @@ begin
       result := result.findNext(tetOpen, strSplitGet('/', withText), findOptions - [tefoSplitSlashes], result.reverse);
     exit();
   end;}
-  if (tefoNoChildren in findOptions) and (self.typ = tetOpen) then cur := self.reverse
+  if (tefoNoChildren in findOptions) and (self.typ in TreeNodesWithChildren) then cur := self.reverse
   else cur := self.next;
   while (cur <> nil) and (cur <> sequenceEnd) do begin
     if ((cur.typ = withTyp) or (tefoIgnoreType in findOptions)) and
@@ -624,7 +626,7 @@ begin
            ( (tefoCaseSensitive in findOptions) and (cur.value = withText) ) or
            ( not (tefoCaseSensitive in findOptions) and (striequal(cur.value, withText) ) ) ) then
              exit(cur);
-    if (tefoNoGrandChildren in findOptions) and (cur.typ = tetOpen) then cur := cur.reverse
+    if (tefoNoGrandChildren in findOptions) and (cur.typ in TreeNodesWithChildren) then cur := cur.reverse
     else cur := cur.next;
   end;
   result := nil;
@@ -635,7 +637,7 @@ function TTreeElement.findChild(withTyp: TTreeElementType; withText: string;
 begin
   result := nil;
   if self = nil then exit;
-  if typ <> tetOpen then exit;
+  if not (typ in TreeNodesWithChildren) then exit;
   if reverse = nil then exit;
   result:=findNext(withTyp, withText, findOptions + [tefoNoGrandChildren] - [tefoNoChildren], reverse);
 end;
@@ -686,6 +688,7 @@ begin
       result+='</'+value+'>';
       if insertLineBreaks then Result+=LineEnding;
     end;
+    tetDocument: result := innerXML(insertLineBreaks);
   end;
 end;
 
@@ -694,11 +697,11 @@ var
   sub: TTreeElement;
 begin
   result := '';
-  if (self = nil) or (typ <> tetOpen) then exit;
+  if (self = nil) or not (typ in TreeNodesWithChildren) then exit;
   sub := next;
   while sub <> reverse do begin
     result += sub.outerXML(insertLineBreaks);
-    if sub.typ <> tetOpen then sub:=sub.next
+    if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
     else sub := sub.reverse.next;
   end;
 end;
@@ -767,7 +770,7 @@ end;
 function TTreeElement.getNextSibling(): TTreeElement;
 begin
   case typ of
-    tetOpen: result:=reverse.next;
+    tetOpen, tetDocument: result:=reverse.next;
     tetText, tetClose, tetComment, tetProcessingInstruction: result := next;
     else raise Exception.Create('Invalid tree element type');
   end;
@@ -776,7 +779,7 @@ end;
 
 function TTreeElement.getFirstChild(): TTreeElement;
 begin
-  if typ <> tetOpen then exit(nil);
+  if not (typ in TreeNodesWithChildren) then exit(nil);
   if next = reverse then exit(nil);
   exit(next);
 end;
@@ -801,7 +804,7 @@ end;
 function TTreeElement.getRootElement: TTreeElement;
 begin
   result := document;
-  if (result = nil) or (result.value <> '') then exit;
+  if (result = nil) or (result.typ = tetOpen) then exit;
   exit(result.findChild(tetOpen,'',[tefoIgnoreText]));
 end;
 
@@ -863,7 +866,7 @@ begin
   case typ of
     tetAttribute: if not cmpFunction(value, TTreeAttribute(cmpTo).value) or not cmpFunction(TTreeAttribute(self).realvalue, TTreeAttribute(cmpTo).realvalue) then exit;
     tetProcessingInstruction: if getAttribute('') <> cmpTo.getAttribute('') then exit;
-    tetOpen: begin
+    tetOpen, tetDocument: begin
       if (next = reverse) <> (cmpTo.next = cmpTo.reverse) then exit;
       if getAttributeCount <> cmpTo.getAttributeCount then exit;
       if attributes <> nil then
@@ -912,13 +915,13 @@ begin
 
   prev.insert(before);
 
-  if surroundee.typ = tetOpen then surroundee.reverse.insert(after)
+  if surroundee.typ in TreeNodesWithChildren then surroundee.reverse.insert(after)
   else surroundee.insert(after);
 
   before.reverse := after;
   after.reverse := before;
 
-  if (before.typ = tetOpen) and (before.reverse = after) then begin
+  if (before.typ in TreeNodesWithChildren) and (before.reverse = after) then begin
     prev := surroundee.getParent();
     el := surroundee;
     while (el <> nil) and (el.parent = prev) do begin
@@ -931,7 +934,7 @@ end;
 procedure TTreeElement.insertSurrounding(basetag: TTreeElement);
 var closing: TTreeElement;
 begin
-  if basetag.typ <> tetOpen then raise Exception.Create('Need an opening tag to surround another tag');
+  if not (basetag.typ in TreeNodesWithChildren) then raise Exception.Create('Need an opening tag to surround another tag');
   closing := TTreeElement(basetag.ClassType.Create);
   closing.typ := tetClose;
   closing.value := basetag.value;
@@ -999,13 +1002,11 @@ begin
     tetAttribute: begin
       result := TTreeAttribute.create(value, TTreeAttribute(self).realvalue);
     end;
-    tetOpen: begin
-      if self is TTreeDocument then begin
-        result := TTreeDocument.create();
-        TTreeDocument(result).FEncoding:=TTreeDocument(self).FEncoding;
-        TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
-        TTreeDocument(result).FCreator:=TTreeDocument(self).FCreator;
-      end else result := ttreeelement.create;
+    tetDocument: begin
+      result := TTreeDocument.create();
+      TTreeDocument(result).FEncoding:=TTreeDocument(self).FEncoding;
+      TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
+      TTreeDocument(result).FCreator:=TTreeDocument(self).FCreator;
     end
     else result := TTreeElement.create();
   end;
@@ -1025,7 +1026,7 @@ var
   kid: TTreeElement;
 begin
   case typ of
-    tetOpen: begin
+    tetOpen, tetDocument: begin
       result := cloneShallow;
       result.reverse := reverse.cloneShallow;
       result.reverse.reverse := result;
@@ -1056,7 +1057,7 @@ var
 begin
   if (self = nil) or (next = nil) then exit;
   toFree := next;
-  if toFree.typ = tetOpen then begin
+  if toFree.typ in TreeNodesWithChildren then begin
     temp := toFree.next;
     next := toFree.reverse.next;
     while temp <> toFree.next do begin //remove all between ]toFree, toFree.reverse] = ]toFree, toFree.next[
@@ -1078,7 +1079,7 @@ begin
   if previous = nil then raise Exception.Create('Cannot remove first tag');
   previous.next := next;
   next.previous := previous;
-  if typ = tetOpen then begin
+  if typ in TreeNodesWithChildren then begin
     temp := next;
     while temp <> reverse do begin
       if temp.parent = self then temp.parent := parent;
@@ -1108,13 +1109,13 @@ begin
     tetText: exit(value);
     tetClose: exit('</'+value+'>');
     tetOpen: begin
-      if (value = '') and (self is TTreeDocument) then exit(innerXML());
       result := '<'+value;
       if attributes <> nil then
         for attrib in attributes do
           result += ' '+attrib.value + '="'+attrib.reverse.value+'"';
       result+='>';
     end;
+    tetDocument: result := innerXML();
     tetComment: exit('<!--'+value+'-->');
     else exit('??');
   end;
@@ -1242,7 +1243,7 @@ begin
     if strliEqual(tagName,'td',tagNameLen) then begin
       for i:=FElementStack.Count-1 downto 0 do begin
         temp :=TTreeElement(FElementStack[i]);
-        if not (temp.typ in  [tetOpen, tetClose]) then continue;
+        if not (temp.typ in  [tetDocument, tetOpen, tetClose]) then continue;
         if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
         if (temp.typ = tetClose) then break;
         if (temp.typ = tetOpen) and (temp.value='td') then begin
@@ -1255,7 +1256,7 @@ begin
     end else if strliEqual(tagName,'tr',tagNameLen) then begin
       for i:=FElementStack.Count-1 downto 0 do begin
         temp :=TTreeElement(FElementStack[i]);
-        if not (temp.typ in  [tetOpen, tetClose]) then continue;
+        if not (temp.typ in  [tetDocument, tetOpen, tetClose]) then continue;
         if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
         if (temp.typ = tetClose) and ((temp.value='tr') or (temp.value='table')) then break;
         if (temp.typ = tetOpen) and (temp.value='tr') then begin
@@ -1582,7 +1583,7 @@ begin
   //2. it serves as parent for multiple top level elements (althought they aren't allowed)
   FCurrentTree:=TTreeDocument.create;
   FCurrentTree.FCreator:=self;
-  FCurrentTree.typ := tetOpen;
+  FCurrentTree.typ := tetDocument;
   FCurrentTree.FBaseURI:=uri;
   FCurrentTree.document := FCurrentTree;
   FCurrentElement:=FCurrentTree;
@@ -1621,7 +1622,7 @@ begin
             FCurrentTree.FEncoding:=eWindows1252;
             break;
           end;
-          tetOpen: if el.attributes <> nil then begin
+          tetOpen, tetDocument: if el.attributes <> nil then begin
             for attrib in el.attributes do
               if isInvalidUTF8(attrib.value) or isInvalidUTF8(attrib.realvalue) then begin
                 FCurrentTree.FEncoding:=eWindows1252;

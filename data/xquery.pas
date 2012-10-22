@@ -742,7 +742,6 @@ type
     iteration: TXQPathNodeConditionIteration; //**< The axis to search
     start,endnode: TTreeElement; //**< Start end node for the search
     searchedTypes: TTreeElementTypes; //**< Treeelement types matched by the query
-    acceptDocument: boolean;
     matchStartNode: boolean; //**< If the search begins at start or at start.next
     checkValue: boolean; //**< If the name of the element matters
     requiredValue: string; //**< Required node name (if checkValue)
@@ -4102,10 +4101,9 @@ end;
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
 begin
   result :=  assigned(node)
-             and ((node.typ in nodeCondition.searchedTypes) or ((nodeCondition.searchedTypes = []) and (node is TTreeDocument) and nodeCondition.acceptDocument))
+             and (node.typ in nodeCondition.searchedTypes)
              and (not (nodeCondition.checkValue) or nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
-             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL()))
-             and (nodeCondition.acceptDocument or not (node is TTreeDocument)) ;
+             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL()));
 end;
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement;
@@ -4159,7 +4157,8 @@ class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeElement; const 
     if qmElement in qmt then include(result, tetOpen);
     if qmComment in qmt then include(result, tetComment);
     if qmProcessingInstruction in qmt then include(result, tetProcessingInstruction);
-    if qmAttribute in qmt then begin result += [tetAttribute]; end;
+    if qmAttribute in qmt then include(result, tetAttribute);
+    if qmDocument in qmt then include(result, tetDocument);
   end;
 begin
   nodeCondition.findOptions:=[];
@@ -4167,7 +4166,6 @@ begin
   nodeCondition.matchStartNode:=false;
   nodeCondition.iteration := qcnciNext;
   nodeCondition.checkValue:=qmValue in command.matching;
-  nodeCondition.acceptDocument := qmDocument in command.matching;
   nodeCondition.requiredValue:=command.value;
   nodeCondition.checkNamespace:=qmCheckNamespace in command.matching;
   nodeCondition.requiredNamespaceURL:=command.namespacePrefix; //is resolved later
@@ -4239,7 +4237,7 @@ begin
   //prevent search in certain cases, to prevent it from reading following elements as children from nodes that cannot have children
   if (nodeCondition.iteration = qcnciNext)                                           //only qcnciNext is concerned with children
      and (nodeCondition.start <> nil)
-     and (not (contextnode.typ in [tetOpen]) or (contextnode.reverse = nil))         //open elements (which btw. should always have a reverse element) have actual children, so this prevention is not needed / harmful
+     and (not (contextnode.typ in TreeNodesWithChildren) or (contextnode.reverse = nil))         //open elements (which btw. should always have a reverse element) have actual children, so this prevention is not needed / harmful
      and (not (command.typ in [qcFollowing, qcFollowingSibling, qcPrecedingSibling]) //following/sibling should match following/sibling so there is also no problem
            or (contextNode.typ in [tetAttribute]))  then            //except the node is an attribute, then should following/sibling shouldn't match anything
     nodeCondition.endnode := nodeCondition.start.next; //prevent search
