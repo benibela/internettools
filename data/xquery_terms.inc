@@ -1005,6 +1005,8 @@ var
     else lastKid := kid;
   end;
   procedure addNodeAsKid;
+  var
+    doc: TTreeElement;
   begin
     kid.parent := tree;
     case kid.typ of
@@ -1031,11 +1033,15 @@ var
       tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
       tetDocument: begin
+        doc := kid;
         kid := kid.getFirstChild();
         while kid <> nil do begin
           addKid;
           kid := kid.getNextSibling();
         end;
+        doc.next := doc.reverse;
+        doc.reverse.previous := doc;
+        doc.deleteAll();
       end
       else raiseEvaluationError('Unknown child node');
     end;
