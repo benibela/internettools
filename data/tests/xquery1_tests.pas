@@ -726,13 +726,12 @@ begin
   t('some $i as xs:integer  in (1,2,3), $j as xs:integer  in (1,2,3)  satisfies $i eq $j', 'true');
   t('every $i as xs:integer  in (1,2,3), $j as xs:integer  in (1,2,3)  satisfies $i eq $j', 'false');
   m('xquery version ''1.0''; 1+2+3', '6');
-  t('(<a>1</a>, <a>2</a>) except (<a>3</a>, <a>4</a>)', '1 2');
-  t('let $a := <a>0</a> return ($a, <a>1</a>, <a>2</a>) except ($a, <a>3</a>, <a>4</a>)', '1 2'); //these tests could fail on other systems due to different memory layouts. The result is correct, if the same elements are there regardless of their order
-  t('let $a := <a>0</a> return ($a, <a>1</a>, <a>2</a>, <a>3</a>, <a>4</a>) except ($a, <a>3</a>, <a>4</a>)', '1 2 3 4');
-  t('let $a := <a>0</a>, $b := <a>7</a> return ($a, $b, <a>1</a>, <a>2</a>, <a>3</a>, <a>4</a>) except ($a, $b, <a>3</a>, <a>4</a>)', '1 2 3 4');
+  t('for $x in ((<a>1</a>, <a>2</a>) except (<a>3</a>, <a>4</a>)) order by $x return $x', '1 2');
+  t('for $x in (let $a := <a>0</a> return ($a, <a>1</a>, <a>2</a>) except ($a, <a>3</a>, <a>4</a>)) order by $x return $x', '1 2');
+  t('for $x in (let $a := <a>0</a> return ($a, <a>1</a>, <a>2</a>, <a>3</a>, <a>4</a>) except ($a, <a>3</a>, <a>4</a>)) order by $x return $x', '1 2 3 4');
+  t('for $x in (let $a := <a>0</a>, $b := <a>7</a> return ($a, $b, <a>1</a>, <a>2</a>, <a>3</a>, <a>4</a>) except ($a, $b, <a>3</a>, <a>4</a>)) order by $x return $x', '1 2 3 4');
   t('let $a := <a>0</a> return ($a, <a>1</a>, <a>2</a>) intersect ($a, <a>3</a>, <a>4</a>)', '0');
-  t('let $a := <a>0</a>, $b := <a>-1</a> return ($a, $b, <a>1</a>, <a>2</a>) intersect ($a, $b, <a>3</a>, <a>4</a>)', '0 -1' );
-  t('let $a := <a>0</a>, $b := <a>-1</a> return ($b, $a, <a>1</a>, <a>2</a>) intersect ($a, $b, <a>3</a>, <a>4</a>)', '-1 0' );
+  t('for $x in (let $a := <a>0</a>, $b := <a>-1</a> return ($a, $b, <a>1</a>, <a>2</a>) intersect ($a, $b, <a>3</a>, <a>4</a>)) order by $x return $x', '-1 0' );
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
 
