@@ -1324,7 +1324,9 @@ type
 
   //Returns a IXQValue containing the passed value
   function xqvalue():IXQValue; inline; //**< Creates an undefined/empty-sequence IXQValue
-  function xqvalue(v: Boolean):IXQValue; inline; //**< Creates an boolean IXQValue
+  function xqvalue(const v: Boolean):IXQValue; inline; //**< Creates an boolean IXQValue
+  function xqvalueTrue:IXQValue; inline; //**< Creates an boolean IXQValue
+  function xqvalueFalse:IXQValue; inline; //**< Creates an boolean IXQValue
   function xqvalue(const v: int65):IXQValue; inline; //**< Creates an integer IXQValue
   function xqvalue(v: Integer):IXQValue; inline; //**< Creates an integer IXQValue
   function xqvalue(const v: Int64):IXQValue; inline; //**< Creates an integer IXQValue
@@ -1857,28 +1859,62 @@ begin
   result := commonDecimalClass(a.getClassType, b.getClassType, TXQValue_Double);
 end;
 
+var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
+
 function xqvalue: IXQValue;
 begin
-  result := TXQValueUndefined.Create;
+  result := commonValuesUndefined;
+  //result := TXQValueUndefined.Create;
 end;
 
-function xqvalue(v: Boolean): IXQValue;
+function xqvalue(const v: Boolean): IXQValue;
 begin
-  result := TXQValueBoolean.Create(v);
+  case v of
+    true:  result := commonValuesTrue;
+    false: result := commonValuesFalse;
+    else result := nil;
+  end;
+
+  //result := TXQValueBoolean.Create(v);
+end;
+
+function xqvalueTrue: IXQValue;
+begin
+  result := commonValuesTrue;
+end;
+
+function xqvalueFalse: IXQValue;
+begin
+  result := commonValuesFalse;
 end;
 
 function xqvalue(const v: int65): IXQValue;
 begin
+  {case v.value of
+    0: result := commonValues[cvk0];
+    1: if v.sign then result := commonValues[cvkM1] else  result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;                                }
   result := TXQValueInt65.Create(v);
 end;
 
 function xqvalue(v: Integer): IXQValue;
 begin
+  {case v of
+    0: result := commonValues[cvk0];
+    1: result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;}
   result := xqvalue(int65(v));
 end;
 
 function xqvalue(const v: Int64): IXQValue;
 begin
+  {case v of
+    0: result := commonValues[cvk0];
+    1: result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;}
   result := xqvalue(int65(v));
 end;
 
@@ -1889,6 +1925,9 @@ end;
 
 function xqvalue(v: string): IXQValue; inline;
 begin
+  {if v = '' then
+    result := commonValues[cvkEmptyString]
+   else}
   result := TXQValueString.Create(v);
 end;
 
@@ -4466,6 +4505,11 @@ TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc
 
 {$DEFINE PXP_DERIVED_TYPES_REGISTRATION}
 {$I xquery_derived_types.inc}
+
+
+commonValuesUndefined := TXQValueUndefined.create;
+commonValuesTrue := TXQValueBoolean.create(true);
+commonValuesFalse := TXQValueBoolean.create(false);
 
 finalization
 //writeln(stderr,'fini');

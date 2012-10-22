@@ -430,7 +430,7 @@ begin
   if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then
     result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
-    result := xqvalue(false);
+    result := xqvalueFalse;
 end;
 
 procedure xqvalueCompareAtomic(a, b: IXQValue; var result: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimeZone: TDateTime);
@@ -441,7 +441,7 @@ begin
     compres := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone);
     result := xqvalue((compres = accept1) or (compres = accept2) );
   end else
-    result := xqvalue(false);
+    result := xqvalueFalse;
 end;
 
 procedure xqvalueLessThanAtomic(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
@@ -578,13 +578,13 @@ procedure xqvalueAnd(const cxt: TEvaluationContext; a, b: IXQValue; var result: 
 begin
   ignore(cxt);
   if a.toBooleanEffective then result := xqvalue(b.toBooleanEffective)
-  else result := xqvalue(false);
+  else result := xqvalueFalse;
 end;
 
 procedure xqvalueOr(const cxt: TEvaluationContext; a, b: IXQValue; var result: IXQValue);
 begin
   ignore(cxt);
-  if a.toBooleanEffective then result := xqvalue(true)
+  if a.toBooleanEffective then result := xqvalueTrue
   else result := xqvalue(b.toBooleanEffective);
 end;
 
@@ -1254,7 +1254,7 @@ begin
   else collation := context.staticContext.collation;
   s :=args[0].toString;
   t :=args[1].toString;
-  if t = '' then result := xqvalue(true)
+  if t = '' then result := xqvalueTrue
   else result := xqvalue(collation.contains(s,t));
 end;
 
@@ -1357,11 +1357,11 @@ begin
   splitted := strSplit(list, split);
   for i:=0 to high(splitted) do
     if cxt.staticContext.collation.equal(splitted[i], searched) then begin
-      result := xqvalue(true);
+      result := xqvalueTrue;
       exit;
     end;
 
-  result := xqvalue(false);
+  result := xqvalueFalse;
 end;
 
 procedure xqFunctionReplace(args: TXQVArray; var result: IXQValue);
@@ -1503,14 +1503,14 @@ end;
 procedure xqFunctionTrue(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
-  result := xqvalue(true);
+  result := xqvalueTrue;
 end;
 
 procedure xqFunctionFalse(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 0);
   //todo: boolean('true') = false in xpath :(
-  result := xqvalue(false);
+  result := xqvalueFalse;
 end;
 
 procedure xqFunctionNot(args: TXQVArray; var result: IXQValue);
@@ -1760,7 +1760,7 @@ begin
     end;
     node := node.getParent();
   end;
-  result := xqvalue(false);
+  result := xqvalueFalse;
 end;
 
 
@@ -1963,12 +1963,12 @@ var
 begin
   requiredArgCount(args, 1);
   url := args[0].toString;
-  if url = '' then begin result := xqvalue(false); exit;end;
+  if url = '' then begin result := xqvalueFalse; exit;end;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
   if TXQValue_anyURI.canCreateFromstring(url) then
-    result := xqvalue(true);
+    result := xqvalueTrue;
   {$else}
-  result := xqvalue(false);
+  result := xqvalueFalse;
   {$endif}
 end;
 
@@ -2017,10 +2017,10 @@ procedure xqFunctionExists(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   case args[0].kind of
-    pvkUndefined: result := xqvalue(false);
+    pvkUndefined: result := xqvalueFalse;
     pvkSequence: result := xqvalue(args[0].getSequenceCount > 0);
     pvkNode: result := xqvalue(args[0].toNode <> nil);
-    else result := xqvalue(true);
+    else result := xqvalueTrue;
   end;
 end;
 
@@ -2028,10 +2028,10 @@ procedure xqFunctionEmpty(args: TXQVArray; var result: IXQValue);
 begin
   requiredArgCount(args, 1);
   case args[0].kind of
-    pvkUndefined: result := xqvalue(true);
+    pvkUndefined: result := xqvalueTrue;
     pvkSequence: result := xqvalue(args[0].getSequenceCount = 0);
     pvkNode: result := xqvalue(args[0].tonode = nil);
-    else result := xqvalue(false);
+    else result := xqvalueFalse;
   end;
 end;
 
@@ -2203,7 +2203,7 @@ begin
   else collation := context.staticContext.collation;
 
   if args[0].getSequenceCount <> args[1].getSequenceCount then begin
-    result := xqvalue(false);
+    result := xqvalueFalse;
     exit;
   end;
 
@@ -2215,21 +2215,21 @@ begin
       if not (enum2.Current is TXQValue_AnyAtomicType)
          or not xqvalueComparableTypes(enum1.Current, enum2.Current)
          or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.sender.ImplicitTimezone,true) then begin //todo:   nodes?
-        result := xqvalue(false);
+        result := xqvalueFalse;
         exit;
       end;
     end else begin
       if (enum2.Current is TXQValue_AnyAtomicType) or
          (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
             and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.staticContext.nodeCollation.equal)) then begin
-        result := xqvalue(false);
+        result := xqvalueFalse;
         exit;
       end;
     end;
     enum1.MoveNext;
     enum2.MoveNext;
   end;
-  result := xqvalue(true);
+  result := xqvalueTrue;
 end;
 
 procedure xqFunctioncount(args: TXQVArray; var result: IXQValue);
