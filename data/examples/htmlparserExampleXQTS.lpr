@@ -95,7 +95,7 @@ begin
   1: writeln('ERROR: got "', myoutput, '" expected "', output, '"');
   2: writeln('EXCEPTION: ', myoutput);
   end;
-  writeln ('  In: ', queryfile, ': ',copy(desc,1,60), ' with ', inputfile, ' time: ', timing * MSecsPerDay);
+  writeln ('  In: ', queryfile, ': ',copy(desc,1,60), ' with ', inputfile, ' time: ', timing * MSecsPerDay:6:6);
 end;
 
 class procedure TPlainLogger.LOG_GROUP_END(startlogged: boolean; correct, wrong, exceptions, skipped: integer);
@@ -220,8 +220,10 @@ begin
   compareTree.clearTrees;
   tree1 := compareTree.parseTree(a);
   tree1.changeEncoding(eUTF8,eUTF8,true,false);
+  //sorttree(tree1);
   tree2 := compareTree.parseTree(b);
   tree2.changeEncoding(eUTF8,eUTF8,true,false);
+  //sorttree(tree2);
   result := tree1.outerXML() = tree2.outerXML();
 
   except on e: ETreeParseException do result := false;
@@ -435,6 +437,8 @@ begin
               logGroupStart;
               mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
             end;
+            if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)   then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
+
             //writeln('PASS: ', copy(desc,1,30),queryname,' : got '  , myoutput);
           end else begin
             wrongLocal+=1;
@@ -442,6 +446,7 @@ begin
             logGroupStart;
 
             mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+            if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)  then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
           {  write(stderr, 'WRONG: ', copy(desc,1,60),' ',queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
             writeln(stderr, '       ', arrayGet(strSplit(query, #13),-2) );
             writeln('      TestSources/'+inputfile+'.xml', '  |  ','Queries/XQuery/'+path+'/'+queryname+'.xq','    |   ', 'ExpectedTestResults/'+path+'/'+outputfile); writeln;}
