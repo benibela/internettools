@@ -710,6 +710,7 @@ begin
   t('(# abc:def # # ) # ) #) {123}', '123');
   t('(# abc:def # # ) # ) #) (# h:k #) {123}', '123');
   t('(# abc:def # # ) # ) #) (: ..(#. :) (# h:k #) {123}', '123');
+  t('let $i := <e xml:lang="en"> <b xml:lang="de"/> </e> return lang("de", $i)', 'false');
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
 

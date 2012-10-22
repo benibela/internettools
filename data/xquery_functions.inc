@@ -1765,7 +1765,7 @@ begin
 
 
   testlang := lowercase(args[0].toString);
-  if node.getParent() = nil then node := node.findNext(tetOpen,'',[tefoIgnoreText]);
+  if node is TTreeDocument then node := node.findNext(tetOpen,'',[tefoIgnoreText]);
   while node <> nil do begin
     if node.hasAttribute('lang', @context.staticContext.nodeCollation.equal) then begin
       rlang := node.getAttribute('lang', @context.staticContext.nodeCollation.equal);
