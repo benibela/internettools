@@ -711,6 +711,9 @@ begin
   t('(# abc:def # # ) # ) #) (# h:k #) {123}', '123');
   t('(# abc:def # # ) # ) #) (: ..(#. :) (# h:k #) {123}', '123');
   t('let $i := <e xml:lang="en"> <b xml:lang="de"/> </e> return lang("de", $i)', 'false');
+  t('fn:local-name(processing-instruction PITarget {"PIcontent"})', 'PITarget');
+  t('fn:name(processing-instruction PITarget {"PIcontent"})', 'PITarget');
+  t('fn:local-name-from-QName(node-name(processing-instruction PITarget {"PIcontent"}))', 'PITarget');
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
 

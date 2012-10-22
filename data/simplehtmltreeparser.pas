@@ -816,7 +816,7 @@ end;
 function TTreeElement.getNodeName: string;
 begin
   case typ of
-    tetOpen, tetAttribute, tetClose: begin
+    tetOpen, tetAttribute, tetClose, tetProcessingInstruction: begin
       if (namespace = nil) or (namespace.prefix = '') then exit(value);
       exit(getNamespacePrefix() + ':' + value);
     end;
