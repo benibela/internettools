@@ -644,7 +644,7 @@ end;
 procedure xqvalueIntersect(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 var a,b, resseq: TXQValueSequence;
     ah, bh: IXQValue;
-    ia,ib,offseta,offsetb: integer;
+    ia,ib,cmp: integer;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
@@ -659,12 +659,11 @@ begin
   ia := 0; ib:=0;
   resseq := TXQValueSequence.create(max(a.seq.Count,b.seq.Count));
   while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
-    offseta := a.seq[ia].toNode.offset;
-    offsetb := b.seq[ib].toNode.offset;
-    if offseta = offsetb then begin
+    cmp := TTreeElement.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
+    if cmp = 0 then begin
       resseq.addChild(xqvalue(a.seq[ia].toNode));
       ia+=1; ib+=1;
-    end else if offseta < offsetb then ia+=1
+    end else if cmp < 0 then ia+=1
     else ib+=1;
   end;
   result := resseq;
@@ -707,7 +706,7 @@ end;
 procedure xqvalueExcept(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
 var ah,bh: IXQValue;
     a, b: TXQValueSequence;
-    ia,ib,offseta,offsetb: integer;
+    ia,ib,cmp: integer;
     i: Integer;
     resseq: TXQValueSequence;
 begin
@@ -725,12 +724,11 @@ begin
   ia := 0; ib:=0;
   resseq := TXQValueSequence.create(a.seq.Count);
   while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
-    offseta := a.seq[ia].toNode.offset;
-    offsetb := b.seq[ib].toNode.offset;
-    if offseta < offsetb then begin
+    cmp := TTreeElement.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
+    if cmp < 0 then begin
       resseq.addChild(a.seq[ia]);
       ia+=1;
-    end else if offseta > offsetb then ib+=1
+    end else if cmp > 0 then ib+=1
     else begin
       ia+=1;
       ib+=1;
