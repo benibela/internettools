@@ -742,6 +742,18 @@ begin
   m('declare namespace test = "foobar"; outer-xml(<test:a xmlns:test="123">abc</test:a>)', '<test:a xmlns:test="123">abc</test:a>');
   m('declare namespace test = "foobar"; declare namespace abc = "def";  outer-xml(<test:a><abc:xyz/></test:a>)', '<test:a xmlns:test="foobar"><abc:xyz xmlns:abc="def"/></test:a>');
   m('declare namespace test = "foobar"; declare namespace abc = "def";  outer-xml(<test:a abc:u=""><abc:xyz/></test:a>)', '<test:a xmlns:test="foobar" xmlns:abc="def" abc:u=""><abc:xyz/></test:a>');
+  t('outer-xml(<a xmlns:abc="123"/>)', '<a/>');
+  t('outer-xml(<abc:a xmlns:abc="123"/>)', '<abc:a xmlns:abc="123"/>');
+  t('outer-xml(<a xmlns:abc="123" abc:xyz="123"/>)', '<a xmlns:abc="123" abc:xyz="123"/>');
+  t('outer-xml(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem>)', '<elem xmlns:foo="http://www.example.com/foo"><elem foo:attr=""/></elem>');
+  m('declare namespace p="http://example.com/ns/p"; declare namespace q="http://example.com/ns/q"; declare namespace f="http://example.com/ns/f"; outer-xml(<p:a q:b="{2}" xmlns:r="http://example.com/ns/r"/>)', '<p:a xmlns:p="http://example.com/ns/p" xmlns:q="http://example.com/ns/q" q:b="2"/>');
+  m('declare namespace p="http://example.com/ns/p"; declare namespace q="http://example.com/ns/q"; declare namespace f="http://example.com/ns/f"; string-join(in-scope-prefixes(<p:a q:b="{2}" xmlns:r="http://example.com/ns/r"/>), " ")', 'xml p q r');
+  t('<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:*', '');
+  t('<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:foo', '');
+  t('<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @*:foo', '');
+  t('count(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:*)', '0');
+  t('count(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:foo)', '0');
+  t('count(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @*:foo)', '0');
 
 
 

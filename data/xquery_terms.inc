@@ -823,6 +823,7 @@ var
   readnamespace: String;
   temp: TNamespace;
   i: Integer;
+  attrib: TTreeAttribute;
 begin
   if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
     tempEl := context.SeqValue.toNode
@@ -847,10 +848,14 @@ begin
       temp := context.findNamespace(readnamespace, xqdnkUnknown);
       if temp <> nil then readnamespace:=temp.url;
     end;
-    for i := 0 to tempel.attributes.Count - 1 do
-      if      (not testValue or striEqual(tempel.attributes.items[i].value, readvalue))
-          and (not testNS or ( tempel.attributes.items[i].getNamespaceURL() = readnamespace))  then
+    for i := 0 to tempel.attributes.Count - 1 do begin
+      attrib := tempel.attributes.items[i];
+      if      (not testValue or striEqual(attrib.value, readvalue))
+          and (not testNS or ( attrib.getNamespaceURL() = readnamespace))
+          and not attrib.isNamespaceNode
+          then
         xqvalueSeqAdd(result, xqvalue(tempEl.attributes.Items[i]));
+    end;
   end;
   if result = nil then result:=xqvalue();
 end;
@@ -1010,7 +1015,7 @@ var
   begin
     kid.parent := tree;
     case kid.typ of
-      tetAttribute:
+      tetAttribute: begin
         if ((kid.namespace = nil) and (kid.value = 'xmlns')) or ((kid.namespace <> nil) and (kid.namespace.url = XMLNamespaceUrl_XMLNS)) then begin
           if (subcontext^.namespaces = nil) then begin
             new(subcontext);
@@ -1021,15 +1026,15 @@ var
           else subcontext^.namespaces.Add(TNamespace.Create(TTreeAttribute(kid).realvalue, kid.value));
           if subcontext^.staticContext.sender.FGarbageNamespaces = nil then subcontext^.staticContext.sender.FGarbageNamespaces := TNamespaceList.Create;
           subcontext^.staticContext.sender.FGarbageNamespaces.Add(subcontext^.namespaces[subcontext^.namespaces.Count-1]);
-          kid.free;
-        end else begin
-          if tree.attributes = nil then tree.attributes := TAttributeList.Create;
-          tree.attributes.add(kid);
-          kid.offset:=baseOffset;
-          kid.parent:=tree;
-          kid.document:=tree.document;
-          baseOffset+=1;
         end;
+
+        if tree.attributes = nil then tree.attributes := TAttributeList.Create;
+        tree.attributes.add(kid);
+        kid.offset:=baseOffset;
+        kid.parent:=tree;
+        kid.document:=tree.document;
+        baseOffset+=1;
+      end;
       tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
       tetDocument: begin

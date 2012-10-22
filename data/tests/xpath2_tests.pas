@@ -1565,7 +1565,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('namespace-uri-from-QName(resolve-QName((), *:r/*:override/*:sub))', '', '');
   t('namespace-uri-for-prefix("t", *:r/*:override/*:sub)', 'test2', '');
   t('namespace-uri-for-prefix((), *:r/*:override/*:sub)', 'default', '');
-  t('string-join(in-scope-prefixes(*:r/*:override/*:sub),",")', 't,', '');
+  t('string-join(in-scope-prefixes(*:r/*:override/*:sub),",")', 'xml,,t', '');
   t('trace(152, "a")', '152', '');
   t('resolve-uri("/def", "http://www.example.com/a/b/c")', 'http://www.example.com/def', '');
   t('resolve-uri("#frag", "http://www.example.com/a/b/c")', 'http://www.example.com/a/b/c#frag', '');

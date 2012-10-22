@@ -2141,7 +2141,7 @@ end;
 
 function TEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 begin
-  if (defaultNamespaceKind in [xqdnkAny, xqdnkElementType]) {<- dynamic namespaces are only created from node constructors}
+  if ((defaultNamespaceKind in [xqdnkAny, xqdnkElementType]) or ((nsprefix <> '') and (defaultNamespaceKind <> xqdnkFunction))) {<- dynamic namespaces are only created from node constructors}
      and (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
   result := staticContext.findNamespace(nsprefix, defaultNamespaceKind);
 end;

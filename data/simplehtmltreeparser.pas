@@ -240,6 +240,7 @@ TTreeElementClass = class of TTreeElement;
 
 TTreeAttribute = class(TTreeElement)
   realvalue: string;
+  function isNamespaceNode: boolean;
   constructor create(const aname, avalue: string; const anamespace: TNamespace = nil);
 end;
 
@@ -358,6 +359,7 @@ var
 implementation
 uses xquery;
 
+
 { TAttributeEnumerator }
 
 function TAttributeEnumerator.GetCurrent: TTreeAttribute;
@@ -372,6 +374,11 @@ begin
 end;
 
 { TTreeAttribute }
+
+function TTreeAttribute.isNamespaceNode: boolean;
+begin
+  result := ((namespace = nil) and (value = 'xmlns')) or ((namespace <> nil) and (namespace.url = XMLNamespaceUrl_XMLNS));
+end;
 
 constructor TTreeAttribute.create(const aname, avalue: string; const anamespace: TNamespace = nil);
 begin
@@ -956,6 +963,22 @@ begin
   free;
 end;
 
+function namespaceUsedByNodeOrChild(n: ttreeelement; const url, prefix: string): boolean;
+var
+  m: TTreeElement;
+  attrib: TTreeAttribute;
+begin
+  m := n;
+  while m <> n.reverse do begin
+    if (m.namespace <> nil) and (m.namespace.prefix = prefix) and (m.namespace.url = url) then exit(true);
+    if m.attributes <> nil then
+       for attrib in m.attributes do
+         if (attrib.namespace <> nil) and (attrib.namespace.prefix = prefix) and (attrib.namespace.url = url) then exit(true);
+    m := m.next;
+  end;
+  result := false;
+end;
+
 function serializeXMLWrapper(base: TTreeElement; nodeSelf: boolean; insertLineBreaks: boolean): string;
 var knownPrefixes, knownURLs: TStringList;
   procedure addNamespace(const url, prefix: string);
@@ -964,14 +987,18 @@ var knownPrefixes, knownURLs: TStringList;
     knownURLs.Add(url);
   end;
 
-  function requireNamespace(n: TNamespace): string;
-  var
-    i: Integer;
+  function hasNamespace(const url, prefix: string): boolean;
+  var i: integer;
   begin
-    if n = nil then exit('');
     for i:=knownPrefixes.Count - 1 downto 0 do
-      if (knownPrefixes[i] = n.prefix) and (knownURLs[i] = n.url) then exit('');
-    if (n.url = XMLNamespaceUrl_XML) or (n.url = XMLNamespaceUrl_XMLNS) then exit('');
+      if (knownPrefixes[i] = prefix) and (knownURLs[i] = url) then exit(true);
+    if (url = XMLNamespaceUrl_XML) or (url = XMLNamespaceUrl_XMLNS) then exit(true);
+    result := false;
+  end;
+
+  function requireNamespace(n: TNamespace): string;
+  begin
+    if (n = nil) or (hasNamespace(n.url, n.prefix)) then exit('');
     if n.prefix = '' then result += ' xmlns="'+xmlStrEscape(n.url)+'"'
     else result += ' xmlns:'+n.prefix+'="'+xmlStrEscape(n.url)+'"';
     knownPrefixes.add(n.prefix);
@@ -999,8 +1026,16 @@ var knownPrefixes, knownURLs: TStringList;
         result := '<' + getNodeName();
         if attributes <> nil then
           for attrib in attributes do
-            if (attrib.getNamespaceURL() = XMLNamespaceUrl_XMLNS) then addNamespace(attrib.value, attrib.realvalue)
-            else if (attrib.namespace = nil) and (attrib.value = 'xmlns') then  addNamespace(attrib.value, '');
+            if attrib.isNamespaceNode then
+              if ((attrib.getNamespaceURL() = XMLNamespaceUrl_XMLNS) and not hasNamespace(attrib.realvalue, attrib.value) and namespaceUsedByNodeOrChild(n, attrib.realvalue, attrib.value)) then begin
+                addNamespace(attrib.realvalue, attrib.value);
+                result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue)+'"';
+                continue;
+              end else if ((attrib.namespace = nil) and (attrib.value = 'xmlns') and not hasNamespace(attrib.realvalue, '') and namespaceUsedByNodeOrChild(n, attrib.realvalue, '')) then begin
+                addNamespace(attrib.realvalue, '');
+                result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue)+'"';
+                continue;
+              end;
 
         result += requireNamespace(namespace);
         if attributes <> nil then
@@ -1009,11 +1044,10 @@ var knownPrefixes, knownURLs: TStringList;
 
 
         if attributes <> nil then
-          for attrib in attributes do begin
-            result += ' ';
-            if attrib.namespace <> nil then result += attrib.getNamespacePrefix()+':';
-            result += attrib.value+'="'+attrib.realvalue+'"'; //todo fix escaping & < >
-          end;
+          for attrib in attributes do
+            if not attrib.isNamespaceNode then
+              result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue)+'"';
+
         if next = reverse then begin
           result += '/>';
           if insertLineBreaks then Result+=LineEnding;
