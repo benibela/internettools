@@ -338,18 +338,19 @@ var
   sortingCache: TFPList;
   finalResult: IXQValue;
 
-  procedure evaluateForLoop(const pos:integer);
+  procedure evaluateForLoop(const pos: Integer);
     procedure continueWithValue(v: IXQValue; index: integer = 1);
     begin
-      tempContext.temporaryVariables.pushAll;
-      //sequenceTyp: TXQTermType;
-      tempContext.temporaryVariables.addVariable(vars[pos].varname, v, vars[pos].namespace);
       if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, context)) then
         raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
-      if vars[pos].positionVarname <> '' then ;
+
+      tempContext.temporaryVariables.pushAll;
+      tempContext.temporaryVariables.addVariable(vars[pos].varname, v, vars[pos].namespace);
+      if vars[pos].positionVarname <> '' then
         tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
       evaluateForLoop(pos+1);
-      tempContext.temporaryVariables.popAll;
+      tempContext.temporaryVariables.popAll();
+
     end;
 
    var tempSeq: IXQValue;
@@ -402,7 +403,14 @@ begin
   if length(orders) = 0 then sortingCache := nil
   else sortingCache := tfplist.Create;
 
+  {oldlen := length(tempContext.temporaryVariables.vars);
+  for i := 0 to high(vars) do begin
+    tempContext.temporaryVariables.addVariable(vars[i].varname, xqvalue(), vars[i].namespace);
+    if vars[i].positionVarname <> '' then
+      tempContext.temporaryVariables.addVariable(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
+  end;}
   evaluateForLoop(0);
+  //setlength(tempContext.temporaryVariables.vars, oldlen);
 
   if sortingCache <> nil then begin
     if sortingCache.Count > 0 then begin

@@ -101,7 +101,7 @@ var
   //    writeln(ps.debugtermToString(ps.FCurTerm));
     starttime := now;
     writeln(stderr, 'Timing '+s1+': ');
-    for i := 1 to 1000 do ps.evaluate(); //.toString;
+    for i := 1 to 200 do ps.evaluate(); //.toString;
     writeln('   => ', (now - starttime) * MSecsPerDay:5:5  );
     got := ps.evaluate().toString;
     if got<>s2 then
@@ -771,8 +771,10 @@ begin
   m('declare namespace abc = "123"; outer-xml(<hallo>{attribute {"abc:test"} {1234} ,"#"}</hallo>)', '<hallo xmlns:abc="123" abc:test="1234">#</hallo>');
   t('outer-xml(<hallo>{attribute {fn:QName("ans", "pref:test")} {1234} ,"#"}</hallo>)', '<hallo xmlns:pref="ans" pref:test="1234">#</hallo>');
   t('outer-xml(<hallo>{attribute {fn:QName("ans", "test")} {1234} ,"#"}</hallo>)', '<hallo xmlns:XXX="ans" XXX:test="1234">#</hallo>');
+  t('let $a := 7 let $a := $a + 10 return $a', '17');
 
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');
+  //timing('(for $i in (1 to 50), $j in (1 to 50)  return ($i))[0]', '');
 
   helper.free;
   xml.free;
