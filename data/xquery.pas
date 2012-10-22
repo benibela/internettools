@@ -3982,6 +3982,7 @@ begin
         nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
       end;
       newnode := getNextQueriedNode(nil, nodeCondition);
+      if newnode = nil then continue;
       j:=0;
       if (newSequence = nil) or not (newSequence is TXQValueSequence) then newSequence := TXQValueSequence.create(0);
       newSequenceSeq := (newSequence as TXQValueSequence).seq;

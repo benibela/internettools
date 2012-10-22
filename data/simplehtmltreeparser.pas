@@ -798,6 +798,7 @@ end;
 
 function TTreeElement.getRootHighest: TTreeElement;
 begin
+  if self = nil then exit(nil);
   result := document;
 end;
 

@@ -714,6 +714,11 @@ begin
   t('fn:local-name(processing-instruction PITarget {"PIcontent"})', 'PITarget');
   t('fn:name(processing-instruction PITarget {"PIcontent"})', 'PITarget');
   t('fn:local-name-from-QName(node-name(processing-instruction PITarget {"PIcontent"}))', 'PITarget');
+  t('empty(<e/>/../.)', 'true');
+  t('empty(<e/>/../..)', 'true');
+  t('empty(<e/>/../ (/) / ..)', 'true');
+  t('empty(<e/>/../ (/) / .. / root() / .. / . / (/) / ..)', 'true');
+  t('empty(fn:root(<e/>/..))', 'true');
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
 

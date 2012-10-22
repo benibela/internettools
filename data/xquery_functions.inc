@@ -1749,6 +1749,7 @@ begin
   requiredArgCount(args,0, 1);
   if length(args) = 1 then temp := args[0].toNode.getRootHighest()
   else temp := context.getRootHighest;
+  if temp = nil then exit;
   if temp.parent is TTreeDocument then result := xqvalue(temp.parent)
   else result := xqvalue(temp);
 end;
