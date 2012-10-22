@@ -704,6 +704,7 @@ begin
   t('outer-xml(element {"elem"} {"text"})', '<elem>text</elem>');
   t('outer-xml(element {(), "elem"} {"text"})', '<elem>text</elem>');
   t('outer-xml(element {"elem", ()} {"text"})', '<elem>text</elem>');
+  //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
   t('(# abc:def #) {123}', '123');
   t('(# abc:def "afas" #) {123}', '123');
   t('(# abc:def "afas#" #) {123}', '123');
@@ -734,7 +735,13 @@ begin
   t('for $x in (let $a := <a>0</a>, $b := <a>-1</a> return ($a, $b, <a>1</a>, <a>2</a>) intersect ($a, $b, <a>3</a>, <a>4</a>)) order by $x return $x', '-1 0' );
   t('element "a" {"b"}', 'b');
   t('document { document { element "a" {"b"}}}', 'b');
-  //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
+  t('outer-xml(<a xmlns="example">abc</a>)', '<a xmlns="example">abc</a>');
+  t('outer-xml(<test:a xmlns:test="123">abc</test:a>)', '<test:a xmlns:test="123">abc</test:a>');
+  m('declare namespace test = "foobar"; outer-xml(<test:a>abc</test:a>)', '<test:a xmlns:test="foobar">abc</test:a>');
+  m('declare default element namespace "www.example.org"; outer-xml(<a xmlns="www.example.org">abc</a>)', '<a xmlns="www.example.org">abc</a>');
+  m('declare namespace test = "foobar"; outer-xml(<test:a xmlns:test="123">abc</test:a>)', '<test:a xmlns:test="123">abc</test:a>');
+  m('declare namespace test = "foobar"; declare namespace abc = "def";  outer-xml(<test:a><abc:xyz/></test:a>)', '<test:a xmlns:test="foobar"><abc:xyz xmlns:abc="def"/></test:a>');
+  m('declare namespace test = "foobar"; declare namespace abc = "def";  outer-xml(<test:a abc:u=""><abc:xyz/></test:a>)', '<test:a xmlns:test="foobar" xmlns:abc="def" abc:u=""><abc:xyz/></test:a>');
 
 
 

@@ -214,6 +214,7 @@ TTreeElement = class
 
   function clone: TTreeElement;
 protected
+  function serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
   function cloneShallow: TTreeElement;
 
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
@@ -656,54 +657,13 @@ begin
 end;
 
 function TTreeElement.outerXML(insertLineBreaks: boolean = false): string;
-var attrib: TTreeAttribute;
 begin
-  if self = nil then exit;
-  case typ of
-    tetText: result := xmlStrEscape(value);
-    tetClose: result := '</'+getNodeName()+'>';
-    tetComment: result := '<!--'+value+'-->';
-    tetProcessingInstruction: begin
-      result := '<?'+value;
-      if attributes <> nil then result += ' '+getAttribute('');
-      result += '?>';
-    end;
-    tetOpen: begin
-      if (value = '') and (self is TTreeDocument) then exit(innerXML());
-      result := '<' + getNodeName();
-      if attributes <> nil then
-        for attrib in attributes do begin
-          result += ' ';
-          if attrib.namespace <> nil then result += attrib.getNamespacePrefix()+':';
-          result += attrib.value+'="'+attrib.realvalue+'"'; //todo fix escaping & < >
-        end;
-      if next = reverse then begin
-        result += '/>';
-        if insertLineBreaks then Result+=LineEnding;
-        exit();
-      end;
-      result +='>';
-      if insertLineBreaks then Result+=LineEnding;
-      result += innerXML(insertLineBreaks);
-      result+='</'+value+'>';
-      if insertLineBreaks then Result+=LineEnding;
-    end;
-    tetDocument: result := innerXML(insertLineBreaks);
-  end;
+  result := serializeXML(true, insertLineBreaks);
 end;
 
 function TTreeElement.innerXML(insertLineBreaks: boolean = false): string;
-var
-  sub: TTreeElement;
 begin
-  result := '';
-  if (self = nil) or not (typ in TreeNodesWithChildren) then exit;
-  sub := next;
-  while sub <> reverse do begin
-    result += sub.outerXML(insertLineBreaks);
-    if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
-    else sub := sub.reverse.next;
-  end;
+  result := serializeXML(false, insertLineBreaks);
 end;
 
 function TTreeElement.getValue(): string;
@@ -996,6 +956,110 @@ begin
   free;
 end;
 
+function serializeXMLWrapper(base: TTreeElement; nodeSelf: boolean; insertLineBreaks: boolean): string;
+var knownPrefixes, knownURLs: TStringList;
+  procedure addNamespace(const url, prefix: string);
+  begin
+    knownPrefixes.Add(prefix);
+    knownURLs.Add(url);
+  end;
+
+  function requireNamespace(n: TNamespace): string;
+  var
+    i: Integer;
+  begin
+    if n = nil then exit('');
+    for i:=knownPrefixes.Count - 1 downto 0 do
+      if (knownPrefixes[i] = n.prefix) and (knownURLs[i] = n.url) then exit('');
+    if (n.url = XMLNamespaceUrl_XML) or (n.url = XMLNamespaceUrl_XMLNS) then exit('');
+    if n.prefix = '' then result += ' xmlns="'+xmlStrEscape(n.url)+'"'
+    else result += ' xmlns:'+n.prefix+'="'+xmlStrEscape(n.url)+'"';
+    knownPrefixes.add(n.prefix);
+    knownURLs.Add(n.url);
+  end;
+
+  function inner(n: TTreeElement): string; forward;
+
+  function outer(n: TTreeElement): string;
+  var attrib: TTreeAttribute;
+      oldnamespacecount: integer;
+  begin
+    with n do
+    case typ of
+      tetText: result := xmlStrEscape(value);
+      tetClose: result := '</'+getNodeName()+'>';
+      tetComment: result := '<!--'+value+'-->';
+      tetProcessingInstruction: begin
+        result := '<?'+value;
+        if attributes <> nil then result += ' '+getAttribute('');
+        result += '?>';
+      end;
+      tetOpen: begin
+        oldnamespacecount:=knownPrefixes.Count;
+        result := '<' + getNodeName();
+        if attributes <> nil then
+          for attrib in attributes do
+            if (attrib.getNamespaceURL() = XMLNamespaceUrl_XMLNS) then addNamespace(attrib.value, attrib.realvalue)
+            else if (attrib.namespace = nil) and (attrib.value = 'xmlns') then  addNamespace(attrib.value, '');
+
+        result += requireNamespace(namespace);
+        if attributes <> nil then
+          for attrib in attributes do
+            result += requireNamespace(attrib.namespace);
+
+
+        if attributes <> nil then
+          for attrib in attributes do begin
+            result += ' ';
+            if attrib.namespace <> nil then result += attrib.getNamespacePrefix()+':';
+            result += attrib.value+'="'+attrib.realvalue+'"'; //todo fix escaping & < >
+          end;
+        if next = reverse then begin
+          result += '/>';
+          if insertLineBreaks then Result+=LineEnding;
+          exit();
+        end;
+        result +='>';
+        if insertLineBreaks then Result+=LineEnding;
+        result += inner(n);
+        result+='</'+n.getNodeName()+'>';
+        if insertLineBreaks then Result+=LineEnding;
+        while knownPrefixes.count > oldnamespacecount do begin
+          knownPrefixes.Delete(knownPrefixes.count-1);
+          knownURLs.Delete(knownURLs.count-1);
+        end;
+      end;
+      tetDocument: result := innerXML(insertLineBreaks);
+    end;
+  end;
+
+  function inner(n: TTreeElement): string;
+  var sub: TTreeElement;
+  begin
+    result := '';
+    if not (n.typ in TreeNodesWithChildren) then exit;
+    sub := n.next;
+    while sub <> n.reverse do begin
+      result += outer(sub);
+      if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
+      else sub := sub.reverse.next;
+    end;
+  end;
+begin
+  knownPrefixes := TStringList.Create;
+  knownURLs := tstringlist.Create;
+  if nodeSelf then result := outer(base)
+  else result := inner(base);
+  knownURLs.Free;
+  knownPrefixes.free;
+end;
+
+function TTreeElement.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
+
+begin
+  if self = nil then exit('');
+  result := serializeXMLWrapper(self, nodeSelf, insertLineBreaks);
+end;
 
 function TTreeElement.cloneShallow: TTreeElement;
 begin
