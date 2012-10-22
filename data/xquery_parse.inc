@@ -1177,7 +1177,7 @@ begin
   if token = 'xquery' then begin
     requireXQuery();
     expect(token); expect('version');
-    expect('"1.0"');
+    if parseStringLiteral <> '1.0' then raiseParsingError('Invalid xquery version, need 1.0');
     token := nextToken(true);
     if token = 'encoding' then begin
       expect(token);

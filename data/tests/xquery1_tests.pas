@@ -725,6 +725,7 @@ begin
   t('every $i as xs:integer  in (1,2,3) satisfies $i eq 2', 'false');
   t('some $i as xs:integer  in (1,2,3), $j as xs:integer  in (1,2,3)  satisfies $i eq $j', 'true');
   t('every $i as xs:integer  in (1,2,3), $j as xs:integer  in (1,2,3)  satisfies $i eq $j', 'false');
+  m('xquery version ''1.0''; 1+2+3', '6');
   //t('outer-xml(element {"elem", "ent"} {"text"})', '<elem>text</elem>'); should be error
 
 
