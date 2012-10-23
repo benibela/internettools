@@ -1866,14 +1866,14 @@ begin
   sl.add('xml');
   try
     while el <> nil do begin
-      if (el.namespace <> nil) and (sl.IndexOf(el.namespace.prefix) = -1) then sl.Add(el.namespace.prefix);
+      if (el.namespace <> nil) and (sl.IndexOf(el.namespace.getPrefix) = -1) then sl.Add(el.namespace.getPrefix);
       if el.attributes <> nil then
         for attrib in el.attributes do
           if (attrib.value = 'xmlns') and (attrib.getNamespaceURL() = '') then begin
             if sl.IndexOf('') = -1 then sl.add('');
           end else if attrib.getNamespaceURL() = XMLNamespaceURL_XMLNS then begin
             if sl.IndexOf(attrib.value) = -1 then sl.add(attrib.value);
-          end else if (attrib.namespace <> nil) and (sl.IndexOf(attrib.namespace.prefix) = -1) then sl.Add(attrib.namespace.prefix);
+          end else if (attrib.namespace <> nil) and (sl.IndexOf(attrib.namespace.getPrefix) = -1) then sl.Add(attrib.namespace.getPrefix);
       el := el.getParent();
     end;
     if sl.count = 0 then exit

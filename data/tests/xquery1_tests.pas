@@ -20,8 +20,8 @@ type
   func1, func2, func3: TXQTerm;
   constructor create;
   destructor Destroy; override;
-  procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const variable: string; var value: IXQValue);
-  procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const functionName: string; var value: TXQValueFunction);
+  procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue);
+  procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const functionName: string; var value: TXQValueFunction);
 end;
 
 procedure unittests;
@@ -816,7 +816,7 @@ begin
   inherited Destroy;
 end;
 
-procedure THelper.DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;
+procedure THelper.DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;
   const variable: string; var value: IXQValue);
 begin
   case variable of
@@ -824,11 +824,11 @@ begin
   'test-import2': value := xqvalue('hallo');
   'test-importNS':
     if namespace = nil then value := xqvalue()
-    else value := xqvalue(namespace.url);
+    else value := xqvalue(namespace.getURL);
   end;
 end;
 
-procedure THelper.DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;
+procedure THelper.DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;
   const functionName: string; var value: TXQValueFunction);
 begin
   case functionName of

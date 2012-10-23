@@ -2498,7 +2498,6 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('/r', '', '!<r xmlns="foobar">test</r>');
   ps.StaticContext.defaultElementTypeNamespace := TNamespace.create('foobar', '');
   t('/r', 'test');
-  FreeAndNil(ps.StaticContext.defaultElementTypeNamespace);
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")

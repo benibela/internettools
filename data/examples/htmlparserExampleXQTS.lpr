@@ -235,7 +235,7 @@ type
 { TVariableProvider }
 
  TVariableProvider = class
-  procedure getvar(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace;  const variable: string; var value: IXQValue);
+  procedure getvar(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue);
 end;
 
 var CATALOG_TEMPLATE: string;
@@ -270,7 +270,7 @@ var htp: THtmlTemplateParser;
 
 { TVariableProvider }
 
-procedure TVariableProvider.getvar(sender: TObject; const context: TXQStaticContext; const namespace: TNamespace; const variable: string;
+procedure TVariableProvider.getvar(sender: TObject; const context: TXQStaticContext; const namespace: INamespace; const variable: string;
   var value: IXQValue);
 begin
   value := pxp.VariableChangelog.getVariableValue(variable);
@@ -356,7 +356,7 @@ begin
         inputfilevar := node.getAttribute('variable');
         inputfile := node.deepNodeText();
         if inputfile = 'id-idref-dtd' then begin inputfile:='id'; pxp.StaticContext.defaultElementTypeNamespace := TNamespace.create('http://www.w3.org/XQueryTest/ididrefs', ''); end
-        else freeandnil(pxp.StaticContext.defaultElementTypeNamespace);
+        else pxp.StaticContext.defaultElementTypeNamespace := nil;
         if striEqual(node.getNodeName(), 'input-URI') then
           pxp.VariableChangelog.addVariable(inputfilevar,  GetCurrentDir + DirectorySeparator + 'TestSources/'+inputfile+'.xml')
         else begin

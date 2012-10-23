@@ -299,7 +299,7 @@ end;
 function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
 var word: string;
   index: Integer;
-  namespace: TNamespace;
+  namespace: INamespace;
 begin
   word := nextToken();
 
@@ -325,7 +325,7 @@ begin
   end else begin;
     staticContext.splitRawQName(namespace, word, xqdnkType);
     if (namespace = nil) then raiseParsingError('No schemas loaded for type '+word);
-    if namespace.url <> XMLNamespaceURL_XMLSchema then raiseParsingError('Invalid schema loaded: '+namespace.url+' by '+word);
+    if namespace.getURL <> XMLNamespaceURL_XMLSchema then raiseParsingError('Invalid schema loaded: '+namespace.getURL+' by '+word);
     result.kind:=tikAtomic;
     index := types.IndexOf(word);
     if index < 0 then raise Exception.Create('Unknown type: '+word);
@@ -345,7 +345,7 @@ begin
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
-  procedure parseVariableName(out name: string; out namespace: TNamespace);
+  procedure parseVariableName(out name: string; out namespace: INamespace);
   begin
     name := nextToken;
     if name = '' then raiseParsingError('Expected variable name');
@@ -1096,7 +1096,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     if module = nil then raiseParsingError('Unknown module: '+moduleURL);
     if staticContext.importedModules = nil then
       staticContext.importedModules := TStringList.Create;
-    if moduleName = '' then moduleName := module.staticContext.moduleNamespace.prefix;
+    if moduleName = '' then moduleName := module.staticContext.moduleNamespace.getPrefix;
     staticContext.importedModules.AddObject(moduleName, module);
   end;
 
@@ -1170,7 +1170,7 @@ var
   nameSpaceName: String;
   nameSpaceURL: String;
   temp: String;
-  namespace: TNamespace;
+  namespace: INamespace;
 begin
   result := nil;
   token := nextToken(true);
@@ -1192,9 +1192,9 @@ begin
     requireModule;
     expect(token); expect('namespace');
     staticContext.moduleNamespace := TNamespace.create('', nextToken());
-    if system.pos(':', staticContext.moduleNamespace.prefix) > 0 then raiseParsingError('Namespace id must not begin with a namespace prefix itself');
+    if system.pos(':', staticContext.moduleNamespace.getPrefix) > 0 then raiseParsingError('Namespace id must not begin with a namespace prefix itself');
     expect('=');
-    staticContext.moduleNamespace.url := parseStringLiteral;
+    (staticContext.moduleNamespace as TNamespace).url := parseStringLiteral;
     expect(';');
     token := nextToken(true);
   end;

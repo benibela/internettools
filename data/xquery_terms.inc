@@ -71,13 +71,13 @@ end;
 
 { TXQTermDefineVariable }
 
-constructor TXQTermDefineVariable.create(avarname: string; anamespace: TNamespace);
+constructor TXQTermDefineVariable.create(avarname: string; anamespace: INamespace);
 begin
   variablename := avarname;
   namespace := anamespace;
 end;
 
-constructor TXQTermDefineVariable.create(varname: TXQTerm; anamespace: TNamespace; value: TXQTerm);
+constructor TXQTermDefineVariable.create(varname: TXQTerm; anamespace: INamespace; value: TXQTerm);
 begin
   if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).debugTermToString
   else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
@@ -145,7 +145,7 @@ end;
 function TXQTermSequenceType.castAs(v: IXQValue; const context: TEvaluationContext): IXQValue;
 var
   temp: String;
-  ns: TNamespace;
+  ns: INamespace;
 begin
   if not isSingleType() then raiseEvaluationError('need singletype for cast as');
   v := xqvalueAtomize(v);
@@ -458,7 +458,7 @@ begin
   index := aindex;
 end;
 
-constructor TXQTermNamedFunction.create(const ns: TNamespace; const name: string);
+constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string);
 begin
   if not findKindIndex(ns, name, kind, index) then begin
     kind := xqfkUnknown;
@@ -467,7 +467,7 @@ begin
   end;
 end;
 
-constructor TXQTermNamedFunction.create(const ns: TNamespace; const name: string; args: array of TXQTerm);
+constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string; args: array of TXQTerm);
 begin
   create(ns, name);
   push(args);
@@ -477,7 +477,7 @@ class function TXQTermNamedFunction.createIfExists(const name: string; const sc:
 var akind: TXQTermNamedFunctionKind;
     aindex: integer;
     localName: string;
-    ns: TNamespace;
+    ns: INamespace;
 begin
   localName:=name;
   sc.splitRawQName(ns, localName, xqdnkFunction);
@@ -494,7 +494,7 @@ var
   func: TXQValueFunction;
   moduleIndex: Integer;
   sc: TXQStaticContext;
-  ns: TNamespace;
+  ns: INamespace;
   temp: String;
 begin
   evaluateChildren(context, evilkids);
@@ -531,7 +531,7 @@ begin
         for i := 0 to high(sc.functions) do
           if (sc.functions[i].name = funcname)
              and  (length(sc.functions[i].parameters) = length(children))
-             and ((sc.functions[i].namespace = ns) or ((ns <> nil) and (sc.functions[i].namespace <> nil) and (sc.functions[i].namespace.url = ns.url))) then begin
+             and ((sc.functions[i].namespace = ns) or ((ns <> nil) and (sc.functions[i].namespace <> nil) and (sc.functions[i].namespace.getURL = ns.getURL))) then begin
             func := sc.functions[i];
             break;
           end;
@@ -552,17 +552,17 @@ end;
 
 procedure xqFunctionGeneralConstructor(args: TXQVArray; var result: IXQValue);forward;
 
-class function TXQTermNamedFunction.findKindIndex(const ns: TNamespace; const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer): boolean;
+class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer): boolean;
 var
   i: Integer;
 begin
   if (ns = nil) then exit(false);
 
-  if (ns.url = XMLNamespaceURL_XPathFunctions) or (ns.url = XMLNamespaceURL_MyExtensions) then begin
+  if (ns.getURL = XMLNamespaceURL_XPathFunctions) or (ns.getURL = XMLNamespaceURL_MyExtensions) then begin
     aindex := basicFunctions.IndexOf(name);
     if aindex >= 0 then begin
       if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
-        if ns.url <> XMLNamespaceURL_MyExtensions then exit(false);
+        if ns.getURL <> XMLNamespaceURL_MyExtensions then exit(false);
         akind:=xqfkTypeConstructor;
         aindex:=types.indexof(name);;
         exit(true);
@@ -577,7 +577,7 @@ begin
       exit(true);
     end;
   end;
-  if (ns.url = XMLNamespaceURL_XMLSchema) or (ns.url = XMLNamespaceURL_MyExtensions)  then begin
+  if (ns.getURL = XMLNamespaceURL_XMLSchema) or (ns.getURL = XMLNamespaceURL_MyExtensions)  then begin
     aindex := basicFunctions.IndexOf('xs:'+name);
     if aindex >= 0 then
       if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
@@ -587,7 +587,7 @@ begin
       end;
 
     exit(false);
-  end else if ns.url = XMLNamespaceURL_MyExtensionOperators then begin;
+  end else if ns.getURL = XMLNamespaceURL_MyExtensionOperators then begin;
     aindex := -1;
     for i:=0 to  binaryOpFunctions.Count-1 do
       if strContains(name, binaryOpFunctions[i]) then begin
@@ -829,7 +829,7 @@ var
   testNS: Boolean;
   readvalue: String;
   readnamespace: String;
-  temp: TNamespace;
+  temp: INamespace;
   i: Integer;
   attrib: TTreeAttribute;
 begin
@@ -854,7 +854,7 @@ begin
     testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
     if testNS then begin
       temp := context.findNamespace(readnamespace, xqdnkUnknown);
-      if temp <> nil then readnamespace:=temp.url;
+      if temp <> nil then readnamespace:=temp.getURL;
     end;
     for i := 0 to tempel.attributes.Count - 1 do begin
       attrib := tempel.attributes.items[i];
@@ -889,7 +889,7 @@ function TXQTermVariable.evaluate(const context: TEvaluationContext): IXQValue;
 var
   temp: TXQValue;
   sc: TXQStaticContext;
-  ns: TNamespace;
+  ns: INamespace;
 begin
   ns := namespace;
   if context.temporaryVariables <> nil then begin
@@ -1017,7 +1017,7 @@ var
     if kid.reverse <> nil then lastKid := kid.reverse
     else lastKid := kid;
   end;
-  function declareNewNamespace(const url, prefix: string): TNamespace;
+  function declareNewNamespace(const url, prefix: string): INamespace;
   begin
     if (subcontext^.namespaces = nil) then begin
       new(subcontext);
@@ -1025,7 +1025,7 @@ var
       subcontext^.namespaces := TNamespaceList.Create;
     end;
     result := subcontext^.findNamespace(prefix, xqdnkAny);
-    if (result <> nil) and (result.url = url) then begin
+    if (result <> nil) and (result.getURL = url) then begin
       subcontext^.namespaces.Add(result);
       exit;
     end;
@@ -1042,7 +1042,7 @@ var
     kid.parent := tree;
     case kid.typ of
       tetAttribute: begin
-        if ((kid.namespace = nil) and (kid.value = 'xmlns')) or ((kid.namespace <> nil) and (kid.namespace.url = XMLNamespaceUrl_XMLNS)) then begin
+        if ((kid.namespace = nil) and (kid.value = 'xmlns')) or ((kid.namespace <> nil) and (kid.namespace.getURL = XMLNamespaceUrl_XMLNS)) then begin
           if kid.namespace = nil then declareNewNamespace(TTreeAttribute(kid).realvalue, '')
           else declareNewNamespace(TTreeAttribute(kid).realvalue, kid.value);
         end;
@@ -1200,7 +1200,6 @@ begin
   end;
   result := xqvalue(tree);
   if subcontext <> @context then begin
-    subcontext^.namespaces.clearNoFree;
     subcontext^.namespaces.free;
     Dispose(subcontext);
   end else if context.namespaces <> nil then
