@@ -836,6 +836,17 @@ begin
   t('let $x := element a { "xyz" } return <element>{$x, $x}</element>', 'xyzxyz');
   t('outer-xml(let $x := element a { "xyz" } return <element>{$x, $x}</element>)', '<element><a>xyz</a><a>xyz</a></element>');
   t('let $x := attribute a { "xyz" } return <element>{$x, $x}</element>', '');
+
+  t('let $x := <a/> return deep-equal($x, $x)', 'true');
+  t('let $x := <abc/> return deep-equal($x, $x)', 'true');
+  t('let $x := <abc/> return deep-equal($x, ($x, 123))', 'false');
+  t('let $x := <abc/> return deep-equal(($x, 123), ($x, 123))', 'true');
+  t('let $x := <abc/> return deep-equal(($x, <h>123</h>), ($x, <h>123</h>))', 'true');
+  t('let $x := <abc/> return deep-equal(($x, <h>123<foo/></h>), ($x, <h>123</h>))', 'false');
+  t('let $x := <abc/> return deep-equal(($x, <h>123<foo/></h>), ($x, <h>123<foo/></h>))', 'true');
+  t('let $x := <abc/> return deep-equal(($x, <h>123<foo/></h>), ($x, <h>123<foo>123</foo></h>))', 'false');
+  t('let $x := <abc/> return deep-equal(($x, <h>123<foo>{$x}</foo></h>), ($x, <h>123<foo>{$x}</foo></h>))', 'true');
+  t('let $x := <abc/> return deep-equal(($x, <h>123<foo>{$x}</foo></h>), ($x, <h>123<foo t="a">{$x}</foo></h>))', 'false');
   //t('outer-xml(let $x := attribute a { "xyz" } return <element>{$x, $x}</element>)', '<element a="xyz" a="xyz"/>');
 
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');

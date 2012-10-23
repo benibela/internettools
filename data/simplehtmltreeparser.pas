@@ -736,6 +736,7 @@ begin
     tetText, tetClose, tetComment, tetProcessingInstruction: result := next;
     else raise Exception.Create('Invalid tree element type');
   end;
+  if result = nil then exit;
   if result.typ = tetClose then exit(nil);
 end;
 
@@ -825,9 +826,11 @@ begin
   result := false;
   if typ <> cmpTo.typ then exit();
   if not cmpFunction(value, cmpTo.value) then exit;
-  if not cmpFunction(getNamespaceURL(), cmpto.getNamespaceURL()) then exit;
+  if getNamespaceURL() <> cmpto.getNamespaceURL() then exit;
   case typ of
-    tetAttribute: if not cmpFunction(value, TTreeAttribute(cmpTo).value) or not cmpFunction(TTreeAttribute(self).realvalue, TTreeAttribute(cmpTo).realvalue) then exit;
+    tetAttribute:
+      if    not cmpFunction(value, TTreeAttribute(cmpTo).value)
+         or not cmpFunction(TTreeAttribute(self).realvalue, TTreeAttribute(cmpTo).realvalue) then exit;
     tetProcessingInstruction: if getAttribute('') <> cmpTo.getAttribute('') then exit;
     tetOpen, tetDocument: begin
       if (next = reverse) <> (cmpTo.next = cmpTo.reverse) then exit;
@@ -841,13 +844,16 @@ begin
       temp1 := next; temp2 := cmpTo.next;
       while (temp1 <> nil) and (temp1.typ in ignoredTypes) do temp1 := temp1.getNextSibling();
       while (temp2 <> nil) and (temp2.typ in ignoredTypes) do temp2 := temp2.getNextSibling();
-      while (temp1 <> nil) and (temp2 <> nil) do begin
+      while (temp1 <> nil) and (temp1 <> reverse) and (temp2 <> nil) and (temp2 <> cmpTo.reverse) do begin
         if not temp1.isDeepEqual(temp2, ignoredTypes, cmpFunction) then exit;
         temp1 := temp1.getNextSibling();
         temp2 := temp2.getNextSibling();
-        while (temp1 <> nil) and (temp1.typ in ignoredTypes) do temp1 := temp1.getNextSibling();
-        while (temp2 <> nil) and (temp2.typ in ignoredTypes) do temp2 := temp2.getNextSibling();
+        while (temp1 <> nil) and (temp1 <> reverse) and (temp1.typ in ignoredTypes) do temp1 := temp1.getNextSibling();
+        while (temp2 <> nil) and (temp2 <> cmpto.reverse) and (temp2.typ in ignoredTypes) do temp2 := temp2.getNextSibling();
       end;
+      if temp1 = reverse then temp1 := nil;
+      if temp2 = cmpTo.reverse then temp2 := nil;
+      if (temp1 <> nil) <> (temp2 <> nil) then exit;
     end;
     tetComment, tetText, tetClose: ;
     else raise ETreeParseException.Create('Invalid node type');
