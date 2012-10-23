@@ -812,6 +812,7 @@ begin
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; element foobar { } instance of element(pre1:foobar)', 'false');
   t('element foobar { } instance of element(*)', 'true');
   t('element foobar { } instance of element(*, xs:anyType)', 'true');
+  t('element foobar { } instance of element(*, xs:untyped)', 'true');
   t('element foobar { } instance of element(*, xs:integer)', 'false');
   t('element foobar { } instance of attribute()', 'false');
   t('element foobar { } instance of attribute(*)', 'false');

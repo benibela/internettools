@@ -1352,7 +1352,7 @@ end;
 
 class function TXQValue_float.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_float then result := txqvalue_anyatomictype
+  if classtype = TXQValue_float then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -1466,7 +1466,7 @@ end;
 
 class function TXQValue_double.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_double then result := txqvalue_anyatomictype
+  if classtype = TXQValue_double then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -1579,7 +1579,7 @@ end;
 
 class function TXQValue_untypedAtomic.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_untypedAtomic then result := txqvalue_anyatomictype
+  if classtype = TXQValue_untypedAtomic then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -1624,6 +1624,106 @@ TXQueryEngine.registerType(TXQValue_untypedAtomic);
 
 t('xs:untypedAtomic(''abc'')', 'abc', '');
 t('type-of(xs:untypedAtomic(''abc''))', 'untypedAtomic', '');
+
+{$endif}
+
+
+
+
+
+
+
+
+{$ifdef PXP_DERIVED_TYPES_INTERFACE}
+//** Type for the XPath type untyped. (automatic generated)
+type TXQValue_untyped = class (TXQValueString)
+  constructor create(const v: TXQ_string); override;
+  class function classTypeName: string; override;
+  class function createFromValue(const v: IXQValue): IXQValue; override;
+    class function classParentNonBlocked: TXQValueClass; override; 
+  
+  class function canCreateFromstring(const v: TXQ_string): boolean; override;
+  
+  
+end;
+{$endif}
+
+{$ifdef PXP_DERIVED_TYPES_IMPLEMENTATION}
+ const RegExpruntyped: TRegexpr = nil;
+
+constructor TXQValue_untyped.create(const v: TXQ_string);
+
+begin
+  
+
+  
+
+  
+  str := trim(v); //trim all derived types
+  
+  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type untyped');
+  
+
+  
+end;
+class function TXQValue_untyped.classTypeName: string;
+begin
+  result := 'untyped';
+end;
+class function TXQValue_untyped.createFromValue(const v: IXQValue): IXQValue;
+begin
+  
+  exit(TXQValue_untyped.create(v.tostring));
+  result := inherited; ignore(v);
+end;
+
+class function TXQValue_untyped.classParentNonBlocked: TXQValueClass;
+begin
+  if classtype = TXQValue_untyped then result := txqvalue_anyType 
+  else result := TXQValueClass(classParent);
+end;
+
+
+
+
+class function TXQValue_untyped.canCreateFromstring(const v: TXQ_string): boolean;
+begin
+  result := true; ignore(v);
+  
+  
+  if (RegExpruntyped = nil) then RegExpruntyped := tregexpr.create('.*');
+  result := RegExpruntyped.exec(v);
+  
+  
+
+end;
+
+
+
+
+
+
+
+{$endif}
+
+
+
+
+
+{$ifdef PXP_DERIVED_TYPES_REGISTRATION}
+TXQueryEngine.registerType(TXQValue_untyped);
+{$endif}
+
+{$ifdef PXP_DERIVED_TYPES_FINALIZATION}
+ RegExpruntyped.free; 
+{$endif}
+
+{$ifdef PXP_DERIVED_TYPES_UNITTESTS}
+
+
+
+t('xs:untyped(''abc'')', 'abc', '');
+t('type-of(xs:untyped(''abc''))', 'untyped', '');
 
 {$endif}
 
@@ -2525,7 +2625,7 @@ end;
 
 class function TXQValue_anyURI.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_anyURI then result := txqvalue_anyatomictype
+  if classtype = TXQValue_anyURI then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -2652,7 +2752,7 @@ end;
 
 class function TXQValue_QName.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_QName then result := txqvalue_anyatomictype
+  if classtype = TXQValue_QName then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -2779,7 +2879,7 @@ end;
 
 class function TXQValue_NOTATION.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_NOTATION then result := txqvalue_anyatomictype
+  if classtype = TXQValue_NOTATION then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3143,7 +3243,7 @@ end;
 
 class function TXQValue_time.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_time then result := txqvalue_anyatomictype
+  if classtype = TXQValue_time then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3252,7 +3352,7 @@ end;
 
 class function TXQValue_date.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_date then result := txqvalue_anyatomictype
+  if classtype = TXQValue_date then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3361,7 +3461,7 @@ end;
 
 class function TXQValue_gYear.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_gYear then result := txqvalue_anyatomictype
+  if classtype = TXQValue_gYear then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3470,7 +3570,7 @@ end;
 
 class function TXQValue_gYearMonth.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_gYearMonth then result := txqvalue_anyatomictype
+  if classtype = TXQValue_gYearMonth then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3579,7 +3679,7 @@ end;
 
 class function TXQValue_gMonthDay.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_gMonthDay then result := txqvalue_anyatomictype
+  if classtype = TXQValue_gMonthDay then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3688,7 +3788,7 @@ end;
 
 class function TXQValue_gMonth.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_gMonth then result := txqvalue_anyatomictype
+  if classtype = TXQValue_gMonth then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3797,7 +3897,7 @@ end;
 
 class function TXQValue_gDay.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_gDay then result := txqvalue_anyatomictype
+  if classtype = TXQValue_gDay then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -3906,7 +4006,7 @@ end;
 
 class function TXQValue_duration.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_duration then result := txqvalue_anyatomictype
+  if classtype = TXQValue_duration then result :=  txqvalue_anyatomictype
   else result := TXQValueClass(classParent);
 end;
 
@@ -4267,6 +4367,8 @@ t('xs:time("23:59:59") instance of datetime','false','');
 
 t('xs:untypedAtomic("abc") instance of string','false','');
 t('string("def") instance of xs:untypedAtomic','false','');
+t('xs:untyped("abc") instance of string','false','');
+t('string("def") instance of xs:untyped','false','');
 
 //castable as
 t('xs:byte(1) castable as byte','true','');
@@ -4304,6 +4406,7 @@ t('xs:time("12:00:00") castable as date','false','');
 t('xs:time("12:12:59") castable as untypedAtomic','true','');
 t('xs:date("2000-01-01") castable as untypedAtomic','true','');
 t('0.5 castable as untypedAtomic','true','');
+t('0.5 castable as untyped','true','');
 t('xs:untypedAtomic("0.5") castable as float','true','');
 t('xs:untypedAtomic("abc") castable as float','false','');
 t('xs:untypedAtomic("abc") castable as string','true','');

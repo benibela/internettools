@@ -261,10 +261,18 @@ type
   end;
   PXQValue = ^TXQValue;
 
+    { TXQValue_AnyType }
+
+  //**Useless type in the XPath type hierarchy
+  TXQValue_AnyType = class(TXQValue)
+  protected
+    class function classTypeName: string; override;
+  end;
+
   { TXQValue_AnySimpleType }
 
   //**Useless type in the XPath type hierarchy
-  TXQValue_AnySimpleType = class(TXQValue)
+  TXQValue_AnySimpleType = class(TXQValue_AnyType)
   protected
     class function classTypeName: string; override;
   end;
@@ -1955,6 +1963,13 @@ function xqvalue(v: TTreeElement): IXQValue;
 begin
   if v = nil then exit(xqvalue());
   result := TXQValueNode.Create(v);
+end;
+
+{ TXQValue_AnyType }
+
+class function TXQValue_AnyType.classTypeName: string;
+begin
+  Result:='anyType';
 end;
 
 { TXQStaticContext }
@@ -4119,8 +4134,14 @@ begin
        or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.next.getNamespaceURL())) then
          exit(false);
   end;
-  if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(xqvalueAtomize(xqvalue(node)))) then
+  if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(xqvalue(node))) then begin
+    if nodeCondition.requiredType.isSingleType() then
+      case node.typ of
+        tetOpen: exit(TXQValue_untyped.instanceOf(nodeCondition.requiredType.atomicTypeInfo));
+        else exit(TXQValue_untypedAtomic.instanceOf(nodeCondition.requiredType.atomicTypeInfo));
+      end;
     exit(false);
+  end;
   result := true;
 end;
 
