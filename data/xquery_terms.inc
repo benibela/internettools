@@ -502,18 +502,13 @@ begin
   assert((kind = xqfkUnknown) or (index >= 0));
 
   case kind of
-    xqfkBasic: begin
-      result := xqvalue();
-      PXQBasicFunctionInfo(basicFunctions.Objects[index])^.func(evilkids, result)
-    end;
-    xqfkComplex: begin
-      result := xqvalue();
-      PXQComplexFunctionInfo(complexFunctions.Objects[index])^.func(context, evilkids, result);
-    end;
+    xqfkBasic:
+      result := PXQBasicFunctionInfo(basicFunctions.Objects[index])^.func(evilkids);
+    xqfkComplex:
+      result := PXQComplexFunctionInfo(complexFunctions.Objects[index])^.func(context, evilkids);
     xqfkWrappedOperator: begin
       if length(evilkids) <> 2 then raiseEvaluationError('Need two arguments for function: op:' + binaryOpFunctions[index]);
-      result := xqvalue();
-      TXQBinaryOp(binaryOpFunctions.Objects[index])(context, evilkids[0], evilkids[1], result);
+      result := TXQBinaryOp(binaryOpFunctions.Objects[index])(context, evilkids[0], evilkids[1]);
     end;
     xqfkTypeConstructor:
       if TXQValueClass(types.Objects[index]).InheritsFrom(TXQValue_QName) then begin
@@ -550,7 +545,11 @@ begin
   end;
 end;
 
-procedure xqFunctionGeneralConstructor(args: TXQVArray; var result: IXQValue);forward;
+function xqFunctionGeneralConstructor(const args: TXQVArray): IXQValue;
+begin
+  ignore(args); result := nil;
+  raise Exception.Create('Abstract function called');
+end;
 
 class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer): boolean;
 var
@@ -623,14 +622,11 @@ begin
   if length(children)<2 then raiseEvaluationError('Not enough subterms');
   if length(children)>2 then raiseEvaluationError('Too many subterms');
 
-  result := xqvalue();
 
-  if (index = binaryOps.IndexOf('/')) or (index = binaryOps.IndexOf('//')) then begin
-    TXQueryEngine.evaluateAccessList(self, context, result);
-    exit;
-  end;
+  if (index = binaryOps.IndexOf('/')) or (index = binaryOps.IndexOf('//')) then
+    exit(TXQueryEngine.evaluateAccessList(self, context));
 
-  operatorInfo^.func(context, children[0].evaluate(context), children[1].evaluate(context),result);
+  result := operatorInfo^.func(context, children[0].evaluate(context), children[1].evaluate(context));
 end;
 
 function TXQTermBinaryOp.getContextDependencies: TXQContextDependencies;
@@ -780,7 +776,7 @@ begin
   else if length(children)>1 then raiseEvaluationError('Too many subterms');
   if index < 0 then raiseEvaluationError('Unknown unary op');
   result := xqvalue();
-  PXQOperatorInfo(binaryOps.Objects[index])^.func(context, xqvalue(0),children[0].evaluate(context),result);
+  result := PXQOperatorInfo(binaryOps.Objects[index])^.func(context, xqvalue(0),children[0].evaluate(context));
 end;
 
 function TXQTermUnaryOp.getContextDependencies: TXQContextDependencies;

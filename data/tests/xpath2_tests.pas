@@ -2499,6 +2499,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   ps.StaticContext.defaultElementTypeNamespace := TNamespace.create('foobar', '');
   t('/r', 'test');
 
+  t('day-from-datetime(())', '');
+  t('doc(())', '');
+  t('collection(())', '');
+
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
 

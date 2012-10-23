@@ -675,17 +675,17 @@ type
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
-  TXQBasicFunction = procedure (args: TXQVArray; var result: IXQValue);
+  TXQBasicFunction = function (const args: TXQVArray): IXQValue;
   (***
     @abstract(Function, taking some TXQValue-arguments and returning a new TXQValue which can depend on the current context state)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
-  TXQComplexFunction = procedure (const context: TEvaluationContext; args: TXQVArray; var result: IXQValue);
+  TXQComplexFunction = function (const context: TEvaluationContext; const args: TXQVArray): IXQValue;
   (***
     @abstract(Binary operator of TXQValues)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
-  TXQBinaryOp = procedure (const cxt: TEvaluationContext; a,b: IXQValue; var result: IXQValue);
+  TXQBinaryOp = function (const cxt: TEvaluationContext; const a,b: IXQValue): IXQValue;
 
 
   type
@@ -1281,7 +1281,7 @@ type
     class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;const context: TEvaluationContext): IXQValue;
 
     //**< Evaluates a path expression, created from the given term in the given context.
-    class procedure evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
+    class function evaluateAccessList(term: TXQTerm; const context: TEvaluationContext): IXQValue;
 
 
     function findNamespace(const nsprefix: string): INamespace;
@@ -3226,12 +3226,6 @@ end;
 
 
 
-procedure xqFunctionGeneralConstructor(args: TXQVArray; var result: IXQValue);
-begin
-  ignore(args); result := nil;
-  raise Exception.Create('Abstract function called');
-end;
-
 
 procedure TXQueryEngine.clear;
 begin
@@ -4038,7 +4032,7 @@ end;
 //   a/b[x][y][z]/c
 //   =>  (  (/a)  /  ( b [:] x, y, z )  ) / c
 //   or:  (  (/a)  /  ( ( (b [:] x) [:] y) [:] z  )  ) / c
-class procedure TXQueryEngine.evaluateAccessList(term: TXQTerm; const context: TEvaluationContext; var result: IXQValue);
+class function TXQueryEngine.evaluateAccessList(term: TXQTerm; const context: TEvaluationContext): IXQValue;
 var
   query: TXQPathMatching;
   i:integer;
@@ -4052,13 +4046,13 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-procedure xqvalueNodeStepChild(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
+function xqvalueNodeStepChild(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(ta); ignore(tb); ignore(result);
   raise EXQEvaluationException.Create('placeholder op:/ called');
 end;
 
-procedure xqvalueNodeStepDescendant(const cxt: TEvaluationContext; ta, tb: IXQValue; var result: IXQValue);
+function xqvalueNodeStepDescendant(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(ta); ignore(tb); ignore(result);
   raise EXQEvaluationException.Create('placeholder op: // called');

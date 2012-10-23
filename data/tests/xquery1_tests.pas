@@ -772,6 +772,7 @@ begin
   t('outer-xml(<hallo>{attribute {fn:QName("ans", "pref:test")} {1234} ,"#"}</hallo>)', '<hallo xmlns:pref="ans" pref:test="1234">#</hallo>');
   t('outer-xml(<hallo>{attribute {fn:QName("ans", "test")} {1234} ,"#"}</hallo>)', '<hallo xmlns:XXX="ans" XXX:test="1234">#</hallo>');
   t('let $a := 7 let $a := $a + 10 return $a', '17');
+  t('nilled( <!-- abc --> )', '');
 
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');
   //timing('(for $i in (1 to 50), $j in (1 to 50)  return ($i))[0]', '');
