@@ -1043,6 +1043,7 @@ var
   procedure addNodeAsKid;
   var
     doc: TTreeElement;
+    n: TTreeElement;
   begin
     kid.parent := tree;
     case kid.typ of
@@ -1065,8 +1066,9 @@ var
         doc := kid;
         kid := kid.getFirstChild();
         while kid <> nil do begin
+          n := kid.getNextSibling();
           addKid;
-          kid := kid.getNextSibling();
+          kid := n;
         end;
         doc.next := doc.reverse;
         doc.reverse.previous := doc;
@@ -1084,7 +1086,6 @@ var
       pvkUndefined:;
       pvkNode: begin
         kid := v.toNode.clone;
-        addNodeAsKid;
         if root = tree then begin
           if kid.getFirstChild() = nil then kid.document := root
           else begin
@@ -1098,6 +1099,7 @@ var
             end;
           end;
         end;
+        addNodeAsKid;
       end;
       pvkSequence: begin
         firstAtomic := true;

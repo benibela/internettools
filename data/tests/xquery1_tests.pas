@@ -831,6 +831,13 @@ begin
   m('declare namespace def = "abc"; document { <foobar xmlns="abc"/> } instance of document-node(element(def:foobar))', 'true');
   m('declare namespace def = "abc"; document { <foobar xmlns="abc"/>, <hallo/> } instance of document-node(element(def:foobar))', 'false');
 
+  t('let $x := document { 123 } return <element>{$x, $x}</element>', '123123');
+  t('let $x := text { "xyz" } return <element>{$x, $x}</element>', 'xyzxyz');
+  t('let $x := element a { "xyz" } return <element>{$x, $x}</element>', 'xyzxyz');
+  t('outer-xml(let $x := element a { "xyz" } return <element>{$x, $x}</element>)', '<element><a>xyz</a><a>xyz</a></element>');
+  t('let $x := attribute a { "xyz" } return <element>{$x, $x}</element>', '');
+  //t('outer-xml(let $x := attribute a { "xyz" } return <element>{$x, $x}</element>)', '<element a="xyz" a="xyz"/>');
+
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');
   //timing('(for $i in (1 to 50), $j in (1 to 50)  return ($i))[0]', '');
 
