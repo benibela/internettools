@@ -1237,6 +1237,8 @@ type
 
     //** Evaluates an XPath 2.0 expression with a certain tree element as current node.
     function evaluateXPath2(expression: string; tree:TTreeElement = nil): IXQValue;
+    //** Evaluates an XQuery 1.0 expression with a certain tree element as current node.
+    function evaluateXQuery1(expression: string; tree:TTreeElement = nil): IXQValue;
     //** Evaluates an CSS 3 Selector expression with a certain tree element as current node.
     function evaluateCSS3(expression: string; tree:TTreeElement = nil): IXQValue;
 
@@ -3348,6 +3350,15 @@ var
 begin
   temp := FLastQuery;
   result := parseXPath2(expression).evaluate(tree);
+  FLastQuery := temp;
+end;
+
+function TXQueryEngine.evaluateXQuery1(expression: string; tree: TTreeElement): IXQValue;
+var
+  temp: IXQuery;
+begin
+  temp := FLastQuery;
+  result := parseXQuery1(expression).evaluate(tree);
   FLastQuery := temp;
 end;
 

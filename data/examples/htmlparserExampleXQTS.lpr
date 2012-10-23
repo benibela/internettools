@@ -267,13 +267,25 @@ var htp: THtmlTemplateParser;
     onlyxpath: Boolean;
     isxpath2: Boolean;
     extvars: TVariableProvider;
+    inputqueries: TStringList;
 
 { TVariableProvider }
 
 procedure TVariableProvider.getvar(sender: TObject; const context: TXQStaticContext; const namespace: INamespace; const variable: string;
   var value: IXQValue);
+var
+  temp: TXQValue;
+  iname: Integer;
 begin
-  value := pxp.VariableChangelog.getVariableValue(variable);
+  if not pxp.VariableChangelog.hasVariable(variable, @temp) then begin
+    for iname := inputqueries.count - 1 downto 0 do
+      if inputqueries.Names[iname] = variable then begin
+        value := pxp.evaluateXQuery1(strLoadFromFile('Queries/XQuery/'+path+'/'+inputqueries.ValueFromIndex[iname]+'.xq'));
+        exit;
+      end;
+
+    value := xqvalue();
+  end;
 end;
 
 begin
@@ -290,7 +302,7 @@ begin
     '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case ' + IfThen(onlyxpath, ' is-XPath2="true" ', '')+'>{('+
     'test:=xs:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name, test.isXPath2 := @*:is-XPath2,' +
     'test.outputfile:=*:output-file,test.outputcomparator:=*:output-file/@*:compare, test.error:=*:expected-error)}' +
-    '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
+    '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-query>{inputQuery:=.}</input-query><input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
 
   compareTree := TTreeParser.Create;
   compareTree.parsingModel:= pmStrict;
@@ -313,6 +325,7 @@ begin
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
   inputfiles:=TStringList.Create;
+  inputqueries := TStringList.Create;
   extendedvars := TXQVariableChangeLog.create();
 //  extendedvars.allowObjects:=true;
  // pxp.OnDefineVariable:=@extendedvars.defineVariable;
@@ -351,6 +364,7 @@ begin
         groupStart := varlog.getVariableValueNode(i); lastGroupStart := groupStart; end;
         pxp.VariableChangelog.clear;
       end
+      else if varlog.getVariableName(i) = 'inputQuery' then inputQueries.add(varlog.getVariableValue(i).toNode.getAttribute('variable')+'='+varlog.getVariableValue(i).toNode.getAttribute('name'))
       else if varlog.getVariableName(i) = 'input' then begin
         node := varlog.getVariableValueNode(i);
         inputfilevar := node.getAttribute('variable');
