@@ -310,7 +310,17 @@ begin
   result.name:=word;
   if (isKindTestFunction(word)) or (word = 'empty-sequence') or (word = 'item') then begin
     expect('(');
-    parseSequenceLike(result);
+
+    skipWhitespaceAndComment();
+    if pos^ = ')' then expect(')')
+    else begin
+      result.push(parse());
+      if nextToken() = ',' then begin
+        result.push(parseSequenceType());
+        expect(')');
+      end;
+    end;
+
     if (word = 'empty-sequence') then begin
       result.kind:=tikNone;
       if length(result.children) <> 0 then raiseParsingError('invalid sequence type');
@@ -658,7 +668,10 @@ begin
     if token = '{' then begin
       result.nameValue := parsePrimaryLevel;
       expect('}');
-    end else result.nameValue := TXQTermString.create(token);
+    end else begin
+      result.nameValue := TXQTermString.create(token);
+      if (token = '') or not (token[1] in ['a'..'z','A'..'Z']) then raiseParsingError('Expected qname, got '+token);
+    end;
   end;
   expect('{');
   skipWhitespaceAndComment();

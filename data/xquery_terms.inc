@@ -193,8 +193,9 @@ begin
     exit(true);
   if kind = tikElementTest then begin
     TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
-    if nodeCondition.checkNamespace then
-      nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkElementType);
+    if xqpncCheckNamespace in nodeCondition.options then
+      if qmAttribute in nodeMatching.matching then nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkUnknown)
+      else nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkElementType);
     nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
   end;
   result := true;
@@ -203,6 +204,13 @@ begin
     if not result then exit;
   end;
 end;
+
+function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
+var temp: TEvaluationContext;
+begin
+  result := instanceOf(ta, temp);
+end;
+
 { TXQTermSequence }
 
 function TXQTermSequence.evaluate(const context: TEvaluationContext): IXQValue;
@@ -732,6 +740,7 @@ begin
     result.typ:=getAxis(axis);
     exit;
   end;
+  result.requiredType := nil;
   case select of
     '/': result.typ := qcDocumentRoot;
     '.': begin

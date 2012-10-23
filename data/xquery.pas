@@ -719,7 +719,7 @@ type
                           qcAncestor, qcPrecedingSibling, qcPreceding, qcSameOrAncestor,
                           qcDocumentRoot,
                           qcFunctionSpecialCase);
-  TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument, qmCheckNamespace);
+  TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument, qmCheckNamespace, qmCheckOnSingleChild);
   TXQPathMatchingKinds = set of TXQPathMatchingKind;
   //***@abstract(Step of a query in a tree)
   //***You can use it to use queries, but it is intended for internal use
@@ -727,6 +727,7 @@ type
     namespacePrefix: string; //**< Namespace the matched node must be in (only used if qmCheckNamespace is set)
     value: string; //**< If @code(value <> ''), only nodes with the corresponding value are found (value = node-name for element node, value = text for text/comment nodes)
     filters: array of TXQTerm; //**< expressions a matched node must satisfy
+    requiredType: TXQTermSequenceType;
     case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
     qcSameNode: (matching: TXQPathMatchingKinds;); //**< Which nodes match the query command. If this is [], _nothing_ is found! The elements of the set [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute] match nodes of a certain type, qmValue activates the value field.
     qcFunctionSpecialCase: (specialCase: TXQTerm; );   //**< Term used for qcFunctionSpecialCase
@@ -736,18 +737,20 @@ type
   TTreeElementTypes = set of TTreeElementType;
   TXQPathNodeConditionIteration = (qcnciNext, qcnciPreceding, qcnciParent);
 
+  TXQPathNodeConditionOption = (xqpncMatchStartNode, xqpncCheckValue, xqpncCheckNamespace, xqpncCheckOnSingleChild);
+  TXQPathNodeConditionOptions = set of TXQPathNodeConditionOption;
   //** Record mapping
   TXQPathNodeCondition = record
+    options: TXQPathNodeConditionOptions;
     findOptions, initialFindOptions: TTreeElementFindOptions; //**< find options for findNext
     iteration: TXQPathNodeConditionIteration; //**< The axis to search
     start,endnode: TTreeElement; //**< Start end node for the search
     searchedTypes: TTreeElementTypes; //**< Treeelement types matched by the query
-    matchStartNode: boolean; //**< If the search begins at start or at start.next
-    checkValue: boolean; //**< If the name of the element matters
     requiredValue: string; //**< Required node name (if checkValue)
-    checkNamespace: boolean;  //**< If the namespace matters
     requiredNamespaceURL: string; //**< Required namespace (if checkNamespace)
+    requiredType: TXQTermSequenceType;
     equalFunction: TStringComparisonFunc; //**< Function used to compare node values with the required values
+    documentElementSubCondition: ^TXQPathNodeCondition;
   end;
 
 
@@ -824,6 +827,7 @@ type
     function castAs(v: IXQValue; const context: TEvaluationContext): IXQValue;
     function castableAs(v: IXQValue): boolean;
     function instanceOf(ta: IXQValue; const context: TEvaluationContext): boolean;
+    function instanceOf(const ta: IXQValue): boolean;
   end;
 
   { TXQTermVariable }
@@ -2307,7 +2311,9 @@ function convertElementTestToPathMatchingStep(const select: string; const childr
 begin
   result.typ:=qcDirectChild;
   result.matching:=convertElementTestToMatchingOptions(select);
+  Result.requiredType := nil;
   if (length(children) = 0) then exit;
+
   if (result.matching = [qmProcessingInstruction])  then begin
     if children[0] is TXQTermNodeMatcher then begin;
       if TXQTermNodeMatcher(children[0]).axis <> '' then raise EXQEvaluationException.Create('axis within element test is not allowed');
@@ -2316,8 +2322,8 @@ begin
       result.value:=TXQTermString(children[0]).value
     else raise EXQEvaluationException.Create('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
     include(result.matching, qmValue) ;
-  end else if select = 'element' then begin
-    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('Invalid element test.');
+  end else if (select = 'element') or (select = 'attribute') or (select = 'schema-element')or (select = 'schema-attribute')  then begin
+    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('Invalid node test.');
     if TXQTermNodeMatcher(children[0]).select <> '*' then begin
       Include(result.matching, qmValue);
       result.value:=TXQTermNodeMatcher(children[0]).select;
@@ -2325,7 +2331,15 @@ begin
         Include(result.matching, qmCheckNamespace);
         result.namespacePrefix:=TXQTermNodeMatcher(children[0]).namespace;
       end;
-    end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('Namespace:wildcard not allowed in element test') ;
+    end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('Namespace:* not allowed in element test') ;
+    if length(children) <= 1 then exit;
+    if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('Invalid type attribute');
+    result.requiredType := children[1] as TXQTermSequenceType;
+  end else if select = 'document-node' then begin
+    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('Invalid option for document test');
+    if not (children[0] as TXQTermNodeMatcher).func or (  ((children[0] as TXQTermNodeMatcher).select <> 'element') and  ((children[0] as TXQTermNodeMatcher).select <> 'schema-element')) then raise EXQEvaluationException.Create('Invalid option for document(element) test');
+    result := convertElementTestToPathMatchingStep((children[0]as TXQTermNodeMatcher).select, (children[0] as TXQTermNodeMatcher).children);
+    result.matching:=result.matching * [qmCheckNamespace, qmValue] + [qmDocument, qmCheckOnSingleChild];
   end else raise EXQEvaluationException.Create('Children not allowed for element test "'+select+'"');
 end;
 
@@ -3964,9 +3978,10 @@ begin
       assert(n.toNode <> nil);
       oldnode := n.toNode;
       unifyQuery(oldnode, command, nodeCondition);
-      if nodeCondition.checkNamespace then begin
+      if xqpncCheckNamespace in nodeCondition.options then begin
         if not cachedNamespace then begin
-          cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix, xqdnkElementType);
+          if qmAttribute in command.matching then cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix, xqdnkUnknown)
+          else cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix, xqdnkElementType);
           cachedNamespace:=true;
         end;
         nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
@@ -4091,10 +4106,22 @@ end;
 
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
 begin
-  result :=  assigned(node)
-             and (node.typ in nodeCondition.searchedTypes)
-             and (not (nodeCondition.checkValue) or nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
-             and (not (nodeCondition.checkNamespace) or nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL()));
+  if not Assigned(node) or not (node.typ in nodeCondition.searchedTypes) then exit(false);
+  if not (xqpncCheckOnSingleChild in nodeCondition.options) then begin
+    if ((xqpncCheckValue in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
+       or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL())) then
+         exit(false);
+  end else begin
+    if node.next = node.reverse then exit(false); //no child
+    if node.next.getNextSibling() <> nil then exit(false); //too many children
+    if (node.next.typ <> tetOpen)
+       or ((xqpncCheckValue in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredValue, node.next.getValue()))
+       or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.next.getNamespaceURL())) then
+         exit(false);
+  end;
+  if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(xqvalueAtomize(xqvalue(node)))) then
+    exit(false);
+  result := true;
 end;
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement;
@@ -4102,7 +4129,7 @@ begin
   //TODO: allow more combinations than single type, or ignore types
 
 
-  if (prev = nil) and (nodeCondition.matchStartNode) then begin
+  if (prev = nil) and (xqpncMatchStartNode in nodeCondition.options) then begin
     if nodeMatchesQueryLocally(nodeCondition, nodeCondition.start) then
       exit(nodeCondition.start);
   end;
@@ -4154,13 +4181,15 @@ class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeElement; const 
 begin
   nodeCondition.findOptions:=[];
   nodeCondition.initialFindOptions:=[];
-  nodeCondition.matchStartNode:=false;
+  nodeCondition.options:=[];
   nodeCondition.iteration := qcnciNext;
-  nodeCondition.checkValue:=qmValue in command.matching;
+  if (qmValue in command.matching) then Include(nodeCondition.options, xqpncCheckValue);
   nodeCondition.requiredValue:=command.value;
-  nodeCondition.checkNamespace:=qmCheckNamespace in command.matching;
+  if (qmCheckNamespace in command.matching) then Include(nodeCondition.options, xqpncCheckNamespace);
   nodeCondition.requiredNamespaceURL:=command.namespacePrefix; //is resolved later
   nodeCondition.searchedTypes:=convertMatchingOptionsToMatchedTypes(command.matching);
+  nodeCondition.requiredType := command.requiredType;
+  if qmCheckOnSingleChild in command.matching then Include(nodeCondition.options, xqpncCheckOnSingleChild);
 
   if contextNode = nil then exit;
 
@@ -4169,7 +4198,7 @@ begin
 
   case command.typ of
     qcSameNode: begin
-      nodeCondition.matchStartNode:=true;
+      Include(nodeCondition.options, xqpncMatchStartNode);
       nodeCondition.endnode:=contextNode.next;
     end;
     qcDirectChild: begin
@@ -4181,7 +4210,7 @@ begin
       nodeCondition.initialFindOptions := [tefoNoGrandChildren];
     end;
     qcSameOrDescendant: begin
-      nodeCondition.matchStartNode:=true;
+      Include(nodeCondition.options, xqpncMatchStartNode);
       nodeCondition.findOptions:=[];
       nodeCondition.initialFindOptions := [tefoNoGrandChildren];
     end;
@@ -4198,13 +4227,13 @@ begin
     end;
 
     qcDirectParent: begin
-      nodeCondition.matchStartNode:=true;
+      Include(nodeCondition.options, xqpncMatchStartNode);
       nodeCondition.start := contextNode.getParent();
       if nodeCondition.start <> nil then nodeCondition.endnode := nodeCondition.start.next;
     end;
     qcAncestor, qcSameOrAncestor: begin
       nodeCondition.iteration := qcnciParent;
-      nodeCondition.matchStartNode:=command.typ = qcSameOrAncestor;
+      if command.typ = qcSameOrAncestor then Include(nodeCondition.options, xqpncMatchStartNode);
       nodeCondition.endnode := nil;
     end;
     qcPrecedingSibling: begin
