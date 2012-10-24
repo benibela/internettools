@@ -59,9 +59,9 @@ var vars: TXQVariableChangeLog;
 begin
 //  time := Now;
   vars:= TXQVariableChangeLog.create();
-  vars.addVariable('abc', 'alphabet');
-  vars.addVariable('test', 'tset');
-  vars.addVariable('eval', '''abc'' = ''abc''');
+  vars.add('abc', 'alphabet');
+  vars.add('test', 'tset');
+  vars.add('eval', '''abc'' = ''abc''');
 
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';

@@ -24,6 +24,7 @@ uses
 //{$DEFINE USE_NO_WRAPPER}
 
 
+type IXQValue = xquery.IXQValue;
 
 (***
 Retrieve data from any url.@br@br
@@ -67,7 +68,7 @@ To get a list of all variables of the last query you can use processedVariables.
 
 The function processedTree will always return a tree representation of the last processed data string.
 *)
-function process(data: string; query: string): string;
+function process(data: string; query: string): IXQValue;
 //**Returns a tree representation of the last processed html/xml data@br
 //**Might return nil
 function processedTree: TTreeElement;
@@ -132,12 +133,13 @@ begin
 end;
 
 
-function process(data: string; query: string): string;
+function process(data: string; query: string): IXQValue;
 var dataFileName: string;
   datain: String;
+  tempVars: TXQVariableChangeLog;
 begin
-  result := '';
-  if query = '' then exit;
+  result := xqvalue();
+  if query = '' then exit();
 
   datain := data;
 
@@ -148,11 +150,16 @@ begin
   query := trim(query);
   if query[1] = '<' then begin
     lastQueryWasPXP := false;
-    if templateParser = nil then templateParser := THtmlTemplateParser.create;
+    if templateParser = nil then begin templateParser := THtmlTemplateParser.create; templateParser.TemplateParser.parsingModel:= pmHTML;end;
     templateParser.parseTemplate(query);
     templateParser.parseHTML(data, dataFileName);
-    if  templateParser.variableChangeLog.count > 0 then
-      result := templateParser.variableChangeLog.getVariableValueString(templateParser.variableChangeLog.count-1);
+    if templateParser.variableChangeLog.count > 0 then begin
+      tempVars := templateParser.VariableChangeLogCondensed.collected;
+      if (tempVars.count = 1) and (tempVars.getName(0) = templateParser.UnnamedVariableName) then begin
+        result := tempVars.get(0);
+        tempVars.free;
+      end else result := TXQValueObject.createTakingVariableLog(tempVars);
+    end;
   end else begin
     lastQueryWasPXP := true;
     if tree = nil then begin
@@ -161,11 +168,11 @@ begin
     end;
     tree.parseTree(data, dataFileName);
     if pxpParser = nil then pxpParser := TXQueryEngine.create;
-    pxpParser.parseXPath2(query);
+    pxpParser.parseXQuery1(query);
     pxpparser.ParentElement := tree.getLastTree;
     pxpparser.RootElement := tree.getLastTree;
     pxpparser.StaticContext.baseURI:=dataFileName;
-    result := pxpParser.evaluate().toString;
+    result := pxpParser.evaluate();
   end;
 end;
 
@@ -176,7 +183,6 @@ begin
     result := tree.getLastTree;
   end else if templateParser = nil then exit(nil)
   else result := templateParser.HTMLTree;
-
 end;
 
 function processedVariables: TXQVariableChangeLog;

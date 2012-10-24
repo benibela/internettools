@@ -236,6 +236,7 @@ type
 
  TVariableProvider = class
   procedure getvar(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue);
+  procedure importModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
 var CATALOG_TEMPLATE: string;
@@ -261,13 +262,12 @@ var htp: THtmlTemplateParser;
     timing: TDateTime;
     mypxpoutput: IXQValue;
     extendedvars: TXQVariableChangeLog;
-    j: Integer;
     varlog: TXQVariableChangeLog;
     outputcomparator: String;
     onlyxpath: Boolean;
     isxpath2: Boolean;
     extvars: TVariableProvider;
-    inputqueries: TStringList;
+    inputqueries, inputmodules: TStringList;
 
 { TVariableProvider }
 
@@ -286,8 +286,22 @@ begin
 
     value := xqvalue();
   end;
+  if temp <> nil then value := temp
+  else value := xqvalue();
 end;
 
+procedure TVariableProvider.importModule(sender: TObject; const namespace: string; const at: array of string);
+var
+  url: String;
+begin
+  url := inputmodules.Values[namespace];
+  inputmodules.Values[namespace ] := '';
+  if not FileExists('TestSources/'+url+'.xq') then exit;
+  pxp.registerModule(pxp.parseXQuery1(strLoadFromFile('TestSources/'+url+'.xq')));
+end;
+
+var t: IXQValue;
+  url: String;
 begin
   {$ifdef win32}defaultInternetAccessClass := TW32InternetAccess.create{$else}defaultInternetAccessClass:=TSynapseInternetAccess{$endif};
 
@@ -302,7 +316,8 @@ begin
     '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case ' + IfThen(onlyxpath, ' is-XPath2="true" ', '')+'>{('+
     'test:=xs:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name, test.isXPath2 := @*:is-XPath2,' +
     'test.outputfile:=*:output-file,test.outputcomparator:=*:output-file/@*:compare, test.error:=*:expected-error)}' +
-    '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-query>{inputQuery:=.}</input-query><input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
+   '<module>{test.modul:=($test.modul, object(("namespace", @*:namespace, "file", text())))}</module>*'+
+    '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-query>{inputQuery:=.}</input-query>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
 
   compareTree := TTreeParser.Create;
   compareTree.parsingModel:= pmStrict;
@@ -320,12 +335,14 @@ begin
   pxp.StaticContext.stripBoundarySpace:=true;
   extvars := TVariableProvider.Create;
   pxp.OnDeclareExternalVariable:=@extvars.getvar;
+  pxp.onImportModule:=@extvars.importModule;
   tree := TTreeParser.Create;
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
   inputfiles:=TStringList.Create;
   inputqueries := TStringList.Create;
+  inputmodules := TStringList.Create;
   extendedvars := TXQVariableChangeLog.create();
 //  extendedvars.allowObjects:=true;
  // pxp.OnDefineVariable:=@extendedvars.defineVariable;
@@ -360,19 +377,19 @@ begin
     varlog := htp.VariableChangeLogCondensed;
     //writeln(varlog.debugTextRepresentation);
     for i:=0 to varlog.count-1 do begin
-      if varlog.getVariableName(i) = 'gi' then begin begin
-        groupStart := varlog.getVariableValueNode(i); lastGroupStart := groupStart; end;
+      if varlog.getName(i) = 'gi' then begin begin
+        groupStart := varlog.get(i).toNode; lastGroupStart := groupStart; end;
         pxp.VariableChangelog.clear;
       end
-      else if varlog.getVariableName(i) = 'inputQuery' then inputQueries.add(varlog.getVariableValue(i).toNode.getAttribute('variable')+'='+varlog.getVariableValue(i).toNode.getAttribute('name'))
-      else if varlog.getVariableName(i) = 'input' then begin
-        node := varlog.getVariableValueNode(i);
+      else if varlog.getName(i) = 'inputQuery' then inputQueries.add(varlog.get(i).toNode.getAttribute('variable')+'='+varlog.get(i).toNode.getAttribute('name'))
+      else if varlog.getName(i) = 'input' then begin
+        node := varlog.get(i).toNode;
         inputfilevar := node.getAttribute('variable');
         inputfile := node.deepNodeText();
         if inputfile = 'id-idref-dtd' then begin inputfile:='id'; pxp.StaticContext.defaultElementTypeNamespace := TNamespace.create('http://www.w3.org/XQueryTest/ididrefs', ''); end
         else pxp.StaticContext.defaultElementTypeNamespace := nil;
         if striEqual(node.getNodeName(), 'input-URI') then
-          pxp.VariableChangelog.addVariable(inputfilevar,  GetCurrentDir + DirectorySeparator + 'TestSources/'+inputfile+'.xml')
+          pxp.VariableChangelog.add(inputfilevar,  GetCurrentDir + DirectorySeparator + 'TestSources/'+inputfile+'.xml')
         else begin
           if inputfiles.IndexOf(inputfile) < 0 then begin
             try
@@ -386,17 +403,24 @@ begin
             end;
           end else currentTree := TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]);
           if fileOpenFailed = '' then
-            pxp.VariableChangelog.addVariable(inputfilevar, TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]));
+            pxp.VariableChangelog.add(inputfilevar, TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]));
         end;
 
-      end else if varlog.getVariableName(i) = 'test' then begin
-        desc := varlog.getVariableValueObject(i).getAsString('desc');
-        queryname := varlog.getVariableValueObject(i).getAsString('queryname');
-        outputfile := varlog.getVariableValueObject(i).getAsString('outputfile');
-        outputcomparator := varlog.getVariableValueObject(i).getAsString('outputcomparator');
-        error := varlog.getVariableValueObject(i).getAsString('error');
-        path := varlog.getVariableValueObject(i).getAsString('path');
-        isxpath2 := varlog.getVariableValueObject(i).getAsString('isXPath2') = 'true';
+      end else if varlog.getName(i) = 'test' then begin
+        desc := varlog.get(i).getProperty('desc').toString;
+        queryname := varlog.get(i).getProperty('queryname').toString;
+        outputfile := varlog.get(i).getProperty('outputfile').toString;
+        outputcomparator := varlog.get(i).getProperty('outputcomparator').toString;
+        error := varlog.get(i).getProperty('error').toString;
+        path := varlog.get(i).getProperty('path').toString;
+        isxpath2 := varlog.get(i).getProperty('isXPath2').toString = 'true';
+        for t in varlog.get(i).getProperty('modul') do
+          if (t.getProperty('file').toString = 'module-defs') and not FileExists('TestSource/module-defs.xq') then
+            inputmodules.Add(t.getProperty('namespace').toString + '=' + 'moduleDefs-lib')
+          else
+            inputmodules.Add(t.getProperty('namespace').toString + '=' + t.getProperty('file').toString);
+
+
         totalLocal += 1;
         if (error <> '') or (striEqual(outputcomparator, 'Inspect')) then begin
           skippedErrorsLocal+=1;
@@ -479,6 +503,9 @@ begin
         //writeln(desc, ': ', , 'Queries/XQuery/'+path+'/'+queryname+'.xq');
         //Exit;
       end;
+      inputqueries.Clear;
+      inputmodules.Clear;
+      pxp.clear;
      end;
     end;
     mylogger.LOG_GROUP_END(startLogged, correctLocal, wrongLocal, exceptionLocal, skippedErrorsLocal);
@@ -500,6 +527,7 @@ begin
   buffer1.free;
   buffer2.free;
   buffer3.free;
+  inputmodules.Free;
   inputfiles.Free;
   tree.free;
   freeandnil(pxp.StaticContext.defaultElementTypeNamespace);

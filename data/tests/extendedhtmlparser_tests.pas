@@ -708,8 +708,8 @@ var i:longint;
         raise Exception.Create('Test failed (length): '+inttostr(i)+': ' +' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"');
       end;
       for j:=0 to sl.count-1 do
-        if (extParser.variableChangeLog.getVariableName(j)<>sl.Names[j]) or
-           ((extParser.variableChangeLog.getVariableValueString(j))<>StringReplace(StringReplace(sl.ValueFromIndex[j], '[[#13]]', #13, [rfReplaceAll]), '[[#10]]', #10, [rfReplaceAll])  )     then begin
+        if (extParser.variableChangeLog.getName(j)<>sl.Names[j]) or
+           ((extParser.variableChangeLog.get(j).toString)<>StringReplace(StringReplace(sl.ValueFromIndex[j], '[[#13]]', #13, [rfReplaceAll]), '[[#10]]', #10, [rfReplaceAll])  )     then begin
              errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"';
              //errormsg:= StringReplace(errormsg, #13, '#13', [rfReplaceAll]);
              //errormsg:= StringReplace(errormsg, #10, '#10', [rfReplaceAll]);
@@ -747,11 +747,11 @@ begin
   tempobj := TXQValueObject.create();
   tempobj.setMutable('a', xqvalue('Hallo'));
   tempobj.setMutable('b', xqvalue(17));
-  extParser.variableChangeLog.addVariable('test', tempobj);
-  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('a'), 'Hallo');
-  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('b'), '17');
-  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('a'), 'Hallo');
-  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('b'), '17');
+  extParser.variableChangeLog.add('test', tempobj);
+  cmp(extParser.variableChangeLog.get('test').getProperty('a').toString, 'Hallo');
+  cmp(extParser.variableChangeLog.get('test').getProperty('b').toString, '17');
+  cmp(extParser.VariableChangeLogCondensed.get('test').getProperty('a').toString, 'Hallo');
+  cmp(extParser.VariableChangeLogCondensed.get('test').getProperty('b').toString, '17');
 
   extParser.parseTemplate('<a/>');
   extParser.parseHTML('<a/>');
@@ -759,11 +759,11 @@ begin
   tempobj := TXQValueObject.create();
   tempobj.setMutable('a', xqvalue('Hallo2'));
   tempobj.setMutable('b', xqvalue(18));
-  extParser.variableChangeLog.addVariable('test', tempobj);
-  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('a'), 'Hallo2');
-  cmp(extParser.variableChangeLog.getVariableValueObject('test').getAsString('b'), '18');
-  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('a'), 'Hallo2');
-  cmp(extParser.VariableChangeLogCondensed.getVariableValueObject('test').getAsString('b'), '18');
+  extParser.variableChangeLog.add('test', tempobj);
+  cmp(extParser.variableChangeLog.get('test').getProperty('a').toString, 'Hallo2');
+  cmp(extParser.variableChangeLog.get('test').getProperty('b').toString, '18');
+  cmp(extParser.VariableChangeLogCondensed.get('test').getProperty('a').toString, 'Hallo2');
+  cmp(extParser.VariableChangeLogCondensed.get('test').getProperty('b').toString, '18');
 
   //t('<a>{obj := object()}<b>{obj.b:=.}</b><c>{obj.c:=.}</c>{final := $obj.c}</a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'obj='#10'obj.b=12'#10'obj.c=56'#10'final=56');
 

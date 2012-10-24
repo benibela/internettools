@@ -16,7 +16,7 @@
         <CompilerPath Value="$(CompPath)"/>
       </Other>
     </CompilerOptions>
-    <Files Count="18">
+    <Files Count="25">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -89,6 +89,34 @@
         <Filename Value="data/xquery_derived_types.inc"/>
         <Type Value="Include"/>
       </Item18>
+      <Item19>
+        <Filename Value="data/xquery_derived_types_template.inc"/>
+        <Type Value="Include"/>
+      </Item19>
+      <Item20>
+        <Filename Value="data/xquery_functions.inc"/>
+        <Type Value="Include"/>
+      </Item20>
+      <Item21>
+        <Filename Value="data/xquery_functions_generated.inc"/>
+        <Type Value="Include"/>
+      </Item21>
+      <Item22>
+        <Filename Value="data/xquery_functions_generated_template.inc"/>
+        <Type Value="Include"/>
+      </Item22>
+      <Item23>
+        <Filename Value="data/xquery_parse.inc"/>
+        <Type Value="Include"/>
+      </Item23>
+      <Item24>
+        <Filename Value="data/xquery_terms.inc"/>
+        <Type Value="Include"/>
+      </Item24>
+      <Item25>
+        <Filename Value="data/xquery_types.inc"/>
+        <Type Value="Include"/>
+      </Item25>
     </Files>
     <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="2">

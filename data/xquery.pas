@@ -194,7 +194,10 @@ type
     function toNode: TTreeElement;  //**< Returns the value as node; dynamically converted, if necessary
     function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer interface to each element of the sequence
     function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
+
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
+    function getChild(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
+    function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
     function jsonSerialize(xmlTextOnly: boolean = true): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
@@ -241,7 +244,10 @@ type
     function toNode: TTreeElement; virtual; //**< Returns the value as node; dynamically converted, if necessary
     function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer to each element of the sequence
     function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
+    function getChild(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
+    function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
     function jsonSerialize(xmlTextOnly: boolean = true): string; virtual;
@@ -508,10 +514,12 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function toNode: TTreeElement; override; //**< Converts the TXQValue dynamically to a node
-    function toArray: TXQVArray; override; //**< Converts the TXQValue dynamically to an array
 
+    function toArray: TXQVArray; override; //**< Converts the TXQValue dynamically to an array
     function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+
     function getSequenceCount: integer; override;
+    function getChild(i: integer): IXQValue; override;
     function GetEnumerator: TXQValueEnumerator; override;
 
     function takeFirstChild: IXQValue;
@@ -569,18 +577,20 @@ type
     prototype: TXQValueObject;
 
     constructor create(); reintroduce; virtual;
+    constructor createTakingVariableLog(log: TXQVariableChangeLog);
     destructor Destroy; override;
 
     class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
 
-    function getClonedValue(const name: string): IXQValue; //**< Returns a clone of a certain property
+    function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+
     procedure setMutable(const name: string; const v: IXQValue); //**< Changes a property
     function setImmutable(const name: string; const v: IXQValue): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it
     procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
     function setImmutable(const name: string; const s: string): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
-    function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
 
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
@@ -588,13 +598,6 @@ type
     function jsonSerialize(xmlTextOnly: boolean = true): string; override;
     function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
-    function getValue(const name: string): IXQValue; //**< Returns the value of a property
-    function getAsBoolean(const name: string): boolean; //**< Returns the value of a property as boolean
-    function getAsInt65(const name: string): int65; //**< Returns the value of a property as integer
-    function getAsDecimal(const name: string): decimal; //**< Returns the value of a property as decimal
-    function getAsString(const name: string): string; //**< Returns the value of a property as string
-    function getAsDateTime(const name: string): TDateTime; //**< Returns the value of a property as datetime
-    function getAsNode(const name: string): TTreeElement; //**< Returns the value of a property as node
   end;
 
   { TXQValueFunction }
@@ -1189,7 +1192,8 @@ type
     @item(API changes to previous versions:
       @unorderedList(
       @item(everything has been renamed, pseudoxpath.pas => xquery.pas, TPseudoXPathParser => TXQueryEngine, TPXPValue => IXQValue)
-      @item(The TPXPValue class has been replaced by an interface)
+      @item(The TPXPValue class has been replaced by an interface => memory deallocation has become implicit and .free must not be called.@br
+            => functions like toString and asString become identically and latter has been removed. Similarly functions like getValueAsString() are not needed anymore and have been removed as well )
       @item(TPXPValue is now a class with subclasses instead of a case record)
       @item(Some things have been renamed, the new names should be obvious)
       @item(The evaluate functions return now a TPXPValue instead of a string, since they may return a typed value or sequence.
@@ -1399,53 +1403,35 @@ type
   TXQVariableChangeLog = class
     caseSensitive: boolean; //**< If true, variables are case-sensitive, otherwise case-insensitive
     readonly: boolean; //**< If true, modifying the variable value raises an error
-    allowObjects: boolean;  //**< If true, object properties can be changed by assigning something to e.g. @code(obj.property)
+    allowObjects: boolean;  //**< If true, object properties are changed when variables like obj.propname are added. (more precise, a copy of the object would be made in which that property has the new value)
 
-    procedure addVariable(name: string; const value: IXQValue; const namespace: INamespace = nil); //**< Add a variable
-    procedure addVariable(name: string; const value: string); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: string; const namespace: INamespace); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: integer; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: decimal; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: boolean; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: TDateTime; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure addVariable(name: string; const value: TTreeElement; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(name: string; const value: IXQValue; const namespace: INamespace = nil); //**< Add a variable
+    procedure add(const name: string; const value: string); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: string; const namespace: INamespace); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: integer; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: decimal; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: boolean; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: TDateTime; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: TTreeElement; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
 
-    function getVariableValue(name: string; const namespace: INamespace = nil): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
-
-    function getVariableValueBoolean(const name: string; const namespace: INamespace = nil): boolean; //**< Last value of the variable with name @code(name) as boolean
-    function getVariableValueInteger(const name: string; const namespace: INamespace = nil): integer; //**< Last value of the variable with name @code(name) as integer
-    function getVariableValueDecimal(const name: string; const namespace: INamespace = nil): decimal; //**< Last value of the variable with name @code(name) as decimal
-    function getVariableValueDateTime(const name: string; const namespace: INamespace = nil): TDateTime; //**< Last value of the variable with name @code(name) as datetime
-    function getVariableValueString(const name: string): string; //**< Last value of the variable with name @code(name) as string
-    function getVariableValueString(const name: string; const namespace: INamespace): string; //**< Last value of the variable with name @code(name) as string
-    function getVariableValueNode(const name: string; const namespace: INamespace = nil): TTreeElement; //**< Last value of the variable with name @code(name) as ttreeelement
-    function getVariableValueArray(const name: string; const namespace: INamespace = nil): TXQVArray; //**< Last value of the variable with name @code(name) as array of txqvalue. It uses an array instead of an list, so you don't have to free it.
-    function getVariableValueObject(const name: string; const namespace: INamespace = nil): TXQValueObject; //**< Last value of the variable with name @code(name) as object
-
-    function getVariableIndex(name: string; const namespace: INamespace = nil): integer; //**< Returns the last index of the variable @code(name) in the internal list. (Warning: doesn't support objects, yet??) It is recommended to use hasVariable instead, the index is an implementation detail
+    function get(const name: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
+    function get(const name: string; const namespace: INamespace): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
 
     function count: integer; //**< Returns the number of stored values (>= count of variables)
 
-    function getVariableName(i: integer): string; //**< Name of the variable at index @code(i)
-    function getVariableValue(i: integer): IXQValue; inline; //**< Value of the variable at index @code(i)  @br The returned interface points to the same instance as the interface in the internal variable storage
+    function get(i: integer): IXQValue; inline; //**< Value of the variable at index @code(i)  @br The returned interface points to the same instance as the interface in the internal variable storage
+    function indexOf(const name: string; const namespace: INamespace = nil): integer; //**< Returns the last index of the variable @code(name) in the internal list. (Warning: doesn't support objects, yet??) It is recommended to use hasVariable instead, the index is an implementation detail
 
-    function getVariableValueBoolean(i: integer): boolean; //**< Value of the variable at index @code(i) as boolean
-    function getVariableValueInteger(i: integer): integer; //**< Value of the variable at index @code(i) as integer
-    function getVariableValueDecimal(i: integer): decimal; //**< Value of the variable at index @code(i) as decimal
-    function getVariableValueDateTime(i: integer): TDateTime; //**< Value of the variable at index @code(i) as datetime
-    function getVariableValueString(i: integer): string; //**< Value of the variable at index @code(i) as string
-    function getVariableValueNode(i: integer): TTreeElement; //**< Value of the variable at index @code(i) as ttreeelement (the TTreeElement is shared with the tree, so do not free it)
-    function getVariableValueArray(i: integer): TXQVArray; //**< Value of the variable at index @code(i) as array of txqvalue. It uses an array instead of an list, so you don't have to free anything.
-    function getVariableValueObject(i: integer): TXQValueObject; //**< Value of the variable at index @code(i) as object. (the object is not a copy, but contained in an internal interface, so do not free it)
-
-    function getAllVariableValues(name: string): TXQVArray; //**< Returns all values of the variable with name @name(name) as array
+    function getName(i: integer): string; //**< Name of the variable at index @code(i)
+    function getAll(const name: string; const namespace: INamespace = nil): IXQValue; //**< Returns all values of the variable with name @name(name) as sequence
+    function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
 
     function hasVariable(const variable: string; value: PXQValue; const namespace: INamespace = nil): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
     function hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace = nil): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
 
-    //property Values[name:string]:TXQValue read getVariableValueClone write addVariable;
-    property ValuesString[name:string]:string read getVariableValueString write addVariable;
-    property Names[i: integer]: string read getVariableName;
+    property Values[name:string]:IXQValue read get write add; default;
+    property ValuesString[name:string]:string read getString write add;
+    property Names[i: integer]: string read getName;
 
     constructor create();
     destructor destroy();override;
@@ -1455,14 +1441,14 @@ type
     procedure popAll(level: integer = -1); //**< Reverts all variables to the latest marked state
 
     procedure stringifyNodes;
-    class function splitVariableName(const variable: string; out base, varname: string): boolean; static;
+    class function splitName(const variable: string; out base, varname: string): boolean; static;
 
     function debugTextRepresentation: string; //**< Dump of the log as list of name=value pairs
 
     function finalValues: TXQVariableChangeLog; //**< Remove all duplicates, so that only the last version of each variable remains
     procedure takeFrom(other: TXQVariableChangeLog); //**< Adds all variables from other to self, and clears other
-    function condensedSharedLog: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
-
+    function condensed: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
+    function collected: TXQVariableChangeLog; //**< Collects multiple assignments to single sequence assignment. (i.e. @code(a := 123, a := 456, a := 789) collected is equivalent to @code(a := (123, 456, 789)))
 
     procedure evaluateVariable(sender: TObject; const variable: string; var value: IXQValue); //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
     procedure defineVariable(sender: TObject; const variable: string; const value: IXQValue); //**< Sets @code(variable) to the @code(value)@br This is used as callback by the XQuery-Engine
@@ -1470,7 +1456,6 @@ type
     shared: boolean;
     vars: array of TXQVariable;
     history: array of integer;
-    temporaryUndefined: IXQValue;
   end;
 
 
@@ -2129,7 +2114,7 @@ begin
         context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, tempDefVar.variablename, tempValue);
         if tempValue = nil then raiseEvaluationError('No value for external variable ' + tempDefVar.variablename+ ' given.');
       end;
-      vars.addVariable(tempDefVar.variablename, tempValue, ns);
+      vars.add(tempDefVar.variablename, tempValue, ns);
 
       if hasTypeDeclaration then
         if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(tempValue, context) then
@@ -2737,8 +2722,7 @@ end;
 
 { TXQVariableStorage }
 
-
-procedure TXQVariableChangeLog.addVariable(name: string; const value: IXQValue; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const namespace: INamespace = nil);
 var
  point: Integer;
  base: String;
@@ -2750,9 +2734,9 @@ begin
     point := pos('.', name);
     if point > 0 then begin
       base := copy(name, 1, point - 1);
-      i := getVariableIndex(base);
+      i := indexOf(base);
       if i < 0 then raise EXQEvaluationException.Create('Failed to find object variable '+base);
-      if not (getVariableValue(i) is TXQValueObject) then raise EXQEvaluationException.Create('Variable '+base+' is not an object, but '+getVariableValueString(i));
+      if not (get(i) is TXQValueObject) then raise EXQEvaluationException.Create('Variable '+base+' is not an object, but '+get(i).toString);
     end;
   end;
   SetLength(vars, length(vars)+1);
@@ -2764,7 +2748,7 @@ begin
   end else begin
     vars[high(vars)].namespace := namespace;
     vars[high(vars)].name:=base;
-    vars[high(vars)].value:=(getVariableValue(i) as TXQValueObject).setImmutable(strCopyFrom(name, point + 1), value);;
+    vars[high(vars)].value:=(get(i) as TXQValueObject).setImmutable(strCopyFrom(name, point + 1), value);;
   end;
 {  end else begin
     i := getVariableIndex(name);
@@ -2779,108 +2763,70 @@ begin
   end;}
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: string);
+procedure TXQVariableChangeLog.add(const name: string; const value: string);
 begin
-  addVariable(name, xqvalue(value), nil);
+  add(name, xqvalue(value), nil);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: string; const namespace: INamespace);
+procedure TXQVariableChangeLog.add(const name: string; const value: string; const namespace: INamespace);
 begin
-  addVariable(name, xqvalue(value), namespace);
+  add(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: integer; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(const name: string; const value: integer; const namespace: INamespace = nil);
 begin
-  addVariable(name, xqvalue(value), namespace);
+  add(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: decimal; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(const name: string; const value: decimal; const namespace: INamespace = nil);
 begin
-  addVariable(name, xqvalue(value), namespace);
+  add(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: boolean; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(const name: string; const value: boolean; const namespace: INamespace = nil);
 begin
-  addVariable(name, xqvalue(value), namespace);
+  add(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: TDateTime; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(const name: string; const value: TDateTime; const namespace: INamespace = nil);
 begin
-  addVariable(name, xqvalue(value), namespace);
+  add(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.addVariable(name: string; const value: TTreeElement; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(const name: string; const value: TTreeElement; const namespace: INamespace = nil);
 begin
-  addVariable(name, xqvalue(value), namespace);
+  add(name, xqvalue(value), namespace);
 end;
 
-function TXQVariableChangeLog.getVariableValue(name: string; const namespace: INamespace): IXQValue;
+function TXQVariableChangeLog.get(const name: string): IXQValue;
+begin
+  result := get(name, nil);
+end;
+
+function TXQVariableChangeLog.get(const name: string; const namespace: INamespace): IXQValue;
 var i:integer;
 begin
-  i := getVariableIndex(name, namespace);
-  if i = -1 then begin
-    if temporaryUndefined = nil then temporaryUndefined := xqvalue();
-    exit(temporaryUndefined);
-  end;
+  i := indexOf(name, namespace);
+  if i = -1 then
+    exit(xqvalue());
   result := vars[i].value;
 end;
 
-function TXQVariableChangeLog.getVariableValueBoolean(const name: string; const namespace: INamespace): boolean;
+
+function TXQVariableChangeLog.getString(const name: string): string;
 begin
-  result := getVariableValue(name, namespace).toBoolean;
+  result := get(name, nil).toString;
 end;
 
-function TXQVariableChangeLog.getVariableValueInteger(const name: string; const namespace: INamespace): integer;
-begin
-  result := getVariableValue(name, namespace).toInt64;
-end;
-
-function TXQVariableChangeLog.getVariableValueDecimal(const name: string; const namespace: INamespace): decimal;
-begin
-  result := getVariableValue(name, namespace).toDecimal;
-end;
-
-function TXQVariableChangeLog.getVariableValueDateTime(const name: string; const namespace: INamespace): TDateTime;
-begin
-  result := getVariableValue(name, namespace).toDateTime;
-end;
-
-function TXQVariableChangeLog.getVariableValueString(const name: string): string;
-begin
-  result := getVariableValueString(name, nil);
-end;
-
-function TXQVariableChangeLog.getVariableValueString(const name: string; const namespace: INamespace): string;
-begin
-  result := getVariableValue(name).toString;
-end;
-
-function TXQVariableChangeLog.getVariableValueNode(const name: string; const namespace: INamespace): TTreeElement;
-begin
-  result := getVariableValue(name, namespace).toNode;
-end;
-
-function TXQVariableChangeLog.getVariableValueArray(const name: string; const namespace: INamespace): TXQVArray;
-begin
-  result := getVariableValue(name, namespace).toArray;
-end;
-
-function TXQVariableChangeLog.getVariableValueObject(const name: string; const namespace: INamespace): TXQValueObject;
-begin
-  result := getVariableValueObject(getVariableIndex(name, namespace));
-end;
-
-function TXQVariableChangeLog.getVariableIndex(name: string; const namespace: INamespace): integer;
+function TXQVariableChangeLog.indexOf(const name: string; const namespace: INamespace): integer;
 var i:longint;
 begin
   if caseSensitive then begin
     for i:=high(vars) downto 0 do
-      if (vars[i].name = name)
-         and ((vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.getURL = namespace.getURL))) then exit(i);
+      if (vars[i].name = name) and equalNamespaces(vars[i].namespace, namespace) then exit(i);
   end else
   for i:=high(vars) downto 0 do
-    if striequal(vars[i].name, name)
-       and ((vars[i].namespace = namespace) or ((vars[i].namespace <> nil) and (namespace <> nil) and (vars[i].namespace.getURL = namespace.getURL))) then exit(i);
+    if striequal(vars[i].name, name) and equalNamespaces(vars[i].namespace, namespace) then exit(i);
   exit(-1);
 end;
 
@@ -2896,84 +2842,39 @@ end;
 procedure TXQVariableChangeLog.defineVariable(sender: TObject; const variable: string; const value: IXQValue);
 begin
   ignore(sender);
-  addVariable(variable,value);
+  add(variable,value);
 end;
+
 
 function TXQVariableChangeLog.count: integer;
 begin
   result:=length(vars);
 end;
 
-function TXQVariableChangeLog.getVariableName(i: integer): string;
+function TXQVariableChangeLog.getName(i: integer): string;
 begin
   assert(i>=0); assert(i< count);
   result := vars[i].fullname;
 end;
 
-function TXQVariableChangeLog.getVariableValue(i: integer): IXQValue; inline;
+function TXQVariableChangeLog.get(i: integer): IXQValue; inline;
 begin
   result := vars[i].value;
 end;
 
-function TXQVariableChangeLog.getVariableValueBoolean(i: integer): boolean;
-begin
-  result := getVariableValue(i).toBoolean;
-end;
-
-function TXQVariableChangeLog.getVariableValueInteger(i: integer): integer;
-begin
-  result := getVariableValue(i).toInt64;
-end;
-
-function TXQVariableChangeLog.getVariableValueDecimal(i: integer): decimal;
-begin
-  result := getVariableValue(i).toDecimal;
-end;
-
-function TXQVariableChangeLog.getVariableValueDateTime(i: integer): TDateTime;
-begin
-  result := getVariableValue(i).toDateTime;
-end;
-
-function TXQVariableChangeLog.getVariableValueString(i: integer): string;
-begin
-  result := getVariableValue(i).toString;
-end;
-
-function TXQVariableChangeLog.getVariableValueNode(i: integer): TTreeElement;
-begin
-  result := getVariableValue(i).toNode;
-end;
-
-function TXQVariableChangeLog.getVariableValueArray(i: integer): TXQVArray;
-begin
-  result := getVariableValue(i).toArray;
-end;
-
-function TXQVariableChangeLog.getVariableValueObject(i: integer): TXQValueObject;
-begin
-  if not (vars[i].value is TXQValueObject) then raise Exception.Create('Need object');
-  result := (vars[i].value as TXQValueObject);
-end;
-
-function TXQVariableChangeLog.getAllVariableValues(name: string): TXQVArray;
+function TXQVariableChangeLog.getAll(const name: string; const namespace: INamespace): IXQValue;
 var
   i: Integer;
 begin
-  setlength(result, 0);
+  result := xqvalue();
   if caseSensitive then begin
     for i:=0 to high(vars) do
-      if vars[i].name = name then begin
-        SetLength(result, length(result) + 1);
-        result[high(Result)] := vars[i].value;
-      end;
-  end else begin
+      if (vars[i].name = name) and (equalNamespaces(vars[i].namespace, namespace)) then
+        xqvalueSeqAdd(result, vars[i].value);
+  end else
     for i:=0 to high(vars) do
-      if striequal(vars[i].name, name) then begin
-        SetLength(result, length(result) + 1);
-        result[high(Result)] := vars[i].value;
-      end;
-  end;
+      if striequal(vars[i].name, name) and (equalNamespaces(vars[i].namespace, namespace)) then
+        xqvalueSeqAdd(result, vars[i].value);
 end;
 
 procedure TXQVariableChangeLog.clear;
@@ -3022,7 +2923,7 @@ begin
     end
 end;
 
-class function TXQVariableChangeLog.splitVariableName(const variable: string; out base, varname: string): boolean;
+class function TXQVariableChangeLog.splitName(const variable: string; out base, varname: string): boolean;
 var
   i: SizeInt;
 begin
@@ -3052,9 +2953,9 @@ function TXQVariableChangeLog.debugTextRepresentation: string;
 var i:longint;
 begin
   if count = 0 then exit('');
-  result:=getVariableName(0)+'='+getVariableValueString(0);
+  result:=getName(0)+'='+get(0).toString;
   for i:=1 to high(vars) do
-    result+=LineEnding+getVariableName(i)+'='+getVariableValueString(i);
+    result+=LineEnding+getName(i)+'='+get(i).toString;
 end;
 
 function TXQVariableChangeLog.finalValues: TXQVariableChangeLog;
@@ -3065,14 +2966,30 @@ begin
   for i:=0 to count-1 do begin
     final := true;
     for j:=i+1 to count-1 do
-      if getVariableName(i) = getVariableName(j) then begin
+      if getName(i) = getName(j) then begin
         final := false;
         break;
       end;
     if not final then continue;
-    result.addVariable(getVariableName(i), getVariableValue(i));
+    result.add(getName(i), get(i));
   end;
   result.caseSensitive:=caseSensitive;
+end;
+
+function TXQVariableChangeLog.collected: TXQVariableChangeLog;
+var i: integer;
+  oldid: Integer;
+begin
+  result := TXQVariableChangeLog.create();
+  for i := 0 to high(vars) do begin
+    oldid := result.indexOf(vars[i].name, vars[i].namespace);
+    if oldid < 0 then begin
+      setlength(result.Vars, length(result.vars) + 1);
+      result.vars[high(result.vars)] := vars[i];
+    end else begin
+      xqvalueSeqAdd(result.vars[oldid].value, vars[i].value);
+    end;
+  end;
 end;
 
 procedure TXQVariableChangeLog.takeFrom(other: TXQVariableChangeLog);
@@ -3087,7 +3004,7 @@ begin
   other.pushAll;
 end;
 
-function TXQVariableChangeLog.condensedSharedLog: TXQVariableChangeLog;
+function TXQVariableChangeLog.condensed: TXQVariableChangeLog;
 var
   p: Integer;
   found: Boolean;
@@ -3130,7 +3047,7 @@ var temp: txqvalue;
   i: Integer;
 begin
   if allowObjects then begin
-    if splitVariableName(variable, base, varname) then begin
+    if splitName(variable, base, varname) then begin
       result := hasVariable(base, @temp, namespace);
       if not result then exit;
       if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
@@ -3138,7 +3055,7 @@ begin
       exit;
     end;
   end;
-  i := getVariableIndex(variable, namespace);
+  i := indexOf(variable, namespace);
   if i = -1 then exit(false);
   if assigned(value) then value^ := vars[i].value as txqvalue;
   result := true;
@@ -3151,7 +3068,7 @@ var temp: txqvalue;
 begin
   if not allowObjects then
     exit(hasVariable(variable, value, namespace));
-  if not splitVariableName(variable, base, varname) then
+  if not splitName(variable, base, varname) then
     exit(hasVariable(variable, value, namespace));
 
   result := hasVariable(base, @temp, namespace);

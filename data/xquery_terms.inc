@@ -14,7 +14,7 @@ begin
   if length(children) > 1 then raiseEvaluationError('Can only read property from one term');
   obj:=children[0].evaluate(context);
   if not (obj is TXQValueObject) then raiseEvaluationError('Expected object, got: '+obj.toString);
-  result := (obj as TXQValueObject).getClonedValue(propname);
+  result := (obj as TXQValueObject).getProperty(propname);
 end;
 
 { TXQTermIf }
@@ -258,7 +258,7 @@ var tempContext:TEvaluationContext;
         if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v, context) then
           raiseEvaluationError('Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.addVariable(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
+      tempContext.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
       if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then begin
         tempContext.temporaryVariables.popAll;
         result := not isEvery;
@@ -353,9 +353,9 @@ var
         raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
 
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.addVariable(vars[pos].varname, v, vars[pos].namespace);
+      tempContext.temporaryVariables.add(vars[pos].varname, v, vars[pos].namespace);
       if vars[pos].positionVarname <> '' then
-        tempContext.temporaryVariables.addVariable(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
+        tempContext.temporaryVariables.add(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
       evaluateForLoop(pos+1);
       tempContext.temporaryVariables.popAll();
 
@@ -413,9 +413,9 @@ begin
 
   {oldlen := length(tempContext.temporaryVariables.vars);
   for i := 0 to high(vars) do begin
-    tempContext.temporaryVariables.addVariable(vars[i].varname, xqvalue(), vars[i].namespace);
+    tempContext.temporaryVariables.add(vars[i].varname, xqvalue(), vars[i].namespace);
     if vars[i].positionVarname <> '' then
-      tempContext.temporaryVariables.addVariable(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
+      tempContext.temporaryVariables.add(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
   end;}
   evaluateForLoop(0);
   //setlength(tempContext.temporaryVariables.vars, oldlen);
@@ -545,7 +545,7 @@ begin
       tempcontext.temporaryVariables := TXQVariableChangeLog.create();
       tempcontext.staticContext := sc;
       for j := 0 to high(func.parameters) do
-        tempcontext.temporaryVariables.addVariable(func.parameters[j].name, evilkids[j]);
+        tempcontext.temporaryVariables.add(func.parameters[j].name, evilkids[j]);
       result := func.body.evaluate(tempcontext);
       tempcontext.temporaryVariables.free;
       exit;
@@ -957,7 +957,7 @@ function TXQTermTypeSwitch.evaluate(const context: TEvaluationContext): IXQValue
     if vari is TXQTermVariable then begin
       if tempContext.temporaryVariables = nil then tempContext.temporaryVariables := TXQVariableChangeLog.create();
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.addVariable(TXQTermVariable(vari).value, value);
+      tempContext.temporaryVariables.add(TXQTermVariable(vari).value, value);
     end;
     result := eval.evaluate(tempContext);
     if vari is TXQTermVariable then begin

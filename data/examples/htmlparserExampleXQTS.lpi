@@ -30,7 +30,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--plain /home/benito/xxtest/cat/SeqIDFunc.xml"/>
+        <CommandLineParams Value="--plain /home/benito/xxtest/cat/ModuleImport.xml"/>
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
@@ -53,7 +53,7 @@
       <Filename Value="htmlparserExampleXQTS"/>
     </Target>
     <SearchPaths>
-      <IncludeFiles Value="$(ProjOutDir)"/>
+      <IncludeFiles Value="$(ProjOutDir);.."/>
       <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;../../import/regexpr/source;/home/benito/hg/components/pascal/internet/;../../import"/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>

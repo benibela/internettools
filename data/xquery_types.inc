@@ -289,6 +289,17 @@ begin
   result := 1;
 end;
 
+function TXQValue.getChild(i: integer): IXQValue;
+begin
+  if i = 1 then exit(self);
+  exit(xqvalue);
+end;
+
+function TXQValue.getProperty(const name: string): IXQValue;
+begin
+
+end;
+
 function TXQValue.GetEnumerator: TXQValueEnumerator;
 begin
   result.FCurrent := self;
@@ -315,9 +326,9 @@ begin
       result := 'object: {';
       temp := self.clone as TXQValueObject;
       if temp.values.count > 0 then begin
-        result += temp.values.getVariableName(0)+': '+temp.values.getVariableValue(0).debugAsStringWithTypeAnnotation(textOnly);
+        result += temp.values.getName(0)+': '+temp.values.get(0).debugAsStringWithTypeAnnotation(textOnly);
         for i:=1 to temp.values.count-1 do
-          result += ', '+temp.values.getVariableName(i)+': '+temp.values.getVariableValue(i).debugAsStringWithTypeAnnotation(textOnly);
+          result += ', '+temp.values.getName(i)+': '+temp.values.get(i).debugAsStringWithTypeAnnotation(textOnly);
       end;
       temp.free;
       result += '}';
@@ -1207,6 +1218,12 @@ begin
   Result:=seq.Count;
 end;
 
+function TXQValueSequence.getChild(i: integer): IXQValue;
+begin
+  if (i < 1) or (i > seq.Count) then exit(xqvalue);
+  exit(seq[i-1]);
+end;
+
 function TXQValueSequence.GetEnumerator: TXQValueEnumerator;
 begin
   result.fcurrentidx:=-1;
@@ -1385,6 +1402,11 @@ begin
   values:= TXQVariableChangeLog.create();
 end;
 
+constructor TXQValueObject.createTakingVariableLog(log: TXQVariableChangeLog);
+begin
+  values := log;
+end;
+
 destructor TXQValueObject.Destroy;
 begin
   values.Free;
@@ -1420,14 +1442,6 @@ begin
   Result:='object';
 end;
 
-function TXQValueObject.getClonedValue(const name: string): IXQValue;
-var
-  temp: TXQValue;
-begin
-  if not hasProperty(name, @temp) then result := xqvalue()
-  else result := temp.clone;
-end;
-
 procedure TXQValueObject.setMutable(const name: string; const v: IXQValue);
 var point: integer;
   temp: String;
@@ -1436,18 +1450,18 @@ var point: integer;
   base: String;
 begin
   point := pos('.', name);
-  if Point = 0 then values.addVariable(name, v)
+  if Point = 0 then values.add(name, v)
   else begin
     temp := name;
     base := strSplitGet('.', temp);
-    i := values.getVariableIndex(base);
+    i := values.indexOf(base);
     if i < 0 then begin
       if not hasProperty(base, @old) then raise EXQEvaluationException.Create('Need object property '+temp+' to assign to '+name);
-      values.addVariable(base, old.clone);
+      values.add(base, old.clone);
       i := values.count-1;
     end;
-    if not (values.getVariableValue(i) is TXQValueObject) then raise EXQEvaluationException.Create('Need object property '+temp+' to assign to '+name);
-    (values.getVariableValue(i) as TXQValueObject).setMutable(temp, v);
+    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('Need object property '+temp+' to assign to '+name);
+    (values.get(i) as TXQValueObject).setMutable(temp, v);
   end;
 end;
 
@@ -1475,18 +1489,18 @@ begin
   point := pos('.', name);
   if point > 0 then begin
     part := copy(name,1,point-1);
-    i := values.getVariableIndex(part);
+    i := values.indexOf(part);
     if i < 0 then begin
       if prototype = nil then raise EXQEvaluationException.Create('Couldn''t find sub object:  ' + name);
       exit(prototype.hasProperty(part, value));
     end;
-    if not (values.getVariableValue(i) is TXQValueObject) then raise EXQEvaluationException.Create('Expected object:  ' + name+ ' got '+values.getVariableValue(i).toString);
-    exit((values.getVariableValue(i) as TXQValueObject).hasProperty(strCopyFrom(name, point + 1), value));
+    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('Expected object:  ' + name+ ' got '+values.get(i).toString);
+    exit((values.get(i) as TXQValueObject).hasProperty(strCopyFrom(name, point + 1), value));
   end;
 
-  i := values.getVariableIndex(name);
+  i := values.indexOf(name);
   if i >= 0 then begin
-    if value <> nil then value^ := values.getVariableValue(i) as txqvalue;
+    if value <> nil then value^ := values.get(i) as txqvalue;
     exit(true);
   end;
   result := prototype <> nil;
@@ -1501,7 +1515,7 @@ begin
   if prototype = nil then result := TXQValueObject.create()
   else result := prototype.clone(); //removes the prototype link (necessary for example)
   for i:=0 to values.count-1 do
-    (result as TXQValueObject).values.addVariable(values.getVariableName(i), values.getVariableValue(i));
+    (result as TXQValueObject).values.add(values.getName(i), values.get(i));
 end;
 
 function TXQValueObject.cloneLinked: TXQValueObject;
@@ -1518,9 +1532,9 @@ begin
   result := '{';
   temp := (self.clone as TXQValueObject);
   if temp.values.count > 0 then begin
-    result += jsonStrEscape(temp.values.getVariableName(0))+': '+temp.values.getVariableValue(0).jsonSerialize(xmlTextOnly);
+    result += jsonStrEscape(temp.values.getName(0))+': '+temp.values.get(0).jsonSerialize(xmlTextOnly);
     for i:=1 to temp.values.count-1 do
-      result += ', '+jsonStrEscape(temp.values.getVariableName(i))+': '+temp.values.getVariableValue(i).jsonSerialize(xmlTextOnly);
+      result += ', '+jsonStrEscape(temp.values.getName(i))+': '+temp.values.get(i).jsonSerialize(xmlTextOnly);
   end;
   temp.free;
   result += '}';
@@ -1535,15 +1549,15 @@ begin
   if temp.values.count = 0 then result := '<'+objectTag+'/>'
   else begin
     result :=  '<'+objectTag+'>';
-    result +=  '<'+temp.values.Names[0]+'>'+temp.values.getVariableValue(0).xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[0]+'>';
+    result +=  '<'+temp.values.Names[0]+'>'+temp.values.get(0).xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[0]+'>';
     for i:=1 to temp.values.count-1 do
-      result +=  '<'+temp.values.Names[i]+'>'+temp.values.getVariableValue(i).xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[i]+'>';
+      result +=  '<'+temp.values.Names[i]+'>'+temp.values.get(i).xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[i]+'>';
     result +=  '</'+objectTag+'>';
   end;
   temp.free;
 end;
 
-function TXQValueObject.getValue(const name: string): IXQValue;
+function TXQValueObject.getProperty(const name: string): IXQValue;
 var
   temp: TXQValue;
 begin
@@ -1551,60 +1565,6 @@ begin
   hasProperty(name, @temp);
   if temp = nil then exit(xqvalue());
   result := temp;
-end;
-
-function TXQValueObject.getAsBoolean(const name: string): boolean;
-var
-  temp: IXQValue;
-begin
-  temp := getValue(name);
-  if temp <> nil then exit(temp.toBoolean);
-  result := false;
-end;
-
-function TXQValueObject.getasInt65(const name: string): int65;
-var
-  temp: IXQValue;
-begin
-  temp := getValue(name);
-  if temp <> nil then exit(temp.toInt65);
-  result := 0;
-end;
-
-function TXQValueObject.getAsDecimal(const name: string): decimal;
-var
-  temp: IXQValue;
-begin
-  temp := getValue(name);
-  if temp <> nil then exit(temp.toDecimal);
-  result := 0;
-end;
-
-function TXQValueObject.getAsString(const name: string): string;
-var
-  temp: IXQValue;
-begin
-  temp := getValue(name);
-  if temp <> nil then exit(temp.toString);
-  result := '';
-end;
-
-function TXQValueObject.getAsDateTime(const name: string): TDateTime;
-var
-  temp: IXQValue;
-begin
-  temp := getValue(name);
-  if temp <> nil then exit(temp.toDateTime);
-  result := 0;
-end;
-
-function TXQValueObject.getAsNode(const name: string): TTreeElement;
-var
-  temp: IXQValue;
-begin
-  temp := getValue(name);
-  if temp <> nil then exit(temp.toNode);
-  result := nil;
 end;
 
 { TXQValueFunction }

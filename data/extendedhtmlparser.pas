@@ -677,7 +677,7 @@ end;
 
 function THtmlTemplateParser.GetVariableLogCondensed: TXQVariableChangeLog;
 begin
-  if FVariableLogCondensed = nil then FVariableLogCondensed := FVariableLog.condensedSharedLog;
+  if FVariableLogCondensed = nil then FVariableLogCondensed := FVariableLog.condensed;
   result := FVariableLogCondensed;
 end;
 
@@ -842,9 +842,9 @@ var xpathText: TTreeElement;
 
     varnameindex := attribs.IndexOfName('var');
     if varnameindex >= 0 then
-      FVariableLog.addVariable(Trim(replaceVars(attribs.Values['var'])), value)
+      FVariableLog.add(Trim(replaceVars(attribs.Values['var'])), value)
     else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
-      FVariableLog.addVariable(FUnnamedVariableName, value);
+      FVariableLog.add(FUnnamedVariableName, value);
 
     templateStart := templateStart.templateReverse;
   end;
@@ -855,7 +855,7 @@ var xpathText: TTreeElement;
   begin
     varcount:=FVariableLog.count;
     read := performPXPEvaluation(templateStart.source);
-    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then FVariableLog.addVariable(FUnnamedVariableName, read);
+    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then FVariableLog.add(FUnnamedVariableName, read);
     templateStart := templateStart.templateReverse;
   end;
 
