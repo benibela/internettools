@@ -924,6 +924,23 @@ begin
   m('declare function f($a as xs:decimal+) { $a }; string-join(for $i in f((1, 1.0, xs:short(7))) return ($i instance of xs:double), " ")', 'false false false');
   m('declare function f($a as xs:decimal+) as xs:double+ { $a }; string-join(for $i in f((1, 1.0, xs:short(7), text { " 8 " })) return ($i instance of xs:double), " ")', 'true true true true');
 
+  t('outer-xml(<a xmlns="foobar"><b xmlns="xyz"/></a>/*:b)', '<b xmlns="xyz"/>');
+  t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>/b)', '<b xmlns=""/>');
+  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+
+  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:b1="b1" xmlns:b2="b2" xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:b1="b1" xmlns:b2="b2" xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+
+  t('outer-xml(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)', '<b xmlns=""/>'); //XQTS test
 
   helper.free;
   xml.free;

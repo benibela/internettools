@@ -1241,7 +1241,7 @@ begin
     Dispose(subcontext);
   end else if context.namespaces <> nil then
     for i:=oldnamespacecount to context.namespaces.Count-1 do
-      context.namespaces.Delete(i);
+      context.namespaces.Delete(context.namespaces.Count-1);
 end;
 
 destructor TXQTermConstructor.destroy;
