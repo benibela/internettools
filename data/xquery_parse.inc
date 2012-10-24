@@ -1106,7 +1106,11 @@ function TXQParsingContext.parseModule(): TXQTerm;
     end;
 
     module := engine.findModule(moduleURL, at);
-    if module = nil then raiseParsingError('Unknown module: '+moduleURL);
+    if module = nil then begin
+      engine.onImportModule(engine, moduleURL, at);
+      module := engine.findModule(moduleURL, at);
+      if module = nil then raiseParsingError('Unknown module: '+moduleURL);
+    end;
     if staticContext.importedModules = nil then
       staticContext.importedModules := TStringList.Create;
     if moduleName = '' then moduleName := module.staticContext.moduleNamespace.getPrefix;

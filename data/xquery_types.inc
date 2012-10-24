@@ -1543,15 +1543,19 @@ begin
   temp.free;
 end;
 
-function TXQValueObject.getValue(const name: string): TXQValue;
+function TXQValueObject.getValue(const name: string): IXQValue;
+var
+  temp: TXQValue;
 begin
-  result := nil;
-  hasProperty(name, @result);
+  temp := nil;
+  hasProperty(name, @temp);
+  if temp = nil then exit(xqvalue());
+  result := temp;
 end;
 
 function TXQValueObject.getAsBoolean(const name: string): boolean;
 var
-  temp: TXQValue;
+  temp: IXQValue;
 begin
   temp := getValue(name);
   if temp <> nil then exit(temp.toBoolean);
@@ -1560,7 +1564,7 @@ end;
 
 function TXQValueObject.getasInt65(const name: string): int65;
 var
-  temp: TXQValue;
+  temp: IXQValue;
 begin
   temp := getValue(name);
   if temp <> nil then exit(temp.toInt65);
@@ -1569,7 +1573,7 @@ end;
 
 function TXQValueObject.getAsDecimal(const name: string): decimal;
 var
-  temp: TXQValue;
+  temp: IXQValue;
 begin
   temp := getValue(name);
   if temp <> nil then exit(temp.toDecimal);
@@ -1578,7 +1582,7 @@ end;
 
 function TXQValueObject.getAsString(const name: string): string;
 var
-  temp: TXQValue;
+  temp: IXQValue;
 begin
   temp := getValue(name);
   if temp <> nil then exit(temp.toString);
@@ -1587,7 +1591,7 @@ end;
 
 function TXQValueObject.getAsDateTime(const name: string): TDateTime;
 var
-  temp: TXQValue;
+  temp: IXQValue;
 begin
   temp := getValue(name);
   if temp <> nil then exit(temp.toDateTime);
@@ -1596,7 +1600,7 @@ end;
 
 function TXQValueObject.getAsNode(const name: string): TTreeElement;
 var
-  temp: TXQValue;
+  temp: IXQValue;
 begin
   temp := getValue(name);
   if temp <> nil then exit(temp.toNode);

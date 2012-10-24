@@ -40,6 +40,7 @@ type
   TXQTerm=class;
   TXQTermSequenceType = class;
   TXQuery = class;
+  IXQuery = interface;
 
 
   { TXQValueEnumerator }
@@ -587,7 +588,7 @@ type
     function jsonSerialize(xmlTextOnly: boolean = true): string; override;
     function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
-    function getValue(const name: string): TXQValue; //**< Returns the value of a property
+    function getValue(const name: string): IXQValue; //**< Returns the value of a property
     function getAsBoolean(const name: string): boolean; //**< Returns the value of a property as boolean
     function getAsInt65(const name: string): int65; //**< Returns the value of a property as integer
     function getAsDecimal(const name: string): decimal; //**< Returns the value of a property as decimal
@@ -679,6 +680,9 @@ type
   You can either create an syntax tree for the function with the respective TXQTerm classes or derive a class from TXQTerm and override the evaluate function to calculate it natively.
   *)
   TDeclareExternalFunctionEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const functionName: string; var result: TXQValueFunction) of object;
+
+  TImportModuleEvent = procedure (sender: TObject; const namespace: string; const at: array of string) of object;
+
   (***
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
@@ -696,7 +700,6 @@ type
   TXQBinaryOp = function (const cxt: TEvaluationContext; const a,b: IXQValue): IXQValue;
 
 
-  type
 
   { TXQParsingContext }
 
@@ -1215,6 +1218,7 @@ type
     OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
     OnDeclareExternalVariable: TDeclareExternalVariableEvent; //**< Event called to import a variable that is declared as "declare variable ... external" in a XQuery expression
     OnDeclareExternalFunction: TDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression.
+    OnImportModule: TImportModuleEvent;
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
@@ -3261,6 +3265,7 @@ end;
 procedure TXQueryEngine.clear;
 begin
   FLastQuery:=nil;
+  FModules.Clear;
 end;
 
 function TXQueryEngine.parseXPath2(s: string): IXQuery;
