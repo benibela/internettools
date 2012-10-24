@@ -460,7 +460,8 @@ begin
           mypxpoutput := pxp.evaluate();
           timing := now - timing;
           myoutput := mytostring(mypxpoutput);
-          if (myoutput = output)
+          if strEqual('Ignore', outputcomparator)
+             or (myoutput = output)
              or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
              or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
              or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18')))
@@ -474,8 +475,9 @@ begin
              or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
              then begin
             correctLocal += 1;
-            if logCorrect then begin
+            if logCorrect or strEqual('Ignore', outputcomparator) then begin
               logGroupStart;
+              if strEqual('Ignore', outputcomparator) then output:='IGNORED OUTPUT' ;
               mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
             end;
             if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)   then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
