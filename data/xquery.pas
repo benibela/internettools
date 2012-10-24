@@ -2380,6 +2380,9 @@ begin
   result := (at[0] = bt[0]) and (at[2] = bt[2]); //ignore prefix
 end;
 
+function xqvalueCastAs(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
+function xqvalueCastableAs(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
+
 
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}

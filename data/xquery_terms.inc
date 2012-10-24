@@ -147,7 +147,6 @@ var
   temp: String;
   ns: INamespace;
 begin
-  if not isSingleType() then raiseEvaluationError('need singletype for cast as');
   v := xqvalueAtomize(v);
   if not castableAsBase(v) then raiseEvaluationError('impossible cast as');
   if not atomicTypeInfo.InheritsFrom(TXQValue_QName) then result := atomicTypeInfo.createFromValue(v)

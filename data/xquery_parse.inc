@@ -991,6 +991,8 @@ var astroot: TXQTerm;
     if res.operatorInfo^.followedBy <> '' then begin
       expect(res.operatorInfo^.followedBy);
       res.push(parseSequenceType()); //assume we read instance of/cast/castable/treat as
+      if ((res.operatorInfo^.func = @xqvalueCastAs) or (res.operatorInfo^.func = @xqvalueCastableAs)) and (not (res.children[high(res.children)] as TXQTermSequenceType).isSingleType()) then
+        raiseParsingError('Need single typ for cast');
     end else
       res.push(parseValue())
   end;

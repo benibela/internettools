@@ -917,6 +917,14 @@ begin
   m('declare function f($a as xs:decimal) {  $a instance of xs:integer }; string-join(for $i in (1, 1.0) return f($i), " ")', 'true false');
   m('declare function f($a as xs:double) {  $a instance of xs:integer }; string-join(for $i in (1, 1.0, 1e1) return f($i), " ")', 'false false false');
 
+  m('declare function f($a as xs:double+) { $a }; string-join(for $i in f((1, 1.0, xs:float(1), xs:double(1))) return ($i instance of xs:double), " ")', 'true true true true');
+  m('declare function f($a as xs:decimal+) { $a }; string-join(for $i in f((1, 1.0, xs:short(7))) return ($i instance of xs:decimal), " ")', 'true true true');
+  m('declare function f($a as xs:decimal+) { $a }; string-join(for $i in f((1, 1.0, xs:short(7))) return ($i instance of xs:integer), " ")', 'true false true');
+  m('declare function f($a as xs:decimal+) { $a }; string-join(for $i in f((1, 1.0, xs:short(7))) return ($i instance of xs:short), " ")', 'false false true');
+  m('declare function f($a as xs:decimal+) { $a }; string-join(for $i in f((1, 1.0, xs:short(7))) return ($i instance of xs:double), " ")', 'false false false');
+  m('declare function f($a as xs:decimal+) as xs:double+ { $a }; string-join(for $i in f((1, 1.0, xs:short(7), text { " 8 " })) return ($i instance of xs:double), " ")', 'true true true true');
+
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
