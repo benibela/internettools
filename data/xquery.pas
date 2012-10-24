@@ -2029,7 +2029,7 @@ begin
     i := importedModules.IndexOf(nsprefix);
     if i >= 0 then exit(TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace);
   end;
-  if (importedSchemas <> nil) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
+  if (importedSchemas <> nil)  and (defaultNamespaceKind in [xqdnkAny, xqdnkElementType,  xqdnkType]) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
     exit;
   result := sender.findNamespace(nsprefix);
   if result = nil then

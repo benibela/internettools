@@ -1067,18 +1067,24 @@ function TXQParsingContext.parseModule(): TXQTerm;
     prefix, url: String;
   begin
     prefix := '';
-    case nextToken() of
+    url := nextToken();
+    case url of
       'default': begin
         expect('element');
         expect('namespace');
+        url := parseStringLiteral();
       end;
       'namespace': begin
         prefix := nextTokenNCName();
         expect('=');
+        url := parseStringLiteral();
       end
-      else raiseParsingError('Invalid schema import');
+      else begin
+        if (url = '') or not (url[1] in ['''', '"']) then raiseParsingError('Invalid schema import');
+        url := '';
+        prefix:=':::'; //no prefix given
+      end;
     end;
-    url := parseStringLiteral();
     if staticContext.importedSchemas = nil then staticContext.importedSchemas := TNamespaceList.Create;
     staticContext.importedSchemas.add(TNamespace.Create(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
     if nextToken(true) = 'at' then begin
@@ -1100,6 +1106,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
       expect('namespace'); moduleName:=nextTokenNCName(); expect('=');
     end;
     moduleURL := parseStringLiteral;
+    at := nil;
     if nextToken(true) = 'at' then begin
       arrayAdd(at, parseStringLiteral);
       while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseStringLiteral); end;

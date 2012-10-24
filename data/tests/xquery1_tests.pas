@@ -852,6 +852,28 @@ begin
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');
   //timing('(for $i in (1 to 50), $j in (1 to 50)  return ($i))[0]', '');
 
+  t('let $x as element() := <abc/> return name($x)', 'abc');
+  t('let $x as element()+ := <abc/> return name($x)', 'abc');
+  t('let $x as element()* := <abc/> return name($x)', 'abc');
+  t('let $x as element()? := <abc/> return name($x)', 'abc');
+  t('let $x as element(abc) := <abc/> return name($x)', 'abc');
+  t('let $x as element(abc)+ := <abc/> return name($x)', 'abc');
+  t('let $x as element(abc)* := <abc/> return name($x)', 'abc');
+  t('let $x as element(abc)? := <abc/> return name($x)', 'abc');
+  t('let $x as element():= <abc/> return name($x)', 'abc');
+  t('let $x as element()+:= <abc/> return name($x)', 'abc');
+  t('let $x as element()*:= <abc/> return name($x)', 'abc');
+  t('let $x as element()?:= <abc/> return name($x)', 'abc');
+  t('let $x as element(abc):= <abc/> return name($x)', 'abc');
+  t('let $x as element(abc)+:= <abc/> return name($x)', 'abc');
+  t('let $x as element(abc)*:= <abc/> return name($x)', 'abc');
+  t('let $x as element(abc)?:= <abc/> return name($x)', 'abc');
+
+  m('import schema default element namespace "http://www.example.com/typedecl"; fn:concat(1,2,3)', '123');
+  m('import schema default element namespace "http://www.example.com/typedecl"; pxp:concat(1,2,3)', '123');
+  m('import schema default element namespace "http://www.example.com/typedecl"; concat(1,2,3)', '123');
+  m('import schema "http://www.example.com/typedecl"; concat(1,2,3)', '123');
+  m('import schema ''http://www.example.com/typedecl''; concat(1,2,3)', '123');
 
 
 
