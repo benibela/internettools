@@ -387,6 +387,9 @@ begin
         inputfilevar := node.getAttribute('variable');
         inputfile := node.deepNodeText();
         if inputfile = 'id-idref-dtd' then begin inputfile:='id'; pxp.StaticContext.defaultElementTypeNamespace := TNamespace.create('http://www.w3.org/XQueryTest/ididrefs', ''); end
+        else if inputfile = 'id-idref' then begin inputfile:='id'; end
+        else if inputfile = 'id-idref2' then begin inputfile:='id2'; end
+        else if inputfile = 'QNameSource' then begin inputfile:='QName-source'; end
         else pxp.StaticContext.defaultElementTypeNamespace := nil;
         if striEqual(node.getNodeName(), 'input-URI') then
           pxp.VariableChangelog.add(inputfilevar,  GetCurrentDir + DirectorySeparator + 'TestSources/'+inputfile+'.xml')
