@@ -1916,7 +1916,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(css(''a[href$=".html"]''), ",")', 'A3', '<a href="http://xyz.com">A1</a><a href="http://xyz.com/test.gif">A2</a><a href="http://xyz.com/test.html">A3</a>');
   t('string-join(css(''p[title*="hello"]''), ",")', 'P2,P3', '<p title="foobar">P1</p><p title="xyzhelloyzxy">P2</p><p title="hello">P3</p>');
   t('string-join(css(''p[*|title*="hello"]''), ",")', 'P2,P3', '');
-  t('string-join(css(''p[xyz|title*="hello"]''), ",")', 'P2,P3', ''); //namespace are ignored. TODO: namespaces
+  t('string-join(css(''p[xyz|title*="hello"]''), ",")', '', '');
   t('string-join(css(''p[|title*="hello"]''), ",")', 'P2,P3', '');
   t('string-join(css(''*.pastoral''), ",")', 'S1,Very green,P1,P2', '<span class="pastoral">S1</span><H1>Not green</H1><H1 class="pastoral">Very green</H1><p class="pastoral blue aqua marine">P1</p><p class="pastoral blue">P2</p>');
   t('string-join(css(''.pastoral''), ",")', 'S1,Very green,P1,P2', '');
@@ -2494,6 +2494,17 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('if (1,2,3) then 5 else 6', '6');
   t('if (/a,2,3) then 5 else 6',  '5', '!<a>..</a>');
 
+
+  t('string-join(css("b|foobar"), ",")', 'hallo', '<xyz:foobar xmlns:xyz="test://b">hallo</xyz:foobar>');
+  t('string-join(css("a|foobar"), ",")', '');
+  t('string-join(css("*|foobar"), ",")', 'hallo');
+  t('string-join(css("b|*"), ",")', 'hallo');
+
+  t('string-join(css("b|foobar"), ",")', 'hallo', '<foobar xmlns="test://b">hallo</foobar>');
+  t('string-join(css("a|foobar"), ",")', '');
+  t('string-join(css("*|foobar"), ",")', 'hallo');
+  t('string-join(css("b|*"), ",")', 'hallo');
+
   t('/r', 'test', '!<r>test</r>');
   t('/r', '', '!<r xmlns="foobar">test</r>');
   ps.StaticContext.defaultElementTypeNamespace := TNamespace.create('foobar', '');
@@ -2502,6 +2513,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('day-from-datetime(())', '');
   t('doc(())', '');
   t('collection(())', '');
+
+
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")

@@ -3547,9 +3547,8 @@ var pos: pchar;
       element:=nextToken;
     end;
 
-    //if namespace <> '*' then result := namespace + ':' + token         TODO: handle namespace (requires namespace support for my Xpath expressions)
-    //else
-    result := element;
+    if (namespace <> '*') or (element <> '*') then result := namespace + ':' + element
+    else result := element;
   end;
 
   function hash: TXQTerm;
@@ -3760,7 +3759,7 @@ var pos: pchar;
     while pos^ <> #0 do begin
       //simple_selector_sequence
       elementName := namespacedIdent;
-      if (elementName = '*') and (axis = 'descendant-or-self') then axis := 'descendant';
+      if ((elementName = '*') or (elementName = '*:*')) and (axis = 'descendant-or-self') then axis := 'descendant';
       if not adjacent then newMatch := TXQTermNodeMatcher.Create(axis + '::' + elementName)
       else begin
         newMatch:=TXQTermFilterSequence.Create(

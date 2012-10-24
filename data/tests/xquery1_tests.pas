@@ -852,6 +852,9 @@ begin
   //timing('subsequence((1 to 1000), 200, 600)[0]', '');
   //timing('(for $i in (1 to 50), $j in (1 to 50)  return ($i))[0]', '');
 
+
+
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
