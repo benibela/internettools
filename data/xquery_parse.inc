@@ -1105,10 +1105,10 @@ function TXQParsingContext.parseModule(): TXQTerm;
       while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseStringLiteral); end;
     end;
 
-    module := engine.findModule(moduleURL, at);
+    module := engine.findModule(moduleURL);
     if module = nil then begin
       engine.onImportModule(engine, moduleURL, at);
-      module := engine.findModule(moduleURL, at);
+      module := engine.findModule(moduleURL);
       if module = nil then raiseParsingError('Unknown module: '+moduleURL);
     end;
     if staticContext.importedModules = nil then

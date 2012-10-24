@@ -1256,7 +1256,7 @@ type
     class function evaluateStaticCSS3(expression: string; tree:TTreeElement = nil): IXQValue;
 
     procedure registerModule(module: IXQuery);
-    function findModule(const namespaceURL: string; at: array of string): TXQuery;
+    function findModule(const namespaceURL: string): TXQuery;
 
     //** Registers an custom, pure function with a certain name
     class procedure registerFunction(const name: string; const func: TXQBasicFunction; const returnType: TXQValueKind=pvkUndefined);
@@ -1576,6 +1576,7 @@ procedure ignore(const intentionallyUnusedParameter: IXQValue); inline; begin en
 procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: Decimal); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begin end;
 
 {$I disableRangeOverflowChecks.inc}
 
@@ -3326,7 +3327,7 @@ begin
   FModules.Add(module);
 end;
 
-function TXQueryEngine.findModule(const namespaceURL: string; at: array of string): TXQuery;
+function TXQueryEngine.findModule(const namespaceURL: string): TXQuery;
 var
   i: Integer;
 begin

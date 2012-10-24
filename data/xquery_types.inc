@@ -297,7 +297,8 @@ end;
 
 function TXQValue.getProperty(const name: string): IXQValue;
 begin
-
+  ignore(name);
+  result := xqvalue();
 end;
 
 function TXQValue.GetEnumerator: TXQValueEnumerator;

@@ -208,6 +208,7 @@ end;
 function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
 var temp: TEvaluationContext;
 begin
+  temp.staticContext := nil;
   result := instanceOf(ta, temp);
 end;
 
@@ -500,7 +501,6 @@ var
   i: Integer;
   j: Integer;
   func: TXQValueFunction;
-  moduleIndex: Integer;
   sc: TXQStaticContext;
   ns: INamespace;
   temp: String;
@@ -1229,29 +1229,10 @@ begin
 end;
 
 function TXQTermDefineFunction.evaluate(const context: TEvaluationContext): IXQValue;
-var
-  resfunc: TXQValueFunction;
-  i: Integer;
 begin
   raiseEvaluationError('Dead branch called');
-{  resfunc := TXQValueFunction.create();
-  i := 0;
-  while (i < high(children)) and (children[i] is TXQTermDefineVariable) do begin
-    setlength(resfunc.parameters, length(resfunc.parameters) + 1);
-    resfunc.parameters[high(resfunc.parameters)].name:=TXQTermDefineVariable(children[i]).variablename;
-    if length(children[i].children) > 0 then
-      resfunc.parameters[high(resfunc.parameters)].seqtype := TXQTermDefineVariable(children[i]).children[0] as TXQTermSequenceType;
-    i+=1;
-  end;
-  if children[i] is TXQTermSequenceType then begin
-    resfunc.resulttype := children[i] as TXQTermSequenceType;
-    i+=1;
-  end;
-  if i <> high(children) then raiseEvaluationError('Invalid function definition');
-  resfunc.namespace := namespace;
-  resfunc.body:=children[i];
-  resfunc.context:=context;
-  result := resfunc;          }
+  ignore(context);
+  result := nil;
 end;
 
 function TXQTermDefineFunction.define(): TXQValueFunction;

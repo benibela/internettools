@@ -1790,9 +1790,7 @@ begin
   result := TXQValue_QName.create(ns + name);
 end;
 
-function xqFunctionQName(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
-var ns: tnamespace;
-  local: String;
+function xqFunctionQName(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,1,2);
   if length(args) = 1 then
