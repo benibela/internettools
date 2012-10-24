@@ -875,7 +875,47 @@ begin
   m('import schema "http://www.example.com/typedecl"; concat(1,2,3)', '123');
   m('import schema ''http://www.example.com/typedecl''; concat(1,2,3)', '123');
 
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(10) instance of xs:integer', 'true');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(10) instance of xs:decimal', 'true');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(10) instance of xs:double', 'false');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(10.0) instance of xs:integer', 'false');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(10.0) instance of xs:decimal', 'true');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(10.0) instance of xs:double', 'false');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(1e1) instance of xs:integer', 'false');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(1e1) instance of xs:decimal', 'false');
+  m('declare function f($a as xs:anyAtomicType) { $a }; f(1e1) instance of xs:double', 'true');
 
+  m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10) instance of xs:integer', 'true');
+  m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10) instance of xs:decimal', 'true');
+  m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10) instance of xs:double', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10.0) instance of xs:integer', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10.0) instance of xs:decimal', 'true');
+  m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10.0) instance of xs:double', 'false');
+  {f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:integer', 'false');
+  f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:decimal', 'false');
+  f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:double', 'true'); conversion fail}
+
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10) instance of xs:integer', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10) instance of xs:decimal', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10) instance of xs:double', 'true');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10.0) instance of xs:integer', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10.0) instance of xs:decimal', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10.0) instance of xs:double', 'true');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(1e1) instance of xs:integer', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(1e1) instance of xs:decimal', 'false');
+  m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(1e1) instance of xs:double', 'true');
+
+  //m('declare function f($a as xs:anyAtomicType) { $a }; f((10,20)) ', 'false');
+  t('() instance of xs:anyAtomicType', 'false');
+  //m('declare function f($a as xs:anyAtomicType) { $a }; f(()) ', 'false');
+  m('declare function f($a as xs:anyAtomicType?) { $a }; empty(f(())) ', 'true');
+  m('declare function f($a as xs:anyAtomicType+) { $a }; string-join( f((10,20)) , " ")', '10 20');
+  m('declare function f($a as xs:anyAtomicType*) { $a }; string-join( f(()) , " ")', '');
+  m('declare function f($a as xs:anyAtomicType*) { $a }; string-join( f((10)) , " ")', '10');
+  m('declare function f($a as xs:anyAtomicType*) { $a }; string-join( f((10,20)) , " ")', '10 20');
+
+  m('declare function f($a as xs:decimal) {  $a instance of xs:integer }; string-join(for $i in (1, 1.0) return f($i), " ")', 'true false');
+  m('declare function f($a as xs:double) {  $a instance of xs:integer }; string-join(for $i in (1, 1.0, 1e1) return f($i), " ")', 'false false false');
 
   helper.free;
   xml.free;

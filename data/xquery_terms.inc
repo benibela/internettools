@@ -495,6 +495,36 @@ begin
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): IXQValue;
+  function functionTypeConversion(const v: IXQValue; const typ: TXQTermSequenceType): IXQValue;
+    function conversionSingle(const w: IXQValue): IXQValue;
+    begin
+      result := w;
+      if result is TXQValueNode then result := xqvalueAtomize(result);
+      if typ.instanceOf(result, context) then exit;
+      if (result is TXQValue_untypedAtomic)
+         or (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) and ((w is TXQValue_float) or (w is TXQValue_double)))
+         or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
+         or (w.instanceOfInternal(TXQValue_anyURI) and (typ.atomicTypeInfo.instanceOf(TXQValueString))) then
+           exit(typ.castAs(result, context));
+      raiseEvaluationError('Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
+    end;
+
+  var
+    i: Integer;
+  begin
+    result := v;
+    if typ = nil then exit;
+    if typ.instanceOf(result, context) then exit;
+    if typ.kind = tikAtomic then begin
+      if not (result is TXQValueSequence) then
+        exit(conversionSingle(result));
+      if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then raiseEvaluationError('Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+      if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raiseEvaluationError('Expected value, but got empty sequence.');
+      for i := 0 to result.getSequenceCount - 1 do
+        (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
+    end;
+  end;
+
 var
   evilkids: TXQVArray;
   tempcontext: TEvaluationContext;
@@ -545,8 +575,9 @@ begin
       tempcontext.temporaryVariables := TXQVariableChangeLog.create();
       tempcontext.staticContext := sc;
       for j := 0 to high(func.parameters) do
-        tempcontext.temporaryVariables.add(func.parameters[j].name, evilkids[j]);
+        tempcontext.temporaryVariables.add(func.parameters[j].name, functionTypeConversion(evilkids[j], func.parameters[j].seqtype) );
       result := func.body.evaluate(tempcontext);
+      result := functionTypeConversion(result, func.resulttype);
       tempcontext.temporaryVariables.free;
       exit;
     end;
