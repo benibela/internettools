@@ -1068,6 +1068,13 @@ begin
   m('declare copy-namespaces preserve, no-inherit; let $d := document { <abc/>, <def/> } return string-join(for $c in <foobar xmlns:inh="erit">{$d}</foobar> / * return outer-xml($c), ":")', '<abc/>:<def/>');
   m('declare copy-namespaces preserve, inherit; let $d := document { <abc/>, <def/> } return string-join(for $c in <foobar xmlns:inh="erit">{$d}</foobar> / * return outer-xml($c), ":")', '<abc xmlns:inh="erit"/>:<def xmlns:inh="erit"/>');
 
+  t('<a>b</a> instance of element(*, xs:anyType)', 'true');
+  t('<a>b</a> instance of element(a, xs:anyType)', 'true');
+  t('<a>b</a> instance of element(b, xs:anyType)', 'false');
+  t('<r><a>b</a></r> / element(*, xs:anyType)', 'b');
+  t('<r><a>b</a></r> / element(a, xs:anyType)', 'b');
+  t('<r><a>b</a></r> / element(b, xs:anyType)', '');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);

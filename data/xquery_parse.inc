@@ -899,13 +899,25 @@ begin
 
         if (isKindTestFunction(word)
            or (strContains(word, '::') and (isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2))))) then begin
-          if strContains(word, 'attribute') then result := TXQTermReadAttribute.create(word, true)
-          else result := TXQTermNodeMatcher.Create(word, true);
+          if strContains(word, 'attribute') then begin
+            result := TXQTermReadAttribute.create(word, true);
+            exit(parseSequenceLike(result));
+          end else begin
+            result := TXQTermNodeMatcher.Create(word, true);
+            skipWhitespaceAndComment();
+            if pos^ <> ')' then begin
+              result.push(parseValue());   skipWhitespaceAndComment();
+              if pos^ = ',' then begin expect(','); result.push(parseSequenceType()); end;
+            end;
+            expect(')');
+            exit;
+          end;
+
         end else begin
           result := TXQTermNamedFunction.createIfExists(word, staticContext);
           if result = nil then raise Exception.Create('unknown function: '+word);
+          exit(parseSequenceLike(result));
         end;
-        exit(parseSequenceLike(result));
       end;
 
 
