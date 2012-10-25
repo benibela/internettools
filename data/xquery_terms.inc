@@ -1129,28 +1129,35 @@ var
               temp := temp.next;
             end;
           end;
-          if not context.staticContext.copyNamespacePreserve then begin
-            //remove namespaces that are not used
-            temp := kid;
-            while (temp <> nil) and (temp <> kid.reverse) do begin
-              if temp.attributes <> nil then
-                for i := temp.attributes.Count - 1 downto 0 do
-                  if (temp.attributes.Items[i].isNamespaceNode) and not (temp.isNamespaceUsed(temp.attributes.Items[i].toNamespace)) then
-                    temp.attributes.Delete(i);
-              temp := temp.next;
+        end;
+        if not context.staticContext.copyNamespacePreserve then begin
+          //remove old namespaces that are not used
+          temp := kid;
+          while (temp <> nil) and (temp <> kid.reverse) do begin
+            if temp.attributes <> nil then
+              for i := temp.attributes.Count - 1 downto 0 do
+                if (temp.attributes.Items[i].isNamespaceNode) and not (temp.isNamespaceUsed(temp.attributes.Items[i].toNamespace)) then
+                  temp.attributes.Delete(i);
+            temp := temp.next;
+          end;
+        end;
+        if v.toNode.parent <> nil then begin
+          //copy namespaces of old parent
+          tempNamespaces := TNamespaceList.Create;
+          v.toNode.parent.getAllNamespaces(tempNamespaces);
+          for i:=0 to tempNamespaces.Count - 1 do
+            if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then
+              kid.addNamespaceDeclaration(tempNamespaces.items[i]);
+          tempNamespaces.free;
+        end;
+        if (not context.staticContext.copyNamespaceInherit) and (subcontext^.namespaces <> nil) then begin
+          //remove namespaces of new parent
+          for i := 0 to subcontext^.namespaces.Count - 1 do
+            if not kid.isNamespaceUsed(subcontext^.namespaces.items[i]) then begin
+              if kid.attributes = nil then kid.attributes := TAttributeList.Create;
+              if subcontext^.namespaces.items[i].getPrefix = '' then kid.attributes.add('xmlns', '')
+              else kid.attributes.add(subcontext^.namespaces.items[i].getPrefix, '', XMLNamespace_XMLNS);
             end;
-          end;
-          if v.toNode.parent <> nil then begin
-            tempNamespaces := TNamespaceList.Create;
-            v.toNode.parent.getAllNamespaces(tempNamespaces);
-            for i:=0 to tempNamespaces.Count - 1 do
-              if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then begin
-                if kid.attributes = nil then kid.attributes := TAttributeList.Create;
-                if tempNamespaces.items[i].getPrefix = '' then kid.attributes.add('xmlns', tempNamespaces.items[i].getURL)
-                else kid.attributes.add(tempNamespaces.items[i].getPrefix, tempNamespaces.items[i].getURL, XMLNamespace_XMLNS);
-              end;
-            tempNamespaces.free;
-          end;
         end;
         addNodeAsKid;
       end;
@@ -1241,6 +1248,11 @@ begin
           addNodeAsKid;
         end else
           addValue(children[i].evaluate(subcontext^));
+
+      if (root = tree) and (oldnamespacecount > 0) and (not context.staticContext.copyNamespaceInherit) then
+        //a newly constructed nodes has all current namespaces binding. But only necessary to add them with no-inherit, because otherwise they are inherited anyways
+        for i := 0 to oldnamespacecount - 1 do
+          tree.addNamespaceDeclaration(context.namespaces.items[i]);
 
       if nameValue <> nil then
         setTreeNodeNameFromTerm(nameValue, xqdnkElementType);

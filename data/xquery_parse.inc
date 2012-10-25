@@ -511,6 +511,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
 
   var marker: PChar;
     atBoundary: Boolean;
+    temp: TXQTerm;
   begin
     atBoundary := (border = '<') and staticContext.stripBoundarySpace;
     while pos^ <> #0 do begin
@@ -535,7 +536,9 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
       case pos^ of
         '{': if (pos+1)^ <> '{' then begin
           pos += 1;
-          parent.push(parsePrimaryLevel);
+          temp := parsePrimaryLevel;
+          if temp is TXQTermConstructor then parent.push(TXQTermSequence.Create().push([temp]))
+          else parent.push(temp);
           expect('}');
           atBoundary := (border = '<') and staticContext.stripBoundarySpace;
         end else begin

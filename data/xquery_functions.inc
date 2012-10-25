@@ -1860,7 +1860,8 @@ begin
     else begin
       resseq := TXQValueSequence.create(namespaces.Count);
       for i := 0 to namespaces.Count - 1 do
-        resseq.seq.add(xqvalue(namespaces.namespaces[i].getPrefix));
+        if namespaces.namespaces[i].getURL <> '' then
+          resseq.seq.add(xqvalue(namespaces.namespaces[i].getPrefix));
       result := resseq;
     end;
   end else result := xqvalue();

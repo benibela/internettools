@@ -25,6 +25,7 @@ var
   var got: string;
     rooted: Boolean;
   begin
+    i+=1;
     if s3 <> '' then begin
       rooted := s3[1] = '!';
       if rooted then s3[1] := ' ';

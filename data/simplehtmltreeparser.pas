@@ -221,6 +221,7 @@ TTreeElement = class
 
   procedure addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil); inline;
   procedure addAttributes(const props: array of THTMLProperty);
+  procedure addNamespaceDeclaration(const n: INamespace);
   procedure addChild(child: TTreeElement);
 
   procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
@@ -1021,6 +1022,13 @@ begin
     attributes.Items[attributes.count - 1].parent := self;
     attributes.Items[attributes.count - 1].document := document;
   end;
+end;
+
+procedure TTreeElement.addNamespaceDeclaration(const n: INamespace);
+begin
+  if attributes = nil then attributes := TAttributeList.Create;
+  if n.getPrefix = '' then attributes.add('xmlns', n.getURL)
+  else attributes.add(n.getPrefix, n.getURL, XMLNamespace_XMLNS);
 end;
 
 procedure TTreeElement.addChild(child: TTreeElement);

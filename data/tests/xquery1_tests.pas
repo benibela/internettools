@@ -986,6 +986,20 @@ begin
   m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns:t=".."></c></b></a> // *:c)}</k>)', '<k><c xmlns:t=".." xmlns:h="def"/></k>');
   m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns="test"></c></b></a> // *:c)}</k>)', '<k><c xmlns="test" xmlns:h="def"/></k>');
 
+  //inheriting tests
+  m('declare copy-namespaces preserve, inherit; let $prev := <x>y</x> return outer-xml(<t xmlns:uv="4"> { $prev } </t> // x)', '<x xmlns:uv="4">y</x>');
+  m('declare copy-namespaces preserve, no-inherit; let $prev := <x>y</x> return outer-xml(<t xmlns:uv="4"> { $prev } </t> // x)', '<x>y</x>');
+  m('declare copy-namespaces preserve, inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<t xmlns:uv="4"> { $prev } </t> // x)', '<x xmlns:abc="foobar" xmlns:uv="4">y</x>');
+  m('declare copy-namespaces preserve, no-inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<t xmlns:uv="4"> { $prev } </t> // x)', '<x xmlns:abc="foobar">y</x>');
+  m('declare copy-namespaces no-preserve, inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<t xmlns:uv="4"> { $prev } </t> // x)', '<x xmlns:uv="4">y</x>');
+  m('declare copy-namespaces no-preserve, no-inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<t xmlns:uv="4"> { $prev } </t> // x)', '<x>y</x>');
+
+  m('declare copy-namespaces preserve, inherit; let $prev := <x>y</x> return outer-xml(<r><t xmlns:uv="4"> { $prev } </t></r> // x)', '<x xmlns:uv="4">y</x>');
+  m('declare copy-namespaces preserve, no-inherit; let $prev := <x>y</x> return outer-xml(<r><t xmlns:uv="4"> { $prev } </t></r> // x)', '<x>y</x>');
+  m('declare copy-namespaces preserve, inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<r><t xmlns:uv="4"> { $prev } </t></r> // x)', '<x xmlns:abc="foobar" xmlns:uv="4">y</x>');
+  m('declare copy-namespaces preserve, no-inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<r><t xmlns:uv="4"> { $prev } </t></r> // x)', '<x xmlns:abc="foobar">y</x>');
+  m('declare copy-namespaces no-preserve, inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<r><t xmlns:uv="4"> { $prev } </t></r> // x)', '<x xmlns:uv="4">y</x>');
+  m('declare copy-namespaces no-preserve, no-inherit; let $prev := <x xmlns:abc="foobar">y</x> return outer-xml(<r><t xmlns:uv="4"> { $prev } </t></r> // x)', '<x>y</x>');
 
   //t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
   {t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2" xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>');
@@ -994,6 +1008,20 @@ begin
   t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:b1="b1" xmlns:b2="b2" xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
   t('outer-xml(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)', '<b xmlns=""/>'); //XQTS test
   }
+
+  m('string-join(in-scope-prefixes(<a></a>), ":")', 'xml');
+  m('string-join(in-scope-prefixes(<a xmlns="abc"></a>), ":")', 'xml:');
+  m('string-join(in-scope-prefixes(<a xmlns:pre="abc"></a>), ":")', 'xml:pre');
+  m('string-join(in-scope-prefixes(<a xmlns:pre="abc"><b></b></a> / b), ":")', 'xml:pre');
+  m('declare copy-namespaces preserve, inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc"><b></b></a> / b), ":")', 'xml:pre');
+  m('declare copy-namespaces no-preserve, inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc"><b></b></a> / b), ":")', 'xml:pre');
+  m('declare copy-namespaces preserve, no-inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc"><b></b></a> / b), ":")', 'xml:pre');
+  m('declare copy-namespaces no-preserve, no-inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc"><b></b></a> / b), ":")', 'xml:pre');
+  m('declare copy-namespaces preserve, inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc">{<b></b>}</a> / b), ":")', 'xml:pre');
+  m('declare copy-namespaces no-preserve, inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc">{<b></b>}</a> / b), ":")', 'xml:pre');
+  m('declare copy-namespaces preserve, no-inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc">{<b xmlns:pre="foobar"></b>}</a> / b), ":")', 'xml:pre'); //b imports pre during its construction
+  m('declare copy-namespaces preserve, no-inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc">{<b></b>}</a> / b), ":")', 'xml:pre'); //b imports pre during its construction
+  m('declare copy-namespaces no-preserve, no-inherit; string-join(in-scope-prefixes(<a xmlns:pre="abc">{<b></b>}</a> / b), ":")', 'xml');
 
   helper.free;
   xml.free;
