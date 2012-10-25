@@ -1679,7 +1679,7 @@ end;
 
 class function TXQValue_untyped.classParentNonBlocked: TXQValueClass;
 begin
-  if classtype = TXQValue_untyped then result := txqvalue_anyType 
+  if classtype = TXQValue_untyped then result := txqvalue 
   else result := TXQValueClass(classParent);
 end;
 

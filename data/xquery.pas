@@ -215,7 +215,7 @@ type
   { TXQValue }
 
   (***
-  Base class for XQuery-variants types, implementing the IXQValue interface. All other type classes are derived from it.@br@br
+  Base class for XQuery-variants types, implementing the IXQValue interface. All other type classes are derived from it. (it correspondes to xs:anyType) @br@br
 
   See IXQValue for an actual description
   *)
@@ -269,18 +269,11 @@ type
   end;
   PXQValue = ^TXQValue;
 
-    { TXQValue_AnyType }
-
-  //**Useless type in the XPath type hierarchy
-  TXQValue_AnyType = class(TXQValue)
-  protected
-    class function classTypeName: string; override;
-  end;
 
   { TXQValue_AnySimpleType }
 
   //**Useless type in the XPath type hierarchy
-  TXQValue_AnySimpleType = class(TXQValue_AnyType)
+  TXQValue_AnySimpleType = class(TXQValue)
   protected
     class function classTypeName: string; override;
   end;
@@ -1999,12 +1992,6 @@ begin
   result := self;
 end;
 
-{ TXQValue_AnyType }
-
-class function TXQValue_AnyType.classTypeName: string;
-begin
-  Result:='anyType';
-end;
 
 { TXQStaticContext }
 
@@ -2387,7 +2374,7 @@ begin
       end;
     end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('Namespace:* not allowed in element test') ;
     if length(children) <= 1 then exit;
-    if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('Invalid type attribute');
+    if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('Invalid type attribute: '+children[1].ToString);
     result.requiredType := children[1] as TXQTermSequenceType;
   end else if select = 'document-node' then begin
     if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('Invalid option for document test');
