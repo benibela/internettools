@@ -1039,6 +1039,7 @@ type
     constructor create(atype: TTreeElementType; aname: txqterm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
     function evaluate(const context: TEvaluationContext; root: TTreeElement; baseOffset: longint): IXQValue;
+    function isNamespaceConstructor: boolean;
     destructor destroy; override;
   end;
 
@@ -3292,6 +3293,8 @@ begin
   StaticContext.collation := TXQCollation(collations.Objects[0]);
   StaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
   StaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
+  StaticContext.copyNamespaceInherit:=true;
+  StaticContext.copyNamespacePreserve:=true;
   FModules := TInterfaceList.Create;
 end;
 

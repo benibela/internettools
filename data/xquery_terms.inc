@@ -1051,13 +1051,19 @@ var
     if kid.reverse <> nil then lastKid := kid.reverse
     else lastKid := kid;
   end;
-  function declareNewNamespace(const url, prefix: string): INamespace;
+  function needNamespaceList: TNamespaceList;
   begin
     if (subcontext^.namespaces = nil) then begin
       new(subcontext);
       subcontext^ := context;
       subcontext^.namespaces := TNamespaceList.Create;
     end;
+    result := subcontext^.namespaces;
+  end;
+
+  function declareNewNamespace(const url, prefix: string): INamespace;
+  begin
+    needNamespaceList;
     result := subcontext^.findNamespace(prefix, xqdnkAny);
     if (result <> nil) and (result.getURL = url) then begin
       subcontext^.namespaces.Add(result);
@@ -1243,19 +1249,32 @@ begin
     end;
     tetOpen, tetDocument: begin
       for i:=0 to high(children) do
-        if children[i] is TXQTermConstructor then begin
+        if (children[i] is TXQTermConstructor) and (TXQTermConstructor(children[i]).isNamespaceConstructor) then begin
           kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
           addNodeAsKid;
-        end else
-          addValue(children[i].evaluate(subcontext^));
+        end;
+
+      if nameValue <> nil then begin
+        setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
+        if tree.namespace <> nil then
+          needNamespaceList.addIfNew(tree.namespace);
+      end;
 
       if (root = tree) and (oldnamespacecount > 0) and (not context.staticContext.copyNamespaceInherit) then
         //a newly constructed nodes has all current namespaces binding. But only necessary to add them with no-inherit, because otherwise they are inherited anyways
         for i := 0 to oldnamespacecount - 1 do
           tree.addNamespaceDeclaration(context.namespaces.items[i]);
 
-      if nameValue <> nil then
-        setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
+
+      for i:=0 to high(children) do
+        if children[i] is TXQTermConstructor then begin
+          if TXQTermConstructor(children[i]).isNamespaceConstructor then continue;
+          kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
+          if (kid.typ = tetAttribute) and (kid.namespace <> nil) then needNamespaceList.addIfNew(kid.namespace);
+          addNodeAsKid;
+        end else
+          addValue(children[i].evaluate(subcontext^));
+
       kid := TTreeElement.create(tetClose, tree.value);
       kid.namespace := tree.namespace;
       addKid;
@@ -1277,6 +1296,13 @@ begin
   end else if context.namespaces <> nil then
     for i:=oldnamespacecount to context.namespaces.Count-1 do
       context.namespaces.Delete(context.namespaces.Count-1);
+end;
+
+function TXQTermConstructor.isNamespaceConstructor: boolean;
+begin
+  result := (typ = tetAttribute)
+            and (nameValue is TXQTermString)
+            and ((TXQTermString(nameValue).value = 'xmlns') or strBeginsWith(TXQTermString(nameValue).value, 'xmlns:'));
 end;
 
 destructor TXQTermConstructor.destroy;
