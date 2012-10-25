@@ -1847,12 +1847,26 @@ end;
 
 function xqFunctionIn_Scope_prefixes(const args: TXQVArray): IXQValue;
 var
-  el: TTreeElement;
-  sl: TStringList;
-  attrib: TTreeAttribute;
+  namespaces: TNamespaceList;
+  resseq: TXQValueSequence;
+  i: Integer;
 begin
   requiredArgCount(args, 1);
-  el := args[0].toNode;
+  namespaces := TNamespaceList.Create;
+  if args[0].toNode <> nil then begin
+    namespaces.add(XMLNamespace_XML);
+    args[0].toNode.getAllNamespaces(namespaces);
+    if namespaces.Count = 1 then result := xqvalue(namespaces.namespaces[0].getPrefix)
+    else begin
+      resseq := TXQValueSequence.create(namespaces.Count);
+      for i := 0 to namespaces.Count - 1 do
+        resseq.seq.add(xqvalue(namespaces.namespaces[i].getPrefix));
+      result := resseq;
+    end;
+  end else result := xqvalue();
+  namespaces.Free;
+           {
+
   sl := TStringList.Create;
   sl.add('xml');
   try
@@ -1871,7 +1885,7 @@ begin
     else result := xqvalue(sl);
   finally
     sl.free;
-  end;
+  end;}
 end;
 
 {$IFNDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}

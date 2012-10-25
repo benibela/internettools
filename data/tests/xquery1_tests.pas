@@ -46,7 +46,7 @@ var
   //    writeln(ps.debugtermToString(ps.FCurTerm));
     got := ps.evaluate().toString;
     if got<>s2 then
-       raise Exception.Create('XPath Test failed: '+IntToStr(count)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
+       raise Exception.Create('XQuery Test failed: '+IntToStr(count)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
   end;
 
   procedure t(a,b: string; c: string = '');
@@ -742,12 +742,12 @@ begin
   m('declare namespace test = "foobar"; outer-xml(<test:a xmlns:test="123">abc</test:a>)', '<test:a xmlns:test="123">abc</test:a>');
   m('declare namespace test = "foobar"; declare namespace abc = "def";  outer-xml(<test:a><abc:xyz/></test:a>)', '<test:a xmlns:test="foobar"><abc:xyz xmlns:abc="def"/></test:a>');
   m('declare namespace test = "foobar"; declare namespace abc = "def";  outer-xml(<test:a abc:u=""><abc:xyz/></test:a>)', '<test:a xmlns:test="foobar" xmlns:abc="def" abc:u=""><abc:xyz/></test:a>');
-  t('outer-xml(<a xmlns:abc="123"/>)', '<a/>');
+  t('outer-xml(<a xmlns:abc="123"/>)', '<a xmlns:abc="123"/>');
   t('outer-xml(<abc:a xmlns:abc="123"/>)', '<abc:a xmlns:abc="123"/>');
   t('outer-xml(<a xmlns:abc="123" abc:xyz="123"/>)', '<a xmlns:abc="123" abc:xyz="123"/>');
   t('outer-xml(<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem>)', '<elem xmlns:foo="http://www.example.com/foo"><elem foo:attr=""/></elem>');
-  m('declare namespace p="http://example.com/ns/p"; declare namespace q="http://example.com/ns/q"; declare namespace f="http://example.com/ns/f"; outer-xml(<p:a q:b="{2}" xmlns:r="http://example.com/ns/r"/>)', '<p:a xmlns:p="http://example.com/ns/p" xmlns:q="http://example.com/ns/q" q:b="2"/>');
-  m('declare namespace p="http://example.com/ns/p"; declare namespace q="http://example.com/ns/q"; declare namespace f="http://example.com/ns/f"; string-join(in-scope-prefixes(<p:a q:b="{2}" xmlns:r="http://example.com/ns/r"/>), " ")', 'xml p q r');
+  m('declare namespace p="http://example.com/ns/p"; declare namespace q="http://example.com/ns/q"; declare namespace f="http://example.com/ns/f"; outer-xml(<p:a q:b="{2}" xmlns:r="http://example.com/ns/r"/>)', '<p:a xmlns:r="http://example.com/ns/r" xmlns:p="http://example.com/ns/p" xmlns:q="http://example.com/ns/q" q:b="2"/>');
+  m('declare namespace p="http://example.com/ns/p"; declare namespace q="http://example.com/ns/q"; declare namespace f="http://example.com/ns/f"; string-join(in-scope-prefixes(<p:a q:b="{2}" xmlns:r="http://example.com/ns/r"/>), " ")', 'xml r p q');
   t('<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:*', '');
   t('<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @xmlns:foo', '');
   t('<elem xmlns:foo="http://www.example.com/foo">{element elem {attribute {"foo:attr"} {}}}</elem> / @*:foo', '');
@@ -925,25 +925,75 @@ begin
   m('declare function f($a as xs:decimal+) as xs:double+ { $a }; string-join(for $i in f((1, 1.0, xs:short(7), text { " 8 " })) return ($i instance of xs:double), " ")', 'true true true true');
 
   t('outer-xml(<a xmlns="foobar"><b xmlns="xyz"/></a>/*:b)', '<b xmlns="xyz"/>');
-  t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>/b)', '<b xmlns=""/>');
+  t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>/b)', '<b/>');
+  t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>)', '<a xmlns="foobar"><b xmlns=""/></a>');
   t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz" xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>'); //should raise error
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz" xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>'); //should raise error
 
-  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:b1="b1" xmlns:b2="b2" xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:b1="b1" xmlns:b2="b2" xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
-
-  t('outer-xml(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)', '<b xmlns=""/>'); //XQTS test
 
   m('declare function local:f($local:v){ $local:v + 1}; local:f(2)', '3');
   m('declare variable $local:v := 17; declare function local:f($local:v){ $local:v + 1}; local:f(2)', '3');
+
+
+  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b>');
+  m('declare default function namespace "foobar"; pxp:outer-xml(<foobar/>)', '<foobar/>');
+
+  //no copying => option independent
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)',              '<c xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)', '<c xmlns:t=".." xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)', '<c xmlns="test" xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)',              '<c xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)', '<c xmlns:t=".." xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)', '<c xmlns="test" xmlns:h="def" xmlns:g="abc"/>');
+
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g=""></c></b></a> // *:c)',              '<c xmlns:h="def"/>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns:t=".."></c></b></a> // *:c)', '<c xmlns:t=".." xmlns:h="def"/>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns="test"></c></b></a> // *:c)', '<c xmlns="test" xmlns:h="def"/>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g=""></c></b></a> // *:c)',              '<c xmlns:h="def"/>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns:t=".."></c></b></a> // *:c)', '<c xmlns:t=".." xmlns:h="def"/>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns="test"></c></b></a> // *:c)', '<c xmlns="test" xmlns:h="def"/>');
+
+  m('declare copy-namespaces no-preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)',              '<c xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces no-preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)', '<c xmlns:t=".." xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces no-preserve, no-inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)', '<c xmlns="test" xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces no-preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)',              '<c xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces no-preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)', '<c xmlns:t=".." xmlns:h="def" xmlns:g="abc"/>');
+  m('declare copy-namespaces no-preserve,    inherit ; outer-xml(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)', '<c xmlns="test" xmlns:h="def" xmlns:g="abc"/>');
+
+  //with copying
+  m('declare copy-namespaces no-preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)}</k>)',              '<k><c/></k>');
+  m('declare copy-namespaces no-preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)}</k>)', '<k><c/></k>');
+  m('declare copy-namespaces no-preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)}</k>)', '<k><c xmlns="test"/></k>');
+  m('declare copy-namespaces no-preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)}</k>)',              '<k><c/></k>');
+  m('declare copy-namespaces no-preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)}</k>)', '<k><c/></k>');
+  m('declare copy-namespaces no-preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)}</k>)', '<k><c xmlns="test"/></k>');
+
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)}</k>)',              '<k><c xmlns:h="def" xmlns:g="abc"/></k>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)}</k>)', '<k><c xmlns:t=".." xmlns:h="def" xmlns:g="abc"/></k>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)}</k>)', '<k><c xmlns="test" xmlns:h="def" xmlns:g="abc"/></k>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c></c></b></a> // *:c)}</k>)',              '<k><c xmlns:h="def" xmlns:g="abc"/></k>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:t=".."></c></b></a> // *:c)}</k>)', '<k><c xmlns:t=".." xmlns:h="def" xmlns:g="abc"/></k>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns="test"></c></b></a> // *:c)}</k>)', '<k><c xmlns="test" xmlns:h="def" xmlns:g="abc"/></k>');
+
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g=""></c></b></a> // *:c)}</k>)',              '<k><c xmlns:h="def"/></k>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns:t=".."></c></b></a> // *:c)}</k>)', '<k><c xmlns:t=".." xmlns:h="def"/></k>');
+  m('declare copy-namespaces    preserve, no-inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns="test"></c></b></a> // *:c)}</k>)', '<k><c xmlns="test" xmlns:h="def"/></k>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g=""></c></b></a> // *:c)}</k>)',              '<k><c xmlns:h="def"/></k>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns:t=".."></c></b></a> // *:c)}</k>)', '<k><c xmlns:t=".." xmlns:h="def"/></k>');
+  m('declare copy-namespaces    preserve,    inherit ; outer-xml(<k>{(<a xmlns:g="abc"><b xmlns:h="def"><c xmlns:g="" xmlns="test"></c></b></a> // *:c)}</k>)', '<k><c xmlns="test" xmlns:h="def"/></k>');
+
+
+  //t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  {t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz" xmlns:b1="b1" xmlns:b2="b2" xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="" xmlns:b1="b1" xmlns:b2="b2"><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:b1="b1" xmlns:b2="b2" xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
+  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:b1="b1" xmlns:b2="b2" xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:pref=""><pref:c>..</pref:c></b>');
+  t('outer-xml(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)', '<b xmlns=""/>'); //XQTS test
+  }
 
   helper.free;
   xml.free;

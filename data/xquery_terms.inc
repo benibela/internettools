@@ -1030,7 +1030,6 @@ end;
 function TXQTermConstructor.evaluate(const context: TEvaluationContext; root: TTreeElement; baseOffset: longint): IXQValue;
 var
   tree: TTreeElement;
-  i: Integer;
   kid: TTreeElement;
   lastKid: TTreeElement;
   subcontext: ^TEvaluationContext;
@@ -1111,6 +1110,8 @@ var
   procedure addValue(const v: IXQValue; firstAtomic: boolean = true);
   var x: IXQValue;
       temp: TTreeElement;
+      i: integer;
+      tempNamespaces: TNamespaceList;
   begin
     case v.kind of
       pvkUndefined:;
@@ -1127,6 +1128,28 @@ var
               else baseOffset += temp.next.offset - temp.offset;
               temp := temp.next;
             end;
+          end;
+          if not context.staticContext.copyNamespacePreserve then begin
+            //remove namespaces that are not used
+            temp := kid;
+            while (temp <> nil) and (temp <> kid.reverse) do begin
+              if temp.attributes <> nil then
+                for i := temp.attributes.Count - 1 downto 0 do
+                  if (temp.attributes.Items[i].isNamespaceNode) and not (temp.isNamespaceUsed(temp.attributes.Items[i].toNamespace)) then
+                    temp.attributes.Delete(i);
+              temp := temp.next;
+            end;
+          end;
+          if v.toNode.parent <> nil then begin
+            tempNamespaces := TNamespaceList.Create;
+            v.toNode.parent.getAllNamespaces(tempNamespaces);
+            for i:=0 to tempNamespaces.Count - 1 do
+              if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then begin
+                if kid.attributes = nil then kid.attributes := TAttributeList.Create;
+                if tempNamespaces.items[i].getPrefix = '' then kid.attributes.add('xmlns', tempNamespaces.items[i].getURL)
+                else kid.attributes.add(tempNamespaces.items[i].getPrefix, tempNamespaces.items[i].getURL, XMLNamespace_XMLNS);
+              end;
+            tempNamespaces.free;
           end;
         end;
         addNodeAsKid;
@@ -1189,7 +1212,7 @@ var
     end;
   end;
 
-var oldnamespacecount: integer;
+var i, oldnamespacecount: integer;
 begin
   subcontext:=@context;
   oldnamespacecount := 0;

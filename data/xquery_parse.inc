@@ -129,7 +129,7 @@ end;
 procedure TXQParsingContext.raiseParsingError(s: string);
 begin
   if (pos < @str[1]) then pos := @str[1]; //make sure pos points to str
-  if (pos > @str[length(str)]) then pos := @str[1];
+  if (pos > @str[length(str)]) then pos := @str[length(str)];
   raise Exception.Create(s+#13#10'in: '+strslice(@str[1],pos-1)+' [<- error occurs before here] '+strslice(pos,@str[length(str)]));
 end;
 
@@ -1253,15 +1253,8 @@ begin
           end;
           'element', 'function': begin
             expect('namespace');
-            if token = 'element' then begin
-              staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseStringLiteral, '');
-              if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
-              staticContext.namespaces.Add(staticContext.defaultElementTypeNamespace);
-            end else begin
-              staticContext.defaultFunctionNamespace := TNamespace.Create(parseStringLiteral, '');
-              if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
-              staticContext.namespaces.add(staticContext.defaultFunctionNamespace);
-            end;
+            if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseStringLiteral, '')
+            else staticContext.defaultFunctionNamespace := TNamespace.Create(parseStringLiteral, '')
           end;
           else raiseParsingError('Unknown default value');
         end;

@@ -35,6 +35,7 @@ TStringComparisonFunc = function (const a,b: string): boolean of object;
 INamespace = interface
   function getPrefix: string;
   function getURL: string;
+  function serialize: string;
 end;
 
 
@@ -46,6 +47,7 @@ TNamespace = class(TInterfacedObject, INamespace)
   constructor create(const aurl: string; aprefix: string);
   function getPrefix: string;
   function getURL: string;
+  function serialize: string;
   destructor Destroy; override;
 end;
 
@@ -57,9 +59,12 @@ private
   function getNamespace(i: integer): INamespace;
 public
   function hasNamespacePrefix(const prefix: string; out ns: INamespace): boolean;
+  function hasNamespace(const n: INamespace): boolean;
 
   procedure add(const ns: TNamespace);
   procedure add(const ns: INamespace);
+  procedure addIfNew(const ns: TNamespace);
+  procedure addIfNew(const ns: INamespace);
 
   function clone: TNamespaceList;
 
@@ -202,6 +207,9 @@ TTreeElement = class
   function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
   function getNamespaceURL(): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute) cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
+  procedure getOwnNamespaces(var list: TNamespaceList);
+  procedure getAllNamespaces(var list: TNamespaceList);
+  function isNamespaceUsed(const n: INamespace): boolean;
 
   property defaultProperty[name: string]: string read getAttribute; default;
 
@@ -247,6 +255,7 @@ TTreeElementClass = class of TTreeElement;
 TTreeAttribute = class(TTreeElement)
   realvalue: string;
   function isNamespaceNode: boolean;
+  function toNamespace: INamespace;
   constructor create(const aname, avalue: string; const anamespace: INamespace = nil);
 end;
 
@@ -386,6 +395,12 @@ begin
   result := ((namespace = nil) and (value = 'xmlns')) or ((namespace <> nil) and (namespace.getURL = XMLNamespaceUrl_XMLNS));
 end;
 
+function TTreeAttribute.toNamespace: INamespace;
+begin
+  if namespace = nil then result := TNamespace.Create(realvalue, '') //TODO: reuse
+  else result := TNamespace.Create(realvalue, value);
+end;
+
 constructor TTreeAttribute.create(const aname, avalue: string; const anamespace: INamespace = nil);
 begin
   inherited create(tetAttribute, aname);
@@ -490,6 +505,15 @@ begin
   exit(false);
 end;
 
+function TNamespaceList.hasNamespace(const n: INamespace): boolean;
+var
+  temp: INamespace;
+begin
+  if not hasNamespacePrefix(n.getPrefix, temp) then exit(false);
+  if temp.getURL <> n.getURL then exit(false);
+  result := true;
+end;
+
 procedure TNamespaceList.add(const ns: TNamespace);
 begin
   inherited add(INamespace(ns)); //hide ancestor method to prevent crash when tnamespace is treated as inamespace instead being cast
@@ -498,6 +522,20 @@ end;
 procedure TNamespaceList.add(const ns: INamespace);
 begin
   inherited add(ns);
+end;
+
+procedure TNamespaceList.addIfNew(const ns: TNamespace);
+begin
+  addIfNew(INamespace(ns));
+end;
+
+procedure TNamespaceList.addIfNew(const ns: INamespace);
+var
+  temp: INamespace;
+begin
+  if (ns = nil) or (ns.getURL = XMLNamespaceUrl_XMLNS) or (ns.getURL = XMLNamespaceUrl_XML) then exit;
+  if not hasNamespacePrefix(ns.getPrefix, temp) then
+    add(ns);
 end;
 
 
@@ -528,6 +566,12 @@ function TNamespace.getURL: string;
 begin
   if self = nil then exit('');
   result := url;
+end;
+
+function TNamespace.serialize: string;
+begin
+  if prefix = '' then result := 'xmlns="'+xmlStrEscape(url)+'"'
+  else result := 'xmlns:'+prefix+'="'+xmlStrEscape(url)+'"'
 end;
 
 destructor TNamespace.Destroy;
@@ -824,6 +868,44 @@ begin
   exit('');
 end;
 
+procedure TTreeElement.getOwnNamespaces(var list: TNamespaceList);
+var attrib: TTreeAttribute;
+begin
+  if attributes <> nil then
+    for attrib in attributes do
+      if attrib.isNamespaceNode then
+        list.addIfNew(attrib.toNamespace);
+  list.addIfNew(namespace);
+  if attributes <> nil then
+    for attrib in attributes do
+      if not attrib.isNamespaceNode then
+        list.addIfNew(attrib.namespace);
+end;
+
+procedure TTreeElement.getAllNamespaces(var list: TNamespaceList);
+begin
+  getOwnNamespaces(list);
+  if parent <> nil then parent.getAllNamespaces(list);
+end;
+
+function TTreeElement.isNamespaceUsed(const n: INamespace): boolean;
+var attrib: TTreeAttribute;
+  temp: TTreeElement;
+begin
+  if (namespace <> nil) and (namespace.getPrefix = n.getPrefix) then
+    exit(namespace.getURL = n.getURL);
+  if attributes <> nil then
+    for attrib in attributes do
+      if (attrib.namespace <> nil) and (attrib.namespace.getPrefix = n.getPrefix) then
+        exit(attrib.namespace.getURL = n.getURL);
+  temp := getFirstChild();
+  while temp <> nil do begin
+    if temp.isNamespaceUsed(n) then exit(true);
+    temp := temp.getNextSibling();
+  end;
+  result := false;
+end;
+
 function TTreeElement.isDeepEqual(cmpTo: TTreeElement; ignoredTypes: TTreeElementTypes; cmpFunction: TStringComparisonFunc): boolean;
 var
   attrib, tempattrib: TTreeAttribute;
@@ -988,29 +1070,12 @@ begin
 end;
 
 function serializeXMLWrapper(base: TTreeElement; nodeSelf: boolean; insertLineBreaks: boolean): string;
-var knownPrefixes, knownURLs: TStringList;
-  procedure addNamespace(const url, prefix: string);
-  begin
-    knownPrefixes.Add(prefix);
-    knownURLs.Add(url);
-  end;
-
-  function hasNamespace(const url, prefix: string): boolean;
-  var i: integer;
-  begin
-    for i:=knownPrefixes.Count - 1 downto 0 do
-      if (knownPrefixes[i] = prefix) and (knownURLs[i] = url) then exit(true);
-    if (url = XMLNamespaceUrl_XML) or (url = XMLNamespaceUrl_XMLNS) then exit(true);
-    result := false;
-  end;
-
+var known: TNamespaceList;
   function requireNamespace(n: INamespace): string;
-  begin
-    if (n = nil) or (hasNamespace(n.getURL, n.getPrefix)) then exit('');
-    if n.getPrefix = '' then result += ' xmlns="'+xmlStrEscape(n.getURL)+'"'
-    else result += ' xmlns:'+n.getPrefix+'="'+xmlStrEscape(n.getURL)+'"';
-    knownPrefixes.add(n.getPrefix);
-    knownURLs.Add(n.getURL);
+  begin //that function is useless the namespace should always be in known. But just for safety...
+    if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
+    known.add(n);
+    result := ' ' + n.serialize;
   end;
 
   function inner(n: TTreeElement): string; forward;
@@ -1018,6 +1083,7 @@ var knownPrefixes, knownURLs: TStringList;
   function outer(n: TTreeElement): string;
   var attrib: TTreeAttribute;
       oldnamespacecount: integer;
+      i: Integer;
   begin
     with n do
     case typ of
@@ -1030,20 +1096,14 @@ var knownPrefixes, knownURLs: TStringList;
         result += '?>';
       end;
       tetOpen: begin
-        oldnamespacecount:=knownPrefixes.Count;
+        oldnamespacecount:=known.Count;
         result := '<' + getNodeName();
-        if attributes <> nil then
-          for attrib in attributes do
-            if attrib.isNamespaceNode then
-              if ((attrib.getNamespaceURL() = XMLNamespaceUrl_XMLNS) and not hasNamespace(attrib.realvalue, attrib.value) and namespaceUsedByNodeOrChild(n, attrib.realvalue, attrib.value)) then begin
-                addNamespace(attrib.realvalue, attrib.value);
-                result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue)+'"';
-                continue;
-              end else if ((attrib.namespace = nil) and (attrib.value = 'xmlns') and not hasNamespace(attrib.realvalue, '') and namespaceUsedByNodeOrChild(n, attrib.realvalue, '')) then begin
-                addNamespace(attrib.realvalue, '');
-                result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue)+'"';
-                continue;
-              end;
+
+        if oldnamespacecount = 0 then n.getAllNamespaces(known)
+        else n.getOwnNamespaces(known);
+        for i:=oldnamespacecount to known.Count - 1 do
+          if known.items[i].getURL <> '' then
+            result += ' '+known.items[i].serialize;
 
         result += requireNamespace(namespace);
         if attributes <> nil then
@@ -1066,10 +1126,8 @@ var knownPrefixes, knownURLs: TStringList;
         result += inner(n);
         result+='</'+n.getNodeName()+'>';
         if insertLineBreaks then Result+=LineEnding;
-        while knownPrefixes.count > oldnamespacecount do begin
-          knownPrefixes.Delete(knownPrefixes.count-1);
-          knownURLs.Delete(knownURLs.count-1);
-        end;
+        while known.count > oldnamespacecount do
+          known.Delete(known.count-1);
       end;
       tetDocument: result := innerXML(insertLineBreaks);
     end;
@@ -1088,12 +1146,10 @@ var knownPrefixes, knownURLs: TStringList;
     end;
   end;
 begin
-  knownPrefixes := TStringList.Create;
-  knownURLs := tstringlist.Create;
+  known := TNamespaceList.Create;
   if nodeSelf then result := outer(base)
   else result := inner(base);
-  knownURLs.Free;
-  knownPrefixes.free;
+  known.free;
 end;
 
 function TTreeElement.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
