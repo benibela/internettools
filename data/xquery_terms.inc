@@ -1230,6 +1230,7 @@ var
     v := term.evaluate(subcontext^);
     if (v is TXQValue_QName) and strContains((v as TXQValueString).str, #2) then begin
       tempqname := qnameSplit((v as TXQValueString).str);
+      if (tempqname[1] = '') and (tempqname[0] = XMLNamespaceUrl_XML) then tempqname[1] := 'xml';
       if (tempqname[1] = '') and (defkind <> xqdnkElementType) then tempqname[1] := chooseRandomPrefix;
       tree.namespace := declareNewNamespace(tempqname[0], tempqname[1]);
       tree.value:=tempqname[2];

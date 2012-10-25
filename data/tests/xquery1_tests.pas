@@ -1247,6 +1247,9 @@ begin
   t('<a><b><c/></b><x/><y/></a> //c/ (for $i in 1 to 3 return (name(ancestor::*[$i])))', 'b a ');
   t('<a><b><c/></b><x/><y/></a> //c/ (for $i in 1 to 3 return (name((ancestor::*)[$i])))', 'a b ');
 
+  t('outer-xml(<a xml:id="foobar"/>)', '<a xml:id="foobar"/>');
+  t('outer-xml(<a>{attribute {QName("'+XMLNamespaceUrl_XML+'", "id")} {123}}</a>)', '<a xml:id="123"/>');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
