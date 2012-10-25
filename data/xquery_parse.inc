@@ -97,8 +97,8 @@ type
   procedure expect(c: char);
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
-  function nextTokenNCName(lookahead: boolean=false): string;
-  function nextTokenQName(lookahead: boolean=false): string;
+  function nextTokenNCName(lookahead: boolean=false): string; inline;
+  function nextTokenQName(lookahead: boolean=false): string; inline;
 
 
   function parseSequenceLike(target: TXQTerm): TXQTerm;
@@ -195,7 +195,7 @@ end;
 
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
-const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';']; // $ is no symbols
+const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', '$'];
 const START_SYMBOLS = ['-'];
 var start:pchar;
    numberE, numberPoint: boolean;
@@ -358,9 +358,8 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
   procedure parseVariableName(out name: string; out namespace: INamespace);
   begin
     name := nextToken;
-    if name = '' then raiseParsingError('Expected variable name');
-    if name[1] <> '$' then raiseParsingError('Expected variable name starting with $, but got "'+name+'"');
-    delete(name, 1, 1);
+    if name <> '$' then raiseParsingError('Expected variable name');
+    name := nextTokenQName();
     staticContext.splitRawQName(namespace, name, xqdnkUnknown);
   end;
 
@@ -479,12 +478,14 @@ var
   word: String;
 begin
   result := TXQTermSomeEvery.Create(akind = 'every');
-  result.push(TXQTermVariable.Create(nextToken(), staticContext));
+  expect('$');
+  result.push(TXQTermVariable.Create(nextTokenQName(), staticContext));
   skipWhitespaceAndComment();
   if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
   expect('in'); result.push(parse());
   word := nextToken();
   while word = ',' do begin
+    expect('$');
     result.push(TXQTermVariable.Create(nextToken(), staticContext));
     skipWhitespaceAndComment();
     if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
@@ -767,7 +768,7 @@ function TXQParsingContext.parseString(const w: string): TXQTerm;
       if s[i] = '$' then begin //Read variable
         if lastStrStart < i then result.push(TXQTermString.create(copy(s, lastStrStart, i-lastStrStart)));
         if i >= length(s) - 1 then raiseParsingError('Variable without name or ; at end of '+s);
-        lastStrStart:=i;
+        lastStrStart:=i + 1;
         while (i <= length(s)) and not (s[i] in [';',' ',#9,#13,#10]) do i+=1;
         if i > length(s) then raiseParsingError('Variable without terminating ; in '+s);
         if lastStrStart  = i then raiseParsingError('Variable without name ($;) in '+s);
@@ -805,8 +806,8 @@ begin
   case word[1] of
     '''', '"':  exit(parseString(word));
     '$': begin
-      if length(word) < 2 then raiseParsingError('Variable must have at least 2 characters: '+word);
-      exit(TXQTermVariable.Create(word, staticContext));
+      if word <> '$' then raiseParsingError('Invalid characters after $');
+      exit(TXQTermVariable.Create(nextTokenQName(), staticContext));
     end;
     '@': exit(TXQTermReadAttribute.create(strcopyfrom(word,2) + parseQNameContinuation));
     '+', '-': begin
@@ -881,7 +882,7 @@ begin
           while word = 'case' do begin
             skipWhitespaceAndComment();
             result.push(TXQTermSequence.Create);
-            if pos^ = '$' then begin result.children[high(result.children)].push(TXQTermVariable.create(nextToken(), staticContext)); expect('as'); end;
+            if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
             result.children[high(result.children)].push(parseSequenceType());
             expect('return');
             result.children[high(result.children)].push(parse());
@@ -890,7 +891,7 @@ begin
           if word <> 'default' then raiseParsingError('expected "default" clause');
           skipWhitespaceAndComment();
           result.push(TXQTermSequence.Create);
-          if pos^ = '$' then result.children[high(result.children)].push(TXQTermVariable.create(nextToken(), staticContext));
+          if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
           expect('return');
           result.children[high(result.children)].push(parse());
 

@@ -1075,6 +1075,9 @@ begin
   t('<r><a>b</a></r> / element(a, xs:anyType)', 'b');
   t('<r><a>b</a></r> / element(b, xs:anyType)', '');
 
+  t('let $ a := 123 return $'#13'a', '123');
+  t('for $ a in 123 return $                a', '123');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
@@ -1103,7 +1106,7 @@ end;
 constructor THelper.create;
 begin
   func1 := TXQTermString.create('func-result');
-  func2 := TXQTermBinaryOp.create('*', TXQTermVariable.Create('$a', nil), TXQTermVariable.Create('$b', nil));;
+  func2 := TXQTermBinaryOp.create('*', TXQTermVariable.Create('a', nil), TXQTermVariable.Create('b', nil));;
   func3 := TTermExtension.Create;
 end;
 

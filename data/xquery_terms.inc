@@ -914,8 +914,7 @@ constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStati
 begin
   value := avalue;
   if value = '' then raiseEvaluationError('variable with empty name');
-  if value[1] <> '$' then raiseEvaluationError('variable name does not start with $:  ' + value);
-  delete(value,1,1);
+  //if value[1] = '$' then raiseEvaluationError('variable name starts with a double $:  ' + value);
   if value[length(value)] = ';' then delete(value, length(value), 1);
   if staticContext <> nil then staticContext.splitRawQName(namespace, value, xqdnkUnknown);
 end;

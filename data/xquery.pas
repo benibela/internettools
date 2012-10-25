@@ -3668,7 +3668,7 @@ var pos: pchar;
 
         TXQTermFlower(result).returned := TXQTermFilterSequence.create(
           axisTerm,
-          newBinOp(newFunction('name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('$__csstemp', StaticContext))
+          newBinOp(newFunction('name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('__csstemp', StaticContext))
         );
       end;
     end;
