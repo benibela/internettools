@@ -775,7 +775,7 @@ begin
     '/': result.typ := qcDocumentRoot;
     '.': begin
       result.typ:=qcSameNode; //same node /./
-      result.matching:=[qmDocument, qmElement, qmAttribute];
+      result.matching:=[qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
     end;
     '..': begin
       result.typ:=qcDirectParent; //parent /../
@@ -1050,6 +1050,7 @@ var
       kid.previous := lastKid;
     end;
     kid.document := root;
+    kid.parent := tree;
     //kid.offset := baseOffset;
     //baseOffset += 1;
     if kid.reverse <> nil then lastKid := kid.reverse
@@ -1107,7 +1108,6 @@ var
         kid := kid.getFirstChild();
         while kid <> nil do begin
           n := kid.getNextSibling();
-          kid.parent := tree;
           if doc.attributes <> nil then begin //a document should not have attributes, but when namespace overrides were added by addValue, they were added there
             if kid.attributes = nil then kid.attributes := TAttributeList.Create;
             for attrib in doc.attributes do kid.attributes.add(attrib.clone);
@@ -1187,8 +1187,6 @@ var
       end
       else if firstAtomic then begin
         kid := TTreeElement.create(tetText);
-        kid.parent := tree;
-        kid.document := root;
         kid.value := v.toString;
         kid.offset:=baseOffset;
         baseOffset+=1;
@@ -1293,6 +1291,7 @@ begin
       kid.offset:=baseOffset;
       baseOffset+=1;
       addKid;
+      kid.parent := tree.parent;
       tree.reverse := kid; kid.reverse := tree;
     end;
     tetProcessingInstruction: begin

@@ -2510,11 +2510,18 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('/r', '', '!<r xmlns="foobar">test</r>');
   ps.StaticContext.defaultElementTypeNamespace := TNamespace.create('foobar', '');
   t('/r', 'test');
+  ps.StaticContext.defaultElementTypeNamespace := nil;
 
   t('day-from-datetime(())', '');
   t('doc(())', '');
   t('collection(())', '');
 
+  t('x / text() / . / . / .', 'y', '<x>y</x>');
+  t('x / comment() / . / . / .', 'comment', '<x><!--comment--></x>');
+  t('name(x / processing-instruction())', 'PI', '<x><?PI?></x>');
+  t('name(x / processing-instruction() / . / . / .)', 'PI', '');
+  t('string-join(/a // string-join(for $i in ./ancestor::* return name($i), ":"), ",")', ',a,a:b,a:b:c,a,a', '!<a><b><c>d</c></b><x/><y/></a>');
+  t('string-join(/a // string-join(for $i in ./ancestor-or-self::* return name($i), ":"), ",")', 'a,a:b,a:b:c,a:b:c,a:x,a:y', '!<a><b><c>d</c></b><x/><y/></a>');
 
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )

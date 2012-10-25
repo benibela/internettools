@@ -1085,6 +1085,13 @@ begin
   t('string-join(<a><b><c>d</c></b><x/><y/></a> / b / following::* / name(.), ":")', 'x:y');
   t('string-join(/a/y / preceding::* / name(.), ":")', 'b:c:x', '<a><b><c>d</c></b><x/><y/></a>');
   t('string-join(<a><b><c>d</c></b><x/><y/></a> / y / preceding::* / name(.), ":")', 'b:c:x');
+  t('<foobar>text</foobar> / text() / .. / name(.)', 'foobar');
+  t('<foobar>text</foobar> / text() / ancestor::* / name(.)', 'foobar');
+  t('<foobar><t>text</t></foobar> / * / text() / .. / name(.)', 't');
+  t('<foobar><t>text</t></foobar> / * / text() / ancestor::* / name(.)', 'foobar t');
+  t('<a><b><c>d</c></b><x/><y/></a> // (concat(name(.),":",.))', 'a:d b:d c:d :d x: y:');
+  t('string-join(<a><b><c>d</c></b><x/><y/></a> // string-join(for $i in ./ancestor-or-self::* return name($i), ":"), ",")', 'a,a:b,a:b:c,a:b:c,a:x,a:y');
+  t('string-join(<a><b><c>d</c></b><x/><y/></a> // string-join(for $i in ./ancestor::* return name($i), ":"), ",")', ',a,a:b,a:b:c,a,a');
   //repeat some of the XPath 2 tests with constructed elements:
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join(a/b/c/text(), ",")', 'c1,c2,c3,c4,cx1,cx2');
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join(a/b/c/text(), ",")', 'c1,c2,c3,c4,cx1,cx2');
