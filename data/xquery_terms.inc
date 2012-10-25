@@ -37,10 +37,14 @@ end;
 function TXQTermFilterSequence.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
-  result := children[0].evaluate(context);
-  TXQueryEngine.filterSequence(result, children[1], context);
-  if result = nil then result := xqvalue()
-  else xqvalueSeqSqueeze(result);
+  if children[0] is TXQTermNodeMatcher then begin
+    result := TXQueryEngine.evaluateAccessList(self, context);
+  end else begin
+    result := children[0].evaluate(context);
+    TXQueryEngine.filterSequence(result, children[1], context);
+    if result = nil then result := xqvalue()
+    else xqvalueSeqSqueeze(result);
+  end;
 end;
 
 function TXQTermFilterSequence.getContextDependencies: TXQContextDependencies;

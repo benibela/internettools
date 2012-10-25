@@ -2521,8 +2521,29 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('name(x / processing-instruction())', 'PI', '<x><?PI?></x>');
   t('name(x / processing-instruction() / . / . / .)', 'PI', '');
   t('string-join(/a // string-join(for $i in ./ancestor::* return name($i), ":"), ",")', ',a,a:b,a:b:c,a,a', '!<a><b><c>d</c></b><x/><y/></a>');
-  t('string-join(/a // string-join(for $i in ./ancestor-or-self::* return name($i), ":"), ",")', 'a,a:b,a:b:c,a:b:c,a:x,a:y', '!<a><b><c>d</c></b><x/><y/></a>');
-
+  t('string-join(/a // string-join(for $i in ./ancestor-or-self::* return name($i), ":"), ",")', 'a,a:b,a:b:c,a:b:c,a:x,a:y', '');
+  t('outer-xml(//text()/ancestor::*[1])', '<c>d</c>', '');
+  t('outer-xml(//text()/ancestor::*[2])', '<b><c>d</c></b>', '');
+  t('outer-xml(//text()/ancestor::*[3])', '<a><b><c>d</c></b><x/><y/></a>', '');
+  t('outer-xml(//text()/ancestor::*[4])', '', '');
+  t('outer-xml(//text()/ancestor-or-self::*[1])', '<c>d</c>', ''); //self does not match *
+  t('outer-xml(//text()/ancestor-or-self::*[2])', '<b><c>d</c></b>', '');
+  t('outer-xml(//text()/ancestor-or-self::*[3])', '<a><b><c>d</c></b><x/><y/></a>', '');
+  t('outer-xml(//text()/ancestor-or-self::*[4])', '', '');
+  t('outer-xml(//text()/ancestor-or-self::node()[1])', 'd', '');
+  t('outer-xml(//text()/ancestor-or-self::node()[2])', '<c>d</c>', ''); //self does not match *
+  t('outer-xml(//text()/ancestor-or-self::node()[3])', '<b><c>d</c></b>', '');
+  t('outer-xml(//text()/ancestor-or-self::node()[4])', '<a><b><c>d</c></b><x/><y/></a>', '');
+  t('outer-xml(//text()/ancestor-or-self::node()[5])', '<a><b><c>d</c></b><x/><y/></a>', ''); //document node
+  t('outer-xml(//text()/ancestor-or-self::node()[6])', '', '');
+  t('', '', '!<a><b><c/></b><x/><y/></a>');
+  t('outer-xml(//c/ancestor-or-self::*[1])', '<c/>', '');
+  t('outer-xml(//c/ancestor-or-self::*[2])', '<b><c/></b>', '');
+  t('outer-xml(//c/ancestor-or-self::*[3])', '<a><b><c/></b><x/><y/></a>', '');
+  t('outer-xml(//c/ancestor-or-self::*[4])', '', '');
+  t('outer-xml(//c/ancestor::*[1])', '<b><c/></b>', '');
+  t('outer-xml(//c/ancestor::*[2])', '<a><b><c/></b><x/><y/></a>', '');
+  t('outer-xml(//c/ancestor::*[3])', '', '');
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
