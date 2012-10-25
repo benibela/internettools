@@ -1037,8 +1037,10 @@ var
   subcontext: ^TEvaluationContext;
   procedure addKid;
   begin
-    if tree.next = nil then tree.next := kid
-    else begin
+    if tree.next = nil then begin
+      tree.next := kid;
+      kid.previous := tree;
+    end else begin
       if (kid.typ = tetText) and (lastKid.typ = tetText) then begin
         lastKid.value += kid.value;
         kid.free;
