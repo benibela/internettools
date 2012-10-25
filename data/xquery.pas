@@ -53,6 +53,7 @@ type
   public
     function MoveNext: Boolean;
     property Current: IXQValue read FCurrent;
+    function CurrentIndex: Integer;
   end;
 
 
@@ -565,6 +566,25 @@ type
 
   { TXQValueNode }
 
+  TXQSimpleVariable = record
+    name: string;
+    value: IXQValue;
+  end;
+
+  { TXQValueObjectPropertyEnumerator }
+
+  TXQValueObjectPropertyEnumerator = record
+  private
+    tempobj: IXQValue;
+    vars: TXQVariableChangeLog;
+    idx: integer;
+    function GetCurrent: TXQSimpleVariable;
+  public
+    function MoveNext: Boolean;
+    property Current: TXQSimpleVariable read GetCurrent;
+    function GetEnumerator: TXQValueObjectPropertyEnumerator;
+  end;
+
   { TXQValueObject }
 
   //**(Experimental) object type.
@@ -586,6 +606,7 @@ type
 
     function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+    function getEnumeratorOrderedProperties(): TXQValueObjectPropertyEnumerator;
 
     procedure setMutable(const name: string; const v: IXQValue); //**< Changes a property
     function setImmutable(const name: string; const v: IXQValue): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it
@@ -602,11 +623,12 @@ type
 
   { TXQValueFunction }
   TXQFunctionParameter = record
+    namespace: INamespace;
     name: string;
     seqtype: TXQTermSequenceType;
   end;
 
-  //** A function. Currenlty only wraps a TXQTerm and can not be called (some kind of hack to store types without having a metatype value)
+  //** A function. Also used to store type information
   TXQValueFunction = class(TXQValue)
     name: string;
     namespace: INamespace;
@@ -1957,6 +1979,25 @@ begin
   result := TXQValueNode.Create(v);
 end;
 
+{ TXQValueObjectPropertyEnumerator }
+
+function TXQValueObjectPropertyEnumerator.GetCurrent: TXQSimpleVariable;
+begin
+  result.name:=vars.vars[idx].name;
+  result.value:=vars.vars[idx].value;
+end;
+
+function TXQValueObjectPropertyEnumerator.MoveNext: Boolean;
+begin
+  idx += 1;
+  Result := idx < length(vars.vars);
+end;
+
+function TXQValueObjectPropertyEnumerator.GetEnumerator: TXQValueObjectPropertyEnumerator;
+begin
+  result := self;
+end;
+
 { TXQValue_AnyType }
 
 class function TXQValue_AnyType.classTypeName: string;
@@ -2134,6 +2175,11 @@ begin
     result := fcurrentidx < flist.Count;
     if result then fcurrent := flist[fcurrentidx];
   end;
+end;
+
+function TXQValueEnumerator.CurrentIndex: Integer;
+begin
+  result := fcurrentidx;
 end;
 
 

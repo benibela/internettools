@@ -1568,6 +1568,13 @@ begin
   result := temp;
 end;
 
+function TXQValueObject.getEnumeratorOrderedProperties: TXQValueObjectPropertyEnumerator;
+begin
+  result.tempobj := clone;
+  result.vars := (result.tempobj as TXQValueObject).values;
+  result.idx:=-1;
+end;
+
 { TXQValueFunction }
 
 constructor TXQValueFunction.create(aterm: TXQTerm);
