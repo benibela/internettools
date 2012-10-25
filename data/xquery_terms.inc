@@ -574,7 +574,7 @@ begin
       tempcontext.temporaryVariables := TXQVariableChangeLog.create();
       tempcontext.staticContext := sc;
       for j := 0 to high(func.parameters) do
-        tempcontext.temporaryVariables.add(func.parameters[j].name, functionTypeConversion(evilkids[j], func.parameters[j].seqtype) );
+        tempcontext.temporaryVariables.add(func.parameters[j].name, functionTypeConversion(evilkids[j], func.parameters[j].seqtype), func.parameters[j].namespace);
       result := func.body.evaluate(tempcontext);
       result := functionTypeConversion(result, func.resulttype);
       tempcontext.temporaryVariables.free;
@@ -1274,6 +1274,7 @@ begin
   result.name:=funcname;
   setlength(result.parameters, parameterCount);
   for i := 0 to high(result.parameters) do begin
+    result.parameters[i].namespace:=(children[i] as TXQTermDefineVariable).namespace;
     result.parameters[i].name:=(children[i] as TXQTermDefineVariable).variablename;
     if length((children[i] as TXQTermDefineVariable).children) > 0 then
       result.parameters[i].seqtype:=(children[i] as TXQTermDefineVariable).children[0] as TXQTermSequenceType

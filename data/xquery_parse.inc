@@ -1166,7 +1166,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     while nextToken(true) <> ')' do begin
       expect('$');
       tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType), nil);
-      staticContext.splitRawQName(tempVar.namespace, tempVar.variablename, xqdnkFunction);
+      staticContext.splitRawQName(tempVar.namespace, tempVar.variablename, xqdnkUnknown);
       if tempType <> nil then tempVar.push(tempType);
       funcTerm.push(tempVar);
       skipWhitespaceAndComment();

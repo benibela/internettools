@@ -942,6 +942,9 @@ begin
 
   t('outer-xml(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)', '<b xmlns=""/>'); //XQTS test
 
+  m('declare function local:f($local:v){ $local:v + 1}; local:f(2)', '3');
+  m('declare variable $local:v := 17; declare function local:f($local:v){ $local:v + 1}; local:f(2)', '3');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
