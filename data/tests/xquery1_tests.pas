@@ -1078,6 +1078,13 @@ begin
   t('let $ a := 123 return $'#13'a', '123');
   t('for $ a in 123 return $                a', '123');
 
+  t('string-join(<a><b><c>d</c></b></a> // name(.), ":")', 'a:b:c:');
+  t('string-join(<a><b><c>d</c></b><x/></a> // name(.), ":")', 'a:b:c::x');
+  t('string-join(<a><b><c>d</c></b><x/><y/></a> / b / following-sibling::* / name(.), ":")', 'x:y');
+  t('string-join(<a><b><c>d</c></b><x/><y/></a> / y / preceding-sibling::* / name(.), ":")', 'b:x');
+  t('string-join(<a><b><c>d</c></b><x/><y/></a> / b / following::* / name(.), ":")', 'x:y');
+  t('string-join(<a><b><c>d</c></b><x/><y/></a> / y / preceding::* / name(.), ":")', 'b:c:x');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);

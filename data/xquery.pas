@@ -1031,7 +1031,7 @@ type
     nameValue: TXQTerm;
     constructor create(atype: TTreeElementType; aname: txqterm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
-    function evaluate(const context: TEvaluationContext; root: TTreeElement; baseOffset: longint): IXQValue;
+    function evaluate(const context: TEvaluationContext; root: TTreeElement; var baseOffset: longint): IXQValue;
     function isNamespaceConstructor: boolean;
     destructor destroy; override;
   end;

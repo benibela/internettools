@@ -1022,11 +1022,14 @@ begin
 end;
 
 function TXQTermConstructor.evaluate(const context: TEvaluationContext): IXQValue;
+var
+  temp: Integer;
 begin
-  result := evaluate(context, nil, 0);
+  temp := 0;
+  result := evaluate(context, nil, temp);
 end;
 
-function TXQTermConstructor.evaluate(const context: TEvaluationContext; root: TTreeElement; baseOffset: longint): IXQValue;
+function TXQTermConstructor.evaluate(const context: TEvaluationContext; root: TTreeElement; var baseOffset: longint): IXQValue;
 var
   tree: TTreeElement;
   kid: TTreeElement;
@@ -1045,8 +1048,8 @@ var
       kid.previous := lastKid;
     end;
     kid.document := root;
-    kid.offset := baseOffset;
-    baseOffset += 1;
+    //kid.offset := baseOffset;
+    //baseOffset += 1;
     if kid.reverse <> nil then lastKid := kid.reverse
     else lastKid := kid;
   end;
@@ -1090,10 +1093,10 @@ var
 
         if tree.attributes = nil then tree.attributes := TAttributeList.Create;
         tree.attributes.add(kid);
-        kid.offset:=baseOffset;
+        //kid.offset:=baseOffset;
         kid.parent:=tree;
         kid.document:=tree.document;
-        baseOffset+=1;
+        //baseOffset+=1;
       end;
       tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
@@ -1135,7 +1138,7 @@ var
             while (temp <> nil) and (temp <> kid.reverse) do begin
               temp.document := root;
               temp.offset := baseOffset;
-              if (temp.next = nil) or (temp.next.offset <= temp.offset) then baseOffset+=8
+              if (temp.next = nil) or (temp.next.offset <= temp.offset) then baseOffset+=1+temp.getAttributeCount()
               else baseOffset += temp.next.offset - temp.offset;
               temp := temp.next;
             end;
@@ -1185,6 +1188,8 @@ var
         kid.parent := tree;
         kid.document := root;
         kid.value := v.toString;
+        kid.offset:=baseOffset;
+        baseOffset+=1;
         addKid;
       end else begin
         if lastKid.typ <> tetText then raiseEvaluationError('Internal error: No atomic value before this one exist, but this one is not the first atomic value.');
@@ -1245,7 +1250,8 @@ begin
     if context.staticContext.sender.FInternalDocuments = nil then context.staticContext.sender.FInternalDocuments := TFPList.Create;
     context.staticContext.sender.FInternalDocuments.Add(tree);
   end;
-  baseOffset += 1;
+  tree.offset:=baseOffset;
+  baseOffset+=1;
   case typ of
     tetAttribute: begin
       setTreeNodeNameFromTerm(nameValue, xqdnkUnknown);
@@ -1282,6 +1288,8 @@ begin
 
       kid := TTreeElement.create(tetClose, tree.value);
       kid.namespace := tree.namespace;
+      kid.offset:=baseOffset;
+      baseOffset+=1;
       addKid;
       tree.reverse := kid; kid.reverse := tree;
     end;
