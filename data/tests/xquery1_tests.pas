@@ -1051,6 +1051,23 @@ begin
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
 
+  t('let $x := <a xmlns="foobar"><b>c</b></a> return outer-xml(<x>{$x}</x>)', '<x><a xmlns="foobar"><b>c</b></a></x>');
+  t('let $x := <a xmlns="foobar"><b>c</b></a> return outer-xml(<x>{$x}</x> / *:a)', '<a xmlns="foobar"><b>c</b></a>');
+  t('let $x := <a xmlns="foobar"><b>c</b></a> return outer-xml(<x>{$x}</x> / *:a / *:b)', '<b xmlns="foobar">c</b>');
+  t('let $x := <x xmlns:preserve="http://www.example.com/preserve"><z/></x> return outer-xml(<y xmlns:inherit="http://www.example.com/inherit">{$x}</y>/x/z)', '<z xmlns:preserve="http://www.example.com/preserve" xmlns:inherit="http://www.example.com/inherit"/>'); //directly taken from XQTS
+  m('declare copy-namespaces no-preserve, inherit; let $x := <x xmlns:preserve="http://www.example.com/preserve"><z/></x> return outer-xml(<y xmlns:inherit="http://www.example.com/inherit">{$x}</y>/x/z)', '<z xmlns:inherit="http://www.example.com/inherit"/>'); //directly taken from XQTS
+  m('declare copy-namespaces preserve, no-inherit; let $x := <x xmlns:preserve="http://www.example.com/preserve"><z/></x> return outer-xml(<y xmlns:preserve="http://www.example.com/preserve">{$x}</y>/x/z)', '<z xmlns:preserve="http://www.example.com/preserve"/>'); //directly taken from XQTS
+  m('declare copy-namespaces no-preserve, no-inherit; let $x := <x xmlns:preserve="http://www.example.com/preserve"><z/></x> return outer-xml(<y xmlns:inherit="http://www.example.com/inherit">{$x}</y>/x/z)', '<z/>'); //directly taken from XQTS
+
+  t('let $d := document { <abc/> } return outer-xml(<foobar>{$d}</foobar>)', '<foobar><abc/></foobar>');
+  t('let $d := document { <abc/> } return outer-xml(<foobar>{$d}</foobar> / *)', '<abc/>');
+  t('let $d := document { <abc/> } return outer-xml(<foobar>{$d}</foobar> / * / .. )', '<foobar><abc/></foobar>');
+  m('declare copy-namespaces preserve, no-inherit; let $d := document { <abc/> } return outer-xml(<foobar xmlns:inh="erit">{$d}</foobar>)', '<foobar xmlns:inh="erit"><abc/></foobar>');
+  m('declare copy-namespaces preserve, no-inherit; let $d := document { <abc/> } return outer-xml(<foobar xmlns:inh="erit">{$d}</foobar> / *)', '<abc/>');
+  m('declare copy-namespaces preserve, no-inherit; let $d := document { <abc/> } return string-join(for $c in <foobar xmlns:inh="erit">{$d}</foobar> / * return outer-xml($c), ":")', '<abc/>');
+  m('declare copy-namespaces preserve, no-inherit; let $d := document { <abc/>, <def/> } return string-join(for $c in <foobar xmlns:inh="erit">{$d}</foobar> / * return outer-xml($c), ":")', '<abc/>:<def/>');
+  m('declare copy-namespaces preserve, inherit; let $d := document { <abc/>, <def/> } return string-join(for $c in <foobar xmlns:inh="erit">{$d}</foobar> / * return outer-xml($c), ":")', '<abc xmlns:inh="erit"/>:<def xmlns:inh="erit"/>');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);

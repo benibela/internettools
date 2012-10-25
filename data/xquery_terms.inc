@@ -1079,6 +1079,7 @@ var
   var
     doc: TTreeElement;
     n: TTreeElement;
+    attrib: TTreeAttribute;
   begin
     kid.parent := tree;
     case kid.typ of
@@ -1102,6 +1103,11 @@ var
         kid := kid.getFirstChild();
         while kid <> nil do begin
           n := kid.getNextSibling();
+          kid.parent := tree;
+          if doc.attributes <> nil then begin //a document should not have attributes, but when namespace overrides were added by addValue, they were added there
+            if kid.attributes = nil then kid.attributes := TAttributeList.Create;
+            for attrib in doc.attributes do kid.attributes.add(attrib.clone);
+          end;
           addKid;
           kid := n;
         end;
