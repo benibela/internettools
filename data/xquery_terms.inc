@@ -1294,8 +1294,8 @@ begin
           needNamespaceList.addIfNewPrefixUrl(tree.namespace);
       end;
 
-      if (root = tree) and (oldnamespacecount > 0) and (not context.staticContext.copyNamespaceInherit) then
-        //a newly constructed nodes has all current namespaces binding. But only necessary to add them with no-inherit, because otherwise they are inherited anyways
+      if (root = tree) and (oldnamespacecount > 0)  then
+        //a newly constructed nodes has all current namespaces binding. But only necessary to add them to the root node, because otherwise they are inherited anyways
         for i := 0 to oldnamespacecount - 1 do
           tree.addNamespaceDeclaration(context.namespaces.items[i], false);
 

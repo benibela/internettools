@@ -1326,6 +1326,11 @@ begin
   m('declare default element namespace "foobar"; let $b := <b xmlns="foobar"/> return outer-xml(<a>{$b}</a>)', '<a xmlns="foobar"><b/></a>');
   m('declare default element namespace "foobar"; let $b := <b xmlns="foobar"/> return outer-xml(<a><x xmlns=""/>{$b}</a>)', '<a xmlns="foobar"><x xmlns=""/><b/></a>');
 
+  m('<a xmlns:a="foobar"><b/></a> / string-join(in-scope-prefixes(. / b), ":")', 'xml:a');
+  m('<a xmlns:a="foobar"></a> / string-join(in-scope-prefixes(. / <b/>), ":")', 'xml');
+  m('let $b := <b/> return <a xmlns:a="foobar">{string-join(in-scope-prefixes($b), ":")}</a> / text()', 'xml');
+  m(' <a xmlns:a="foobar">{string-join(in-scope-prefixes(<b/>), ":")}</a> / text()', 'xml:a');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
