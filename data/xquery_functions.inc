@@ -1744,7 +1744,8 @@ begin
   if args[0].isUndefined then exit(xqvalue);
   node := xqvalueToSingleNode(args[0]);
   if (node = nil) or not (node is TTreeDocument) then exit(xqvalue);
-  result := xqvalue(TTreeDocument(node).baseURI);
+  if TTreeDocument(node).documentURI = '' then exit(xqvalue);
+  result := TXQValue_anyURI.create(TTreeDocument(node).documentURI);
 end;
 
 function xqFunctionRoot(const context: TEvaluationContext; const args: TXQVArray): IXQValue;

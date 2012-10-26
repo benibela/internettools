@@ -265,11 +265,12 @@ end;
 TTreeDocument = class(TTreeElement)
 protected
   FEncoding: TEncoding;
-  FBaseURI: string;
+  FBaseURI, FDocumentURI: string;
   FCreator: TTreeParser;
 
 public
   property baseURI: string read FBaseURI write FBaseURI;
+  property documentURI: string read FDocumentURI write FDocumentURI;
 
   function getCreator: TTreeParser;
 
@@ -1177,6 +1178,7 @@ begin
       result := TTreeDocument.create();
       TTreeDocument(result).FEncoding:=TTreeDocument(self).FEncoding;
       TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
+      TTreeDocument(result).FDocumentURI:=TTreeDocument(self).FDocumentURI;
       TTreeDocument(result).FCreator:=TTreeDocument(self).FCreator;
     end
     else result := TTreeElement.create();
@@ -1755,6 +1757,7 @@ begin
   FCurrentTree.FCreator:=self;
   FCurrentTree.typ := tetDocument;
   FCurrentTree.FBaseURI:=uri;
+  FCurrentTree.FDocumentURI:=uri;
   FCurrentTree.document := FCurrentTree;
   FCurrentElement:=FCurrentTree;
   FElementStack.Clear;

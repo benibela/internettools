@@ -1269,6 +1269,12 @@ begin
   m('declare base-uri "http://example.org"; (base-uri(<a xml:base="test">{processing-instruction foobar {1} }</a> / processing-instruction() ))', 'http://example.org/test');
   m('declare base-uri "http://example.org"; (base-uri(<a xml:base="test">{text {1} }</a> / text()))', 'http://example.org/test');
 
+  m('declare base-uri "http://example.org"; document-uri(document { element a {1} })', '');
+  m('declare base-uri "http://example.org"; document-uri(document { element a {1}, element b {1} })', '');
+  m('declare base-uri "http://example.org"; empty(document-uri(document { element a {1}, element b {1} }))', 'true');
+  m('declare base-uri "http://example.org"; empty(document-uri(element a {1} ))', 'true');
+  m('declare base-uri "http://example.org"; document-uri(document { element a {1}, element b {1} }) instance of xs:string', 'false');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
