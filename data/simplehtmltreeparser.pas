@@ -269,7 +269,7 @@ protected
   FCreator: TTreeParser;
 
 public
-  property baseURI: string read FBaseURI;
+  property baseURI: string read FBaseURI write FBaseURI;
 
   function getCreator: TTreeParser;
 
@@ -1212,7 +1212,11 @@ begin
 
       if attributes <> nil then result.attributes := attributes.clone;
     end;
-    tetText, tetComment, tetProcessingInstruction, tetAttribute: result := cloneShallow;
+    tetProcessingInstruction: begin
+      result := cloneShallow;
+      if attributes <> nil then attributes := attributes.clone;
+    end;
+    tetText, tetComment, tetAttribute: result := cloneShallow;
     tetClose: raise ETreeParseException.Create('Cannot clone closing tag');
     else raise ETreeParseException.Create('Unknown tag');
   end;
