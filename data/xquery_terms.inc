@@ -1174,11 +1174,11 @@ var
             for i:=0 to tempNamespaces.Count - 1 do
               if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then
                 kid.addNamespaceDeclaration(tempNamespaces.items[i], false);
-            if not tempNamespaces.hasNamespacePrefix('') then begin
+            {if not tempNamespaces.hasNamespacePrefix('') then begin
               v.toNode.getOwnNamespaces(tempNamespaces);
               if not tempNamespaces.hasNamespacePrefix('') then
                 kid.addNamespaceDeclaration(TNamespace.create('', ''), false);
-            end;
+            end;}
             tempNamespaces.free;
           end;
           if (not context.staticContext.copyNamespaceInherit) and (subcontext^.namespaces <> nil) then begin
@@ -1239,7 +1239,7 @@ var
   var
     tempqname: TStringArray;
   begin
-    if (v is TXQValue_QName) and strContains((v as TXQValueString).str, #2) then begin
+    if (v is TXQValue_QName) and ((defkind = xqdnkElementType) or   strContains((v as TXQValueString).str, #2)) then begin
       tempqname := qnameSplit((v as TXQValueString).str);
       if (tempqname[1] = '') and (tempqname[0] = XMLNamespaceUrl_XML) then tempqname[1] := 'xml';
       if (tempqname[1] = '') and (defkind <> xqdnkElementType) then tempqname[1] := chooseRandomPrefix;

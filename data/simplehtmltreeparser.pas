@@ -1149,6 +1149,7 @@ var known: TNamespaceList;
   var attrib: TTreeAttribute;
       oldnamespacecount: integer;
       i: Integer;
+      temp: INamespace;
   begin
     with n do
     case typ of
@@ -1164,12 +1165,13 @@ var known: TNamespaceList;
         oldnamespacecount:=known.Count;
         result := '<' + getNodeName();
 
-{        writeln(stderr,'--');
+        {
+        writeln(stderr,'--');
          if attributes <> nil then
           for attrib in attributes do
             if attrib.isNamespaceNode then
-             writeln(stderr, value+': '+attrib.toNamespace.serialize);}
-
+             writeln(stderr, value+': '+attrib.toNamespace.serialize);
+        }
         if oldnamespacecount = 0 then n.getAllNamespaces(known)
         else n.getOwnNamespaces(known);
         for i:=oldnamespacecount to known.Count - 1 do
@@ -1179,7 +1181,12 @@ var known: TNamespaceList;
                      or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then
             result += ' '+known.items[i].serialize;
 
-        result += requireNamespace(namespace);
+        if namespace <> nil then result += requireNamespace(namespace)
+        else if known.hasNamespacePrefix('', temp) then
+          if temp.getURL <> '' then begin
+            known.add(tNamespace.create('', ''));
+            result += ' xmlns=""';
+          end;
         if attributes <> nil then
           for attrib in attributes do
             result += requireNamespace(attrib.namespace);
