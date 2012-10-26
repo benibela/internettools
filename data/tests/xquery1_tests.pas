@@ -1315,6 +1315,11 @@ begin
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"><!--x--></foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"><!--x--></foo:child2></new>');
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"><?pi?></foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"><?pi ?></foo:child2></new>');
 
+  m('outer-xml(<a><b xmlns="foobar"/><c xmlns="foobar"/></a>)', '<a><b xmlns="foobar"/><c xmlns="foobar"/></a>');
+  m('declare default element namespace "foobar"; outer-xml(<a><b xmlns="foobar"/></a>)', '<a xmlns="foobar"><b/></a>');
+  m('declare default element namespace "foobar"; let $b := <b xmlns="foobar"/> return outer-xml(<a>{$b}</a>)', '<a xmlns="foobar"><b/></a>');
+  m('declare default element namespace "foobar"; let $b := <b xmlns="foobar"/> return outer-xml(<a><x xmlns=""/>{$b}</a>)', '<a xmlns="foobar"><x xmlns=""/><b/></a>');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);

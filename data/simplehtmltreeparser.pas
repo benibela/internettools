@@ -1164,7 +1164,7 @@ var known: TNamespaceList;
         oldnamespacecount:=known.Count;
         result := '<' + getNodeName();
 
-        {writeln(stderr,'--');
+{        writeln(stderr,'--');
          if attributes <> nil then
           for attrib in attributes do
             if attrib.isNamespaceNode then
@@ -1193,6 +1193,8 @@ var known: TNamespaceList;
         if next = reverse then begin
           result += '/>';
           if insertLineBreaks then Result+=LineEnding;
+          while known.count > oldnamespacecount do
+            known.Delete(known.count-1);
           exit();
         end;
         result +='>';
