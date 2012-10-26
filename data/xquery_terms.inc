@@ -1246,8 +1246,10 @@ begin
   oldnamespacecount := 0;
   if subcontext^.namespaces <> nil then oldnamespacecount := subcontext^.namespaces.Count;
 
-  if (typ = tetDocument) then tree := TTreeDocument.create(typ)
-  else if typ = tetAttribute then tree := TTreeAttribute.create('','')
+  if (typ = tetDocument) then begin
+    tree := TTreeDocument.create(typ);
+    TTreeDocument(tree).baseURI := context.staticContext.baseURI;
+  end else if typ = tetAttribute then tree := TTreeAttribute.create('','')
   else tree := TTreeElement.create(typ);
   if root = nil then root := tree;
   tree.document := root;

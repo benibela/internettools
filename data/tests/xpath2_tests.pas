@@ -1588,7 +1588,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('fn:iri-to-uri ("http://www.example.com/~bébé")', 'http://www.example.com/~b%C3%A9b%C3%A9', '');
   t('fn:escape-html-uri ("http://www.example.com/00/Weather/CA/Los Angeles#ocean")', 'http://www.example.com/00/Weather/CA/Los Angeles#ocean', '');
   t('fn:escape-html-uri ("javascript:if (navigator.browserLanguage == ''fr'') window.open(''http://www.example.com/~bébé'');")', 'javascript:if (navigator.browserLanguage == ''fr'') window.open(''http://www.example.com/~b%C3%A9b%C3%A9'');', '');
-  t('base-uri(doc/paragraph/link)', 'http://example.org/today/xy/', '<doc xmlns:xlink="http://www.w3.org/1999/xlink" xml:base="http://example.org/today/"><paragraph xml:base="xy"><link xlink:type="simple" xlink:href="new.xml"></link>!</paragraph></doc>');
+  t('base-uri(doc/paragraph/link)', 'http://example.org/today/xy', '<doc xmlns:xlink="http://www.w3.org/1999/xlink" xml:base="http://example.org/today/"><paragraph xml:base="xy"><link xlink:type="simple" xlink:href="new.xml"></link>!</paragraph></doc>');
   t('name(./tmp/*)', 'pr:abc', '<tmp xmlns:pr="http://www.example.com"><pr:abc></pr:abc></tmp>');
   t('name(./tmp/element())', 'pr:abc', '');
   t('local-name(./tmp/element())', 'abc', '');
@@ -2544,6 +2544,20 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('outer-xml(//c/ancestor::*[1])', '<b><c/></b>', '');
   t('outer-xml(//c/ancestor::*[2])', '<a><b><c/></b><x/><y/></a>', '');
   t('outer-xml(//c/ancestor::*[3])', '', '');
+
+
+  t('base-uri(/)', '', '!<root xml:base="http://www.example.org"><!--comment--><sub1 xml:base="foobar"><sub1a xml:base="123" attrib="maus"/></sub1><sub2 xml:base="test/xyz"/><sub3 xml:base="456/"/><sub4 xml:base="http://www.benibela.de"/></root>');
+  //t('empty(base-uri(/))', 'true'); ??
+  t('base-uri(/root)', 'http://www.example.org');
+  t('base-uri(/root/sub1)', 'http://www.example.org/foobar');
+  t('base-uri(/root/sub1)', 'http://www.example.org/foobar');
+  t('base-uri(/root/sub1/sub1a)', 'http://www.example.org/foobar/123');
+  t('base-uri(/root/sub1/sub1a/@attrib)', 'http://www.example.org/foobar/123');
+  t('base-uri(/root/sub2)', 'http://www.example.org/test/xyz');
+  t('base-uri(/root/sub4)', 'http://www.benibela.de');
+  t('base-uri(/root/comment())', 'http://www.example.org');
+  t('base-uri(/root/comment()) instance of xs:string', 'false');
+  t('base-uri(/root/comment()) instance of xs:anyURI', 'true');
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")

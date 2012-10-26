@@ -1708,21 +1708,32 @@ function xqFunctionBase_Uri(const context: TEvaluationContext; const args: TXQVA
 var uri: string;
   node: TTreeElement;
   temp: String;
+  last: TTreeElement;
+  found: Boolean;
 begin
   requiredArgCount(args,0, 1);
   if length(args) = 0 then node := xqvalueContextNode(context)
   else if args[0].isUndefined then exit(xqvalue)
   else node := xqvalueToSingleNode(args[0]);
   uri := '';
+  last := node;
+  found := false;
   while node <> nil do begin
     if node.getAttributeTry('xml:base', temp, @context.staticContext.nodeCollation.equal) then begin
+      found := true;
       if temp <> '' then
-        if temp[length(temp)] = '/' then uri := temp + uri
-        else uri := temp + '/' + uri;
+        uri := strResolveURI(uri, temp);
     end;
+    last := node;
     node := node.getParent();
   end;
-  result := xqvalue(uri);
+  if last <> nil then begin
+    if last is TTreeDocument then uri := strResolveURI(uri, TTreeDocument(last).baseURI)
+    else if last.typ in [tetOpen] then uri := strResolveURI(uri, context.staticContext.baseURI)
+    else if (uri = '') and (last.typ in [tetAttribute, tetText, tetComment, tetProcessingInstruction]) then exit(xqvalue());
+  end;
+  result := TXQValue_anyURI.create('');
+  (result as TXQValueString).str := uri; // by pass validation
 end;
 
 function xqFunctionDocument_Uri(const args: TXQVArray): IXQValue;

@@ -1250,6 +1250,25 @@ begin
   t('outer-xml(<a xml:id="foobar"/>)', '<a xml:id="foobar"/>');
   t('outer-xml(<a>{attribute {QName("'+XMLNamespaceUrl_XML+'", "id")} {123}}</a>)', '<a xml:id="123"/>');
 
+  m('declare base-uri "http://example.org"; base-uri(document { element a {1} })', 'http://example.org');
+  m('declare base-uri "http://example.org"; base-uri(element a {1} )', 'http://example.org');
+  m('declare base-uri "http://example.org"; base-uri(attribute a {1} )', '');
+  m('declare base-uri "http://example.org"; base-uri(comment {1} )', '');
+  m('declare base-uri "http://example.org"; base-uri(processing-instruction foobar {1} )', '');
+  m('declare base-uri "http://example.org"; base-uri(text {1} )', '');
+  m('declare base-uri "http://example.org"; empty(base-uri(attribute a {1} ))', 'true');
+  m('declare base-uri "http://example.org"; empty(base-uri(comment {1} ))', 'true');
+  m('declare base-uri "http://example.org"; empty(base-uri(processing-instruction foobar {1} ))', 'true');
+  m('declare base-uri "http://example.org"; empty(base-uri(text {1} ))', 'true');
+  m('declare base-uri "http://example.org"; (base-uri(<a>{attribute a {1} }</a> / @*))', 'http://example.org');
+  m('declare base-uri "http://example.org"; (base-uri(<a>{comment {1} }</a> / comment()))', 'http://example.org');
+  m('declare base-uri "http://example.org"; (base-uri(<a>{processing-instruction foobar {1} }</a> / processing-instruction() ))', 'http://example.org');
+  m('declare base-uri "http://example.org"; (base-uri(<a>{text {1} }</a> / text()))', 'http://example.org');
+  m('declare base-uri "http://example.org"; (base-uri(<a xml:base="test">{attribute a {1} }</a> / @a))', 'http://example.org/test');
+  m('declare base-uri "http://example.org"; (base-uri(<a xml:base="test">{comment {1} }</a> / comment()))', 'http://example.org/test');
+  m('declare base-uri "http://example.org"; (base-uri(<a xml:base="test">{processing-instruction foobar {1} }</a> / processing-instruction() ))', 'http://example.org/test');
+  m('declare base-uri "http://example.org"; (base-uri(<a xml:base="test">{text {1} }</a> / text()))', 'http://example.org/test');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
