@@ -155,7 +155,7 @@ begin
   if not castableAsBase(v) then raiseEvaluationError('impossible cast as');
   if not atomicTypeInfo.InheritsFrom(TXQValue_QName) then result := atomicTypeInfo.createFromValue(v)
   else begin
-    temp := v.toString;
+    temp := trim(v.toString);
     context.splitRawQName(ns, temp, xqdnkAny);
     result := qnameMake(ns, temp, TXQValueStringClass(atomicTypeInfo));
   end;

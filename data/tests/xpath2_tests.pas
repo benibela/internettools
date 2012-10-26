@@ -2559,6 +2559,17 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('base-uri(/root/comment()) instance of xs:string', 'false');
   t('base-uri(/root/comment()) instance of xs:anyURI', 'true');
 
+  t('"  123  " cast as xs:integer', '123');
+  t('"    567.566  " cast as xs:double', '567.566');
+  t('"    www  " cast as xs:anyURI', 'www');
+  t('"    www  " cast as xs:string', '    www  ');
+  t('"    www  " cast as xs:normalizedString', '    www  ');
+  t('"    ww   w  " cast as xs:untyped', '    ww   w  ');
+  t('"    ww   w  " cast as xs:untypedAtomic', '    ww   w  ');
+  t('"    ww'#9'w  " cast as xs:normalizedString', '    ww w  ');
+  t('"    123  " cast as xs:int', '123');
+
+
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
 

@@ -1700,7 +1700,7 @@ end;
 function xqFunctionStatic_Base_Uri(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,0);
-  if context.staticContext.baseURI <> '' then result := xqvalue(context.staticContext.baseURI)
+  if context.staticContext.baseURI <> '' then result := TXQValue_anyURI.create(context.staticContext.baseURI)
   else result := xqvalue();
 end;
 
@@ -1722,18 +1722,18 @@ begin
     if node.getAttributeTry('xml:base', temp, @context.staticContext.nodeCollation.equal) then begin
       found := true;
       if temp <> '' then
-        uri := strResolveURI(uri, temp);
+        uri := strResolveURI(uri, strTrimAndNormalize(temp, [#9,#10,#13,' ']));
     end;
     last := node;
     node := node.getParent();
   end;
   if last <> nil then begin
-    if last is TTreeDocument then uri := strResolveURI(uri, TTreeDocument(last).baseURI)
-    else if last.typ in [tetOpen] then uri := strResolveURI(uri, context.staticContext.baseURI)
+    if last is TTreeDocument then uri := strResolveURI(uri, strTrimAndNormalize(TTreeDocument(last).baseURI, [#9,#10,#13,' ']))
+    else if last.typ in [tetOpen] then uri := strResolveURI(uri, strTrimAndNormalize(context.staticContext.baseURI, [#9,#10,#13,' ']))
     else if (uri = '') and (last.typ in [tetAttribute, tetText, tetComment, tetProcessingInstruction]) then exit(xqvalue());
   end;
   result := TXQValue_anyURI.create('');
-  (result as TXQValueString).str := uri; // by pass validation
+  (result as TXQValueString).str :=  uri; // by pass validation
 end;
 
 function xqFunctionDocument_Uri(const args: TXQVArray): IXQValue;
@@ -1745,7 +1745,7 @@ begin
   node := xqvalueToSingleNode(args[0]);
   if (node = nil) or not (node is TTreeDocument) then exit(xqvalue);
   if TTreeDocument(node).documentURI = '' then exit(xqvalue);
-  result := TXQValue_anyURI.create(TTreeDocument(node).documentURI);
+  result := TXQValue_anyURI.create(strTrimAndNormalize(TTreeDocument(node).documentURI, [#9,#10,#13,' ']));
 end;
 
 function xqFunctionRoot(const context: TEvaluationContext; const args: TXQVArray): IXQValue;

@@ -639,23 +639,30 @@ end;
 function TXQValueString.canConvertToInt65: boolean;
 var
   temp: int64;
+  tempstr: string;
 begin
-  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(false);
-  result := TryStrToInt64(str,temp);
+  tempstr:=trim(str);
+  if (tempstr = 'NaN') or (tempstr = 'INF') or (tempstr = '-INF') then exit(false);
+  result := TryStrToInt64(tempstr,temp);
 end;
 
 function TXQValueString.canConvertToDecimal(pure: boolean): boolean;
 var
   temp: Extended;
+  tempstr: String;
 begin
-  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(not pure);
-  if pure and striContains(str, 'e') then exit(false);
-  result := TryStrToFloat(str, temp, XQFormats);
+  tempstr := trim(str);
+  if (tempstr = 'NaN') or (tempstr = 'INF') or (tempstr = '-INF') then exit(not pure);
+  if pure and striContains(tempstr, 'e') then exit(false);
+  result := TryStrToFloat(tempstr, temp, XQFormats);
 end;
 
 function TXQValueString.canConvertToBoolean: boolean;
+var
+  tempstr: String;
 begin
-  Result:=(str = '0') or (str = '1') or (str = 'true') or (str = 'false') or (str = '');
+  tempstr := trim(str);
+  Result:=(tempstr = '0') or (tempstr = '1') or (tempstr = 'true') or (tempstr = 'false') or (str = '');
 end;
 
 function TXQValueString.toBoolean: boolean;

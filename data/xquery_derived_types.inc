@@ -91,12 +91,14 @@ end;
 
 
 class function TXQValue_long.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   
   
   
+
   
   
 
@@ -197,12 +199,14 @@ end;
 
 
 class function TXQValue_int.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < -2147483648 then exit(false); 
   if v > 2147483647 then exit(false); 
   
+
   
   
 
@@ -307,12 +311,14 @@ end;
 
 
 class function TXQValue_short.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < -32768 then exit(false); 
   if v > 32767 then exit(false); 
   
+
   
   
 
@@ -417,12 +423,14 @@ end;
 
 
 class function TXQValue_byte.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < -128 then exit(false); 
   if v > 127 then exit(false); 
   
+
   
   
 
@@ -523,12 +531,14 @@ end;
 
 
 class function TXQValue_nonPositiveInteger.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   
   if v > 0 then exit(false); 
   
+
   
   
 
@@ -627,12 +637,14 @@ end;
 
 
 class function TXQValue_negativeInteger.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   
   if v > -1 then exit(false); 
   
+
   
   
 
@@ -726,12 +738,14 @@ end;
 
 
 class function TXQValue_nonNegativeInteger.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < 0 then exit(false); 
   
   
+
   
   
 
@@ -825,12 +839,14 @@ end;
 
 
 class function TXQValue_positiveInteger.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < 1 then exit(false); 
   
   
+
   
   
 
@@ -924,12 +940,14 @@ end;
 
 
 class function TXQValue_unsignedLong.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < 0 then exit(false); 
   
   
+
   
   
 
@@ -1032,12 +1050,14 @@ end;
 
 
 class function TXQValue_unsignedInt.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < 0 then exit(false); 
   if v > 4294967295 then exit(false); 
   
+
   
   
 
@@ -1142,12 +1162,14 @@ end;
 
 
 class function TXQValue_unsignedShort.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < 0 then exit(false); 
   if v > 65536 then exit(false); 
   
+
   
   
 
@@ -1252,12 +1274,14 @@ end;
 
 
 class function TXQValue_unsignedByte.canCreateFromint65(const v: TXQ_int65): boolean;
+
 begin
   result := true; ignore(v);
   
   if v < 0 then exit(false); 
   if v > 255 then exit(false); 
   
+
   
   
 
@@ -1360,9 +1384,11 @@ end;
 
 
 class function TXQValue_float.canCreateFromdecimal(const v: TXQ_decimal): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
 
@@ -1474,9 +1500,11 @@ end;
 
 
 class function TXQValue_double.canCreateFromdecimal(const v: TXQ_decimal): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
 
@@ -1559,7 +1587,9 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type untypedAtomic');
   
@@ -1587,12 +1617,17 @@ end;
 
 
 class function TXQValue_untypedAtomic.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+
   if (RegExpruntypedAtomic = nil) then RegExpruntypedAtomic := tregexpr.create('.*');
-  result := RegExpruntypedAtomic.exec(v);
+  result := RegExpruntypedAtomic.exec(tv);
   
   
 
@@ -1659,7 +1694,9 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type untyped');
   
@@ -1687,12 +1724,17 @@ end;
 
 
 class function TXQValue_untyped.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+
   if (RegExpruntyped = nil) then RegExpruntyped := tregexpr.create('.*');
-  result := RegExpruntyped.exec(v);
+  result := RegExpruntyped.exec(tv);
   
   
 
@@ -1759,7 +1801,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  str := stringreplace(stringreplace(stringreplace(str, #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]), #9, ' ', [rfReplaceAll]);
+  
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type normalizedString');
   
@@ -1781,12 +1828,20 @@ end;
 
 
 class function TXQValue_normalizedString.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  tv := stringreplace(stringreplace(stringreplace(tv, #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]), #9, ' ', [rfReplaceAll]);
+  
+  
+
   if (RegExprnormalizedString = nil) then RegExprnormalizedString := tregexpr.create('^[^'#9#13#10']*$');
-  result := RegExprnormalizedString.exec(v);
+  result := RegExprnormalizedString.exec(tv);
   
   
 
@@ -1853,7 +1908,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type token');
   
@@ -1875,12 +1935,20 @@ end;
 
 
 class function TXQValue_token.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprtoken = nil) then RegExprtoken := tregexpr.create('^(([^'#9#13#10' ]+|[^'#9#13#10' ] )*[^'#9#13#10' ])?$');
-  result := RegExprtoken.exec(v);
+  result := RegExprtoken.exec(tv);
   
   
 
@@ -1947,7 +2015,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type language');
   
@@ -1969,12 +2042,20 @@ end;
 
 
 class function TXQValue_language.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprlanguage = nil) then RegExprlanguage := tregexpr.create(RegExpr__language);
-  result := RegExprlanguage.exec(v);
+  result := RegExprlanguage.exec(tv);
   
   
 
@@ -2041,7 +2122,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type NMTOKEN');
   
@@ -2063,12 +2149,20 @@ end;
 
 
 class function TXQValue_NMTOKEN.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprNMTOKEN = nil) then RegExprNMTOKEN := tregexpr.create('^('+RegExpr_XMLNameChar+')+$');
-  result := RegExprNMTOKEN.exec(v);
+  result := RegExprNMTOKEN.exec(tv);
   
   
 
@@ -2135,7 +2229,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type Name');
   
@@ -2157,12 +2256,20 @@ end;
 
 
 class function TXQValue_Name.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprName = nil) then RegExprName := tregexpr.create(RegExpr_XMLName);
-  result := RegExprName.exec(v);
+  result := RegExprName.exec(tv);
   
   
 
@@ -2229,7 +2336,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type NCName');
   
@@ -2251,12 +2363,20 @@ end;
 
 
 class function TXQValue_NCName.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprNCName = nil) then RegExprNCName := tregexpr.create(RegExpr_XMLNCName);
-  result := RegExprNCName.exec(v);
+  result := RegExprNCName.exec(tv);
   
   
 
@@ -2323,7 +2443,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type ID');
   
@@ -2345,12 +2470,20 @@ end;
 
 
 class function TXQValue_ID.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprID = nil) then RegExprID := tregexpr.create(RegExpr_XMLNCName);
-  result := RegExprID.exec(v);
+  result := RegExprID.exec(tv);
   
   
 
@@ -2417,7 +2550,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type IDREF');
   
@@ -2439,12 +2577,20 @@ end;
 
 
 class function TXQValue_IDREF.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprIDREF = nil) then RegExprIDREF := tregexpr.create(RegExpr_XMLNCName);
-  result := RegExprIDREF.exec(v);
+  result := RegExprIDREF.exec(tv);
   
   
 
@@ -2511,7 +2657,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type ENTITY');
   
@@ -2533,12 +2684,20 @@ end;
 
 
 class function TXQValue_ENTITY.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprENTITY = nil) then RegExprENTITY := tregexpr.create(RegExpr_XMLNCName);
-  result := RegExprENTITY.exec(v);
+  result := RegExprENTITY.exec(tv);
   
   
 
@@ -2605,7 +2764,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type anyURI');
   
@@ -2660,12 +2824,20 @@ end;
 
 
 class function TXQValue_anyURI.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExpranyURI = nil) then RegExpranyURI := tregexpr.create('^'+RegExpr_anyURIRaw+'$');
-  result := RegExpranyURI.exec(v);
+  result := RegExpranyURI.exec(tv);
   
   
 
@@ -2732,7 +2904,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type QName');
   
@@ -2787,12 +2964,20 @@ end;
 
 
 class function TXQValue_QName.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprQName = nil) then RegExprQName := tregexpr.create(RegExpr_QName);
-  result := RegExprQName.exec(v);
+  result := RegExprQName.exec(tv);
   
   
 
@@ -2859,7 +3044,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type NOTATION');
   
@@ -2914,12 +3104,20 @@ end;
 
 
 class function TXQValue_NOTATION.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprNOTATION = nil) then RegExprNOTATION := tregexpr.create(RegExpr_QName);
-  result := RegExprNOTATION.exec(v);
+  result := RegExprNOTATION.exec(tv);
   
   
 
@@ -2986,7 +3184,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
    str := uppercase(str); 
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type hexBinary');
   
@@ -3035,12 +3238,20 @@ end;
 
 
 class function TXQValue_hexBinary.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprhexBinary = nil) then RegExprhexBinary := tregexpr.create('^([0-9A-Fa-f][0-9A-Fa-f])*$');
-  result := RegExprhexBinary.exec(v);
+  result := RegExprhexBinary.exec(tv);
   
   
 
@@ -3104,7 +3315,12 @@ begin
   
 
   
-  str := trim(v); //trim all derived types
+  str := v;
+  
+  
+  str := strTrimAndNormalize(str, [#9,#10,#13,' ']);
+  
+
   
   if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type base64Binary');
   
@@ -3153,12 +3369,20 @@ end;
 
 
 class function TXQValue_base64Binary.canCreateFromstring(const v: TXQ_string): boolean;
+var tv: string; 
 begin
   result := true; ignore(v);
   
+
   
+  tv := v;
+  
+  
+  tv := strTrimAndNormalize(tv, [#9,#10,#13,' ']);
+  
+
   if (RegExprbase64Binary = nil) then RegExprbase64Binary := tregexpr.create('^([A-Za-z0-9+/] *)*(|[AEIMQUYcgkosw048] *=|[AQgw] *= *=)$');
-  result := RegExprbase64Binary.exec(v);
+  result := RegExprbase64Binary.exec(tv);
   
   
 
@@ -3251,9 +3475,11 @@ end;
 
 
 class function TXQValue_time.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -3360,9 +3586,11 @@ end;
 
 
 class function TXQValue_date.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -3469,9 +3697,11 @@ end;
 
 
 class function TXQValue_gYear.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -3578,9 +3808,11 @@ end;
 
 
 class function TXQValue_gYearMonth.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -3687,9 +3919,11 @@ end;
 
 
 class function TXQValue_gMonthDay.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -3796,9 +4030,11 @@ end;
 
 
 class function TXQValue_gMonth.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -3905,9 +4141,11 @@ end;
 
 
 class function TXQValue_gDay.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -4014,9 +4252,11 @@ end;
 
 
 class function TXQValue_duration.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -4117,9 +4357,11 @@ end;
 
 
 class function TXQValue_dayTimeDuration.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
@@ -4220,9 +4462,11 @@ end;
 
 
 class function TXQValue_yearMonthDuration.canCreateFromdatetime(const v: TXQ_datetime): boolean;
+
 begin
   result := true; ignore(v);
   
+
   
   
   result:=inherited;
