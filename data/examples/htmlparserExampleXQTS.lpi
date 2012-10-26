@@ -30,7 +30,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--plain /home/benito/xxtest/cat/ModuleImport.xml"/>
+        <CommandLineParams Value="--plain /home/benito/xxtest/cat/functx-functx-change-element-ns.xml"/>
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>

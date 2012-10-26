@@ -1030,6 +1030,7 @@ begin
 
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz xmlns="foobar" xmlns:t="u"/> return outer-xml(<b:x><c>{$a}</c></b:x> / c)', '<c xmlns:b="BNS"><a:xyz xmlns="foobar" xmlns:t="u" xmlns:a="ANS"/></c>' );
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz xmlns="foobar" xmlns:t="u"/> return outer-xml(<b:x><c>{$a}</c></b:x> / c)', '<c xmlns:b="BNS"><a:xyz xmlns:a="ANS"/></c>'  );
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz xmlns="foobar" xmlns:t="u"/> return string-join(in-scope-prefixes(<b:x><c>{$a}</c></b:x> / c / a:*), ",")', 'xml,,t,a');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz xmlns="foobar" xmlns:t="u"/> return outer-xml(<b:x><c>{$a}</c></b:x> / c)', '<c xmlns:b="BNS"><a:xyz xmlns="foobar" xmlns:t="u" xmlns:a="ANS"/></c>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz xmlns="foobar" xmlns:t="u"/> return outer-xml(<b:x><c>{$a}</c></b:x> / c)', '<c xmlns:b="BNS"><a:xyz xmlns:a="ANS"/></c>');
 
@@ -1298,6 +1299,21 @@ begin
   t('count(<a>{" "}{(comment {""})}{""}</a> / comment())', '1');
   t('outer-xml(<a>{ processing-instruction { "  abc  "} { () }}</a>)', '<a><?abc ?></a>');
   t('outer-xml(<a>{ processing-instruction { "  abc  "} { ("   ", "  foo ", "  bar ", "   ") }}</a>)', '<a><?abc foo    bar     ?></a>');
+
+  t('let $x := <x xmlns=""/> return outer-xml(<a xmlns="ANS">{$x}</a>)', '<a xmlns="ANS"><x xmlns=""/></a>');
+  t('let $x := <y xmlns=""><x/></y> / *:x return outer-xml(<a xmlns="ANS">{$x}</a>)', '<a xmlns="ANS"><x xmlns=""/></a>');
+  t('let $x := <y xmlns=""><x foo="bar"/></y> / *:x return outer-xml(<a xmlns="ANS">{$x}</a>)', '<a xmlns="ANS"><x xmlns="" foo="bar"/></a>');
+  t('let $y := <y xmlns=""><x foo="bar"/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns="" foo="bar"/></a>');
+  t('let $y := <y xmlns="" xmlns:abc="def"><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" xmlns:abc="def" foo="bar"/></a>');
+  t('let $y := <y xmlns=""><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" foo="bar"/></a>');
+  m('declare default element namespace "abc"; let $y := <y><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="abc" foo="bar"/></a>');
+  t('let $y := <y><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" foo="bar"/></a>');
+  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><child2 attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><child2 xmlns:foo="http://www.example.com/parent2" xmlns="" attr="child"/></new>'); //XQTS test
+  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" xmlns="" attr="child"/></new>');
+  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"/></new>');
+  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child">foobar</foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child">foobar</foo:child2></new>');
+  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"><!--x--></foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"><!--x--></foo:child2></new>');
+  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"><?pi?></foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"><?pi ?></foo:child2></new>');
 
   helper.free;
   xml.free;
