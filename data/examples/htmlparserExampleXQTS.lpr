@@ -92,8 +92,9 @@ class procedure TPlainLogger.LOG_RESULT(state: integer; desc, queryname, query, 
 begin
   case state of
   0: writeln('correct');
-  1: writeln('ERROR: got "', myoutput, '" expected "', output, '"');
-  2: writeln('EXCEPTION: ', myoutput);
+  1: writeln('correct (igored output)');
+  2: writeln('ERROR: got "', myoutput, '" expected "', output, '"');
+  3: writeln('EXCEPTION: ', myoutput);
   end;
   writeln ('  In: ', queryfile, ': ',copy(desc,1,60), ' with ', inputfile, ' time: ', timing * MSecsPerDay:6:6);
 end;
@@ -115,7 +116,9 @@ end;
 class procedure THTMLLogger.LOG_START;
 begin
   writeln('<html><head><title>XQuery Test Suite Evaluation</title>');
-  writeln('<style>  table tr th {background-color: #EEEEFF}    table tr:hover {background-color: #EEEEFF}   </style>');
+  writeln('<style>  table tr th {background-color: #EEEEFF}    table tr:hover td {background-color: #A0A0FF} ');
+  writeln('  tr.correct {background-color: #AAFFAA} tr.correctIgnored {background-color: #FFFFAA} tr.wrong {background-color: #FFAAAA} tr.error {background-color: #FF9999}');
+  writeln('</style>');
   writeln('</head><body>');
   writeln('<h1>XQTS Evaluation</h1>');
   writeln('<h2>Overview</h2>');
@@ -150,8 +153,9 @@ begin
 
     case state of
     0: buffer3.add('<tr class="correct"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
-    1: buffer3.add('<tr class="wrong"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
-    2: buffer3.add('<tr class="error"><td>'+queryname+'</td><td>'+desc+'</td><td> <b>Error</b>:'+myoutput+'</td><td>'+output+'</td></tr>');
+    1: buffer3.add('<tr class="correctignored"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
+    2: buffer3.add('<tr class="wrong"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
+    3: buffer3.add('<tr class="error"><td>'+queryname+'</td><td>'+desc+'</td><td> <b>Error</b>:'+myoutput+'</td><td>'+output+'</td></tr>');
     end;
 end;
 
@@ -477,8 +481,12 @@ begin
             correctLocal += 1;
             if logCorrect or strEqual('Ignore', outputcomparator) then begin
               logGroupStart;
-              if strEqual('Ignore', outputcomparator) then output:='IGNORED OUTPUT' ;
-              mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+              if not strEqual('Ignore', outputcomparator) then
+                mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)
+              else begin
+                output:='IGNORED OUTPUT (counted as correct)' ;
+                mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+              end
             end;
             if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)   then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
 
@@ -488,7 +496,7 @@ begin
 
             logGroupStart;
 
-            mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+            mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
             if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)  then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
           {  write(stderr, 'WRONG: ', copy(desc,1,60),' ',queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
             writeln(stderr, '       ', arrayGet(strSplit(query, #13),-2) );
@@ -497,7 +505,7 @@ begin
         except on e: sysutils.Exception do begin
           logGroupStart;
           exceptionLocal+=1;
-          mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', e.message, output, timing);
+          mylogger.LOG_RESULT(3, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', e.message, output, timing);
           fileOpenFailed  := '';
 {          writeln(stderr, 'EXCEPTION: ',desc, queryname, ': ', e.message);
           writeln('       ', arrayGet(strSplit(strTrim(query), #13),-1) );
