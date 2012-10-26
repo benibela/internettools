@@ -284,7 +284,7 @@ begin
   t('outer-xml(<a test="{<temp>dingdong</temp>}">5</a>)', '<a test="dingdong">5</a>');
   t('outer-xml(<a test="foo{{123}}bar">5</a>)', '<a test="foo{123}bar">5</a>');
   t('outer-xml(<a test="&#x61;&#x20;&#x61;{61}">&#x61;&#x20;&#x61;{61}</a>)', '<a test="a a61">a a61</a>');
-  t('outer-xml(<a><![CDATA[]]></a>)', '<a></a>');
+  t('outer-xml(<a><![CDATA[]]></a>)', '<a/>');
   t('outer-xml(<a><![CDATA[123]]></a>)', '<a>123</a>');
   t('outer-xml(<a>foo<![CDATA[123]]>bar</a>)', '<a>foo123bar</a>');
   t('outer-xml(<a>{1+2}<![CDATA[{1+2}]]>{1+3}</a>)', '<a>3{1+2}4</a>');
@@ -1280,6 +1280,23 @@ begin
   m('declare base-uri "abc"; static-base-uri() instance of xs:string', 'false');
   m('declare base-uri "abc"; static-base-uri() instance of xs:anyURI', 'true');
   m('declare base-uri "   http://abc    def     "; base-uri(<a/>)', 'http://abc def');
+
+  t('count(text {""})', '1');
+  t('count(text {()})', '0');
+  t('count((text {""}, text {""}))', '2');
+  t('let $a := () return count((text {""}, text {$a}, text {""}))', '2');
+  t('let $ a := () return count(<a>{$a}</a> / text())', '0');
+  t('let $ a := "" return count(<a>{$a}</a> / text())', '0');
+
+  t('count(<a>{(comment {"foobar"})}</a> / comment())', '1');
+  t('outer-xml(<a>{""}</a>)', '<a/>');
+  t('outer-xml(<a>{("", "", "")}</a>)', '<a/>');
+  t('outer-xml(<a>{(text {""})}</a>)', '<a/>');
+  t('count(<a>{(text {""})}{""}</a> / text())', '0');
+  t('count(<a>{(comment {""})}{""}</a> / comment())', '1');
+  t('count(<a>{""}{(comment {""})}{""}</a> / comment())', '1');
+  t('count(<a>{" "}{(comment {""})}{""}</a> / comment())', '1');
+  t('outer-xml(<a>{ processing-instruction { "  abc  "} { () }}</a>)', '<a><?abc ?></a>');
 
   helper.free;
   xml.free;

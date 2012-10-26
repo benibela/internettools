@@ -1041,6 +1041,11 @@ var
   subcontext: ^TEvaluationContext;
   procedure addKid;
   begin
+    if (kid.typ = tetText) and (kid.value = '') then begin
+      kid.free;
+      kid := nil;
+      exit;
+    end;
     if tree.next = nil then begin
       tree.next := kid;
       kid.previous := tree;
@@ -1186,7 +1191,8 @@ var
         for x in v do begin
           addValue(x, firstAtomic);
           if x is TXQValueNode then firstAtomic := true
-          else firstAtomic:=false;
+          else if not (x is TXQValueString) then firstAtomic := false
+          else if  (x.toString <> '')  then firstAtomic:=false;
         end;
       end
       else if firstAtomic then begin
@@ -1216,7 +1222,7 @@ var
     end;
   end;
 
-  procedure setTreeNodeNameFromTerm(term: txqterm; defkind: TXQDefaultNamespaceKind);
+  procedure setTreeNodeNameFromValue(const v: IXQValue; defkind: TXQDefaultNamespaceKind);
     function chooseRandomPrefix(): string;
     begin
       result := 'XXX'; //just like Zorba
@@ -1224,10 +1230,8 @@ var
     end;
 
   var
-    v: IXQValue;
     tempqname: TStringArray;
   begin
-    v := term.evaluate(subcontext^);
     if (v is TXQValue_QName) and strContains((v as TXQValueString).str, #2) then begin
       tempqname := qnameSplit((v as TXQValueString).str);
       if (tempqname[1] = '') and (tempqname[0] = XMLNamespaceUrl_XML) then tempqname[1] := 'xml';
@@ -1241,10 +1245,15 @@ var
   end;
 
 var i, oldnamespacecount: integer;
+  nameValueEvaluated: IXQValue;
 begin
+  if not (typ in [tetOpen,tetDocument]) then nameValueEvaluated := nameValue.evaluate(context);
+  if (typ = tetText) and (nameValueEvaluated.isUndefined) then exit(xqvalue);
+
   subcontext:=@context;
   oldnamespacecount := 0;
   if subcontext^.namespaces <> nil then oldnamespacecount := subcontext^.namespaces.Count;
+
 
   if (typ = tetDocument) then begin
     tree := TTreeDocument.create(typ);
@@ -1261,7 +1270,7 @@ begin
   baseOffset+=1;
   case typ of
     tetAttribute: begin
-      setTreeNodeNameFromTerm(nameValue, xqdnkUnknown);
+      setTreeNodeNameFromValue(nameValueEvaluated, xqdnkUnknown);
       for i:= 0 to high(children) do
         TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
     end;
@@ -1273,7 +1282,7 @@ begin
         end;
 
       if nameValue <> nil then begin
-        setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
+        setTreeNodeNameFromValue(nameValue.evaluate(subcontext^), xqdnkElementType);
         if tree.namespace <> nil then
           needNamespaceList.addIfNew(tree.namespace);
       end;
@@ -1302,12 +1311,11 @@ begin
       tree.reverse := kid; kid.reverse := tree;
     end;
     tetProcessingInstruction: begin
-      tree.value := nameValue.evaluate(subcontext^).toString;
+      tree.value := strTrim(nameValueEvaluated.toString, [#9,#10,#13,' ']);
       if length(children) = 0 then tree.addAttribute('', '')
       else tree.addAttribute('', valueToString(children[0].evaluate(subcontext^)));
     end;
-    tetText: tree.value := valueToString(nameValue.evaluate(subcontext^));
-    tetComment: tree.value := valueToString(nameValue.evaluate(subcontext^));
+    tetText, tetComment: tree.value := valueToString(nameValueEvaluated);
     else raiseEvaluationError('Invalid type for constructor');
   end;
   result := xqvalue(tree);
