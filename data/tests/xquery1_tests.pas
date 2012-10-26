@@ -1297,6 +1297,7 @@ begin
   t('count(<a>{""}{(comment {""})}{""}</a> / comment())', '1');
   t('count(<a>{" "}{(comment {""})}{""}</a> / comment())', '1');
   t('outer-xml(<a>{ processing-instruction { "  abc  "} { () }}</a>)', '<a><?abc ?></a>');
+  t('outer-xml(<a>{ processing-instruction { "  abc  "} { ("   ", "  foo ", "  bar ", "   ") }}</a>)', '<a><?abc foo    bar     ?></a>');
 
   helper.free;
   xml.free;

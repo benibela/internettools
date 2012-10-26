@@ -1313,7 +1313,7 @@ begin
     tetProcessingInstruction: begin
       tree.value := strTrim(nameValueEvaluated.toString, [#9,#10,#13,' ']);
       if length(children) = 0 then tree.addAttribute('', '')
-      else tree.addAttribute('', valueToString(children[0].evaluate(subcontext^)));
+      else tree.addAttribute('', strTrimLeft(valueToString(children[0].evaluate(subcontext^)), [#9,#10,#13,' ']));
     end;
     tetText, tetComment: tree.value := valueToString(nameValueEvaluated);
     else raiseEvaluationError('Invalid type for constructor');
