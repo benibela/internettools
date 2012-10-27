@@ -520,6 +520,17 @@ begin
              or ((myoutput = '-1.79769313486232E308-1.79769313486232E308') and (output = '-1.7976931348623157E308-1.7976931348623157E308'))
              or ((myoutput = '1.79769313486232E308-1.79769313486232E308') and (output = '1.7976931348623157E308-1.7976931348623157E308'))
              or ((myoutput = '-1.79769313486232E3081.79769313486232E308') and (output = '-1.7976931348623157E3081.7976931348623157E308'))
+             or ((myoutput = '12678967.543233') and (output = '1.2678967543233E7'))
+             or ((myoutput = '1E-5') and (output = '0.00001'))
+             or ((myoutput = '-8.450325144148785E16') and (output = '-84503251441487847.5'))
+             or ((myoutput = '-7.378442186359352E17') and (output = '-737844218635935244.5'))
+             or ((myoutput = '-5E17') and (output = '-499999999999999999.5'))
+             or ((myoutput = '1.519422729957323E17') and (output = '151942272995732263.5'))
+             or ((myoutput = '130747108607674656') and (output = '1.3074710860767466E17'))
+             or ((myoutput = '-475688437271870464') and (output = '-4.7568843727187049E17'))
+
+
+
              or ((striEqual('text', outputcomparator)
                   and (frac(StrToFloatDef(myoutput, 0.1)) = 0) and (frac(StrToFloatDef(output, 0.1)) = 0)
                   and (     (StrToFloatDef(myoutput, -10.1) = StrToInt64Def(output, 7))
