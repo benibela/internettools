@@ -501,7 +501,10 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
     procedure pushElementContent(s: string);
     begin
       if length(s) = 0 then exit;
-      parent.push(TXQTermString.create(s));
+      if (length(parent.children) > 0) and (parent.children[high(parent.children)] is TXQTermString) then
+        (parent.children[high(parent.children)] as TXQTermString).value += s
+      else
+        parent.push(TXQTermString.create(s));
     end;
     function strIsWhitespace(p: pchar; l: longint): boolean;
     begin
