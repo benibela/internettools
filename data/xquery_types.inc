@@ -697,6 +697,7 @@ begin
     temp := pos(#2, result);
     if temp = 0 then exit;
     delete(result, 1, temp);
+    if (result <> '') and (result[1] = ':') then delete(result, 1, 1);
   end;
 end;
 

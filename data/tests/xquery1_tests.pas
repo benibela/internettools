@@ -1417,6 +1417,9 @@ begin
   t('(text {""}, text {""}, text {""}, comment {()}) /(position())', '1 2 3 4');
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / @test:test', '123');
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / namespace-uri(@test:test)', 'foobar');
+  m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / node-name(@test:test)', 'test:test');
+  m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / node-name(.)', 'a');
+  m('declare default element namespace "foobar"; <a xmlns:test="foobar" test:test="123"/> / node-name(.)', 'a');
 
 
   helper.free;
