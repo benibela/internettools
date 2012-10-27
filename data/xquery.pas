@@ -3948,8 +3948,11 @@ begin
 
   resultSeq:=TXQValueSequence.create(previous.getSequenceCount);
 
-  if command.typ = qcFunctionSpecialCase then
+  if command.typ = qcFunctionSpecialCase then begin
     tempContext := context;
+    tempContext.SeqLength:=previous.getSequenceCount;
+    tempContext.SeqIndex:=0;
+  end;
 
   newSequence := nil;
   cachedNamespace := false;
@@ -3959,6 +3962,7 @@ begin
     if command.typ = qcFunctionSpecialCase then begin
       if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
       else newSequence := nil;
+      tempContext.SeqIndex += 1;
       tempContext.SeqValue := n;
       if n is TXQValueNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
       xqvalueSeqAdd(newSequence, command.specialCase.evaluate(tempContext));
