@@ -2046,7 +2046,7 @@ begin
   result := nil;
   if (moduleNamespace <> nil) and (moduleNamespace.getPrefix = nsprefix) then
     exit(moduleNamespace);
-  if (defaultElementTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkElementType, xqdnkType]) and (defaultElementTypeNamespace.getPrefix = nsprefix) then
+  if (defaultElementTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkElementType, xqdnkType]) and (defaultElementTypeNamespace.getPrefix = nsprefix) then
     exit(defaultElementTypeNamespace);
   if (defaultTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkType]) and (defaultTypeNamespace.getPrefix = nsprefix) then
     exit(defaultTypeNamespace);

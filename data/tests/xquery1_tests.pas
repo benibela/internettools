@@ -1372,6 +1372,10 @@ begin
   t('sum(xs:untypedAtomic(1)) instance of xs:double', 'true');
   t('avg(xs:untypedAtomic(1)) instance of xs:double', 'true');
 
+  m('declare default element namespace "foobar"; namespace-uri-from-QName(xs:QName("localName"))', 'foobar');
+  m('declare default element namespace "foobar"; <wiz xmlns="123">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '123');
+  m('declare default element namespace "foobar"; <wiz xmlns="">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
