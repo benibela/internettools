@@ -1336,27 +1336,41 @@ begin
   m('(data(document { <a>hallo</a> }))', 'hallo');
   m('type-of(data(document { element a {"hallo"} }))', 'untypedAtomic');
   m('type-of(data(document { <a>hallo</a> }))', 'untypedAtomic');
-
   m('(data( element a {"hallo"} ))', 'hallo');
   m('(data( <a>hallo</a> ))', 'hallo');
   m('type-of(data(element a {"hallo"} ))', 'untypedAtomic');
   m('type-of(data(<a>hallo</a> ))', 'untypedAtomic');
-
   m('(data(  attribute a {"hallo"} ))', 'hallo');
   m('type-of(data( attribute a {"hallo" }))', 'untypedAtomic');
-
   m('(data(<?hallo welt?>))', 'welt');
   m('(data(processing-instruction hallo {"welt"}))', 'welt');
   m('type-of(data(<?hallo welt?>))', 'string');
   m('type-of(data( processing-instruction hallo {"welt"}))', 'string');
-
   m('(data(<!--hallo-->))', 'hallo');
   m('(data(comment {"hallo"}))', 'hallo');
   m('type-of(data(<!--hallo-->))', 'string');
   m('type-of(data(comment {"hallo"}))', 'string');
-
   m('(data(text {"hallo"}))', 'hallo');
   m('type-of(data(text {"hallo"}))', 'untypedAtomic');
+
+
+  t('<a>1</a> instance of element()', 'true');
+  t('max(<a>1</a>) instance of element()', 'false');
+  t('min(<a>1</a>) instance of element()', 'false');
+  t('sum(<a>1</a>) instance of element()', 'false');
+  t('avg(<a>1</a>) instance of element()', 'false');
+  t('max(<a>1</a>) instance of xs:double', 'true');
+  t('min(<a>1</a>) instance of xs:double', 'true');
+  t('sum(<a>1</a>) instance of xs:double', 'true');
+  t('avg(<a>1</a>) instance of xs:double', 'true');
+  t('max(xs:short(1)) instance of xs:short', 'true');
+  t('min(xs:short(1)) instance of xs:short', 'true');
+  t('sum(xs:short(1)) instance of xs:short', 'true');
+  t('avg(xs:short(1)) instance of xs:short', 'true');
+  t('max(xs:untypedAtomic(1)) instance of xs:double', 'true');
+  t('min(xs:untypedAtomic(1)) instance of xs:double', 'true');
+  t('sum(xs:untypedAtomic(1)) instance of xs:double', 'true');
+  t('avg(xs:untypedAtomic(1)) instance of xs:double', 'true');
 
   helper.free;
   xml.free;

@@ -2287,11 +2287,13 @@ begin
   end;
 
   ak := args[0].kind;
-  if ak <> pvkSequence then begin
-    if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0] is TXQValue_duration) and not (args[0] is TXQValue_untypedAtomic) then raise EXQEvaluationException.Create('Wrong type for sum');
-    if (args[0] is TXQValue_untypedAtomic) then result := TXQValue_double.create(args[0].toDecimal)
-    else result := args[0];
-    exit;
+  if args[0].getSequenceCount < 2 then begin
+    Result := args[0];
+    if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0] is TXQValue_duration) and not (args[0] is TXQValue_untypedAtomic) then
+      raise EXQEvaluationException.Create('Wrong type for sum');
+    if ak = pvkSequence then result := args[0].getChild(1);
+    if (result is TXQValue_untypedAtomic) or (result is TXQValueNode) then result := TXQValue_double.create(result.toDecimal);
+    exit();
   end;
 
   seq := (args[0] as TXQValueSequence).seq;
@@ -2324,11 +2326,14 @@ var tempf: decimal;
  seq: TXQVList;
 begin
   requiredArgCount(args,1);
-  if args[0].kind <> pvkSequence then
-    exit(args[0]);
   i := args[0].getSequenceCount;
   if i = 0 then exit(xqvalue);
-  if i = 1 then begin result := args[0]; xqvalueSeqSqueeze(result); exit; end;
+  if i = 1 then begin
+    result := args[0];
+    xqvalueSeqSqueeze(result);
+    if (result is TXQValue_untypedAtomic) or (result is TXQValueNode) then result := TXQValue_double.create(result.toDecimal);
+    exit;
+  end;
 
 
   seq := (args[0] as TXQValueSequence).seq;
@@ -2366,8 +2371,12 @@ begin
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString)
   else collation := context.staticContext.collation;
 
-  if args[0].kind <> pvkSequence then
-    exit(args[0]);
+  if args[0].getSequenceCount < 2 then begin
+    Result := args[0];
+    if result is TXQValueSequence then result := args[0].getChild(1);
+    if (result is TXQValue_untypedAtomic) or (result is TXQValueNode) then result := TXQValue_double.create(result.toDecimal);
+    exit();
+  end;
 
   seq := (args[0] as TXQValueSequence).seq;
   if seq.Count = 0 then
