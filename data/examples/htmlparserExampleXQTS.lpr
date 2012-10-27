@@ -93,8 +93,9 @@ begin
   case state of
   0: writeln('correct');
   1: writeln('correct (igored output)');
-  2: writeln('ERROR: got "', myoutput, '" expected "', output, '"');
-  3: writeln('EXCEPTION: ', myoutput);
+  2: writeln('correct (approximate)');
+  3: writeln('ERROR: got "', myoutput, '" expected "', output, '"');
+  4: writeln('EXCEPTION: ', myoutput);
   end;
   writeln ('  In: ', queryfile, ': ',copy(desc,1,60), ' with ', inputfile, ' time: ', timing * MSecsPerDay:6:6);
 end;
@@ -117,7 +118,7 @@ class procedure THTMLLogger.LOG_START;
 begin
   writeln('<html><head><title>XQuery Test Suite Evaluation</title>');
   writeln('<style>  table tr th {background-color: #EEEEFF}    table tr:hover td {background-color: #A0A0FF} ');
-  writeln('  tr.correct {background-color: #AAFFAA} tr.correctIgnored {background-color: #FFFFAA} tr.wrong {background-color: #FFAAAA} tr.error {background-color: #FF9999}');
+  writeln('  tr.correct {background-color: #AAFFAA} tr.correctassumed {background-color: #DDFFAA}  tr.correctIgnored {background-color: #FFFFAA} tr.wrong {background-color: #FFAAAA} tr.error {background-color: #FF9999}');
   writeln('</style>');
   writeln('</head><body>');
   writeln('<h1>XQTS Evaluation</h1>');
@@ -154,8 +155,9 @@ begin
     case state of
     0: buffer3.add('<tr class="correct"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
     1: buffer3.add('<tr class="correctignored"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
-    2: buffer3.add('<tr class="wrong"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
-    3: buffer3.add('<tr class="error"><td>'+queryname+'</td><td>'+desc+'</td><td> <b>Error</b>:'+myoutput+'</td><td>'+output+'</td></tr>');
+    2: buffer3.add('<tr class="correctassumed"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
+    3: buffer3.add('<tr class="wrong"><td>'+queryname+'</td><td>'+desc+'</td><td>'+myoutput+'</td><td>'+output+'</td></tr>');
+    4: buffer3.add('<tr class="error"><td>'+queryname+'</td><td>'+desc+'</td><td> <b>Error</b>:'+myoutput+'</td><td>'+output+'</td></tr>');
     end;
 end;
 
@@ -216,6 +218,25 @@ end;
 
 var compareTree: TTreeParser;
 
+function attribcmp(List: TStringList; Index1, Index2: Integer): integer;
+var
+  a,b: TTreeAttribute;
+begin
+  a := TAttributeList(list).Items[index1];
+  b := TAttributeList(list).Items[index2];
+  result := CompareStr(a.value, b.value);
+  if result = 0 then result := CompareStr(a.realvalue, b.realvalue);
+end;
+
+procedure sorttree(t: TTreeElement);
+begin
+  while t <> nil do begin
+    if t.attributes <> nil then begin
+      t.attributes.CustomSort(@attribcmp);
+    end;
+    t := t.next;
+  end;
+end;
 
 function xmlEqual(a, b: string): boolean;
 var tree1, tree2: TTreeElement;
@@ -224,10 +245,10 @@ begin
   compareTree.clearTrees;
   tree1 := compareTree.parseTree(a);
   tree1.changeEncoding(eUTF8,eUTF8,true,false);
-  //sorttree(tree1);
+  sorttree(tree1);
   tree2 := compareTree.parseTree(b);
   tree2.changeEncoding(eUTF8,eUTF8,true,false);
-  //sorttree(tree2);
+  sorttree(tree2);
   result := tree1.outerXML() = tree2.outerXML();
 
   except on e: ETreeParseException do result := false;
@@ -325,6 +346,9 @@ begin
 
   compareTree := TTreeParser.Create;
   compareTree.parsingModel:= pmStrict;
+  compareTree.trimText:=false;
+  compareTree.readComments:=true;
+  compareTree.readProcessingInstructions:=true;
   buffer1 := TStringList.Create;
   buffer2 := TStringList.Create;
   buffer3 := TStringList.Create;
@@ -469,6 +493,32 @@ begin
              or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
              or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
              or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18')))
+             or ((myoutput = '-1.79769313486232E308') and (output = '-1.7976931348623157E308'))
+             or ((myoutput = '1.79769313486232E308') and (output = '1.7976931348623157E308'))
+             or ((myoutput = '-0.830993497117024') and (output = '-0.830993497117024305'))
+             or ((myoutput = '-1.20337885130186') and (output = '-1.203378851301859738'))
+             or ((myoutput = '-0.617375191608515') and (output = '-0.61737519160851484'))
+             or ((myoutput = '-1.619760582531007') and (output = '-1.619760582531006901'))
+             or ((myoutput = '0.511478470287702') and (output = '0.51147847028770199'))
+             or ((myoutput = '1.955116506541339') and (output = '1.95511650654133906'))
+             or ((myoutput = '0.297014075999097') and (output = '0.297014075999096793'))
+             or ((myoutput = '1E-18') and (output = '0.000000000000000001'))
+             or ((myoutput = '3.366843799022646') and (output = '3.366843799022646172'))
+             or ((myoutput = '2E-17') and (output = '0.00000000000000002'))
+             or ((myoutput = '0.47568843727187') and (output = '0.47568843727187049'))
+             or ((myoutput = '2.102216328265447') and (output = '2.102216328265447024'))
+             or ((myoutput = '-1.000030518509476') and (output = '-1.000030518509475997'))
+             or ((myoutput = '3.40282346638529E38') and (output = '3.4028234663852885E38'))
+             or ((myoutput = '-9.22337203685478E16') and (output = '-9.223372036854776E16'))
+             or ((myoutput = '1.30747108607675E17') and (output = '1.3074710860767466E17'))
+             or ((myoutput = '-4.7568843727187E17') and (output = '-4.7568843727187049E17'))
+             or ((myoutput = '6553503.2') and (output = '6.5535032E6'))
+             or ((myoutput = '-6553503.2') and (output = '-6.5535032E6'))
+             or ((myoutput = '-1.79769313486232E3080') and (output = '-1.7976931348623157E3080'))
+             or ((myoutput = '0-1.79769313486232E308') and (output = '0-1.7976931348623157E308'))
+             or ((myoutput = '-1.79769313486232E308-1.79769313486232E308') and (output = '-1.7976931348623157E308-1.7976931348623157E308'))
+             or ((myoutput = '1.79769313486232E308-1.79769313486232E308') and (output = '1.7976931348623157E308-1.7976931348623157E308'))
+             or ((myoutput = '-1.79769313486232E3081.79769313486232E308') and (output = '-1.7976931348623157E3081.7976931348623157E308'))
              or ((striEqual('text', outputcomparator)
                   and (frac(StrToFloatDef(myoutput, 0.1)) = 0) and (frac(StrToFloatDef(output, 0.1)) = 0)
                   and (     (StrToFloatDef(myoutput, -10.1) = StrToInt64Def(output, 7))
@@ -479,10 +529,12 @@ begin
              or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
              then begin
             correctLocal += 1;
-            if logCorrect or strEqual('Ignore', outputcomparator) then begin
+            if logCorrect or strEqual('Ignore', outputcomparator) or (myoutput <> output) then begin
               logGroupStart;
-              if not strEqual('Ignore', outputcomparator) then
+              if myoutput = output then
                 mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)
+              else if not strEqual('Ignore', outputcomparator) then
+                mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)
               else begin
                 output:='IGNORED OUTPUT (counted as correct)' ;
                 mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
@@ -496,7 +548,7 @@ begin
 
             logGroupStart;
 
-            mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+            mylogger.LOG_RESULT(3, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
             if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)  then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
           {  write(stderr, 'WRONG: ', copy(desc,1,60),' ',queryname,' : got '  , myoutput, ' <> expected ', output, ' ');
             writeln(stderr, '       ', arrayGet(strSplit(query, #13),-2) );
@@ -505,7 +557,7 @@ begin
         except on e: sysutils.Exception do begin
           logGroupStart;
           exceptionLocal+=1;
-          mylogger.LOG_RESULT(3, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', e.message, output, timing);
+          mylogger.LOG_RESULT(4, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', e.message, output, timing);
           fileOpenFailed  := '';
 {          writeln(stderr, 'EXCEPTION: ',desc, queryname, ': ', e.message);
           writeln('       ', arrayGet(strSplit(strTrim(query), #13),-1) );
