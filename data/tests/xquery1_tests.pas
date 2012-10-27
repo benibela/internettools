@@ -1436,6 +1436,7 @@ begin
   m('declare function local:foo($x as node()*) {$x [. = max($x)]} ; outer-xml(local:foo((<a>123</a>,<b>456</b>)))', '<b>456</b>');
 
 
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);

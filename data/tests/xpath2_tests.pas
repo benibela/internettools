@@ -2587,6 +2587,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:positiveInteger', 'false');
   t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:nonPositiveInteger', 'false');
 
+  t('/ = "hallo" ', 'true', '!<a>hallo</a>');
+  t('/ = "hxallo" ', 'false', '!<a>hallo</a>');
+  t('/ | / ', 'hallo', '!<a>hallo</a>');
+  t('/ + 17', '140', '!<a>123</a>');
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
