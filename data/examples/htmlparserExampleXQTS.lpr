@@ -246,6 +246,8 @@ begin
   tree1 := compareTree.parseTree(a);
   tree1.changeEncoding(eUTF8,eUTF8,true,false);
   sorttree(tree1);
+  b := StringReplace(b, #13#10, #10, [rfReplaceAll]); //expected result files contain #13#10, but xml parser is supposed to parse it as #10 (??)
+  b := StringReplace(b, #13, #10, [rfReplaceAll]);
   tree2 := compareTree.parseTree(b);
   tree2.changeEncoding(eUTF8,eUTF8,true,false);
   sorttree(tree2);
@@ -529,7 +531,7 @@ begin
              or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
              then begin
             correctLocal += 1;
-            if logCorrect or strEqual('Ignore', outputcomparator) or (myoutput <> output) then begin
+            if logCorrect or strEqual('Ignore', outputcomparator) or ((myoutput <> output) and (not striEqual('xml', outputcomparator) or (((myoutput + #10) <> output) and (((myoutput + #13#10) <> output)))) ) then begin
               logGroupStart;
               if myoutput = output then
                 mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)

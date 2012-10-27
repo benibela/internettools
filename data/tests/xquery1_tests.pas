@@ -1376,8 +1376,8 @@ begin
   m('declare default element namespace "foobar"; <wiz xmlns="123">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '123');
   m('declare default element namespace "foobar"; <wiz xmlns="">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '');
 
-  t('outer-xml(<a att0="x'#13'y" att1="ab'#13#13'c" att2="ab'#9#10#13'cd" att3="{"ab'#9#10#13'cd"}" att4="x'#13#10#13#10'y" />)', '<a att0="x y" att1="ab  c" att2="ab   cd" att3="ab'#9#10#13'cd" att4="x  y"/>');
-  t('outer-xml(<a>{attribute att2 {"ab'#9#10#13'cd"}}</a>)', '<a att2="ab'#9#10#13'cd"/>');
+  t('outer-xml(<a att0="x'#13'y" att1="ab'#13#13'c" att2="ab'#9#10#13'cd" att3="{"ab'#9#10#13'cd"}" att4="x'#13#10#13#10'y" />)', '<a att0="x y" att1="ab  c" att2="ab   cd" att3="ab'#9#10#10'cd" att4="x  y"/>');
+  t('outer-xml(<a>{attribute att2 {"ab'#9#10#13'cd"}}</a>)', '<a att2="ab'#9#10#10'cd"/>');
   t('outer-xml(<a x="&#x9;"/>)', '<a x="'#9'"/>');
   t('outer-xml(<a x="&#xA;"/>)', '<a x="'#10'"/>');
   t('outer-xml(<a x="&#xD;"/>)', '<a x="'#13'"/>');
@@ -1388,6 +1388,12 @@ begin
   t('outer-xml(<a>{"", (), ""}</a>)', '<a> </a>');
   t('outer-xml(<a x="{"", (), ""}"></a>)', '<a x=" "/>');
   t('outer-xml(<a x="{"", (), ""}">{""}</a>)', '<a x=" "/>');
+  t('outer-xml(<a>'#9'</a>)', '<a/>');
+  t('outer-xml(<a>'#10'</a>)', '<a/>');
+  t('outer-xml(<a>'#13'</a>)', '<a/>');
+  m('declare boundary-space preserve; outer-xml(<a>'#9'</a>)', '<a>'#9'</a>');
+  m('declare boundary-space preserve; outer-xml(<a>'#10'</a>)', '<a>'#10'</a>');
+  m('declare boundary-space preserve; outer-xml(<a>'#13'</a>)', '<a>'#10'</a>');
 
   helper.free;
   xml.free;
