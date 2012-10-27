@@ -216,6 +216,7 @@ function xqvalueDivideInt(const cxt: TEvaluationContext; const a, b: IXQValue): 
 var f: decimal;
  i: int65;
  ak, bk: TXQValueKind;
+ cc: TXQValueInt65Class;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
@@ -228,7 +229,15 @@ begin
      ((bk = pvkInt) or ((bk in [pvkString,pvkNode]) and (b.canConvertToInt65))) then begin
     i := b.toInt65;
     if i = 0 then result := xqvalue()
-    else result := commonIntegerClass(a,b).create(a.toInt65 div i);
+    else begin
+      i := a.toInt65 div i;
+      cc := commonIntegerClass(a,b);
+      if (cc.InheritsFrom(TXQValue_positiveInteger) and (i <= 0)) or (cc.InheritsFrom(TXQValue_negativeInteger) and (i >= 0))
+         or (cc.InheritsFrom(TXQValue_nonNegativeInteger) and (i < 0)) or (cc.InheritsFrom(TXQValue_nonPositiveInteger) and (i > 0)) then
+        result := TXQValueInt65.create()
+      else
+        result := cc.create(i);
+    end;
     exit;
   end;
 

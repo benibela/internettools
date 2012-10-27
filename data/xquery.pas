@@ -1854,6 +1854,11 @@ begin
     else if a.InheritsFrom(TXQValueInt65) then exit(TXQValueDecimal)
     else exit(failureClass);
 
+  if not a.InheritsFrom(TXQValueDecimal) and not a.InheritsFrom(TXQValueInt65) then
+    a := failureClass;
+  if not b.InheritsFrom(TXQValueDecimal) and not b.InheritsFrom(TXQValueInt65) then
+    b := failureClass;
+
   if becomesType(TXQValue_double) then
     exit; //all values can be converted to double, but double can not be converted to anything
 

@@ -2332,7 +2332,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('xs:float("INF") eq xs:double("-INF")', 'false');
   t('xs:float("-INF") eq xs:double("INF")', 'false');
   t('xs:float("-INF") eq xs:double("-INF")', 'true');
-  t('xs:float(1.2) = "1.2"', 'true'); //extension: weak typing.
+  //t('xs:float(1.2) = "1.2"', 'true'); //extension: weak typing.
   t('xs:double(1.2) = "1.2"', 'true'); //extension: weak typing.
   t('1.2 = "1.2"', 'true'); //extension: weak typing.
   t('string-join(index-of((0,1,2,3),"1"), ":")', '');
@@ -2570,6 +2570,22 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('"    ww   w  " cast as xs:untypedAtomic', '    ww   w  ');
   t('"    ww'#9'w  " cast as xs:normalizedString', '    ww w  ');
   t('"    123  " cast as xs:int', '123');
+
+
+  t('xs:untypedAtomic("0") + xs:float(0)', '0');
+  t('type-of(xs:untypedAtomic("0") + xs:float(0))', 'double');
+  t('xs:untypedAtomic("0") + xs:decimal(0)', '0');
+  t('type-of(xs:untypedAtomic("0") + xs:decimal(0))', 'double');
+  t('string-join(for $x in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)), $y in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x + $y), " ")', 'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
+  t('string-join(for $x in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)), $y in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x mod $y), " ")', 'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
+  t('(xs:untypedAtomic("3") - 1.1) instance of xs:double', 'true');
+  t('(xs:positiveInteger("1") idiv xs:nonPositiveInteger("-999999999999999999")) instance of xs:integer', 'true');
+  t('(xs:positiveInteger("1") idiv xs:nonPositiveInteger("-999999999999999999")) instance of xs:positiveInteger', 'false');
+  t('(xs:positiveInteger("1") idiv xs:nonPositiveInteger("-999999999999999999")) instance of xs:nonPositiveInteger', 'false');
+  t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999"))', '0');
+  t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:integer', 'true');
+  t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:positiveInteger', 'false');
+  t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:nonPositiveInteger', 'false');
 
 
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
