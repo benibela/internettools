@@ -1199,18 +1199,20 @@ var
           addValue(x, firstAtomic);
           if x is TXQValueNode then firstAtomic := true
           else if not (x is TXQValueString) then firstAtomic := false
-          else if  (x.toString <> '')  then firstAtomic:=false;
+          else {if  (x.toString <> '')  then }firstAtomic:=false;
         end;
       end
-      else if firstAtomic then begin
+      else if (lastKid = nil) or (lastKid.typ <> tetText) then begin
         kid := TTreeElement.create(tetText);
-        kid.value := v.toString;
+        if firstAtomic then kid.value:=v.toString
+        else kid.value := ' '+ v.toString;
         kid.offset:=baseOffset;
         baseOffset+=1;
         addKid;
       end else begin
         if lastKid.typ <> tetText then raiseEvaluationError('Internal error: No atomic value before this one exist, but this one is not the first atomic value.');
-        lastKid.value += ' ' + v.toString;
+        if firstAtomic then lastKid.value += v.toString
+        else lastKid.value += ' ' + v.toString;
       end;
     end;
   end;
@@ -1282,6 +1284,7 @@ begin
         TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
     end;
     tetOpen, tetDocument: begin
+      lastKid := nil;
       for i:=0 to high(children) do
         if (children[i] is TXQTermConstructor) and (TXQTermConstructor(children[i]).isNamespaceConstructor) then begin
           kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
