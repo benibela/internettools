@@ -1928,9 +1928,32 @@ end;
 
 function xmlStrEscape(s: string):string;
 var
-  i: Integer;
+  i, p: Integer;
+  procedure push(const t:string); inline;
+  begin
+    if p + length(t) > length(result) + 1 then setlength(result, length(result) + 64);
+    move(t[1], result[p], length(t));
+    p+=length(t);
+  end;
+
 begin
-  result := StringReplace(s, '<', '&lt;', [rfReplaceAll]); //TODO: escape all
+  setlength(result, length(s));
+  p:=1;
+  for i := 1 to length(s) do begin
+    case s[i] of
+      '<': push('&lt;');
+      '>': push('&gt;');
+      '&': push('&amp;');
+      '''': push('&apos;');
+      '"': push('&quot;');
+      else begin
+        if p > length(result) then setlength(result, length(result) + 64);
+        result[p] := s[i];
+        p+=1;
+      end;
+    end;
+  end;
+  setlength(result, p - 1);
 end;
 
 function equalNamespaces(const ans, bns: INamespace): boolean;

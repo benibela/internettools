@@ -241,9 +241,9 @@ begin
   t('outer-xml(<hallo> surrounded <nestling/> surrounded2 </hallo>)', '<hallo> surrounded <nestling/> surrounded2 </hallo>');
   t('outer-xml(<hallo> surrounded <nestling>double</nestling> surrounded2 </hallo>)', '<hallo> surrounded <nestling>double</nestling> surrounded2 </hallo>');
   t('outer-xml(<hallo> surrounded <nestling atti = "matti">double</nestling> surrounded2 </hallo>)', '<hallo> surrounded <nestling atti="matti">double</nestling> surrounded2 </hallo>');
-  t('outer-xml(<hallo>&quot;</hallo>)', '<hallo>"</hallo>');
-  t('outer-xml(<hallo> inline entity: &quot;</hallo>)', '<hallo> inline entity: "</hallo>');
-  t('outer-xml(<hallo> inline entities: &lt;&amp;&gt;</hallo>)', '<hallo> inline entities: &lt;&></hallo>'); //lt is escaped again (todo: also escape amp again)
+  t('outer-xml(<hallo>&quot;</hallo>)', '<hallo>&quot;</hallo>');
+  t('outer-xml(<hallo> inline entity: &quot;</hallo>)', '<hallo> inline entity: &quot;</hallo>');
+  t('outer-xml(<hallo> inline entities: &lt;&amp;&gt;</hallo>)', '<hallo> inline entities: &lt;&amp;&gt;</hallo>'); //lt is escaped again (todo: also escape amp again)
   t('outer-xml(<hallo>{{brackets}}</hallo>)', '<hallo>{brackets}</hallo>');
   t('outer-xml(<hallo>surr{{brackets}}ounded</hallo>)', '<hallo>surr{brackets}ounded</hallo>');
   t('outer-xml(<hallo>1 + 2 + 3</hallo>)', '<hallo>1 + 2 + 3</hallo>');
@@ -271,16 +271,18 @@ begin
   t('outer-xml(<a test="{1+2}">5</a>)', '<a test="3">5</a>');
   t('outer-xml(<a test="MAUS{1+2}HAUS">5</a>)', '<a test="MAUS3HAUS">5</a>');
   t('outer-xml(<a test="{1}{2}{3}">5</a>)', '<a test="123">5</a>');
-  t('outer-xml(<a test="&apos;">5</a>)', '<a test="''">5</a>');
-  t('outer-xml(<a test="foo&apos;bar">5</a>)', '<a test="foo''bar">5</a>');
+  t('outer-xml(<a test="&apos;">5</a>)', '<a test="&apos;">5</a>');
+  t('outer-xml(<a test="foo&apos;bar">5</a>)', '<a test="foo&apos;bar">5</a>');
+  t('<a test="foo&apos;bar">5</a> / @test', 'foo''bar');
   t('outer-xml(<a test=''{1+2}''>5</a>)', '<a test="3">5</a>');
   t('outer-xml(<a test=''MAUS{1+2}HAUS''>5</a>)', '<a test="MAUS3HAUS">5</a>');
   t('outer-xml(<a test  =  ''MAUS{1+2}HAUS''   >5</a>)', '<a test="MAUS3HAUS">5</a>');
   t('outer-xml(<a test=''{1}{2}{3}''>5</a>)', '<a test="123">5</a>');
-  t('outer-xml(<a test=''&apos;''>5</a>)', '<a test="''">5</a>');
-  t('outer-xml(<a test=''foo&apos;bar''>5</a>)', '<a test="foo''bar">5</a>');
-  t('outer-xml(<a test="xpa""th">5</a>)', '<a test="xpa"th">5</a>');        //TODO: fix tree output
-  t('outer-xml(<a test=''xpa''''th''>5</a>)', '<a test="xpa''th">5</a>');
+  t('outer-xml(<a test=''&apos;''>5</a>)', '<a test="&apos;">5</a>');
+  t('<a test=''&apos;''>5</a> / @test', '''');
+  t('outer-xml(<a test=''foo&apos;bar''>5</a>)', '<a test="foo&apos;bar">5</a>');
+  t('outer-xml(<a test="xpa""th">5</a>)', '<a test="xpa&quot;th">5</a>');
+  t('outer-xml(<a test=''xpa''''th''>5</a>)', '<a test="xpa&apos;th">5</a>');
   t('outer-xml(<a test="{<temp>dingdong</temp>}">5</a>)', '<a test="dingdong">5</a>');
   t('outer-xml(<a test="foo{{123}}bar">5</a>)', '<a test="foo{123}bar">5</a>');
   t('outer-xml(<a test="&#x61;&#x20;&#x61;{61}">&#x61;&#x20;&#x61;{61}</a>)', '<a test="a a61">a a61</a>');
@@ -1400,7 +1402,12 @@ begin
   t('outer-xml(<a>'#13'<![CDATA[]]>   </a>)', '<a>'#10'   </a>');
   t('outer-xml(<a><![CDATA[]]>   </a>)', '<a>   </a>');
   t('outer-xml(<a> <![CDATA[]]></a>)', '<a> </a>');
-
+  t('outer-xml(<a>&lt;</a>)', '<a>&lt;</a>');
+  t('outer-xml(<a><![CDATA[&lt;]]></a>)', '<a>&amp;lt;</a>');
+  t('outer-xml(<!--&lt;-->)', '<!--&lt;-->');
+//  t('data(<!--&lt;-->)', '<');
+  t('outer-xml(<?abc &lt;?>)', '<?abc &lt;?>');
+//  t('data(<?abc &lt;?>', '<');
 
 
 
