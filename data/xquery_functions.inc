@@ -1855,12 +1855,16 @@ end;
 
 function xqFunctionNamespace_URI_For_Prefix(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  res: String;
+  temp: TNamespaceList;
+  tempns: INamespace;
 begin
   requiredArgCount(args, 2);
-  res := args[1].toNode.getNamespaceURL(args[0].toString, @context.staticContext.nodeCollation.equal);  ignore(context);
-  if res = '' then exit(xqvalue);
-  result := xqvalue(res);
+  if args[1].toNode = nil then exit(xqvalue);
+  temp := TNamespaceList.Create;
+  args[1].toNode.getAllNamespaces(temp);
+  if not temp.hasNamespacePrefix(args[0].toString, tempns) then result := xqvalue
+  else result := TXQValue_anyURI.create(tempns.getURL);
+  temp.free;
 end;
 
 function xqFunctionIn_Scope_prefixes(const args: TXQVArray): IXQValue;

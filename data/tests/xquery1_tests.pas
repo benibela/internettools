@@ -1440,6 +1440,9 @@ begin
   m('declare base-uri "http://www.w3.org"; starts-with("ABC", "abc", "/2005/xpath-functions/collation/codepoint")','false');
   m('declare base-uri "http://www.w3.org/2005/xpath-functions/"; declare default collation "collation/codepoint"; default-collation() eq "http://www.w3.org/2005/xpath-functions/collation/codepoint"','true');
 
+  m('namespace-uri-for-prefix("", exactly-one(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b))', ''); //XQTS test
+  m('namespace-uri-for-prefix("", exactly-one(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)) eq ""', 'true'); //XQTS tes
+  m('namespace-uri-for-prefix("", exactly-one(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)) instance of xs:anyURI', 'true');
 
 
   helper.free;
