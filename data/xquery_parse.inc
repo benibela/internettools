@@ -517,7 +517,15 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
     atBoundary := (border = '<') and staticContext.stripBoundarySpace;
     while pos^ <> #0 do begin
       marker := pos;
-      while not (pos^ in [#0, '{', '}', '&']) and (pos^ <> border) do pos+=1;
+      while not (pos^ in [#0, '{', '}', '&']) and (pos^ <> border) and ((border = '<') or not (pos^ in [#9, #10, #13])) do pos+=1;
+
+      if pos^ in [#9, #10, #13] then begin //whitespace normalization #9, #10, #13 => space
+        pushElementContent(strFromPchar(marker, pos - marker));
+        if ((pos-1)^ <> #13) or (pos^ <> #10) then
+          pushElementContent(' ');
+        pos+=1;
+        continue;
+      end;
 
       if pos^ = #0 then raiseParsingError('Unexpected end');
 

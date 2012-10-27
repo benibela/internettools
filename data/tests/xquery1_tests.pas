@@ -1376,6 +1376,9 @@ begin
   m('declare default element namespace "foobar"; <wiz xmlns="123">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '123');
   m('declare default element namespace "foobar"; <wiz xmlns="">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '');
 
+  t('outer-xml(<a att0="x'#13'y" att1="ab'#13#13'c" att2="ab'#9#10#13'cd" att3="{"ab'#9#10#13'cd"}" att4="x'#13#10#13#10'y" />)', '<a att0="x y" att1="ab  c" att2="ab   cd" att3="ab'#9#10#13'cd" att4="x  y"/>');
+  t('outer-xml(<a>{attribute att2 {"ab'#9#10#13'cd"}}</a>)', '<a att2="ab'#9#10#13'cd"/>');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
