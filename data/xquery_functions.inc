@@ -2505,14 +2505,10 @@ end;
 function xqFunctionNamespace_URI(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
 var
   node: TTreeElement;
-//  prefix: String;
 begin
   node := simpleNode(context, args);
-  if (node = nil) or (node.typ <> tetOpen) then result := TXQValue_anyURI.create('')
-  else begin
-    //if node.getNamespacePrefix() = '' then result := xqvalue(TXQValue_anyURI.create(''));
-    result := TXQValue_anyURI.create(node.getNamespaceURL());
-  end;
+  if (node = nil) or not (node.typ in [tetOpen, tetAttribute]) then result := TXQValue_anyURI.create('')
+  else result := TXQValue_anyURI.create(node.getNamespaceURL());
 end;
 
 function xqFunctionPosition(const context: TEvaluationContext; const args: TXQVArray): IXQValue;

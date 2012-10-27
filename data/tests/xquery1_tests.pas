@@ -1415,6 +1415,8 @@ begin
   t('outer-xml(<a id="  a  b "/>)', '<a id="  a  b "/>');
   t('outer-xml(<a xml:id="  a  b "/>)', '<a xml:id="a b"/>');
   t('(text {""}, text {""}, text {""}, comment {()}) /(position())', '1 2 3 4');
+  m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / @test:test', '123');
+  m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / namespace-uri(@test:test)', 'foobar');
 
 
   helper.free;
