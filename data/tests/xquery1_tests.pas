@@ -1394,6 +1394,15 @@ begin
   m('declare boundary-space preserve; outer-xml(<a>'#9'</a>)', '<a>'#9'</a>');
   m('declare boundary-space preserve; outer-xml(<a>'#10'</a>)', '<a>'#10'</a>');
   m('declare boundary-space preserve; outer-xml(<a>'#13'</a>)', '<a>'#10'</a>');
+  t('outer-xml(<a>'#13'</a>)', '<a/>');
+  t('outer-xml(<a>'#13'<![CDATA[-]]>   </a>)', '<a>'#10'-   </a>');
+  t('outer-xml(<a>'#13'<![CDATA[ ]]>   </a>)', '<a>'#10'    </a>');
+  t('outer-xml(<a>'#13'<![CDATA[]]>   </a>)', '<a>'#10'   </a>');
+  t('outer-xml(<a><![CDATA[]]>   </a>)', '<a>   </a>');
+  t('outer-xml(<a> <![CDATA[]]></a>)', '<a> </a>');
+
+
+
 
   helper.free;
   xml.free;

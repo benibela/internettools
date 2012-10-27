@@ -497,7 +497,7 @@ begin
 end;
 
 function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstructor;
-  procedure parseCommonContent(parent: TXQTermConstructor; border: char);
+  procedure parseCommonContent(parent: TXQTermConstructor; border: char; atBoundary: boolean);
     procedure pushElementContent(s: string);
     begin
       if length(s) = 0 then exit;
@@ -514,10 +514,9 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
     end;
 
   var marker: PChar;
-    atBoundary: Boolean;
     temp: TXQTerm;
   begin
-    atBoundary := (border = '<') and staticContext.stripBoundarySpace;
+    atBoundary := atBoundary and staticContext.stripBoundarySpace;
     while pos^ <> #0 do begin
       marker := pos;
       while not (pos^ in [#0, '{', '}', '&']) and (pos^ <> border) and ((border = '<') or not (pos^ in [#9, #10, #13])) do pos+=1;
@@ -532,7 +531,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
 
       if pos^ = #0 then raiseParsingError('Unexpected end');
 
-      if not atBoundary or (pos^ in ['}', '&']) or not strIsWhitespace(marker, pos - marker) then begin
+      if not atBoundary or (pos^ in ['}', '&']) or strBeginsWith(pos, '<![') or not strIsWhitespace(marker, pos - marker) then begin
         pushElementContent(strFromPchar(marker, pos - marker));
         atBoundary := false;
       end;
@@ -602,6 +601,7 @@ var
   token: String;
   marker: PChar;
   attribute: TXQTermConstructor;
+  lastWasCData: Boolean;
 begin
   name := nextToken();
   if name = '!' then exit(parseCommentConstructor)
@@ -616,7 +616,7 @@ begin
     if not (pos^ in ['''', '"']) then raiseParsingError('Expected attribute value');
     marker := pos;
     pos+=1;
-    parseCommonContent(attribute, marker^);
+    parseCommonContent(attribute, marker^, false);
     expect(marker^);
     token := nextToken();
   end;
@@ -626,8 +626,10 @@ begin
     exit;
   end;
 
+  lastWasCData := false;
   while pos^ <> #0 do begin
-    parseCommonContent(result, '<');
+    parseCommonContent(result, '<', not lastWasCData);
+    lastWasCData := false;
 
     if pos^ = #0 then raiseParsingError('Unexpected end');
     if pos^ = '<' then begin
@@ -640,6 +642,7 @@ begin
           exit;
         end;
         '!': if strBeginsWith(pos, '![CDATA[') then begin
+          lastWasCData := true;
           pos += length('![CDATA[');
           marker := pos;
           while (pos^ <> #0) and not strBeginsWith(pos, ']]>') do pos+=1;
