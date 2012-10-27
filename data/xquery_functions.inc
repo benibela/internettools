@@ -781,7 +781,7 @@ begin
     tetOpen, tetDocument: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
     tetClose: result := xqvalue();
     tetText: result := TXQValue_untypedAtomic.create(v.tonode.value);// xqvalue(v.tonode.value);
-    tetComment: result := TXQValue_untypedAtomic.create(v.tonode.value);
+    tetComment: result := TXQValueString.create(v.tonode.value);
     tetAttribute: result := TXQValue_untypedAtomic.create(TTreeAttribute(v.tonode).realvalue);
     tetProcessingInstruction: result := xqvalue(v.tonode.getAttribute(''));
     else raise EXQEvaluationException.Create('Impossible node type');

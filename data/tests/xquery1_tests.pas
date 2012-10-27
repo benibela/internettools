@@ -1331,6 +1331,33 @@ begin
   m('let $b := <b/> return <a xmlns:a="foobar">{string-join(in-scope-prefixes($b), ":")}</a> / text()', 'xml');
   m(' <a xmlns:a="foobar">{string-join(in-scope-prefixes(<b/>), ":")}</a> / text()', 'xml:a');
 
+
+  m('(data(document { element a {"hallo"} }))', 'hallo');
+  m('(data(document { <a>hallo</a> }))', 'hallo');
+  m('type-of(data(document { element a {"hallo"} }))', 'untypedAtomic');
+  m('type-of(data(document { <a>hallo</a> }))', 'untypedAtomic');
+
+  m('(data( element a {"hallo"} ))', 'hallo');
+  m('(data( <a>hallo</a> ))', 'hallo');
+  m('type-of(data(element a {"hallo"} ))', 'untypedAtomic');
+  m('type-of(data(<a>hallo</a> ))', 'untypedAtomic');
+
+  m('(data(  attribute a {"hallo"} ))', 'hallo');
+  m('type-of(data( attribute a {"hallo" }))', 'untypedAtomic');
+
+  m('(data(<?hallo welt?>))', 'welt');
+  m('(data(processing-instruction hallo {"welt"}))', 'welt');
+  m('type-of(data(<?hallo welt?>))', 'string');
+  m('type-of(data( processing-instruction hallo {"welt"}))', 'string');
+
+  m('(data(<!--hallo-->))', 'hallo');
+  m('(data(comment {"hallo"}))', 'hallo');
+  m('type-of(data(<!--hallo-->))', 'string');
+  m('type-of(data(comment {"hallo"}))', 'string');
+
+  m('(data(text {"hallo"}))', 'hallo');
+  m('type-of(data(text {"hallo"}))', 'untypedAtomic');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
