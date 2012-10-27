@@ -1412,7 +1412,8 @@ begin
   m('declare boundary-space strip; outer-xml(<a x="&#xA;"/>)', '<a x="'#10'"/>');
   m('declare boundary-space strip; outer-xml(<a x="&#xD;"/>)', '<a x="&#xD;"/>');
 
-
+  t('outer-xml(<a id="  a  b "/>)', '<a id="  a  b "/>');
+  t('outer-xml(<a xml:id="  a  b "/>)', '<a xml:id="a b"/>');
 
 
   helper.free;

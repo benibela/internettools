@@ -1282,6 +1282,8 @@ begin
       setTreeNodeNameFromValue(nameValueEvaluated, xqdnkUnknown);
       for i:= 0 to high(children) do
         TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
+      if (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) then
+        TTreeAttribute(tree).realvalue := strTrimAndNormalize(TTreeAttribute(tree).realvalue);
     end;
     tetOpen, tetDocument: begin
       lastKid := nil;
