@@ -431,7 +431,7 @@ begin
       setlength(sortingData.collations, length(orders));
       for i := 0 to high(orders) do
         if orders[i].collation = '' then sortingData.collations[i] := nil
-        else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation);
+        else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation, context.staticContext.baseURI);
       stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
       for i := 0 to sortingCache.Count - 1 do begin
         xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);

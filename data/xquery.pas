@@ -1284,7 +1284,7 @@ type
     class procedure registerCollation(const collation: TXQCollation);
 
     //**< Returns the collation for an url id
-    class function getCollation(id:string): TXQCollation;
+    class function getCollation(id:string; base: string): TXQCollation;
   private
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
@@ -4066,15 +4066,22 @@ end;
 
 
 
-class function TXQueryEngine.getCollation(id: string): TXQCollation;
+class function TXQueryEngine.getCollation(id: string; base: string): TXQCollation;
 var
   i: Integer;
+  oldid: string;
 begin
   if strEndsWith(id, '/') then delete(id, length(id), 1);
+  oldid := id;
+  id := strResolveURI(id, base);
   if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then
     id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
   i := collations.IndexOf(id);
-  if i < 0 then raise EXQEvaluationException.Create('Collation ' + id + ' is not defined');
+  if i < 0 then begin
+    i := collations.IndexOf(oldid);
+    if i < 0 then
+      raise EXQEvaluationException.Create('Collation ' + id + ' is not defined');
+  end;
   result:=TXQCollation(collations.Objects[i]);
 end;
 

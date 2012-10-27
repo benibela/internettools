@@ -1273,7 +1273,7 @@ begin
       'default': begin
         token := nextToken();
         case token of
-          'collation': staticContext.collation := staticContext.sender.getCollation(parseStringLiteral);
+          'collation': staticContext.collation := staticContext.sender.getCollation(parseStringLiteral, staticContext.baseURI);
           'order': begin
             expect('empty');
             case nextToken() of
@@ -1330,7 +1330,7 @@ begin
         namespace := staticContext.findNamespace(strSplitGet(':', token), xqdnkUnknown);
         if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
           case token of
-            'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp);
+            'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
             'extended-strings': case temp of
               'on': AllowVariableUseInStringLiterals:=true;
               'off': AllowVariableUseInStringLiterals:=false;

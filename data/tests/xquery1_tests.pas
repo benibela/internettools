@@ -1435,6 +1435,11 @@ begin
   m('declare function local:foo($x as node()*) {$x [. = "456"]} ; outer-xml(local:foo((<a>123</a>,<b>456</b>)))', '<b>456</b>');
   m('declare function local:foo($x as node()*) {$x [. = max($x)]} ; outer-xml(local:foo((<a>123</a>,<b>456</b>)))', '<b>456</b>');
 
+  m('declare base-uri "http://www.w3.org/2005/xpath-functions/"; starts-with("ABC", "abc")','true');
+  m('declare base-uri "http://www.w3.org/2005/xpath-functions/"; starts-with("ABC", "abc", "collation/codepoint")','false');
+  m('declare base-uri "http://www.w3.org"; starts-with("ABC", "abc", "/2005/xpath-functions/collation/codepoint")','false');
+  m('declare base-uri "http://www.w3.org/2005/xpath-functions/"; declare default collation "collation/codepoint"; default-collation() eq "http://www.w3.org/2005/xpath-functions/collation/codepoint"','true');
+
 
 
   helper.free;

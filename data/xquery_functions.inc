@@ -1253,7 +1253,7 @@ var
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   if args[0].isUndefined  or args[1].isUndefined then exit(xqvalue);
   result := xqvalue(collation.compare(args[0].toString, args[1].toString));
@@ -1272,7 +1272,7 @@ var s, t: string;
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   s :=args[0].toString;
   t :=args[1].toString;
@@ -1285,7 +1285,7 @@ var
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   result := xqvalue(collation.startsWith(args[0].toString,args[1].toString));
 end;
@@ -1295,7 +1295,7 @@ var
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   result := xqvalue(collation.endsWith(args[0].toString, args[1].toString));
 end;
@@ -1305,7 +1305,7 @@ var a,b: string;
   collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   a := args[0].toString;
   b := args[1].toString;
@@ -1319,7 +1319,7 @@ var a,b: string;
     collation: TXQCollation;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   a := args[0].toString;
   b := args[1].toString;
@@ -2040,7 +2040,7 @@ var  i: Integer;
      v: IXQValue;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   if args[0].kind <> pvkSequence then begin
     if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.staticContext.sender.ImplicitTimezone) then result := xqvalue(1)
@@ -2105,7 +2105,7 @@ var
  atom: IXQValue;
 begin
   requiredArgCount(args, 1, 2);
-  if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString)
+  if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   atom := xqvalueAtomize(args[0]);
   if atom.kind <> pvkSequence then
@@ -2247,7 +2247,7 @@ var i:integer;
     enum1, enum2: TXQValueEnumerator;
 begin
   requiredArgCount(args,2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString)
+  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
 
   if args[0].getSequenceCount <> args[1].getSequenceCount then
@@ -2404,7 +2404,7 @@ var tempf: decimal;
  temp: IXQValue;
 begin
   requiredArgCount(args,1, 3);
-  if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString)
+  if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
 
   if args[0].getSequenceCount < 2 then begin
