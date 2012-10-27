@@ -2596,6 +2596,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('/ | / ', 'hallo', '!<a>hallo</a>');
   t('/ + 17', '140', '!<a>123</a>');
 
+  t('xs:float(1e7)', '10000000');
+  t('xs:double(1e18)', '1000000000000000000');
+
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
 

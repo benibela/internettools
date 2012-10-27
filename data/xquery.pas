@@ -1688,10 +1688,12 @@ begin
 end;
 function myDecimalToStr(const v:single): string;
 begin
+  if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
   result := FloatToStrF(V, ffGeneral, 8, 0, FormatSettings);
 end;
 function myDecimalToStr(const v:double): string;
 begin
+  if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
   result := FloatToStrF(V, ffGeneral, 16, 0, FormatSettings);
 end;
 
