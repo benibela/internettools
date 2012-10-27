@@ -16,7 +16,7 @@
         <CompilerPath Value="$(CompPath)"/>
       </Other>
     </CompilerOptions>
-    <Files Count="25">
+    <Files Count="22">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -30,102 +30,87 @@
         <UnitName Value="dregexpr"/>
       </Item3>
       <Item4>
-        <Filename Value="internet/autoupdate.pas"/>
-        <UnitName Value="autoupdate"/>
-      </Item4>
-      <Item5>
         <Filename Value="internet/simpleinternet.pas"/>
         <UnitName Value="simpleinternet"/>
-      </Item5>
-      <Item6>
+      </Item4>
+      <Item5>
         <Filename Value="internet/internetaccess.pas"/>
         <UnitName Value="internetaccess"/>
-      </Item6>
-      <Item7>
+      </Item5>
+      <Item6>
         <Filename Value="data/disableRangeOverflowChecks.inc"/>
         <Type Value="Include"/>
-      </Item7>
-      <Item8>
+      </Item6>
+      <Item7>
         <Filename Value="data/simplehtmlparser.pas"/>
         <UnitName Value="simplehtmlparser"/>
-      </Item8>
-      <Item9>
+      </Item7>
+      <Item8>
         <Filename Value="data/simplehtmltreeparser.pas"/>
         <UnitName Value="simplehtmltreeparser"/>
-      </Item9>
-      <Item10>
+      </Item8>
+      <Item9>
         <Filename Value="data/simplexmlparser.pas"/>
         <UnitName Value="simplexmlparser"/>
-      </Item10>
-      <Item11>
+      </Item9>
+      <Item10>
         <Filename Value="data/restoreRangeOverflowChecks.inc"/>
         <Type Value="Include"/>
-      </Item11>
-      <Item12>
-        <Filename Value="../lazarus/dialogs/progressdialog.lfm"/>
-        <Type Value="LFM"/>
-      </Item12>
-      <Item13>
-        <Filename Value="../lazarus/dialogs/progressdialog.lrs"/>
-        <Type Value="LRS"/>
-      </Item13>
-      <Item14>
-        <Filename Value="../lazarus/dialogs/progressdialog.pas"/>
-        <UnitName Value="progressdialog"/>
-      </Item14>
-      <Item15>
-        <Filename Value="../lazarus/dialogs/progressdialog.lfm"/>
-        <Type Value="LFM"/>
-      </Item15>
-      <Item16>
+      </Item10>
+      <Item11>
         <Filename Value="data/int65math.pas"/>
         <UnitName Value="int65math"/>
-      </Item16>
-      <Item17>
+      </Item11>
+      <Item12>
         <Filename Value="data/xquery.pas"/>
         <UnitName Value="xquery"/>
+      </Item12>
+      <Item13>
+        <Filename Value="data/xquery_derived_types.inc"/>
+        <Type Value="Include"/>
+      </Item13>
+      <Item14>
+        <Filename Value="data/xquery_derived_types_template.inc"/>
+        <Type Value="Include"/>
+      </Item14>
+      <Item15>
+        <Filename Value="data/xquery_functions.inc"/>
+        <Type Value="Include"/>
+      </Item15>
+      <Item16>
+        <Filename Value="data/xquery_functions_generated.inc"/>
+        <Type Value="Include"/>
+      </Item16>
+      <Item17>
+        <Filename Value="data/xquery_functions_generated_template.inc"/>
+        <Type Value="Include"/>
       </Item17>
       <Item18>
-        <Filename Value="data/xquery_derived_types.inc"/>
+        <Filename Value="data/xquery_parse.inc"/>
         <Type Value="Include"/>
       </Item18>
       <Item19>
-        <Filename Value="data/xquery_derived_types_template.inc"/>
+        <Filename Value="data/xquery_terms.inc"/>
         <Type Value="Include"/>
       </Item19>
       <Item20>
-        <Filename Value="data/xquery_functions.inc"/>
+        <Filename Value="data/xquery_types.inc"/>
         <Type Value="Include"/>
       </Item20>
       <Item21>
-        <Filename Value="data/xquery_functions_generated.inc"/>
-        <Type Value="Include"/>
+        <Filename Value="internet/synapseinternetaccess.pas"/>
+        <UnitName Value="synapseinternetaccess"/>
       </Item21>
       <Item22>
-        <Filename Value="data/xquery_functions_generated_template.inc"/>
-        <Type Value="Include"/>
+        <Filename Value="internet/w32internetaccess.pas"/>
+        <UnitName Value="w32internetaccess"/>
       </Item22>
-      <Item23>
-        <Filename Value="data/xquery_parse.inc"/>
-        <Type Value="Include"/>
-      </Item23>
-      <Item24>
-        <Filename Value="data/xquery_terms.inc"/>
-        <Type Value="Include"/>
-      </Item24>
-      <Item25>
-        <Filename Value="data/xquery_types.inc"/>
-        <Type Value="Include"/>
-      </Item25>
     </Files>
     <Type Value="RunAndDesignTime"/>
-    <RequiredPkgs Count="2">
+    <RequiredPkgs Count="1">
       <Item1>
-        <PackageName Value="lcl"/>
-      </Item1>
-      <Item2>
         <PackageName Value="FCL"/>
-      </Item2>
+      </Item1>
     </RequiredPkgs>
     <UsageOptions>
       <UnitPath Value="$(PkgOutDir)"/>

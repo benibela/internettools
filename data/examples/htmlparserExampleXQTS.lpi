@@ -36,7 +36,7 @@
     </RunParams>
     <RequiredPackages Count="1">
       <Item1>
-        <PackageName Value="mlprocessing"/>
+        <PackageName Value="internettools"/>
       </Item1>
     </RequiredPackages>
     <Units Count="1">

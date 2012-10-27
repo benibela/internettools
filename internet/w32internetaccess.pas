@@ -22,12 +22,17 @@ unit w32internetaccess;
 //{$define simulateInet} //read the files previously written on the hard disks
 interface
 
+//{$DEFINE DELPHI_WININET} //If you use the Delphi wininet unit. Search for   "unit wininet" inurl:wininet.pas   to find one. (and then add {$mode delphi} there)
+{$IFDEF WIN32}
+{$DEFINE COMPILE_W32_INTERNETACCESS}  //If this unit should be compiled
+{$ENDIF}
+
+{$IFDEF COMPILE_W32_INTERNETACCESS}
 uses
   windows,Classes, SysUtils,dialogs,
   wininet,
   internetaccess;
 
-//{$DEFINE DELPHI_WININET} //If you use the Delphi wininet unit. Search for   "unit wininet" inurl:wininet.pas   to find one. (and then add {$mode delphi} there)
 
 type
   EW32InternetException=class(EInternetException)
@@ -65,9 +70,11 @@ type
 
 const TEMPORARY_DIRECTORY='T:\theInternet\';
 
+{$ENDIF}
 implementation
 //uses bbdebugtools;
 
+{$IFDEF COMPILE_W32_INTERNETACCESS}
 
 constructor EW32InternetException.create();
 var s: string;
@@ -485,7 +492,7 @@ function TW32InternetAccess.internalHandle: TObject;
 begin
   result:=tobject(hLastConnection);
 end;
-
+{$ENDIF}
 
 end.
 

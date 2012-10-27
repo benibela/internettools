@@ -17,9 +17,18 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 {**This unit contains the wrapper for synapse}
 unit synapseinternetaccess;
 
+
 {$mode objfpc}{$H+}
 
+{$IFNDEF WIN32}
+{$DEFINE COMPILE_SYNAPSE_INTERNETACCESS} //If this unit should be compiled. Not enabled on windows, since you can use w32internetaccess there
+{$ENDIF}
+
+
+
 interface
+
+{$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
 
 uses
   Classes, SysUtils, internetAccess,Dialogs,
@@ -62,7 +71,11 @@ public
 end;
 TSynapseInternetAccessClass = class of TSynapseInternetAccess;
 
+{$ENDIF}
+
 implementation
+
+{$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
 
 uses synautil,ssl_openssl_lib,bbutils{$ifndef win32},netdb{$endif};
 
@@ -253,6 +266,8 @@ InitCriticalSection(resolvConfCS);
 finalization
 DoneCriticalsection(resolvConfCS);
 {$endif}
+
+{$ENDIF}
 
 end.
 
