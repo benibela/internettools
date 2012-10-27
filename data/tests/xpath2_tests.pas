@@ -1679,6 +1679,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(for $i in /processing-instruction() return node-name($i), ";")', 'abc;def', '!<?abc?><?def ?><html/>');
   t('string-join(for $i in /processing-instruction(def) return node-name($i), ";")', 'def', '!<?abc?><?def ?><html/>');
   t('string-join(for $i in /processing-instruction("abc") return node-name($i), ";")', 'abc', '!<?abc?><?def ?><html/>');
+  t('string-join(for $i in /processing-instruction("  abc  ") return node-name($i), ";")', 'abc', '!<?abc?><?def ?><html/>');
   t('string-join(//self::*,";")', 'abcxfoobar;x', '!<html>abc<test>x</test>foobar</html>');
   t('string-join(time/x/a[3]/preceding::*,";")', 'q;1;2', '<time><p>q</p>t<x>u<a>1</a><a>2</a><a>3</a></x></time>');
   t('string-join(time/x/a[3]/preceding::a,";")', '1;2', '<time><p>q</p>t<x>u<a>1</a><a>2</a><a>3</a></x></time>');

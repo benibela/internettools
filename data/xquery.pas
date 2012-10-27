@@ -2360,7 +2360,7 @@ begin
       if TXQTermNodeMatcher(children[0]).axis <> '' then raise EXQEvaluationException.Create('axis within element test is not allowed');
       result.value := TXQTermNodeMatcher(children[0]).select;
     end else if children[0] is TXQTermString then
-      result.value:=TXQTermString(children[0]).value
+      result.value:=strTrimAndNormalize(TXQTermString(children[0]).value)
     else raise EXQEvaluationException.Create('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
     include(result.matching, qmValue) ;
   end else if (select = 'element') or (select = 'attribute') or (select = 'schema-element')or (select = 'schema-attribute')  then begin
