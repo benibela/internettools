@@ -3448,22 +3448,7 @@ var cxt: TXQParsingContext;
   i,p: Integer;
 begin
   if str = '' then exit(TXQuery.Create(StaticContext.clone(), TXQTermSequence.Create));
-  if pos(#13, str) > 0 then begin
-    p := 1;
-    for i :=1 to length(str) do begin
-      case str[i] of
-        #13: begin
-          str[p] := #10;
-          if str[i + 1] = #10 then continue;
-        end
-        else str[p] := str[i];
-      end;
-      p+=1;
-    end;
-    setlength(str, p - 1);
-    {str := StringReplace(str, #13#10, #10, [rfReplaceAll]);
-    sr := StringReplace(str, #13, #10, [rfReplaceAll]);}
-  end;
+  if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;

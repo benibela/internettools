@@ -460,7 +460,7 @@ begin
           continue;
         end;
         query := strLoadFromFile('Queries/XQuery/'+path+'/'+queryname+'.xq');
-        output := strDecodeHTMLEntities(strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile),eUTF8);
+        output :=strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile);
         try
           if isxpath2 then begin
             query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
@@ -529,9 +529,10 @@ begin
              or ((striEqual('xml', outputcomparator) or striEqual('fragment', outputcomparator)) and (trim(myoutput) = trim(output)))
              or ((striEqual('xml', outputcomparator) and xmlEqual(myoutput, output)))
              or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
+             or ((striEqual('text', outputcomparator) and strEqual(myoutput, strDecodeHTMLEntities(output, eUTF8)) or strEqual(myoutput, strNormalizeLineEndings(output))  ))
              then begin
             correctLocal += 1;
-            if logCorrect or strEqual('Ignore', outputcomparator) or ((myoutput <> output) and (not striEqual('xml', outputcomparator) or (((myoutput + #10) <> output) and (((myoutput + #13#10) <> output)))) ) then begin
+            if logCorrect or strEqual('Ignore', outputcomparator) or ((myoutput <> output) and (not striEqual('xml', outputcomparator) or ((myoutput + #10) <> output) ) ) then begin
               logGroupStart;
               if myoutput = output then
                 mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)

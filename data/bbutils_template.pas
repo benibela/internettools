@@ -256,6 +256,10 @@ function strTrimRight(const s:string; const trimCharacters: TCharSet = [#0..' ']
 function strTrim(const s: string; const trimCharacters: TCharSet = [#0..' ']):string; inline;
 function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [#0..' ']):string;
 
+//**<Replaces all #13#10 or #13 by #10
+function strNormalizeLineEndings(const s: string): string;
+
+
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first part is returned as function result, the second one is again assign to remainingPart
 //**(If remainingPart does not contain separator, it returns remainingPart and sets remainingPart := '')
@@ -1140,7 +1144,26 @@ begin
    setlength(result,j-1);
 end;
 
-
+function strNormalizeLineEndings(const s: string): string;
+var
+  i, p: Integer;
+begin
+  result := s;
+  p := 1;
+  for i :=1 to length(result) do begin
+    case result[i] of
+      #13: begin
+        result[p] := #10;
+        if result[i + 1] = #10 then continue;
+      end
+      else result[p] := result[i];
+    end;
+    p+=1;
+  end;
+  setlength(result, p - 1);
+  {str := StringReplace(str, #13#10, #10, [rfReplaceAll]);
+  sr := StringReplace(str, #13, #10, [rfReplaceAll]);}
+end;
 
 function strSplitGet(const separator: string; var remainingPart: string): string;
 begin
