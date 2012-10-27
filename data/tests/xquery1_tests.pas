@@ -1382,10 +1382,10 @@ begin
   t('outer-xml(<a>{attribute att2 {"ab'#9#10#13'cd"}}</a>)', '<a att2="ab'#9#10#10'cd"/>');
   t('outer-xml(<a x="&#x9;"/>)', '<a x="'#9'"/>');
   t('outer-xml(<a x="&#xA;"/>)', '<a x="'#10'"/>');
-  t('outer-xml(<a x="&#xD;"/>)', '<a x="'#13'"/>');
+  t('outer-xml(<a x="&#xD;"/>)', '<a x="&#xD;"/>');
   t('outer-xml(<a>&#x9;</a>)', '<a>'#9'</a>');
   t('outer-xml(<a>&#xA;</a>)', '<a>'#10'</a>');
-  t('outer-xml(<a>&#xD;</a>)', '<a>'#13'</a>');
+  t('outer-xml(<a>&#xD;</a>)', '<a>&#xD;</a>');
   t('outer-xml(<a>{"", "", ""}</a>)', '<a>  </a>');
   t('outer-xml(<a>{"", (), ""}</a>)', '<a> </a>');
   t('outer-xml(<a x="{"", (), ""}"></a>)', '<a x=" "/>');
@@ -1408,6 +1408,10 @@ begin
 //  t('data(<!--&lt;-->)', '<');
   t('outer-xml(<?abc &lt;?>)', '<?abc &lt;?>');
 //  t('data(<?abc &lt;?>', '<');
+  m('declare boundary-space strip; outer-xml(<a x="&#x9;"/>)', '<a x="'#9'"/>');
+  m('declare boundary-space strip; outer-xml(<a x="&#xA;"/>)', '<a x="'#10'"/>');
+  m('declare boundary-space strip; outer-xml(<a x="&#xD;"/>)', '<a x="&#xD;"/>');
+
 
 
 

@@ -72,6 +72,7 @@ begin
   xml := TTreeParser.Create;
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
+  xml.TargetEncoding:=eUnknown;
 
   t('',                          '',                                 '');
   t('''''',                      '',                                 '');

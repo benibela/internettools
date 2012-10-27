@@ -332,6 +332,7 @@ private
   FCurrentNamespace: INamespace;
   FCurrentNamespaces: TNamespaceList;
   FCurrentNamespaceDefinitions: TList;
+  FTargetEncoding: TEncoding;
   procedure pushNamespace(const url, prefix: string);
   function findNamespace(const prefix: string): INamespace;
 
@@ -364,6 +365,7 @@ published
   property readProcessingInstructions: boolean read FReadProcessingInstructions write FReadProcessingInstructions;
   property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
+  property TargetEncoding: TEncoding read FTargetEncoding write FTargetEncoding;
 end;
 
 
@@ -665,6 +667,7 @@ procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: 
   function change(s: string): string;
   begin
     result := strChangeEncoding(s, from, toe);
+    result := strNormalizeLineEndings(result);
     if substituteEntities then result := strDecodeHTMLEntities(result, toe, false);
     if trimText then result := trim(result); //retrim because &nbsp; replacements could have introduced new spaces
   end;
@@ -1481,7 +1484,7 @@ begin
       last := properties[high(properties)].value + properties[high(properties)].valueLen;
       while ((last+1)^ <> #0) and ((last^ <> '?') or ((last+1)^ <> '>'))  do last+=1;
 
-      new.addAttribute('', strFromPchar(first, last-first));
+      new.addAttribute('', strNormalizeLineEndings(strFromPchar(first, last-first)));
       new.addAttributes(properties);
     end;
     new.initialized;
@@ -1747,6 +1750,7 @@ begin
   FCurrentNamespaceDefinitions := TList.Create;
   FCurrentNamespaces := TNamespaceList.Create;
   globalNamespaces := TNamespaceList.Create;
+  FTargetEncoding:=eUTF8;
   //FConvertEntities := true;
 end;
 
@@ -1888,6 +1892,8 @@ begin
   result := FCurrentTree;
   FCurrentNamespaces.clear;
   FCurrentNamespaceDefinitions.Clear;
+  if FTargetEncoding <> eUnknown then
+    FCurrentTree.setEncoding(FTargetEncoding, true, true);
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
 end;
@@ -1946,6 +1952,7 @@ begin
       '&': push('&amp;');
       '''': push('&apos;');
       '"': push('&quot;');
+      #13: push('&#xD;');
       else begin
         if p > length(result) then setlength(result, length(result) + 64);
         result[p] := s[i];
