@@ -234,7 +234,7 @@ begin
       cc := commonIntegerClass(a,b);
       if (cc.InheritsFrom(TXQValue_positiveInteger) and (i <= 0)) or (cc.InheritsFrom(TXQValue_negativeInteger) and (i >= 0))
          or (cc.InheritsFrom(TXQValue_nonNegativeInteger) and (i < 0)) or (cc.InheritsFrom(TXQValue_nonPositiveInteger) and (i > 0)) then
-        result := TXQValueInt65.create()
+        result := TXQValueInt65.create(i)
       else
         result := cc.create(i);
     end;

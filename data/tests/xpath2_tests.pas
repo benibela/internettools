@@ -2586,6 +2586,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:integer', 'true');
   t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:positiveInteger', 'false');
   t('(xs:positiveInteger("1") idiv xs:positiveInteger("999999999999999999")) instance of xs:nonPositiveInteger', 'false');
+  t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2"))', '2');
+  t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:negativeInteger', 'false');
+  t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:positiveInteger', 'false');
+  t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:integer', 'true');
 
   t('/ = "hallo" ', 'true', '!<a>hallo</a>');
   t('/ = "hxallo" ', 'false', '!<a>hallo</a>');
