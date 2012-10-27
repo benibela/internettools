@@ -3442,7 +3442,6 @@ end;
 
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQuery;
 var cxt: TXQParsingContext;
-  i,p: Integer;
 begin
   if str = '' then exit(TXQuery.Create(StaticContext.clone(), TXQTermSequence.Create));
   if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);

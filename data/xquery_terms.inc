@@ -1,4 +1,76 @@
 
+
+{ TXQTerm }
+
+function TXQTerm.getContextDependencies: TXQContextDependencies;
+begin
+  result := [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+end;
+
+function TXQTerm.debugTermToString: string;
+var
+  i: Integer;
+begin
+  result := '(' + ClassName;
+  if length(children) >= 1 then result += ': '+children[0].debugTermToString();
+  for i:= 1 to high(children) do result += ', '+children[1].debugTermToString();
+  result += ')';
+end;
+
+destructor TXQTerm.destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to high(children) do children[i].free;
+  inherited destroy;
+end;
+
+procedure TXQTerm.push(t: TXQTerm);
+begin
+  SetLength(children, length(children) + 1);
+  children[high(children)] := t;
+end;
+
+function TXQTerm.push(t: array of TXQTerm): TXQTerm;
+var
+  i: Integer;
+begin
+  for i := 0 to high(t) do push(t[i]);
+  result := self;
+end;
+
+procedure TXQTerm.raiseParsingError(const s: string);
+begin
+  raise Exception.Create(s);
+end;
+
+procedure TXQTerm.raiseEvaluationError(const s: string);
+begin
+  raise EXQEvaluationException.Create(s);
+end;
+
+procedure TXQTerm.evaluateChildren(const context: TEvaluationContext; out results: TXQVArray);
+var
+  i: Integer;
+begin
+  setlength(results, length(children));
+  for i:=0 to high(children) do
+    results[i] := children[i].evaluate(context);
+end;
+
+function TXQTerm.toQueryCommand: TXQPathMatchingStep;
+begin
+  result.typ:=qcFunctionSpecialCase;
+  result.specialCase:=self;
+end;
+
+procedure TXQTerm.addToQueryList(var path: TXQPathMatching);
+begin
+  SetLength(path, length(path) + 1);
+  path[high(path)] := toQueryCommand;
+end;
+
+
 { TXQTermReadProperty }
 
 constructor TXQTermReadObjectProperty.create(apropname: string);

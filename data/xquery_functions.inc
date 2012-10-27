@@ -1718,7 +1718,6 @@ var uri: string;
   node: TTreeElement;
   temp: String;
   last: TTreeElement;
-  found: Boolean;
 begin
   requiredArgCount(args,0, 1);
   if length(args) = 0 then node := xqvalueContextNode(context)
@@ -1726,10 +1725,8 @@ begin
   else node := xqvalueToSingleNode(args[0]);
   uri := '';
   last := node;
-  found := false;
   while node <> nil do begin
     if node.getAttributeTry('xml:base', temp, @context.staticContext.nodeCollation.equal) then begin
-      found := true;
       if temp <> '' then
         uri := strResolveURI(uri, strTrimAndNormalize(temp, [#9,#10,#13,' ']));
     end;
