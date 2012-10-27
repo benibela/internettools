@@ -1420,6 +1420,20 @@ begin
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / node-name(@test:test)', 'test:test');
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / node-name(.)', 'a');
   m('declare default element namespace "foobar"; <a xmlns:test="foobar" test:test="123"/> / node-name(.)', 'a');
+  m('declare function local:foo($x as node()) {type-of($x)}; local:foo(<a>123</a>)', 'node');
+  m('declare function local:foo($x as node()) {type-of($x)}; local:foo(text {""})', 'node');
+  m('declare function local:foo($x as element()) {type-of($x)}; local:foo(<a>123</a>)', 'node');
+  m('declare function local:foo($x as item()) {type-of($x)}; local:foo(<a>123</a>)', 'node');
+  m('declare function local:foo($x as node()*) {type-of($x)}; local:foo(<a>123</a>)', 'node');
+  m('declare function local:foo($x as node()*) {type-of($x)}; local:foo(text {""})', 'node');
+  m('declare function local:foo($x as element()*) {type-of($x)}; local:foo(<a>123</a>)', 'node');
+  m('declare function local:foo($x as item()*) {type-of($x)}; local:foo(<a>123</a>)', 'node');
+  m('declare function local:foo($x as node()*) {type-of($x[1])}; local:foo((<a>123</a>,<b>123</b>))', 'node');
+  m('declare function local:foo() {element a {"abc" }} ; local:foo()', 'abc');
+  m('declare function local:foo() {element a {"abc" }} ; outer-xml(local:foo())', '<a>abc</a>');
+  m('declare function local:foo($x as node()*) {$x [. = max($x)]} ; local:foo((<a>123</a>,<b>456</b>))', '456');
+  m('declare function local:foo($x as node()*) {$x [. = "456"]} ; outer-xml(local:foo((<a>123</a>,<b>456</b>)))', '<b>456</b>');
+  m('declare function local:foo($x as node()*) {$x [. = max($x)]} ; outer-xml(local:foo((<a>123</a>,<b>456</b>)))', '<b>456</b>');
 
 
   helper.free;

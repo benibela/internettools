@@ -671,7 +671,7 @@ type
 
     property Count: integer read fcount write setCount;
 
-    function getPromotedType(untypedOrNodesToDouble: boolean = true): TXQValueKind; //**< Returns the lowest type that all items in the list can be converted to
+    function getPromotedType(): TXQValueKind; //**< Returns the lowest type that all items in the list can be converted to
     function getPromotedIntegerType: TXQValueInt65Class; //**< Returns the lowest type derived by integer that all items in the list can be converted to
     function getPromotedDecimalType: TXQValueDecimalClass; //**< Returns the lowest type derived by decimal that all items in the list can be converted to
     function getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass; //**< Returns the lowest type derived by datetime that all items in the list can be converted to
@@ -2702,19 +2702,11 @@ begin
     xqswap(list[i], list[h-i]);
 end;
 
-function TXQVList.getPromotedType(untypedOrNodesToDouble: boolean): TXQValueKind;
+function TXQVList.getPromotedType(): TXQValueKind;
 var
   i: Integer;
 begin
   if count = 0 then exit(pvkUndefined);
-  if untypedOrNodesToDouble then begin
-    for i:=0 to count-1 do
-      if items[i] is TXQValue_untypedAtomic then
-        items[i] := TXQValue_double.create(items[i].toDecimal)
-      else if items[i] is TXQValueNode then
-        items[i] := TXQValue_double.create(items[i].toDecimal);
-
-  end;
   result := items[0].kind;
   for i:=1 to count-1 do
     result := commonTyp(result, items[i].kind);

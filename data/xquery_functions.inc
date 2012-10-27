@@ -2271,6 +2271,29 @@ begin
   result := xqvalue(args[0].getSequenceCount);
 end;
 
+function castUntypedToDouble(const v: IXQValue): IXQValue;
+var x: IXQValue;
+  found: Boolean;
+  resseq: TXQVList;
+begin
+  found := false;
+  for x in v do begin
+    if (x is TXQValue_untypedAtomic) or (x is TXQValueNode) or (x is TXQValue_untyped) then begin
+      found := true;
+      break;
+    end;
+  end;
+  if not found then exit(v);
+
+  result := TXQValueSequence.create(v.getSequenceCount);
+  resseq := (result as TXQValueSequence).seq;;
+  for x in v do
+    if (x is TXQValue_untypedAtomic) or (x is TXQValueNode) or (x is TXQValue_untyped) then
+      resseq.add(TXQValue_double.create(x.toDecimal))
+     else
+      resseq.add(x);
+end;
+
 function xqFunctionSum(const args: TXQVArray): IXQValue;
 var
  tempf: decimal;
@@ -2278,6 +2301,7 @@ var
  seq: TXQVList;
  i: Integer;
  ak: TXQValueKind;
+ temp: IXQValue;
 begin
   requiredArgCount(args,1,2);
 
@@ -2296,7 +2320,8 @@ begin
     exit();
   end;
 
-  seq := (args[0] as TXQValueSequence).seq;
+  temp := castUntypedToDouble(args[0]);
+  seq := (temp as TXQValueSequence).seq;
   case seq.getPromotedType of
     pvkBoolean, pvkString: raise EXQEvaluationException.Create('Wrong type for sum');
     pvkDateTime: begin
@@ -2324,6 +2349,7 @@ var tempf: decimal;
  i: Integer;
  tempf2: decimal;
  seq: TXQVList;
+ temp: IXQValue;
 begin
   requiredArgCount(args,1);
   i := args[0].getSequenceCount;
@@ -2335,8 +2361,8 @@ begin
     exit;
   end;
 
-
-  seq := (args[0] as TXQValueSequence).seq;
+  temp := castUntypedToDouble(args[0]);
+  seq := (temp as TXQValueSequence).seq;
   case seq.getPromotedType of
     pvkBoolean, pvkString: raise EXQEvaluationException.Create('Invalid types for average');
     pvkDateTime: begin
@@ -2366,6 +2392,7 @@ var tempf: decimal;
  tempf2: decimal;
  temps2: String;
  collation: TXQCollation;
+ temp: IXQValue;
 begin
   requiredArgCount(args,1, 3);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString)
@@ -2378,9 +2405,8 @@ begin
     exit();
   end;
 
-  seq := (args[0] as TXQValueSequence).seq;
-  if seq.Count = 0 then
-    exit(xqvalue);
+  temp := castUntypedToDouble(args[0]);
+  seq := (temp as TXQValueSequence).seq;
 
   case seq.getPromotedType of
     pvkDateTime: begin
