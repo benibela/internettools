@@ -977,7 +977,6 @@ begin
          or not cmpFunction(TTreeAttribute(self).realvalue, TTreeAttribute(cmpTo).realvalue) then exit;
     tetProcessingInstruction: if getAttribute('') <> cmpTo.getAttribute('') then exit;
     tetOpen, tetDocument: begin
-      if (next = reverse) <> (cmpTo.next = cmpTo.reverse) then exit;
       if getAttributeCount <> cmpTo.getAttributeCount then exit;
       if attributes <> nil then
         for attrib in attributes do begin

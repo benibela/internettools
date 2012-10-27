@@ -1444,6 +1444,10 @@ begin
   m('namespace-uri-for-prefix("", exactly-one(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)) eq ""', 'true'); //XQTS tes
   m('namespace-uri-for-prefix("", exactly-one(<e xmlns="http://www.example.com/A" xmlns:A="http://www.example.com/C"><b xmlns:B="http://www.example.com/C" xmlns=""/></e>/b)) instance of xs:anyURI', 'true');
 
+  m('deep-equal(document { element abc { 123 }}, document { element abc { 123 }}  )', 'true');
+  m('deep-equal(document { element abc { 123 }}, document { element abc { 123 }, element abc { 123 }}  )', 'false');
+  m('deep-equal(document { element abc { 123 }}, document { element abc { 123 }, processing-instruction abc { 123 }}  )', 'true');
+  m('deep-equal(document { () }, document { processing-instruction abc { 123 }}  )', 'true');
 
   helper.free;
   xml.free;
