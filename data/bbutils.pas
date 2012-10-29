@@ -1907,7 +1907,7 @@ begin
   result:=striindexof(str, searched, from) > 0;
 end;
 
-function strcopyfrom(const s: string; start: longint): string; inline;overload;
+function strcopyfrom(const s: string; start: longint): string; inline;
 begin
   result:=copy(s,start,length(s)-start+1);
 end;
