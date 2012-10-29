@@ -34,11 +34,11 @@ A collection of such single-page templates can be stored in a multi-page templat
        A multi-page template is a list of explicit actions that are performed in order, like an algorithm;
        A single-page template is an implicit pattern that is matched against the page, like a regular expression)
 
-@section(2 AnchorNamePXP High-Mid-Level: PXPath/Expression processing)
+@section(2 AnchorNamePXP High-Mid-Level: XQuery/XPath/Expression processing)
 
-The PXPath expression language which used within the templates is implemented by the TPseudoXPathParser-class in the unit pseudoxpath.
+The XQuery expression language which can be used within the templates is implemented by the class TXQueryEngine in the unit @link(xquery).
 
-It is an almost complete implementation of the XPath 2 standard syntax + some things I needed for the templates (e.g. objects and variable assignments).
+It is an almost complete implementation of the XPath 2 and XQuery standard syntax (missing schemas, error codes and static type checking) + some  extensions (e.g. objects and variable assignments).
 
 @section(2 AnchorNameTree Mid-Level: Tree/DOM-like processing)
 
