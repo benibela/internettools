@@ -1449,6 +1449,10 @@ begin
   m('deep-equal(document { element abc { 123 }}, document { element abc { 123 }, processing-instruction abc { 123 }}  )', 'true');
   m('deep-equal(document { () }, document { processing-instruction abc { 123 }}  )', 'true');
 
+  m('let $obj := object(("a", "b")) return $obj.a', 'b');
+  //m('(let $obj := object(("a", "b")) return $obj.a := 17).a', '17'); //seems that does not work as it does find $obj in the := call. (which is good, since it will probably crash)
+  t('for $obj in (object(("a", "b")), object(("a", "c")), object(("a", "d"))) return $obj.a', 'b c d');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
