@@ -900,9 +900,10 @@ begin
         end;
       end;
 
-      if (word = 'validate') and ((wordlookahead = 'lax') or (wordlookahead = 'strict')) then begin
+      if (word = 'validate') and ((wordlookahead = 'lax') or (wordlookahead = 'strict') or (wordlookahead = '{')) then begin
         requireXQuery('for schema validation');
-        expect(wordlookahead);
+        if wordlookahead <> '{' then
+          expect(wordlookahead);
         expect('{');
         raiseParsingError('Schema validaton is not supported');
       end;
