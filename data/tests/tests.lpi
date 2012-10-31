@@ -34,10 +34,13 @@
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
-    <RequiredPackages Count="1">
+    <RequiredPackages Count="2">
       <Item1>
-        <PackageName Value="internettools"/>
+        <PackageName Value="internettools_utf8"/>
       </Item1>
+      <Item2>
+        <PackageName Value="internettools"/>
+      </Item2>
     </RequiredPackages>
     <Units Count="13">
       <Unit0>

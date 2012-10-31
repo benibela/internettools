@@ -6,8 +6,8 @@ uses
 //  heaptrc,
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
-  {$ENDIF}{$ENDIF}
-  Classes, extendedhtmlparser, simplehtmltreeparser, xquery, bbutils , sysutils, internetaccess, strutils
+  {$ENDIF}{$ENDIF} interfaces,
+  Classes, extendedhtmlparser, simplehtmltreeparser, xquery, xquery_utf8, bbutils , sysutils, internetaccess, strutils
   ,{$ifdef win32}w32internetaccess{$else}synapseinternetaccess{$endif};
   { you can add units after this }
 

@@ -34,10 +34,13 @@
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
-    <RequiredPackages Count="1">
+    <RequiredPackages Count="2">
       <Item1>
-        <PackageName Value="internettools"/>
+        <PackageName Value="internettools_utf8"/>
       </Item1>
+      <Item2>
+        <PackageName Value="internettools"/>
+      </Item2>
     </RequiredPackages>
     <Units Count="1">
       <Unit0>
@@ -54,7 +57,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir);.."/>
-      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;../../import/regexpr/source;/home/benito/hg/components/pascal/internet/;../../import"/>
+      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;../../import/regexpr/source;/home/benito/hg/components/pascal/internet/;../../data;../../import"/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
