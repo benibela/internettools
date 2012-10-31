@@ -525,6 +525,7 @@ begin
              or ((myoutput = '1E-5') and (output = '0.00001'))
              or ((myoutput = '-8.450325144148785E16') and (output = '-84503251441487847.5'))
              or ((myoutput = '-7.378442186359352E17') and (output = '-737844218635935244.5'))
+             or ((myoutput = '5E17') and (output = '499999999999999999.5'))
              or ((myoutput = '-5E17') and (output = '-499999999999999999.5'))
              or ((myoutput = '1.519422729957323E17') and (output = '151942272995732263.5'))
              or ((myoutput = '130747108607674656') and (output = '1.3074710860767466E17'))
