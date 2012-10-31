@@ -529,6 +529,7 @@ var
   marker: PChar;
   attribute: TXQTermConstructor;
   lastWasCData: Boolean;
+  i: Integer;
 begin
   name := nextToken();
   if name = '!' then exit(parseCommentConstructor)
@@ -537,13 +538,23 @@ begin
   token := nextToken();
   while (token <> '>') and (token <> '/') and (token <> '') do begin
     attribute := TXQTermConstructor.create(tetAttribute, TXQTermString.create(token));
-    result.push(attribute);
     expect('=');
     skipWhitespaceAndComment();
     if not (pos^ in ['''', '"']) then raiseParsingError('Expected attribute value');
     marker := pos;
     pos+=1;
     parseCommonContent(attribute, marker^, false);
+    if strBeginsWith(TXQTermString(attribute.nameValue).value, 'xmlns:') or (TXQTermString(attribute.nameValue).value = 'xmlns') then begin
+      token := '';
+      if length(attribute.children) > 0 then begin
+        if not (attribute.children[0] is TXQTermString) then raiseParsingError('Namespace url is not a literal string');
+        token := TXQTermString(attribute.children[0]).value;
+      end; //else namespace undeclaration
+      if result.implicitNamespaces = nil then result.implicitNamespaces := TNamespaceList.Create;
+      if TXQTermString(attribute.nameValue).value = 'xmlns' then result.implicitNamespaces.add(TNamespace.create(token, ''))
+      else result.implicitNamespaces.add(TNamespace.create(token, strCopyFrom(TXQTermString(attribute.nameValue).value, length('xmlns:')+1)));
+      attribute.Free;
+    end else result.push(attribute);
     expect(marker^);
     token := nextToken();
   end;
@@ -551,6 +562,12 @@ begin
   if token = '/' then begin
     expect('>');
     exit;
+  end;
+
+  if Result.implicitNamespaces <> nil then begin
+    if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+    for i := 0 to result.implicitNamespaces.Count - 1 do
+      staticContext.namespaces.add(Result.implicitNamespaces.namespaces[i]);
   end;
 
   lastWasCData := false;
@@ -566,6 +583,11 @@ begin
           pos += 1;
           if nextToken <> name then raiseParsingError('Expected matching closing tag');
           expect('>');
+
+          if Result.implicitNamespaces <> nil then
+            for i := 0 to result.implicitNamespaces.Count - 1 do
+              staticContext.namespaces.Delete(staticContext.namespaces.Count-1);
+
           exit;
         end;
         '!': if strBeginsWith(pos, '![CDATA[') then begin
@@ -588,7 +610,7 @@ begin
       end;
     end;
   end;
-  raiseParsingError('Unexpected end')
+  raiseParsingError('Unexpected end (probably missing closing tag for <'+name+'>')
 end;
 
 function TXQParsingContext.parseComputedConstructor(name: string): TXQTermConstructor;

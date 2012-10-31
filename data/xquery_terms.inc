@@ -648,8 +648,11 @@ begin
             vfunc := sc.functions[i];
             break;
           end;
-      if vfunc = nil then
+      if vfunc = nil then begin
+        findKindIndex(namespace, funcname, kind, func);
+        if kind <> xqfkUnknown then exit(evaluate(context));
         raiseEvaluationError('Function '+funcname+' not found');
+      end;
 
       tempcontext := context;
       tempcontext.temporaryVariables := TXQVariableChangeLog.create();
@@ -1142,8 +1145,6 @@ var
     end;
     result := TNamespace.Create(url, prefix);
     subcontext^.namespaces.Add(result);
-    if subcontext^.staticContext.sender.FGarbageNamespaces = nil then subcontext^.staticContext.sender.FGarbageNamespaces := TNamespaceList.Create;
-    subcontext^.staticContext.sender.FGarbageNamespaces.Add(result);
   end;
 
   procedure addNodeAsKid;
@@ -1155,11 +1156,6 @@ var
     kid.parent := tree;
     case kid.typ of
       tetAttribute: begin
-        if ((kid.namespace = nil) and (kid.value = 'xmlns')) or ((kid.namespace <> nil) and (kid.namespace.getURL = XMLNamespaceUrl_XMLNS)) then begin
-          if kid.namespace = nil then declareNewNamespace(TTreeAttribute(kid).realvalue, '')
-          else declareNewNamespace(TTreeAttribute(kid).realvalue, kid.value);
-        end;
-
         if tree.attributes = nil then tree.attributes := TAttributeList.Create;
         tree.attributes.add(kid);
         //kid.offset:=baseOffset;
@@ -1320,7 +1316,6 @@ begin
   oldnamespacecount := 0;
   if subcontext^.namespaces <> nil then oldnamespacecount := subcontext^.namespaces.Count;
 
-
   if (typ = tetDocument) then begin
     tree := TTreeDocument.create(typ);
     TTreeDocument(tree).baseURI := context.staticContext.baseURI;
@@ -1343,6 +1338,14 @@ begin
         TTreeAttribute(tree).realvalue := strTrimAndNormalize(TTreeAttribute(tree).realvalue);
     end;
     tetOpen, tetDocument: begin
+      if implicitNamespaces <> nil then begin
+        needNamespaceList;
+        for i:= 0 to implicitNamespaces.Count - 1 do begin
+          tree.addNamespaceDeclaration(implicitNamespaces.namespaces[i], true);
+          subcontext^.namespaces.add(implicitNamespaces.namespaces[i]);
+        end;
+      end;
+
       lastKid := nil;
       for i:=0 to high(children) do
         if (children[i] is TXQTermConstructor) and (TXQTermConstructor(children[i]).isNamespaceConstructor) then begin
@@ -1406,6 +1409,7 @@ end;
 destructor TXQTermConstructor.destroy;
 begin
   nameValue.Free;
+  implicitNamespaces.Free;
   inherited destroy;
 end;
 

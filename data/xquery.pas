@@ -1034,6 +1034,7 @@ type
   TXQTermConstructor = class(TXQTerm)
     typ: TTreeElementType;
     nameValue: TXQTerm;
+    implicitNamespaces: TNamespaceList;
     constructor create(atype: TTreeElementType; aname: txqterm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
     function evaluate(const context: TEvaluationContext; root: TTreeElement; var baseOffset: longint): IXQValue;
@@ -1288,7 +1289,6 @@ type
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
-    FGarbageNamespaces: TNamespaceList;
     {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
     FInternet: TInternetAccess;
     {$endif}
@@ -3353,7 +3353,6 @@ begin
 
     FInternalDocuments.Free;
   end;
-  FGarbageNamespaces.Free;
   FExternalDocuments.Free;
   GlobalNamespaces.free;
   FModules.Free;
