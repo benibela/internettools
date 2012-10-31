@@ -1183,6 +1183,7 @@ begin
   if from > maxLen then begin len := 0; exit; end;
   if unti > maxLen + 1 then unti := maxLen + 1;
   len := unti-from;
+  if len < 0 then len := 0;
 end;
 
 function xqFunctionString_join(const args: TXQVArray): IXQValue;

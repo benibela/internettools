@@ -683,7 +683,7 @@ var
 begin
   if (ns = nil) then exit(false);
 
-  module := TXQueryEngine.findNativeModule(ns);
+  module := TXQueryEngine.findNativeModule(ns.getURL);
 
   if (module = nil) then exit(false);
 

@@ -86,8 +86,8 @@ type
     baseURI: string;
     collation: TXQCollation;
     nodeCollation: TXQCollation; //**< default collation used for node name comparisons (extension, does not exist in XQuery)
-    stringEncoding: TEncoding;
-    strictTypeChecking: boolean;
+    stringEncoding: TEncoding; //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
+    strictTypeChecking: boolean; //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
 
 
     stripBoundarySpace: boolean;  //**< If <a>  </a> is equivallent to <a/>. Only used during parsing of the query, ignored during evaluation
@@ -1284,6 +1284,7 @@ type
 
     procedure registerModule(module: IXQuery);
     function findModule(const namespaceURL: string): TXQuery;
+    class function findNativeModule(const ns: string): TXQNativeModule;
 
     //** Registers a collation for custom string comparisons
     class procedure registerCollation(const collation: TXQCollation);
@@ -1326,7 +1327,6 @@ type
     class procedure registerNativeModule(const module: TXQNativeModule);
 
     function findNamespace(const nsprefix: string): INamespace;
-    class function findNativeModule(const ns: INamespace): TXQNativeModule;
     class function findOperator(const name: string): TXQOperatorInfo;
     class function findTypeClass(const name: string): TXQValueClass;
   end;
@@ -1566,6 +1566,16 @@ protected
 end;
 
   function jsonStrEscape(s: string):string;
+  procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
+  procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
+
+  const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
+  const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
+        XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
+        XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
+        XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
+        XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
+        XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
 implementation
 uses base64;
 
@@ -1614,14 +1624,8 @@ type
 var collations: TStringList;
     nativeModules: TStringList;
 
-const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
 
-const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
-      XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
-      XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
-      XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
-      XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
-      XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
+
 
 var   XMLNamespace_XPathFunctions, XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_MyExtensions, XMLNamespace_MyExtensionOperators: INamespace;
 
@@ -4195,11 +4199,11 @@ begin
   end;
 end;
 
-class function TXQueryEngine.findNativeModule(const ns: INamespace): TXQNativeModule;
+class function TXQueryEngine.findNativeModule(const ns: string): TXQNativeModule;
 var
   index: Integer;
 begin
-  index := nativeModules.IndexOf(ns.getURL);
+  index := nativeModules.IndexOf(ns);
   if index < 0 then exit(nil);
   result := TXQNativeModule(nativeModules.Objects[index]);
 end;
