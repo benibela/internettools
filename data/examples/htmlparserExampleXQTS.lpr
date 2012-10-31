@@ -361,6 +361,7 @@ begin
   pxp.VariableChangelog.allowObjects:=false;
   pxp.StaticContext.collation := pxp.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   pxp.StaticContext.stripBoundarySpace:=true;
+  pxp.StaticContext.strictTypeChecking:=true;
   extvars := TVariableProvider.Create;
   pxp.OnDeclareExternalVariable:=@extvars.getvar;
   pxp.onImportModule:=@extvars.importModule;

@@ -229,7 +229,9 @@ function TXQValue.canConvertToType(v: TXQValueClass): boolean;
 begin
   if not v.castableFromInternal(self) then
     exit(false);
-  if ClassType = v then result := true
+  if (ClassType = v) or (v = TXQValue_untyped) then result := true
+  //else if (v = TXQValue_untypedAtomic) or (v = TXQValue_AnyAtomicType) or (v = TXQValue_AnySimpleType) then result := getSequenceCount = 1
+  //else if v = TXQValueNumericPseudoType then result := canConvertToDecimal(false)
   else if v.InheritsFrom(TXQValueInt65) then result := canConvertToInt65 and TXQValueInt65Class(v).canCreateFromInt65(toInt65)
   else if v.InheritsFrom(TXQValueDecimal) then result :=  canConvertToDecimal(v = TXQValueDecimal) and TXQValueDecimalClass(v).canCreateFromDecimal(toDecimal)
   else if v.InheritsFrom(TXQValueString) then begin

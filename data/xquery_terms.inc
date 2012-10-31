@@ -235,7 +235,7 @@ end;
 
 function TXQTermSequenceType.castableAs(v: IXQValue): boolean;
 begin
-  if not isSingleType() then raiseEvaluationError('need singletype for castable as');
+  if kind <> tikAtomic then raiseEvaluationError('need atomic type for castable as');
   v := xqvalueAtomize(v);
   result := castableAsBase(v);
 end;
@@ -247,7 +247,11 @@ var nodeCondition: TXQPathNodeCondition;
   begin
     case kind of
       //tikAny, tikNone: ; //handled before
-      tikAtomic: result := sub.instanceOfInternal(atomicTypeInfo);
+      tikAtomic:
+        if atomicTypeInfo = TXQValueNumericPseudoType then
+          result := (sub is TXQValueInt65) or (sub is TXQValueDecimal)
+         else
+          result := sub.instanceOfInternal(atomicTypeInfo);
       tikElementTest: result  := TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, sub.toNode);
     end;
   end;
@@ -619,6 +623,11 @@ begin
 
   assert((kind = xqfkUnknown) or (func <> nil));
 
+  if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex]) then
+    if not func.checkTypes(evilkids, context) then
+      raiseEvaluationError('Invalid types for function call: '+func.versions[0].name);
+
+
   case kind of
     xqfkBasic:
       result := TXQBasicFunctionInfo(func).func(evilkids);
@@ -658,9 +667,9 @@ begin
       tempcontext.temporaryVariables := TXQVariableChangeLog.create();
       tempcontext.staticContext := sc;
       for j := 0 to high(vfunc.parameters) do
-        tempcontext.temporaryVariables.add(vfunc.parameters[j].name, functionTypeConversion(evilkids[j], vfunc.parameters[j].seqtype), vfunc.parameters[j].namespace);
+        tempcontext.temporaryVariables.add(vfunc.parameters[j].name, TXQAbstractFunctionInfo.convertType(evilkids[j], vfunc.parameters[j].seqtype, context), vfunc.parameters[j].namespace);
       result := vfunc.body.evaluate(tempcontext);
-      result := functionTypeConversion(result, vfunc.resulttype);
+      result := TXQAbstractFunctionInfo.convertType(result, vfunc.resulttype, context);
       tempcontext.temporaryVariables.free;
       exit;
     end;

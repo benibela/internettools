@@ -87,6 +87,8 @@ type
     collation: TXQCollation;
     nodeCollation: TXQCollation; //**< default collation used for node name comparisons (extension, does not exist in XQuery)
     stringEncoding: TEncoding;
+    strictTypeChecking: boolean;
+
 
     stripBoundarySpace: boolean;  //**< If <a>  </a> is equivallent to <a/>. Only used during parsing of the query, ignored during evaluation
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
@@ -731,6 +733,9 @@ type
 
   TXQAbstractFunctionInfo = class
     versions: array of TXQFunctionParameterTypes;
+    class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TEvaluationContext): IXQValue; static;
+    class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TEvaluationContext): boolean; static;
+    function checkTypes(const values: TXQVArray; const context:TEvaluationContext): boolean;
     destructor Destroy; override;
   end;
   //**Information about a basic xquery function   (pure/independent of current context)
@@ -1605,21 +1610,6 @@ type
     result := 'numeric';
   end;
 
-{ TXQAbstractFunctionInfo }
-
-destructor TXQAbstractFunctionInfo.Destroy;
-var
-  i, j: Integer;
-begin
-  for i := 0 to High(versions) do begin
-    for j := 0 to high(versions[i].types) do
-      versions[i].types[j].free;
-    versions[i].returnType.Free;
-  end;
-  versions := nil;
-  inherited Destroy;
-end;
-
 
 var collations: TStringList;
     nativeModules: TStringList;
@@ -2085,6 +2075,7 @@ begin
   result.copynamespacepreserve := copynamespacepreserve;
   result.copynamespaceinherit := copynamespaceinherit;
   result.stringEncoding:=stringEncoding;
+  result.strictTypeChecking:=strictTypeChecking;
 end;
 
 destructor TXQStaticContext.Destroy;
@@ -2478,6 +2469,104 @@ end;
 
 function xqvalueCastAs(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
 function xqvalueCastableAs(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
+
+
+
+{ TXQAbstractFunctionInfo }
+
+class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TEvaluationContext
+  ): IXQValue;
+
+  function conversionSingle(const w: IXQValue): IXQValue;
+  begin
+    result := w;
+    if result is TXQValueNode then result := xqvalueAtomize(result);
+    if typ.instanceOf(result, context) then exit;
+    if (result is TXQValue_untypedAtomic)
+       or (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) and ((w is TXQValue_float) or (w is TXQValue_double)))
+       or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
+       or (w.instanceOfInternal(TXQValue_anyURI) and (typ.atomicTypeInfo.instanceOf(TXQValueString))) then
+         exit(typ.castAs(result, context));
+    raise EXQEvaluationException.Create('Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
+  end;
+
+var
+  i: Integer;
+begin
+  result := v;
+  if typ = nil then exit;
+  if typ.instanceOf(result, context) then exit;
+  if typ.kind = tikAtomic then begin
+    if not (result is TXQValueSequence) then
+      exit(conversionSingle(result));
+    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then raise EXQEvaluationException.Create('Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+    if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('Expected value, but got empty sequence.');
+    for i := 0 to result.getSequenceCount - 1 do
+      (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
+  end;
+end;
+
+class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TEvaluationContext
+  ): boolean;
+  function checkSingle(const wpre: IXQValue): boolean;
+  var w: IXQValue;
+  begin
+    if wpre is TXQValueNode then w := xqvalueAtomize(wpre)
+    else w := wpre;
+    if typ.instanceOf(w, context) then exit(true);
+    if (w is TXQValue_untypedAtomic)
+       or (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) and ((w is TXQValue_float) or (w is TXQValue_double)))
+       or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
+       or (w.instanceOfInternal(TXQValue_anyURI) and (typ.atomicTypeInfo.instanceOf(TXQValueString)))      then
+         exit(typ.castableAs(w));
+    result := false;
+  end;
+
+var
+i: Integer;
+begin
+  if typ = nil then exit(true);
+  if typ.instanceOf(v, context) then exit(true);
+  result := false;
+  if typ.kind = tikAtomic then begin
+    if not (v is TXQValueSequence) then
+      exit(checkSingle(v));
+    if ((not typ.allowMultiple) and (v.getSequenceCount > 1)) then exit(false);
+    if ((not typ.allowNone) and (v.getSequenceCount = 0)) then exit(false);
+    for i := 0 to v.getSequenceCount - 1 do
+      if not checkSingle((v as TXQValueSequence).seq[i]) then exit(false);
+    result := true;
+  end;
+end;
+
+
+function TXQAbstractFunctionInfo.checkTypes(const values: TXQVArray; const context: TEvaluationContext): boolean;
+var
+  i, j: Integer;
+begin
+  if length(versions) = 0 then exit(true);
+  for i:= 0 to high(versions) do begin
+    if length(values) <> length(versions[i].types) then continue;
+    result := true;
+    for j := 0 to high(values) do
+      if not checkType(values[j], versions[i].types[j], context) then begin result := false; break; end;
+    if result then exit;
+  end;
+  result := false;
+end;
+
+destructor TXQAbstractFunctionInfo.Destroy;
+var
+  i, j: Integer;
+begin
+  for i := 0 to High(versions) do begin
+    for j := 0 to high(versions[i].types) do
+      versions[i].types[j].free;
+    versions[i].returnType.Free;
+  end;
+  versions := nil;
+  inherited Destroy;
+end;
 
 
 {$I xquery_parse.inc}
@@ -4352,6 +4441,7 @@ begin
   temp.func := func;
   basicFunctions.AddObject(name, temp);
   parseTypeChecking(temp, typeChecking);
+  if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
 end;
 
 procedure TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string);
@@ -4362,6 +4452,7 @@ begin
   temp.func := func;
   complexFunctions.AddObject(name, temp);
   parseTypeChecking(temp, typeChecking);
+  if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
 end;
 
 procedure TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; const typeChecking: array of string);
@@ -4577,7 +4668,7 @@ fn.registerFunction('document-uri',@xqFunctionDocument_Uri, ['($arg as node()?) 
 
 fn.registerFunction('doc', @xqFunctionDoc, ['($uri as xs:string?) as document-node()?']);
 fn.registerFunction('doc-available', @xqFunctionDoc_Available, ['($uri as xs:string?) as xs:boolean']);
-fn.registerFunction('collection', @xqFunctionCollection, ['($arg as xs:string?) as node()*']);
+fn.registerFunction('collection', @xqFunctionCollection, ['fn:collection() as node()*', '($arg as xs:string?) as node()*']);
 
 
 fn.registerFunction('root', @xqFunctionRoot, ['() as node()', '($arg as node()?) as node()?']);

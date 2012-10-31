@@ -30,6 +30,8 @@ var
   ps: TXQueryEngine;
   xml: TTreeParser;
 
+  TestErrors: boolean;
+
   procedure performUnitTest(s1,s2,s3: string);
   var got: string;
     rooted: Boolean;
@@ -60,6 +62,24 @@ var
       raise;
     end end;
   end;
+
+  procedure f(a: string; c: string = '');
+  var
+    err: Boolean;
+  begin
+    if not TestErrors then exit;
+    err := false;
+    try
+    count+=1;
+    performUnitTest(a,'',c);
+
+    except on e: EXQEvaluationException do begin
+      err := true;
+    end end;
+    if not err then raise Exception.Create('No error => Test failed ');
+  end;
+
+
 
   procedure m(a,b: string; c: string = ''); //main module
   begin
@@ -1462,6 +1482,27 @@ begin
 
   //t('validate lax { <a/> }', '');
   //t('validate { <a/> }', '');
+
+
+
+  TestErrors := false;
+
+  ps.StaticContext.strictTypeChecking:=true;
+  m('string-join(("1", "2", "3"), " ")', '1 2 3');
+  f('string-join(1 to 3, " ")', '');
+  m('"17" instance of xs:anyAtomicType', 'true');
+  f('text {"17"} castable as xs:anyAtomicType', 'true'); //would work, but that type is not castable-to
+  m('number("17")', '17');
+  m('number(text {"17"} )', '17');
+  m('number(comment {"17"} )', '17');
+  m('string-to-codepoints("ABC")', '65');
+  m('string-to-codepoints(processing-instruction XYZ {"A"})', '65');
+  t('collection()', '');
+  m('123 castable as xs:integer', 'true');
+  f('456 castable as xs:integer+');
+  m('<e/>[1]/text{string-join(., " ")}', '');
+  m('count(<a>X</a> union <b>Y</b>)', '2');
+
 
   helper.free;
   xml.free;
