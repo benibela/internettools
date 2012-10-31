@@ -17,7 +17,7 @@ uses
    Classes, SysUtils,
    dregexpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page dead, I create a mirror on benibela.de) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr)
              //ATTENTION: You must use my version of it, OR set NSUBEXP = 90, otherwise it will crash with an "TRegExpr(comp): ParseReg Unmatched ()" error everytime you use the anyURI type
-   simplehtmltreeparser, math, int65math,
+   simplehtmltreeparser, math, int65math, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif};
 
 
@@ -41,6 +41,7 @@ type
   TXQTermSequenceType = class;
   TXQuery = class;
   IXQuery = interface;
+  TXQNativeModule = class;
 
 
   { TXQValueEnumerator }
@@ -85,16 +86,16 @@ type
     baseURI: string;
     collation: TXQCollation;
     nodeCollation: TXQCollation; //**< default collation used for node name comparisons (extension, does not exist in XQuery)
+    stringEncoding: TEncoding;
 
     stripBoundarySpace: boolean;  //**< If <a>  </a> is equivallent to <a/>. Only used during parsing of the query, ignored during evaluation
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
 
-    //TODO: use these values
-    constructionPreserve: boolean;
     copyNamespacePreserve, copyNamespaceInherit: boolean;
 
     //**ignored
     ordering: boolean;
+    constructionPreserve: boolean;
 
     function clone(): TXQStaticContext;
     destructor Destroy; override;
@@ -720,28 +721,33 @@ type
 
 
   { TXQParsingContext }
+  TXQFunctionParameterTypes = record
+    name: string;
+    types: array of TXQTermSequenceType;
+    returnType: TXQTermSequenceType;
+  end;
 
+  { TXQAbstractFunctionInfo }
 
-  //**Information about a basic xquery function
-  TXQBasicFunctionInfo = record
+  TXQAbstractFunctionInfo = class
+    versions: array of TXQFunctionParameterTypes;
+    destructor Destroy; override;
+  end;
+  //**Information about a basic xquery function   (pure/independent of current context)
+  TXQBasicFunctionInfo = class(TXQAbstractFunctionInfo)
     func: TXQBasicFunction;
-    returnType: TXQValueKind
   end;
-  PXQBasicFunctionInfo=^TXQBasicFunctionInfo;
-  //**Information about a complex xquery function
-  TXQComplexFunctionInfo = record
+  //**Information about a complex xquery function (dependent of current context)
+  TXQComplexFunctionInfo = class(TXQAbstractFunctionInfo)
     func: TXQComplexFunction;
-    returnType: TXQValueKind
   end;
-  PXQComplexFunctionInfo=^TXQComplexFunctionInfo;
   //**Information about a xquery binary operator
-  TXQOperatorInfo = record
+  TXQOperatorInfo = class(TXQAbstractFunctionInfo)
+    name: string;
     func: TXQBinaryOp;
     priority: integer;
-    returnType: TXQValueKind;
     followedBy: string;
   end;
-  PXQOperatorInfo=^TXQOperatorInfo;
 
 
   TXQPathMatchingAxis = (qcSameNode, qcDirectParent, qcDirectChild, qcSameOrDescendant, qcDescendant, qcFollowing, qcFollowingSibling,
@@ -934,22 +940,22 @@ type
   TXQTermNamedFunction = class(TXQTerm)
     namespace: INamespace;
     kind: TXQTermNamedFunctionKind;
-    index: integer;
+    func: TXQAbstractFunctionInfo;
     funcname: string;
-    constructor create(const akind: TXQTermNamedFunctionKind; const aindex: integer);
+    constructor create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
     constructor create(const ns: INamespace; const name: string);
     constructor create(const ns: INamespace; const name: string; args: array of TXQTerm);
     class function createIfExists(const name: string; const sc: TXQStaticContext): TXQTermNamedFunction;
     function evaluate(const context: TEvaluationContext): IXQValue; override;
   private
-    class function findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer): boolean;
+    class function findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
   end;
 
   { TXQTermUnaryOp }
 
   TXQTermUnaryOp = class(TXQTerm)
-    index: integer;
-    constructor create(const op: string; arg: TXQTerm = nil);
+    op: TXQOperatorInfo;
+    constructor create(const aop: string; arg: TXQTerm = nil);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -957,12 +963,11 @@ type
   { TXQTermBinaryOp }
 
   TXQTermBinaryOp = class(TXQTerm)
-    index: integer;
-    constructor create(const op: string; arg1: TXQTerm = nil; arg2: TXQTerm = nil);
-    constructor create(arg1: TXQTerm; const op: string; arg2: TXQTerm);
+    op: TXQOperatorInfo;
+    constructor create(const aop: string; arg1: TXQTerm = nil; arg2: TXQTerm = nil);
+    constructor create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
     function evaluate(const context: TEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
-    function operatorInfo: PXQOperatorInfo;
   protected
     procedure addToQueryList(var path: TXQPathMatching); override;
   end;
@@ -1274,12 +1279,6 @@ type
     procedure registerModule(module: IXQuery);
     function findModule(const namespaceURL: string): TXQuery;
 
-    //** Registers an custom, pure function with a certain name
-    class procedure registerFunction(const name: string; const func: TXQBasicFunction; const returnType: TXQValueKind=pvkUndefined);
-    //** Registers an custom, complex function with a certain name
-    class procedure registerFunction(const name: string; const func: TXQComplexFunction; const returnType: TXQValueKind=pvkUndefined);
-    //** Registers a custom type (you can also use custom types derived by TXQValue without registering them, but registering is necessary, if constructor should be useable in the expression)
-    class procedure registerType(const typ: TXQValueClass; name: string = '');
     //** Registers a collation for custom string comparisons
     class procedure registerCollation(const collation: TXQCollation);
 
@@ -1296,9 +1295,6 @@ type
     FModules: TInterfaceList;
 
   protected
-    class procedure registerBinaryOp(const name: string; const func: TXQBinaryOp; const priority: integer; const returnType: TXQValueKind=pvkUndefined);
-    class procedure registerBinaryOpFunction(const name: string; const func: TXQBinaryOp);
-
     function parseTerm(str:string; model: TXQParsingModel): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
     function getEvaluationContext(staticContextOverride: TXQStaticContext): TEvaluationContext;
@@ -1322,7 +1318,12 @@ type
     class function evaluateAccessList(term: TXQTerm; const context: TEvaluationContext): IXQValue;
 
 
+    class procedure registerNativeModule(const module: TXQNativeModule);
+
     function findNamespace(const nsprefix: string): INamespace;
+    class function findNativeModule(const ns: INamespace): TXQNativeModule;
+    class function findOperator(const name: string): TXQOperatorInfo;
+    class function findTypeClass(const name: string): TXQValueClass;
   end;
 
   { TXQQueryIterator }
@@ -1531,12 +1532,37 @@ TXQValue_Binary = class (TXQValueString)
   class function classParentNonBlocked: TXQValueClass; override;
 end;
 
+
   {$DEFINE PXP_DERIVED_TYPES_INTERFACE}
   {$I xquery_derived_types.inc}
 
+type
+
+{ TXQNativeModule }
+
+ TXQNativeModule = class
+  namespace: INamespace;
+  parent: TXQNativeModule;
+  constructor create(const anamespace: INamespace; const aparentModule: TXQNativeModule=nil);
+  destructor Destroy; override;
+  procedure registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
+  procedure registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string);
+  procedure registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string);
+  procedure registerType(const typ: TXQValueClass);
+
+  function findBasicFunction(const name: string): TXQBasicFunctionInfo;
+  function findComplexFunction(const name: string): TXQComplexFunctionInfo;
+protected
+  basicFunctions: TStringList;
+  complexFunctions: TStringList;
+  binaryOps, binaryOpFunctions: TStringList;
+  types: TStringList;
+ procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+end;
+
   function jsonStrEscape(s: string):string;
 implementation
-uses bbutils, base64;
+uses base64;
 
 var
   XQFormats : TFormatSettings = (
@@ -1565,11 +1591,38 @@ var
   );
 
 
-var basicFunctions: TStringList;
-    complexFunctions: TStringList;
-    binaryOps, binaryOpFunctions: TStringList;
-    types: TStringList;
-    collations: TStringList;
+type
+
+  { TXQValueNumericPseudoType }
+
+  TXQValueNumericPseudoType = class(TXQValue)
+    class function classTypeName: string; override;
+  end;
+
+
+  class function TXQValueNumericPseudoType.classTypeName: string;
+  begin
+    result := 'numeric';
+  end;
+
+{ TXQAbstractFunctionInfo }
+
+destructor TXQAbstractFunctionInfo.Destroy;
+var
+  i, j: Integer;
+begin
+  for i := 0 to High(versions) do begin
+    for j := 0 to high(versions[i].types) do
+      versions[i].types[j].free;
+    versions[i].returnType.Free;
+  end;
+  versions := nil;
+  inherited Destroy;
+end;
+
+
+var collations: TStringList;
+    nativeModules: TStringList;
 
 const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
 
@@ -1980,6 +2033,7 @@ begin
   result := TXQValueNode.Create(v);
 end;
 
+
 { TXQValueObjectPropertyEnumerator }
 
 function TXQValueObjectPropertyEnumerator.GetCurrent: TXQSimpleVariable;
@@ -2030,6 +2084,7 @@ begin
   result.ordering := ordering;
   result.copynamespacepreserve := copynamespacepreserve;
   result.copynamespaceinherit := copynamespaceinherit;
+  result.stringEncoding:=stringEncoding;
 end;
 
 destructor TXQStaticContext.Destroy;
@@ -3281,6 +3336,7 @@ begin
   StaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
   StaticContext.copyNamespaceInherit:=true;
   StaticContext.copyNamespacePreserve:=true;
+  StaticContext.stringEncoding:=eUTF8;
   FModules := TInterfaceList.Create;
 end;
 
@@ -3381,65 +3437,9 @@ begin
   Move(p^, result^, s);
 end;
 
-class procedure TXQueryEngine.registerFunction(const name: string; const func: TXQBasicFunction; const returnType: TXQValueKind);
-var info: PXQBasicFunctionInfo;
-begin
-  if basicFunctions.IndexOf(name) >= 0 then raise Exception.Create('Redefined function: '+name);
-  if complexFunctions.IndexOf(name) >= 0 then raise Exception.Create('Redefined function: '+name);
-  info := GetMem(sizeof(TXQBasicFunctionInfo));
-  info^.func:=func;
-  info^.returnType:=returnType;
-  basicFunctions.AddObject(name, TObject(info));
-  if pos(':', name) = 0 then basicFunctions.AddObject('fn:'+name, TObject(recordClone(info,sizeof(TXQBasicFunctionInfo))));
-end;
-class procedure TXQueryEngine.registerFunction(const name: string; const func: TXQComplexFunction; const returnType: TXQValueKind);
-var info: PXQComplexFunctionInfo;
-begin
-  if basicFunctions.IndexOf(name) >= 0 then raise Exception.Create('Redefined function: '+name);
-  if complexFunctions.IndexOf(name) >= 0 then raise Exception.Create('Redefined function: '+name);
-  info := GetMem(sizeof(TXQBasicFunctionInfo));
-  info^.func:=func;
-  info^.returnType:=returnType;
-  complexFunctions.AddObject(name, TObject(info));
-  if pos(':', name) = 0 then complexFunctions.AddObject('fn:'+name, TObject(recordClone(info,sizeof(TXQBasicFunctionInfo))));
-end;
-
-class procedure TXQueryEngine.registerType(const typ: TXQValueClass; name: string = '');
-begin
-  if name = '' then name := typ.classTypeName;
-  if (basicFunctions.IndexOf(name) < 0) and (complexFunctions.IndexOf(name) < 0) then
-    registerFunction(name, @xqFunctionGeneralConstructor, typ.classKind);
-  registerFunction('xs:' + name, @xqFunctionGeneralConstructor, typ.classKind);
-  types.AddObject(name, TObject(typ));
-end;
-
 class procedure TXQueryEngine.registerCollation(const collation: TXQCollation);
 begin
   collations.AddObject(collation.id, collation);
-end;
-
-
-class procedure TXQueryEngine.registerBinaryOp(const name: string; const func: TXQBinaryOp; const priority: integer; const returnType: TXQValueKind);
-var info: PXQOperatorInfo;
-  spacepos: SizeInt;
-begin
-  info := GetMem(sizeof(TXQOperatorInfo));
-  FillChar(info^.followedBy, sizeof(info^.followedBy), 0); //assigning nil crashes
-  info^.func:=func;
-  info^.priority:=priority;
-  info^.returnType:=returnType;
-  spacepos := pos(' ', name);
-  if spacepos = 0 then begin
-    binaryOps.AddObject(name, TObject(info));
-  end else begin
-    binaryOps.AddObject(copy(name, 1, spacepos-1), TObject(info));
-    info^.followedBy := strCopyFrom(name, spacepos+1);
-  end;
-end;
-
-class procedure TXQueryEngine.registerBinaryOpFunction(const name: string; const func: TXQBinaryOp);
-begin
-  binaryOpFunctions.AddObject(name, TObject(func));
 end;
 
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQuery;
@@ -4052,6 +4052,11 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+class procedure TXQueryEngine.registerNativeModule(const module: TXQNativeModule);
+begin
+  nativeModules.AddObject(module.namespace.getURL, module);
+end;
+
 function xqvalueNodeStepChild(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(ta); ignore(tb); ignore(result);
@@ -4088,7 +4093,7 @@ end;
 
 function TXQueryEngine.findNamespace(const nsprefix: string): INamespace;
 begin
-  if (GlobalNamespaces <> nil) and (GlobalNamespaces.hasNamespacePrefix(nsprefix, result)) then exit;
+  if (self <> nil) and (GlobalNamespaces <> nil) and (GlobalNamespaces.hasNamespacePrefix(nsprefix, result)) then exit;
   case nsprefix of
     'xml': result := XMLNamespace_XML;
     'xmlns': result := XMLNamespace_XMLNS;
@@ -4100,6 +4105,39 @@ begin
     'op': result := XMLNamespace_MyExtensionOperators;
     else result := nil;
   end;
+end;
+
+class function TXQueryEngine.findNativeModule(const ns: INamespace): TXQNativeModule;
+var
+  index: Integer;
+begin
+  index := nativeModules.IndexOf(ns.getURL);
+  if index < 0 then exit(nil);
+  result := TXQNativeModule(nativeModules.Objects[index]);
+end;
+
+class function TXQueryEngine.findOperator(const name: string): TXQOperatorInfo;
+var
+  i: Integer;
+  j: Integer;
+begin
+  for i := 0 to nativeModules.count - 1 do begin
+    j := TXQNativeModule(nativeModules.Objects[i]).binaryOps.IndexOf(name);
+    if j >= 0 then exit(TXQOperatorInfo(TXQNativeModule(nativeModules.Objects[i]).binaryOps.Objects[j]));
+  end;
+  result := nil;
+end;
+
+class function TXQueryEngine.findTypeClass(const name: string): TXQValueClass;
+var
+  i: Integer;
+  j: Integer;
+begin
+  for i := 0 to nativeModules.count - 1 do begin
+    j := TXQNativeModule(nativeModules.Objects[i]).types.IndexOf(name);
+    if j >= 0 then exit(TXQValueClass(TXQNativeModule(nativeModules.Objects[i]).types.Objects[j]));
+  end;
+  result := nil;
 end;
 
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
@@ -4271,19 +4309,145 @@ begin
 end;
 
 
+{ TXQNativeModule }
+
+constructor TXQNativeModule.create(const anamespace: INamespace; const aparentModule: TXQNativeModule=nil);
+begin
+  namespace := anamespace;
+  basicFunctions:=TStringList.Create;
+  basicFunctions.Sorted := true;
+  basicFunctions.OwnsObjects:=true;
+  complexFunctions:=TStringList.Create;
+  complexFunctions.Sorted := true;
+  complexFunctions.OwnsObjects:=true;
+  binaryOps:=TStringList.Create;
+  binaryOps.Sorted := true;
+  binaryOps.OwnsObjects:=true;
+
+  binaryOpFunctions:=TStringList.Create;
+  binaryOpFunctions.Sorted := true;
+  types:=TStringList.Create;
+  types.Sorted := true;
+  parent := aparentModule;
+end;
+
+destructor TXQNativeModule.Destroy;
+begin
+  basicFunctions.Clear;
+  complexFunctions.Clear;
+  binaryOps.Clear;
+
+  basicFunctions.free;
+  complexFunctions.free;
+  binaryOps.free;
+  binaryOpFunctions.Free;
+  types.free;
+  inherited Destroy;
+end;
+
+procedure TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
+var
+  temp: TXQBasicFunctionInfo;
+begin
+  temp := TXQBasicFunctionInfo.Create;
+  temp.func := func;
+  basicFunctions.AddObject(name, temp);
+  parseTypeChecking(temp, typeChecking);
+end;
+
+procedure TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string);
+var
+  temp: TXQComplexFunctionInfo;
+begin
+  temp := TXQComplexFunctionInfo.Create;
+  temp.func := func;
+  complexFunctions.AddObject(name, temp);
+  parseTypeChecking(temp, typeChecking);
+end;
+
+procedure TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; const typeChecking: array of string);
+var
+  temp: TXQOperatorInfo;
+  spacepos: SizeInt;
+  i: Integer;
+begin
+  temp := TXQOperatorInfo.Create;
+  temp.name:=name;
+  temp.func:=func;
+  temp.priority:=priority;
+  spacepos := pos(' ', name);
+  if spacepos = 0 then binaryOps.AddObject(name, (temp))
+  else begin
+    binaryOps.AddObject(copy(name, 1, spacepos-1), (temp));
+    temp.followedBy := strCopyFrom(name, spacepos+1);
+  end;
+  parseTypeChecking(temp, typeChecking);
+  for i := 0 to high(temp.versions) do
+    binaryOpFunctions.AddObject(temp.versions[i].name, TObject(temp));
+end;
+
+procedure TXQNativeModule.registerType(const typ: TXQValueClass);
+begin
+  types.AddObject(typ.classTypeName, TObject(typ));
+end;
+
+function TXQNativeModule.findBasicFunction(const name: string): TXQBasicFunctionInfo;
+var
+  i: Integer;
+begin
+  i := basicFunctions.IndexOf(name);
+  if i >= 0 then exit(TXQBasicFunctionInfo(basicFunctions.Objects[i]));
+  if parent <> nil then exit(parent.findBasicFunction(name));
+  result := nil;
+end;
+
+function TXQNativeModule.findComplexFunction(const name: string): TXQComplexFunctionInfo;
+var
+  i: Integer;
+begin
+  i := complexFunctions.IndexOf(name);
+  if i >= 0 then exit(TXQComplexFunctionInfo(complexFunctions.Objects[i]));
+  if parent <> nil then exit(parent.findComplexFunction(name));
+  result := nil;
+end;
+
+var globalTypeParsingContext: TXQParsingContext;
+
+procedure TXQNativeModule.parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+var
+  i, j: Integer;
+begin
+  SetLength(info.versions, length(typeChecking));
+  for i:= 0 to high(typeChecking) do
+    with globalTypeParsingContext  do begin
+      str:=typeChecking[i];
+      pos:=@globalTypeParsingContext.str[1];
+      skipWhitespaceAndComment();
+      if pos^ <> '(' then info.versions[i].name:=nextTokenNCName();
+      expect('(');
+      skipWhitespaceAndComment();
+      if pos^ <> ')' then begin
+        SetLength(info.versions[i].types, strCount(str, ',') + 1);
+        for j := 0 to high(info.versions[i].types) do begin
+          if j <> 0 then expect(',');
+          expect('$'); nextTokenNCName(); expect('as');
+          info.versions[i].types[j] := parseSequenceType();
+        end;
+      end;
+      expect(')');
+      if nextToken() = 'as' then
+        info.versions[i].returnType := parseSequenceType();
+    end;
+end;
 
 var i:integer;
+    fn, pxp, op, xs: TXQNativeModule;
 initialization
-basicFunctions:=TStringList.Create;
-complexFunctions:=TStringList.Create;
-binaryOps:=TStringList.Create;
-binaryOpFunctions:=TStringList.Create;
 collations:=TStringList.Create;
-types:=TStringList.Create;
-binaryOps.Sorted := true;
-basicFunctions.Sorted := true;
-complexFunctions.Sorted := true;
-types.Sorted:=true;
+collations.OwnsObjects:=true;
+nativeModules := TStringList.Create;
+globalTypeParsingContext := TXQParsingContext.Create;
+globalTypeParsingContext.staticContext := TXQStaticContext.Create;
 //namespaces
 XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
 XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
@@ -4292,232 +4456,233 @@ XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocal
 XMLNamespace_MyExtensions:=TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
 XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
 
+fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions);
+TXQueryEngine.registerNativeModule(fn);
+xs := TXQNativeModule.Create(XMLNamespace_XMLSchema);
+TXQueryEngine.registerNativeModule(xs);
+globalTypeParsingContext.staticContext.defaultElementTypeNamespace := xs.namespace;
+pxp := TXQNativeModule.Create(XMLNamespace_MyExtensions, fn);
+TXQueryEngine.registerNativeModule(pxp);
+op := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators);
+TXQueryEngine.registerNativeModule(op);
+
+//Constructors (xs: namespace, not fn:)
+xs.registerType(TXQValueBoolean);
+xs.registerType(TXQValueInt65);
+xs.registerType(TXQValueDecimal);
+xs.registerType(TXQValueString);
+xs.registerType(TXQValueDateTime);
+xs.registerType(TXQValueObject);
+xs.registerType(TXQValue_AnyAtomicType);
+xs.registerType(TXQValue_AnySimpleType);
+xs.registerType(TXQValue);
+xs.registerType(TXQValueNumericPseudoType);
+
+{$DEFINE PXP_DERIVED_TYPES_REGISTRATION}
+{$I xquery_derived_types.inc}
+
+
+
 //my functions
-TXQueryEngine.registerFunction('filter',@xqFunctionFilter);
-TXQueryEngine.registerFunction('split-equal',@xqFunctionSplitEqual,pvkString);
-TXQueryEngine.registerFunction('parse-date',@xqFunctionParse_Date);
-TXQueryEngine.registerFunction('parse-datetime',@xqFunctionParse_Datetime);
-TXQueryEngine.registerFunction('parse-time',@xqFunctionParse_Time);
-TXQueryEngine.registerFunction('deep-text',@xqFunctionDeep_Node_Text);
-TXQueryEngine.registerFunction('outer-xml',@xqFunctionOuter_XML);
-TXQueryEngine.registerFunction('inner-xml',@xqFunctionInner_XML);
-TXQueryEngine.registerFunction('form',@xqFunctionForm);
-TXQueryEngine.registerFunction('eval',@xqFunctionEval);
-TXQueryEngine.registerFunction('css',@xqFunctionCSS);
-TXQueryEngine.registerFunction('is-nth',@xqFunctionIs_Nth);
-TXQueryEngine.registerFunction('type-of',@xqFunctionType_of);
+pxp.registerFunction('filter',@xqFunctionFilter, []);
+pxp.registerFunction('split-equal',@xqFunctionSplitEqual,[]);
+pxp.registerFunction('parse-date',@xqFunctionParse_Date, []);
+pxp.registerFunction('parse-datetime',@xqFunctionParse_Datetime, []);
+pxp.registerFunction('parse-time',@xqFunctionParse_Time, []);
+pxp.registerFunction('deep-text',@xqFunctionDeep_Node_Text, []);
+pxp.registerFunction('outer-xml',@xqFunctionOuter_XML, []);
+pxp.registerFunction('inner-xml',@xqFunctionInner_XML, []);
+pxp.registerFunction('form',@xqFunctionForm, []);
+pxp.registerFunction('eval',@xqFunctionEval, []);
+pxp.registerFunction('css',@xqFunctionCSS, []);
+pxp.registerFunction('is-nth',@xqFunctionIs_Nth, []);
+pxp.registerFunction('type-of',@xqFunctionType_of, []);
 
 
 //standard functions
-TXQueryEngine.registerFunction('exists',@xqFunctionExists,pvkBoolean);
-TXQueryEngine.registerFunction('empty', @xqFunctionempty,pvkBoolean);
-TXQueryEngine.registerFunction('nilled', @xqFunctionNilled,pvkBoolean);
-TXQueryEngine.registerFunction('error',@xqFunctionError);
-TXQueryEngine.registerFunction('abs',@xqFunctionAbs);
-TXQueryEngine.registerFunction('ceiling',@xqFunctionCeiling);
-TXQueryEngine.registerFunction('floor',@xqFunctionFloor);
-TXQueryEngine.registerFunction('round',@xqFunctionRound);
-TXQueryEngine.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even);
-TXQueryEngine.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string,pvkString);
-TXQueryEngine.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints);
-TXQueryEngine.registerFunction('string-join',@xqFunctionString_join,pvkString);
-TXQueryEngine.registerFunction('substring',@xqFunctionSubstring,pvkString);
-TXQueryEngine.registerFunction('upper-case',@xqFunctionUpper_Case,pvkString);
-TXQueryEngine.registerFunction('lower-case',@xqFunctionLower_case,pvkString);
-TXQueryEngine.registerFunction('compare',@xqFunctionCompare,pvkInt);
-TXQueryEngine.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal,pvkBoolean);
-TXQueryEngine.registerFunction('contains',@xqFunctionContains,pvkBoolean);
-TXQueryEngine.registerFunction('starts-with',@xqFunctionStarts_with,pvkBoolean);
-TXQueryEngine.registerFunction('ends-with',@xqFunctionEnds_with,pvkBoolean);
-TXQueryEngine.registerFunction('substring-before',@xqFunctionSubstring_before,pvkString);
-TXQueryEngine.registerFunction('substring-after',@xqFunctionSubstring_after,pvkString);
-TXQueryEngine.registerFunction('concat',@xqFunctionConcat,pvkString);
-TXQueryEngine.registerFunction('translate',@xqFunctionTranslate,pvkString);
-TXQueryEngine.registerFunction('replace',@xqFunctionReplace,pvkString);
-TXQueryEngine.registerFunction('matches',@xqFunctionMatches,pvkBoolean);
-TXQueryEngine.registerFunction('tokenize',@xqFunctionTokenize,pvkString);
-TXQueryEngine.registerFunction('boolean',@xqFunctionBoolean,pvkBoolean);
-TXQueryEngine.registerFunction('true',@xqFunctionTrue,pvkBoolean);
-TXQueryEngine.registerFunction('false',@xqFunctionFalse,pvkBoolean);
-TXQueryEngine.registerFunction('not',@xqFunctionNot,pvkBoolean);
+fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
+fn.registerFunction('empty', @xqFunctionempty,['($arg as item()*) as xs:boolean']);
+fn.registerFunction('nilled', @xqFunctionNilled,['($arg as node()?) as xs:boolean?']);
+fn.registerFunction('error',@xqFunctionError,['()', '($error as xs:QName)', '($error as xs:QName?, $description as xs:string)', '($error as xs:QName?, $description as xs:string, $error-object as item()*)']);
+
+fn.registerFunction('abs',@xqFunctionAbs,['($arg as numeric?) as numeric?']);
+fn.registerFunction('ceiling',@xqFunctionCeiling,['($arg as numeric?) as numeric?']);
+fn.registerFunction('floor',@xqFunctionFloor,['($arg as numeric?) as numeric?']);
+fn.registerFunction('round',@xqFunctionRound,['($arg as numeric?) as numeric?']);
+fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even,['($arg as numeric?) as numeric?', '($arg as numeric?, $precision as xs:integer) as numeric?']);
+
+fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string,['($arg as xs:integer*) as xs:string']);
+fn.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints,['($arg as xs:string?) as xs:integer*']);
+fn.registerFunction('string-join',@xqFunctionString_join,['($arg1 as xs:string*, $arg2 as xs:string) as xs:string']);
+fn.registerFunction('substring',@xqFunctionSubstring,['($sourceString as xs:string?, $startingLoc as xs:double) as xs:string', '($sourceString as xs:string?, $startingLoc as xs:double, $length as xs:double) as xs:string']);
+fn.registerFunction('upper-case',@xqFunctionUpper_Case,['($arg as xs:string?) as xs:string']);
+fn.registerFunction('lower-case',@xqFunctionLower_case,['($arg as xs:string?) as xs:string']);
+fn.registerFunction('compare',@xqFunctionCompare,['($comparand1 as xs:string?, $comparand2 as xs:string?) as xs:integer?', '($comparand1 as xs:string?, $comparand2 as xs:string?, $collation as xs:string) as xs:integer?']);
+fn.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal,['($comparand1 as xs:string?, $comparand2 as xs:string?) as xs:boolean?']);
+fn.registerFunction('contains',@xqFunctionContains,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean']);
+fn.registerFunction('starts-with',@xqFunctionStarts_with,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean']);
+fn.registerFunction('ends-with',@xqFunctionEnds_with,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean']);
+fn.registerFunction('substring-after',@xqFunctionSubstring_after,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string']);
+fn.registerFunction('substring-before',@xqFunctionSubstring_before,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string']);
+fn.registerFunction('concat',@xqFunctionConcat,[]);
+fn.registerFunction('translate',@xqFunctionTranslate,['($arg as xs:string?, $mapString as xs:string, $transString as xs:string) as xs:string']);
+fn.registerFunction('replace',@xqFunctionReplace,['($input as xs:string?, $pattern as xs:string, $replacement as xs:string) as xs:string', '($input as xs:string?, $pattern as xs:string, $replacement as xs:string, $flags as xs:string) as xs:string ']);
+fn.registerFunction('matches',@xqFunctionMatches,['($input as xs:string?, $pattern as xs:string) as xs:boolean', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:boolean']);
+fn.registerFunction('tokenize',@xqFunctionTokenize,['($input as xs:string?, $pattern as xs:string) as xs:string*', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:string*']);
+
+fn.registerFunction('boolean',@xqFunctionBoolean,['($arg as item()*) as xs:boolean']);
+fn.registerFunction('true',@xqFunctionTrue,['() as xs:boolean']);
+fn.registerFunction('false',@xqFunctionFalse,['() as xs:boolean']);
+fn.registerFunction('not',@xqFunctionNot,['($arg as item()*) as xs:boolean']);
 
 
+fn.registerFunction('dateTime',@xqFunctionDateTime,['($arg1 as xs:date?, $arg2 as xs:time?) as xs:dateTime?']);
+fn.registerFunction('year-from-datetime',@xqFunctionYear_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('month-from-datetime',@xqFunctionMonth_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('day-from-datetime',@xqFunctionDay_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('hours-from-datetime',@xqFunctionHours_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('minutes-from-datetime',@xqFunctionMinutes_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('seconds-from-datetime',@xqFunctionSeconds_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
 
-TXQueryEngine.registerFunction('dateTime',@xqFunctionDateTime,pvkDateTime);
-TXQueryEngine.registerFunction('year-from-datetime',@xqFunctionYear_From_Datetime);
-TXQueryEngine.registerFunction('month-from-datetime',@xqFunctionMonth_From_Datetime);
-TXQueryEngine.registerFunction('day-from-datetime',@xqFunctionDay_From_Datetime);
-TXQueryEngine.registerFunction('hours-from-datetime',@xqFunctionHours_From_Datetime);
-TXQueryEngine.registerFunction('minutes-from-datetime',@xqFunctionMinutes_From_Datetime);
-TXQueryEngine.registerFunction('seconds-from-datetime',@xqFunctionSeconds_From_Datetime);
+fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
 
-TXQueryEngine.registerFunction('years-from-duration',@xqFunctionYear_From_Duration);
-TXQueryEngine.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration);
-TXQueryEngine.registerFunction('days-from-duration',@xqFunctionDay_From_Duration);
-TXQueryEngine.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration);
-TXQueryEngine.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration);
-TXQueryEngine.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration);
-
-TXQueryEngine.registerFunction('year-from-date',@xqFunctionYear_From_Datetime);
-TXQueryEngine.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime);
-TXQueryEngine.registerFunction('day-from-date',@xqFunctionDay_From_Datetime);
-TXQueryEngine.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime);
-TXQueryEngine.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime);
-TXQueryEngine.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime);
-TXQueryEngine.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime);
-TXQueryEngine.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime);
-TXQueryEngine.registerFunction('timezone-from-datetime',@xqFunctionTimezone_From_Datetime);
-TXQueryEngine.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone);
-TXQueryEngine.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone);
-TXQueryEngine.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone);
-TXQueryEngine.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone);
-
-
-TXQueryEngine.registerFunction('current-datetime',@xqFunctionCurrent_Datetime,pvkDateTime);
-TXQueryEngine.registerFunction('current-date',@xqFunctionCurrent_Date,pvkDateTime);
-TXQueryEngine.registerFunction('current-time',@xqFunctionCurrent_Time,pvkDateTime);
-
-TXQueryEngine.registerFunction('trace',@xqFunctionTrace);
-TXQueryEngine.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri);
-TXQueryEngine.registerFunction('base-uri',@xqFunctionBase_Uri);
-TXQueryEngine.registerFunction('document-uri',@xqFunctionDocument_Uri);
-
-TXQueryEngine.registerFunction('root', @xqFunctionRoot);
-TXQueryEngine.registerFunction('lang', @xqFunctionLang);
+fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
+fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
+fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
+fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
+fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
+fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
+fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime, ['($arg as xs:time?) as xs:dayTimeDuration?']);
+fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime, ['($arg as xs:date?) as xs:dayTimeDuration?']);
+fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime, ['($arg as xs:dateTime?) as xs:dayTimeDuration?']);
+fn.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:dateTime?) as xs:dateTime?', '($arg as xs:dateTime?, $timezone as xs:dayTimeDuration?) as xs:dateTime?']);
+fn.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:date?) as xs:date?', '($arg as xs:date?, $timezone as xs:dayTimeDuration?) as xs:date?']);
+fn.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:time?) as xs:time?', '($arg as xs:time?, $timezone as xs:dayTimeDuration?) as xs:time?']);
+fn.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone, ['() as xs:dayTimeDuration']);
 
 
-TXQueryEngine.registerFunction('resolve-QName',@xqFunctionResolve_QName);
-TXQueryEngine.registerFunction('QName',@xqFunctionQName);
-TXQueryEngine.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName);
-TXQueryEngine.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName);
-TXQueryEngine.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName);
-TXQueryEngine.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix);
-TXQueryEngine.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes);
+fn.registerFunction('current-dateTime',@xqFunctionCurrent_Datetime,['() as xs:dateTime']);
+fn.registerFunction('current-date',@xqFunctionCurrent_Date,['() as xs:date']);
+fn.registerFunction('current-time',@xqFunctionCurrent_Time,['() as xs:time']);
 
-TXQueryEngine.registerFunction('resolve-uri', @xqFunctionResolve_Uri);
-TXQueryEngine.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri);
-TXQueryEngine.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri);
-TXQueryEngine.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri);
+fn.registerFunction('trace',@xqFunctionTrace, ['($value as item()*, $label as xs:string) as item()*']);
+fn.registerFunction('default-collation', @xqFunctionDefault_Collation, ['() as xs:string']);
+fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri, ['() as xs:anyURI?']);
+fn.registerFunction('base-uri',@xqFunctionBase_Uri, ['() as xs:anyURI?', '($arg as node()?) as xs:anyURI?']);
+fn.registerFunction('document-uri',@xqFunctionDocument_Uri, ['($arg as node()?) as xs:anyURI?']);
 
-TXQueryEngine.registerFunction('doc', @xqFunctionDoc);
-TXQueryEngine.registerFunction('doc-available', @xqFunctionDoc_Available);
-TXQueryEngine.registerFunction('collection', @xqFunctionCollection);
+fn.registerFunction('doc', @xqFunctionDoc, ['($uri as xs:string?) as document-node()?']);
+fn.registerFunction('doc-available', @xqFunctionDoc_Available, ['($uri as xs:string?) as xs:boolean']);
+fn.registerFunction('collection', @xqFunctionCollection, ['($arg as xs:string?) as node()*']);
 
 
-TXQueryEngine.registerFunction('data', @xqFunctionData);
-TXQueryEngine.registerFunction('number',@xqFunctionNumber,pvkInt);
-TXQueryEngine.registerFunction('string',@xqFunctionString,pvkString);
-TXQueryEngine.registerFunction('string-length',@xqFunctionString_length);
-TXQueryEngine.registerFunction('normalize-space',@xqFunctionNormalize_space);
+fn.registerFunction('root', @xqFunctionRoot, ['() as node()', '($arg as node()?) as node()?']);
+fn.registerFunction('lang', @xqFunctionLang, ['($testlang as xs:string?) as xs:boolean', '($testlang as xs:string?, $node as node()) as xs:boolean']);
+
+
+fn.registerFunction('QName',@xqFunctionQName, ['($paramURI as xs:string?, $paramQName as xs:string) as xs:QName']);
+fn.registerFunction('name',@xqFunctionName, ['() as xs:string', '($arg as node()?) as xs:string']);
+fn.registerFunction('local-name',@xqFunctionLocal_Name, ['() as xs:string', '($arg as node()?) as xs:string']);
+fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, ['() as xs:anyURI', '($arg as node()?) as xs:anyURI']);
+fn.registerFunction('node-name', @xqFunctionNode_Name, ['($arg as node()?) as xs:QName?']);
+fn.registerFunction('resolve-QName',@xqFunctionResolve_QName, ['($qname as xs:string?, $element as element()) as xs:QName?']);
+fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
+fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
+fn.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName, ['($arg as xs:QName?) as xs:anyURI?']);
+fn.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix, ['($prefix as xs:string?, $element as element()) as xs:anyURI?']);
+fn.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes, ['($element as element()) as xs:string*']);
+
+
+fn.registerFunction('resolve-uri', @xqFunctionResolve_Uri, ['($relative as xs:string?) as xs:anyURI?', '($relative as xs:string?, $base as xs:string) as xs:anyURI?']);
+fn.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']);
+fn.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri, ['($iri as xs:string?) as xs:string']);
+fn.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri, ['($uri as xs:string?) as xs:string']);
+
+
+fn.registerFunction('data', @xqFunctionData, ['($arg as item()*) as xs:anyAtomicType*']);
+fn.registerFunction('number',@xqFunctionNumber, ['() as xs:double', '($arg as xs:anyAtomicType?) as xs:double']);
+fn.registerFunction('string',@xqFunctionString, ['() as xs:string', '($arg as item()?) as xs:string']);
+fn.registerFunction('string-length',@xqFunctionString_length, ['() as xs:integer', '($arg as xs:string?) as xs:integer']);
+fn.registerFunction('normalize-space',@xqFunctionNormalize_space, ['() as xs:string', '($arg as xs:string?) as xs:string']);
 //TODO: normalize-unicode
 
-TXQueryEngine.registerFunction('concatenate',@xqFunctionConcatenate); //this should be an operator
-TXQueryEngine.registerFunction('index-of', @xqFunctionindex_of);
-TXQueryEngine.registerFunction('distinct-values', @xqFunctiondistinct_values);
-TXQueryEngine.registerFunction('insert-before', @xqFunctioninsert_before);
-TXQueryEngine.registerFunction('remove', @xqFunctionremove);
-TXQueryEngine.registerFunction('reverse', @xqFunctionreverse);
-TXQueryEngine.registerFunction('subsequence', @xqFunctionsubsequence);
-TXQueryEngine.registerFunction('unordered', @xqFunctionunordered);
-TXQueryEngine.registerFunction('zero-or-one', @xqFunctionzero_or_one);
-TXQueryEngine.registerFunction('one-or-more', @xqFunctionone_or_more);
-TXQueryEngine.registerFunction('exactly-one', @xqFunctionexactly_one);
-TXQueryEngine.registerFunction('deep-equal', @xqFunctiondeep_equal);
-TXQueryEngine.registerFunction('count', @xqFunctioncount);
-TXQueryEngine.registerFunction('avg', @xqFunctionavg);
-TXQueryEngine.registerFunction('max', @xqFunctionmax);
-TXQueryEngine.registerFunction('min', @xqFunctionmin);
-TXQueryEngine.registerFunction('sum', @xqFunctionsum);
-TXQueryEngine.registerFunction('default-collation', @xqFunctionDefault_Collation);
+fn.registerFunction('concatenate',@xqFunctionConcatenate, []); //this should be an operator
+fn.registerFunction('index-of', @xqFunctionindex_of, ['($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType) as xs:integer*', '($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType, $collation as xs:string) as xs:integer*']);
+fn.registerFunction('distinct-values', @xqFunctiondistinct_values, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType*', '($arg as xs:anyAtomicType*, $collation as xs:string) as xs:anyAtomicType*']);
+fn.registerFunction('insert-before', @xqFunctioninsert_before, ['($target as item()*, $position as xs:integer, $inserts as item()*) as item()*']);
+fn.registerFunction('remove', @xqFunctionremove, ['($target as item()*, $position as xs:integer) as item()*']);
+fn.registerFunction('reverse', @xqFunctionreverse, ['($arg as item()*) as item()*']);
+fn.registerFunction('subsequence', @xqFunctionsubsequence, ['($sourceSeq as item()*, $startingLoc as xs:double) as item()*', '($sourceSeq as item()*, $startingLoc as xs:double, $length as xs:double) as item()*']);
+fn.registerFunction('unordered', @xqFunctionunordered, ['($sourceSeq as item()*) as item()']);
+fn.registerFunction('zero-or-one', @xqFunctionzero_or_one, ['($arg as item()*) as item()?']);
+fn.registerFunction('one-or-more', @xqFunctionone_or_more, ['($arg as item()*) as item()+']);
+fn.registerFunction('exactly-one', @xqFunctionexactly_one, ['($arg as item()*) as item()']);
+fn.registerFunction('deep-equal', @xqFunctiondeep_equal, ['($parameter1 as item()*, $parameter2 as item()*) as xs:boolean', '($parameter1 as item()*, $parameter2 as item()*, $collation as string) as xs:boolean']);
+fn.registerFunction('count', @xqFunctioncount, ['($arg as item()*) as xs:integer']);
+fn.registerFunction('avg', @xqFunctionavg, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?']);
+fn.registerFunction('max', @xqFunctionmax, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?']);
+fn.registerFunction('min', @xqFunctionmin, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?']);
+fn.registerFunction('sum', @xqFunctionsum, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType', '($arg as xs:anyAtomicType*, $zero as xs:anyAtomicType?) as xs:anyAtomicType?']);
 
-TXQueryEngine.registerFunction('name',@xqFunctionName);
-TXQueryEngine.registerFunction('local-name',@xqFunctionLocal_Name);
-TXQueryEngine.registerFunction('namespace-uri',@xqFunctionNamespace_URI);
-TXQueryEngine.registerFunction('node-name', @xqFunctionNode_Name,pvkInt);
+fn.registerFunction('position', @xqFunctionPosition, ['() as xs:integer']);
+fn.registerFunction('last', @xqFunctionLast, ['() as xs:integer']);
 
-TXQueryEngine.registerFunction('position', @xqFunctionPosition,pvkInt);
-TXQueryEngine.registerFunction('last', @xqFunctionLast,pvkInt);
+fn.registerFunction('id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()']);
+fn.registerFunction('idref', @xqFunctionId, ['($arg as xs:string*) as node()*', '($arg as xs:string*, $node as node()) as node()*']);
+fn.registerFunction('element-with-id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
 
-TXQueryEngine.registerFunction('id', @xqFunctionId);
-TXQueryEngine.registerFunction('idref', @xqFunctionId);
-TXQueryEngine.registerFunction('element-with-id', @xqFunctionId); //TODO: should search for #ID nodes (?)
+op.registerBinaryOp('/',@xqvalueNodeStepChild,200, []);
+op.registerBinaryOp('//',@xqvalueNodeStepDescendant,200, []);
 
-//Constructors (xs: namespace, not fn:)
-TXQueryEngine.registerType(TXQValueBoolean);
-TXQueryEngine.registerType(TXQValueInt65);
-TXQueryEngine.registerType(TXQValueDecimal);
-TXQueryEngine.registerType(TXQValueString);
-TXQueryEngine.registerType(TXQValueDateTime);
-TXQueryEngine.registerType(TXQValueObject);
-TXQueryEngine.registerType(TXQValue_AnyAtomicType);
-TXQueryEngine.registerType(TXQValue_AnySimpleType);
-TXQueryEngine.registerType(TXQValue);
+op.registerBinaryOp('cast as',@xqvalueCastAs,170, []);
+op.registerBinaryOp('castable as',@xqvalueCastableAs,160, []);
+op.registerBinaryOp('treat as',@xqvalueTreatAs,150, []);
+op.registerBinaryOp('instance of',@xqvalueInstanceOf,140, []);
 
-TXQueryEngine.registerBinaryOp('/',@xqvalueNodeStepChild,200);
-TXQueryEngine.registerBinaryOp('//',@xqvalueNodeStepDescendant,200);
+op.registerBinaryOp('intersect',@xqvalueIntersect,125, ['intersect($parameter1 as node()*, $parameter2 as node()*) as node()*']);
+op.registerBinaryOp('except',@xqvalueExcept,125,['except($parameter1 as node()*, $parameter2 as node()*) as node()*']);
 
-TXQueryEngine.registerBinaryOp('cast as',@xqvalueCastAs,170);
-TXQueryEngine.registerBinaryOp('castable as',@xqvalueCastableAs,160);
-TXQueryEngine.registerBinaryOp('treat as',@xqvalueTreatAs,150);
-TXQueryEngine.registerBinaryOp('instance of',@xqvalueInstanceOf,140);
-
-TXQueryEngine.registerBinaryOp('intersect',@xqvalueIntersect,125);
-TXQueryEngine.registerBinaryOp('except',@xqvalueExcept,125);
-
-TXQueryEngine.registerBinaryOp('|',@xqvalueUnion,115);
-TXQueryEngine.registerBinaryOp('union',@xqvalueUnion,115);
+op.registerBinaryOp('|',@xqvalueUnion,115, ['union($parameter1 as node()*, $parameter2 as node()*) as node()*']);
+op.registerBinaryOp('union',@xqvalueUnion,115, ['union($parameter1 as node()*, $parameter2 as node()*) as node()*']);
 
 
-TXQueryEngine.registerBinaryOp('div',@xqvalueDivide,100,pvkDecimal);
-TXQueryEngine.registerBinaryOp('*',@xqvalueMultiply,100,pvkDecimal);
-TXQueryEngine.registerBinaryOp('idiv',@xqvalueDivideInt,100,pvkDecimal);
-TXQueryEngine.registerBinaryOp('mod',@xqvalueMod,100,pvkDecimal);
+op.registerBinaryOp('idiv',@xqvalueDivideInt,100,['numeric-integer-divide($arg1 as numeric, $arg2 as numeric) as xs:integer']);
+op.registerBinaryOp('div',@xqvalueDivide,100,['numeric-divide($arg1 as numeric, $arg2 as numeric) as numeric', 'divide-yearMonthDuration($arg1 as xs:yearMonthDuration, $arg2 as xs:double) as xs:yearMonthDuration', 'divide-yearMonthDuration-by-yearMonthDuration($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:decimal', 'divide-dayTimeDuration($arg1 as xs:dayTimeDuration, $arg2 as xs:double) as xs:dayTimeDuration', 'divide-dayTimeDuration-by-dayTimeDuration($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:decimal']);
+op.registerBinaryOp('*',@xqvalueMultiply,100,['numeric-multiply($arg1 as numeric, $arg2 as numeric) as numeric', 'multiply-yearMonthDuration($arg1 as xs:yearMonthDuration, $arg2 as xs:double) as xs:yearMonthDuration', 'multiply-dayTimeDuration($arg1 as xs:dayTimeDuration, $arg2 as xs:double) as xs:dayTimeDuration']);
+op.registerBinaryOp('mod',@xqvalueMod,100,['numeric-mod($arg1 as numeric, $arg2 as numeric) as numeric']);
 
-TXQueryEngine.registerBinaryOp('+',@xqvalueAdd,70,pvkDecimal);
-TXQueryEngine.registerBinaryOp('-',@xqvalueSubtract,70,pvkDecimal);
+op.registerBinaryOp('+',@xqvalueAdd,70,['numeric-add($arg1 as numeric, $arg2 as numeric) as numeric', 'add-yearMonthDurations($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:yearMonthDuration', 'add-dayTimeDurations($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:dayTimeDuration', 'add-yearMonthDuration-to-dateTime($arg1 as xs:dateTime, $arg2 as xs:yearMonthDuration) as xs:dateTime', 'add-dayTimeDuration-to-dateTime($arg1 as xs:dateTime, $arg2 as xs:dayTimeDuration) as xs:dateTime', 'add-yearMonthDuration-to-date($arg1 as xs:date, $arg2 as xs:yearMonthDuration) as xs:date', 'add-dayTimeDuration-to-date($arg1 as xs:date, $arg2 as xs:dayTimeDuration) as xs:date', 'add-dayTimeDuration-to-time($arg1 as xs:time, $arg2 as xs:dayTimeDuration) as xs:time', 'numeric-unary-plus($arg as numeric) as numeric']);
+op.registerBinaryOp('-',@xqvalueSubtract,70,['numeric-subtract($arg1 as numeric, $arg2 as numeric) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date, $arg2 as xs:date) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time, $arg2 as xs:time) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime, $arg2 as xs:yearMonthDuration) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime, $arg2 as xs:dayTimeDuration) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date, $arg2 as xs:yearMonthDuration) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date, $arg2 as xs:dayTimeDuration) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time, $arg2 as xs:dayTimeDuration) as xs:time', 'numeric-unary-minus($arg as numeric) as numeric']);
 
-TXQueryEngine.registerBinaryOp('to',@xqvalueTo,60,pvkInt);
+op.registerBinaryOp('to',@xqvalueTo,60,['to($firstval as xs:integer, $lastval as xs:integer) as xs:integer*']);
 
-TXQueryEngine.registerBinaryOp('=',@xqvalueEqualGeneric,50,pvkBoolean);         TXQueryEngine.registerBinaryOp('eq',@xqvalueEqualAtomic,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('!=',@xqvalueUnequalGeneric,50,pvkBoolean);      TXQueryEngine.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('<',@xqvalueLessThanGeneric,50,pvkBoolean);      TXQueryEngine.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('>',@xqvalueGreaterThanGeneric,50,pvkBoolean);   TXQueryEngine.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('<=',@xqvalueLessEqualGeneric,50,pvkBoolean);    TXQueryEngine.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('>=',@xqvalueGreaterEqualGeneric,50,pvkBoolean); TXQueryEngine.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('is',@xqvalueSameNode,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('<<',@xqvalueNodeBefore,50,pvkBoolean);
-TXQueryEngine.registerBinaryOp('>>',@xqvalueNodeAfter,50,pvkBoolean);
-
-
-TXQueryEngine.registerBinaryOp('and',@xqvalueAnd,40,pvkBoolean);
-
-TXQueryEngine.registerBinaryOp('or',@xqvalueOr,30,pvkBoolean);
+op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,['numeric-equal($arg1 as numeric, $arg2 as numeric) as xs:boolean', 'duration-equal($arg1 as xs:duration, $arg2 as xs:duration) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', 'date-equal($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', 'time-equal($arg1 as xs:time, $arg2 as xs:time) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth, $arg2 as xs:gYearMonth) as xs:boolean', 'gYear-equal($arg1 as xs:gYear, $arg2 as xs:gYear) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay, $arg2 as xs:gMonthDay) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth, $arg2 as xs:gMonth) as xs:boolean', 'gDay-equal($arg1 as xs:gDay, $arg2 as xs:gDay) as xs:boolean', 'QName-equal($arg1 as xs:QName, $arg2 as xs:QName) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary, $value2 as xs:hexBinary) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary, $value2 as xs:base64Binary) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION, $arg2 as xs:NOTATION) as xs:boolean']);
+op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50, ['($arg1 as numeric, $arg2 as numeric) as xs:boolean', '($arg1 as xs:duration, $arg2 as xs:duration) as xs:boolean', '($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', '($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', '($arg1 as xs:time, $arg2 as xs:time) as xs:boolean', '($arg1 as xs:gYearMonth, $arg2 as xs:gYearMonth) as xs:boolean', '($arg1 as xs:gYear, $arg2 as xs:gYear) as xs:boolean', '($arg1 as xs:gMonthDay, $arg2 as xs:gMonthDay) as xs:boolean', '($arg1 as xs:gMonth, $arg2 as xs:gMonth) as xs:boolean', '($arg1 as xs:gDay, $arg2 as xs:gDay) as xs:boolean', '($arg1 as xs:QName, $arg2 as xs:QName) as xs:boolean', '($value1 as xs:hexBinary, $value2 as xs:hexBinary) as xs:boolean', '($value1 as xs:base64Binary, $value2 as xs:base64Binary) as xs:boolean', '($arg1 as xs:NOTATION, $arg2 as xs:NOTATION) as xs:boolean']);
+op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50, ['numeric-less-than($arg1 as numeric, $arg2 as numeric) as xs:boolean', 'yearMonthDuration-less-than($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', 'dayTimeDuration-less-than($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', 'dateTime-less-than($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', 'date-less-than($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', 'time-less-than($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
+op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,['numeric-greater-than($arg1 as numeric, $arg2 as numeric) as xs:boolean', 'yearMonthDuration-greater-than($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', 'dayTimeDuration-greater-than($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', 'dateTime-greater-than($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', 'date-greater-than($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', 'time-greater-than($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
+op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,['($arg1 as numeric, $arg2 as numeric) as xs:boolean', '($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', '($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', '($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', '($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', '($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
+op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,['($arg1 as numeric, $arg2 as numeric) as xs:boolean', '($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', '($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', '($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', '($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', '($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
 
 
 
-TXQueryEngine.registerBinaryOpFunction('intersect',@xqvalueIntersect);
-TXQueryEngine.registerBinaryOpFunction('except',@xqvalueExcept);
+op.registerBinaryOp('=',@xqvalueEqualGeneric,50,[]);
+op.registerBinaryOp('!=',@xqvalueUnequalGeneric,50,[]);
+op.registerBinaryOp('<',@xqvalueLessThanGeneric,50,[]);
+op.registerBinaryOp('>',@xqvalueGreaterThanGeneric,50,[]);
+op.registerBinaryOp('<=',@xqvalueLessEqualGeneric,50,[]);
+op.registerBinaryOp('>=',@xqvalueGreaterEqualGeneric,50,[]);
+op.registerBinaryOp('is',@xqvalueSameNode,50,['is-same-node($parameter1 as node(), $parameter2 as node()) as xs:boolean']);
+op.registerBinaryOp('<<',@xqvalueNodeBefore,50,['node-before($parameter1 as node(), $parameter2 as node()) as xs:boolean']);
+op.registerBinaryOp('>>',@xqvalueNodeAfter,50,['node-after($parameter1 as node(), $parameter2 as node()) as xs:boolean']);
 
-TXQueryEngine.registerBinaryOpFunction('union',@xqvalueUnion);
+op.registerBinaryOp('and',@xqvalueAnd,40,[]);
 
-TXQueryEngine.registerBinaryOpFunction('integer-divide',@xqvalueDivideInt); //order important!
-TXQueryEngine.registerBinaryOpFunction('divide',@xqvalueDivide);
-TXQueryEngine.registerBinaryOpFunction('multiply',@xqvalueMultiply);
-TXQueryEngine.registerBinaryOpFunction('mod',@xqvalueMod);
-
-TXQueryEngine.registerBinaryOpFunction('add',@xqvalueAdd);
-TXQueryEngine.registerBinaryOpFunction('subtract',@xqvalueSubtract);
-
-TXQueryEngine.registerBinaryOpFunction('to',@xqvalueTo);
-
-TXQueryEngine.registerBinaryOpFunction('equal',@xqvalueEqualGeneric);
-TXQueryEngine.registerBinaryOpFunction('less-than',@xqvalueLessThanGeneric);
-TXQueryEngine.registerBinaryOpFunction('greater-than',@xqvalueGreaterThanGeneric);
-TXQueryEngine.registerBinaryOpFunction('is-same-node',@xqvalueSameNode);
-TXQueryEngine.registerBinaryOpFunction('node-before',@xqvalueNodeBefore);
-TXQueryEngine.registerBinaryOpFunction('node-after',@xqvalueNodeAfter);
-
-
+op.registerBinaryOp('or',@xqvalueOr,30,[]);
 
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-insensitive-clever', @striCompareClever, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-sensitive-clever', @strCompareClever, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
@@ -4525,29 +4690,20 @@ TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpat
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
 
-{$DEFINE PXP_DERIVED_TYPES_REGISTRATION}
-{$I xquery_derived_types.inc}
-
-
 commonValuesUndefined := TXQValueUndefined.create;
 commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
 
 finalization
-//writeln(stderr,'fini');
-for i:=0 to binaryOps.Count-1 do begin
-PXQOperatorInfo(binaryOps.Objects[i])^.followedBy:='';
-Freemem(binaryOps.Objects[i]);
-end;
-for i:=0 to basicFunctions.Count-1 do Freemem(basicFunctions.Objects[i]);
-for i:=0 to complexFunctions.Count-1 do Freemem(complexFunctions.Objects[i]);
-for i:=0 to collations.Count-1 do collations.Objects[i].Free;
-binaryOps.Free;
-binaryOpFunctions.free;
-basicFunctions.Free;
-complexFunctions.Free;
+xs.free;
+pxp.free;
+fn.free;
+op.free;
+collations.Clear;
 collations.Free;
-types.free;
+nativeModules.free;
+globalTypeParsingContext.staticContext.Free;
+globalTypeParsingContext.free;
 {$DEFINE PXP_DERIVED_TYPES_FINALIZATION}
 {$I xquery_derived_types.inc}
 end.

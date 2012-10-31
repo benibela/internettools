@@ -387,8 +387,8 @@ function striCompareClever(const s1, s2: string): integer; inline;
 //search
 //**Searchs the last index of c in s
 function strRpos(c:char;s:string):longint;
-//**Counts all occurrences of search in searchIn (case sensitive, stops at #0)
-function strlCount(const search:char; const searchIn:pchar; const len: longint): longint;
+//**Counts all occurrences of search in searchIn (case sensitive)
+function strCount(const str: string; const searched: char; from: longint = 1): longint;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
 function strlsIndexOf(str,searched:pchar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
@@ -430,6 +430,7 @@ function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [
 
 //**<Replaces all #13#10 or #13 by #10
 function strNormalizeLineEndings(const s: string): string;
+
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first part is returned as function result, the second one is again assign to remainingPart
@@ -1827,6 +1828,7 @@ begin
               (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pchar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
 end;
 
+
 function strlsIndexOf(str, searched: pchar; l1, l2: longint): longint;
 var last: pchar;
 begin
@@ -1940,6 +1942,16 @@ begin
   end;
 end;
 
+
+function strCount(const str: string; const searched: char; from: longint): longint;
+var
+  i: LongInt;
+begin
+  result := 0;
+  for i := from to length(str) do
+    if str[i] = searched then result+=1;
+end;
+
 function strslice(const  first, last: pchar): string;
 begin
   if first>last then exit;
@@ -2019,7 +2031,6 @@ begin
  if j -1 <> length(result) then
    setlength(result,j-1);
 end;
-
 
 function strNormalizeLineEndings(const s: string): string;
 var

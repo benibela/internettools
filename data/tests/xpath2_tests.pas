@@ -1832,7 +1832,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('fn:resolve-uri("././c", "http://www.example.com")' ,'http://www.example.com/c', '');
   t('fn:resolve-uri("././c", "http://www.example.com/")' ,'http://www.example.com/c', '');
   t('fn:tokenize("abc", "def")', 'abc', '');
-  t('fn:type-of(abs(xs:byte(1)))', 'integer', ''); //standard, abs: If the type of $arg is a type derived from one of the numeric types, the result is an instance of the base numeric type.
+  t('pxp:type-of(abs(xs:byte(1)))', 'integer', ''); //standard, abs: If the type of $arg is a type derived from one of the numeric types, the result is an instance of the base numeric type.
   t('abs(negativeInteger(-3))', '3', '');
   t('type-of(number(-3))', 'double', '');
   t('not(double("NaN"))', 'true', '');

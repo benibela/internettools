@@ -32,7 +32,7 @@ type
   function parseSequenceLike(target: TXQTerm): TXQTerm;
   function parseQNameContinuation: string;
   function parseSequenceType(): TXQTermSequenceType;
-  function replaceEntities(s: string; enc: TEncoding): string;
+  function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
 
@@ -265,9 +265,8 @@ begin
     if (namespace = nil) then raiseParsingError('No schemas loaded for type '+word);
     if namespace.getURL <> XMLNamespaceURL_XMLSchema then raiseParsingError('Invalid schema loaded: '+namespace.getURL+' by '+word);
     result.kind:=tikAtomic;
-    index := types.IndexOf(word);
-    if index < 0 then raise Exception.Create('Unknown type: '+word);
-    result.atomicTypeInfo := TXQValueClass(types.Objects[index]);
+    result.atomicTypeInfo := TXQueryEngine.findTypeClass(word);
+    if result.atomicTypeInfo = nil then raise Exception.Create('Unknown type: '+word);
   end;
 
 
@@ -495,7 +494,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
           while not (pos^ in [#0, ';']) do pos += 1;
           if pos^ = #0 then raiseParsingError('Unexpected end');
           pos += 1;
-          pushElementContent(replaceEntities(strFromPchar(marker, pos - marker), encoding));
+          pushElementContent(replaceEntities(strFromPchar(marker, pos - marker)));
           atBoundary:=false;
         end;
       end;
@@ -663,7 +662,7 @@ begin
   expect('{'); result := parsePrimaryLevel; expect('}');
 end;
 
-function TXQParsingContext.replaceEntities(s: string; enc: TEncoding): string;
+function TXQParsingContext.replaceEntities(s: string): string;
 var
   n, p: Integer;
   temp: string;
@@ -684,8 +683,8 @@ begin
       else begin
         if temp[1] <> '#' then raiseParsingError('Invalid entity');
         delete(temp,1,1);
-        if temp[1] = 'x' then result += strGetUnicodeCharacter(StrToInt('$'+strcopyfrom(temp,2)), enc)
-        else result += strGetUnicodeCharacter(StrToInt(temp), enc);
+        if temp[1] = 'x' then result += strGetUnicodeCharacter(StrToInt('$'+strcopyfrom(temp,2)), staticContext.stringEncoding)
+        else result += strGetUnicodeCharacter(StrToInt(temp), staticContext.stringEncoding);
       end;
     end;
     p := n + 1;
@@ -699,7 +698,7 @@ function TXQParsingContext.parseString(const w: string): TXQTerm;
       lastStrStart, i: integer;
   begin
     s := StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]);
-    if parsingModel in [xqpmXQuery1] then s := replaceEntities(s, encoding);
+    if parsingModel in [xqpmXQuery1] then s := replaceEntities(s);
     if (not AllowVariableUseInStringLiterals) or (w[1] = '''') or (system.Pos('$', s) <= 0)  then
       exit(TXQTermString.create(s));
 
@@ -927,7 +926,7 @@ type PXQTerm = ^TXQTerm;
 //(parentheses can be ignored since they are stored as sequence terms in the tree)
 function ripBinOpApart(term: pxqterm; const prio: integer): PXQTerm;
 begin
-  if not (term^ is TXQTermBinaryOp) or (TXQTermBinaryOp(term^).operatorInfo^.priority >= prio) then result := term
+  if not (term^ is TXQTermBinaryOp) or (TXQTermBinaryOp(term^).op.priority >= prio) then result := term
   else result := ripBinOpApart(@term^.children[1], prio);
 end;
 
@@ -942,15 +941,15 @@ var astroot: TXQTerm;
     expect(v);
 
     res := TXQTermBinaryOp.Create(v);
-    replace := ripBinOpApart(@astroot, res.operatorInfo^.priority);
+    replace := ripBinOpApart(@astroot, res.op.priority);
 
     res.push(replace^);
     replace^ := res;
 
-    if res.operatorInfo^.followedBy <> '' then begin
-      expect(res.operatorInfo^.followedBy);
+    if res.op.followedBy <> '' then begin
+      expect(res.op.followedBy);
       res.push(parseSequenceType()); //assume we read instance of/cast/castable/treat as
-      if ((res.operatorInfo^.func = @xqvalueCastAs) or (res.operatorInfo^.func = @xqvalueCastableAs)) and (not (res.children[high(res.children)] as TXQTermSequenceType).isSingleType()) then
+      if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) and (not (res.children[high(res.children)] as TXQTermSequenceType).isSingleType()) then
         raiseParsingError('Need single typ for cast');
     end else
       res.push(parseValue())
@@ -988,7 +987,7 @@ begin
         staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
         exit;
       end;
-      else if binaryOps.IndexOf(word) >= 0 then pushBinaryOp(word)
+      else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
       else if (word[1] = '.') and AllowObjects then begin
         expect(word);
         replace := ripBinOpApart(@astroot, 10000);

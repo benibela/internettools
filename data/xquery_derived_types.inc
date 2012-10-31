@@ -117,7 +117,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_long);
+xs.registerType(TXQValue_long);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -225,7 +225,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_int);
+xs.registerType(TXQValue_int);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -337,7 +337,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_short);
+xs.registerType(TXQValue_short);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -449,7 +449,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_byte);
+xs.registerType(TXQValue_byte);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -557,7 +557,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_nonPositiveInteger);
+xs.registerType(TXQValue_nonPositiveInteger);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -663,7 +663,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_negativeInteger);
+xs.registerType(TXQValue_negativeInteger);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -764,7 +764,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_nonNegativeInteger);
+xs.registerType(TXQValue_nonNegativeInteger);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -865,7 +865,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_positiveInteger);
+xs.registerType(TXQValue_positiveInteger);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -966,7 +966,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_unsignedLong);
+xs.registerType(TXQValue_unsignedLong);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1076,7 +1076,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_unsignedInt);
+xs.registerType(TXQValue_unsignedInt);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1188,7 +1188,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_unsignedShort);
+xs.registerType(TXQValue_unsignedShort);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1300,7 +1300,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_unsignedByte);
+xs.registerType(TXQValue_unsignedByte);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1420,7 +1420,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_float);
+xs.registerType(TXQValue_float);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1536,7 +1536,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_double);
+xs.registerType(TXQValue_double);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1646,7 +1646,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_untypedAtomic);
+xs.registerType(TXQValue_untypedAtomic);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1753,7 +1753,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_untyped);
+xs.registerType(TXQValue_untyped);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1860,7 +1860,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_normalizedString);
+xs.registerType(TXQValue_normalizedString);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -1967,7 +1967,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_token);
+xs.registerType(TXQValue_token);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2074,7 +2074,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_language);
+xs.registerType(TXQValue_language);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2181,7 +2181,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_NMTOKEN);
+xs.registerType(TXQValue_NMTOKEN);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2288,7 +2288,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_Name);
+xs.registerType(TXQValue_Name);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2395,7 +2395,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_NCName);
+xs.registerType(TXQValue_NCName);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2502,7 +2502,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_ID);
+xs.registerType(TXQValue_ID);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2609,7 +2609,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_IDREF);
+xs.registerType(TXQValue_IDREF);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2716,7 +2716,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_ENTITY);
+xs.registerType(TXQValue_ENTITY);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2798,7 +2798,7 @@ end;
 const CastableFromanyURI: TClassArray = nil;
 const CastableFromanyURISplit: TStringArray = nil;
 class function TXQValue_anyURI.castableFromInternal(const v: IXQValue): boolean;
-var i,t: integer; temp: string;
+var i: integer; temp: string;
 begin
   if v.instanceOfInternal(self) then exit(true);
   if CastableFromanyURI = nil then begin
@@ -2807,9 +2807,8 @@ begin
     for i:=0 to high(CastableFromanyURISplit) do begin
       temp := CastableFromanyURISplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
-      t := types.indexOf(temp);
-      if t < 0 then raise exception.create('Could not find type: '+temp);
-      CastableFromanyURI[i] := TXQValueClass(types.objects[t]);
+      CastableFromanyURI[i] := TXQueryEngine.findTypeClass(temp);
+      if CastableFromanyURI[i] = nil then raise exception.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -2856,7 +2855,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_anyURI);
+xs.registerType(TXQValue_anyURI);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -2938,7 +2937,7 @@ end;
 const CastableFromQName: TClassArray = nil;
 const CastableFromQNameSplit: TStringArray = nil;
 class function TXQValue_QName.castableFromInternal(const v: IXQValue): boolean;
-var i,t: integer; temp: string;
+var i: integer; temp: string;
 begin
   if v.instanceOfInternal(self) then exit(true);
   if CastableFromQName = nil then begin
@@ -2947,9 +2946,8 @@ begin
     for i:=0 to high(CastableFromQNameSplit) do begin
       temp := CastableFromQNameSplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
-      t := types.indexOf(temp);
-      if t < 0 then raise exception.create('Could not find type: '+temp);
-      CastableFromQName[i] := TXQValueClass(types.objects[t]);
+      CastableFromQName[i] := TXQueryEngine.findTypeClass(temp);
+      if CastableFromQName[i] = nil then raise exception.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -2996,7 +2994,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_QName);
+xs.registerType(TXQValue_QName);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3078,7 +3076,7 @@ end;
 const CastableFromNOTATION: TClassArray = nil;
 const CastableFromNOTATIONSplit: TStringArray = nil;
 class function TXQValue_NOTATION.castableFromInternal(const v: IXQValue): boolean;
-var i,t: integer; temp: string;
+var i: integer; temp: string;
 begin
   if v.instanceOfInternal(self) then exit(true);
   if CastableFromNOTATION = nil then begin
@@ -3087,9 +3085,8 @@ begin
     for i:=0 to high(CastableFromNOTATIONSplit) do begin
       temp := CastableFromNOTATIONSplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
-      t := types.indexOf(temp);
-      if t < 0 then raise exception.create('Could not find type: '+temp);
-      CastableFromNOTATION[i] := TXQValueClass(types.objects[t]);
+      CastableFromNOTATION[i] := TXQueryEngine.findTypeClass(temp);
+      if CastableFromNOTATION[i] = nil then raise exception.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -3136,7 +3133,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_NOTATION);
+xs.registerType(TXQValue_NOTATION);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3212,7 +3209,7 @@ end;
 const CastableFromhexBinary: TClassArray = nil;
 const CastableFromhexBinarySplit: TStringArray = nil;
 class function TXQValue_hexBinary.castableFromInternal(const v: IXQValue): boolean;
-var i,t: integer; temp: string;
+var i: integer; temp: string;
 begin
   if v.instanceOfInternal(self) then exit(true);
   if CastableFromhexBinary = nil then begin
@@ -3221,9 +3218,8 @@ begin
     for i:=0 to high(CastableFromhexBinarySplit) do begin
       temp := CastableFromhexBinarySplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
-      t := types.indexOf(temp);
-      if t < 0 then raise exception.create('Could not find type: '+temp);
-      CastableFromhexBinary[i] := TXQValueClass(types.objects[t]);
+      CastableFromhexBinary[i] := TXQueryEngine.findTypeClass(temp);
+      if CastableFromhexBinary[i] = nil then raise exception.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -3270,7 +3266,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_hexBinary);
+xs.registerType(TXQValue_hexBinary);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3343,7 +3339,7 @@ end;
 const CastableFrombase64Binary: TClassArray = nil;
 const CastableFrombase64BinarySplit: TStringArray = nil;
 class function TXQValue_base64Binary.castableFromInternal(const v: IXQValue): boolean;
-var i,t: integer; temp: string;
+var i: integer; temp: string;
 begin
   if v.instanceOfInternal(self) then exit(true);
   if CastableFrombase64Binary = nil then begin
@@ -3352,9 +3348,8 @@ begin
     for i:=0 to high(CastableFrombase64BinarySplit) do begin
       temp := CastableFrombase64BinarySplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
-      t := types.indexOf(temp);
-      if t < 0 then raise exception.create('Could not find type: '+temp);
-      CastableFrombase64Binary[i] := TXQValueClass(types.objects[t]);
+      CastableFrombase64Binary[i] := TXQueryEngine.findTypeClass(temp);
+      if CastableFrombase64Binary[i] = nil then raise exception.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -3401,7 +3396,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_base64Binary);
+xs.registerType(TXQValue_base64Binary);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3510,7 +3505,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_time);
+xs.registerType(TXQValue_time);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3621,7 +3616,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_date);
+xs.registerType(TXQValue_date);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3732,7 +3727,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_gYear);
+xs.registerType(TXQValue_gYear);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3843,7 +3838,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_gYearMonth);
+xs.registerType(TXQValue_gYearMonth);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -3954,7 +3949,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_gMonthDay);
+xs.registerType(TXQValue_gMonthDay);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -4065,7 +4060,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_gMonth);
+xs.registerType(TXQValue_gMonth);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -4176,7 +4171,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_gDay);
+xs.registerType(TXQValue_gDay);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -4287,7 +4282,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_duration);
+xs.registerType(TXQValue_duration);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -4392,7 +4387,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_dayTimeDuration);
+xs.registerType(TXQValue_dayTimeDuration);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}
@@ -4497,7 +4492,7 @@ end;
 
 
 {$ifdef PXP_DERIVED_TYPES_REGISTRATION}
-TXQueryEngine.registerType(TXQValue_yearMonthDuration);
+xs.registerType(TXQValue_yearMonthDuration);
 {$endif}
 
 {$ifdef PXP_DERIVED_TYPES_FINALIZATION}

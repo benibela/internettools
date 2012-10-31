@@ -536,15 +536,15 @@ end;
 
 { TXQTermNamedFunction }
 
-constructor TXQTermNamedFunction.create(const akind: TXQTermNamedFunctionKind; const aindex: integer);
+constructor TXQTermNamedFunction.create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
 begin
   kind := akind;
-  index := aindex;
+  func := afunc;
 end;
 
 constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string);
 begin
-  if not findKindIndex(ns, name, kind, index) then begin
+  if not findKindIndex(ns, name, kind, func) then begin
     kind := xqfkUnknown;
     funcname:=name;
     namespace := ns;
@@ -559,14 +559,19 @@ end;
 
 class function TXQTermNamedFunction.createIfExists(const name: string; const sc: TXQStaticContext): TXQTermNamedFunction;
 var akind: TXQTermNamedFunctionKind;
-    aindex: integer;
+    afunc: TXQAbstractFunctionInfo;
     localName: string;
     ns: INamespace;
 begin
   localName:=name;
   sc.splitRawQName(ns, localName, xqdnkFunction);
-  if findKindIndex(ns, localName, akind, aindex) then result := TXQTermNamedFunction.Create(akind, aindex)
-  else result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet
+  if findKindIndex(ns, localName, akind, afunc) then exit(TXQTermNamedFunction.Create(akind, afunc))
+  else if pos(':', name) = 0 then
+     if sc.defaultElementTypeNamespace <> nil then begin
+       if findKindIndex(sc.defaultElementTypeNamespace, localName, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc))
+     end else if sc.defaultTypeNamespace <> nil then
+       if findKindIndex(sc.defaultTypeNamespace, localName, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc));
+  result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): IXQValue;
@@ -605,34 +610,34 @@ var
   tempcontext: TEvaluationContext;
   i: Integer;
   j: Integer;
-  func: TXQValueFunction;
+  vfunc: TXQValueFunction;
   sc: TXQStaticContext;
   ns: INamespace;
   temp: String;
 begin
   evaluateChildren(context, evilkids);
 
-  assert((kind = xqfkUnknown) or (index >= 0));
+  assert((kind = xqfkUnknown) or (func <> nil));
 
   case kind of
     xqfkBasic:
-      result := PXQBasicFunctionInfo(basicFunctions.Objects[index])^.func(evilkids);
+      result := TXQBasicFunctionInfo(func).func(evilkids);
     xqfkComplex:
-      result := PXQComplexFunctionInfo(complexFunctions.Objects[index])^.func(context, evilkids);
+      result := TXQComplexFunctionInfo(func).func(context, evilkids);
     xqfkWrappedOperator: begin
-      if length(evilkids) <> 2 then raiseEvaluationError('Need two arguments for function: op:' + binaryOpFunctions[index]);
-      result := TXQBinaryOp(binaryOpFunctions.Objects[index])(context, evilkids[0], evilkids[1]);
+      if length(evilkids) <> 2 then raiseEvaluationError('Need two arguments for function: op:' + funcname);
+      result := TXQOperatorInfo(func).func(context, evilkids[0], evilkids[1]);
     end;
     xqfkTypeConstructor:
-      if TXQValueClass(types.Objects[index]).InheritsFrom(TXQValue_QName) then begin
+      if TXQValueClass(func).InheritsFrom(TXQValue_QName) then begin
         temp := evilkids[0].toString;
         context.splitRawQName(ns, temp, xqdnkAny);
-        result := qnameMake(ns, temp,  TXQValueStringClass(types.Objects[index]));
-      end else if length(evilkids) = 0 then result := TXQValueClass(types.Objects[index]).createFromValue(nil)
-      else if length(evilkids) = 1 then result := TXQValueClass(types.Objects[index]).createFromValue(evilkids[0])
+        result := qnameMake(ns, temp,  TXQValueStringClass(func));
+      end else if length(evilkids) = 0 then result := TXQValueClass(func).createFromValue(nil)
+      else if length(evilkids) = 1 then result := TXQValueClass(func).createFromValue(evilkids[0])
       else raiseEvaluationError('Invalid argument count for constructor function');
     xqfkUnknown: begin
-      func := nil;
+      vfunc := nil;
       ns := namespace;
       sc := context.findModuleStaticContext(ns);
       if sc <> nil then
@@ -640,74 +645,60 @@ begin
           if (sc.functions[i].name = funcname)
              and  (length(sc.functions[i].parameters) = length(children))
              and ((sc.functions[i].namespace = ns) or ((ns <> nil) and (sc.functions[i].namespace <> nil) and (sc.functions[i].namespace.getURL = ns.getURL))) then begin
-            func := sc.functions[i];
+            vfunc := sc.functions[i];
             break;
           end;
-      if func = nil then
+      if vfunc = nil then
         raiseEvaluationError('Function '+funcname+' not found');
 
       tempcontext := context;
       tempcontext.temporaryVariables := TXQVariableChangeLog.create();
       tempcontext.staticContext := sc;
-      for j := 0 to high(func.parameters) do
-        tempcontext.temporaryVariables.add(func.parameters[j].name, functionTypeConversion(evilkids[j], func.parameters[j].seqtype), func.parameters[j].namespace);
-      result := func.body.evaluate(tempcontext);
-      result := functionTypeConversion(result, func.resulttype);
+      for j := 0 to high(vfunc.parameters) do
+        tempcontext.temporaryVariables.add(vfunc.parameters[j].name, functionTypeConversion(evilkids[j], vfunc.parameters[j].seqtype), vfunc.parameters[j].namespace);
+      result := vfunc.body.evaluate(tempcontext);
+      result := functionTypeConversion(result, vfunc.resulttype);
       tempcontext.temporaryVariables.free;
       exit;
     end;
   end;
 end;
 
-function xqFunctionGeneralConstructor(const args: TXQVArray): IXQValue;
-begin
-  ignore(args); result := nil;
-  raise Exception.Create('Abstract function called');
-end;
-
-class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out aindex: integer): boolean;
+class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
-  i: Integer;
+  i, aindex: Integer;
+  module: TXQNativeModule;
 begin
   if (ns = nil) then exit(false);
 
-  if (ns.getURL = XMLNamespaceURL_XPathFunctions) or (ns.getURL = XMLNamespaceURL_MyExtensions) then begin
-    aindex := basicFunctions.IndexOf(name);
-    if aindex >= 0 then begin
-      if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
-        if ns.getURL <> XMLNamespaceURL_MyExtensions then exit(false);
-        akind:=xqfkTypeConstructor;
-        aindex:=types.indexof(name);;
-        exit(true);
-      end;
-      akind:=xqfkBasic;
-      exit(true);
-    end;
+  module := TXQueryEngine.findNativeModule(ns);
 
-    aindex := complexFunctions.IndexOf(name);
-    if aindex >= 0 then begin
-      akind:=xqfkComplex;
-      exit(true);
-    end;
+  if (module = nil) then exit(false);
+
+  afunc := module.findBasicFunction(name);
+  if afunc <> nil then begin
+    akind:=xqfkBasic;
+    exit(true);
   end;
-  if (ns.getURL = XMLNamespaceURL_XMLSchema) or (ns.getURL = XMLNamespaceURL_MyExtensions)  then begin
-    aindex := basicFunctions.IndexOf('xs:'+name);
-    if aindex >= 0 then
-      if PXQBasicFunctionInfo(basicFunctions.Objects[aindex])^.func = @xqfunctionGeneralConstructor then begin
-        akind:=xqfkTypeConstructor;
-        aindex:=types.indexof(name);;
-        exit(true);
-      end;
 
-    exit(false);
-  end else if ns.getURL = XMLNamespaceURL_MyExtensionOperators then begin;
-    aindex := -1;
-    for i:=0 to  binaryOpFunctions.Count-1 do
-      if strContains(name, binaryOpFunctions[i]) then begin
-        aindex := i;
-        akind := xqfkWrappedOperator;
-        exit(true);
-      end;;
+  afunc := module.findComplexFunction(name);
+  if afunc <> nil then begin
+    akind:=xqfkComplex;
+    exit(true);
+  end;
+
+  aindex := module.binaryOpFunctions.IndexOf(name);
+  if aindex >= 0 then begin
+    afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
+    akind := xqfkWrappedOperator;
+    exit;
+  end;
+
+  aindex:=module.types.IndexOf(name);
+  if aindex >= 0 then begin
+    akind:=xqfkTypeConstructor;
+    afunc := TXQAbstractFunctionInfo(module.types.Objects[aindex]);
+    exit(true)
   end;
 
   exit(false);
@@ -717,18 +708,18 @@ end;
 
 { TXQTermBinaryOp }
 
-constructor TXQTermBinaryOp.create(const op: string; arg1: TXQTerm; arg2: TXQTerm);
+constructor TXQTermBinaryOp.create(const aop: string; arg1: TXQTerm; arg2: TXQTerm);
 begin
-  index := binaryOps.IndexOf(op);
+  op := TXQueryEngine.findOperator(aop);
   if arg1 <> nil then begin
     push(arg1);
     if arg2 <> nil then push(arg2);
   end;
 end;
 
-constructor TXQTermBinaryOp.create(arg1: TXQTerm; const op: string; arg2: TXQTerm);
+constructor TXQTermBinaryOp.create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
 begin
-  create(op, arg1, arg2);
+  create(aop, arg1, arg2);
 end;
 
 function TXQTermBinaryOp.evaluate(const context: TEvaluationContext): IXQValue;
@@ -737,10 +728,10 @@ begin
   if length(children)>2 then raiseEvaluationError('Too many subterms');
 
 
-  if (index = binaryOps.IndexOf('/')) or (index = binaryOps.IndexOf('//')) then
+  if (op.name = '/') or (op.name = '//') then
     exit(TXQueryEngine.evaluateAccessList(self, context));
 
-  result := operatorInfo^.func(context, children[0].evaluate(context), children[1].evaluate(context));
+  result := op.func(context, children[0].evaluate(context), children[1].evaluate(context));
 end;
 
 function TXQTermBinaryOp.getContextDependencies: TXQContextDependencies;
@@ -748,19 +739,13 @@ begin
     result := [xqcdContextCollation, xqcdContextTime, xqcdContextOther] + children[0].getContextDependencies + children[1].getContextDependencies;
 end;
 
-function TXQTermBinaryOp.operatorInfo: PXQOperatorInfo;
-begin
-  if (index < 0) or (index >= binaryOps.Count) then raiseEvaluationError('Invalid bin op index');
-  result := PXQOperatorInfo(binaryOps.Objects[index])
-end;
-
 procedure TXQTermBinaryOp.addToQueryList(var path: TXQPathMatching);
 var
   isDoubleSlash: Boolean;
   last: Integer;
 begin
-  isDoubleSlash := (index = binaryOps.IndexOf('//'));
-  if  not (isDoubleSlash or (index = binaryOps.IndexOf('/'))) then begin
+  isDoubleSlash := op.name = '//';
+  if  not (isDoubleSlash or (op.name = '/')) then begin
     inherited addToQueryList(path);
     exit;
   end;
@@ -879,9 +864,9 @@ end;
 
 { TXQTermUnaryOp }
 
-constructor TXQTermUnaryOp.create(const op: string; arg: TXQTerm);
+constructor TXQTermUnaryOp.create(const aop: string; arg: TXQTerm);
 begin
-  index := binaryOps.IndexOf(op);
+  op := TXQueryEngine.findOperator(aop);
   if arg <> nil then push(arg);
 end;
 
@@ -889,9 +874,9 @@ function TXQTermUnaryOp.evaluate(const context: TEvaluationContext): IXQValue;
 begin
   if length(children)<1 then raiseEvaluationError( 'Not enough subterms')
   else if length(children)>1 then raiseEvaluationError('Too many subterms');
-  if index < 0 then raiseEvaluationError('Unknown unary op');
+  if op = nil then raiseEvaluationError('Unknown unary op');
   result := xqvalue();
-  result := PXQOperatorInfo(binaryOps.Objects[index])^.func(context, xqvalue(0),children[0].evaluate(context));
+  result := op.func(context, xqvalue(0),children[0].evaluate(context));
 end;
 
 function TXQTermUnaryOp.getContextDependencies: TXQContextDependencies;

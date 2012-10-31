@@ -1378,11 +1378,12 @@ begin
   m('declare default element namespace "foobar"; <wiz xmlns="123">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '123');
   m('declare default element namespace "foobar"; <wiz xmlns="">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '');
 
-  t('outer-xml(<a att0="x'#13'y" att1="ab'#13#13'c" att2="ab'#9#10#13'cd" att3="{"ab'#9#10#13'cd"}" att4="x'#13#10#13#10'y" />)', '<a att0="x y" att1="ab  c" att2="ab   cd" att3="ab'#9#10#10'cd" att4="x  y"/>');
-  t('outer-xml(<a>{attribute att2 {"ab'#9#10#13'cd"}}</a>)', '<a att2="ab'#9#10#10'cd"/>');
-  t('outer-xml(<a x="&#x9;"/>)', '<a x="'#9'"/>');
-  t('outer-xml(<a x="&#xA;"/>)', '<a x="'#10'"/>');
+  t('outer-xml(<a att0="x'#13'y" att1="ab'#13#13'c" att2="ab'#9#10#13'cd" att3="{"ab'#9#10#13'cd"}" att4="x'#13#10#13#10'y" />)', '<a att0="x y" att1="ab  c" att2="ab   cd" att3="ab&#x9;&#xA;&#xA;cd" att4="x  y"/>');
+  t('outer-xml(<a>{attribute att2 {"ab'#9#10#13'cd"}}</a>)', '<a att2="ab&#x9;&#xA;&#xA;cd"/>');
+  t('outer-xml(<a x="&#x9;"/>)', '<a x="&#x9;"/>');
+  t('outer-xml(<a x="&#xA;"/>)', '<a x="&#xA;"/>');
   t('outer-xml(<a x="&#xD;"/>)', '<a x="&#xD;"/>');
+  t('outer-xml(<a x="&#xE;"/>)', '<a x="'#$E'"/>');
   t('outer-xml(<a>&#x9;</a>)', '<a>'#9'</a>');
   t('outer-xml(<a>&#xA;</a>)', '<a>'#10'</a>');
   t('outer-xml(<a>&#xD;</a>)', '<a>&#xD;</a>');
@@ -1408,9 +1409,11 @@ begin
 //  t('data(<!--&lt;-->)', '<');
   t('outer-xml(<?abc &lt;?>)', '<?abc &lt;?>');
 //  t('data(<?abc &lt;?>', '<');
-  m('declare boundary-space strip; outer-xml(<a x="&#x9;"/>)', '<a x="'#9'"/>');
-  m('declare boundary-space strip; outer-xml(<a x="&#xA;"/>)', '<a x="'#10'"/>');
+  m('declare boundary-space strip; outer-xml(<a x="&#x9;"/>)', '<a x="&#x9;"/>');
+  m('declare boundary-space strip; outer-xml(<a x="&#xA;"/>)', '<a x="&#xA;"/>');
   m('declare boundary-space strip; outer-xml(<a x="&#xD;"/>)', '<a x="&#xD;"/>');
+  m('outer-xml(<a>&#x9;&#xA;&#xD;&#x85;&#x2028;</a>)', '<a>'#9#10'&#xD;&#x85;&#x2028;</a>');
+  m('outer-xml(<a x="foobar&#x9;&#xA;&#xD;&#x85;&#x2028;"/>)', '<a x="foobar&#x9;&#xA;&#xD;&#x85;&#x2028;"/>');
 
   t('outer-xml(<a id="  a  b "/>)', '<a id="  a  b "/>');
   t('outer-xml(<a xml:id="  a  b "/>)', '<a xml:id="a b"/>');

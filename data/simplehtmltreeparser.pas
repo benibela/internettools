@@ -369,7 +369,7 @@ published
 end;
 
 
-function xmlStrEscape(s: string):string;
+function xmlStrEscape(s: string; attrib: boolean = false):string;
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
       XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -609,8 +609,8 @@ end;
 
 function TNamespace.serialize: string;
 begin
-  if prefix = '' then result := 'xmlns="'+xmlStrEscape(url)+'"'
-  else result := 'xmlns:'+prefix+'="'+xmlStrEscape(url)+'"'
+  if prefix = '' then result := 'xmlns="'+xmlStrEscape(url, true)+'"'
+  else result := 'xmlns:'+prefix+'="'+xmlStrEscape(url, true)+'"'
 end;
 
 destructor TNamespace.Destroy;
@@ -1197,7 +1197,7 @@ var known: TNamespaceList;
         if attributes <> nil then
           for attrib in attributes do
             if not attrib.isNamespaceNode then
-              result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue)+'"';
+              result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue, true)+'"';
 
         if next = reverse then begin
           result += '/>';
@@ -1931,7 +1931,7 @@ begin
 end;
 
 
-function xmlStrEscape(s: string):string;
+function xmlStrEscape(s: string; attrib: boolean = false):string;
 var
   i, p: Integer;
   procedure push(const t:string); inline;
@@ -1944,7 +1944,8 @@ var
 begin
   setlength(result, length(s));
   p:=1;
-  for i := 1 to length(s) do begin
+  i := 1;
+  while i <= length(s) do begin
     case s[i] of
       '<': push('&lt;');
       '>': push('&gt;');
@@ -1952,12 +1953,17 @@ begin
       '''': push('&apos;');
       '"': push('&quot;');
       #13: push('&#xD;');
+      #10: if attrib then push('&#xA;') else push(#10);
+      #9: if attrib then push('&#x9;') else push(#9);
+      #$C2: if (i <> length(s)) and (s[i+1] <> #$85) then push(#$C2) else begin push('&#x85;'); i+=1; end;
+      #$E2: if (i + 2 <= length(s)) and ((s[i+1] <> #$80) or (s[i+2] <> #$A8)) then push(#$E2) else begin push('&#x2028;'); i+=2; end;
       else begin
         if p > length(result) then setlength(result, length(result) + 64);
         result[p] := s[i];
         p+=1;
       end;
     end;
+    i+=1;
   end;
   setlength(result, p - 1);
 end;
