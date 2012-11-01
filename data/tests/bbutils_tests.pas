@@ -519,6 +519,23 @@ begin
   if strConvertFromUtf8('ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo',eWindows1252)<>'ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo' then
      raise Exception.Create('conversion utf8->latin1 failed');
 
+  test(strGetUnicodeCharacter($79, eUTF16BE), #$00#$79);
+  test(strGetUnicodeCharacter($79, eUTF16LE), #$79#$00);
+  test(strGetUnicodeCharacter($20AC, eUTF16BE), #$20#$AC);
+  test(strGetUnicodeCharacter($20AC, eUTF16LE), #$AC#$20);
+  test(strGetUnicodeCharacter($1D11E, eUTF16BE), #$D8#$34#$DD#$1E);
+  test(strGetUnicodeCharacter($1D11E, eUTF16LE), #$34#$D8#$1E#$DD);
+
+  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), eUTF16BE), #$D8#$34#$DD#$1E#$D8#$34#$DD#$1E);
+  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), eUTF16LE), #$34#$D8#$1E#$DD#$34#$D8#$1E#$DD);
+
+  test(#$79, strConvertToUtf8(#$00#$79, eUTF16BE));
+  test(#$79, strConvertToUtf8(#$79#$00, eUTF16LE));
+  test(#$79#$79, strConvertToUtf8(#$00#$79#$00#$79, eUTF16BE));
+  test(#$79#$79, strConvertToUtf8(#$79#$00#$79#$00, eUTF16LE));
+  test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$D8#$34#$DD#$1E#$D8#$34#$DD#$1E, eUTF16BE));
+  test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$34#$D8#$1E#$DD#$34#$D8#$1E#$DD, eUTF16LE));
+
   //splitting
   test(strSplit('hallo,welt,maus')[1] = 'welt');
 

@@ -159,7 +159,7 @@ procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
 //I: case insensitive
 
 type
-  TEncoding=(eUnknown,eWindows1252,eUTF8);
+  TEncoding=(eUnknown,eWindows1252,eUTF8,eUTF16BE,eUTF16LE);
 
 //copy
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
@@ -1372,6 +1372,7 @@ var len: longint;
     pos: longint;
     i: Integer;
 begin
+  if length(str) = 0 then exit('');
   //use my own conversion, because i found no existing source which doesn't relies on iconv
   //(AnsiToUtf8 doesn't work, since Ansi<>latin1)
   //edit: okay, now i found lconvencoding, but i let this here, because i don't want to change it again
@@ -1404,9 +1405,23 @@ begin
       end;
       assert(pos=reslen+1);
     end;
+    {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
+      SetLength(result, (length(str) * 3) div 2);
+      i := UnicodeToUtf8(pointer(result), length(result) + 1, pointer(str), length(str) div 2);
+      if i > 0 then SetLength(result, i);
+    end;
+    {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
+      result := strConvertToUtf8(str, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+      i := 1;
+      while i < length(result) do begin
+        PWord(@result[i])^ := SwapEndian(PWord(@result[i])^);
+        i+=2;
+      end;
+    end;
     else raise Exception.Create('Unknown encoding in strConvertToUtf8');
   end;
 end;
+
 
 function strConvertFromUtf8(str: string; toe: TEncoding): string;
 var len, reslen, i, pos: longint;
@@ -1433,6 +1448,19 @@ begin
         end;
         pos+=1;
       end ;
+    end;
+    {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
+      SetLength(result, length(str)*2);           ;
+    i := Utf8ToUnicode(pointer(result), length(result), pointer(str), length(str));
+      if i > 0 then SetLength(result, (i - 1) * 2);
+    end;
+    {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
+      result := strConvertFromUtf8(str, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+      i := 1;
+      while i < length(result) do begin
+        PWord(@result[i])^ := SwapEndian(PWord(@result[i])^);
+        i+=2;
+      end;
     end;
     else raise Exception.Create('Unknown encoding in strConvertFromUtf8');
   end;
