@@ -70,6 +70,8 @@ public
   procedure addIfNewPrefixUrl(const ns: TNamespace);
   procedure addIfNewPrefixUrl(const ns: INamespace);
 
+  procedure deleteFrom(i: integer);
+
   function clone: TNamespaceList;
 
   property namespaces[prefix: string]: INamespace read getNamespace;
@@ -245,6 +247,7 @@ public
 
   constructor create();
   constructor create(atyp: TTreeElementType; avalue: string = '');
+  class function createElementPair(anodename: string): TTreeElement;
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
 
@@ -273,6 +276,7 @@ protected
   FCreator: TTreeParser;
 
 public
+  constructor create(creator: TTreeParser);
   property baseURI: string read FBaseURI write FBaseURI;
   property documentURI: string read FDocumentURI write FDocumentURI;
 
@@ -303,7 +307,7 @@ TParsingModel = (pmStrict, pmHTML);
 //**and you can call setEncoding to change the tree to the encoding you need. (this will also convert the entities)@br
 //**You can change the class used for the elements in the tree with the field treeElementClass.
 TTreeParser = class
-private
+protected
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
 //  FConvertEntities: boolean;
@@ -577,6 +581,13 @@ begin
     add(ns);
 end;
 
+procedure TNamespaceList.deleteFrom(i: integer);
+begin
+  if i < 0 then i := 0;
+  while count > i do
+    delete(count - 1);
+end;
+
 
 function TNamespaceList.clone: TNamespaceList;
 var
@@ -619,6 +630,12 @@ begin
 end;
 
 { TTreeDocument }
+
+constructor TTreeDocument.create(creator: TTreeParser);
+begin
+  inherited create(tetDocument);
+  FCreator := creator;
+end;
 
 function TTreeDocument.getCreator: TTreeParser;
 begin
@@ -1095,6 +1112,7 @@ var
   oldprev: TTreeElement;
 begin
   child.parent := self;
+  child.document := document;
   oldprev := reverse.previous;
   oldprev.next := child;
   child.previous := oldprev;
@@ -1104,6 +1122,8 @@ begin
   end else begin
     reverse.previous := child.reverse;
     child.reverse.next := reverse;
+    child.reverse.parent := self;
+    child.reverse.document := document;
   end;
 end;
 
@@ -1251,11 +1271,10 @@ begin
       result := TTreeAttribute.create(value, TTreeAttribute(self).realvalue);
     end;
     tetDocument: begin
-      result := TTreeDocument.create();
+      result := TTreeDocument.create(TTreeDocument(self).FCreator);
       TTreeDocument(result).FEncoding:=TTreeDocument(self).FEncoding;
       TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
       TTreeDocument(result).FDocumentURI:=TTreeDocument(self).FDocumentURI;
-      TTreeDocument(result).FCreator:=TTreeDocument(self).FCreator;
     end
     else result := TTreeElement.create();
   end;
@@ -1382,6 +1401,15 @@ constructor TTreeElement.create(atyp: TTreeElementType; avalue: string);
 begin
   self.typ := atyp;
   self.value := avalue;
+end;
+
+class function TTreeElement.createElementPair(anodename: string): TTreeElement;
+begin
+  result := TTreeElement.create(tetOpen, anodename);
+  result.reverse := TTreeElement.create(tetClose, anodename);
+  result.reverse.reverse := result;
+  result.next := Result.reverse;
+  result.reverse.previous := Result;
 end;
 
 destructor TTreeElement.destroy();
@@ -1830,7 +1858,7 @@ begin
   //1. it is necessary for the correct interpretion of xpath expressions html/... assumes
   //   that the current element is a parent of html
   //2. it serves as parent for multiple top level elements (althought they aren't allowed)
-  FCurrentTree:=TTreeDocument.create;
+  FCurrentTree:=TTreeDocument.create(self);
   FCurrentTree.FCreator:=self;
   FCurrentTree.typ := tetDocument;
   FCurrentTree.FBaseURI:=uri;
