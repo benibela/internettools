@@ -5,7 +5,7 @@ unit xquery_utf8;
 interface
 
 uses
-  Classes, SysUtils, xquery, LCLProc, utf8scanner, character;
+  Classes, SysUtils, xquery, LCLProc, utf8scanner, unicodeinfo;
 
 implementation
 
@@ -68,24 +68,25 @@ end;
 function xqFunctionNormalizeUnicode(const args: TXQVArray): IXQValue;
 var
   method: String;
-  s: String;
+  p: pchar;
 begin
   requiredArgCount(args, 1, 2);
   method := 'NFC';
   if length(args) = 2 then method := trim(UpperCase(args[1].toString));
 
-  s := args[0].toString;
+  p := pchar(args[0].toString);
   case method of
-    'NFC': s := TCharacter.Normalize_NFC(s);
-    'NFD': s := TCharacter.Normalize_NFD(s);
-    'NFKC': s := TCharacter.Normalize_NFKC(s);
-    'NFKD': s := TCharacter.Normalize_NFKD(s);
+    'NFC':  p := utf8proc_NFC(p);
+    'NFD':  p := utf8proc_NFD(p);
+    'NFKC': p := utf8proc_NFKC(p);
+    'NFKD': p := utf8proc_NFKD(p);
     //'FULLY-NORMALIZED': ??
     '': ; //s := s;
     else raise EXQEvaluationException.Create('Unknown normalization method: '+method);
   end;
 
-  result :=xqvalue(s);
+  result :=xqvalue(UTF8String(p));
+  Freemem(p);
 end;
 
 function xqFunctionString_to_codepoints(const args: TXQVArray): IXQValue;
