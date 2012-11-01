@@ -1095,6 +1095,7 @@ var //node: TTreeElement;
 
 
       {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
+      if form.getDocument() <> nil then value := strResolveURI(value, form.getDocument().baseURI);
       value := strResolveURI(value, context.staticContext.baseURI);
       {$ENDIF}
       (result as TXQValueObject).setMutable('url', value);
