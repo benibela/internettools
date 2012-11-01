@@ -53,6 +53,11 @@ function httpRequest(url: string): string;
 function httpRequest(url: string; rawpostdata: string): string;
 //**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it
 function httpRequest(url: string; postdata: TStringList): string;
+//**Make a http request to an address given in an IXQValue.  @br
+//**node: if a link (a), download @href. If a resource (img, frame), download @src. Otherwise download the text
+//**object: Download obj.url, possibly sending obj.post as postdata
+//**else: Download string value
+function httpRequest(const dest: IXQValue): string;
 
 (***
 Processes data with a certain query.@br@br
@@ -232,6 +237,27 @@ end;
 function httpRequest(url: string; postdata: TStringList): string;
 begin
   result := httpRequest(url, TInternetAccess.urlEncodeData(postdata));
+end;
+
+function httpRequest(const dest: IXQValue): string;
+var n: TTreeElement;
+begin
+  case dest.kind of
+    pvkUndefined: exit;
+    pvkNode: begin
+      n := dest.toNode;
+      if n = nil then exit;
+      if n.typ <> tetOpen then result := httpRequest(dest.toString)
+      else if SameText(n.value, 'a') then result := httpRequest(n['href'])
+      else if SameText(n.value, 'frame') or SameText(n.value, 'iframe') or SameText(n.value, 'img') then result := httpRequest(n['src'])
+      else result := httpRequest(n.deepNodeText());
+    end;
+    pvkObject:
+      if dest.getProperty('method').toString <> 'GET' then result := httpRequest(dest.getProperty('url').toString, dest.getProperty('post').toString)
+      else result := httpRequest(dest.getProperty('url').toString);
+    pvkSequence: result := httpRequest(dest.getChild(1));
+    else result := httpRequest(dest.toString);
+  end;
 end;
 
 finalization
