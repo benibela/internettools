@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  StdCtrls, extendedhtmlparser,simplehtmltreeparser,pseudoxpath;
+  StdCtrls, extendedhtmlparser,simplehtmltreeparser,xquery;
 
 type
 
@@ -16,6 +16,7 @@ type
     Button1: TButton;
     Button2: TButton;
     Button3: TButton;
+    Button4: TButton;
     CheckBoxTextOnly: TCheckBox;
     CheckBoxverbose: TCheckBox;
     CheckBoxOptions: TCheckBox;
@@ -48,7 +49,7 @@ type
     procedure htmlparserVariableRead(variable: string; value: string);
   private
     { private declarations }
-    function mypxptostring(v: TPXPValue): string;
+    function mypxptostring(const v: IXQValue): string;
     procedure parseHTML(tp: TTreeParser);
   public
     { public declarations }
@@ -88,7 +89,7 @@ begin
     end;
 
     for i:=0 to htmlparser.variableChangeLog.count-1 do
-      memo3.Lines.add(htmlparser.variableChangeLog.getVariableName(i)+'='+mypxptostring(htmlparser.variableChangeLog.getVariableValue(i)));
+      memo3.Lines.add(htmlparser.variableChangeLog.getName(i)+'='+mypxptostring(htmlparser.variableChangeLog.get(i)));
 //    memo3.Lines.Text:=htmlparser.variableChangeLog.debugTextRepresentation;
   finally
     htmlparser.Free;
@@ -106,20 +107,22 @@ begin
 end;
 
 procedure TForm1.Button3Click(Sender: TObject);
-var ppath: TPseudoXPathParser;
+var ppath: TXQueryEngine;
     tp: TTreeParser;
-    vars: TPXPVariableChangeLog;
-    temp: TPXPValue;
+    vars: TXQVariableChangeLog;
+    temp: IXQValue;
 begin
-  ppath := TPseudoXPathParser.Create;
-  vars := TPXPVariableChangeLog.create();
+  ppath := TXQueryEngine.Create;
+  vars := TXQVariableChangeLog.create();
   tp := TTreeParser.Create;
   try
     ppath.OnEvaluateVariable:=@vars.evaluateVariable;
     ppath.OnDefineVariable:=@vars.defineVariable;
     ppath.AllowVariableUseInStringLiterals:=CheckBoxVarsInStrs.Checked;
     vars.allowObjects:=CheckBoxObjects.Checked;
-    ppath.parse(memo1.Lines.text);
+
+    if (sender as tbutton).tag = 1 then ppath.parseXQuery1(memo1.lines.Text)
+    else ppath.parseXPath2(memo1.Lines.text);
 
     parseHTML(tp);
 
@@ -127,7 +130,6 @@ begin
     ppath.RootElement := tp.getLastTree;
     temp := ppath.evaluate();
     memo3.Lines.Text:=mypxptostring(temp);
-    temp.free;
   finally
     tp.Free;
     ppath.Free;
@@ -145,14 +147,13 @@ begin
   memo3.Lines.Add(variable+ ' = '+value);
 end;
 
-function TForm1.mypxptostring(v: TPXPValue): string;
+function TForm1.mypxptostring(const v: IXQValue): string;
 var
-  temp: TPXPValueObject;
   i: Integer;
 begin
   if not CheckBoxverbose.Checked then begin
-    if (CheckBoxTextOnly.Checked) or not (v is TPXPValueNode) then result := v.asString
-    else result := v.asNode.outerXML()
+    if (CheckBoxTextOnly.Checked) or not (v is TXQValueNode) then result := v.toString
+    else result := v.toNode.outerXML()
   end else
     result := v.debugAsStringWithTypeAnnotation(CheckBoxTextOnly.Checked);
 end;

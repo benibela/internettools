@@ -311,8 +311,8 @@ object Form1: TForm1
         Left = 215
         Height = 25
         Top = 4
-        Width = 232
-        Caption = 'Evaluate template as pXpath'
+        Width = 128
+        Caption = 'Evaluate as XPath'
         OnClick = Button3Click
         TabOrder = 1
       end
@@ -326,7 +326,7 @@ object Form1: TForm1
         TabOrder = 2
       end
       object CheckBoxOptions: TCheckBox
-        Left = 455
+        Left = 487
         Height = 18
         Top = 9
         Width = 70
@@ -335,6 +335,16 @@ object Form1: TForm1
         OnChange = CheckBoxOptionsChange
         ParentColor = False
         TabOrder = 3
+      end
+      object Button4: TButton
+        Tag = 1
+        Left = 343
+        Height = 25
+        Top = 4
+        Width = 136
+        Caption = 'Evaluate as XQuery'
+        OnClick = Button3Click
+        TabOrder = 4
       end
     end
   end

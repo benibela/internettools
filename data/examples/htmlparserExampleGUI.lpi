@@ -36,7 +36,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="7">
+    <Units Count="6">
       <Unit0>
         <Filename Value="htmlparserExampleGUI.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -61,18 +61,13 @@
         <UnitName Value="simplehtmltreeparser"/>
       </Unit3>
       <Unit4>
-        <Filename Value="../pseudoxpath.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="pseudoxpath"/>
-      </Unit4>
-      <Unit5>
         <Filename Value="../disableRangeOverflowChecks.inc"/>
         <IsPartOfProject Value="True"/>
-      </Unit5>
-      <Unit6>
+      </Unit4>
+      <Unit5>
         <Filename Value="../restoreRangeOverflowChecks.inc"/>
         <IsPartOfProject Value="True"/>
-      </Unit6>
+      </Unit5>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
