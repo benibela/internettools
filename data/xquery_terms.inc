@@ -1326,7 +1326,7 @@ begin
   if subcontext^.namespaces <> nil then oldnamespacecount := subcontext^.namespaces.Count;
 
   if (typ = tetDocument) then begin
-    tree := TTreeDocument.create(typ);
+    tree := TTreeDocument.create(nil);
     TTreeDocument(tree).baseURI := context.staticContext.baseURI;
   end else if typ = tetAttribute then tree := TTreeAttribute.create('','')
   else tree := TTreeElement.create(typ);

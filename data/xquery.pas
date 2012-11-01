@@ -4141,6 +4141,7 @@ begin
   result := evaluateSingleStepQuery(query[0],context);
   for i:=1 to high(query) do
     result := expandSequence(result, query[i], context);
+
   xqvalueSeqSqueeze(result);
 end;
 

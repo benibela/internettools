@@ -16,7 +16,7 @@
         <CompilerPath Value="$(CompPath)"/>
       </Other>
     </CompilerOptions>
-    <Files Count="22">
+    <Files Count="23">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -105,6 +105,10 @@
         <Filename Value="internet/w32internetaccess.pas"/>
         <UnitName Value="w32internetaccess"/>
       </Item22>
+      <Item23>
+        <Filename Value="data/simplexmltreeparserfpdom.pas"/>
+        <UnitName Value="simplexmltreeparserfpdom"/>
+      </Item23>
     </Files>
     <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="1">
