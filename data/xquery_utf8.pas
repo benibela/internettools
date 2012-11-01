@@ -1,3 +1,16 @@
+{**
+  @abstract(This units contains utf-8 aware version of certain XQuery functions)
+
+  If this unit is included in any uses clause it overrides the default string-length, substring, translate, string-to-codepoints XQuery functions
+  with utf8-aware functions.
+
+  It also defines a normalize-unicode function.
+
+  It depends on the utf8tools (http://wiki.lazarus.freepascal.org/Theodp)
+
+  @author Benito van der Zander (http://www.benibela.de)
+*}
+
 unit xquery_utf8;
 
 {$mode objfpc}{$H+}
@@ -5,7 +18,8 @@ unit xquery_utf8;
 interface
 
 uses
-  Classes, SysUtils, xquery, LCLProc, utf8scanner, unicodeinfo;
+  Classes, SysUtils, xquery, LCLProc,
+  utf8scanner, unicodeinfo; //<- utf8tools, get them from http://wiki.lazarus.freepascal.org/Theodp
 
 implementation
 

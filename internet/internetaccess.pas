@@ -86,7 +86,7 @@ type
     //out
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
     property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last request
-    function getLastHTTPHeader(header: string): string;
+    function getLastHTTPHeader(header: string): string; //**< Reads a certain HTTP header received by the last request
   public
     constructor create();virtual;
     //**post the (url encoded) data to the given url and returns the resulting document

@@ -9,7 +9,7 @@ You can also further @noAutoLink(process) the data with the function @link(simpl
 
 @section(1 AnchorNameXYZ Accessing the internet/downloading things)
 
-The interface TInternetAccess for accessing the internet is defined in the unit internetaccess, and contains several abstract methods to get/post http-data (other internet services like ftp/smtp might be added in future versions). @br 
+The class TInternetAccess for accessing the internet is defined in the unit internetaccess, and contains several abstract methods to get/post http-data (other internet services like ftp/smtp might be added in future versions). @br 
 
 Inherited from TInternetAccess are TSynapseInternetAccess and TW32InternetAccess (in the units synapseinternetaccess and w32internetaccess) which provide wrappers around synapse and wininet.  So you can easily switch between the two libraries and choose the most appropriate (wininet integrates better with windows systems, because it does not require openssl, but synapse it platform independent).
 
@@ -38,13 +38,15 @@ A collection of such single-page templates can be stored in a multi-page templat
 
 The XQuery expression language which can be used within the templates is implemented by the class TXQueryEngine in the unit @link(xquery).
 
-It is an almost complete implementation of the XPath 2 and XQuery standard syntax (missing schemas, error codes and static type checking) + some  extensions (e.g. objects and variable assignments).
+It is an almost complete implementation of the XPath 2 and XQuery standard (missing schemas, error codes and static type checking) + some  extensions (e.g. objects and global variable assignments).
 
 @section(2 AnchorNameTree Mid-Level: Tree/DOM-like processing)
 
-To @noAutoLink(process) a html file directly in fpc, without using another, interpreted language, you can use the class TTreeParser in the unit simplehtmltreeparser.@br
+To @noAutoLink(process) a html file directly in fpc, without using another, interpreted language, you can use the class TTreeParser  in the unit simplehtmltreeparser.. @br
 
-It creates a tree of TTreeElement-s from the  html document text (you know such trees from DOM, but this tree has nothing to do with do(o)m).
+It creates a tree of TTreeElement-s from the  html document text (you know such trees from DOM, but this tree has nothing to do with do(o)m).@br
+
+You can also use the class TTreeParserDOM in the unit simplexmltreeparserfpdom to import a DOM document read by the standard fpc xml parser
 
 @section(2 AnchorNameSimple Low-Level: Lexer/SAX-like interface)
 
@@ -58,7 +60,8 @@ A similar function, parseXML, exists for xml data in the unit simplexmlparser (i
 
 @unorderedList(
 @item(The unit autoupdate contains the TAutoUpdater class which can look online for an available update for the current system architecture and then download/install it)
-@item(The unit bbutils contains low-level functions, that are way below the simplehtmlparser and should actually be in the fpc rtl.  )
+@item(The unit int65math contains functions to do calculations with 65-bit integers.)
+@item(The unit bbutils contains low-level functions, that are way below the simplehtmlparser and should actually be in the fpc rtl, but are not.  )
 @item(The unit pastemplate implements a very simple template language for pascal units (such a template is used to generate bbutils) )
 )
 

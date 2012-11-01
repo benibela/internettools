@@ -27,6 +27,10 @@ interface
 {$DEFINE COMPILE_W32_INTERNETACCESS}  //If this unit should be compiled
 {$ENDIF}
 
+{$IFDEF PASDOCRUN}
+{$DEFINE COMPILE_W32_INTERNETACCESS}  //If this unit should be compiled
+{$ENDIF}
+
 {$IFDEF COMPILE_W32_INTERNETACCESS}
 uses
   windows,Classes, SysUtils,dialogs,

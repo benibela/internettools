@@ -1,5 +1,7 @@
 {**
-  @abstract This units contains a XPath 2 interpreter
+  @abstract(This units contains a XPath 2 / XQuery interpreter)
+
+  The most important class is TXQueryEngine, which implements it, and IXQValue, which is the variant used to store the results.
 
   @author Benito van der Zander (http://www.benibela.de)
 *}
@@ -70,34 +72,34 @@ type
 
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   TXQStaticContext = class
-    sender: TXQueryEngine;
+    sender: TXQueryEngine; //**< Engine this context belongs to
 
     //The following values map directly to XQuery options declarable in a Prolog
-    moduleNamespace: INamespace; //**< The namespace of this module or nil (owned by context)
-    namespaces: TNamespaceList;  //**< All declared namespaces. (namespace objects owned by the context)
+    moduleNamespace: INamespace; //**< The namespace of this module or nil
+    namespaces: TNamespaceList;  //**< All declared namespaces.
     moduleVariables: TXQVariableChangeLog;  //**< All declared variables.
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
-    importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: TODO.
-    defaultFunctionNamespace: INamespace; //**< Default function namespace (shared namespace object)
-    defaultElementTypeNamespace: INamespace; //**< Default function namespace (shared namespace object)
-    defaultTypeNamespace: INamespace; //**< Extension: default type namespace (shared namespace object)
+    importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
+    defaultFunctionNamespace: INamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
+    defaultElementTypeNamespace: INamespace; //**< Default element type namespace (default is empty)
+    defaultTypeNamespace: INamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
 
-    baseURI: string;
-    collation: TXQCollation;
-    nodeCollation: TXQCollation; //**< default collation used for node name comparisons (extension, does not exist in XQuery)
-    stringEncoding: TEncoding; //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
-    strictTypeChecking: boolean; //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
+    baseURI: string;              //**< Static base uri
+    collation: TXQCollation;      //**< Default collation for string comparisons
+    nodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
+    stringEncoding: TEncoding;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
+    strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
 
 
-    stripBoundarySpace: boolean;  //**< If <a>  </a> is equivallent to <a/>. Only used during parsing of the query, ignored during evaluation
+    stripBoundarySpace: boolean;  //**< If <a>  </a> is equivalent to <a/>. Only used during parsing of the query, ignored during evaluation
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
 
     copyNamespacePreserve, copyNamespaceInherit: boolean;
 
     //**ignored
-    ordering: boolean;
-    constructionPreserve: boolean;
+    ordering: boolean;  //**< unused
+    constructionPreserve: boolean; //**< unused
 
     function clone(): TXQStaticContext;
     destructor Destroy; override;
@@ -145,7 +147,7 @@ type
   which convert the returned value to the requested type.
 
   The @code(kind) property and the @code(is) operator can be used to check for the actually contained type.
-  E.g. for an string @code(kind) returns @code(pvkString) and @code(is TXQValueString) returns true. @code(kind)
+  E.g. for an string @code(kind) returns @code(pvkString) and @code(is TXQValueString) returns true (latter might be changed in feature versions). @code(kind)
   returns a basic type, so e.g. float and double values both return pvkDecimal.
 
   Since IXQValue is an interface, it can be used without worrying much about memory management. @br
@@ -155,7 +157,7 @@ type
   IXQValue are usually returned by the "parser" classes, so you don't have to create your own, but if you want, you can
   use the xqvalue() functions which return a IXQValue corresponding to the type of their parameter.
 
-  You can declare user defined types by deriving TXQValue (not IXQValue, there is a bunch of depending on the class) and
+  You can declare user defined types by deriving TXQValue (not IXQValue, there is a bunch of staff depending on the class) and
   calling TXQueryEngine.registerType with the new type.
 
   @br@br@br@br@br@bold(Internal types / data model)@br
@@ -1094,7 +1096,7 @@ type
 
     @bold(Syntax of a XQuery / XPath / Pseudo-XPath-Expression)
 
-    This so called XQuery engine currently supports XPath 2.0, with some extensions and minor deviations.@br@br
+    This XQuery engine currently supports XPath 2.0 and XQuery 1.0, with some extensions and minor deviations.@br@br
 
     Some very basic XPath examples:
     @unorderedList(
@@ -1126,21 +1128,39 @@ type
       @item(@code(if (condition) then $x else $y) @br This returns @code(x) if @code(condition) is true, and @code(y) otherwise  )
     )
 
-    Differences between this implementation and standard XPath/XQuery (most differences can be turned off by setting the respective parameter):
+    Differences between this implementation and standard XPath/XQuery (most differences can be turned off by setting the respective parameter in the default StaticContext):
 
-
+    Changed syntax:@br
 
     @unorderedList(
-      @item(@code($var;) @br You can _also_ use  @code($var;) instead of @code($var))
-      @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. )
-      @item(@code(var:=value) @br This assignes the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) @br (Remark: I'm too lazy to formally define a execution order, but you can assume it is left-to-right _for now_))
+    @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. )
+    @item(@code(var:=value) @br This assignes the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) @br (Remark: I'm too lazy to formally define a execution order, but you can assume it is left-to-right _for now_))
+    @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
+          unless you use collations.)
+    @item(The default type system is weaker typed, most values are automatically converted if necessary, e.g. "1" + 2 returns 3. @br
+          )
+    @item(If a namespace prefix is unknown, the namespace is resolved using the current context item.
+          This basically allows you to do namespace prefix only matching.
+          )
+    @item(Element tests based on types of the xml are not suppored (since it can not read schemas ) )
+    @item(Regex remarks: @unorderedList(
+      @item(If you use "-strings instead of '-strings, you have to escape $ as @code($$;).)
+      @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
+      @item($0 and $& can be used as substitute for the
+    whole regex, and $i or  ${i} is substituted with the i-th submatch, for any integer i. Therefore $12 is match 12, while ${1}2 is match 1 followed by digit 2)
+    ))
+    )
+
+    New functions:@br
+
+    @unorderedList(
 
       @item(@code(deep-text()) @br This is the concatenated plain text of the every tag inside the current text.
                                       You can also pass a separator like deep-text(' ') to separate text of different nodes.)
       @item(@code(filter(<string>,<regex>[,<match>,[<flags>]])) @br This applies the regex <regex> to <string> and returns only the matching part.
                                                                     If the <match> argument is used, only the <match>-th submatch will be returned
                                                                     (<match> must be a string containing a number). )
-      @item(@code(eval(<string>)) @br This evaluates the string as a pseudo-XPath-expression. )
+      @item(@code(eval(<string>)) @br This evaluates the string as a XQuery-expression. )
       @item(@code(css(<string>)) @br This evaluates the string as a css selector. )
       @item(@code(parse-date(<string>, <format>))
                   @br Reads a date/time from string with the given format )
@@ -1169,27 +1189,12 @@ type
                   @br Objects can be assigned to each other (e.g. @code(obj1 := object(), obj2 := object(), obj2.prop := 123, obj1.sub := obj2 ) ).
                                        Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers). @br
                                        However, objects are still preliminary/experimental.)
+      @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions", which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
 
     )
 
-    @unorderedList(
-    @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
-          unless you use collations.)
-    @item(All atomic values (except dates and ints) are stored as pascal extended/string, so their ranges may be smaller than XPaths demands.
-    @item(The system is weaker typed, most values are automatically converted if necessary. @br
-          Especially @code('false' = false()).  (in contrast to XPath where @code('false' = true()) holds)
-          )
-    @item(The namespace axis are not supported and namespace comparisons only look at the prefix (ignoring the associated namespace url, althought you can read that if you want))
-    @item(Element tests based on types of the xml are not suppored (since it can not read schemes ) )
-    @item(Regex remarks: @unorderedList(
-      @item(If you use "-strings instead of '-strings, you have to escape $ as @code($$;).)
-      @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
-      @item($0 and $& can be used as substitute for the
-    whole regex, and $i or  ${i} is substituted with the i-th submatch, for any integer i. Therefore $12 is match 12, while ${1}2 is match 1 followed by digit 2)
-    ))
-    )
 
-    You can look at the unit tests in the tests directory to see many (~ 2000) examples.
+    You can look at the unit tests in the tests directory to see many (> 3000) examples.
 
     @bold(Using the class in FPC)
 
@@ -1239,7 +1244,7 @@ type
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
 
-    StaticContext: TXQStaticContext;
+    StaticContext: TXQStaticContext;  //**< XQuery static context, defining various default values.
 
 
     VariableChangelog: TXQVariableChangeLog;  //**< All variables that have been set (if a variable was overriden, it stores the old and new value)
@@ -1249,13 +1254,13 @@ type
     OnDefineVariable: TDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
     OnDeclareExternalVariable: TDeclareExternalVariableEvent; //**< Event called to import a variable that is declared as "declare variable ... external" in a XQuery expression
     OnDeclareExternalFunction: TDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression.
-    OnImportModule: TImportModuleEvent;
+    OnImportModule: TImportModuleEvent;  //**< Event called to import a XQuery module that has not previously be defined
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TEvaluateVariableEvent; //**< Event called by fn:collection
 
     AllowVariableUseInStringLiterals: boolean; //**< If "...$var.. " should be replaced by the value of var, or remain a string literal
-    GlobalNamespaces: TNamespaceList;
+    GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
 
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
@@ -1282,14 +1287,14 @@ type
     //** Evaluates an expression with a certain tree element as current node.
     class function evaluateStaticCSS3(expression: string; tree:TTreeElement = nil): IXQValue;
 
-    procedure registerModule(module: IXQuery);
-    function findModule(const namespaceURL: string): TXQuery;
-    class function findNativeModule(const ns: string): TXQNativeModule;
+    procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. A XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
+    function findModule(const namespaceURL: string): TXQuery; //**< Finds a certain registered XQuery module
+    class function findNativeModule(const ns: string): TXQNativeModule; //**< Finds a native module.
 
     //** Registers a collation for custom string comparisons
     class procedure registerCollation(const collation: TXQCollation);
 
-    //**< Returns the collation for an url id
+    //** Returns the collation for an url id
     class function getCollation(id:string; base: string): TXQCollation;
   private
     FLastQuery: IXQuery;
@@ -1545,13 +1550,20 @@ type
 
 { TXQNativeModule }
 
+ {** A native XQuery module. Each native module has a certain namespace and declares functions, types and operators *}
  TXQNativeModule = class
   namespace: INamespace;
   parent: TXQNativeModule;
   constructor create(const anamespace: INamespace; const aparentModule: TXQNativeModule=nil);
   destructor Destroy; override;
+  //** Registers a function that does not depend on the context.
+  //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
   procedure registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
+  //** Registers a function that does depend on the context.
+  //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
   procedure registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string);
+  //** Registers a binary operator
+  //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   procedure registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string);
   procedure registerType(const typ: TXQValueClass);
 
@@ -1565,9 +1577,12 @@ protected
  procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
 end;
 
-  function jsonStrEscape(s: string):string;
-  procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
-  procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
+//**Returns a "..." string for use in json (internally used)
+function jsonStrEscape(s: string):string;
+//**Checks the length of the args array (internally used)
+procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
+//**Calculates starting position / length from a range definition (checks for things like NaN, INF, ...) (internally used)
+procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 
   const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
   const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';

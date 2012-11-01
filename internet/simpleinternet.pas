@@ -3,9 +3,20 @@
 
   To get started, you can just use the function retrieve('...url...') to get the data you need as a string. @br
 
-  Retrieve also supports file:// urls or other data source; if you want to only get http sites or make a http POST request, you have to use httpRequest.@br@br
+  Retrieve also supports file:// urls or other data source; if you want to restrict it to http GET/POST-requests only, you can use the httpRequest function.@br@br
 
-  The data can then be processed with process, with applies an PXPath expression or a html template to it.
+  The data can then be processed with process which applies an XPath/XQuery expression or a html template to it.@br@br
+
+  @bold(Example)
+
+  Get all links on a page:
+
+  @longCode(#
+    for v in process('http://www.freepascal.org', '//a') do
+      writeln(v.toString, ' => ', v.toNode['href']);
+  #)
+
+
 
 *)
 unit simpleinternet;
@@ -23,7 +34,7 @@ uses
 //{$DEFINE USE_WININET_WRAPPER}
 //{$DEFINE USE_NO_WRAPPER}
 
-
+//** IXQValue from the xquery unit. Just a wrapper, so that no other unit needs to be included
 type IXQValue = xquery.IXQValue;
 
 (***
@@ -47,33 +58,41 @@ function retrieve(data: string): string;
 
 
 
-//**Make a http GET request to a certain url
+//**Make a http GET request to a certain url.
 function httpRequest(url: string): string;
-//**Make a http POST request to a certain url, sending the data in rawpostdata unmodified to the server
+//**Make a http POST request to a certain url, sending the data in rawpostdata unmodified to the server.
 function httpRequest(url: string; rawpostdata: string): string;
-//**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it
+//**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it.
 function httpRequest(url: string; postdata: TStringList): string;
 //**Make a http request to an address given in an IXQValue.  @br
-//**node: if a link (a), download @href. If a resource (img, frame), download @src. Otherwise download the text
-//**object: Download obj.url, possibly sending obj.post as postdata
-//**else: Download string value
-function httpRequest(const dest: IXQValue): string;
+//**node: if a link (a), download @@href. If a resource (img, frame), download @@src. Otherwise download the text@br.
+//**object: Download obj.url, possibly sending obj.post as postdata.
+//**else: Download the string value.
+function httpRequest(const dest: xquery.IXQValue): string;
 
 (***
 Processes data with a certain query.@br@br
 
-data can be an url, or a html/xml file in a string.@br@br
+data can be an url, or a html/xml file in a string, like in retrieve.@br@br
 
 
-query can be a @link(pseudoxpath.TPseudoXPathParser PXPath expression), like in @code(process('http://www.google.de', '/html/head/title');). @br@br
+query can be a @link(xquery.TXQueryEngine XPath/XQuery expression), like in @code(process('http://www.google.de', '//title');). @br@br
 
 Or query can be a @link(extendedhtmlparser.THtmlTemplateParser html template) like @code(process('http://www.google.de', '<title><t:s>result:=text()</t:s></title>');)
 The advantage of such templates is that they can return several variables at once and a canonical representation of the same data on different web sites.
 To get a list of all variables of the last query you can use processedVariables.@br@br
 
-The function processedTree will always return a tree representation of the last processed data string.
+This function returns an IXQValue value, which is a variant for XQuery expression.
+If you want a string value, you can convert it like @code(process(...).toString). Or if you want to access a retrieved node directly, you can use @code(process(..).toNode).@br
+It can also contain multiple values, which can be access like @code(for x in process(..)), where x is another IXQValue.
+
+
+The global function processedTree returns a tree representation of the last processed data string.
+
+
+
 *)
-function process(data: string; query: string): IXQValue;
+function process(data: string; query: string): xquery.IXQValue;
 //**Returns a tree representation of the last processed html/xml data@br
 //**Might return nil
 function processedTree: TTreeElement;
@@ -138,7 +157,7 @@ begin
 end;
 
 
-function process(data: string; query: string): IXQValue;
+function process(data: string; query: string): xquery.IXQValue;
 var dataFileName: string;
   datain: String;
   tempVars: TXQVariableChangeLog;
@@ -239,7 +258,7 @@ begin
   result := httpRequest(url, TInternetAccess.urlEncodeData(postdata));
 end;
 
-function httpRequest(const dest: IXQValue): string;
+function httpRequest(const dest: xquery.IXQValue): string;
 var n: TTreeElement;
 begin
   case dest.kind of

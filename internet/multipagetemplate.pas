@@ -16,7 +16,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
 
 (***
-  @abstract(This unit contains classes to handle multi-page templates. A collection of single-page templates that can applied to different pages.)@br@br
+  @abstract(This unit contains classes to handle multi-page templates. A collection of single-page templates that can be applied to different pages.)@br@br
 
   The class TMultiPageTemplate can be used to load a template (and there is also the documentation of the template syntax/semantic).
 
