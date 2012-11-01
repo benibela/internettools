@@ -159,7 +159,7 @@ procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
 //I: case insensitive
 
 type
-  TEncoding=(eUnknown,eWindows1252,eUTF8,eUTF16BE,eUTF16LE);
+  TEncoding=(eUnknown,eWindows1252,eUTF8,eUTF16BE,eUTF16LE,eUTF32BE,eUTF32LE);
 
 //copy
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
@@ -320,6 +320,7 @@ function strChangeEncoding(const str: string; from,toe: TEncoding):string; //**<
 function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string; //**< Get unicode character @code(character) in a certain encoding
 function strDecodeUTF8Character(const str: string; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromName(str:string):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+function strEncodingFromBOMRemove(var str:string):TEncoding; //**< Gets the encoding from an unicode bom and removes it
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
@@ -1366,6 +1367,38 @@ begin
   end;
 end;
 
+procedure strSwapEndianWord(var str: string);
+var
+  i: Integer;
+begin
+  i := 1;
+  while i < length(str) do begin
+    PWord(@str[i])^ := SwapEndian(PWord(@str[i])^);
+    i+=2;
+  end;
+end;
+
+procedure strSwapEndianDWord(var str: string);
+var
+  i: Integer;
+begin
+  i := 1;
+  while i < length(str) do begin
+    PDWord(@str[i])^ := SwapEndian(PDWord(@str[i])^);
+    i+=4;
+  end;
+end;
+
+
+function strConvertToUtf8FromUTF32N(str: string): string;
+var temp: UCS4String;
+begin
+  SetLength(temp, length(str) div 4 + 1);
+  move(str[1], temp[0], length(str));
+  temp[high(temp)] := 0; //tailing #0
+  result := UTF8Encode(UCS4StringToUnicodeString(temp));
+end;
+
 function strConvertToUtf8(str: string; from: TEncoding): string;
 var len: longint;
     reslen: longint;
@@ -1408,24 +1441,36 @@ begin
     {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
       SetLength(result, (length(str) * 3) div 2);
       i := UnicodeToUtf8(pointer(result), length(result) + 1, pointer(str), length(str) div 2);
-      if i > 0 then SetLength(result, i);
+      if i > 0 then SetLength(result, i - 1);
     end;
     {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
-      result := strConvertToUtf8(str, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
-      i := 1;
-      while i < length(result) do begin
-        PWord(@result[i])^ := SwapEndian(PWord(@result[i])^);
-        i+=2;
-      end;
+      result := str;
+      strSwapEndianWord(result);
+      result := strConvertToUtf8(result, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
     end;
+    {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF}: result := strConvertToUtf8FromUTF32N(str);
+    {$IFDEF ENDIAN_BIG}eUTF32LE{$ELSE}eUTF32BE{$ENDIF}: begin
+      result := str;
+      strSwapEndianDWord(result);
+      result := strConvertToUtf8FromUTF32N(result);
+    end
     else raise Exception.Create('Unknown encoding in strConvertToUtf8');
   end;
 end;
 
 
+function strConvertFromUtf8ToUTF32N(str: string): string;
+var temp: UCS4String;
+begin
+  temp := UnicodeStringToUCS4String(UTF8Decode(str));
+  setlength(str, (length(temp) - 1)*4);
+  move(temp[0], str[1], length(str));
+end;
+
 function strConvertFromUtf8(str: string; toe: TEncoding): string;
 var len, reslen, i, pos: longint;
 begin
+  if str = '' then exit;
   case toe of
     eUnknown, eUTF8: result:=str;
     eWindows1252: begin //actually latin-1
@@ -1456,12 +1501,13 @@ begin
     end;
     {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
       result := strConvertFromUtf8(str, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
-      i := 1;
-      while i < length(result) do begin
-        PWord(@result[i])^ := SwapEndian(PWord(@result[i])^);
-        i+=2;
-      end;
+      strSwapEndianWord(result)
     end;
+    {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF}: result := strConvertFromUtf8ToUTF32N(str);
+    {$IFDEF ENDIAN_BIG}eUTF32LE{$ELSE}eUTF32BE{$ENDIF}: begin
+      result := strConvertFromUtf8ToUTF32N(str);
+      strSwapEndianDWord(result);
+    end
     else raise Exception.Create('Unknown encoding in strConvertFromUtf8');
   end;
 end;
@@ -1547,10 +1593,32 @@ begin
 
 end;
 
+function strEncodingFromBOMRemove(var str: string): TEncoding;
+begin
+  if strbeginswith(str,#$ef#$bb#$bf) then begin
+    delete(str,1,3);
+    result:=eUTF8;
+  end else if strbeginswith(str,#$fe#$ff) then begin
+    delete(str,1,2);
+    result:=eUTF16BE;
+  end else if strbeginswith(str,#$ff#$fe) then begin
+    delete(str,1,2);
+    result:=eUTF16LE;
+  end else if strbeginswith(str,#00#00#$fe#$ff) then begin
+    delete(str,1,4);
+    result:=eUTF32BE;
+  end else if strbeginswith(str,#$ff#$fe#00#00) then begin
+    delete(str,1,4);
+    result:=eUTF32LE;
+  end else result := eUnknown;
+end;
+
+
 {%SPECIAL:INCLUDE-ENTITY-DECODER}
 
 
 {$ifndef BBUTILS_INCLUDE_COMPLETE}
+
 function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
 begin
   raise Exception.Create('bbutils include missing');

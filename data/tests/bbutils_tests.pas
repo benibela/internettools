@@ -536,6 +536,11 @@ begin
   test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$D8#$34#$DD#$1E#$D8#$34#$DD#$1E, eUTF16BE));
   test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$34#$D8#$1E#$DD#$34#$D8#$1E#$DD, eUTF16LE));
 
+  test(#$79, strConvertToUtf8(#$00#$00#$00#$79, eUTF32BE));
+  test(#$79, strConvertToUtf8(#$79#$00#$00#$00, eUTF32LE));
+  test(#$79 + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$00#$00#$00#$79#$00#$01#$D1#$1E, eUTF32BE));
+  test(#$79 + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$79#$00#$00#$00#$1E#$D1#$01#$00, eUTF32LE));
+
   //splitting
   test(strSplit('hallo,welt,maus')[1] = 'welt');
 

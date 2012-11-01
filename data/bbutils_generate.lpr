@@ -2205,15 +2205,15 @@ var
   s: String;
   i: Integer;
 begin
-  totalresult+=('const entityMap: array['+IntToStr(low(entities))+'..'+IntToStr(high(entities))+'] of array[TEncoding] of string=(')+LineEnding;
+  totalresult+=('const entityMap: array['+IntToStr(low(entities))+'..'+IntToStr(high(entities))+'] of array[eUnknown..eUTF8] of string=(')+LineEnding;
   for ent:=low(entities) to high(entities) do begin
     totalresult+=('('''+strcopyfrom(entities[ent].s,4)+''',');
     enc:=low(TEncoding);inc(enc);
-    for enc:=enc to high(TEncoding) do begin
+    for enc:=enc to eUTF8 do begin
       s := strGetUnicodeCharacter(entities[ent].c, enc);
       for i:=1 to length(s) do
         totalresult+='#'+IntToStr(ord(s[i]));
-      if enc <> high(TEncoding) then totalresult+=',';
+      if enc <> eUTF8 then totalresult+=',';
     end;
     totalresult+=(')');
     if ent <> high(entities) then totalresult+=(',')+LineEnding
@@ -2228,7 +2228,7 @@ const SDHE_Start: string =
 '    entity,entityStart, entityEnd, entityBase: longint;'+LineEnding+
 '    entitys: string;'+LineEnding+
 'begin'+LineEnding+
-'  if encoding = eUnknown then encoding := eUtf8;'+LineEnding+
+'  if encoding = eUnknown then encoding := eUtf8 else if encoding > eUTF8 then raise exception.create(''Entity conversion is only supported for utf-8 and latin1 for this encoding.'');'+LineEnding+
 '  setLength(result,l);'+LineEnding+
 '  lastChar:=@p[l-1];'+LineEnding+
 '  ResLen:=0;'+LineEnding;
