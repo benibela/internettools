@@ -2623,6 +2623,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   xml.parseTree('<?xml encoding="utf-8" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> eUTF8 then raise Exception.Create('xml encoding detection failed 3');
   xml.parseTree('<?xml encoding="windows-1252" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> eWindows1252 then raise Exception.Create('xml encoding detection failed 4');
 
+  writeln('XPath 2: ', i, ' completed');
+
   ps.free;
   xml.Free;
   vars.Free;

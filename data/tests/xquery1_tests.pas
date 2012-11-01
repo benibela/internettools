@@ -1504,6 +1504,8 @@ begin
   m('count(<a>X</a> union <b>Y</b>)', '2');
 
 
+  writeln('XQuery: ', count, ' completed');
+
   helper.free;
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
