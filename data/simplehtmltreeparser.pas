@@ -1868,7 +1868,13 @@ begin
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);
   FTemplateCount:=1;
-  FXmlHeaderEncoding := eUnknown;
+
+  FXmlHeaderEncoding := strEncodingFromBOMRemove(html);
+  if not (FXmlHeaderEncoding in [eUTF8, eUnknown]) then begin
+    html := strConvertToUtf8(html, FXmlHeaderEncoding);
+    FXmlHeaderEncoding:=eUTF8;
+  end;
+
 
   //parse
   if FParsingModel = pmHTML then simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText, @readComment)

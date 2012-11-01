@@ -1237,15 +1237,7 @@ var el: TTemplateElement;
     looper: TTemplateElement;
     temp: TTemplateElement;
 begin
-  FTemplate.getLastTree.setEncoding(eUnknown, false, false);
-  if strbeginswith(template,#$ef#$bb#$bf) then begin
-    delete(template,1,3);
-    FTemplate.getLastTree.setEncoding(eUTF8,false,false);
-  end else if strbeginswith(template,#$fe#$ff) or strbeginswith(template,#$ff#$fe) or
-    strbeginswith(template,#00#00#$fe#$ef) then
-    raise Exception.Create('Ungültiger Codierung BOM im Template');
-
-  //read template
+   //read template
   FTemplate.parseTree(template, templateName);
   el := TTemplateElement(FTemplate.getLastTree.next);
   while el <> nil do begin
