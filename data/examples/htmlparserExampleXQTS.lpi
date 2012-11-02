@@ -30,7 +30,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--plain /home/benito/xxtest/wtf.xml"/>
+        <CommandLineParams Value="--plain /home/benito/xxtest/cat/functx-fn-normalize-unicode.xml"/>
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>

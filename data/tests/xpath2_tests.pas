@@ -2603,6 +2603,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode') <> nil then begin
     t('translate("Hallö", "aö", "äo")', 'Hällo');
     t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
+    t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);
+    t('normalize-unicode("e'#$CC#$81'", "")', 'e'#$CC#$81);
     t('string-join(string-to-codepoints("XÄY"), " ")', '88 196 89');
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")

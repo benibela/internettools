@@ -85,6 +85,7 @@ var
   p: pchar;
 begin
   requiredArgCount(args, 1, 2);
+  if args[0].toString = '' then exit(xqvalue(''));
   method := 'NFC';
   if length(args) = 2 then method := trim(UpperCase(args[1].toString));
 
@@ -95,7 +96,7 @@ begin
     'NFKC': p := utf8proc_NFKC(p);
     'NFKD': p := utf8proc_NFKD(p);
     //'FULLY-NORMALIZED': ??
-    '': ; //s := s;
+    '': exit(args[0]);
     else raise EXQEvaluationException.Create('Unknown normalization method: '+method);
   end;
 
