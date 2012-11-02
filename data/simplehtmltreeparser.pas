@@ -1869,7 +1869,7 @@ begin
   FElementStack.Add(FCurrentElement);
   FTemplateCount:=1;
 
-  FXmlHeaderEncoding := strEncodingFromBOMRemove(html);
+  FXmlHeaderEncoding := strEncodingFromBOMRemove(FCurrentFile);
   if not (FXmlHeaderEncoding in [eUTF8, eUnknown]) then begin
     html := strConvertToUtf8(html, FXmlHeaderEncoding);
     FXmlHeaderEncoding:=eUTF8;
