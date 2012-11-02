@@ -83,19 +83,22 @@ type
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
     defaultFunctionNamespace: INamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
     defaultElementTypeNamespace: INamespace; //**< Default element type namespace (default is empty)
-    defaultTypeNamespace: INamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
 
     baseURI: string;              //**< Static base uri
     collation: TXQCollation;      //**< Default collation for string comparisons
-    nodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
-    stringEncoding: TEncoding;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
-    strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
 
 
     stripBoundarySpace: boolean;  //**< If <a>  </a> is equivalent to <a/>. Only used during parsing of the query, ignored during evaluation
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
 
     copyNamespacePreserve, copyNamespaceInherit: boolean;
+
+    //extensions
+    defaultTypeNamespace: INamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
+    nodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
+    stringEncoding: TEncoding;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
+    strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
+    useContextItemNamespaces: boolean;
 
     //**ignored
     ordering: boolean;  //**< unused
@@ -2095,6 +2098,7 @@ begin
   result.copynamespaceinherit := copynamespaceinherit;
   result.stringEncoding:=stringEncoding;
   result.strictTypeChecking:=strictTypeChecking;
+  Result.useContextItemNamespaces:=useContextItemNamespaces;
 end;
 
 destructor TXQStaticContext.Destroy;
@@ -3445,6 +3449,7 @@ begin
   StaticContext.copyNamespaceInherit:=true;
   StaticContext.copyNamespacePreserve:=true;
   StaticContext.stringEncoding:=eUTF8;
+  StaticContext.useContextItemNamespaces:=true;
   FModules := TInterfaceList.Create;
 end;
 
@@ -4036,7 +4041,7 @@ var
   n : IXQValue;
   newSequenceSeq: TXQVList;
   resultSeq: TXQValueSequence;
-  cachedNamespace: boolean;
+  cachedNamespace: INamespace;
   cachedNamespaceURL: string;
 
   procedure add(const v: IXQValue); inline;
@@ -4059,8 +4064,18 @@ begin
     tempContext.SeqIndex:=0;
   end;
 
+  if qmCheckNamespace in command.matching then begin
+    if qmAttribute in command.matching then cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkUnknown)
+    else cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkElementType);
+    if cachedNamespace <> nil then cachedNamespaceURL:=cachedNamespace.getURL
+    else if not context.staticContext.useContextItemNamespaces then begin
+      if command.namespacePrefix <> '' then raise EXQEvaluationException.Create('Unknown namespace prefix: '+command.namespacePrefix+' for element matching');
+      cachedNamespaceURL:='';
+      cachedNamespace := XMLNamespace_XMLSchema; //just assign something, so it is not nil. The value is not used
+    end;
+  end;
+
   newSequence := nil;
-  cachedNamespace := false;
   nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
   onlyNodes := false;
   for n in previous do begin
@@ -4076,14 +4091,9 @@ begin
       assert(n.toNode <> nil);
       oldnode := n.toNode;
       unifyQuery(oldnode, command, nodeCondition);
-      if xqpncCheckNamespace in nodeCondition.options then begin
-        if not cachedNamespace then begin
-          if qmAttribute in command.matching then cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix, xqdnkUnknown)
-          else cachedNamespaceURL := context.findNamespaceURL(command.namespacePrefix, xqdnkElementType);
-          cachedNamespace:=true;
-        end;
-        nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
-      end;
+      if xqpncCheckNamespace in nodeCondition.options then
+        if (cachedNamespace <> nil) then nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
+        else Exclude(nodeCondition.options, xqpncCheckNamespace);
       newnode := getNextQueriedNode(nil, nodeCondition);
       if newnode = nil then continue;
       j:=0;
@@ -4091,6 +4101,9 @@ begin
       newSequenceSeq := (newSequence as TXQValueSequence).seq;
       newSequenceSeq.count := 0;
       while newnode <> nil do begin
+        if ((qmCheckNamespace in command.matching) = (xqpncCheckNamespace in nodeCondition.options))
+           or (newnode.getNamespacePrefix() = command.namespacePrefix)                            //extension, use namespace bindings of current item, if it is not statically known
+           or (newnode.getNamespaceURL(command.namespacePrefix) = newnode.getNamespaceURL()) then
         newSequenceSeq.add(xqvalue(newnode));
         newnode := getNextQueriedNode(newnode, nodeCondition);
       end;

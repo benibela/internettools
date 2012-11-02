@@ -66,6 +66,7 @@ begin
 
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
+  ps.StaticContext.useContextItemNamespaces:=false;
   ps.ImplicitTimezone:=-5 / HoursPerDay;
   ps.OnEvaluateVariable:=@vars.evaluateVariable;
   ps.OnDefineVariable:=@vars.defineVariable;
@@ -2609,6 +2610,23 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
   end;
+
+
+  t('local-name(html)', '',  '<html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html>');
+  ps.StaticContext.useContextItemNamespaces:=true;
+  t('local-name(html)', 'html');
+  t('local-name(html/svg:*)', 'abc');
+  t('local-name(html/svg2:*)', 'abc');
+  t('local-name(html/svg3:*)', '');
+  t('string-join(for $i in html/svg:abc/* return local-name($i), " ")', 'a b c');
+  t('string-join(for $i in html/svg:abc/svg:* return local-name($i), " ")', 'a b'); //svg and svg2 have the same ns url, so they are both returned
+  t('string-join(for $i in html/svg:abc/svg2:* return local-name($i), " ")', 'a b');
+  t('string-join(for $i in html/svg:abc/svg3:* return local-name($i), " ")', 'c');
+
+  t('', '',  '<html xmlns="foobar"><svg:abc xmlns:svg="svgNS"> foobar </svg:abc> <svg2:def xmlns:svg2="svgNS"> foobar </svg2:def> <svg:xyz xmlns:svg="NS2"> 123 </svg:xyz>  </html>');
+  t('string-join(for $i in html/svg:* return local-name($i), " ")', 'abc xyz');
+  t('string-join(for $i in html/svg:* return $i, " ")', 'foobar 123');
+
 
   performUnitTest('$abc','alphabet','');
   performUnitTest('$ABC','','');

@@ -1504,6 +1504,12 @@ begin
   m('count(<a>X</a> union <b>Y</b>)', '2');
 
 
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html return local-name($i)', 'html');
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg:* return local-name($i)', 'a b');
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg2:* return local-name($i)', 'a b');
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg3:* return local-name($i)', 'c');
+
+
   writeln('XQuery: ', count, ' completed');
 
   helper.free;
