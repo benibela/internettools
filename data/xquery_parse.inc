@@ -1171,6 +1171,16 @@ function TXQParsingContext.parseModule(): TXQTerm;
 
 
 
+  procedure readBoolean(var b: boolean; const v: string);
+  begin
+    case v of
+      'on':  b := true;
+      'off': b := false;
+      'toggle': b := not b;
+      else raiseParsingError('Invalid option value. Expected on/off/toggle');
+    end;
+  end;
+
 var
   token: String;
   nameSpaceName: String;
@@ -1281,11 +1291,10 @@ begin
         if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
           case token of
             'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
-            'extended-strings': case temp of
-              'on': AllowVariableUseInStringLiterals:=true;
-              'off': AllowVariableUseInStringLiterals:=false;
-              'toggle': AllowVariableUseInStringLiterals:=not AllowVariableUseInStringLiterals;
-            end;
+            'extended-strings': readBoolean(AllowVariableUseInStringLiterals, temp);
+            'objects': readBoolean(AllowObjects, temp);
+            'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
+            'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
           end;
         end;
       end;

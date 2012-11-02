@@ -66,7 +66,7 @@ begin
 
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
-  ps.StaticContext.useContextItemNamespaces:=false;
+  ps.StaticContext.useLocalNamespaces:=false;
   ps.ImplicitTimezone:=-5 / HoursPerDay;
   ps.OnEvaluateVariable:=@vars.evaluateVariable;
   ps.OnDefineVariable:=@vars.defineVariable;
@@ -2613,7 +2613,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
 
   t('local-name(html)', '',  '<html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html>');
-  ps.StaticContext.useContextItemNamespaces:=true;
+  ps.StaticContext.useLocalNamespaces:=true;
   t('local-name(html)', 'html');
   t('local-name(html/svg:*)', 'abc');
   t('local-name(html/svg2:*)', 'abc');

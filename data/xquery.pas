@@ -98,7 +98,7 @@ type
     nodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
     stringEncoding: TEncoding;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
-    useContextItemNamespaces: boolean;
+    useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
 
     //**ignored
     ordering: boolean;  //**< unused
@@ -1136,22 +1136,23 @@ type
     Changed syntax:@br
 
     @unorderedList(
-    @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. )
+    @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. (option: extended-strings))
     @item(@code(var:=value) @br This assignes the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) @br (Remark: I'm too lazy to formally define a execution order, but you can assume it is left-to-right _for now_))
     @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
           unless you use collations.)
     @item(The default type system is weaker typed, most values are automatically converted if necessary, e.g. "1" + 2 returns 3. @br
+          (option: strict-type-checking))
+    @item(If a namespace prefix is unknown, the namespace is resolved using the current context item. @br
+          This basically allows you to do namespace prefix only matching. (option: use-local-namespaces)
           )
-    @item(If a namespace prefix is unknown, the namespace is resolved using the current context item.
-          This basically allows you to do namespace prefix only matching.
-          )
-    @item(Element tests based on types of the xml are not suppored (since it can not read schemas ) )
+    @item(Element tests based on types of the xml are not supported (since it can not read schemas ) )
     @item(Regex remarks: @unorderedList(
       @item(If you use "-strings instead of '-strings, you have to escape $ as @code($$;).)
       @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
       @item($0 and $& can be used as substitute for the
     whole regex, and $i or  ${i} is substituted with the i-th submatch, for any integer i. Therefore $12 is match 12, while ${1}2 is match 1 followed by digit 2)
     ))
+    @item( Most of them can be disabled with 'declare option pxp:respective-option "off"' (that there are syntax modifying options is another extension) )
     )
 
     New functions:@br
@@ -2098,7 +2099,7 @@ begin
   result.copynamespaceinherit := copynamespaceinherit;
   result.stringEncoding:=stringEncoding;
   result.strictTypeChecking:=strictTypeChecking;
-  Result.useContextItemNamespaces:=useContextItemNamespaces;
+  Result.useLocalNamespaces:=useLocalNamespaces;
 end;
 
 destructor TXQStaticContext.Destroy;
@@ -3449,7 +3450,7 @@ begin
   StaticContext.copyNamespaceInherit:=true;
   StaticContext.copyNamespacePreserve:=true;
   StaticContext.stringEncoding:=eUTF8;
-  StaticContext.useContextItemNamespaces:=true;
+  StaticContext.useLocalNamespaces:=true;
   FModules := TInterfaceList.Create;
 end;
 
@@ -4068,7 +4069,7 @@ begin
     if qmAttribute in command.matching then cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkUnknown)
     else cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkElementType);
     if cachedNamespace <> nil then cachedNamespaceURL:=cachedNamespace.getURL
-    else if not context.staticContext.useContextItemNamespaces then begin
+    else if not context.staticContext.useLocalNamespaces then begin
       if command.namespacePrefix <> '' then raise EXQEvaluationException.Create('Unknown namespace prefix: '+command.namespacePrefix+' for element matching');
       cachedNamespaceURL:='';
       cachedNamespace := XMLNamespace_XMLSchema; //just assign something, so it is not nil. The value is not used

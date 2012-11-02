@@ -1509,6 +1509,15 @@ begin
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg2:* return local-name($i)', 'a b');
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg3:* return local-name($i)', 'c');
 
+  m('declare option pxp:extended-strings "on"; let $a := 17 return ">$a;<" ', '>17<');
+  m('declare option pxp:extended-strings "off"; let $a := 17 return ">$a;<" ', '>$a;<');
+  m('declare option pxp:strict-type-checking "off"; "1" + 2 ', '3');
+  //m('declare option pxp:strict-type-checking "on"; "1" + 2 ', '<fail>');
+  m('declare option pxp:use-local-namespaces "on";  <r><a:b xmlns:a="xxx">!</a:b></r> / a:b ', '!');
+  m('declare option pxp:use-local-namespaces "on";  <r><b xmlns="xxx">!</b></r> / b ', '!');
+  m('declare option pxp:use-local-namespaces "off";  <r><b xmlns="xxx">!</b></r> / b ', '');
+
+
 
   writeln('XQuery: ', count, ' completed');
 
