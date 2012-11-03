@@ -546,7 +546,7 @@ begin
   baseActions.clear;
 
   (t as TTreeDocument).setEncoding(eUTF8,true,true);
-  if t.typ <> tetOpen then raise Exception.Create('Empty template');
+  if not (t.typ in [tetOpen, tetDocument]) then raise Exception.Create('Empty template');
   u := t.findChild(tetOpen,'action',[tefoIgnoreText]);
   if u = nil then raise Exception.Create('Empty template');
   baseActions.addChildrenFromTree(u.getParent());
