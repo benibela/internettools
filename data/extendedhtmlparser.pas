@@ -412,7 +412,7 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    procedure evaluatePXPVariable(sender: TObject; const variable: string; var value: IXQValue);
+    procedure evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
@@ -434,7 +434,7 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     function debugMatchings(const width: integer): string;
-    function createXQuery(const expression: string): IXQuery; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
+    function parseXPath(const expression: string): IXQuery; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TXQVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
@@ -572,7 +572,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     if templateAttributes = nil then exit(nil);
     i := templateAttributes.IndexOfName(name);
     if i < 0 then exit(nil);
-    result := parser.createXQuery(templateAttributes.ValueFromIndex[i]);
+    result := parser.parseXPath(templateAttributes.ValueFromIndex[i]);
   end;
 
   procedure cacheRegExpr(name: string; prefix, suffix: string; escape: boolean);
@@ -606,7 +606,7 @@ begin
 
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
-  if templateType = tetCommandShortRead then source := parser.createXQuery(strDecodeHTMLEntities(deepNodeText(),eUTF8)) //todo: use correct encoding
+  if templateType = tetCommandShortRead then source := parser.parseXPath(strDecodeHTMLEntities(deepNodeText(),eUTF8)) //todo: use correct encoding
   else source := cachePXP('source');
 
   if templateAttributes= nil then exit;
@@ -664,7 +664,7 @@ begin
   result := FTemplate.getLastTree;
 end;
 
-function THtmlTemplateParser.createXQuery(const expression: string): IXQuery;
+function THtmlTemplateParser.parseXPath(const expression: string): IXQuery;
 begin
   if expression = '' then raise ETemplateParseException.Create('no expression given');
   result := FQueryEngine.parseXPath2(expression);
@@ -690,7 +690,7 @@ begin
   result := FVariables;
 end;
 
-procedure THtmlTemplateParser.evaluatePXPVariable(sender: TObject; const variable: string; var value: IXQValue);
+procedure THtmlTemplateParser.evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue);
 var
   temp: TXQValue;
 begin
@@ -1109,7 +1109,7 @@ begin
 
   FQueryEngine := TXQueryEngine.create;
   FQueryEngine.OnDefineVariable:= @FVariableLog.defineVariable;
-  FQueryEngine.OnEvaluateVariable:=@evaluatePXPVariable;
+  FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -1343,7 +1343,7 @@ begin
       while (i<=length(s)) and (s[i]<>';')  do inc(i);
       temp:=copy(s,f,i-f);
       tempxqvalue:=xqvalue();
-      evaluatePXPVariable(self,temp,tempxqvalue);
+      evaluateXQVariable(self,temp,tempxqvalue);
       value:=tempxqvalue.toString;
       if assigned(customReplace) then customReplace(temp,value);
     //  OutputDebugString(pchar(parser.variables.Text));

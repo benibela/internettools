@@ -29,7 +29,7 @@ unit multipagetemplate;
 interface
 
 uses
-  Classes, SysUtils,bbutils,extendedhtmlparser,simplehtmlparser,simplehtmltreeparser,simplexmlparser, pseudoxpath,dRegExpr,internetaccess;
+  Classes, SysUtils,bbutils,extendedhtmlparser,simplehtmlparser,simplehtmltreeparser,simplexmlparser, xquery,dRegExpr,internetaccess;
 
 type
 
@@ -278,13 +278,13 @@ type
 { THtmlTemplateParserBreaker }
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
-  function getVariable(name: string): TPXPValue;
+  function getVariable(name: string): IXQValue;
 end;
 
-function THtmlTemplateParserBreaker.getVariable(name: string): TPXPValue;
+function THtmlTemplateParserBreaker.getVariable(name: string): IXQValue;
 begin
-  result := pxpvalue();
-  evaluatePXPVariable(self, name, result);
+  result := xqvalue();
+  evaluateXQVariable(self, name, result);
 end;
 
 procedure TTemplateActionLoop.initFromTree(t: TTreeElement);
@@ -297,42 +297,28 @@ end;
 
 procedure TTemplateActionLoop.perform(reader: TMultipageTemplateReader);
 var
-  listx: TPXPValue;
-  testx: TPseudoXPathParser;
+  listx, x: IXQValue;
+  testx: IXQuery;
   i: Integer;
   j: Integer;
-  pxp: TPseudoXPathParser;
 begin
   if list <> '' then begin
     if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
-    pxp := reader.parser.createPseudoXPathParser(list);
-    listx := pxp.evaluate();
-    pxp.free;
+    listx := reader.parser.parseXPath(list).evaluate(); //TODO: parse only once
   end else listx := nil;
-  if test <> '' then testx := reader.parser.createPseudoXPathParser(test)
+  if test <> '' then testx := reader.parser.parseXPath(test)
   else testx := nil;
 
   if listx = nil then begin
     if testx <> nil then
-      while testx.evaluateToBoolean do
+      while testx.evaluate().toBoolean do
         performChildren(reader);
-  end else if listx.kind <> pvkSequence then begin
-    reader.parser.variableChangeLog.addVariable(varname, listx);
-    if (testx = nil) or (testx.evaluateToBoolean) then
-      performChildren(reader);
-  end else begin
-    for i := 0 to TPXPValueSequence(listx).seq.Count-1 do begin
-      reader.parser.variableChangeLog.addVariable(varname, TPXPValueSequence(listx).seq[i]);
-      if (testx <> nil) and (not testx.evaluateToBoolean()) then begin
-        for j:=i+1 to TPXPValueSequence(listx).seq.Count-1 do
-          TPXPValueSequence(listx).seq[j].free;
-        break;
-      end;
-      performChildren(reader);
-    end;
-    TPXPValueSequence(listx).freeNonRecursive;
+  end else for x in listx do begin
+    reader.parser.variableChangeLog.add(varname, x);
+    if (testx <> nil) and (not testx.evaluate().toBoolean) then
+      break;
+    performChildren(reader);
   end;
-  testx.free;
 end;
 
 { TTemplateActionCallAction }
@@ -377,22 +363,17 @@ end;
 
 procedure TTemplateActionLoadPage.perform(reader: TMultipageTemplateReader);
 var
-  cachedCondition: TPseudoXPathParser;
+  cachedCondition: IXQuery;
   cururl: String;
   post: String;
   page: String;
   tempname: String;
   j: Integer;
-  tempvalue: TPXPValue;
+  tempvalue: IXQValue;
 begin
   if condition <> '' then begin
-    cachedCondition := reader.parser.createPseudoXPathParser(condition); //TODO: long term cache
-    try
-      if not cachedCondition.evaluateToBoolean() then
-        exit;
-    finally
-      cachedCondition.clear;
-    end;
+    cachedCondition := reader.parser.parseXPath(condition); //TODO: long term cache
+    if not cachedCondition.evaluate().toBoolean then exit;
   end;
 
   if template<>'' then begin
@@ -406,11 +387,10 @@ begin
   if cururl <> '' then begin
     if (url[1] = '$') and (url[length(url)] = ';') and (pos('$', copy(url, 2, length(url) - 1)) <= 0) and (pos(';', copy(url, 1, length(url) - 1)) <= 0) then begin;
       tempvalue := THtmlTemplateParserBreaker(reader.parser).getVariable(copy(url, 2, length(url)-2));
-      if tempvalue is TPXPValueObject then begin
-        cururl := TPXPValueObject(tempvalue).getAsString('url');
-        post := TPXPValueObject(tempvalue).getAsString('post');
-      end else cururl:=tempvalue.asString;
-      tempvalue.free;
+      if tempvalue is TXQValueObject then begin
+        cururl := tempvalue.getProperty('url').toString;
+        post := tempvalue.getProperty('post').toString;
+      end else cururl:=tempvalue.toString;
     end else
       cururl := reader.parser.replaceVars(url);
     if cururl = '' then exit;
@@ -473,15 +453,14 @@ end;
 
 procedure TTemplateActionVariable.perform(reader: TMultipageTemplateReader);
 var
-  pxp: TPseudoXPathParser;
+  pxp: IXQuery;
 begin
   if hasValueStr then
     reader.parser.variableChangeLog.ValuesString[name] := reader.parser.replaceVars(value);
   if valuex <> '' then begin
-    pxp := reader.parser.createPseudoXPathParser(valuex);
-    if name <> '' then reader.parser.variableChangeLog.addVariable(name, pxp.evaluate())
+    pxp := reader.parser.parseXPath(valuex);
+    if name <> '' then reader.parser.variableChangeLog.add(name, pxp.evaluate())
     else pxp.evaluate();
-    pxp.free;
   end;
 
 end;
