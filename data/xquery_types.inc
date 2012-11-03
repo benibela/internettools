@@ -314,6 +314,7 @@ function TXQValue.debugAsStringWithTypeAnnotation(textOnly: boolean = true): str
 var
   temp: TXQValueObject;
   i: Integer;
+  tempp: IXQValue;
 begin
   case self.kind of
     pvkSequence: begin
@@ -327,13 +328,13 @@ begin
     end;
     pvkObject: begin
       result := 'object: {';
-      temp := self.clone as TXQValueObject;
+      tempp := self.clone; //need temporary variable to keep the reference count > 0
+      temp := tempp as TXQValueObject;
       if temp.values.count > 0 then begin
         result += temp.values.getName(0)+': '+temp.values.get(0).debugAsStringWithTypeAnnotation(textOnly);
         for i:=1 to temp.values.count-1 do
           result += ', '+temp.values.getName(i)+': '+temp.values.get(i).debugAsStringWithTypeAnnotation(textOnly);
       end;
-      temp.free;
       result += '}';
     end;
     pvkNode: if textOnly then result := typeName+': '+toString else result := typeName + ': '+toNode.outerXML();
