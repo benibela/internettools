@@ -583,6 +583,8 @@ begin
 
 
   tree := TTreeParser.Create;
+  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
+  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
   readTree(tree.parseTreeFromFile(_dataPath+'template'));
   loadTemplates(baseActions);
   tree.free;
@@ -595,6 +597,8 @@ begin
   self.path:='';
   self.name:=aname;
   tree := TTreeParser.Create;
+  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
+  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
   readTree(tree.parseTree(template));
   tree.Free;
 end;
