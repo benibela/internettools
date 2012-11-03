@@ -1384,7 +1384,7 @@ begin
       result := '<'+value;
       if attributes <> nil then
         for attrib in attributes do
-          result += ' '+attrib.value + '="'+attrib.reverse.value+'"';
+          result += ' '+attrib.value + '="'+attrib.realvalue+'"';
       result+='>';
     end;
     tetDocument: result := innerXML();
