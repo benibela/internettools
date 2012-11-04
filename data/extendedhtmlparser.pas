@@ -39,7 +39,7 @@ type
 //**@value tetHTMLOpen normal html opening tag, searched in the processed document
 //**@value tetHTMLClose normal html closing tag, searched in the processed document
 //**@value tetHTMLText text node, , searched in the processed document
-//**@value tetCommandMeta <template:meta> command to specify encoding
+//**@value tetCommandMeta <template:meta> command to specify how strings are compared (e.g. regex, substring, equal)
 //**@value tetCommandRead <template:read> command to set a variable
 //**@value tetCommandShortRead <template:s> command to execute a pxp expression
 //**@value tetCommandLoopOpen <template:loop> command to repeat something as long as possible
@@ -318,9 +318,8 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         list-contains treats the text of the node as a comma separated list and tests if that list contains the attribute value .@br
         case-sensitive enables case-sensitive comparisons.
       )
-      @item(@code(<template:meta [encoding="??"] [default-text-matching="??"] [default-case-sensitive="??"]/>) @br
+      @item(@code(<template:meta [default-text-matching="??"] [default-case-sensitive="??"]/>) @br
         Specifies meta information to change the template semantic:@br
-        @code(encoding): the encoding of the template, only windows-1252 and utf-8 are allowed@br
         @code(default-text-matching): specifies how text node in the template are matched against html text nodes. You can set it to the allowed attributes of match-text. (default is "starts-with") @br
         @code(default-text-case-sensitive): specifies if text nodes are matched case sensitive.
     )
@@ -1252,26 +1251,6 @@ begin
   //detect meta encoding (doesn't change encoding; just sets it, so we can convert from it to another one later)
   el := TTemplateElement(FTemplate.getLastTree.next);
 
-  while el <> nil do begin
-    if el.templateType = tetCommandMeta then begin
-      if el.templateAttributes.Values['encoding'] <> '' then begin
-        encoding:=el.templateAttributes.Values['encoding'];
-        if striequal(encoding,'utf8') or striequal(encoding,'utf-8') then
-          FTemplate.getLastTree.setEncoding(eUTF8, false, false)
-        else if striequal(el.templateAttributes.Values['encoding'],'latin1') or striequal(el.templateAttributes.Values['encoding'],'iso88591') or
-                striequal(el.templateAttributes.Values['encoding'],'iso-8859-1') or striequal(el.templateAttributes.Values['encoding'],'windows1252') then
-          FTemplate.getLastTree.setEncoding(eWindows1252, false, false)
-        else
-         raise ETemplateParseException.create('Unknown/unsupported encoding: '+encoding);
-        if el.templateAttributes.count > 1 then
-          raise ETemplateParseException.create('Additional attributes in meta-tag: '+el.tostring);
-      end; // else
-        //raise ETemplateParseException.create('Empty/wrong meta-tag: '+el.tostring);
-
-    end;
-    el := el.templateNext;
-  end;
-
 
   defaultTextMatching := 'starts-with';
   defaultCaseSensitive := '';
@@ -1279,9 +1258,15 @@ begin
   el := TTemplateElement(FTemplate.getLastTree.next);
   while el <> nil do begin
     if (el.templateType = tetCommandMeta) and (el.templateAttributes<>nil) then begin
-      if el.templateAttributes.Values['default-text-matching'] <> '' then defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
+      if el.templateAttributes.Values['encoding'] <> '' then
+        raise EHTMLParseException.Create('The meta encoding attribute is deprecated');
+      if el.templateAttributes.Values['default-text-matching'] <> '' then
+        defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
       i := el.templateAttributes.IndexOfName('default-text-case-sensitive');
-      if i >= 0 then begin defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i]; if defaultCaseSensitive = '' then defaultCaseSensitive := 'true'; end;
+      if i >= 0 then begin
+        defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i];
+        if defaultCaseSensitive = '' then defaultCaseSensitive := 'true';
+      end;
     end else if el.templateType = tetHTMLText then begin
       if (FVeryShortNotation) and (el.value <> '') then begin
         if el.value[1] = '?' then begin
