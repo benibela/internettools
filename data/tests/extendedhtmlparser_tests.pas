@@ -759,6 +759,13 @@ begin
   t('<a><b>{$foobar}</b>*</a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'foobar=12'#10'foobar=34');
   t('<a><b>{$foobar}</b><b>{$abc}</b><c>{$xyz}</c></a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'foobar=12'#10'abc=34'#10'xyz=56');
 
+  t('<a x="{6+5}"/>', '<a x="7"/>', '_result=11');
+  t('<a x="{.}"/>', '<a x="7"/>', '_result=7');
+  t('<a x="{$abc := 6+5}"/>', '<a x="7"/>', 'abc=11');
+  t('<a x="{$abc}"/>', '<a x="7"/>', 'abc=7');
+  t('<r><a x="{../text()}"/></r>', '<r><a>1</a><a x>2</a></r>', '_result=2');
+  t('<r><a x="{../text()}" y="{../text()}"/></r>', '<r><a>1</a><a x>2</a><a y>3</a><a x y>4</a><a x y>5</a></r>', '_result=4'#10'_result=4'#10);
+  t('<r><a x="{../text()}" y="{../text()}"/></r>', '<r><a>1</a><a x>2</a><a y>3</a><a x="x" y>4</a><a x y="y">5</a></r>', '_result=4'#10'_result=4'#10);
 
   //  t('<a><b>{.}</b>{3}</a>', '<a><b>12</b><b>34</b></a>', '_result=12'#10'_result=34');
 

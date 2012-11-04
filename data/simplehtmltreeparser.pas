@@ -1405,8 +1405,8 @@ end;
 
 class function TTreeElement.createElementPair(anodename: string): TTreeElement;
 begin
-  result := TTreeElement.create(tetOpen, anodename);
-  result.reverse := TTreeElement.create(tetClose, anodename);
+  result := TTreeElementClass(ClassType).create(tetOpen, anodename);
+  result.reverse := TTreeElementClass(ClassType).create(tetClose, anodename);
   result.reverse.reverse := result;
   result.next := Result.reverse;
   result.reverse.previous := Result;

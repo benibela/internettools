@@ -525,9 +525,10 @@ end;
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
  curChild: TTreeElement;
+ temp: TTemplateElement;
  i: Integer;
+ rv: String;
 begin
-  ignore(parser);
   //inherited initialized;
   if attributes <> nil then
     for i := attributes.Count - 1 downto 0 do
@@ -537,12 +538,31 @@ begin
   templateType:=strToCommand(getNamespaceURL(), value, typ);
 
   if attributes <> nil then
-    for i := attributes.Count - 1 downto 0 do
+    for i := attributes.Count - 1 downto 0 do begin
+      rv := attributes.Items[i].realvalue;
       if (templateType >= firstRealTemplateType) or (attributes.Items[i].getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin
         if templateAttributes = nil then templateAttributes := tStringAttributeList.Create;
         templateAttributes.Add(attributes.Items[i].value+'='+attributes.Items[i].realvalue);
         attributes.Delete(i);
+      end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
+        temp := TTemplateElement.createElementPair('s') as TTemplateElement;
+        temp.namespace := TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't');
+        temp.templateType:=tetCommandShortRead;
+        temp.reverse.namespace := temp.namespace;
+        temp.templateReverse.templateType:=tetIgnore;
+        temp.addChild(TTemplateElement.create());
+        temp.templateNext.typ := tetText;
+        temp.templateNext.templateType := tetIgnore;
+        temp.templateNext.value:='@'+attributes.Items[i].getNodeName() + ' / (' + copy(rv, 2, length(rv) - 2)+')';
+        addChild(temp);
+        if templateAttributes = nil then templateAttributes := TStringAttributeList.Create;
+        //todo: optimize ?
+        if templateAttributes.Values['condition'] = '' then templateAttributes.Values['condition'] := 'exists(@'+attributes.Items[i].getNodeName()+')'
+        else templateAttributes.Values['condition'] := '(' + templateAttributes.Values['condition'] + ') and exists(@'+attributes.Items[i].getNodeName()+')';
+        //attributes.Delete(i); // Items[i].realvalue := '';
+        attributes.Delete(i); // Items[i].realvalue := '';
       end;
+    end;
 
   if templateAttributes <> nil then
     if templateAttributes.Values['optional'] = 'true' then flags+=[tefOptional];
@@ -598,6 +618,8 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     end;
   end;
 
+var
+  term: TXQTerm;
 begin
   contentRepetitions := 0;
 
@@ -607,7 +629,19 @@ begin
 
   if templateType = tetCommandShortRead then begin
     source := parser.parseXPath(strDecodeHTMLEntities(deepNodeText(),eUTF8)); //todo: use correct encoding
-    if source.Term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(source.Term, nil, TXQTermNodeMatcher.Create('.'));
+    term := source.Term;
+    if term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(Term, nil, TXQTermNodeMatcher.Create('.'))
+    else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
+            and (source.term.children[0] is TXQTermReadAttribute) and (source.Term.children[1] is TXQTermSequence)
+            and (length(source.term.children[1].children) = 1) and (source.term.children[1].children[0] is TXQTermVariable) then begin
+      //replace    @foobar / ( $xyz ) by $xyz := @foobar
+      source.term := TXQTermDefineVariable.create(Term.children[1].children[0], nil, Term.children[0]);
+      //free terms
+      setlength(term.children[1].children, 0);
+      term.children[1].free;
+      setlength(term.children, 0);
+      term.free;
+    end;
   end else source := cachePXP('source');
 
   if templateAttributes= nil then exit;
