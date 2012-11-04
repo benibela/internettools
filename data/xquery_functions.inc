@@ -1955,6 +1955,16 @@ begin
   result := xqvalue(urlHexEncode(args[0].toString, [#32..#126]));
 end;
 
+function resolveDocURI(s: string; const context: TEvaluationContext): string;
+begin
+  result := strResolveURI(s, context.staticContext.baseURI);
+  writeln(stderr, 'YY: ', result, ' ::',context.staticContext.baseURI);
+  if strBeginsWith(result, 'file:') then begin
+    delete(result, 1, 5);
+    while (length(result) > 1) and (result[1] = '/') and (result[2] = '/') do delete(result,1,1);
+  end;
+end;
+
 function xqFunctionDoc(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
 var
   url: String;
@@ -1974,22 +1984,21 @@ begin
   if context.staticContext.sender.FExternalDocuments.IndexOf(url) >= 0 then
     exit(xqvalue(TTreeElement(context.staticContext.sender.FExternalDocuments.Objects[context.staticContext.sender.FExternalDocuments.IndexOf(url)])));
 
-  if (url[1] = '/') and (context.staticContext.baseURI <> '') then url := strResolveURI(url, context.staticContext.baseURI);
-  if strBeginsWith(url, 'file:') then begin
-    delete(url, 1, 5);
-    while (url[1] = '/') and (url[2] = '/') do delete(url,1,1);
-  end;
+  url := resolveDocURI(url, context);
 
-  if url[1] = '/' then node := node.getDocument().getCreator.parseTreeFromFile(url)
-  else begin
+  if not strContains(url, '://') then begin
+    if not FileExists(url) then raise EXQEvaluationException.Create('Failed to find document: ' + url);
+    node := node.getDocument().getCreator.parseTreeFromFile(url)
+  end else begin
     if context.staticContext.sender.FInternet = nil then begin
       if defaultInternetAccessClass = nil then
-        raise Exception.Create('To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
+        raise EXQEvaluationException.Create('To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
       context.staticContext.sender.FInternet := defaultInternetAccessClass.create();
     end;
     node := node.getDocument().getCreator.parseTree(context.staticContext.sender.FInternet.get(url), url);
   end;
 
+  if node = nil then raise EXQEvaluationException.Create('Failed to load document: '+url);
   //writeln(strFromPtr(node));
 
   context.staticContext.sender.FExternalDocuments.AddObject(url, node);
@@ -2001,13 +2010,16 @@ begin
   {$endif}
 end;
 
-function xqFunctionDoc_Available(const args: TXQVArray): IXQValue;
+function xqFunctionDoc_Available(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
 var
   url: String;
 begin
   requiredArgCount(args, 1);
   url := args[0].toString;
   if url = '' then exit(xqvalueFalse);
+  url := resolveDocURI(url, context);
+  if (url = '') then exit(xqvalueFalse);
+  if not strContains(url, '://') and not FileExists(url) then exit(xqvalueFalse);
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
   if TXQValue_anyURI.canCreateFromstring(url) then
     result := xqvalueTrue;

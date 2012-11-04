@@ -1932,8 +1932,14 @@ begin
 end;
 
 function TTreeParser.parseTreeFromFile(filename: string): TTreeDocument;
+var
+  absfilename: String;
 begin
-  result := parseTree(strLoadFromFile(filename), filename);
+  absfilename :=  filename;
+  if (filename <> '') and not (filename[1] in AllowDirectorySeparators) and
+     ((length(filename) < 3) or (filename[2] <> ':') or (filename[3] <> '\')) then
+    absfilename:=ExpandFileName(absfilename);
+  result := parseTree(strLoadFromFile(filename), absfilename);
 end;
 
 function TTreeParser.getLastTree: TTreeDocument;
