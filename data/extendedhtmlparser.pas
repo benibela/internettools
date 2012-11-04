@@ -396,7 +396,7 @@ THtmlTemplateParser=class
     FQueryEngine: TXQueryEngine;
 
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TXQVariableChangeLog;
-    FParsingExceptions: boolean;
+    FParsingExceptions, FSingleQueryModule: boolean;
 
     FAttributeMatching: TStringList;
 
@@ -436,7 +436,7 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     function debugMatchings(const width: integer): string;
-    function parseXPath(const expression: string): IXQuery; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
+    function parseQuery(const expression: string): IXQuery; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TXQVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
@@ -451,6 +451,7 @@ THtmlTemplateParser=class
     property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
     property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
     property AllowObjects: boolean read FObjects write FObjects;
+    property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< All XPath/XQuery expressions in the templates are kept in the same module
 
     property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
@@ -594,7 +595,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     if templateAttributes = nil then exit(nil);
     i := templateAttributes.IndexOfName(name);
     if i < 0 then exit(nil);
-    result := parser.parseXPath(templateAttributes.ValueFromIndex[i]);
+    result := parser.parseQuery(templateAttributes.ValueFromIndex[i]);
   end;
 
   procedure cacheRegExpr(name: string; prefix, suffix: string; escape: boolean);
@@ -631,7 +632,7 @@ begin
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
   if templateType = tetCommandShortRead then begin
-    source := parser.parseXPath(strDecodeHTMLEntities(deepNodeText(),eUTF8)); //todo: use correct encoding
+    source := parser.parseQuery(strDecodeHTMLEntities(deepNodeText(),eUTF8)); //todo: use correct encoding
     term := source.Term;
     if term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(Term, nil, TXQTermNodeMatcher.Create('.'))
     else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
@@ -702,10 +703,15 @@ begin
   result := FTemplate.getLastTree;
 end;
 
-function THtmlTemplateParser.parseXPath(const expression: string): IXQuery;
+function THtmlTemplateParser.parseQuery(const expression: string): IXQuery;
+var
+  context: TXQStaticContext;
 begin
   if expression = '' then raise ETemplateParseException.Create('no expression given');
-  result := FQueryEngine.parseXPath2(expression);
+  context := nil;
+  if FSingleQueryModule then context := QueryEngine.StaticContext;
+  if strBeginsWith(trim(expression), 'xquery') then result := FQueryEngine.parseXQuery1(expression, context)
+  else result := FQueryEngine.parseXPath2(expression, context);
 end;
 
 function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;
@@ -1238,6 +1244,7 @@ begin
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
   FObjects:=true;
+  FSingleQueryModule := true;
 
   FAttributeMatching := TStringList.Create;
   FAttributeMatching.Values['class'] := 'list-contains';

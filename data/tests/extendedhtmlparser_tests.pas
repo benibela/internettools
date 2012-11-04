@@ -930,6 +930,17 @@ begin
   q('string-join(for $i in match(<a>{{.}}</a>, (<a>x</a>, <a>y</a>, <a>z</a>)) return $i, " ")', 'x y z');
   q('string-join(for $i in match(<a>{{$t := .}}</a>, (<a>x</a>, <a>y</a>, <a>z</a>)) return $i.t, " ")', 'x y z');
 
+
+  t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');
+  t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := concat(., $abc, .)}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=XXX123XXX');
+  t('<r>{xquery version "1.0"; declare function doub($x) { 2 * $x }; ()}<b>{$def := doub(.)}</b></r>', '<r><b>100</b></r>', '_result='#10'def=200');
+  t('<r>{xquery version "1.0"; declare function doub($x) { 2 * $x }; ()}<b>{$def := doub(.)}</b></r>', '<r><b>100</b></r>', '_result='#10'def=200');
+  t('<r>{xquery version "1.0"; declare function add($x, $y) { $x + $y }; ()}<b>{$def := add(123, .)}</b></r>', '<r><b>100</b></r>', '_result='#10'def=223');
+  t('<r>{xquery version "1.0"; declare function add($x, $y) { $x + $y }; ()}<b/>'+
+       '{xquery version "1.0"; declare variable $v1 := 17; ()}<b/>'+
+       '{xquery version "1.0"; declare function triple($x) {$x * 3}; ()}<b>{$def := add(triple(.), $v1)}</b></r>', '<r><b/><b/><b>100</b></r>',
+    '_result='#10'_result='#10'_result='#10'def=317');
+
   extParser.free;
   sl.Free;
 end;

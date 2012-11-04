@@ -2192,10 +2192,12 @@ begin
   if context.staticContext.moduleNamespace <> nil then truechildcount-=1;
 
   functionCount := 0;
-  for i:=0 to truechildcount - 1 do if children[i] is TXQTermDefineFunction then functionCount += 1;
-  setlength(context.staticContext.functions, functionCount);
+  for i:=0 to truechildcount - 1 do
+    if children[i] is TXQTermDefineFunction then
+      functionCount += 1;
+  setlength(context.staticContext.functions, length(context.staticContext.functions) + functionCount);
   functions := context.staticContext.functions;
-  functionCount := 0;
+  functionCount := length(context.staticContext.functions) - functionCount;
   for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineFunction then begin
       functions[functionCount] := TXQTermDefineFunction(children[i]).define();
@@ -2353,7 +2355,7 @@ end;
 destructor TXQuery.Destroy;
 begin
   fterm.Free;
-  if staticContext<> nil then
+  if not staticContextShared then
     FreeAndNil(staticContext);
   inherited Destroy;
 end;
