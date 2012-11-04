@@ -1079,7 +1079,9 @@ type
     procedure initializeStaticContext(const context: TEvaluationContext);
   end;
 
-  //**Exception raised the evaluation of an expression causes an error
+  //**Exception raised during the parsing of an expression
+  EXQParsingException = Exception;
+  //**Exception raised during the evaluation of an expression
   EXQEvaluationException = Exception;
 
   //** Event called by the trace(value,info) function. You should not free value and info
@@ -2037,7 +2039,7 @@ end;}
 function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
 begin
   result := nil;
-  raise Exception.Create('Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
+  raise EXQEvaluationException.Create('Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
 end;
 
 function xqvalue(v: TTreeElement): IXQValue;
@@ -2421,7 +2423,7 @@ begin
   else if select = 'processing-instruction' then exit([qmProcessingInstruction])
   else if select = 'document-node' then exit([qmDocument])
   else if select = 'attribute' then exit([qmAttribute])
-  else raise Exception.Create('Unknown element test: '+select);
+  else raise EXQParsingException.Create('Unknown element test: '+select);
 end;
 
 
@@ -2747,14 +2749,14 @@ begin
           else if cmp < 0 then begin insertSingle(m, child); exit; end
           else begin insertSingle(m + 1, child); exit; end;
         end;
-        raise Exception.Create('binary insert failed');
+        raise EXQEvaluationException.Create('binary insert failed');
       end;
     end;
     pvkUndefined: ;
     pvkSequence:
       for s in child do
         addMerging(s); //TODO: optimize
-    else raise Exception.Create('invalid merging');
+    else raise EXQEvaluationException.Create('invalid merging');
   end;
 end;
 
@@ -2918,10 +2920,10 @@ begin
     else exit(TXQValueDateTime);
   result := TXQValueDateTimeClass(items[0].getClassType);
   for i:=1 to count - 1 do begin
-    if result <> items[i].getClassType then raise Exception.Create('Mixed date/time/duration types');
+    if result <> items[i].getClassType then raise EXQEvaluationException.Create('Mixed date/time/duration types');
     //result := TXQValueDateTimeClass(commonClass(result, TXQValueClass(items[i])));
   end;
-  if (needDuration) and (not result.InheritsFrom(TXQValue_duration)) then raise Exception.Create('Expected duration type, got: '+result.ClassName);
+  if (needDuration) and (not result.InheritsFrom(TXQValue_duration)) then raise EXQEvaluationException.Create('Expected duration type, got: '+result.ClassName);
 end;
 
 
@@ -2933,7 +2935,7 @@ var
  base: String;
  i: Integer;
 begin
-  if readonly then raise Exception.Create('Readonly variable changelog modified');
+  if readonly then raise EXQEvaluationException.Create('Readonly variable changelog modified');
   point := 0;
   if allowObjects then begin
     point := pos('.', name);
@@ -3092,7 +3094,7 @@ end;
 
 function TXQVariableChangeLog.pushAll: integer;
 begin
-  if readonly then raise Exception.Create('readonly variable change log modified');
+  if readonly then raise EXQEvaluationException.Create('readonly variable change log modified');
   result := length(history);
   arrayAdd(history, length(vars));
 end;
@@ -3101,7 +3103,7 @@ procedure TXQVariableChangeLog.popAll(level: integer = -1);
 var s: integer;
  l: Integer;
 begin
-  if readonly then raise Exception.Create('readonly variable change log modified');
+  if readonly then raise EXQEvaluationException.Create('readonly variable change log modified');
   if level > 0 then begin
     level := level - length(history);
     if level >= 0 then exit;
@@ -3236,7 +3238,7 @@ begin
           result.vars[p-1].fullname := vars[i].name;
           break;
         end;
-      if not found then raise Exception.Create('Assignment to object without an object');
+      if not found then raise EXQEvaluationException.Create('Assignment to object without an object');
       continue;
     end;
     result.vars[p] := vars[i];
@@ -3298,7 +3300,7 @@ begin
   setlength(curIndices, length(query));
   curNodes[0] := startNode;
   curIndices[0] := 0;
-  raise Exception.Create('Need sender??');
+  raise EXQEvaluationException.Create('Need sender??');
   context.ParentElement := nil;
   context.collation := TXQueryEngine.getDefaultCollation;
   context.SeqValue := nil;
@@ -3335,7 +3337,7 @@ begin
   curIndices[pos]+=1;
   if length(query[pos].filters) > 0 then begin
     if length(query[pos].filters) > 1 then raise EXQEvaluationException.Create('Query too complex for iterator (multiple sequence filter [][])');
-    raise Exception.Create('Need sender');
+    raise EXQEvaluationException.Create('Need sender');
     context.ParentElement := curNodes[pos];
     tempValueNode.node:= curNodes[pos];
     context.SeqValue:=tempValueNode;
@@ -3586,7 +3588,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
 
   procedure raiseParsingError(err: string);
   begin
-    raise Exception.Create(err);
+    raise EXQParsingException.Create(err);
   end;
 
 //XPATH Expression tree construction

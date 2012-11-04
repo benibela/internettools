@@ -3,7 +3,7 @@ function xqFunction__NAME___From_Datetime(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValueDateTime) then raise Exception.Create('Expected date time, got: ' + args[0].toString);
+  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('Expected date time, got: ' + args[0].toString);
   result := xqvalue((args[0] as TXQValueDateTime).value.__VALUE__);
 end;
 {%END-REPEAT}
@@ -12,7 +12,7 @@ function xqFunctionSeconds_From_Datetime(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValueDateTime) then raise Exception.Create('Expected date time, got: ' + args[0].toString);
+  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('Expected date time, got: ' + args[0].toString);
   result := xqvalue(RoundTo(decimal((args[0] as TXQValueDateTime).value.sec + (args[0] as TXQValueDateTime).value.secfraction), -6));
 end;
 

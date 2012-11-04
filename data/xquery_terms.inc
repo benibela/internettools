@@ -41,7 +41,7 @@ end;
 
 procedure TXQTerm.raiseParsingError(const s: string);
 begin
-  raise Exception.Create(s);
+  raise EXQParsingException.Create(s);
 end;
 
 procedure TXQTerm.raiseEvaluationError(const s: string);

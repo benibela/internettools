@@ -682,7 +682,7 @@ end;
 function getTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 begin
   if not (wrapper is TXQValueFunction) or not ((wrapper as TXQValueFunction).body is TXQTermSequenceType) then
-    raise Exception.Create('Expected type, got: '+wrapper.toString);
+    raise EXQEvaluationException.Create('Expected type, got: '+wrapper.toString);
   result := TXQTermSequenceType((wrapper as TXQValueFunction).body);
 end;
 
@@ -709,7 +709,7 @@ function xqvalueTreatAs(const cxt: TEvaluationContext; const ta, tb: IXQValue): 
 begin
   result := ta;
   if not getTypeInfo(tb).instanceOf(result, cxt) then
-    raise Exception.Create('treat as type not matched');
+    raise EXQEvaluationException.Create('treat as type not matched');
 end;
 
 function xqvalueExcept(const cxt: TEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -1592,7 +1592,7 @@ function xqFunctionYear_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_duration) then raise Exception.Create('Expected duration, got: ' + args[0].toString);
+  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('Expected duration, got: ' + args[0].toString);
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() div 12);
 end;
 
@@ -1600,7 +1600,7 @@ function xqFunctionMonth_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_duration) then raise Exception.Create('Expected duration, got: ' + args[0].toString);
+  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('Expected duration, got: ' + args[0].toString);
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() mod 12);
 end;
 
@@ -1610,7 +1610,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValueDateTime) then raise Exception.Create('Expected duration time, got: ' + args[0].toString);
+  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('Expected duration time, got: ' + args[0].toString);
   tempValue := (args[0] as TXQValue_duration).value;
   TXQValue_duration.setDayTime(tempValue, (args[0] as TXQValue_duration).toDayTime());
   if v <> 6 then result := xqvalue(tempValue.values[v])
@@ -1827,7 +1827,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise Exception.Create('Expected QName, got: '+args[0].toString);
+  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('Expected QName, got: '+args[0].toString);
   splitted := qnameSplit((args[0] as TXQValueString).str);
   if splitted[1] = '' then exit(xqvalue);
   result := TXQValue_NCName.create(splitted[1]);
@@ -1839,7 +1839,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise Exception.Create('Expected QName, got: '+args[0].toString);
+  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('Expected QName, got: '+args[0].toString);
   splitted := qnameSplit((args[0] as TXQValueString).str);
   result := TXQValue_NCName.create(splitted[2]);
 end;
@@ -1850,7 +1850,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise Exception.Create('Expected QName, got: '+args[0].toString);
+  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('Expected QName, got: '+args[0].toString);
   splitted := qnameSplit((args[0] as TXQValueString).str);
   result := TXQValue_anyURI.create(splitted[0]);
 end;
@@ -1974,10 +1974,10 @@ begin
   url := args[0].toString;
   if url = '' then exit(xqvalue);
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
-  if not TXQValue_anyURI.canCreateFromstring(url) then raise Exception.Create('Invalid url: '+url);
+  if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('Invalid url: '+url);
 
   node := xqvalueContextNode(context);
-  if node = nil then raise Exception.Create('Need  a loaded document to load a new one');
+  if node = nil then raise EXQEvaluationException.Create('Need  a loaded document to load a new one');
 
   if context.staticContext.sender.FExternalDocuments = nil then context.staticContext.sender.FExternalDocuments := TStringList.Create;
 

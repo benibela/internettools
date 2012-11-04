@@ -58,7 +58,7 @@ procedure TXQParsingContext.raiseParsingError(s: string);
 begin
   if (pos < @str[1]) then pos := @str[1]; //make sure pos points to str
   if (pos > @str[length(str)]) then pos := @str[length(str)];
-  raise Exception.Create(s+#13#10'in: '+strslice(@str[1],pos-1)+' [<- error occurs before here] '+strslice(pos,@str[length(str)]));
+  raise EXQParsingException.Create(s+#13#10'in: '+strslice(@str[1],pos-1)+' [<- error occurs before here] '+strslice(pos,@str[length(str)]));
 end;
 
 procedure TXQParsingContext.raiseInvalidModel(s: string);
@@ -105,7 +105,7 @@ procedure TXQParsingContext.expect(c: char);
 begin
   skipWhitespaceAndComment;
     if pos^ <> c then
-      raise Exception.Create('"'+c+'"'+' expected, but "'+pos^+'" found'#13#10+strslice(@str[1],pos));
+      raise EXQParsingException.Create('"'+c+'"'+' expected, but "'+pos^+'" found'#13#10+strslice(@str[1],pos));
     pos+=1;
 end;
 
@@ -116,7 +116,7 @@ begin
   skipWhitespaceAndComment;
   for i:=1 to length(s) do begin
     if pos^ <> s[i] then
-      raise Exception.Create('"'+ s+'" expected, but "'+pos^+'" found'#13#10+strslice(@str[1],pos));
+      raise EXQParsingException.Create('"'+ s+'" expected, but "'+pos^+'" found'#13#10+strslice(@str[1],pos));
     pos+=1;
   end;
 end;
@@ -266,7 +266,7 @@ begin
     if namespace.getURL <> XMLNamespaceURL_XMLSchema then raiseParsingError('Invalid schema loaded: '+namespace.getURL+' by '+word);
     result.kind:=tikAtomic;
     result.atomicTypeInfo := TXQueryEngine.findTypeClass(word);
-    if result.atomicTypeInfo = nil then raise Exception.Create('Unknown type: '+word);
+    if result.atomicTypeInfo = nil then raiseParsingError('Unknown type: '+word);
   end;
 
 
@@ -879,7 +879,7 @@ begin
 
         end else begin
           result := TXQTermNamedFunction.createIfExists(word, staticContext);
-          if result = nil then raise Exception.Create('unknown function: '+word);
+          if result = nil then raiseParsingError('unknown function: '+word);
           exit(parseSequenceLike(result));
         end;
       end;

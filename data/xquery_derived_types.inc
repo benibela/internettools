@@ -1591,7 +1591,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type untypedAtomic');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type untypedAtomic');
   
 
   
@@ -1698,7 +1698,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type untyped');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type untyped');
   
 
   
@@ -1808,7 +1808,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type normalizedString');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type normalizedString');
   
 
   
@@ -1915,7 +1915,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type token');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type token');
   
 
   
@@ -2022,7 +2022,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type language');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type language');
   
 
   
@@ -2129,7 +2129,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type NMTOKEN');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type NMTOKEN');
   
 
   
@@ -2236,7 +2236,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type Name');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type Name');
   
 
   
@@ -2343,7 +2343,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type NCName');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type NCName');
   
 
   
@@ -2450,7 +2450,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type ID');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type ID');
   
 
   
@@ -2557,7 +2557,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type IDREF');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type IDREF');
   
 
   
@@ -2664,7 +2664,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type ENTITY');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type ENTITY');
   
 
   
@@ -2771,7 +2771,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type anyURI');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type anyURI');
   
 
   
@@ -2808,7 +2808,7 @@ begin
       temp := CastableFromanyURISplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
       CastableFromanyURI[i] := TXQueryEngine.findTypeClass(temp);
-      if CastableFromanyURI[i] = nil then raise exception.create('Could not find type: '+temp);
+      if CastableFromanyURI[i] = nil then raise EXQEvaluationException.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -2910,7 +2910,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type QName');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type QName');
   
 
   
@@ -2947,7 +2947,7 @@ begin
       temp := CastableFromQNameSplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
       CastableFromQName[i] := TXQueryEngine.findTypeClass(temp);
-      if CastableFromQName[i] = nil then raise exception.create('Could not find type: '+temp);
+      if CastableFromQName[i] = nil then raise EXQEvaluationException.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -3049,7 +3049,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type NOTATION');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type NOTATION');
   
 
   
@@ -3086,7 +3086,7 @@ begin
       temp := CastableFromNOTATIONSplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
       CastableFromNOTATION[i] := TXQueryEngine.findTypeClass(temp);
-      if CastableFromNOTATION[i] = nil then raise exception.create('Could not find type: '+temp);
+      if CastableFromNOTATION[i] = nil then raise EXQEvaluationException.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -3188,7 +3188,7 @@ begin
   
 
    str := uppercase(str); 
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type hexBinary');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type hexBinary');
   
 
   
@@ -3219,7 +3219,7 @@ begin
       temp := CastableFromhexBinarySplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
       CastableFromhexBinary[i] := TXQueryEngine.findTypeClass(temp);
-      if CastableFromhexBinary[i] = nil then raise exception.create('Could not find type: '+temp);
+      if CastableFromhexBinary[i] = nil then raise EXQEvaluationException.create('Could not find type: '+temp);
     end;
   end;
   result := false;
@@ -3318,7 +3318,7 @@ begin
   
 
   
-  if not canCreateFromstring(str) then raise exception.create('Invalid value: '+v+' for type base64Binary');
+  if not canCreateFromstring(str) then raise EXQEvaluationException.create('Invalid value: '+v+' for type base64Binary');
   
 
   
@@ -3349,7 +3349,7 @@ begin
       temp := CastableFrombase64BinarySplit[i];
       if temp[1] in ['*'] then delete(temp,1,1);
       CastableFrombase64Binary[i] := TXQueryEngine.findTypeClass(temp);
-      if CastableFrombase64Binary[i] = nil then raise exception.create('Could not find type: '+temp);
+      if CastableFrombase64Binary[i] = nil then raise EXQEvaluationException.create('Could not find type: '+temp);
     end;
   end;
   result := false;

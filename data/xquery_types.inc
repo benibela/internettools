@@ -199,7 +199,7 @@ class function TXQValue.createFromValue(const v: IXQValue): IXQValue;
 begin
   ignore(v);
   result := nil;
-  raise Exception.Create('Invalid constructor called');
+  raise EXQEvaluationException.Create('Invalid constructor called');
 end;
 
 class function TXQValue.instanceOf(const testType: TXQValueClass): boolean;
@@ -725,7 +725,7 @@ end;
 constructor TXQValueDateTime.create(const str: string);
 begin
   if not tryCreateFromString(str,  dateFormat, @value) then
-    raise exception.Create('Invalid conversion from '+str+' to date format ' + dateFormat);
+    raise EXQEvaluationException.Create('Invalid conversion from '+str+' to date format ' + dateFormat);
 end;
 
 class function TXQValueDateTime.createFromValue(const v: IXQValue): IXQValue;
@@ -740,7 +740,7 @@ end;
 constructor TXQValueDateTime.create(const str, format: string);
 begin
   if not tryCreateFromString(str, format, @value) then
-    raise exception.Create('Invalid conversion from '+str+' to date format ' + format);
+    raise EXQEvaluationException.Create('Invalid conversion from '+str+' to date format ' + format);
 end;
 
 constructor TXQValueDateTime.create(const dt: TXQValueDateTimeData);
