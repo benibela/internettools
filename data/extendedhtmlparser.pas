@@ -1097,7 +1097,7 @@ begin
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
-  FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *, *([0-9]+) *[}] *');
+  FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *');
   FUnnamedVariableName:='_result';
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
@@ -1283,7 +1283,8 @@ begin
             delete(el.value,1,1);
           end else begin
             looper.setTemplateAttribute('min', FRepetitionRegEx.Match[1]);
-            looper.setTemplateAttribute('max', FRepetitionRegEx.Match[2]);
+            if FRepetitionRegEx.MatchLen[3] <= 0 then looper.setTemplateAttribute('max', FRepetitionRegEx.Match[1])
+            else looper.setTemplateAttribute('max', FRepetitionRegEx.Match[3]);
             delete(el.value,1,FRepetitionRegEx.MatchLen[0]);
           end;
         end;
