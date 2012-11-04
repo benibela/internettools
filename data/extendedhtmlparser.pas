@@ -605,8 +605,10 @@ begin
 
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
-  if templateType = tetCommandShortRead then source := parser.parseXPath(strDecodeHTMLEntities(deepNodeText(),eUTF8)) //todo: use correct encoding
-  else source := cachePXP('source');
+  if templateType = tetCommandShortRead then begin
+    source := parser.parseXPath(strDecodeHTMLEntities(deepNodeText(),eUTF8)); //todo: use correct encoding
+    if source.Term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(source.Term, nil, TXQTermNodeMatcher.Create('.'));
+  end else source := cachePXP('source');
 
   if templateAttributes= nil then exit;
 
