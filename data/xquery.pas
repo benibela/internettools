@@ -1062,6 +1062,10 @@ type
   IXQuery = interface
     function evaluate(const tree: TTreeElement = nil): IXQValue;
     function evaluate(const context: TEvaluationContext): IXQValue;
+
+    function getTerm: TXQTerm;
+    procedure setTerm(aterm: TXQTerm);
+    property Term: TXQTerm read getTerm write setTerm;
   end;
 
   { TXQuery }
@@ -1072,11 +1076,14 @@ type
     function evaluate(const context: TEvaluationContext): IXQValue;
 
     destructor Destroy; override;
+
   private
-    term: txqterm;
+    fterm: txqterm;
     staticContextInitialized: boolean;
     staticContext: TXQStaticContext;
     procedure initializeStaticContext(const context: TEvaluationContext);
+    function getTerm: TXQTerm;
+    procedure setTerm(aterm: TXQTerm);
   end;
 
   //**Exception raised during the parsing of an expression
@@ -2316,47 +2323,57 @@ end;
 
 constructor TXQuery.Create(asStaticContext: TXQStaticContext; aterm: TXQTerm);
 begin
-  term := aterm;
+  fterm := aterm;
   staticContext := asStaticContext;
 end;
 
 function TXQuery.evaluate(const tree: TTreeElement = nil): IXQValue;
 var context: TEvaluationContext;
 begin
-  if term = nil then exit(xqvalue());
+  if fterm = nil then exit(xqvalue());
   context := staticContext.sender.getEvaluationContext(staticContext);
   if tree <> nil then begin
     context.ParentElement := tree;
     context.RootElement := tree;
   end;
   initializeStaticContext(context);
-  result := term.evaluate(context);
+  result := fterm.evaluate(context);
 end;
 
 function TXQuery.evaluate(const context: TEvaluationContext): IXQValue;
 var tempcontext: TEvaluationContext;
 begin
-  if term = nil then exit(xqvalue());
+  if fterm = nil then exit(xqvalue());
   tempcontext:=context;
   tempcontext.staticContext:=staticContext;
   initializeStaticContext(tempcontext);
-  result := term.evaluate(tempcontext);
+  result := fterm.evaluate(tempcontext);
 end;
 
 destructor TXQuery.Destroy;
 begin
-  term.Free;
+  fterm.Free;
   if staticContext<> nil then
     FreeAndNil(staticContext);
   inherited Destroy;
+end;
+
+function TXQuery.getTerm: TXQTerm;
+begin
+  result := fterm;
+end;
+
+procedure TXQuery.setTerm(aterm: TXQTerm);
+begin
+  fterm := aterm;
 end;
 
 procedure TXQuery.initializeStaticContext(const context: TEvaluationContext);
 begin
   if staticContextInitialized then exit;
   staticContextInitialized:=true;
-  if term is TXQTermModule then
-    TXQTermModule(term).initializeStaticContext(context);
+  if fterm is TXQTermModule then
+    TXQTermModule(fterm).initializeStaticContext(context);
 end;
 
 procedure xqvalueSeqSqueeze(var v: IXQValue);
@@ -3573,7 +3590,7 @@ begin
     cxt.str := str;
     cxt.pos := @cxt.str[1];
     result := TXQuery.Create(cxt.staticContext);
-    result.term := cxt.parseModule();
+    result.fterm := cxt.parseModule();
     if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
     if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   finally
