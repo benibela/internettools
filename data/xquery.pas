@@ -1079,7 +1079,7 @@ type
 
   private
     fterm: txqterm;
-    staticContextInitialized: boolean;
+    staticContextInitialized, staticContextShared: boolean;
     staticContext: TXQStaticContext;
     procedure initializeStaticContext(const context: TEvaluationContext);
     function getTerm: TXQTerm;
@@ -1277,9 +1277,9 @@ type
 
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
-    function parseXPath2(s:string): IXQuery;
+    function parseXPath2(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
     //** Parses a new XQuery expression and stores it in tokenized form.
-    function parseXQuery1(s:string): IXQuery;
+    function parseXQuery1(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
     //** Parses a new CSS 3.0 Selector expression and stores it in tokenized form.
     function parseCSS3(s:string): IXQuery;
 
@@ -1319,7 +1319,7 @@ type
     FModules: TInterfaceList;
 
   protected
-    function parseTerm(str:string; model: TXQParsingModel): TXQuery;
+    function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
     function getEvaluationContext(staticContextOverride: TXQStaticContext): TEvaluationContext;
 
@@ -3409,15 +3409,15 @@ begin
   FModules.Clear;
 end;
 
-function TXQueryEngine.parseXPath2(s: string): IXQuery;
+function TXQueryEngine.parseXPath2(s: string; sharedContext: TXQStaticContext = nil): IXQuery;
 begin
-  FLastQuery:=parseTerm(s, xqpmXPath2);
+  FLastQuery:=parseTerm(s, xqpmXPath2, sharedContext);
   result := FLastQuery;
 end;
 
-function TXQueryEngine.parseXQuery1(s: string): IXQuery;
+function TXQueryEngine.parseXQuery1(s: string; sharedContext: TXQStaticContext = nil): IXQuery;
 begin
-  FLastQuery:=parseTerm(s, xqpmXQuery1);
+  FLastQuery:=parseTerm(s, xqpmXQuery1, sharedContext);
   result := FLastQuery;
 end;
 
@@ -3574,22 +3574,30 @@ begin
   collations.AddObject(collation.id, collation);
 end;
 
-function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel): TXQuery;
+function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
 var cxt: TXQParsingContext;
+  staticContextShared: Boolean;
 begin
-  if str = '' then exit(TXQuery.Create(StaticContext.clone(), TXQTermSequence.Create));
+  staticContextShared := context <> nil;
+  if context = nil then context := StaticContext.clone();
+  if str = '' then begin
+    result := TXQuery.Create(context, TXQTermSequence.Create);
+    result.staticContextShared := staticContextShared;
+    exit;
+  end;
   if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
   cxt.AllowObjects:=VariableChangelog.allowObjects;
-  cxt.staticContext := StaticContext.clone();
+  cxt.staticContext := context;
   cxt.parsingModel:=model;
   cxt.engine := self;
   try
     cxt.str := str;
     cxt.pos := @cxt.str[1];
     result := TXQuery.Create(cxt.staticContext);
+    result.staticContextShared := staticContextShared;
     result.fterm := cxt.parseModule();
     if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
     if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
