@@ -728,6 +728,18 @@ var previoushtml: string;
       checklog(expected);
     end;
 
+    procedure q(const template, expected: string; html: string = '');
+    var
+      query: IXQuery;
+      got: String;
+    begin
+      query := extParser.QueryEngine.parseXQuery1(template);
+      //if html <> '' then extParser.parseh;
+      got := query.evaluate(extParser.HTMLTree).toString;
+      if got <> expected then
+        raise Exception.Create('Test failed got '+got+ ' expected '+expected);
+    end;
+
    procedure cmp(a,b: string);
    begin
      if a <> b then raise Exception.Create('Test failed: '+a+' <> '+b);
@@ -882,10 +894,46 @@ begin
   if extParser.variables.ValuesString['newjoinednew']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['newtype']<>'string' then raise Exception.Create('invalid var');
 
+  //test, if the testing here works
+  q('1+2', '3');
+  q('"abc"', 'abc');
+  q('outer-xml(<a>b</a>)', '<a>b</a>');
+
+  q('match(<a>{{.}}</a>, <r><a>123</a></r>)', '123');
+  q('match(<a>{{.}}</a>, <a>123456</a>)', '123456');
+  q('string-join(match(<a>{{.}}</a>, (<a>1</a>, <a>2</a>)), " ")', '1 2');
+  q('string-join(match(<a>{{.}}</a>, (<a>1</a>, <a>2</a>, <a>3</a>, <a>4</a>)), " ")', '1 2 3 4');
+  q('sum(match(<a>{{.}}</a>, (<a>1</a>, <a>2</a>, <a>3</a>, <a>4</a>)))', '10');
+  q('string-join(match(<a>{{.}}</a>,  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1');
+  q('string-join(match(<a>*{{.}}</a>,  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
+  q('string-join(match(<a>*{{.}}</a>,  (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>)), " ")', '1 2 3 4 5 6');
+  q('string-join(match(<a>{{.}}</a>, (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>)), " ")', '1 4');
+  q('string-join(match(<r>{{.}}</r>, (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>) ), " ")', '123 456');
+  q('string-join(match((<a>{{.}}</a>, <r>{{.}}</r>), (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>) ), " ")', '1 4 123 456');
+  q('string-join(match((<a>{{.}}</a>, <a>{{.}}</a>), (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>) ), " ")', '1 4 1 4');
+  q('string-join(match(("<a>{.}</a>", "<a>{.}</a>"), (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>) ), " ")', '1 4 1 4');
+
+  q('match(<a>{{$var}}</a>, <r><a>123</a></r>)', '');
+  q('match(<a>{{$var}}</a>, <r><a>123</a></r>).var', '123');
+  q('match(<r><a>{{$var}}</a><b>{{$var2}}</b></r>, <r><a>123</a><b>456</b></r>).var', '123');
+  q('match(<r><a>{{$var}}</a><b>{{$var2}}</b></r>, <r><a>123</a><b>456</b></r>).var2', '456');
+  q('match(<r><a>{{$var}}</a><b>{{$var2}}</b><b>{{$var3}}</b></r>, <r><a>123</a><b>456</b><b>789</b></r>).var', '123');
+  q('match(<r><a>{{$var}}</a><b>{{$var2}}</b><b>{{$var3}}</b></r>, <r><a>123</a><b>456</b><b>789</b></r>).var2', '456');
+  q('match(<r><a>{{$var}}</a><b>{{$var2}}</b><b>{{$var3}}</b></r>, <r><a>123</a><b>456</b><b>789</b></r>).var3', '789');
+  q('string-join(match(<a>*{{$res := .}}</a>, <r><a>1</a><a>2</a><a>3</a></r>).res, " ")', '1 2 3');
+  q('string-join(match(<a>{{$res := .}}</a>, <r><a>1</a><a>2</a><a>3</a></r>).res, " ")', '1');
+  q('string-join(match(<r><a>{{$res := .}}</a>*<b>{{$foo := .}}</b></r>, <r><a>1</a><a>2</a><a>3</a><b>H</b></r>).res, " ")', '1 2 3');
+  q('string-join(match(<r><a>{{$res := .}}</a>*<b>{{$foo := .}}</b></r>, <r><a>1</a><a>2</a><a>3</a><b>H</b></r>).foo, " ")', 'H');
+  q('string-join(match(<r><a>{{$res := .}}</a>*<b>{{.}}</b></r>, <r><a>1</a><a>2</a><a>3</a><b>H</b></r>).res, " ")', '1 2 3');
+  q('string-join(match(<r><a>{{$res := .}}</a>*<b>{{.}}</b></r>, <r><a>1</a><a>2</a><a>3</a><b>H</b></r>)._result, " ")', 'H');
+
+  q('string-join(for $i in match(<a>{{.}}</a>, (<a>x</a>, <a>y</a>, <a>z</a>)) return $i, " ")', 'x y z');
+  q('string-join(for $i in match(<a>{{$t := .}}</a>, (<a>x</a>, <a>y</a>, <a>z</a>)) return $i.t, " ")', 'x y z');
 
   extParser.free;
   sl.Free;
 end;
+
 
 
 

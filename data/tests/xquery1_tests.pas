@@ -1473,7 +1473,7 @@ begin
   m('deep-equal(document { () }, document { processing-instruction abc { 123 }}  )', 'true');
 
   m('let $obj := object(("a", "b")) return $obj.a', 'b');
-  //m('(let $obj := object(("a", "b")) return $obj.a := 17).a', '17'); //seems that does not work as it does find $obj in the := call. (which is good, since it will probably crash)
+  //m('(let $obj := object(("a", "b")) return $obj.a := 17).a', '17'); //seems that does not work as it does not find $obj in the := call. (which is good, since it will probably crash)
   t('for $obj in (object(("a", "b")), object(("a", "c")), object(("a", "d"))) return $obj.a', 'b c d');
 
   m('declare namespace p="http://www.w3.org/2001/XMLSchema"; p:integer(1)', '1');

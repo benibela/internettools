@@ -392,7 +392,7 @@ THtmlTemplateParser=class
     FKeepOldVariables: TKeepPreviousVariables;
 
     FTemplate, FHTML: TTreeParser;
-    FHtmlTree: TTreeDocument;
+    FHtmlTree: TTreeElement;
     FQueryEngine: TXQueryEngine;
 
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TXQVariableChangeLog;
@@ -417,6 +417,9 @@ THtmlTemplateParser=class
 
     function templateElementFitHTMLOpen(html:TTreeElement; template: TTemplateElement): Boolean;
     function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeElement; templateStart, templateEnd: TTemplateElement): boolean;
+
+    procedure parseHTMLSimple(html, uri, contenttype: string);
+    function matchLastTrees: Boolean;
   public
     constructor create;
     destructor destroy; override;
@@ -1118,6 +1121,103 @@ begin
     FVariableLog.popAll(level);
 end;
 
+procedure THtmlTemplateParser.parseHTMLSimple(html, uri, contenttype: string);
+begin
+  FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
+  FHtmlTree := FHTML.parseTree(html, (uri), contenttype);
+
+  //encoding trouble
+  if FHtmlTree is TTreeDocument then
+    TTreeDocument(FHtmlTree).setEncoding(outputEncoding,true,true);
+
+  if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
+    FHTML.removeEmptyTextNodes(true);
+end;
+
+function THtmlTemplateParser.matchLastTrees: boolean;
+var cur,last,realLast:TTemplateElement;
+    temp: TTreeElement;
+begin
+  FreeAndNil(FVariables);
+  if FKeepOldVariables = kpvForget then
+    FVariableLog.Clear
+  else begin
+    //convert all node variables to string (because the nodes point to a tree which we will destroy soon)
+    FVariableLog.stringifyNodes;
+    if FKeepOldVariables = kpvKeepValues then
+      FOldVariableLog.takeFrom(FVariableLog);;
+  end;
+  FreeAndNil(FVariableLogCondensed);
+  FVariableLog.allowObjects:=FObjects;
+
+  if FTemplate.getLastTree <> nil then begin
+    if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
+      cur := TTemplateElement(FTemplate.getLastTree.next);
+      while cur <> nil do begin
+        if (cur.templateAttributes<>nil) then
+          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
+        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+          cur.initializeCaches(self,true);
+        cur := cur.templateNext;
+      end;
+    end else begin
+      cur := TTemplateElement(FTemplate.getLastTree.next);
+      while cur <> nil do begin
+        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+          cur.initializeCaches(self,lastTrimTextNodes <> FTrimTextNodes);
+        cur := cur.templateNext;
+      end;
+    end;
+  end;
+  FTemplate.getLastTree.setEncoding(outputEncoding,true,true);
+  lastTrimTextNodes := FTrimTextNodes;
+
+
+  if FParsingExceptions then begin
+    cur := TTemplateElement(FTemplate.getLastTree.next);
+    while cur <> nil do begin
+      cur.match := nil;
+      cur := cur.templateNext;
+    end;
+  end;
+
+  FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
+  FQueryEngine.RootElement := FHtmlTree;
+  if FHtmlTree.document is TTreeDocument then
+    FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI;
+
+  temp := FHtmlTree;
+  if temp is TTreeDocument then temp := temp.next;
+  result:=matchTemplateTree(FHtmlTree, temp, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
+
+  if not result and FParsingExceptions then begin
+    cur := TTemplateElement(FTemplate.getLastTree.next);
+    if cur = nil then raise EHTMLParseException.Create('No template');
+    cur := cur.templateNext;
+    realLast := cur;
+    last := cur;
+    while cur <> nil do begin
+      case cur.templateType of
+        tetHTMLOpen, tetHTMLText: begin
+          if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
+            raise EHTMLParseMatchingException.create('Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+          end;
+          last:=cur;
+        end;
+        tetCommandIfOpen: begin
+          if cur.match = nil then cur := cur.templateReverse;
+          last:=cur;
+        end;
+      end;
+
+      realLast := cur;
+      cur := cur.templateNext;
+    end;
+    raise EHTMLParseException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason');
+  end;
+//TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
+end;
+
 constructor THtmlTemplateParser.create;
 begin
   FVariableLog := TXQVariableChangeLog.Create;
@@ -1162,99 +1262,9 @@ begin
 end;
 
 function THtmlTemplateParser.parseHTML(html: string; htmlFileName: string; contentType: string): boolean;
-var cur,last,realLast:TTemplateElement;
 begin
-  FreeAndNil(FVariables);
-  if FKeepOldVariables = kpvForget then
-    FVariableLog.Clear
-  else begin
-    //convert all node variables to string (because the nodes point to a tree which we will destroy soon)
-    FVariableLog.stringifyNodes;
-    if FKeepOldVariables = kpvKeepValues then
-      FOldVariableLog.takeFrom(FVariableLog);;
-  end;
-  FreeAndNil(FVariableLogCondensed);
-  FVariableLog.allowObjects:=FObjects;
-
-  FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
-  FHTML.parseTree(html, htmlfilename, contentType);
-  FHtmlTree := fhtml.getLastTree;
-
-
-  //encoding trouble
-  FHtmlTree.setEncoding(outputEncoding,true,true);
-
-  if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
-    FHTML.removeEmptyTextNodes(true);
-
-  if FHtmlTree = nil then begin
-    if FParsingExceptions then raise EXQEvaluationException.Create('Website is empty: '+htmlFileName);
-    exit;
-  end;
-
-  if FTemplate.getLastTree <> nil then begin
-    if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
-      cur := TTemplateElement(FTemplate.getLastTree.next);
-      while cur <> nil do begin
-        if (cur.templateAttributes<>nil) then
-          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
-        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
-          cur.initializeCaches(self,true);
-        cur := cur.templateNext;
-      end;
-    end else begin
-      cur := TTemplateElement(FTemplate.getLastTree.next);
-      while cur <> nil do begin
-        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
-          cur.initializeCaches(self,lastTrimTextNodes <> FTrimTextNodes);
-        cur := cur.templateNext;
-      end;
-    end;
-  end;
-  FTemplate.getLastTree.setEncoding(outputEncoding,true,true);
-  lastTrimTextNodes := FTrimTextNodes;
-
-
-  if FParsingExceptions then begin
-    cur := TTemplateElement(FTemplate.getLastTree.next);
-    while cur <> nil do begin
-      cur.match := nil;
-      cur := cur.templateNext;
-    end;
-  end;
-
-  FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
-  FQueryEngine.RootElement := FHtmlTree;
-  FQueryEngine.StaticContext.baseURI := FHtmlTree.baseURI;
-
-  result:=matchTemplateTree(FHtmlTree, FHtmlTree.next, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
-
-  if not result and FParsingExceptions then begin
-    cur := TTemplateElement(FTemplate.getLastTree.next);
-    if cur = nil then raise EHTMLParseException.Create('No template');
-    cur := cur.templateNext;
-    realLast := cur;
-    last := cur;
-    while cur <> nil do begin
-      case cur.templateType of
-        tetHTMLOpen, tetHTMLText: begin
-          if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
-            raise EHTMLParseMatchingException.create('Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
-          end;
-          last:=cur;
-        end;
-        tetCommandIfOpen: begin
-          if cur.match = nil then cur := cur.templateReverse;
-          last:=cur;
-        end;
-      end;
-
-      realLast := cur;
-      cur := cur.templateNext;
-    end;
-    raise EHTMLParseException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason');
-  end;
-//TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
+  parseHTMLSimple(html, htmlFileName, contentType);
+  Result := matchLastTrees;
 end;
 
 function THtmlTemplateParser.parseHTMLFile(htmlfilename: string):boolean;
@@ -1442,8 +1452,58 @@ begin
 end;
 
 
+function xqFunctionMatches(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
+var temp: THtmlTemplateParser;
+    template, html: IXQValue;
+    cols: TXQVariableChangeLog;
+    tempobj: TXQValueObject;
+    i: Integer;
+begin
+  requiredArgCount(args, 2);
+  result := nil;
+  temp := THtmlTemplateParser.create; //TODO: optimize
+  try
+    temp.QueryEngine.StaticContext.Free;
+    temp.QueryEngine.StaticContext := context.staticContext.clone();
+    temp.QueryEngine.staticContext.sender := temp.QueryEngine;
+    temp.KeepPreviousVariables:=kpvForget;
+    temp.OutputEncoding:=context.staticContext.stringEncoding;
+    for template in args[0] do begin
+      if template is TXQValueString then temp.parseTemplate(template.toString)
+      else if template is TXQValueNode then temp.parseTemplate(template.toNode.outerXML())
+      else raise EXQEvaluationException.Create('Invalid type for template. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
+      for html in args[1] do begin
+        if not (html is TXQValueNode) then
+          raise EXQEvaluationException.Create('Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
+        temp.FHtmlTree := html.toNode;
+        if not temp.matchLastTrees then raise EXQEvaluationException.Create('Failed to match template to html');
+        cols := temp.VariableChangeLogCondensed.collected;
+        try
+          if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
+            xqvalueSeqAdd(result, cols.get(0))
+          else begin
+            tempobj := TXQValueObject.create();
+            for i := 0 to cols.count - 1 do
+              tempobj.setMutable(cols.getName(i), cols.get(i));
+            xqvalueSeqAdd(result, tempobj);
+          end;
+        finally
+          cols.free;
+        end;
+      end;
+    end;
+  finally
+    temp.free;
+  end;
+  if result = nil then result := xqvalue;
+end;
+
+var module: TXQNativeModule;
 
 initialization
+
+module := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
+module.registerFunction('match', @xqFunctionMatches, []);
 
 
 end.
