@@ -247,7 +247,6 @@ end;
 
 function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
 var word: string;
-  index: Integer;
   namespace: INamespace;
 begin
   word := nextToken();

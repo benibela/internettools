@@ -1883,7 +1883,7 @@ begin
   result := TXQValue_anyURI.create(splitted[0]);
 end;
 
-function xqFunctionNamespace_URI_For_Prefix(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionNamespace_URI_For_Prefix(const args: TXQVArray): IXQValue;
 var
   temp: TNamespaceList;
   tempns: INamespace;

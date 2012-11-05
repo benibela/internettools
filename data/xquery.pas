@@ -4633,8 +4633,7 @@ begin
     end;
 end;
 
-var i:integer;
-    fn, pxp, op, xs: TXQNativeModule;
+var fn, pxp, op, xs: TXQNativeModule;
 initialization
 collations:=TStringList.Create;
 collations.OwnsObjects:=true;

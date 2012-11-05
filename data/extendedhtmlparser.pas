@@ -1279,7 +1279,6 @@ end;
 procedure THtmlTemplateParser.parseTemplate(template: string;
   templateName: string);
 var el: TTemplateElement;
-    encoding: string;
     defaultTextMatching: String;
     defaultCaseSensitive: string;
     i: Integer;

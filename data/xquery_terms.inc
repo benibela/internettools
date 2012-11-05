@@ -668,7 +668,7 @@ end;
 
 class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
-  i, aindex: Integer;
+  aindex: Integer;
   module: TXQNativeModule;
 begin
   if (ns = nil) then exit(false);
