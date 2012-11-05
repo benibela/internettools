@@ -24,7 +24,7 @@ uses
 implementation
 
 
-function xqFunctionString_length(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionString_length(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   temp: String;
 begin

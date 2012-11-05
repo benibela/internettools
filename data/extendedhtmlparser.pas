@@ -1456,7 +1456,7 @@ begin
 end;
 
 
-function xqFunctionMatches(const context: TEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionMatches(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var temp: THtmlTemplateParser;
     template, html: IXQValue;
     cols: TXQVariableChangeLog;

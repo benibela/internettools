@@ -1534,12 +1534,12 @@ type
 { TTermExtension }
 
  TTermExtension = class(TXQTerm)
-  function evaluate(const context: TEvaluationContext): IXQValue; override;
+  function evaluate(const context: TXQEvaluationContext): IXQValue; override;
 end;
 
 { TTermExtension }
 
-function TTermExtension.evaluate(const context: TEvaluationContext): IXQValue;
+function TTermExtension.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   result := xqvalue('native!');
 end;

@@ -49,7 +49,7 @@ begin
   raise EXQEvaluationException.Create(s);
 end;
 
-procedure TXQTerm.evaluateChildren(const context: TEvaluationContext; out results: TXQVArray);
+procedure TXQTerm.evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
 var
   i: Integer;
 begin
@@ -78,7 +78,7 @@ begin
   propname := apropname;
 end;
 
-function TXQTermReadObjectProperty.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermReadObjectProperty.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   obj: IXQValue;
 begin
@@ -91,7 +91,7 @@ end;
 
 { TXQTermIf }
 
-function TXQTermIf.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermIf.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if length(children)<>3 then raiseEvaluationError('if must have 3 arguments');
   if children[0].evaluate(context).toBooleanEffective then result:=children[1].evaluate(context)
@@ -106,7 +106,7 @@ begin
   push(filter);
 end;
 
-function TXQTermFilterSequence.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermFilterSequence.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
   if children[0] is TXQTermNodeMatcher then begin
@@ -163,7 +163,7 @@ begin
   if value <> nil then push(value);
 end;
 
-function TXQTermDefineVariable.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermDefineVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   //this is never called for true XQuery variables, they are handled from the module term.
   if not assigned(context.staticContext.sender.OnDefineVariable) then raiseEvaluationError(':= can''t be used without a method assigned to the OnDefineVariable event');
@@ -189,7 +189,7 @@ begin
 end;
 
 
-function TXQTermSequenceType.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermSequenceType.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   result := TXQValueFunction.create(self); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
@@ -218,7 +218,7 @@ begin
   else result := v.canConvertToType(atomicTypeInfo)
 end;
 
-function TXQTermSequenceType.castAs(v: IXQValue; const context: TEvaluationContext): IXQValue;
+function TXQTermSequenceType.castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
 var
   temp: String;
   ns: INamespace;
@@ -240,7 +240,7 @@ begin
   result := castableAsBase(v);
 end;
 
-function TXQTermSequenceType.instanceOf(ta: IXQValue; const context: TEvaluationContext): boolean;
+function TXQTermSequenceType.instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
 var nodeCondition: TXQPathNodeCondition;
 
   function instanceOfSingleType(sub: IXQValue): boolean;
@@ -285,7 +285,7 @@ begin
 end;
 
 function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
-var temp: TEvaluationContext;
+var temp: TXQEvaluationContext;
 begin
   temp.staticContext := nil;
   result := instanceOf(ta, temp);
@@ -293,7 +293,7 @@ end;
 
 { TXQTermSequence }
 
-function TXQTermSequence.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermSequence.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
   tempSeq: TXQValueSequence;
@@ -321,8 +321,8 @@ begin
   isEvery:=every;
 end;
 
-function TXQTermSomeEvery.evaluate(const context: TEvaluationContext): IXQValue;
-var tempContext:TEvaluationContext;
+function TXQTermSomeEvery.evaluate(const context: TXQEvaluationContext): IXQValue;
+var tempContext:TXQEvaluationContext;
   function evaluateSomeEvery(pos:integer): boolean;
   var v: IXQValue;
       typeDelta: integer;
@@ -368,7 +368,7 @@ end;
   TFlowerSortingData = record
     flower: TXQTermFlower;
     collations: array of TXQCollation;
-    context: ^TEvaluationContext;
+    context: ^TXQEvaluationContext;
   end;
   PFlowerSortingData = ^TFlowerSortingData;
 
@@ -420,9 +420,9 @@ begin
   end;
 end;
 
-function TXQTermFlower.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermFlower.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
-  tempContext: TEvaluationContext;
+  tempContext: TXQEvaluationContext;
   sortingCache: TFPList;
   finalResult: IXQValue;
 
@@ -578,7 +578,7 @@ begin
   result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet
 end;
 
-function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
   function functionTypeConversion(const v: IXQValue; const typ: TXQTermSequenceType): IXQValue;
     function conversionSingle(const w: IXQValue): IXQValue;
     begin
@@ -611,7 +611,7 @@ function TXQTermNamedFunction.evaluate(const context: TEvaluationContext): IXQVa
 
 var
   evilkids: TXQVArray;
-  tempcontext: TEvaluationContext;
+  tempcontext: TXQEvaluationContext;
   i: Integer;
   j: Integer;
   vfunc: TXQValueFunction;
@@ -734,7 +734,7 @@ begin
   create(aop, arg1, arg2);
 end;
 
-function TXQTermBinaryOp.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if length(children)<2 then raiseEvaluationError('Not enough subterms');
   if length(children)>2 then raiseEvaluationError('Too many subterms');
@@ -793,7 +793,7 @@ begin
   func := asfunction;
 end;
 
-function TXQTermNodeMatcher.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermNodeMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
   else if func and (axis = '') and (select = 'text') and (context.staticContext.sender.TextElement<>nil) then result := xqvalue(context.staticContext.sender.TextElement)
@@ -882,7 +882,7 @@ begin
   if arg <> nil then push(arg);
 end;
 
-function TXQTermUnaryOp.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermUnaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if length(children)<1 then raiseEvaluationError( 'Not enough subterms')
   else if length(children)>1 then raiseEvaluationError('Too many subterms');
@@ -905,7 +905,7 @@ begin
   else value := xqvalue(StrToInt65(avalue));
 end;
 
-function TXQTermNumber.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermNumber.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   result := value.clone;
@@ -930,7 +930,7 @@ begin
   end;
 end;
 
-function TXQTermReadAttribute.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermReadAttribute.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   tempEl: TTreeElement;
   testValue: Boolean;
@@ -992,7 +992,7 @@ begin
   if staticContext <> nil then staticContext.splitRawQName(namespace, value, xqdnkUnknown);
 end;
 
-function TXQTermVariable.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   temp: TXQValue;
   sc: TXQStaticContext;
@@ -1034,7 +1034,7 @@ begin
   value := avalue;
 end;
 
-function TXQTermString.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermString.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   Result := xqvalue(value);
@@ -1050,10 +1050,10 @@ end;
 
 { TXQTermTypeSwitch }
 
-function TXQTermTypeSwitch.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
   function evaluateWithChangedVariable(eval, vari: TXQTerm; const value: IXQValue): IXQValue;
   var
-    tempContext: TEvaluationContext;
+    tempContext: TXQEvaluationContext;
   begin
     tempContext := context;
     if vari is TXQTermVariable then begin
@@ -1094,7 +1094,7 @@ begin
   nameValue := aname;
 end;
 
-function TXQTermConstructor.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermConstructor.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   temp: Integer;
 begin
@@ -1102,12 +1102,12 @@ begin
   result := evaluate(context, nil, temp);
 end;
 
-function TXQTermConstructor.evaluate(const context: TEvaluationContext; root: TTreeElement; var baseOffset: longint): IXQValue;
+function TXQTermConstructor.evaluate(const context: TXQEvaluationContext; root: TTreeElement; var baseOffset: longint): IXQValue;
 var
   tree: TTreeElement;
   kid: TTreeElement;
   lastKid: TTreeElement;
-  subcontext: ^TEvaluationContext;
+  subcontext: ^TXQEvaluationContext;
   procedure addKid;
   begin
     if (kid.typ = tetText) and (kid.value = '') then begin
@@ -1430,7 +1430,7 @@ begin
   funcname:=aname;
 end;
 
-function TXQTermDefineFunction.evaluate(const context: TEvaluationContext): IXQValue;
+function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   raiseEvaluationError('Dead branch called');
   ignore(context);
