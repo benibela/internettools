@@ -33,6 +33,7 @@ type
 
   str: string;
   pos: pchar;
+  resultquery: TXQuery;
 
   procedure raiseParsingError(s: string);
   procedure raiseInvalidModel(s: string);
@@ -1238,6 +1239,8 @@ begin
     (staticContext.moduleNamespace as TNamespace).url := parseStringLiteral;
     expect(';');
     token := nextToken(true);
+    if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then
+      staticContext.sender.FModules.Add(IXQuery(resultquery));
   end;
 
   while (token = 'declare') or (token = 'import') do begin
@@ -1331,5 +1334,9 @@ begin
   end;
   if result <> nil then result.push(parsePrimaryLevel)
   else result := parsePrimaryLevel();
+  if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) and (result is TXQTermModule) and (staticContext.moduleNamespace <> nil)  then begin
+    resultquery.fterm := result;
+    resultquery.initializeStaticContext(staticContext.sender.getEvaluationContext(staticContext));
+  end;
 end;
 

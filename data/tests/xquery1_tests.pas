@@ -18,10 +18,12 @@ type
 
  THelper = class
   func1, func2, func3: TXQTerm;
+  ps: TXQueryEngine;
   constructor create;
   destructor Destroy; override;
   procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue);
   procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const functionName: string; var value: TXQValueFunction);
+  procedure ImportModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
 procedure unittests;
@@ -654,6 +656,7 @@ begin
   m('import schema namespace foobar="xyz"; 5 instance of foobar:double', 'false'); //TODO: arbitrary schemas
 
   helper := THelper.Create;
+  helper.ps := ps;
   ps.OnDeclareExternalVariable:=@helper.DeclareExternalVariableEvent;
   ps.OnDeclareExternalFunction:=@helper.DeclareExternalFunctionEvent;
 
@@ -1566,6 +1569,18 @@ begin
   m('declare option pxp:use-local-namespaces "off";  <r><b xmlns="xxx">!</b></r> / b ', '');
 
 
+  ps.StaticContext.strictTypeChecking:=false;
+
+  ps.AutomaticallyRegisterParsedModules := true;
+  ps.parseXQuery1('module namespace test3 = "pseudo://test-module3"; declare function test3:double($x) { 2*$x}; declare variable $test3:var := 17');
+  m('import module "pseudo://test-module3"; test3:double(10)', '20');
+  m('import module namespace test4 = "pseudo://test-module3"; test4:double(10) + $test4:var', '37');
+  ps.OnImportModule:=@helper.ImportModule;
+
+  ps.parseXQuery1('module namespace circle1 = "pseudo://circle1"; import module "pseudo://circle2"; declare function circle1:cf1 ($x) { if ($x <= 0) then 1 else $x * circle2:cf2($x - 1)}');
+
+  m('import module namespace circle1 = "pseudo://circle1"; import module namespace circle2 = "pseudo://circle2"; circle1:cf1(10)', '3628800');
+
 
   writeln('XQuery: ', count, ' completed');
 
@@ -1629,6 +1644,14 @@ begin
   'test-importfunc2': value.body := func2;
   'test-importfunc3': value.body := func3;
   end;
+end;
+
+procedure THelper.ImportModule(sender: TObject; const namespace: string; const at: array of string);
+begin
+  if namespace = 'pseudo://circle2' then
+    ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ')
+  else
+    raise Exception.Create('Invalid namespace: '+namespace)
 end;
 
 end.

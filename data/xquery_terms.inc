@@ -589,11 +589,12 @@ begin
   localName:=name;
   sc.splitRawQName(ns, localName, xqdnkFunction);
   if findKindIndex(ns, localName, akind, afunc) then exit(TXQTermNamedFunction.Create(akind, afunc))
-  else if pos(':', name) = 0 then
+  else if pos(':', name) = 0 then begin
      if sc.defaultElementTypeNamespace <> nil then begin
        if findKindIndex(sc.defaultElementTypeNamespace, localName, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc))
      end else if sc.defaultTypeNamespace <> nil then
        if findKindIndex(sc.defaultTypeNamespace, localName, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc));
+  end;
   result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet
 end;
 

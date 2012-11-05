@@ -322,7 +322,7 @@ begin
   url := inputmodules.Values[namespace];
   inputmodules.Values[namespace ] := '';
   if not FileExists('TestSources/'+url+'.xq') then exit;
-  pxp.registerModule(pxp.parseXQuery1(strLoadFromFile('TestSources/'+url+'.xq')));
+  pxp.parseXQuery1(strLoadFromFile('TestSources/'+url+'.xq'));
 end;
 
 var t: IXQValue;
@@ -365,6 +365,7 @@ begin
   extvars := TVariableProvider.Create;
   pxp.OnDeclareExternalVariable:=@extvars.getvar;
   pxp.onImportModule:=@extvars.importModule;
+  pxp.AutomaticallyRegisterParsedModules:=true;
   tree := TTreeParser.Create;
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;

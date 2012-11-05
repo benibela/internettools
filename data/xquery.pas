@@ -1302,6 +1302,8 @@ type
     AllowVariableUseInStringLiterals: boolean; //**< If "...$var.. " should be replaced by the value of var, or remain a string literal
     GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
 
+    AutomaticallyRegisterParsedModules: boolean;
+
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
     function parseXPath2(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
@@ -3639,6 +3641,7 @@ begin
     cxt.pos := @cxt.str[1];
     result := TXQuery.Create(cxt.staticContext);
     result.staticContextShared := staticContextShared;
+    cxt.resultquery := result;
     result.fterm := cxt.parseModule();
     if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
     if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
