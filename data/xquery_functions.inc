@@ -574,7 +574,7 @@ begin
   xqvalueCompareGeneric(cxt,a,b,result,1,0);
 end;
 
-function xqvalueContextNode(const context: TXQEvaluationContext): TTreeElement;
+function xqvalueContextNode(const context: TXQEvaluationContext): TTreeNode;
 begin
   if context.ParentElement <> nil then exit(context.ParentElement);
   if context.RootElement <> nil then exit(context.RootElement);
@@ -584,7 +584,7 @@ begin
   result := nil;
 end;
 
-function xqvalueToSingleNode(v: IXQValue): TTreeElement;
+function xqvalueToSingleNode(v: IXQValue): TTreeNode;
 var
   k: TXQValueKind;
 begin
@@ -604,13 +604,13 @@ function xqvalueNodeBefore(const cxt: TXQEvaluationContext; const ta, tb: IXQVal
 begin
   ignore(cxt);
   if ta.isUndefined or tb.isUndefined then exit(xqvalue);
-  result := xqvalue(TTreeElement.compareInDocumentOrder(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) < 0);
+  result := xqvalue(TTreeNode.compareInDocumentOrder(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) < 0);
 end;
 function xqvalueNodeAfter(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt);
   if ta.isUndefined or tb.isUndefined then exit(xqvalue);
-  result := xqvalue(TTreeElement.compareInDocumentOrder(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) > 0);
+  result := xqvalue(TTreeNode.compareInDocumentOrder(xqvalueToSingleNode(ta), xqvalueToSingleNode(tb)) > 0);
 end;
 
 
@@ -686,7 +686,7 @@ begin
   ia := 0; ib:=0;
   resseq := TXQValueSequence.create(max(a.seq.Count,b.seq.Count));
   while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
-    cmp := TTreeElement.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
+    cmp := TTreeNode.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
     if cmp = 0 then begin
       resseq.addChild(xqvalue(a.seq[ia].toNode));
       ia+=1; ib+=1;
@@ -750,7 +750,7 @@ begin
   ia := 0; ib:=0;
   resseq := TXQValueSequence.create(a.seq.Count);
   while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
-    cmp := TTreeElement.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
+    cmp := TTreeNode.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
     if cmp < 0 then begin
       resseq.addChild(a.seq[ia]);
       ia+=1;
@@ -987,7 +987,7 @@ begin
 end;
 
 function xqFunctionOuter_XML(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-var node: TTreeElement;
+var node: TTreeNode;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then node := args[0].toNode
@@ -996,7 +996,7 @@ begin
 end;
 
 function xqFunctionInner_XML(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-var node: TTreeElement;
+var node: TTreeNode;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then node := args[0].toNode
@@ -1020,7 +1020,7 @@ function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArr
   , '&')
 }
 
-var //node: TTreeElement;
+var //node: TTreeNode;
     replace: TStringList;
     cmp: TStringComparisonFunc;
     procedure add(s: string);
@@ -1034,11 +1034,11 @@ var //node: TTreeElement;
     end;
 
 
-    function encodeForm(const form: TTreeElement): IXQValue;
+    function encodeForm(const form: TTreeNode): IXQValue;
     var
-      temp: TTreeElement;
+      temp: TTreeNode;
       typ: string;
-      tempend: TTreeElement;
+      tempend: TTreeNode;
       value: String;
       first: Boolean;
       request: string;
@@ -1735,9 +1735,9 @@ end;
 
 function xqFunctionBase_Uri(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var uri: string;
-  node: TTreeElement;
+  node: TTreeNode;
   temp: String;
-  last: TTreeElement;
+  last: TTreeNode;
 begin
   requiredArgCount(args,0, 1);
   if length(args) = 0 then node := xqvalueContextNode(context)
@@ -1764,7 +1764,7 @@ end;
 
 function xqFunctionDocument_Uri(const args: TXQVArray): IXQValue;
 var
-  node: TTreeElement;
+  node: TTreeNode;
 begin
   requiredArgCount(args,1);
   if args[0].isUndefined then exit(xqvalue);
@@ -1776,7 +1776,7 @@ end;
 
 function xqFunctionRoot(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  temp: TTreeElement;
+  temp: TTreeNode;
 begin
   requiredArgCount(args,0, 1);
   if length(args) = 1 then temp := args[0].toNode.getRootHighest()
@@ -1788,7 +1788,7 @@ end;
 
 function xqFunctionLang(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  node: TTreeElement;
+  node: TTreeNode;
   rlang, testlang: string;
 begin
   requiredArgCount(args,1, 2);
@@ -1986,7 +1986,7 @@ end;
 function xqFunctionDoc(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   url: String;
-  node: TTreeElement;
+  node: TTreeNode;
 begin
   requiredArgCount(args, 1);
   url := args[0].toString;
@@ -2000,7 +2000,7 @@ begin
   if context.staticContext.sender.FExternalDocuments = nil then context.staticContext.sender.FExternalDocuments := TStringList.Create;
 
   if context.staticContext.sender.FExternalDocuments.IndexOf(url) >= 0 then
-    exit(xqvalue(TTreeElement(context.staticContext.sender.FExternalDocuments.Objects[context.staticContext.sender.FExternalDocuments.IndexOf(url)])));
+    exit(xqvalue(TTreeNode(context.staticContext.sender.FExternalDocuments.Objects[context.staticContext.sender.FExternalDocuments.IndexOf(url)])));
 
   url := resolveDocURI(url, context);
 
@@ -2526,7 +2526,7 @@ end;
 
 function xqFunctionNode_name(const args: TXQVArray): IXQValue;
 var
-  node: TTreeElement;
+  node: TTreeNode;
 begin
   requiredArgCount(args,1);
   node := args[0].toNode;
@@ -2536,7 +2536,7 @@ begin
     result := xqvalue();
 end;
 
-function simpleNode(const context: TXQEvaluationContext; args: TXQVArray): TTreeElement;
+function simpleNode(const context: TXQEvaluationContext; args: TXQVArray): TTreeNode;
 begin
   requiredArgCount(args,0, 1);
   if length(args) = 0 then exit(xqvalueContextNode(context))
@@ -2546,7 +2546,7 @@ end;
 
 function simpleNodeName(const context: TXQEvaluationContext; args: TXQVArray): string;
 var
-  node: TTreeElement;
+  node: TTreeNode;
 begin
   node := simpleNode(context, args);
   if node = nil then exit('');
@@ -2572,7 +2572,7 @@ end;
 
 function xqFunctionNamespace_URI(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  node: TTreeElement;
+  node: TTreeNode;
 begin
   node := simpleNode(context, args);
   if (node = nil) or not (node.typ in [tetOpen, tetAttribute]) then result := TXQValue_anyURI.create('')
@@ -2618,7 +2618,7 @@ end;
 var
   seq: TXQVList;
   i: Integer;
-  node: TTreeElement;
+  node: TTreeNode;
   attrib: TTreeAttribute;
 begin
   requiredArgCount(args,1, 2);

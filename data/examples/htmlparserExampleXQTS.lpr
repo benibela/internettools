@@ -11,7 +11,7 @@ uses
   ,{$ifdef win32}w32internetaccess{$else}synapseinternetaccess{$endif};
   { you can add units after this }
 
-var lastGroupStart: TTreeElement;
+var lastGroupStart: TTreeNode;
     buffer1, buffer2, buffer3: TStringList;
 
 type TLogger = class
@@ -205,7 +205,7 @@ end;
 var mylogger: TLoggerClass;
     startLogged: boolean;
     CAT: Integer;
-    groupStart: TTreeElement;
+    groupStart: TTreeNode;
 procedure logGroupStart;
 begin
   if groupStart <> nil then begin
@@ -228,7 +228,7 @@ begin
   if result = 0 then result := CompareStr(a.realvalue, b.realvalue);
 end;
 
-procedure sorttree(t: TTreeElement);
+procedure sorttree(t: TTreeNode);
 begin
   while t <> nil do begin
     if t.attributes <> nil then begin
@@ -239,7 +239,7 @@ begin
 end;
 
 function xmlEqual(a, b: string): boolean;
-var tree1, tree2: TTreeElement;
+var tree1, tree2: TTreeNode;
 begin
   try
   compareTree.clearTrees;
@@ -274,7 +274,7 @@ var htp: THtmlTemplateParser;
     pxp: TXQueryEngine;
     myoutput: string;
     from: SizeInt;
-    node: TTreeElement;
+    node: TTreeNode;
     inputfile: String;
     inputfilevar: String;
     skipped: Integer;
@@ -282,7 +282,7 @@ var htp: THtmlTemplateParser;
     wrong: Integer;
     exceptions: Integer;
     fileOpenFailed: String;
-    currentTree: TTreeElement = nil;
+    currentTree: TTreeNode = nil;
     logCorrect: Boolean;
     timing: TDateTime;
     mypxpoutput: IXQValue;
@@ -427,15 +427,15 @@ begin
             try
             fileOpenFailed:='';
             inputfiles.AddObject(inputfile, tree.parseTreeFromFile('TestSources/'+inputfile+'.xml'));
-            currentTree:=TTreeElement(inputfiles.Objects[inputfiles.Count-1]);
+            currentTree:=TTreeNode(inputfiles.Objects[inputfiles.Count-1]);
             except on e: EFOpenError do
               fileOpenFailed := e.Message;
               on e: ETreeParseException do
               fileOpenFailed := e.Message;
             end;
-          end else currentTree := TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]);
+          end else currentTree := TTreeNode(inputfiles.Objects[inputfiles.IndexOf(inputfile)]);
           if fileOpenFailed = '' then
-            pxp.VariableChangelog.add(inputfilevar, TTreeElement(inputfiles.Objects[inputfiles.IndexOf(inputfile)]));
+            pxp.VariableChangelog.add(inputfilevar, TTreeNode(inputfiles.Objects[inputfiles.IndexOf(inputfile)]));
         end;
 
       end else if varlog.getName(i) = 'test' then begin

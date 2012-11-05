@@ -18,17 +18,17 @@ type
 
 
 //**The type of a tree element. <Open>, text, or </close>
-TTreeElementType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument);
-TTreeElementTypes = set of TTreeElementType;
+TTreeNodeType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument);
+TTreeNodeTypes = set of TTreeNodeType;
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
 //**case sensitive: do not ignore the case, no descend: only check elements that direct children of the current node
-TTreeElementFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensitive, tefoNoChildren, tefoNoGrandChildren);
+TTreeNodeFindOptions = set of (tefoIgnoreType, tefoIgnoreText, tefoCaseSensitive, tefoNoChildren, tefoNoGrandChildren);
 
 TTreeParser = class;
 TTreeDocument = class;
 
-{ TTreeElement }
+{ TTreeNode }
 
 TStringComparisonFunc = function (const a,b: string): boolean of object;
 
@@ -82,7 +82,7 @@ public
   property items[i: integer]: INamespace read getNamespace;
 end;
 
-TTreeElement = class;
+TTreeNode = class;
 TTreeAttribute = class;
 
 TAttributeList = class;
@@ -112,7 +112,7 @@ public
   function getValue(i: integer): string;
 
   procedure add(const name, value: string; const namespace: INamespace = nil);
-  procedure add(att: TTreeElement);
+  procedure add(att: TTreeNode);
 
   function clone: TAttributeList;
 
@@ -144,16 +144,16 @@ end;
 //**@br
 //**Attributes should be accessed with the getAttribute or getAttributeTry method. Or you can enumerate them all @code(for attrib in attributes), if attributes is not nil. @br
 //** #)
-TTreeElement = class
+TTreeNode = class
 //use the fields if you know what you're doing
-  typ: TTreeElementType; //**<open, close, text or comment node
+  typ: TTreeNodeType; //**<open, close, text or comment node
   value: string; //**< tag name for open/close nodes, text for text/comment nodes
   attributes: TAttributeList;  //**<nil if there are no attributes
-  next: TTreeElement; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
-  previous: TTreeElement; //**< previous element (self.next.previous = self)
-  parent: TTreeElement;
-  document: TTreeElement;
-  reverse: TTreeElement; //**<element paired by open/closing, or corresponding attributes
+  next: TTreeNode; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
+  previous: TTreeNode; //**< previous element (self.next.previous = self)
+  parent: TTreeNode;
+  document: TTreeNode;
+  reverse: TTreeNode; //**<element paired by open/closing, or corresponding attributes
   namespace: INamespace; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
 
   offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
@@ -166,12 +166,12 @@ TTreeElement = class
 
   //Complex search functions.
   //**Returns the element with the given type and text which occurs before sequenceEnd.@br
-  //**This function is nil-safe, so if you call TTreeElement(nil).findNext(...) it will return nil
-  function findNext(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]; sequenceEnd: TTreeElement = nil):TTreeElement;
+  //**This function is nil-safe, so if you call TTreeNode(nil).findNext(...) it will return nil
+  function findNext(withTyp: TTreeNodeType; withText:string; findOptions: TTreeNodeFindOptions=[]; sequenceEnd: TTreeNode = nil):TTreeNode;
   //**Find a matching direct child (equivalent to findNext with certain parameters, but easier to use)@br
   //**A direct child of X is a node Y with Y.parent = X. @br
   //**The options tefoNoChildren, tefoNoGrandChildren have of course no effect. (former is set to false, latter to true)
-  function findChild(withTyp: TTreeElementType; withText:string; findOptions: TTreeElementFindOptions=[]): TTreeElement;
+  function findChild(withTyp: TTreeNodeType; withText:string; findOptions: TTreeNodeFindOptions=[]): TTreeNode;
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
   function outerXML(insertLineBreaks: boolean = false):string;
@@ -187,12 +187,12 @@ TTreeElement = class
   function getAttributeTry(a: string; out valueout: TTreeAttribute; cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeCount(): integer;
 
-  function getNextSibling(): TTreeElement; //**< Get the next element on the same level or nil if there is none
-  function getFirstChild(): TTreeElement; //**< Get the first child, or nil if there is none
-  function getParent(): TTreeElement; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
-  function getPrevious(): TTreeElement; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
-  function getRootHighest(): TTreeElement;    //**< Returns the highest node ancestor
-  function getRootElement(): TTreeElement;    //**< Returns the highest element node ancestor
+  function getNextSibling(): TTreeNode; //**< Get the next element on the same level or nil if there is none
+  function getFirstChild(): TTreeNode; //**< Get the first child, or nil if there is none
+  function getParent(): TTreeNode; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+  function getPrevious(): TTreeNode; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+  function getRootHighest(): TTreeNode;    //**< Returns the highest node ancestor
+  function getRootElement(): TTreeNode;    //**< Returns the highest element node ancestor
   function getDocument(): TTreeDocument; //**< Returns the document node containing this node
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
@@ -205,24 +205,24 @@ TTreeElement = class
 
   property defaultProperty[name: string]: string read getAttribute; default;
 
-  function isDeepEqual(cmpTo: TTreeElement; ignoredTypes: TTreeElementTypes = [tetComment, tetProcessingInstruction]; cmpFunction: TStringComparisonFunc = nil): boolean;
+  function isDeepEqual(cmpTo: TTreeNode; ignoredTypes: TTreeNodeTypes = [tetComment, tetProcessingInstruction]; cmpFunction: TStringComparisonFunc = nil): boolean;
 
-  procedure insert(el: TTreeElement); //**< inserts el after the current element (does only change next+previous, not reverse+parent)
-  procedure insertSurrounding(before, after: TTreeElement); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
-  procedure insertSurrounding(basetag: TTreeElement); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
+  procedure insert(el: TTreeNode); //**< inserts el after the current element (does only change next+previous, not reverse+parent)
+  procedure insertSurrounding(before, after: TTreeNode); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
+  procedure insertSurrounding(basetag: TTreeNode); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
   procedure addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil); inline;
   procedure addAttributes(const props: array of THTMLProperty);
   procedure addNamespaceDeclaration(n: INamespace; overridens: boolean );
-  procedure addChild(child: TTreeElement);
+  procedure addChild(child: TTreeNode);
 
   procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
-  function deleteElementFromDoubleLinkedList: TTreeElement; //removes the element from the double linked list (only updates previous/next), frees it and returns next  (mostly useful for attribute nodes)
+  function deleteElementFromDoubleLinkedList: TTreeNode; //removes the element from the double linked list (only updates previous/next), frees it and returns next  (mostly useful for attribute nodes)
 
-  function clone: TTreeElement;
+  function clone: TTreeNode;
 protected
   function serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
-  function cloneShallow: TTreeElement;
+  function cloneShallow: TTreeNode;
 
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
   procedure removeElementKeepChildren; //**< removes/frees the current element, but keeps the children (i.e. removes self and possible self.reverse. Will not remove the opening tag, if called on a closing tag)
@@ -232,21 +232,21 @@ public
   function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
 
   constructor create();
-  constructor create(atyp: TTreeElementType; avalue: string = '');
-  class function createElementPair(anodename: string): TTreeElement;
+  constructor create(atyp: TTreeNodeType; avalue: string = '');
+  class function createElementPair(anodename: string): TTreeNode;
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
 
   function caseInsensitiveCompare(const a,b: string): boolean; //**< returns true if a=b case insensitive. Can be passed to getAttribute
   function caseSensitiveCompare(const a,b: string): boolean;   //**< returns true if a=b case sensitive. Can be passed to getAttribute
 
-  class function compareInDocumentOrder(const a,b: TTreeElement): integer; static;
+  class function compareInDocumentOrder(const a,b: TTreeNode): integer; static;
 end;
-TTreeElementClass = class of TTreeElement;
+TTreeNodeClass = class of TTreeNode;
 
 { TTreeAttribute }
 
-TTreeAttribute = class(TTreeElement)
+TTreeAttribute = class(TTreeNode)
   realvalue: string;
   function isNamespaceNode: boolean;
   function toNamespace: INamespace;
@@ -255,7 +255,7 @@ end;
 
 { TTreeDocument }
 
-TTreeDocument = class(TTreeElement)
+TTreeDocument = class(TTreeNode)
 protected
   FEncoding: TEncoding;
   FBaseURI, FDocumentURI: string;
@@ -290,13 +290,13 @@ TParsingModel = (pmStrict, pmHTML);
 //**
 //**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree).@br
 //**If TargetEncoding is not eUnknown, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
-//**You can change the class used for the elements in the tree with the field treeElementClass.
+//**You can change the class used for the elements in the tree with the field treeNodeClass.
 TTreeParser = class
 protected
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
 //  FConvertEntities: boolean;
-  FCurrentElement: TTreeElement;
+  FCurrentElement: TTreeNode;
   FTemplateCount: Integer;
   FElementStack: TList;
   FAutoCloseTag: boolean;
@@ -308,8 +308,8 @@ protected
   FXmlHeaderEncoding: TEncoding;
 
 
-  function newTreeElement(typ:TTreeElementType; text: pchar; len:longint):TTreeElement;
-  function newTreeElement(typ:TTreeElementType; s: string):TTreeElement;
+  function newTreeNode(typ:TTreeNodeType; text: pchar; len:longint):TTreeNode;
+  function newTreeNode(typ:TTreeNodeType; s: string):TTreeNode;
   procedure autoCloseLastTag();
 
   function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
@@ -328,7 +328,7 @@ private
   function htmlTagWeight(s:string): integer;
   function htmlTagAutoClosed(s:string): boolean;
 public
-  treeElementClass: TTreeElementClass; //**< Class of the tree nodes. You can subclass TTreeElement if you need to store additional data at every node
+  treeNodeClass: TTreeNodeClass; //**< Class of the tree nodes. You can subclass TTreeNode if you need to store additional data at every node
   globalNamespaces: TNamespaceList;
 
   constructor Create;
@@ -449,7 +449,7 @@ begin
   AddObject(name, TTreeAttribute.create(name, value, namespace));
 end;
 
-procedure TAttributeList.add(att: TTreeElement);
+procedure TAttributeList.add(att: TTreeNode);
 begin
   AddObject(TTreeAttribute(att).value, att);
 end;
@@ -647,11 +647,11 @@ begin
   inherited destroy;
 end;
 
-{ TTreeElement }
+{ TTreeNode }
 
-{procedure TTreeElement.deleteNext();
+{procedure TTreeNode.deleteNext();
 var
-  temp: TTreeElement;
+  temp: TTreeNode;
 begin
   if next = nil then exit;
   temp := next;
@@ -659,14 +659,14 @@ begin
   temp.Free;
 end;}
 
-procedure TTreeElement.deleteAll();
+procedure TTreeNode.deleteAll();
 begin
   if next <> nil then next.deleteAll();
   next:=nil;
   Free;
 end;
 
-procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
+procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
   function change(s: string): string;
   begin
     result := strChangeEncoding(s, from, toe);
@@ -675,7 +675,7 @@ procedure TTreeElement.changeEncoding(from, toe: TEncoding; substituteEntities: 
     if trimText then result := trim(result); //retrim because &nbsp; replacements could have introduced new spaces
   end;
 
-var tree: TTreeElement;
+var tree: TTreeNode;
   attrib: TTreeAttribute;
 begin
   if (from = eUnknown) or (toe = eUnknown) then exit;
@@ -699,8 +699,8 @@ begin
   end;
 end;
 
-function TTreeElement.findNext(withTyp: TTreeElementType; withText: string; findOptions: TTreeElementFindOptions =[]; sequenceEnd: TTreeElement = nil): TTreeElement;
-var cur: TTreeElement;
+function TTreeNode.findNext(withTyp: TTreeNodeType; withText: string; findOptions: TTreeNodeFindOptions =[]; sequenceEnd: TTreeNode = nil): TTreeNode;
+var cur: TTreeNode;
   //splitted: array of string;
 begin
   if self = nil then exit(nil);
@@ -724,8 +724,8 @@ begin
   result := nil;
 end;
 
-function TTreeElement.findChild(withTyp: TTreeElementType; withText: string;
-  findOptions: TTreeElementFindOptions): TTreeElement;
+function TTreeNode.findChild(withTyp: TTreeNodeType; withText: string;
+  findOptions: TTreeNodeFindOptions): TTreeNode;
 begin
   result := nil;
   if self = nil then exit;
@@ -734,8 +734,8 @@ begin
   result:=findNext(withTyp, withText, findOptions + [tefoNoGrandChildren] - [tefoNoChildren], reverse);
 end;
 
-function TTreeElement.deepNodeText(separator: string): string;
-var cur:TTreeElement;
+function TTreeNode.deepNodeText(separator: string): string;
+var cur:TTreeNode;
 begin
   result:='';
   if self = nil then exit;
@@ -747,53 +747,53 @@ begin
   if (result<>'') and (separator<>'') then setlength(result,length(result)-length(separator));
 end;
 
-function TTreeElement.outerXML(insertLineBreaks: boolean = false): string;
+function TTreeNode.outerXML(insertLineBreaks: boolean = false): string;
 begin
   result := serializeXML(true, insertLineBreaks);
 end;
 
-function TTreeElement.innerXML(insertLineBreaks: boolean = false): string;
+function TTreeNode.innerXML(insertLineBreaks: boolean = false): string;
 begin
   result := serializeXML(false, insertLineBreaks);
 end;
 
-function TTreeElement.getValue(): string;
+function TTreeNode.getValue(): string;
 begin
   if self = nil then exit('');
   result := value;
 end;
 
-function TTreeElement.getValueTry(out valueout:string): boolean;
+function TTreeNode.getValueTry(out valueout:string): boolean;
 begin
   if self = nil then exit(false);
   valueout := self.value;
   result := true;
 end;
 
-function TTreeElement.hasAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
+function TTreeNode.hasAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
 var temp: TTreeAttribute;
 begin
   exit(getAttributeTry(a, temp, cmpFunction));
 end;
 
-function TTreeElement.getAttribute(const a: string): string;
+function TTreeNode.getAttribute(const a: string): string;
 begin
   result := getAttribute(a, @caseInsensitiveCompare);
 end;
 
-function TTreeElement.getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): string;
+function TTreeNode.getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): string;
 begin
   if not getAttributeTry(a, result, cmpFunction) then
     result:='';
 end;
 
-function TTreeElement.getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string;
+function TTreeNode.getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string;
 begin
   if not getAttributeTry(a, result, cmpFunction) then
     result:=def;
 end;
 
-function TTreeElement.getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
+function TTreeNode.getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil): boolean;
 var temp: TTreeAttribute;
 begin
   result := getAttributeTry(a, temp, cmpFunction);
@@ -801,7 +801,7 @@ begin
   valueout := temp.realvalue;
 end;
 
-function TTreeElement.getAttributeTry(a: string; out valueout: TTreeAttribute; cmpFunction: TStringComparisonFunc = nil): boolean;
+function TTreeNode.getAttributeTry(a: string; out valueout: TTreeAttribute; cmpFunction: TStringComparisonFunc = nil): boolean;
 var
   ns: string;
 begin
@@ -817,13 +817,13 @@ begin
   result := valueout <> nil;
 end;
 
-function TTreeElement.getAttributeCount: integer;
+function TTreeNode.getAttributeCount: integer;
 begin
   if (self = nil) or (attributes = nil) then exit(0);
   result := attributes.Count;
 end;
 
-function TTreeElement.getNextSibling(): TTreeElement;
+function TTreeNode.getNextSibling(): TTreeNode;
 begin
   case typ of
     tetOpen, tetDocument: result:=reverse.next;
@@ -834,44 +834,44 @@ begin
   if result.typ = tetClose then exit(nil);
 end;
 
-function TTreeElement.getFirstChild(): TTreeElement;
+function TTreeNode.getFirstChild(): TTreeNode;
 begin
   if not (typ in TreeNodesWithChildren) then exit(nil);
   if next = reverse then exit(nil);
   exit(next);
 end;
 
-function TTreeElement.getParent(): TTreeElement;
+function TTreeNode.getParent(): TTreeNode;
 begin
   if (self = nil) then exit(nil);
   exit(parent);
 end;
 
-function TTreeElement.getPrevious: TTreeElement;
+function TTreeNode.getPrevious: TTreeNode;
 begin
   if self = nil then exit;
   result := previous
 end;
 
-function TTreeElement.getRootHighest: TTreeElement;
+function TTreeNode.getRootHighest: TTreeNode;
 begin
   if self = nil then exit(nil);
   result := document;
 end;
 
-function TTreeElement.getRootElement: TTreeElement;
+function TTreeNode.getRootElement: TTreeNode;
 begin
   result := document;
   if (result = nil) or (result.typ = tetOpen) then exit;
   exit(result.findChild(tetOpen,'',[tefoIgnoreText]));
 end;
 
-function TTreeElement.getDocument: TTreeDocument;
+function TTreeNode.getDocument: TTreeDocument;
 begin
   result := document as TTreeDocument;
 end;
 
-function TTreeElement.getNodeName: string;
+function TTreeNode.getNodeName: string;
 begin
   case typ of
     tetOpen, tetAttribute, tetClose, tetProcessingInstruction: begin
@@ -882,21 +882,21 @@ begin
   end;
 end;
 
-function TTreeElement.getNamespacePrefix: string;
+function TTreeNode.getNamespacePrefix: string;
 begin
   if namespace = nil then exit('');
   result := namespace.getPrefix;
 end;
 
-function TTreeElement.getNamespaceURL(): string;
+function TTreeNode.getNamespaceURL(): string;
 begin
   if namespace = nil then exit('');
   result := namespace.getURL;
 end;
 
-function TTreeElement.getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string;
+function TTreeNode.getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string;
 var
-  n: TTreeElement;
+  n: TTreeNode;
   attrib: String;
 begin
   if (namespace <> nil) and (namespace.getPrefix = prefixOverride) then exit(namespace.getURL) ;
@@ -911,7 +911,7 @@ begin
   exit('');
 end;
 
-procedure TTreeElement.getOwnNamespaces(var list: TNamespaceList);
+procedure TTreeNode.getOwnNamespaces(var list: TNamespaceList);
 var attrib: TTreeAttribute;
 begin
   if attributes <> nil then
@@ -925,7 +925,7 @@ begin
         list.addIfNewPrefixUrl(attrib.namespace);
 end;
 
-procedure TTreeElement.getAllNamespaces(var list: TNamespaceList; first: boolean);
+procedure TTreeNode.getAllNamespaces(var list: TNamespaceList; first: boolean);
 var attrib: TTreeAttribute;
 begin
   if first then getOwnNamespaces(list)
@@ -943,9 +943,9 @@ begin
   if parent <> nil then parent.getAllNamespaces(list, false);
 end;
 
-function TTreeElement.isNamespaceUsed(const n: INamespace): boolean;
+function TTreeNode.isNamespaceUsed(const n: INamespace): boolean;
 var attrib: TTreeAttribute;
-  temp: TTreeElement;
+  temp: TTreeNode;
 begin
   if (namespace = nil) and (n = nil) then exit(true);
   if (namespace <> nil) and (n <> nil) and (namespace.getPrefix = n.getPrefix) then
@@ -964,10 +964,10 @@ begin
   result := false;
 end;
 
-function TTreeElement.isDeepEqual(cmpTo: TTreeElement; ignoredTypes: TTreeElementTypes; cmpFunction: TStringComparisonFunc): boolean;
+function TTreeNode.isDeepEqual(cmpTo: TTreeNode; ignoredTypes: TTreeNodeTypes; cmpFunction: TStringComparisonFunc): boolean;
 var
   attrib, tempattrib: TTreeAttribute;
-  temp1, temp2: TTreeElement;
+  temp1, temp2: TTreeNode;
 begin
   //this follows the XPath deep-equal function
   result := false;
@@ -1007,7 +1007,7 @@ begin
   result := true;
 end;
 
-procedure TTreeElement.insert(el: TTreeElement);
+procedure TTreeNode.insert(el: TTreeNode);
 begin
   // self  self.next  => self el self.next
   if self = nil then exit;
@@ -1018,9 +1018,9 @@ begin
   if el.next <> nil then el.next.previous := el;
 end;
 
-procedure TTreeElement.insertSurrounding(before, after: TTreeElement);
-var surroundee, prev: TTreeElement;
-  el: TTreeElement;
+procedure TTreeNode.insertSurrounding(before, after: TTreeNode);
+var surroundee, prev: TTreeNode;
+  el: TTreeNode;
 begin
   if self = nil then exit;
   if self.typ = tetClose then surroundee := reverse
@@ -1046,17 +1046,17 @@ begin
   end;
 end;
 
-procedure TTreeElement.insertSurrounding(basetag: TTreeElement);
-var closing: TTreeElement;
+procedure TTreeNode.insertSurrounding(basetag: TTreeNode);
+var closing: TTreeNode;
 begin
   if not (basetag.typ in TreeNodesWithChildren) then raise Exception.Create('Need an opening tag to surround another tag');
-  closing := TTreeElement(basetag.ClassType.Create);
+  closing := TTreeNode(basetag.ClassType.Create);
   closing.typ := tetClose;
   closing.value := basetag.value;
   insertSurrounding(basetag, closing);
 end;
 
-procedure TTreeElement.addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil);
+procedure TTreeNode.addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil);
 begin
   if attributes = nil then attributes := TAttributeList.Create;
   attributes.add(aname, avalue, anamespace);
@@ -1065,7 +1065,7 @@ begin
   attributes.Items[attributes.count - 1].document := document;
 end;
 
-procedure TTreeElement.addAttributes(const props: array of THTMLProperty);
+procedure TTreeNode.addAttributes(const props: array of THTMLProperty);
 var
   i: Integer;
 begin
@@ -1080,7 +1080,7 @@ begin
   end;
 end;
 
-procedure TTreeElement.addNamespaceDeclaration(n: INamespace; overridens: boolean );
+procedure TTreeNode.addNamespaceDeclaration(n: INamespace; overridens: boolean );
 var a : TTreeAttribute;
 begin
   if attributes = nil then attributes := TAttributeList.Create
@@ -1093,9 +1093,9 @@ begin
   else attributes.add(n.getPrefix, n.getURL, XMLNamespace_XMLNS);
 end;
 
-procedure TTreeElement.addChild(child: TTreeElement);
+procedure TTreeNode.addChild(child: TTreeNode);
 var
-  oldprev: TTreeElement;
+  oldprev: TTreeNode;
 begin
   child.parent := self;
   child.document := document;
@@ -1113,22 +1113,22 @@ begin
   end;
 end;
 
-procedure TTreeElement.removeElementFromDoubleLinkedList;
+procedure TTreeNode.removeElementFromDoubleLinkedList;
 begin
   if previous <> nil then previous.next := next;
   if next <> nil then next.previous := nil;
 end;
 
-function TTreeElement.deleteElementFromDoubleLinkedList: TTreeElement;
+function TTreeNode.deleteElementFromDoubleLinkedList: TTreeNode;
 begin
   result := next;
   removeElementFromDoubleLinkedList;
   free;
 end;
 
-function namespaceUsedByNodeOrChild(n: ttreeelement; const url, prefix: string): boolean;
+function namespaceUsedByNodeOrChild(n: TTreeNode; const url, prefix: string): boolean;
 var
-  m: TTreeElement;
+  m: TTreeNode;
   attrib: TTreeAttribute;
 begin
   m := n;
@@ -1142,7 +1142,7 @@ begin
   result := false;
 end;
 
-function serializeXMLWrapper(base: TTreeElement; nodeSelf: boolean; insertLineBreaks: boolean): string;
+function serializeXMLWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks: boolean): string;
 var known: TNamespaceList;
   function requireNamespace(n: INamespace): string;
   begin //that function is useless the namespace should always be in known. But just for safety...
@@ -1151,9 +1151,9 @@ var known: TNamespaceList;
     result := ' ' + n.serialize;
   end;
 
-  function inner(n: TTreeElement): string; forward;
+  function inner(n: TTreeNode): string; forward;
 
-  function outer(n: TTreeElement): string;
+  function outer(n: TTreeNode): string;
   var attrib: TTreeAttribute;
       oldnamespacecount: integer;
       i: Integer;
@@ -1224,8 +1224,8 @@ var known: TNamespaceList;
     end;
   end;
 
-  function inner(n: TTreeElement): string;
-  var sub: TTreeElement;
+  function inner(n: TTreeNode): string;
+  var sub: TTreeNode;
   begin
     result := '';
     if not (n.typ in TreeNodesWithChildren) then exit;
@@ -1243,14 +1243,14 @@ begin
   known.free;
 end;
 
-function TTreeElement.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
+function TTreeNode.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
 
 begin
   if self = nil then exit('');
   result := serializeXMLWrapper(self, nodeSelf, insertLineBreaks);
 end;
 
-function TTreeElement.cloneShallow: TTreeElement;
+function TTreeNode.cloneShallow: TTreeNode;
 begin
   case typ of
     tetAttribute: begin
@@ -1262,7 +1262,7 @@ begin
       TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
       TTreeDocument(result).FDocumentURI:=TTreeDocument(self).FDocumentURI;
     end
-    else result := TTreeElement.create();
+    else result := TTreeNode.create();
   end;
   result.typ := typ;
   result.value := value;
@@ -1275,9 +1275,9 @@ begin
   result.offset := offset;
 end;
 
-function TTreeElement.clone: TTreeElement;
+function TTreeNode.clone: TTreeNode;
 var
-  kid: TTreeElement;
+  kid: TTreeNode;
 begin
   case typ of
     tetOpen, tetDocument: begin
@@ -1308,10 +1308,10 @@ begin
   else result.next := next;
 end;
 
-procedure TTreeElement.removeAndFreeNext();
+procedure TTreeNode.removeAndFreeNext();
 var
-  toFree: TTreeElement;
-  temp: TTreeElement;
+  toFree: TTreeNode;
+  temp: TTreeNode;
 begin
   if (self = nil) or (next = nil) then exit;
   toFree := next;
@@ -1330,9 +1330,9 @@ begin
   tofree.free;
 end;
 
-procedure TTreeElement.removeElementKeepChildren;
+procedure TTreeNode.removeElementKeepChildren;
 var
-  temp: TTreeElement;
+  temp: TTreeNode;
 begin
   if previous = nil then raise Exception.Create('Cannot remove first tag');
   previous.next := next;
@@ -1348,17 +1348,17 @@ begin
   free;
 end;
 
-function TTreeElement.caseInsensitiveCompare(const a, b: string): boolean;
+function TTreeNode.caseInsensitiveCompare(const a, b: string): boolean;
 begin
   result := striEqual(a, b);
 end;
 
-function TTreeElement.caseSensitiveCompare(const a, b: string): boolean;
+function TTreeNode.caseSensitiveCompare(const a, b: string): boolean;
 begin
   result := a = b;
 end;
 
-function TTreeElement.toString(): string;
+function TTreeNode.toString(): string;
 var
   attrib: TTreeAttribute;
 begin
@@ -1379,37 +1379,37 @@ begin
   end;
 end;
 
-constructor TTreeElement.create();
+constructor TTreeNode.create();
 begin
 end;
 
-constructor TTreeElement.create(atyp: TTreeElementType; avalue: string);
+constructor TTreeNode.create(atyp: TTreeNodeType; avalue: string);
 begin
   self.typ := atyp;
   self.value := avalue;
 end;
 
-class function TTreeElement.createElementPair(anodename: string): TTreeElement;
+class function TTreeNode.createElementPair(anodename: string): TTreeNode;
 begin
-  result := TTreeElementClass(ClassType).create(tetOpen, anodename);
-  result.reverse := TTreeElementClass(ClassType).create(tetClose, anodename);
+  result := TTreeNodeClass(ClassType).create(tetOpen, anodename);
+  result.reverse := TTreeNodeClass(ClassType).create(tetClose, anodename);
   result.reverse.reverse := result;
   result.next := Result.reverse;
   result.reverse.previous := Result;
 end;
 
-destructor TTreeElement.destroy();
+destructor TTreeNode.destroy();
 begin
   attributes.Free;
   inherited destroy();
 end;
 
-procedure TTreeElement.initialized;
+procedure TTreeNode.initialized;
 begin
 
 end;
 
-class function TTreeElement.compareInDocumentOrder(const a,b: TTreeElement): integer;
+class function TTreeNode.compareInDocumentOrder(const a,b: TTreeNode): integer;
 begin
   if a.document = b.document then
     exit(a.offset - b.offset);
@@ -1422,16 +1422,16 @@ end;
 
 { THTMLTreeParser }
 
-function TTreeParser.newTreeElement(typ:TTreeElementType; text: pchar; len: longint): TTreeElement;
+function TTreeParser.newTreeNode(typ:TTreeNodeType; text: pchar; len: longint): TTreeNode;
 begin
-  result := newTreeElement(typ, strFromPchar(text, len));
+  result := newTreeNode(typ, strFromPchar(text, len));
   result.offset:=longint(text - @FCurrentFile[1]);
 end;
 
-function TTreeParser.newTreeElement(typ: TTreeElementType; s: string
-  ): TTreeElement;
+function TTreeParser.newTreeNode(typ: TTreeNodeType; s: string
+  ): TTreeNode;
 begin
-  result:=treeElementClass.Create;
+  result:=treeNodeClass.Create;
   result.typ := typ;
   result.value := s;
   result.document := FCurrentTree;
@@ -1441,20 +1441,20 @@ begin
   result.previous := FCurrentElement;
   FCurrentElement := result;
 
-  if typ <> tetClose then result.parent := TTreeElement(FElementStack.Last)
-  else result.parent := TTreeElement(FElementStack.Last).getParent();
+  if typ <> tetClose then result.parent := TTreeNode(FElementStack.Last)
+  else result.parent := TTreeNode(FElementStack.Last).getParent();
   //FCurrentElement.id:=FTemplateCount;
 end;
 
 procedure TTreeParser.autoCloseLastTag();
 var
-  last: TTreeElement;
-  new: TTreeElement;
+  last: TTreeNode;
+  new: TTreeNode;
 begin
-  last := TTreeElement(FElementStack.Last);
+  last := TTreeNode(FElementStack.Last);
   Assert(last<>nil);
   if last.typ = tetOpen then begin
-    new := newTreeElement(tetClose, last.value);
+    new := newTreeNode(tetClose, last.value);
     //new := treeElementClass.create();
     //new.typ:=tetClose;
     //new.value:=last.value;
@@ -1470,7 +1470,7 @@ end;
 function TTreeParser.enterTag(tagName: pchar; tagNameLen: longint;
   properties: THTMLProperties): TParsingResult;
 var
-  new,temp: TTreeElement;
+  new,temp: TTreeNode;
   i: Integer;
   j: Integer;
   enc: String;
@@ -1488,7 +1488,7 @@ begin
       exit;
     end;
     if not FReadProcessingInstructions then exit;
-    new := newTreeElement(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
+    new := newTreeNode(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
     if length(properties)>0 then begin
       first := properties[0].name;
       first-=1;
@@ -1509,7 +1509,7 @@ begin
     //table hack (don't allow two open td/tr unless separated by tr/table)
     if strliEqual(tagName,'td',tagNameLen) then begin
       for i:=FElementStack.Count-1 downto 0 do begin
-        temp :=TTreeElement(FElementStack[i]);
+        temp :=TTreeNode(FElementStack[i]);
         if not (temp.typ in  [tetDocument, tetOpen, tetClose]) then continue;
         if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
         if (temp.typ = tetClose) then break;
@@ -1522,7 +1522,7 @@ begin
       end;
     end else if strliEqual(tagName,'tr',tagNameLen) then begin
       for i:=FElementStack.Count-1 downto 0 do begin
-        temp :=TTreeElement(FElementStack[i]);
+        temp :=TTreeNode(FElementStack[i]);
         if not (temp.typ in  [tetDocument, tetOpen, tetClose]) then continue;
         if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
         if (temp.typ = tetClose) and ((temp.value='tr') or (temp.value='table')) then break;
@@ -1535,7 +1535,7 @@ begin
       end;
     end;
   end;
-  new := newTreeElement(tetOpen, tagName, tagNameLen);
+  new := newTreeNode(tetOpen, tagName, tagNameLen);
   if (FParsingModel = pmHTML) then //normal auto close
     FAutoCloseTag:=htmlTagAutoClosed(new.value);
 
@@ -1564,7 +1564,7 @@ end;
 
 function TTreeParser.leaveTag(tagName: pchar; tagNameLen: longint): TParsingResult;
 var
-  new,last,temp: TTreeElement;
+  new,last,temp: TTreeNode;
   match: longint;
   i: Integer;
   weight: LongInt;
@@ -1574,7 +1574,7 @@ var
 begin
   result:=prContinue;
 
-  last := TTreeElement(FElementStack.Last);
+  last := TTreeNode(FElementStack.Last);
   if (FParsingModel = pmStrict) and (last = nil) then
     raise ETreeParseException.create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but none was open');
 
@@ -1585,7 +1585,7 @@ begin
 
   new := nil;
   if (strliequal(tagName, last.getNodeName, tagNameLen)) then begin
-    new := newTreeElement(tetClose, tagName, tagNameLen);
+    new := newTreeNode(tetClose, tagName, tagNameLen);
     new.reverse := last; last.reverse := new;
     FElementStack.Delete(FElementStack.Count-1);
     new.initialized;
@@ -1595,7 +1595,7 @@ begin
     //try to auto detect unclosed tags
     match:=-1;
     for i:=FElementStack.Count-1 downto 0 do
-      if strliequal(tagName, TTreeElement(FElementStack[i]).value, tagNameLen) then begin
+      if strliequal(tagName, TTreeNode(FElementStack[i]).value, tagNameLen) then begin
         match:=i;
         break;
       end;
@@ -1603,12 +1603,12 @@ begin
       //there are unclosed tags, but a tag opening the currently closed exist, close all in between
       weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
       for i:=match+1 to FElementStack.Count-1 do
-        if htmlTagWeight(TTreeElement(FElementStack[i]).value) > weight then
+        if htmlTagWeight(TTreeNode(FElementStack[i]).value) > weight then
             exit;
       for i:=match+1 to FElementStack.Count-1 do
         autoCloseLastTag();
-      new := newTreeElement(tetClose, tagName, tagNameLen);
-      last := TTreeElement(FElementStack[match]);
+      new := newTreeNode(tetClose, tagName, tagNameLen);
+      last := TTreeNode(FElementStack[match]);
       last.reverse := new; new.reverse := last;
       FElementStack.Count:=match;
       new.initialized;
@@ -1625,7 +1625,7 @@ begin
           if (last.value = name) then begin
             if (last.reverse <> last.next) or (parenDelta <> 0) then break; //do not allow nested auto closed elements (reasonable?)
             //remove old closing tag, and insert new one at the end
-            new := newTreeElement(tetClose, tagName, tagNameLen);
+            new := newTreeNode(tetClose, tagName, tagNameLen);
             last.reverse.removeElementKeepChildren;
             last.reverse := new; new.reverse := last;
 
@@ -1683,7 +1683,7 @@ begin
   if textLen = 0 then
     exit;
 
-  newTreeElement(tetText, text, textLen).initialized;
+  newTreeNode(tetText, text, textLen).initialized;
 end;
 
 function TTreeParser.readComment(text: pchar; textLen: longint): TParsingResult;
@@ -1693,7 +1693,7 @@ begin
     exit;
   if textLen <= 0 then
     exit;
-  newTreeElement(tetComment, text, textLen).initialized;
+  newTreeNode(tetComment, text, textLen).initialized;
 end;
 
 procedure TTreeParser.pushNamespace(const url, prefix: string);
@@ -1753,7 +1753,7 @@ end;
 constructor TTreeParser.Create;
 begin
   FElementStack := TList.Create;
-  treeElementClass := TTreeElement;
+  treeNodeClass := TTreeNode;
   FTrimText:=true;
   FReadComments:=false;
   FReadProcessingInstructions:=false;
@@ -1824,7 +1824,7 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
   end;
 
 var
-  el: TTreeElement;
+  el: TTreeNode;
   attrib: TTreeAttribute;
   encMeta, encHeader: TEncoding;
 begin
@@ -1945,7 +1945,7 @@ procedure TTreeParser.removeEmptyTextNodes(const whenTrimmed: boolean);
   end;
 
 var
-  temp: TTreeElement;
+  temp: TTreeNode;
 begin
   temp := getLastTree;
   if temp = nil then exit;

@@ -33,15 +33,15 @@ var doc: TTreeDocument;
     namespaces.add(result);
   end;
 
-  procedure importNode(parent: TTreeElement; node: TDOMNode);
+  procedure importNode(parent: TTreeNode; node: TDOMNode);
   var
     i: Integer;
-    new: TTreeElement;
+    new: TTreeNode;
     nscount: Integer;
   begin
     nscount := namespaces.Count;
     if node is TDOMElement then begin
-      new := TTreeElement.createElementPair(node.NodeName);
+      new := TTreeNode.createElementPair(node.NodeName);
       if node.HasAttributes then
         for i := 0 to node.Attributes.Length - 1 do begin
           new.addAttribute(node.Attributes[i].NodeName, node.Attributes[i].NodeValue);
@@ -51,10 +51,10 @@ var doc: TTreeDocument;
       for i := 0 to node.ChildNodes.Count - 1 do
         importNode(new, node.ChildNodes[i]);
     end else begin
-      if (node is TDOMText) or (node is TDOMCDATASection) then new := TTreeElement.create(tetText, node.NodeValue)
-      else if node is TDOMComment then new := TTreeElement.create(tetComment, node.NodeValue)
+      if (node is TDOMText) or (node is TDOMCDATASection) then new := TTreeNode.create(tetText, node.NodeValue)
+      else if node is TDOMComment then new := TTreeNode.create(tetComment, node.NodeValue)
       else if node is TDOMProcessingInstruction then begin
-        new := TTreeElement.create(tetProcessingInstruction, node.NodeName);
+        new := TTreeNode.create(tetProcessingInstruction, node.NodeName);
         new.addAttribute('', node.NodeValue);
       end else exit;
     end;
@@ -67,7 +67,7 @@ var doc: TTreeDocument;
     namespaces.DeleteFrom(nscount);
   end;
 var i: Integer;
-  temp: TTreeElement;
+  temp: TTreeNode;
   offset: Integer;
   a: TTreeAttribute;
 begin
@@ -77,7 +77,7 @@ begin
   doc.documentURI:=dom.baseURI;
   doc.document := doc;
 
-  doc.reverse := TTreeElement.create(tetClose);
+  doc.reverse := TTreeNode.create(tetClose);
   doc.reverse.reverse := doc;
   doc.next := doc.reverse;
   doc.next.previous := doc;

@@ -95,7 +95,7 @@ The global function processedTree returns a tree representation of the last proc
 function process(data: string; query: string): xquery.IXQValue;
 //**Returns a tree representation of the last processed html/xml data@br
 //**Might return nil
-function processedTree: TTreeElement;
+function processedTree: TTreeNode;
 //**Returns all variable assignments during the last query
 function processedVariables: TXQVariableChangeLog;
 
@@ -201,7 +201,7 @@ begin
   end;
 end;
 
-function processedTree: TTreeElement;
+function processedTree: TTreeNode;
 begin
   if lastQueryWasPXP then begin
     if tree = nil then exit(nil);
@@ -259,7 +259,7 @@ begin
 end;
 
 function httpRequest(const dest: xquery.IXQValue): string;
-var n: TTreeElement;
+var n: TTreeNode;
 begin
   case dest.kind of
     pvkUndefined: exit;

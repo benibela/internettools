@@ -78,7 +78,7 @@ TStringAttributeList = tStringList;
 
 { TTemplateElement }
 //**@abstract Interally used template tree element @exclude
-TTemplateElement=class(TTreeElement)
+TTemplateElement=class(TTreeNode)
   //constant template
   templateType: TTemplateElementType;
   flags: TTemplateElementFlags;
@@ -86,7 +86,7 @@ TTemplateElement=class(TTreeElement)
 
   //matching information
   contentRepetitions: integer;
-  match: TTreeElement; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
+  match: TTreeNode; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
   test, condition, valuepxp, source, min, max: IXQuery;
@@ -387,7 +387,7 @@ THtmlTemplateParser=class
     FKeepOldVariables: TKeepPreviousVariables;
 
     FTemplate, FHTML: TTreeParser;
-    FHtmlTree: TTreeElement;
+    FHtmlTree: TTreeNode;
     FQueryEngine: TXQueryEngine;
 
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TXQVariableChangeLog;
@@ -397,8 +397,8 @@ THtmlTemplateParser=class
 
     function GetVariableLogCondensed: TXQVariableChangeLog;
     function GetVariables: TXQVariableChangeLog;
-    function getHTMLTree: TTreeElement;
-    function getTemplateTree: TTreeElement;
+    function getHTMLTree: TTreeNode;
+    function getTemplateTree: TTreeNode;
     function GetTemplateNamespace: TNamespaceList;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
@@ -410,8 +410,8 @@ THtmlTemplateParser=class
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
-    function templateElementFitHTMLOpen(html:TTreeElement; template: TTemplateElement): Boolean;
-    function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeElement; templateStart, templateEnd: TTemplateElement): boolean;
+    function templateElementFitHTMLOpen(html:TTreeNode; template: TTemplateElement): Boolean;
+    function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeNode; templateStart, templateEnd: TTemplateElement): boolean;
 
     procedure parseHTMLSimple(html, uri, contenttype: string);
     function matchLastTrees: Boolean;
@@ -448,8 +448,8 @@ THtmlTemplateParser=class
     property AllowObjects: boolean read FObjects write FObjects; //**< If objects can be created and used. (e.g. @code( object(("a", 1, "b", 2)).a ) would become 1). When objects are enabled, variable names cannot contain points.  (default true)
     property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< If all XPath/XQuery expressions in the templates are kept in the same module. Only if true, XQuery variables/functions declared are accessible in other read commands. (declarations must be preceded by @code(xquery version "1.0";) and followed by an expression, if only @code(())) Global variables, declared with a simple $x := value, are always everywhere accessible. (default true)
 
-    property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
-    property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
+    property TemplateTree: TTreeNode read getTemplateTree; //**<A tree representation of the current template
+    property HTMLTree: TTreeNode read getHTMLTree; //**<A tree representation of the processed html file
     property TemplateParser: TTreeParser read FTemplate; //**< X/HTML parser used to read the templates (public so you can change the parsing behaviour, if you really need it)
     property QueryEngine: TXQueryEngine read FQueryEngine; //**< XQuery engine used for evaluating query expressions contained in the template
   end;
@@ -468,7 +468,7 @@ const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
 
 { TTemplateElement }
 
-function strToCommand(ns, s:string; treeTyp: TTreeElementType): TTemplateElementType;
+function strToCommand(ns, s:string; treeTyp: TTreeNodeType): TTemplateElementType;
 var  t: TTemplateElementType;
 begin
   if ((treeTyp = tetOpen) or (treeTyp = tetClose)) then begin
@@ -523,7 +523,7 @@ end;
 
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
- curChild: TTreeElement;
+ curChild: TTreeNode;
  temp: TTemplateElement;
  i: Integer;
  rv: String;
@@ -686,13 +686,13 @@ begin
   inherited destroy;
 end;
 
-function THtmlTemplateParser.getHTMLTree: TTreeElement;
+function THtmlTemplateParser.getHTMLTree: TTreeNode;
 begin
   if FHtmlTree = nil then exit(nil);
   result := FHtmlTree;
 end;
 
-function THtmlTemplateParser.getTemplateTree: TTreeElement;
+function THtmlTemplateParser.getTemplateTree: TTreeNode;
 begin
   if FTemplate = nil then exit(nil);
   result := FTemplate.getLastTree;
@@ -739,7 +739,7 @@ begin
   value := temp;
 end;
 
-function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeElement;
+function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeNode;
   template: TTemplateElement): Boolean;
 var
   name, strategy: string;
@@ -789,10 +789,10 @@ begin
   result := template.condition.evaluate().toBoolean;
 end;
 
-function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeElement;
+function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeNode;
   templateStart, templateEnd: TTemplateElement): Boolean;
 
-var xpathText: TTreeElement;
+var xpathText: TTreeNode;
 
   function performPXPEvaluation(const pxp: IXQuery): IXQValue;
   begin
@@ -949,7 +949,7 @@ var xpathText: TTreeElement;
   end;
 
 
-  var realHtmlStart: TTreeElement;
+  var realHtmlStart: TTreeNode;
     procedure HandleCommandLoopClose;
     begin
       //Jump to loop start if a html element was read in the loop
@@ -1022,7 +1022,7 @@ var xpathText: TTreeElement;
     end;
 
     procedure switchPrioritized;
-    var oldHtmlStart: TTreeElement;
+    var oldHtmlStart: TTreeNode;
     begin
       //TODO: understand and document how this all works
 
@@ -1137,7 +1137,7 @@ end;
 
 function THtmlTemplateParser.matchLastTrees: boolean;
 var cur,last,realLast:TTemplateElement;
-    temp: TTreeElement;
+    temp: TTreeNode;
 begin
   FreeAndNil(FVariables);
   if FKeepOldVariables = kpvForget then
@@ -1225,7 +1225,7 @@ begin
   FOldVariableLog := TXQVariableChangeLog.create;
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
-  FTemplate.treeElementClass:=TTemplateElement;
+  FTemplate.treeNodeClass:=TTemplateElement;
   FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
   FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
   FHTML := TTreeParser.Create;
@@ -1392,20 +1392,20 @@ end;
 function THtmlTemplateParser.debugMatchings(const width: integer): string;
 var res: TStringArray;
     template: TTemplateElement;
-    html: TTreeElement;
+    html: TTreeNode;
     LINK, NOLINK, EMPTY: String;
     tsl, hsl: TStringArray;
     templateIndent, htmlIndent: integer;
     tempTemplateIndent, tempHTMLIndent: String;
 
-  procedure updateIndentation(element: TTreeElement; var count: integer; var cache: string);
+  procedure updateIndentation(element: TTreeNode; var count: integer; var cache: string);
   begin
     if element.typ in TreeNodesWithChildren then count+=1
     else if element.typ = tetClose then count-=1;
     cache := strDup(' ', min(width div 2, count));
   end;
 
-  procedure printHTMLUntil(endElement: TTreeElement);
+  procedure printHTMLUntil(endElement: TTreeNode);
   var
     i: Integer;
   begin

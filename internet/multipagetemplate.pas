@@ -39,12 +39,12 @@ type
   //**@abstract(Internal used base class for an action within the multi page template)
   TTemplateAction = class
   protected
-    procedure addChildFromTree(t: TTreeElement);
+    procedure addChildFromTree(t: TTreeNode);
     procedure performChildren(reader: TMultipageTemplateReader);
   public
     children: array of TTemplateAction;
-    procedure initFromTree(t: TTreeElement); virtual;
-    procedure addChildrenFromTree(t: TTreeElement);
+    procedure initFromTree(t: TTreeNode); virtual;
+    procedure addChildrenFromTree(t: TTreeNode);
     procedure perform(reader: TMultipageTemplateReader); virtual; abstract;
     procedure clear;
     destructor Destroy; override;
@@ -154,7 +154,7 @@ type
   *)
   TMultiPageTemplate=class
   protected
-    procedure readTree(t: TTreeElement);
+    procedure readTree(t: TTreeNode);
   public
     //**The primary <actions> element (or the first <action> element, if only one exists)
     baseActions: TTemplateAction;
@@ -234,7 +234,7 @@ implementation
 type
   TTemplateActionMain = class(TTemplateAction)
     name: string;
-    procedure initFromTree(t: TTreeElement); override;
+    procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
@@ -243,7 +243,7 @@ type
   TTemplateActionVariable = class(TTemplateAction)
     name, value, valuex: string;
     hasValueStr: boolean;
-    procedure initFromTree(t: TTreeElement); override;
+    procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
@@ -255,7 +255,7 @@ type
     template:string;
     postparams:array of TProperty;
     condition: string;
-    procedure initFromTree(t: TTreeElement); override;
+    procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
@@ -263,7 +263,7 @@ type
 
   TTemplateActionCallAction = class(TTemplateAction)
     action: string;
-    procedure initFromTree(t: TTreeElement); override;
+    procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
@@ -271,7 +271,7 @@ type
 
   TTemplateActionLoop = class(TTemplateAction)
     varname, list, test: string;
-    procedure initFromTree(t: TTreeElement); override;
+    procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
   end;
 
@@ -287,7 +287,7 @@ begin
   evaluateXQVariable(self, name, result);
 end;
 
-procedure TTemplateActionLoop.initFromTree(t: TTreeElement);
+procedure TTemplateActionLoop.initFromTree(t: TTreeNode);
 begin
   varname:=t['var'];
   list:=t['list'];
@@ -304,9 +304,9 @@ var
 begin
   if list <> '' then begin
     if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
-    listx := reader.parser.parseXPath(list).evaluate(); //TODO: parse only once
+    listx := reader.parser.parseQuery(list).evaluate(); //TODO: parse only once
   end else listx := nil;
-  if test <> '' then testx := reader.parser.parseXPath(test)
+  if test <> '' then testx := reader.parser.parseQuery(test)
   else testx := nil;
 
   if listx = nil then begin
@@ -323,7 +323,7 @@ end;
 
 { TTemplateActionCallAction }
 
-procedure TTemplateActionCallAction.initFromTree(t: TTreeElement);
+procedure TTemplateActionCallAction.initFromTree(t: TTreeNode);
 begin
   action := t['action'];
 end;
@@ -339,7 +339,7 @@ end;
 
 { TTemplateActionLoadPage }
 
-procedure TTemplateActionLoadPage.initFromTree(t: TTreeElement);
+procedure TTemplateActionLoadPage.initFromTree(t: TTreeNode);
 begin
   SetLength(postparams, 0);
   url := t.getAttribute('url', url);
@@ -372,7 +372,7 @@ var
   tempvalue: IXQValue;
 begin
   if condition <> '' then begin
-    cachedCondition := reader.parser.parseXPath(condition); //TODO: long term cache
+    cachedCondition := reader.parser.parseQuery(condition); //TODO: long term cache
     if not cachedCondition.evaluate().toBoolean then exit;
   end;
 
@@ -444,7 +444,7 @@ end;
 
 { TTemplateActionVariable }
 
-procedure TTemplateActionVariable.initFromTree(t: TTreeElement);
+procedure TTemplateActionVariable.initFromTree(t: TTreeNode);
 begin
   name := t['name'];
   hasValueStr :=  t.getAttributeTry('value', value);
@@ -458,7 +458,7 @@ begin
   if hasValueStr then
     reader.parser.variableChangeLog.ValuesString[name] := reader.parser.replaceVars(value);
   if valuex <> '' then begin
-    pxp := reader.parser.parseXPath(valuex);
+    pxp := reader.parser.parseQuery(valuex);
     if name <> '' then reader.parser.variableChangeLog.add(name, pxp.evaluate())
     else pxp.evaluate();
   end;
@@ -467,7 +467,7 @@ end;
 
 { TTemplateActionMain }
 
-procedure TTemplateActionMain.initFromTree(t: TTreeElement);
+procedure TTemplateActionMain.initFromTree(t: TTreeNode);
 begin
   name := t['id'];
   addChildrenFromTree(t);
@@ -481,12 +481,12 @@ end;
 { TTemplateAction }
 
 
-procedure TTemplateAction.initFromTree(t: TTreeElement);
+procedure TTemplateAction.initFromTree(t: TTreeNode);
 begin
 
 end;
 
-procedure TTemplateAction.addChildFromTree(t: TTreeElement);
+procedure TTemplateAction.addChildFromTree(t: TTreeNode);
   procedure addChild(c: TTemplateActionClass);
   begin
     SetLength(children, length(children)+1);
@@ -512,7 +512,7 @@ begin
   for i:=0 to high(children) do children[i].perform(reader);
 end;
 
-procedure TTemplateAction.addChildrenFromTree(t: TTreeElement);
+procedure TTemplateAction.addChildrenFromTree(t: TTreeNode);
 begin
   t := t.getFirstChild();
   while t <> nil do begin
@@ -539,9 +539,9 @@ end;
 { TMultiPageTemplate }
 
 
-procedure TMultiPageTemplate.readTree(t: TTreeElement);
+procedure TMultiPageTemplate.readTree(t: TTreeNode);
 var tagName:string;
-  u: TTreeElement;
+  u: TTreeNode;
 begin
   baseActions.clear;
 

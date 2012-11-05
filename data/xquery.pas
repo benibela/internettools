@@ -139,8 +139,8 @@ type
   Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
   *)
   TXQEvaluationContext = record
-    RootElement: TTreeElement;   //**< associated tree (returned by @code( / ) within an expression)
-    ParentElement: TTreeElement; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
+    RootElement: TTreeNode;   //**< associated tree (returned by @code( / ) within an expression)
+    ParentElement: TTreeNode; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
 
     SeqValue: IXQValue; //**<Context item / value of @code( . ),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
@@ -156,7 +156,7 @@ type
     function findModuleStaticContext(const namespace: INamespace): TXQStaticContext;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
-    function getRootHighest: TTreeElement;
+    function getRootHighest: TTreeNode;
   end;
 
 
@@ -221,7 +221,7 @@ type
     function toDecimal: decimal;  //**< Returns the value as decimal; dynamically converted, if necessary
     function toString: string;  //**< Returns the value as string; dynamically converted, if necessary
     function toDateTime: TDateTime;  //**< Returns the value as datetime; dynamically converted, if necessary
-    function toNode: TTreeElement;  //**< Returns the value as node; dynamically converted, if necessary
+    function toNode: TTreeNode;  //**< Returns the value as node; dynamically converted, if necessary
     function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer interface to each element of the sequence
     function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
 
@@ -271,7 +271,7 @@ type
     function toDecimal: decimal; virtual; //**< Returns the value as decimal; dynamically converted, if necessary
     function toString: string; override; //**< Returns the value as string; dynamically converted, if necessary
     function toDateTime: TDateTime; virtual; //**< Returns the value as datetime; dynamically converted, if necessary
-    function toNode: TTreeElement; virtual; //**< Returns the value as node; dynamically converted, if necessary
+    function toNode: TTreeNode; virtual; //**< Returns the value as node; dynamically converted, if necessary
     function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer to each element of the sequence
     function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
 
@@ -536,7 +536,7 @@ type
     function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
-    function toNode: TTreeElement; override; //**< Converts the TXQValue dynamically to a node
+    function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
 
     function toArray: TXQVArray; override; //**< Converts the TXQValue dynamically to an array
     function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
@@ -562,9 +562,9 @@ type
 
   //** Type for a node
   TXQValueNode = class (TXQValue)
-    node: TTreeElement; //**< pointer to a tree element in the html tree.@br Attention: this tree is shared, you don't have to free anything, but the pointer becomes invalid if the tree is free
+    node: TTreeNode; //**< pointer to a tree element in the html tree.@br Attention: this tree is shared, you don't have to free anything, but the pointer becomes invalid if the tree is free
 
-    constructor create(anode: TTreeElement = nil); reintroduce; virtual;
+    constructor create(anode: TTreeNode = nil); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
@@ -578,7 +578,7 @@ type
     function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
-    function toNode: TTreeElement; override; //**< Converts the TXQValue dynamically to a node
+    function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
 
     function clone: IXQValue; override;
 
@@ -800,7 +800,7 @@ type
   end;
   TXQPathMatching = array of TXQPathMatchingStep;
 
-  TTreeElementTypes = set of TTreeElementType;
+  TTreeElementTypes = set of TTreeNodeType;
   TXQPathNodeConditionIteration = (qcnciNext, qcnciPreceding, qcnciParent);
 
   TXQPathNodeConditionOption = (xqpncMatchStartNode, xqpncCheckValue, xqpncCheckNamespace, xqpncCheckOnSingleChild);
@@ -808,9 +808,9 @@ type
   //** Record mapping
   TXQPathNodeCondition = record
     options: TXQPathNodeConditionOptions;
-    findOptions, initialFindOptions: TTreeElementFindOptions; //**< find options for findNext
+    findOptions, initialFindOptions: TTreeNodeFindOptions; //**< find options for findNext
     iteration: TXQPathNodeConditionIteration; //**< The axis to search
-    start,endnode: TTreeElement; //**< Start end node for the search
+    start,endnode: TTreeNode; //**< Start end node for the search
     searchedTypes: TTreeElementTypes; //**< Treeelement types matched by the query
     requiredValue: string; //**< Required node name (if checkValue)
     requiredNamespaceURL: string; //**< Required namespace (if checkNamespace)
@@ -1063,12 +1063,12 @@ type
   { TXQTermConstructor }
 
   TXQTermConstructor = class(TXQTerm)
-    typ: TTreeElementType;
+    typ: TTreeNodeType;
     nameValue: TXQTerm;
     implicitNamespaces: TNamespaceList;
-    constructor create(atype: TTreeElementType; aname: txqterm = nil);
+    constructor create(atype: TTreeNodeType; aname: txqterm = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function evaluate(const context: TXQEvaluationContext; root: TTreeElement; var baseOffset: longint): IXQValue;
+    function evaluate(const context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
     function isNamespaceConstructor: boolean;
     destructor destroy; override;
   end;
@@ -1081,7 +1081,7 @@ type
   end;
 
   IXQuery = interface
-    function evaluate(const tree: TTreeElement = nil): IXQValue;
+    function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
 
     function getTerm: TXQTerm;
@@ -1093,7 +1093,7 @@ type
 
   TXQuery = class(TInterfacedObject, IXQuery)
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
-    function evaluate(const tree: TTreeElement = nil): IXQValue;
+    function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
 
     destructor Destroy; override;
@@ -1246,9 +1246,9 @@ type
     @bold(Using the class in FPC)
 
     The easiest way to evaluate a XQuery/XPath-expression is to call the class methods like @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
-    If you want to process a html/xml document, you have to pass the root TTreeElement (obtained by TTreeParser) instead of nil.@br@br@br
+    If you want to process a html/xml document, you have to pass the root TTreeNode (obtained by TTreeParser) instead of nil.@br@br@br
     If you call @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) without a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br
-    With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeElement or @code(toDecimal) an extended. @br@br
+    With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeNode or @code(toDecimal) an extended. @br@br
 
     You can also create a TXQueryEngine instance and then call @code(parseXPath2('expression')) and @code(evaluateXPath2()). @br
     This is not as easy, but you have more options: @br
@@ -1286,9 +1286,9 @@ type
   *)
   TXQueryEngine=class
   public
-    RootElement: TTreeElement; //**< Root element
-    ParentElement: TTreeElement; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
-    TextElement: TTreeElement; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
+    RootElement: TTreeNode; //**< Root element
+    ParentElement: TTreeNode; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
+    TextElement: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
 
@@ -1317,22 +1317,22 @@ type
     //** Parses a new CSS 3.0 Selector expression and stores it in tokenized form.
     function parseCSS3(s:string): IXQuery;
 
-    function evaluate(tree:TTreeElement = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as TXQValue
+    function evaluate(tree:TTreeNode = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as TXQValue
 
     constructor create;
     destructor Destroy; override;
 
     //** Evaluates an XPath 2.0 expression with a certain tree element as current node.
-    function evaluateXPath2(expression: string; tree:TTreeElement = nil): IXQValue;
+    function evaluateXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
     //** Evaluates an XQuery 1.0 expression with a certain tree element as current node.
-    function evaluateXQuery1(expression: string; tree:TTreeElement = nil): IXQValue;
+    function evaluateXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
     //** Evaluates an CSS 3 Selector expression with a certain tree element as current node.
-    function evaluateCSS3(expression: string; tree:TTreeElement = nil): IXQValue;
+    function evaluateCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
 
     //** Evaluates an expression with a certain tree element as current node.
-    class function evaluateStaticXPath2(expression: string; tree:TTreeElement = nil): IXQValue;
+    class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
     //** Evaluates an expression with a certain tree element as current node.
-    class function evaluateStaticCSS3(expression: string; tree:TTreeElement = nil): IXQValue;
+    class function evaluateStaticCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
 
     procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. A XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
     function findModule(const namespaceURL: string): TXQuery; //**< Finds a certain registered XQuery module
@@ -1362,11 +1362,11 @@ type
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: array of TXQTerm; const context: TXQEvaluationContext);
 
-    class function nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean; static;
+    class function nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean; static;
     //** Gets the next node matching a query step (ignoring [] filter)
-    class function getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement; static;
+    class function getNextQueriedNode(prev: TTreeNode; var nodeCondition: TXQPathNodeCondition): TTreeNode; static;
     //** Gets the next node matching a query step (ignoring [] filter)
-    class procedure unifyQuery(const contextNode: TTreeElement; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition); static;
+    class procedure unifyQuery(const contextNode: TTreeNode; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition); static;
     //** Performs a query step, given a (sequence) of parent nodes
     class function expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; const context: TXQEvaluationContext): IXQValue;
     //** Initialize a query by performing the first step
@@ -1428,7 +1428,7 @@ type
   function xqvalue(v: decimal):IXQValue; inline; //**< Creates an decimal IXQValue
   function xqvalue(v: string):IXQValue; inline; //**< Creates an string IXQValue
   function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Creates an TDateTime IXQValue
-  function xqvalue(v: TTreeElement):IXQValue; inline; //**< Creates an node TXQValue
+  function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates an node TXQValue
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes a IXQValue (single element seq => single element, empty seq => undefined)
   procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add )
@@ -1486,7 +1486,7 @@ type
     procedure add(const name: string; const value: decimal; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: boolean; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: TDateTime; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure add(const name: string; const value: TTreeElement; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: TTreeNode; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
 
     function get(const name: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
     function get(const name: string; const namespace: INamespace): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
@@ -2083,7 +2083,7 @@ begin
   raise EXQEvaluationException.Create('Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
 end;
 
-function xqvalue(v: TTreeElement): IXQValue;
+function xqvalue(v: TTreeNode): IXQValue;
 begin
   if v = nil then exit(xqvalue());
   result := TXQValueNode.Create(v);
@@ -2342,7 +2342,7 @@ begin
   else namespace := findNamespace('', defaultNamespaceKind);
 end;
 
-function TXQEvaluationContext.getRootHighest: TTreeElement;
+function TXQEvaluationContext.getRootHighest: TTreeNode;
 begin
   if (SeqValue <> nil) then begin
     if (SeqValue.kind = pvkNode) then result := SeqValue.toNode.document
@@ -2363,7 +2363,7 @@ begin
   staticContext := asStaticContext;
 end;
 
-function TXQuery.evaluate(const tree: TTreeElement = nil): IXQValue;
+function TXQuery.evaluate(const tree: TTreeNode = nil): IXQValue;
 var context: TXQEvaluationContext;
 begin
   if fterm = nil then exit(xqvalue());
@@ -2777,27 +2777,27 @@ procedure TXQVList.addMerging(child: IXQValue);
 var
  a,b,m, cmp: Integer;
  s: IXQValue;
- childnode: TTreeElement;
+ childnode: TTreeNode;
 begin
   case child.kind of
     pvkNode: begin
       childnode:=(child as TXQValueNode).node;
-      if (Count = 0) or (TTreeElement.compareInDocumentOrder(childnode, (Items[count-1] as TXQValueNode).node) > 0) then
+      if (Count = 0) or (TTreeNode.compareInDocumentOrder(childnode, (Items[count-1] as TXQValueNode).node) > 0) then
         add(child)
-      else if (TTreeElement.compareInDocumentOrder(childnode, (Items[0] as TXQValueNode).node) < 0) then
+      else if (TTreeNode.compareInDocumentOrder(childnode, (Items[0] as TXQValueNode).node) < 0) then
         insertSingle(0, child)
       else begin
         a := 0;
         b := count-1;
         while a < b do begin
           m := (a+b) div 2;
-          cmp:=TTreeElement.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
+          cmp:=TTreeNode.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
           if cmp = 0 then begin exit; end
           else if cmp < 0 then b := m-1
           else a := m + 1;
         end;
         for m := b to a do begin
-          cmp:=TTreeElement.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
+          cmp:=TTreeNode.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
           if cmp = 0 then begin exit; end
           else if cmp < 0 then begin insertSingle(m, child); exit; end
           else begin insertSingle(m + 1, child); exit; end;
@@ -2866,7 +2866,7 @@ function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): integer;
 type PIXQValue = ^IXQValue;
 begin
   ignore(temp);
-  result:=TTreeElement.compareInDocumentOrder(PIXQValue(p1)^.toNode,PIXQValue(p2)^.toNode);
+  result:=TTreeNode.compareInDocumentOrder(PIXQValue(p1)^.toNode,PIXQValue(p2)^.toNode);
 end;
 
 procedure TXQVList.sortInDocumentOrderUnchecked;
@@ -3053,7 +3053,7 @@ begin
   add(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.add(const name: string; const value: TTreeElement; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(const name: string; const value: TTreeNode; const namespace: INamespace = nil);
 begin
   add(name, xqvalue(value), namespace);
 end;
@@ -3341,7 +3341,7 @@ end;
                        (*
 { TXQQueryIterator }
 
-function TXQQueryIterator.getNext(): TTreeElement;
+function TXQQueryIterator.getNext(): TTreeNode;
 begin
   if length(query) = 0 then exit(nil);
   if length(curNodes) > 0 then begin
@@ -3378,7 +3378,7 @@ begin
   inherited Destroy;
 end;
 
-function TXQQueryIterator.getCurrent(): TTreeElement;
+function TXQQueryIterator.getCurrent(): TTreeNode;
 begin
   if length(curNodes)= 0 then exit(nil);
   result:=curNodes[high(curNodes)];
@@ -3404,8 +3404,8 @@ begin
 end;
 
 function TXQQueryIterator.getNextAt(pos:integer): boolean;
-var findOptions: TTreeElementFindOptions;
-  start: TTreeElement;
+var findOptions: TTreeNodeFindOptions;
+  start: TTreeNode;
 begin
   case query[pos].typ of
     qcSameNode:
@@ -3467,7 +3467,7 @@ begin
   result := FLastQuery;
 end;
 
-function TXQueryEngine.evaluate(tree: TTreeElement): IXQValue;
+function TXQueryEngine.evaluate(tree: TTreeNode): IXQValue;
 begin
   if FLastQuery = nil then exit(xqvalue())
   else if tree = nil then exit(FLastQuery.evaluate())
@@ -3518,7 +3518,7 @@ begin
   clear;
   if FInternalDocuments <> nil then begin;
     for i:= 0 to FInternalDocuments.count - 1 do
-      TTreeElement(FInternalDocuments[i]).deleteAll();
+      TTreeNode(FInternalDocuments[i]).deleteAll();
 
     FInternalDocuments.Free;
   end;
@@ -3529,7 +3529,7 @@ begin
   inherited Destroy;
 end;
 
-function TXQueryEngine.evaluateXPath2(expression: string; tree: TTreeElement): IXQValue;
+function TXQueryEngine.evaluateXPath2(expression: string; tree: TTreeNode): IXQValue;
 var
   temp: IXQuery;
 begin
@@ -3538,7 +3538,7 @@ begin
   FLastQuery := temp;
 end;
 
-function TXQueryEngine.evaluateXQuery1(expression: string; tree: TTreeElement): IXQValue;
+function TXQueryEngine.evaluateXQuery1(expression: string; tree: TTreeNode): IXQValue;
 var
   temp: IXQuery;
 begin
@@ -3547,7 +3547,7 @@ begin
   FLastQuery := temp;
 end;
 
-function TXQueryEngine.evaluateCSS3(expression: string; tree: TTreeElement): IXQValue;
+function TXQueryEngine.evaluateCSS3(expression: string; tree: TTreeNode): IXQValue;
 var
   temp: IXQuery;
 begin
@@ -3556,7 +3556,7 @@ begin
   FLastQuery := temp;
 end;
 
-class function TXQueryEngine.evaluateStaticXPath2(expression: string; tree: TTreeElement): IXQValue;
+class function TXQueryEngine.evaluateStaticXPath2(expression: string; tree: TTreeNode): IXQValue;
 var engine: TXQueryEngine;
 begin
   engine := TXQueryEngine.create;
@@ -3567,7 +3567,7 @@ begin
   end;
 end;
 
-class function TXQueryEngine.evaluateStaticCSS3(expression: string; tree: TTreeElement): IXQValue;
+class function TXQueryEngine.evaluateStaticCSS3(expression: string; tree: TTreeNode): IXQValue;
 var engine: TXQueryEngine;
 begin
   engine := TXQueryEngine.create;
@@ -4095,7 +4095,7 @@ end;
 
 
 class function TXQueryEngine.expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; const context: TXQEvaluationContext): IXQValue;
-var oldnode,newnode: TTreeElement;
+var oldnode,newnode: TTreeNode;
     newSequence: IXQValue;
     nodeCondition: TXQPathNodeCondition;
 var
@@ -4325,7 +4325,7 @@ begin
   result := nil;
 end;
 
-class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeElement): boolean;
+class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean;
 begin
   if not Assigned(node) or not (node.typ in nodeCondition.searchedTypes) then exit(false);
   if not (xqpncCheckOnSingleChild in nodeCondition.options) then begin
@@ -4351,7 +4351,7 @@ begin
   result := true;
 end;
 
-class function TXQueryEngine.getNextQueriedNode(prev: TTreeElement; var nodeCondition: TXQPathNodeCondition): TTreeElement;
+class function TXQueryEngine.getNextQueriedNode(prev: TTreeNode; var nodeCondition: TXQPathNodeCondition): TTreeNode;
 begin
   //TODO: allow more combinations than single type, or ignore types
 
@@ -4394,7 +4394,7 @@ begin
   exit(nil);
 end;
 
-class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeElement; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition);
+class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeNode; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition);
   function convertMatchingOptionsToMatchedTypes(const qmt: TXQPathMatchingKinds): TTreeElementTypes;
   begin
     result := [];

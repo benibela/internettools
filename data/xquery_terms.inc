@@ -951,7 +951,7 @@ end;
 
 function TXQTermReadAttribute.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
-  tempEl: TTreeElement;
+  tempEl: TTreeNode;
   testValue: Boolean;
   testNS: Boolean;
   readvalue: String;
@@ -1107,7 +1107,7 @@ end;
 
 { TXQTermConstructor }
 
-constructor TXQTermConstructor.create(atype: TTreeElementType; aname: txqterm = nil);
+constructor TXQTermConstructor.create(atype: TTreeNodeType; aname: txqterm = nil);
 begin
   typ := atype;
   nameValue := aname;
@@ -1121,11 +1121,11 @@ begin
   result := evaluate(context, nil, temp);
 end;
 
-function TXQTermConstructor.evaluate(const context: TXQEvaluationContext; root: TTreeElement; var baseOffset: longint): IXQValue;
+function TXQTermConstructor.evaluate(const context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
 var
-  tree: TTreeElement;
-  kid: TTreeElement;
-  lastKid: TTreeElement;
+  tree: TTreeNode;
+  kid: TTreeNode;
+  lastKid: TTreeNode;
   subcontext: ^TXQEvaluationContext;
   procedure addKid;
   begin
@@ -1177,8 +1177,8 @@ var
 
   procedure addNodeAsKid;
   var
-    doc: TTreeElement;
-    n: TTreeElement;
+    doc: TTreeNode;
+    n: TTreeNode;
     attrib: TTreeAttribute;
   begin
     kid.parent := tree;
@@ -1215,7 +1215,7 @@ var
 
   procedure addValue(const v: IXQValue; firstAtomic: boolean = true);
   var x: IXQValue;
-      temp: TTreeElement;
+      temp: TTreeNode;
       i: integer;
       tempNamespaces: TNamespaceList;
   begin
@@ -1284,7 +1284,7 @@ var
         end;
       end
       else if (lastKid = nil) or (lastKid.typ <> tetText) then begin
-        kid := TTreeElement.create(tetText);
+        kid := TTreeNode.create(tetText);
         if firstAtomic then kid.value:=v.toString
         else kid.value := ' '+ v.toString;
         kid.offset:=baseOffset;
@@ -1348,7 +1348,7 @@ begin
     tree := TTreeDocument.create(nil);
     TTreeDocument(tree).baseURI := context.staticContext.baseURI;
   end else if typ = tetAttribute then tree := TTreeAttribute.create('','')
-  else tree := TTreeElement.create(typ);
+  else tree := TTreeNode.create(typ);
   if root = nil then root := tree;
   tree.document := root;
   if baseOffset = 0 then begin
@@ -1402,7 +1402,7 @@ begin
         end else
           addValue(children[i].evaluate(subcontext^));
 
-      kid := TTreeElement.create(tetClose, tree.value);
+      kid := TTreeNode.create(tetClose, tree.value);
       kid.namespace := tree.namespace;
       kid.offset:=baseOffset;
       baseOffset+=1;

@@ -90,7 +90,7 @@ begin
   result := 0;
 end;
 
-function TXQValue.toNode: TTreeElement;
+function TXQValue.toNode: TTreeNode;
 begin
   result := nil;
 end;
@@ -1202,7 +1202,7 @@ begin
   else result := 0;
 end;
 
-function TXQValueSequence.toNode: TTreeElement;
+function TXQValueSequence.toNode: TTreeNode;
 begin
   if seq.Count >= 1 then result := seq[0].toNode
   else result := nil;
@@ -1301,7 +1301,7 @@ end;
 
 { TXQValueNode }
 
-constructor TXQValueNode.create(anode: TTreeElement);
+constructor TXQValueNode.create(anode: TTreeNode);
 begin
   inherited create;
   node := anode;
@@ -1358,7 +1358,7 @@ begin
   result := myStrToDecimal(toString);
 end;
 
-function treeElementAsString(node: TTreeElement; deepSeparator: string = ''): string; inline;
+function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
 begin
   if (node = nil) then exit('');
   case node.typ of
@@ -1381,7 +1381,7 @@ begin
   result := StrToDateTimeDef(toString,0);
 end;
 
-function TXQValueNode.toNode: TTreeElement;
+function TXQValueNode.toNode: TTreeNode;
 begin
   result := node;
 end;
