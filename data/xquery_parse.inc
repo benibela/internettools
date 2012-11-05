@@ -1187,6 +1187,11 @@ function TXQParsingContext.parseModule(): TXQTerm;
       'external': ;
     end;
     result.push(funcTerm);
+    if funcTerm.namespace = nil then raiseParsingError('No namespace for declared function: '+funcTerm.funcname);
+    if (funcTerm.namespace.getURL = 'http://www.w3.org/XML/1998/namespace') or
+       (funcTerm.namespace.getURL = 'http://www.w3.org/2001/XMLSchema') or
+       (funcTerm.namespace.getURL = 'http://www.w3.org/2001/XMLSchema-instance') or
+       (funcTerm.namespace.getURL = 'http://www.w3.org/2005/xpath-functions') then raiseParsingError('Invalid namespace for function declaration: '+funcTerm.namespace.getURL);
   end;
 
 

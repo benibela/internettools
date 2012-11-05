@@ -1493,7 +1493,7 @@ begin
 
 
   TestErrors := false;
-  //TestErrors := true;
+  //TestErrors := true; disabled at default, since these test cause memory leaks
 
   m('"1" + 2', '3');
   ps.StaticContext.strictTypeChecking:=true;
@@ -1543,6 +1543,12 @@ begin
   m('() mod ()', '');
   m('() + ()', '');
   m('() - ()', '');
+  m('declare function local:test(){0}; local:test()', '0');
+  f('declare function fn:test(){0}; fn:test()'     );
+  f('declare namespace fntricky = "http://www.w3.org/2005/xpath-functions"; declare function fntricky:test(){0}; fntricky:test()'     );
+  f('declare function xs:test(){0}; xs:test()'     );
+  f('declare function xml:test(){0}; xml:test()'     );
+  f('declare function xsi:test(){0}; xsi:test()'     );
 
 
 
