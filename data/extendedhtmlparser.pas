@@ -41,7 +41,7 @@ type
 //**@value tetHTMLText text node, , searched in the processed document
 //**@value tetCommandMeta <template:meta> command to specify how strings are compared (e.g. regex, substring, equal)
 //**@value tetCommandRead <template:read> command to set a variable
-//**@value tetCommandShortRead <template:s> command to execute a pxp expression
+//**@value tetCommandShortRead <template:s> command to execute a xq expression
 //**@value tetCommandLoopOpen <template:loop> command to repeat something as long as possible
 //**@value tetCommandIfOpen <template:if> command to skip something
 //**@value tetCommandElseOpen <template:else> command to skip something
@@ -109,7 +109,7 @@ end;
 //** Specifies when the text of text nodes is trimmed. Each value removes strictly more whitespace than the previous ones.
 //** @value ttnNever never, all whitespace is kept
 //** @value ttnForMatching When comparing two text nodes, whitespace is ignored; but all whitespace will be returned when reading text
-//** @value ttnAfterReading The PXP-functions like ., text(), deep-text() return the text trimmed, but the whitespace is still stored in the tree (so deep-text returns whitespace between child nodes)
+//** @value ttnAfterReading The XQ-functions like ., text(), deep-text() return the text trimmed, but the whitespace is still stored in the tree (so deep-text returns whitespace between child nodes)
 //** @value ttnWhenLoading All starting/ending whitespace is unconditionally removed from all text nodes
 TTrimTextNodes = (ttnNever, ttnForMatching, ttnWhenLoadingEmptyOnly, ttnWhenLoading);
 
@@ -146,7 +146,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         This will write the value of the text node that contains the t:s tag in the variable yourVariableName.@br@br
         Instead of the @code(t:s) tag, you can also use the short notation @code({yourVariableName:=text()}); and instead of
         @code(text()) to read the text node, you can also use @code(@attrib) to read an attribute; or an arbitrary complex
-        @link(pseudoxpath.TPseudoXPathParser pseudo-xpath-expression))
+        @link(xquery.TXQueryEngine xpath/xquery-expression))
 
   @item(Then the template is finished, at least the trivial things)
   )
@@ -269,14 +269,14 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   The following template commands can be used:
    @unorderedList(
       @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
-        @br The @link(pseudoxpath.TPseudoXPathParser Pseudo-XPath-expression) in source is evaluated and stored in variable of var.
-        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the pxpath-function filter instead of the regex/submatch attributes, because former is more elegant)
+        @br The @link(xquery.TXQueryEngine XPath-expression) in source is evaluated and stored in variable of var.
+        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the xq-function filter instead of the regex/submatch attributes, because former is more elegant)
         )
       @item(@code(<template:s>var:=source</template:s>)
-        @br Short form of @code(template:read). The PXP-expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several variables like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the pxp-syntax, so you can use much more complex expressions.)
+        @br Short form of @code(template:read). The expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several variables like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the expression syntax, so you can use much more complex expressions.)
         )
       @item(@code(<template:if test="??"/>  .. </template:if>)
-        @br Everything inside this tag is only used iff the pseudo-XPath-expression in test equals to true)
+        @br Everything inside this tag is only used iff the XPath-expression in test equals to true)
       @item(@code(<template:else [test="??"]/>  .. </template:else>)
         @br Everything inside this tag is only used iff the immediate previous if/else block was not executed. @br
             You can chain several else blocks that have test attributes together after an starting if, to create an ifelse chain, in which
@@ -292,8 +292,8 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
       This command can be used to match only one of several possibilities. It has two different forms:
       @orderedList(
        @item(Case 1: All direct child elements are template commands:@br
-          Then the switch statement will choose the first child command, whose pxp attribute @code(test) evaluates to true.
-          @br Additionally, if one of the child elements has an attributes @code(value), the pxp expressions of the switch and the child @code(value) attribute are evaluated, and the command is only choosen, if both expressions are equal.
+          Then the switch statement will choose the first child command, whose attribute @code(test) evaluates to true.
+          @br Additionally, if one of the child elements has an attributes @code(value), the expressions of the switch and the child @code(value) attribute are evaluated, and the command is only choosen, if both expressions are equal.
           @br An element that has neither a @code(value) nor a @code(test) attribute is always choosen (if no element before it is choosen).
           @br If no child can be choosen at the current position in the html file, the complete switch statement will skipped.
        )
@@ -324,14 +324,14 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @code(default-text-case-sensitive): specifies if text nodes are matched case sensitive.
     )
     )@br
-        Each of these commands can also have a property @code(test="{pxp condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
+        Each of these commands can also have a property @code(test="{xpath condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
     @br
     There are two special attributes allowed for html or matching tags in the template file:
     @unorderedList(
       @item(@code(template:optional="true") @br if this is set the file is read successesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
-      @item(@code(template:condition="pseudo xpath") @br if this is given, a tag is only accepted as matching, iff the given pxpath-expression returns true (powerful, but slow) @br
+      @item(@code(template:condition="xpath") @br if this is given, a tag is only accepted as matching, iff the given xpath-expression returns true (powerful, but slow) @br
                                                       (condition is not the same as test: if test evaluates to false, the template tag is ignored; if condition evaluates to false, the html tag )
       )
     )
@@ -362,7 +362,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
     @item(The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it)
     @item(All changes mentioned in pseudoxpath.)
     @item(Also text() doesn't match the next text element anymore, but the next text element of the current node. Use .//text() for the old behaviour)
-    @item(All variable names in the pxp are now case-sensitive in the default mode. You can set variableChangeLog.caseSensitive to change it to the old behaviour (however, variables defined with in the pxp expression by @code(for/some/every) (but not by @code(:=) ) remain case sensitive))
+    @item(All variable names in the pxp are now case-sensitive in the default mode. You can set variableChangeLog.caseSensitive to change it to the old behaviour (however, variables defined with in the expression by @code(for/some/every) (but not by @code(:=) ) remain case sensitive))
     @item(There was always some confusion, if the old variable changelog should be deleted or merged with the new one, if you process several html documents. Therefore the old merging option was removed and replaced by the KeepPreviousVariables property.)
     )
 

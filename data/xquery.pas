@@ -1152,13 +1152,13 @@ type
       @item(@code(if (condition) then $x else $y) @br This returns @code(x) if @code(condition) is true, and @code(y) otherwise  )
     )
 
-    Differences between this implementation and standard XPath/XQuery (most differences can be turned off by setting the respective parameter in the default StaticContext):
+    Differences between this implementation and standard XPath/XQuery (most differences can be turned off with the respective option or the field in the default StaticContext):
 
     Changed syntax:@br
 
     @unorderedList(
     @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. (option: extended-strings))
-    @item(@code(var:=value) @br This assignes the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) @br (Remark: I'm too lazy to formally define a execution order, but you can assume it is left-to-right _for now_))
+    @item(@code(var:=value) @br This assignes the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) )
     @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
           unless you use collations.)
     @item(The default type system is weaker typed, most values are automatically converted if necessary, e.g. "1" + 2 returns 3. @br
@@ -1206,16 +1206,19 @@ type
                   @br post: Url encoded post data (in future versions it might be multipart-encoded, if enctype is set) )
       @item(@code(split-equal(<list>, <string> [, <sep> = ' ']))
                   @br Treats the string <list> as a list of strings separated by <sep> and tests if <string> is contained in this list, which is useful for matching classes.
-                  @br (This is almost the same as @code(tokenize(<list>, <sep>) = <string>), but more efficient, since <sep> is a string not a regexp, and no boxing of the list entries to the xq variant type occurs ))
+                  @br (This is almost the same as @code(tokenize(<list>, <sep>) = <string>), but more efficient, since <sep> is a string not a regexp, and no boxing of the list entries to the xq variant type occurs )
+                  )
       @item(@code(is-nth(<i:int>, <a:int>, <b:int>))
-                  @br Returns true iff the equation @code ( i = a * n + b ) can be solved by an non-negative integer @code(n). (This is used to implement the css functions like nth-child ) )
+                  @br Returns true iff the equation @code ( i = a * n + b ) can be solved by an non-negative integer @code(n).
+                  (This is used to implement the css functions like nth-child ) )
       @item(@code(var := object())
                   @br This creates an object var, whose properties can be accessed like @code(var.propertyname).
                   @br Objects can be assigned to each other (e.g. @code(obj1 := object(), obj2 := object(), obj2.prop := 123, obj1.sub := obj2 ) ).
                                        Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers). @br
                                        However, objects are still preliminary/experimental.)
       @item(@code(get-property(<object>, <name>))
-                  @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled)
+                  @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled
+                  )
       @item(@code(match(<template>, <node>))
                   @br Performs pattern matching between the template and the nodes, and returns a list or an object of matched values.@br
                   @br E.g. @code(match(<a>{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code(<a>FOO</a>), and
@@ -1227,9 +1230,12 @@ type
                   @br If unnamed and named variables are mixed, the unnamed variables are treated like variables with the name @code(_result).
                   @br The template can be a node or a string. Written as string the example above would be @code(match("<a>{.}</a>", <x><a>FOO</a><a>BAR</a></x>)).
                   @br You can pass multiple templates and nodes, in which case each template is applied to each node, and the result of all matching calls is returned in a single sequence.
-                  @br If the template can not be matched, an error is raised
-                  @br see THtmlTemplateParser for the full template reference. (This function is not actually declared in xquery.pas, but in extendedhtmlparser.pas, so it is only available if latter unit is included in any uses clause. )
-      @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions", which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
+                  @br If the template can not be matched, an error is raised.
+                  @br see THtmlTemplateParser for the full template reference.
+                  (This function is not actually declared in xquery.pas, but in extendedhtmlparser.pas, so it is only available if latter unit is included in any uses clause. )
+                  )
+      @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions",
+            which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
 
     )
 
