@@ -69,7 +69,7 @@ TReadCallbackFunction = procedure (read: pchar; readLen:longint) of object;*)
 //**Possible callback for getting the value of a variable
 TReplaceFunction = procedure (variable: string; var value:string) of object;
 
-ETemplateParseException = Exception;
+ETemplateParseException = class(Exception);
 EHTMLParseException = class(Exception);
 EHTMLParseMatchingException = class(EHTMLParseException);
 THtmlTemplateParser=class;
@@ -515,7 +515,7 @@ end;
 constructor TTemplateElement.create(attyp: TTemplateElementType);
 begin
   templateType:=attyp;
-  if attyp < firstRealTemplateType then raise Exception.Create('invalid type');
+  if attyp < firstRealTemplateType then raise ETemplateParseException.Create('invalid type');
   if COMMAND_CLOSED[attyp] = 2 then typ := tetClose
   else typ := tetOpen;
   value := COMMAND_STR[attyp];
@@ -774,7 +774,7 @@ begin
           for k:= 0 to high(htmlList) do if striEqual(templateList[j], htmlList[k]) then begin found := true; break; end;
           if not found then exit(false);
         end;
-      end else raise Exception.Create('Invalid attribute matching kind');
+      end else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind');
       {todo: cacheRegExpr('regex', '', '', false);
       cacheRegExpr('starts-with', '^', '.*$', true);
       cacheRegExpr('ends-with', '^.*', '$', true);

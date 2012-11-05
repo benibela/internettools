@@ -947,7 +947,7 @@ begin
         if wordlookahead <> '{' then
           expect(wordlookahead);
         expect('{');
-        raiseParsingError('Schema validaton is not supported');
+        raiseParsingError('Schema validation is not supported');
       end;
 
 

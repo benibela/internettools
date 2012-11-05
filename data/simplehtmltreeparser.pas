@@ -278,7 +278,7 @@ public
   destructor destroy; override;
 end;
 
-ETreeParseException = Exception;
+ETreeParseException = class(Exception);
 { TTreeParser }
 
 //**Parsing model used to interpret the document
@@ -693,7 +693,7 @@ begin
             attrib.realvalue := change(attrib.realvalue);
           end;
       end;
-      else raise Exception.Create('Unkown tree element: '+tree.outerXML());
+      else raise ETreeParseException.Create('Unkown tree element: '+tree.outerXML());
     end;
     tree := tree.next;
   end;
@@ -828,7 +828,7 @@ begin
   case typ of
     tetOpen, tetDocument: result:=reverse.next;
     tetText, tetClose, tetComment, tetProcessingInstruction: result := next;
-    else raise Exception.Create('Invalid tree element type');
+    else raise ETreeParseException.Create('Invalid tree element type');
   end;
   if result = nil then exit;
   if result.typ = tetClose then exit(nil);
@@ -1049,7 +1049,7 @@ end;
 procedure TTreeNode.insertSurrounding(basetag: TTreeNode);
 var closing: TTreeNode;
 begin
-  if not (basetag.typ in TreeNodesWithChildren) then raise Exception.Create('Need an opening tag to surround another tag');
+  if not (basetag.typ in TreeNodesWithChildren) then raise ETreeParseException.Create('Need an opening tag to surround another tag');
   closing := TTreeNode(basetag.ClassType.Create);
   closing.typ := tetClose;
   closing.value := basetag.value;
@@ -1323,7 +1323,7 @@ begin
       temp := temp.next;
     end;
   end else if toFree.typ = tetClose then
-    raise Exception.Create('Cannot remove single closing tag')
+    raise ETreeParseException.Create('Cannot remove single closing tag')
   else
     next := toFree.next;
   next.previous := self;
@@ -1334,7 +1334,7 @@ procedure TTreeNode.removeElementKeepChildren;
 var
   temp: TTreeNode;
 begin
-  if previous = nil then raise Exception.Create('Cannot remove first tag');
+  if previous = nil then raise ETreeParseException.Create('Cannot remove first tag');
   previous.next := next;
   next.previous := previous;
   if typ in TreeNodesWithChildren then begin
@@ -1670,7 +1670,7 @@ begin
     strlTrimLeft(text, textLen);
     if textLen = 0 then exit;
     if strBeginsWith(text, #239#187#191) or strBeginsWith(text,#254#255) or strBeginsWith(text, #255#254) or
-       strBeginsWith(text, #43#47#118) then raise Exception.Create('xml ' + FCurrentTree.FBaseURI + ' starts with unicode BOM. That is not supported');
+       strBeginsWith(text, #43#47#118) then raise ETreeParseException.Create('xml ' + FCurrentTree.FBaseURI + ' starts with unicode BOM. That is not supported');
     raise ETreeParseException.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
   end;
 
