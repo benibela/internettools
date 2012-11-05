@@ -180,9 +180,9 @@ TTreeNode = class
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
   function hasAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): boolean; //**< returns if an attribute with that name exists. cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
-  function getAttribute(const a: string):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
-  function getAttribute(const a: string; const cmpFunction: TStringComparisonFunc):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
-  function getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttribute(const a: string):string; overload; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttribute(const a: string; const cmpFunction: TStringComparisonFunc):string; overload; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
+  function getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string; overload; //**< get the value of an attribute of this element or '' if this attribute doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeTry(const a: string; out valueout: string; const cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeTry(a: string; out valueout: TTreeAttribute; cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeCount(): integer;
@@ -776,18 +776,18 @@ begin
   exit(getAttributeTry(a, temp, cmpFunction));
 end;
 
-function TTreeNode.getAttribute(const a: string): string;
+function TTreeNode.getAttribute(const a: string): string; overload;
 begin
   result := getAttribute(a, @caseInsensitiveCompare);
 end;
 
-function TTreeNode.getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): string;
+function TTreeNode.getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): string; overload;
 begin
   if not getAttributeTry(a, result, cmpFunction) then
     result:='';
 end;
 
-function TTreeNode.getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string;
+function TTreeNode.getAttribute(const a: string; const def: string; const cmpFunction: TStringComparisonFunc = nil):string; overload;
 begin
   if not getAttributeTry(a, result, cmpFunction) then
     result:=def;

@@ -1867,8 +1867,6 @@ begin
 end;
 
 
-function commonClass(a,b: TXQValueClass): TXQValueClass; forward;
-function commonClass(a,b: IXQValue): TXQValueClass; forward;
 function xqvalueAtomize(const v: IXQValue): IXQValue; forward;
 
 function commonClass(a,b: TXQValueClass): TXQValueClass; overload;
@@ -1887,7 +1885,7 @@ begin
 end;
 
 
-function commonClass(a,b: IXQValue): TXQValueClass; overload; inline;
+function commonClass(const a,b: IXQValue): TXQValueClass; overload; inline;
 begin
   result := commonClass(a.getClassType, b.getClassType);
 end;
