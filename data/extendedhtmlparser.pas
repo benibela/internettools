@@ -343,17 +343,21 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
     Commonly used commands can be abbreviated as textual symbols instead of xml tags. To avoid conflicts with text node matching, this short notation is only allowed at the beginning of template text nodes.
 
-    The short read tag @code(<t:s>foo:=..</t:s>) to read something in variable @code(foo) can be abbreviated as @code({foo:=..}).
+    The short read tag @code(<t:s>foo:=..</t:s>) to read something in variable @code(foo) can be abbreviated as @code({foo:=..}). Similarly {} can be written within attributes to read the attribute, e.g. @code(<a href="{$dest := .}"/>).@br
+    Also the trailing @code(:= .) can be omitted, if only one variable assignment occurs, e.g. as @code({$foo}) is equivalent to @code(foo := .) and @code($foo := .).
 
     Optional and repeated elements can be marked with ?, *, +, {min, max}; like @code(<a>?...</a>) or, equivalent, @code(<a>..</a>?). @br
     An element marked with ? becomes optional, which has the same effect as adding the template:optional="true" attribute.@br
     An element marked with * can be repeated any times, which has the same effect as surrounding it with a template:loop element.@br
     An element marked with + has to be repeated at least once, which has the same effect as surrounding it with a template:loop element with attribute min=1.@br
-    An element marked with {min,max} has to be repeated at least min-times and at most max-times (just like in a t:loop).@br
+    An element marked with {min,max} has to be repeated at least min-times and at most max-times (just like in a t:loop) (remember that additional data/elements are always ignored).@br
+    An element marked with {count} has to be repeated exactly count-times (just like in a t:loop) (remember that additional data/elements are always ignored).@br
 
 
     @bold(Breaking changes from previous versions:)@br
     @unorderedList(
+    @item(As was announced in planned changes, the meaning of {$x} and {6} was changed)
+    @item(As was announced in planned changes, the meaning of <x value="{$x}"/> was changed)
     @item(Adding the short notation breaks all templates that match text nodes starting with *, +, ? or {)
     @item(The default template prefix was changed to template: (from htmlparser:). You can add the old prefix to the templateNamespace-property, if you want to continue to use it)
     @item(All changes mentioned in pseudoxpath.)
@@ -364,15 +368,6 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
     @bold(Planned breaking changes: )@br
     @unorderedList(
-    @item(Avoid using numbers and other variables with the unnamed result variable:@br
-          Currently the very short notation @code({x}) always assigns the value of x to the unnamed result variable. (when x doesn't contain a comma)@br
-          So @code({5}) is the same as @code({result:=5}) and @code({$a}) is the same as @code({result:=$a}).@br
-          But that is pretty much useless, so in future versions @code({5}) will probably ask for a five-time repetition of the previous element (which is the same @code({5,5}) does now) and
-          @code({$a}) will be the same a @code({a := .}), saving two letters)
-    @item(Avoid using {} at the begin/end of attributes:@br
-          The only way to read an attribute is to use the XPath attribute selector, e.g. @code({attrib:=@href}) or @code({@href}) with the unnamed variable.@br
-          This is not how the templates are supposed to look, so in future the very short notation will probably also be interpreted in attributes,
-          e.g. @code(<a href="{url:=.}"/>) might read an url. )
     @item(Avoid unmatched parenthesis and pipes within text nodes:@br
           Currently is no short notation to read alternatives with the template:switch command, like @code(<template:switch><a>..</a><b>..</b><c>..</c></template:switch>).@br
           In future this might be the same as @code((<a>..</a>|<b>..</b>|<c>..</c>)).@br
@@ -451,7 +446,7 @@ THtmlTemplateParser=class
     property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
     property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
     property AllowObjects: boolean read FObjects write FObjects;
-    property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< All XPath/XQuery expressions in the templates are kept in the same module
+    property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< If all XPath/XQuery expressions in the templates are kept in the same module. Only if true, XQuery variables/functions declared are accessible in other read commands. (declarations must be preceded by @code(xquery version "1.0";) and followed by an expression, if only @code(())) Global variables, declared with a simple $x := value, are always everywhere accessible.
 
     property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
@@ -1252,6 +1247,8 @@ begin
   FQueryEngine := TXQueryEngine.create;
   FQueryEngine.OnDefineVariable:= @FVariableLog.defineVariable;
   FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
+  FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
+  FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -1470,6 +1467,7 @@ begin
   result := nil;
   temp := THtmlTemplateParser.create; //TODO: optimize
   try
+    temp.TemplateParser.parsingModel:=pmHTML;
     temp.QueryEngine.StaticContext.Free;
     temp.QueryEngine.StaticContext := context.staticContext.clone();
     temp.QueryEngine.staticContext.sender := temp.QueryEngine;

@@ -913,6 +913,12 @@ begin
   q('string-join(match((<a>{{.}}</a>, <a>{{.}}</a>), (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>) ), " ")', '1 4 1 4');
   q('string-join(match(("<a>{.}</a>", "<a>{.}</a>"), (<r><a>1</a><a>2</a><a>3</a></r>, <r><a>4</a><a>5</a><a>6</a></r>) ), " ")', '1 4 1 4');
 
+  q('string-join(match(<t:loop><a>{{.}}</a></t:loop>,  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
+  q('string-join(match(<template:loop><a>{{.}}</a></template:loop>,  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
+  q('string-join(match("<a>{.}</a>*",  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
+  q('string-join(match("<t:loop><a>{.}</a></t:loop>",  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
+  q('string-join(match("<template:loop><a>{.}</a></template:loop>",  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
+
   q('match(<a>{{$var}}</a>, <r><a>123</a></r>)', '');
   q('match(<a>{{$var}}</a>, <r><a>123</a></r>).var', '123');
   q('match(<r><a>{{$var}}</a><b>{{$var2}}</b></r>, <r><a>123</a><b>456</b></r>).var', '123');

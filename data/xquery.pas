@@ -1202,6 +1202,19 @@ type
                   @br Objects can be assigned to each other (e.g. @code(obj1 := object(), obj2 := object(), obj2.prop := 123, obj1.sub := obj2 ) ).
                                        Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers). @br
                                        However, objects are still preliminary/experimental.)
+      @item(@code(match(<template>, <node>))
+                  @br Performs pattern matching between the template and the nodes, and returns a list or an object of matched values.@br
+                  @br E.g. @code(match(<a>{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code(<a>FOO</a>), and
+                           @code(match(<a>*{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code((<a>FOO</a>, <a>BAR</a>))
+                  @br It is also possible to use named variables in the template, in which case an object is returned, e.g:
+                           @code(match(<x><a>{{first:=.}}</a><a>{{second:=.}}</a></x>, <x><a>FOO</a><a>BAR</a></x>)) returns an object with two properties @code(first) and @code(bar), containing @code(<a>FOO</a>) and @code(<a>BAR</a>) respectively.
+                      These properties can be accessed like @code(match(<x><a>{{first:=.}}</a><a>{{second:=.}}</a></x>, <x><a>FOO</a><a>BAR</a></x>).first)
+                  @br Multiple values assigned to the same variable are merged into a single sequence, e.g. @code(match(<x><a>{{res:=.}}</a><a>{{res:=.}}</a></x>, <x><a>FOO</a><a>BAR</a></x>)) returns an object with a single property @code(res) with value @code((<a>FOO</a>, <a>BAR</a>))
+                  @br If unnamed and named variables are mixed, the unnamed variables are treated like variables with the name @code(_result).
+                  @br The template can be a node or a string. Written as string the example above would be @code(match("<a>{.}</a>", <x><a>FOO</a><a>BAR</a></x>)).
+                  @br You can pass multiple templates and nodes, in which case each template is applied to each node, and the result of all matching calls is returned in a single sequence.
+                  @br If the template can not be matched, an error is raised
+                  @br see THtmlTemplateParser for the full template reference. (This function is not actually declared in xquery.pas, but in extendedhtmlparser.pas, so it is only available if latter unit is included in any uses clause. )
       @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions", which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
 
     )
