@@ -765,6 +765,10 @@ begin
   t('for $x in (let $a := <a>0</a>, $b := <a>7</a> return ($a, $b, <a>1</a>, <a>2</a>, <a>3</a>, <a>4</a>) except ($a, $b, <a>3</a>, <a>4</a>)) order by $x return $x', '1 2 3 4');
   t('let $a := <a>0</a> return ($a, <a>1</a>, <a>2</a>) intersect ($a, <a>3</a>, <a>4</a>)', '0');
   t('for $x in (let $a := <a>0</a>, $b := <a>-1</a> return ($a, $b, <a>1</a>, <a>2</a>) intersect ($a, $b, <a>3</a>, <a>4</a>)) order by $x return $x', '-1 0' );
+
+  t('for $x in <r><a>A</a><a>AA</a><a>AAA</a><a>AAAA</a></r> / a order by $x return $x', 'A AA AAA AAAA');
+  t('for $x in <r><a>A</a><a>AA</a><a>AAA</a><a>AAAA</a></r> / a order by $x descending return $x', 'AAAA AAA AA A');
+
   t('element a {"b"}', 'b');
   t('document { document { element a {"b"}}}', 'b');
   t('outer-xml(<a xmlns="example">abc</a>)', '<a xmlns="example">abc</a>');
