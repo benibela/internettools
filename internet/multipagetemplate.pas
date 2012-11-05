@@ -29,7 +29,7 @@ unit multipagetemplate;
 interface
 
 uses
-  Classes, SysUtils,bbutils,extendedhtmlparser,simplehtmlparser,simplehtmltreeparser,simplexmlparser, xquery,dRegExpr,internetaccess;
+  Classes, SysUtils,bbutils,extendedhtmlparser, simplehtmltreeparser,simplexmlparser, xquery,dRegExpr,internetaccess;
 
 type
 
@@ -299,8 +299,6 @@ procedure TTemplateActionLoop.perform(reader: TMultipageTemplateReader);
 var
   listx, x: IXQValue;
   testx: IXQuery;
-  i: Integer;
-  j: Integer;
 begin
   if list <> '' then begin
     if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
@@ -540,8 +538,7 @@ end;
 
 
 procedure TMultiPageTemplate.readTree(t: TTreeNode);
-var tagName:string;
-  u: TTreeNode;
+var  u: TTreeNode;
 begin
   baseActions.clear;
 
@@ -666,8 +663,6 @@ begin
 end;
 
 constructor TMultipageTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
-var
-  i: Integer;
 begin
   internet:=ainternet;
   parser:=THtmlTemplateParser.create;
