@@ -7,6 +7,26 @@
 *}
 unit xquery;
 
+{
+Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+                          benito@benibela.de
+                          www.benibela.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+}
+
 {$mode objfpc}
 {$modeswitch advancedrecords}
 {$H+}
@@ -63,6 +83,7 @@ type
   //**Type of xqvalue (see TXQValue)
   TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkFunction);
 
+  //**Type used for XQuery decimal types
   Decimal = Extended;
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
@@ -118,18 +139,18 @@ type
   Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
   *)
   TXQEvaluationContext = record
-    ParentElement: TTreeElement; //**< associated tree element (= context item if context item is a node)
-    RootElement: TTreeElement;
+    RootElement: TTreeElement;   //**< associated tree (returned by @code( / ) within an expression)
+    ParentElement: TTreeElement; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
 
-    SeqValue: IXQValue; //**<Context item / value of @code(.),  if a sequence is processed (nil otherwise)
+    SeqValue: IXQValue; //**<Context item / value of @code( . ),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
 
     temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
-    namespaces: TNamespaceList;
+    namespaces: TNamespaceList;               //**< Namespace declared in the outside scope (only changed by xmlns attributes of constructed nodes)
 
     staticContext: TXQStaticContext;
 
-    function compareAtomicBase(const a,b: IXQValue): integer;
+    function compareAtomicBase(const a,b: IXQValue): integer; //**< Compares two values (depending on the context properties like collations)
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     function findModuleStaticContext(const namespace: INamespace): TXQStaticContext;
@@ -144,13 +165,13 @@ type
   (***
   @abstract(Variant used in XQuery-expressions)
 
-  This is the base interface used to store the various values occuring during the evaluation of a XQuery expression.
+  This is the base interface used to access the various values occuring during the evaluation of a XQuery expression.
 
   You can read its value with the methods toBoolean, toInt64, toDecimal, toString, toDateTime, toNode, toArray,
   which convert the returned value to the requested type.
 
   The @code(kind) property and the @code(is) operator can be used to check for the actually contained type.
-  E.g. for an string @code(kind) returns @code(pvkString) and @code(is TXQValueString) returns true (latter might be changed in feature versions). @code(kind)
+  E.g. for an string @code(kind) returns @code(pvkString) and @code(is TXQValueString) returns true (latter might be changed in later versions). @code(kind)
   returns a basic type, so e.g. float and double values both return pvkDecimal.
 
   Since IXQValue is an interface, it can be used without worrying much about memory management. @br
@@ -1110,14 +1131,14 @@ type
 
     This XQuery engine currently supports XPath 2.0 and XQuery 1.0, with some extensions and minor deviations.@br@br
 
-    Some very basic XPath examples:
+    Some very basic, standard XPath examples:
     @unorderedList(
       @item(@code("something") or @code("something") @br This returns the string 'something'. (see below))
       @item(@code($var)  @br This returns the value of the variable @code(var). (see below))
       @item(@code( a + b )  @br This returns the numerical sum of @code(a) and @code(b)@br
             Instead of +, you can also use one of operators @code(-, *, div, idiv, =, !=, <, >, <=, =>, to, or, and, eq, ne, lt, gt, le, ge) )
       @item(@code(1245.567)  @br This returns the number 1245.567)
-      @item(@code(concat(a,b,c)) @br This concatenates the strings a,b and c.@br
+      @item(@code(concat("a","b","c")) @br This concatenates the strings a,b and c.@br
             There are many more functions than @code(concat), you can look them up in a XPath reference)
       @item(@code((1,2,3)) @br This returns a sequence (1,2,3). @br Sequences can not be nested.)
       @item(@code((1,2,3)[. mod 2 = 1]) @br This returns the sequence (1,3) of all odd numbers.)
@@ -1231,7 +1252,8 @@ type
 
     You can also create a TXQueryEngine instance and then call @code(parseXPath2('expression')) and @code(evaluateXPath2()). @br
     This is not as easy, but you have more options: @br
-    You can set separate root (/) (with the property RootElement) and parent elements (./) (with the property ParentElement), and you can read and define variables in the expression.
+    For the basic you can set separate root (/) (with the property RootElement) and parent elements (./) (with the property ParentElement), or  you can read and define variables in the expression,
+    or change other behaviours.
 
 
     @br@br@bold(Compatibility to previous version)@br
@@ -1273,8 +1295,7 @@ type
     StaticContext: TXQStaticContext;  //**< XQuery static context, defining various default values.
 
 
-    VariableChangelog: TXQVariableChangeLog;  //**< All variables that have been set (if a variable was overriden, it stores the old and new value)
-    //TreeStorage: TTreeParser; //**< Object storing all trees generated during by an XQuery expression
+    VariableChangelog: TXQVariableChangeLog;  //**< All global variables that have been set (if a variable was overriden, it stores the old and new value)
 
     OnEvaluateVariable: TXQEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
     OnDefineVariable: TXQDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
@@ -1429,7 +1450,7 @@ type
   (***
   @abstract(A XQuery variable)
 
-  consisting of a name and a value.
+  consisting of a name with namespace and a value.
 
   *)
   TXQVariable = record
@@ -1446,7 +1467,7 @@ type
   (***
    @abstract(XQuery variable storage)
 
-   This is stores a list of variables - a IXQValue for a string name.@br@br
+   This class stores a list of variables - a IXQValue for a string name.@br@br
 
    It is called changelog because it also stores every old value. This allows you to go back in time with pushAll/popAll.@br
    Reading a variable by name will always return the latest value (unless it was deleted by popAll).
@@ -1600,7 +1621,7 @@ protected
   complexFunctions: TStringList;
   binaryOps, binaryOpFunctions: TStringList;
   types: TStringList;
- procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+  procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
 end;
 
 //**Returns a "..." string for use in json (internally used)

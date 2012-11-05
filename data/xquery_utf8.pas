@@ -1,5 +1,5 @@
 {**
-  @abstract(This units contains utf-8 aware version of certain XQuery functions)
+  @abstract(This units contains utf-8 aware versions of certain XQuery functions)
 
   If this unit is included in any uses clause it overrides the default string-length, substring, translate, string-to-codepoints XQuery functions
   with utf8-aware functions.

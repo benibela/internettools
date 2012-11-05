@@ -32,18 +32,21 @@ TTreeDocument = class;
 
 TStringComparisonFunc = function (const a,b: string): boolean of object;
 
+//** Namespace interface, storing url and prefix. (Interface, so it is ref-counted)
 INamespace = interface
-  function getPrefix: string;
-  function getURL: string;
-  function serialize: string;
+  function getPrefix: string; //**< Returns the prefix
+  function getURL: string; //**< Returns the url
+  function serialize: string; //**< Returns a xmlns attribute declaring this namespace with url and prefix
 end;
 
 
 { TNamespace }
 
+//** Class implementing the INamespace interface
 TNamespace = class(TInterfacedObject, INamespace)
   url: string;
   prefix: string;
+  //** Creates a new namespace with url and prefix. (watch the argument order. It follows the XPath fn:QName function)
   constructor create(const aurl: string; aprefix: string);
   function getPrefix: string;
   function getURL: string;
@@ -53,6 +56,7 @@ end;
 
 { TNamespaceList }
 
+//** List of namespaces
 TNamespaceList = class(TInterfaceList)
 private
   function getNamespace(const prefix: string): INamespace;
@@ -94,10 +98,10 @@ public
   property Current: TTreeAttribute read GetCurrent;
 end;
 
+{ TAttributeList }
+
 //**@abstract A list of attributes.
 //**Currently this is a simple string list, and you can get the values with the values property. (with c++ I would have used map<string, string> but this doesn't exist in Pascal)
-
-{ TAttributeList }
 
 TAttributeList = class(TStringList)
 public
@@ -138,25 +142,7 @@ end;
 //**∀a \in SO: a < a.reverse@br
 //**∀a,b \in SO: a < b < a.reverse => a < b.reverse < a.reverse@br
 //**@br
-//**Attributes should be accessed with the getAttribute or getAttributeTry method. @br
-//**But if you are brave or need to modify the attributes, you can access the internal attribute storage with the attributes field.@br
-//**All attributes are stored in the same structure as the other elements as quadro-linked list. The names and values are stored in two lists, which are connected with the connecting @code(reverse) field.@br
-//**You can use the second getAttributeTry method to get a pointer to value node for a certain name.
-//**
-//** @code(<foo name1="value1" name2="value2" name3="value3>/>)
-//** @longCode(#
-//**      /--------------\                                     pointer to first attribute (attributes)
-//**      |              |
-//**      |      /-->  <foo>  <-----------------------\
-//**      |       |             |           |          |       single linked list to parent (parent)
-//**      |       |             |           |          |
-//**      \-->  name1  <-->  name2  <-->  name3        |       double linked list of attributes (previous and next)
-//**             /|\          /|\          /|\         |
-//**              |            |            |          |       single linked list of corresponding node/thing (reverse)
-//**             \|/          \|/          \|/         |
-//**            value1 <-->  value2 <-->  value3       |       (again) double linked list of attributes (previous and next)
-//**              |            |            |          |
-//**              \------------------------------------/       (again) single linked list to parent
+//**Attributes should be accessed with the getAttribute or getAttributeTry method. Or you can enumerate them all @code(for attrib in attributes), if attributes is not nil. @br
 //** #)
 TTreeElement = class
 //use the fields if you know what you're doing
@@ -213,9 +199,9 @@ TTreeElement = class
   function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
   function getNamespaceURL(): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute) cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
-  procedure getOwnNamespaces(var list: TNamespaceList);
-  procedure getAllNamespaces(var list: TNamespaceList; first: boolean = true);
-  function isNamespaceUsed(const n: INamespace): boolean;
+  procedure getOwnNamespaces(var list: TNamespaceList); //**< Returns all namespaces declared or used in this element and its attributes
+  procedure getAllNamespaces(var list: TNamespaceList; first: boolean = true); //**< Returns all namespaces declared/used by this element and all parent
+  function isNamespaceUsed(const n: INamespace): boolean; //**< Tests if a namespace is used by this element or any child (same prefix + url)
 
   property defaultProperty[name: string]: string read getAttribute; default;
 
@@ -300,11 +286,10 @@ ETreeParseException = Exception;
 //**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised), detect encoding
 TParsingModel = (pmStrict, pmHTML);
 //**@abstract This parses a html/sgml/xml file to a tree like structure
-//**To use it, you have to call @code(parseTree) with a string containing the document. Afterwards you can call @code(getTree) to get the document root node.@br
+//**To use it, you have to call @code(parseTree) with a string containing the document. Afterwards you can call @code(getLastTree) to get the document root node.@br
 //**
 //**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree).@br
-//**After tree parsing the tree contains the text as byte strings, without encoding or entity conversions. But in the case of html, the meta/http-equiv encoding is detected
-//**and you can call setEncoding to change the tree to the encoding you need. (this will also convert the entities)@br
+//**If TargetEncoding is not eUnknown, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
 //**You can change the class used for the elements in the tree with the field treeElementClass.
 TTreeParser = class
 protected
@@ -367,6 +352,7 @@ published
   property readComments: boolean read FReadComments write FReadComments;
   //** If this is true (default is false) processing instructions are included in the generated tree
   property readProcessingInstructions: boolean read FReadProcessingInstructions write FReadProcessingInstructions;
+  //** Determines if the encoding should be automatically detected (default true)
   property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
   property TargetEncoding: TEncoding read FTargetEncoding write FTargetEncoding;

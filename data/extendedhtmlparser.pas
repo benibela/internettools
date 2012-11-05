@@ -5,9 +5,9 @@
 }
 unit extendedhtmlparser;
 {
-Copyright (C) 2008 Benito van der Zander (BeniBela)
-                   benito@benibela.de
-                   www.benibela.de
+Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+                          benito@benibela.de
+                          www.benibela.de
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -254,7 +254,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
   ))
 
-  See the unit tests at the end of the file extendedhtmlparser.pas for more examples
+  See the unit tests in tests/extendedhtmlparser_tests.pas for more examples.
 
 
 
@@ -422,8 +422,8 @@ THtmlTemplateParser=class
 
     procedure parseTemplate(template: string; templateName: string = '<unknown>');//**< loads the given template, stores templateName for debugging issues
     procedure parseTemplateFile(templatefilename: string); //**<loads a template from a file
-    function parseHTML(html: string; htmlFileName: string = ''; contentType: string = ''):boolean; //**< parses the given data. htmlFileName is just for debugging issues
-    function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file.
+    function parseHTML(html: string; htmlFileName: string = ''; contentType: string = ''):boolean; //**< parses the given data by applying a previously loaded template. htmlFileName is just for debugging issues
+    function parseHTMLFile(htmlfilename: string):boolean; //**< parses the given file by applying a previously loaded template.
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
     //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
 
@@ -431,22 +431,22 @@ THtmlTemplateParser=class
     function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
 
     function debugMatchings(const width: integer): string;
-    function parseQuery(const expression: string): IXQuery; //**< Returns a XPath interpreter object that access the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
+    function parseQuery(const expression: string): IXQuery; //**< Returns a IXQuery that accesses the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables
     property variableChangeLog: TXQVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
     property oldVariableChangeLog: TXQVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
-    property VariableChangeLogCondensed: TXQVariableChangeLog read GetVariableLogCondensed; //**<oldVariableChangeLog (no, no, no, it's the new one) with duplicated objects removed (i.e. if you have obj := object(), obj.a := 1, obj.b := 2, obj := object(); the normal change log will contain 4 objects (like {}, {a:1}, {a:1,b:2}, {}), but the condensed log only two {a:1,b:2}, {})
+    property VariableChangeLogCondensed: TXQVariableChangeLog read GetVariableLogCondensed; //**< VariableChangeLog with duplicated objects removed (i.e. if you have obj := object(), obj.a := 1, obj.b := 2, obj := object(); the normal change log will contain 4 objects (like {}, {a:1}, {a:1,b:2}, {}), but the condensed log only two {a:1,b:2}, {})
 
     property templateNamespaces: TNamespaceList read GetTemplateNamespace; //**< Global namespaces to set the commands that will be recognized as template commands. Default prefixes are template: and t: @br Namespaces can also be defined in a template with the xmlns: notation and the namespace url  'http://www.benibela.de/2011/templateparser'
     property ParsingExceptions: boolean read FParsingExceptions write FParsingExceptions; //**< If this is true (default) it will raise an exception if the matching fails.
     property OutputEncoding: TEncoding read FOutputEncoding write FOutputEncoding; //**< Output encoding, i.e. the encoding of the read variables. Html document and template are automatically converted to it
     property KeepPreviousVariables: TKeepPreviousVariables read FKeepOldVariables write FKeepOldVariables; //**< Controls if old variables are deleted when processing a new document (see TKeepPreviousVariables)
     property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.XQGlobalTrimNodes which controls, how the values are returned.
-    property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assign to a variable, it is assigned to this variable. (Default: _result)
+    property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assigned to a variable, it is assigned to this one. (Default: _result)
     property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
-    property AllowObjects: boolean read FObjects write FObjects;
-    property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< If all XPath/XQuery expressions in the templates are kept in the same module. Only if true, XQuery variables/functions declared are accessible in other read commands. (declarations must be preceded by @code(xquery version "1.0";) and followed by an expression, if only @code(())) Global variables, declared with a simple $x := value, are always everywhere accessible.
+    property AllowObjects: boolean read FObjects write FObjects; //**< If objects can be created and used. (e.g. @code( object(("a", 1, "b", 2)).a ) would become 1). When objects are enabled, variable names cannot contain points.  (default true)
+    property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< If all XPath/XQuery expressions in the templates are kept in the same module. Only if true, XQuery variables/functions declared are accessible in other read commands. (declarations must be preceded by @code(xquery version "1.0";) and followed by an expression, if only @code(())) Global variables, declared with a simple $x := value, are always everywhere accessible. (default true)
 
     property TemplateTree: TTreeElement read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeElement read getHTMLTree; //**<A tree representation of the processed html file
