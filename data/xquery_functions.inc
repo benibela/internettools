@@ -1533,6 +1533,13 @@ begin
   result := xqvalue(args[0].typeName);
 end;
 
+function xqFunctionGet_Property(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 2);
+  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.Create('Expected object');
+  result := args[0].getProperty(args[1].toString);
+end;
+
 //Boolean functions
 function xqFunctionBoolean(const args: TXQVArray): IXQValue;
 begin

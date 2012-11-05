@@ -1223,6 +1223,8 @@ type
                   @br Objects can be assigned to each other (e.g. @code(obj1 := object(), obj2 := object(), obj2.prop := 123, obj1.sub := obj2 ) ).
                                        Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers). @br
                                        However, objects are still preliminary/experimental.)
+      @item(@code(get-property(<object>, <name>))
+                  @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled)
       @item(@code(match(<template>, <node>))
                   @br Performs pattern matching between the template and the nodes, and returns a list or an object of matched values.@br
                   @br E.g. @code(match(<a>{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code(<a>FOO</a>), and
@@ -4684,6 +4686,7 @@ pxp.registerFunction('eval',@xqFunctionEval, []);
 pxp.registerFunction('css',@xqFunctionCSS, []);
 pxp.registerFunction('is-nth',@xqFunctionIs_Nth, []);
 pxp.registerFunction('type-of',@xqFunctionType_of, []);
+pxp.registerFunction('get-property',@xqFunctionGet_Property, []);
 
 
 //standard functions
