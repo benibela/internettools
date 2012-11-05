@@ -140,7 +140,7 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="4">
+    <Exceptions Count="6">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -153,6 +153,12 @@
       <Item4>
         <Name Value="Exception"/>
       </Item4>
+      <Item5>
+        <Name Value="EXQEvaluationException"/>
+      </Item5>
+      <Item6>
+        <Name Value="EXQParsingException"/>
+      </Item6>
     </Exceptions>
   </Debugging>
 </CONFIG>

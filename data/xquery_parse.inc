@@ -801,7 +801,7 @@ begin
         expect(wordlookahead);
         exit(TXQTermNumber.Create('-' + wordlookahead));
       end else
-        exit(TXQTermUnaryOp.create(word, parseValue()));
+        exit(TXQTermBinaryOp.create(word, TXQTermNumber.create('0'), parseValue()));
     end;
 
     '(': begin

@@ -267,7 +267,7 @@ var nodeCondition: TXQPathNodeCondition;
     case kind of
       //tikAny, tikNone: ; //handled before
       tikAtomic:
-        if atomicTypeInfo = TXQValueNumericPseudoType then
+        if (atomicTypeInfo = TXQValueNumericPseudoType) or (atomicTypeInfo = TXQValueTrueNumericPseudoType) then
           result := (sub is TXQValueInt65) or (sub is TXQValueDecimal)
          else
           result := sub.instanceOfInternal(atomicTypeInfo);
@@ -598,36 +598,6 @@ begin
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
-  function functionTypeConversion(const v: IXQValue; const typ: TXQTermSequenceType): IXQValue;
-    function conversionSingle(const w: IXQValue): IXQValue;
-    begin
-      result := w;
-      if result is TXQValueNode then result := xqvalueAtomize(result);
-      if typ.instanceOf(result, context) then exit;
-      if (result is TXQValue_untypedAtomic)
-         or (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) and ((w is TXQValue_float) or (w is TXQValue_double)))
-         or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
-         or (w.instanceOfInternal(TXQValue_anyURI) and (typ.atomicTypeInfo.instanceOf(TXQValueString))) then
-           exit(typ.castAs(result, context));
-      raiseEvaluationError('Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
-    end;
-
-  var
-    i: Integer;
-  begin
-    result := v;
-    if typ = nil then exit;
-    if typ.instanceOf(result, context) then exit;
-    if typ.kind = tikAtomic then begin
-      if not (result is TXQValueSequence) then
-        exit(conversionSingle(result));
-      if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then raiseEvaluationError('Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
-      if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raiseEvaluationError('Expected value, but got empty sequence.');
-      for i := 0 to result.getSequenceCount - 1 do
-        (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
-    end;
-  end;
-
 var
   evilkids: TXQVArray;
   tempcontext: TXQEvaluationContext;
@@ -754,6 +724,7 @@ begin
 end;
 
 function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
+var evilkids: TXQVArray;
 begin
   if length(children)<2 then raiseEvaluationError('Not enough subterms');
   if length(children)>2 then raiseEvaluationError('Too many subterms');
@@ -762,7 +733,15 @@ begin
   if (op.name = '/') or (op.name = '//') then
     exit(TXQueryEngine.evaluateAccessList(self, context));
 
-  result := op.func(context, children[0].evaluate(context), children[1].evaluate(context));
+
+  if not context.staticContext.strictTypeChecking  then
+    result := op.func(context, children[0].evaluate(context), children[1].evaluate(context))
+  else begin
+    evaluateChildren(context, evilkids);
+    if not op.checkTypes(evilkids, context) then
+      raiseEvaluationError('Invalid types for binary operator: '+op.name+ ' '+op.followedBy);
+    result := op.func(context, evilkids[0], evilkids[1]);
+  end;
 end;
 
 function TXQTermBinaryOp.getContextDependencies: TXQContextDependencies;
@@ -891,28 +870,6 @@ begin
       end;
     end;
   end;
-end;
-
-{ TXQTermUnaryOp }
-
-constructor TXQTermUnaryOp.create(const aop: string; arg: TXQTerm);
-begin
-  op := TXQueryEngine.findOperator(aop);
-  if arg <> nil then push(arg);
-end;
-
-function TXQTermUnaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
-begin
-  if length(children)<1 then raiseEvaluationError( 'Not enough subterms')
-  else if length(children)>1 then raiseEvaluationError('Too many subterms');
-  if op = nil then raiseEvaluationError('Unknown unary op');
-  result := xqvalue();
-  result := op.func(context, xqvalue(0),children[0].evaluate(context));
-end;
-
-function TXQTermUnaryOp.getContextDependencies: TXQContextDependencies;
-begin
-  result := children[0].getContextDependencies;
 end;
 
 { TXQTermNumber }

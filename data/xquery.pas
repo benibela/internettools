@@ -982,15 +982,6 @@ type
     class function findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
   end;
 
-  { TXQTermUnaryOp }
-
-  TXQTermUnaryOp = class(TXQTerm)
-    op: TXQOperatorInfo;
-    constructor create(const aop: string; arg: TXQTerm = nil);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function getContextDependencies: TXQContextDependencies; override;
-  end;
-
   { TXQTermBinaryOp }
 
   TXQTermBinaryOp = class(TXQTerm)
@@ -1108,9 +1099,9 @@ type
   end;
 
   //**Exception raised during the parsing of an expression
-  EXQParsingException = Exception;
+  EXQParsingException = class(Exception);
   //**Exception raised during the evaluation of an expression
-  EXQEvaluationException = Exception;
+  EXQEvaluationException = class(Exception);
 
   //** Event called by the trace(value,info) function. You should not free value and info
   type TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;
@@ -1682,6 +1673,18 @@ type
   class function TXQValueNumericPseudoType.classTypeName: string;
   begin
     result := 'numeric';
+  end;
+
+type
+  //equal to numeric, but does not match untypedAtomic
+  TXQValueTrueNumericPseudoType = class(TXQValue)
+    class function classTypeName: string; override;
+  end;
+
+
+  class function TXQValueTrueNumericPseudoType.classTypeName: string;
+  begin
+    result := 'true-numeric';
   end;
 
 
@@ -4666,6 +4669,7 @@ xs.registerType(TXQValue_AnyAtomicType);
 xs.registerType(TXQValue_AnySimpleType);
 xs.registerType(TXQValue);
 xs.registerType(TXQValueNumericPseudoType);
+xs.registerType(TXQValueTrueNumericPseudoType);
 
 {$DEFINE PXP_DERIVED_TYPES_REGISTRATION}
 {$I xquery_derived_types.inc}
@@ -4826,6 +4830,13 @@ fn.registerFunction('id', @xqFunctionId, ['($arg as xs:string*) as element()*', 
 fn.registerFunction('idref', @xqFunctionId, ['($arg as xs:string*) as node()*', '($arg as xs:string*, $node as node()) as node()*']);
 fn.registerFunction('element-with-id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
 
+
+//Operators
+//The type information are just the function declarations of the up-backing functions
+//However, ? were added, since the operators accept empty sequences
+//For *, +  functions with reverted argument order were added (since the order does not matter )
+//For eq/ne/.. boolean and string cases were added
+
 op.registerBinaryOp('/',@xqvalueNodeStepChild,200, []);
 op.registerBinaryOp('//',@xqvalueNodeStepDescendant,200, []);
 
@@ -4841,22 +4852,22 @@ op.registerBinaryOp('|',@xqvalueUnion,115, ['union($parameter1 as node()*, $para
 op.registerBinaryOp('union',@xqvalueUnion,115, ['union($parameter1 as node()*, $parameter2 as node()*) as node()*']);
 
 
-op.registerBinaryOp('idiv',@xqvalueDivideInt,100,['numeric-integer-divide($arg1 as numeric, $arg2 as numeric) as xs:integer']);
-op.registerBinaryOp('div',@xqvalueDivide,100,['numeric-divide($arg1 as numeric, $arg2 as numeric) as numeric', 'divide-yearMonthDuration($arg1 as xs:yearMonthDuration, $arg2 as xs:double) as xs:yearMonthDuration', 'divide-yearMonthDuration-by-yearMonthDuration($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:decimal', 'divide-dayTimeDuration($arg1 as xs:dayTimeDuration, $arg2 as xs:double) as xs:dayTimeDuration', 'divide-dayTimeDuration-by-dayTimeDuration($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:decimal']);
-op.registerBinaryOp('*',@xqvalueMultiply,100,['numeric-multiply($arg1 as numeric, $arg2 as numeric) as numeric', 'multiply-yearMonthDuration($arg1 as xs:yearMonthDuration, $arg2 as xs:double) as xs:yearMonthDuration', 'multiply-dayTimeDuration($arg1 as xs:dayTimeDuration, $arg2 as xs:double) as xs:dayTimeDuration']);
-op.registerBinaryOp('mod',@xqvalueMod,100,['numeric-mod($arg1 as numeric, $arg2 as numeric) as numeric']);
+op.registerBinaryOp('idiv',@xqvalueDivideInt,100,['numeric-integer-divide($arg1 as numeric?, $arg2 as numeric?) as xs:integer']);
+op.registerBinaryOp('div',@xqvalueDivide,100,['numeric-divide($arg1 as numeric?, $arg2 as numeric?) as numeric', 'divide-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', 'divide-yearMonthDuration-by-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:decimal', 'divide-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', 'divide-dayTimeDuration-by-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:decimal']);
+op.registerBinaryOp('*',@xqvalueMultiply,100,['numeric-multiply($arg1 as numeric?, $arg2 as numeric?) as numeric', 'multiply-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', '($arg2 as xs:double?, $arg1 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'multiply-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', '($arg2 as xs:double?, $arg1 as xs:dayTimeDuration?) as xs:dayTimeDuration']);
+op.registerBinaryOp('mod',@xqvalueMod,100,['numeric-mod($arg1 as numeric?, $arg2 as numeric?) as numeric']);
 
-op.registerBinaryOp('+',@xqvalueAdd,70,['numeric-add($arg1 as numeric, $arg2 as numeric) as numeric', 'add-yearMonthDurations($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:yearMonthDuration', 'add-dayTimeDurations($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:dayTimeDuration', 'add-yearMonthDuration-to-dateTime($arg1 as xs:dateTime, $arg2 as xs:yearMonthDuration) as xs:dateTime', 'add-dayTimeDuration-to-dateTime($arg1 as xs:dateTime, $arg2 as xs:dayTimeDuration) as xs:dateTime', 'add-yearMonthDuration-to-date($arg1 as xs:date, $arg2 as xs:yearMonthDuration) as xs:date', 'add-dayTimeDuration-to-date($arg1 as xs:date, $arg2 as xs:dayTimeDuration) as xs:date', 'add-dayTimeDuration-to-time($arg1 as xs:time, $arg2 as xs:dayTimeDuration) as xs:time', 'numeric-unary-plus($arg as numeric) as numeric']);
-op.registerBinaryOp('-',@xqvalueSubtract,70,['numeric-subtract($arg1 as numeric, $arg2 as numeric) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date, $arg2 as xs:date) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time, $arg2 as xs:time) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime, $arg2 as xs:yearMonthDuration) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime, $arg2 as xs:dayTimeDuration) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date, $arg2 as xs:yearMonthDuration) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date, $arg2 as xs:dayTimeDuration) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time, $arg2 as xs:dayTimeDuration) as xs:time', 'numeric-unary-minus($arg as numeric) as numeric']);
+op.registerBinaryOp('+',@xqvalueAdd,70,['numeric-add($arg1 as numeric?, $arg2 as numeric?) as numeric', 'add-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'add-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'add-yearMonthDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'add-dayTimeDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'add-yearMonthDuration-to-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'add-dayTimeDuration-to-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'add-dayTimeDuration-to-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time', {reverted: } '($arg2 as xs:yearMonthDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:yearMonthDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:time?) as xs:time']);
+op.registerBinaryOp('-',@xqvalueSubtract,70,['numeric-subtract($arg1 as numeric?, $arg2 as numeric?) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date?, $arg2 as xs:date?) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time?, $arg2 as xs:time?) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time']);
 
-op.registerBinaryOp('to',@xqvalueTo,60,['to($firstval as xs:integer, $lastval as xs:integer) as xs:integer*']);
+op.registerBinaryOp('to',@xqvalueTo,60,['to($firstval as xs:integer?, $lastval as xs:integer?) as xs:integer*']);
 
-op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,['numeric-equal($arg1 as numeric, $arg2 as numeric) as xs:boolean', 'duration-equal($arg1 as xs:duration, $arg2 as xs:duration) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', 'date-equal($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', 'time-equal($arg1 as xs:time, $arg2 as xs:time) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth, $arg2 as xs:gYearMonth) as xs:boolean', 'gYear-equal($arg1 as xs:gYear, $arg2 as xs:gYear) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay, $arg2 as xs:gMonthDay) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth, $arg2 as xs:gMonth) as xs:boolean', 'gDay-equal($arg1 as xs:gDay, $arg2 as xs:gDay) as xs:boolean', 'QName-equal($arg1 as xs:QName, $arg2 as xs:QName) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary, $value2 as xs:hexBinary) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary, $value2 as xs:base64Binary) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION, $arg2 as xs:NOTATION) as xs:boolean']);
-op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50, ['($arg1 as numeric, $arg2 as numeric) as xs:boolean', '($arg1 as xs:duration, $arg2 as xs:duration) as xs:boolean', '($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', '($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', '($arg1 as xs:time, $arg2 as xs:time) as xs:boolean', '($arg1 as xs:gYearMonth, $arg2 as xs:gYearMonth) as xs:boolean', '($arg1 as xs:gYear, $arg2 as xs:gYear) as xs:boolean', '($arg1 as xs:gMonthDay, $arg2 as xs:gMonthDay) as xs:boolean', '($arg1 as xs:gMonth, $arg2 as xs:gMonth) as xs:boolean', '($arg1 as xs:gDay, $arg2 as xs:gDay) as xs:boolean', '($arg1 as xs:QName, $arg2 as xs:QName) as xs:boolean', '($value1 as xs:hexBinary, $value2 as xs:hexBinary) as xs:boolean', '($value1 as xs:base64Binary, $value2 as xs:base64Binary) as xs:boolean', '($arg1 as xs:NOTATION, $arg2 as xs:NOTATION) as xs:boolean']);
-op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50, ['numeric-less-than($arg1 as numeric, $arg2 as numeric) as xs:boolean', 'yearMonthDuration-less-than($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', 'dayTimeDuration-less-than($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', 'dateTime-less-than($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', 'date-less-than($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', 'time-less-than($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
-op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,['numeric-greater-than($arg1 as numeric, $arg2 as numeric) as xs:boolean', 'yearMonthDuration-greater-than($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', 'dayTimeDuration-greater-than($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', 'dateTime-greater-than($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', 'date-greater-than($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', 'time-greater-than($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
-op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,['($arg1 as numeric, $arg2 as numeric) as xs:boolean', '($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', '($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', '($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', '($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', '($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
-op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,['($arg1 as numeric, $arg2 as numeric) as xs:boolean', '($arg1 as xs:yearMonthDuration, $arg2 as xs:yearMonthDuration) as xs:boolean', '($arg1 as xs:dayTimeDuration, $arg2 as xs:dayTimeDuration) as xs:boolean', '($arg1 as xs:dateTime, $arg2 as xs:dateTime) as xs:boolean', '($arg1 as xs:date, $arg2 as xs:date) as xs:boolean', '($arg1 as xs:time, $arg2 as xs:time) as xs:boolean']);
+op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,['numeric-equal($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', 'duration-equal($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-equal($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-equal($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', 'gYear-equal($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', 'gDay-equal($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', 'QName-equal($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean']);
+op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50, ['($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', '($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', '($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', '($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', '($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', '($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', '($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', '($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', '($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', '($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean']);
+op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50, ['numeric-less-than($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', 'yearMonthDuration-less-than($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', 'dayTimeDuration-less-than($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', 'dateTime-less-than($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-less-than($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-less-than($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean']);
+op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,['numeric-greater-than($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', 'yearMonthDuration-greater-than($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', 'dayTimeDuration-greater-than($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', 'dateTime-greater-than($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-greater-than($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-greater-than($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean']);
+op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,['($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean']);
+op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,['($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean']);
 
 
 
@@ -4866,9 +4877,9 @@ op.registerBinaryOp('<',@xqvalueLessThanGeneric,50,[]);
 op.registerBinaryOp('>',@xqvalueGreaterThanGeneric,50,[]);
 op.registerBinaryOp('<=',@xqvalueLessEqualGeneric,50,[]);
 op.registerBinaryOp('>=',@xqvalueGreaterEqualGeneric,50,[]);
-op.registerBinaryOp('is',@xqvalueSameNode,50,['is-same-node($parameter1 as node(), $parameter2 as node()) as xs:boolean']);
-op.registerBinaryOp('<<',@xqvalueNodeBefore,50,['node-before($parameter1 as node(), $parameter2 as node()) as xs:boolean']);
-op.registerBinaryOp('>>',@xqvalueNodeAfter,50,['node-after($parameter1 as node(), $parameter2 as node()) as xs:boolean']);
+op.registerBinaryOp('is',@xqvalueSameNode,50,['is-same-node($parameter1 as node()?, $parameter2 as node()?) as xs:boolean']);
+op.registerBinaryOp('<<',@xqvalueNodeBefore,50,['node-before($parameter1 as node()?, $parameter2 as node()?) as xs:boolean']);
+op.registerBinaryOp('>>',@xqvalueNodeAfter,50,['node-after($parameter1 as node()?, $parameter2 as node()?) as xs:boolean']);
 
 op.registerBinaryOp('and',@xqvalueAnd,40,[]);
 

@@ -231,7 +231,6 @@ begin
     exit(false);
   if (ClassType = v) or (v = TXQValue_untyped) then result := true
   //else if (v = TXQValue_untypedAtomic) or (v = TXQValue_AnyAtomicType) or (v = TXQValue_AnySimpleType) then result := getSequenceCount = 1
-  //else if v = TXQValueNumericPseudoType then result := canConvertToDecimal(false)
   else if v.InheritsFrom(TXQValueInt65) then result := canConvertToInt65 and TXQValueInt65Class(v).canCreateFromInt65(toInt65)
   else if v.InheritsFrom(TXQValueDecimal) then result :=  canConvertToDecimal(v = TXQValueDecimal) and TXQValueDecimalClass(v).canCreateFromDecimal(toDecimal)
   else if v.InheritsFrom(TXQValueString) then begin
@@ -256,6 +255,10 @@ begin
               or ((self.ClassType = TXQValue_date) and not (v.InheritsFrom(TXQValue_time)))
               or ( (self is TXQValueString) and TXQValueDateTimeClass(v).canCreateFromDateTime(toString))
   else if v.InheritsFrom(TXQValueBoolean) then result := canConvertToBoolean
+  else if v.InheritsFrom(TXQValueNumericPseudoType) then
+    result := (self is TXQValueDecimal) or (self is TXQValueInt65) or ((self is TXQValue_untypedAtomic) and self.canConvertToDecimal(false))
+  else if v.InheritsFrom(TXQValueTrueNumericPseudoType) then
+    result := (self is TXQValueDecimal) or (self is TXQValueInt65)
   else result := false;
 end;
 

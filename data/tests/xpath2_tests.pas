@@ -1839,7 +1839,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('not(double("NaN"))', 'true', '');
   t('subsequence((1,2), 4)', '', '');
   t('string-join((), "...") eq ""', 'true', '');
-  t('tokenize("", "abc") eq ""', 'false', '');
+  t('tokenize("", "abc") eq ""', '', ''); //empty sequence returned by tokenize
   t('/', '12', '!<a>12</a>');
   t('(/) * 3', '36', '');
   t('4 + /', '16', '');

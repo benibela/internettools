@@ -462,7 +462,10 @@ end;
 
 function xqvalueEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
-  result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone)); //contract: always return TXQValueBoolean
+  if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then
+    result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
+  else
+    result := xqvalue();
 end;
 
 function xqvalueUnequalAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -470,7 +473,7 @@ begin
   if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then
     result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
-    result := xqvalueFalse;
+    result := xqvalue;
 end;
 
 procedure xqvalueCompareAtomic(a, b: IXQValue; var result: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimeZone: TDateTime);
@@ -481,7 +484,7 @@ begin
     compres := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone);
     result := xqvalue((compres = accept1) or (compres = accept2) );
   end else
-    result := xqvalueFalse;
+    result := xqvalue();
 end;
 
 function xqvalueLessThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;

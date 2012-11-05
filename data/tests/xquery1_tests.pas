@@ -32,9 +32,8 @@ var
 
   TestErrors: boolean;
 
-  procedure performUnitTest(s1,s2,s3: string);
-  var got: string;
-    rooted: Boolean;
+  function performUnitTest(s1,s2,s3: string): string;
+  var rooted: Boolean;
   begin
     if s3 <> '' then begin
       xml.parseTree(s3);
@@ -46,16 +45,18 @@ var
   //    writeln(s1);
   //    writeln('??');
   //    writeln(ps.debugtermToString(ps.FCurTerm));
-    got := ps.evaluate().toString;
-    if got<>s2 then
-       raise Exception.Create('XQuery Test failed: '+IntToStr(count)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
+    result := ps.evaluate().toString;
   end;
 
   procedure t(a,b: string; c: string = '');
+  var
+    got: String;
   begin
     try
     count+=1;
-    performUnitTest('string-join('+a+', " ")',b,c);
+    got := performUnitTest('string-join('+a+', " ")',b,c);
+    if got<>b then
+      raise Exception.Create('XQuery Test failed: '+IntToStr(count)+ ': '+a+#13#10'got: "'+got+'" expected "'+b+'"');
 
     except on e:exception do begin
       writeln('Error @ "',a, '"');
@@ -75,6 +76,8 @@ var
 
     except on e: EXQEvaluationException do begin
       err := true;
+    end; on e: EXQParsingException do begin
+      err := true;
     end end;
     if not err then raise Exception.Create('No error => Test failed ');
   end;
@@ -82,10 +85,14 @@ var
 
 
   procedure m(a,b: string; c: string = ''); //main module
+  var
+    got: String;
   begin
     try
     count+=1;
-    performUnitTest(a,b,c);
+    got := performUnitTest(a,b,c);
+    if got<>b then
+     raise Exception.Create('XQuery Test failed: '+IntToStr(count)+ ': '+a+#13#10'got: "'+got+'" expected "'+b+'"');
 
     except on e:exception do begin
       writeln('Error @ "',a, '"');
@@ -1486,12 +1493,14 @@ begin
 
 
   TestErrors := false;
+  //TestErrors := true;
 
+  m('"1" + 2', '3');
   ps.StaticContext.strictTypeChecking:=true;
   m('string-join(("1", "2", "3"), " ")', '1 2 3');
   f('string-join(1 to 3, " ")', '');
   m('"17" instance of xs:anyAtomicType', 'true');
-  f('text {"17"} castable as xs:anyAtomicType', 'true'); //would work, but that type is not castable-to
+  //f('text {"17"} castable as xs:anyAtomicType'); //would work, but that type is not castable-to
   m('number("17")', '17');
   m('number(text {"17"} )', '17');
   m('number(comment {"17"} )', '17');
@@ -1502,6 +1511,39 @@ begin
   f('456 castable as xs:integer+');
   m('<e/>[1]/text{string-join(., " ")}', '');
   m('count(<a>X</a> union <b>Y</b>)', '2');
+  f('"1" + 2');
+  m('1 + 2', '3');
+  m('untypedAtomic("1") + 2', '3');
+  f('untypedAtomic("1a") + 2');
+  m('text {"1"} + 2', '3');
+  f('comment {"1"} + 2');
+  m('- 2', '-2');
+  f('- "2"');
+  m('- xs:untypedAtomic("2")', '-2');
+
+  m('1 eq 2', 'false');
+  m('1 eq 1.0', 'true');
+  f('"1" eq 2');
+  m('true() eq true()', 'true');
+  m('untypedAtomic("2") eq "2"', 'true');
+  f('untypedAtomic("2") eq 2');
+  m('untypedAtomic("2") = "2"', 'true');
+  {f('"1" = 2');
+  f('(1, 2, 3) = 2');} //TODO
+  m('xs:untypedAtomic("2") = 2', 'true');
+  m('xs:untypedAtomic("2") = "2"', 'true');
+  m('(1, 2, 3) = 2', 'true');
+  m('(1, 2, 3) != 2', 'true');
+  m('xs:yearMonthDuration("P3Y36M") * 3', 'P18Y');
+  m('3 * xs:yearMonthDuration("P3Y36M")', 'P18Y');
+  m('<a/> eq ()', '');
+  m('() eq 17', '');
+  m('<a/> is ()', '');
+  m('() div ()', '');
+  m('() mod ()', '');
+  m('() + ()', '');
+  m('() - ()', '');
+
 
 
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html return local-name($i)', 'html');
