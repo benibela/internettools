@@ -55,6 +55,17 @@ begin
   Writeln('Use CSS Selectors:');
   writeln('  ', process('<html><div class="foobar">something</div></html>', 'css(".foobar")').toString);
 
+  WriteLn();
+
+  WriteLn('Use XQuery to find all primes below 30:');
+  for v in process('',
+    'xquery version "1.0";'                                +
+    'declare function local:isprime($p){'                  +
+    '  every $i in 2 to $p - 1 satisfies ($p mod $i != 0)' +
+    '};'                                                   +
+    'for $i in 2 to 30 where local:isprime($i) return $i') do
+    writeln(v.toString);
+
   writeln;  writeln;  writeln;  writeln;  writeln;
 end.
 
