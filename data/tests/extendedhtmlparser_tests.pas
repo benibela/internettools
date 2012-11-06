@@ -942,6 +942,7 @@ begin
   q('declare function x(){17}; match(<a id="{x()}">{{.}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', 'B');
   q('declare function x(){17}; match(<a id="{x()}">{{concat(., x())}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', 'B17');
   q('declare function x($arg){concat(17, $arg)}; match(<a id="{x("")}">{{x(.)}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', '17B');
+  q('declare variable $v := 1000; declare function x($arg){concat(17, $arg)}; match(<a id="{x("")}">{{concat(x(.), $v)}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', '17B1000');
 
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := concat(., $abc, .)}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=XXX123XXX');
