@@ -616,7 +616,7 @@ type
   //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
   TXQValueObject = class (TXQValue)
     values: TXQVariableChangeLog;
-    prototype: TXQValueObject;
+    prototype: IXQValue;
 
     constructor create(); reintroduce; virtual;
     constructor createTakingVariableLog(log: TXQVariableChangeLog);

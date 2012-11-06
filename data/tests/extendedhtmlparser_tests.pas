@@ -936,6 +936,8 @@ begin
   q('string-join(for $i in match(<a>{{.}}</a>, (<a>x</a>, <a>y</a>, <a>z</a>)) return $i, " ")', 'x y z');
   q('string-join(for $i in match(<a>{{$t := .}}</a>, (<a>x</a>, <a>y</a>, <a>z</a>)) return $i.t, " ")', 'x y z');
 
+  q('count(match(<r><a>{{obj := object(), obj.name := text(), obj.url := @href}}</a>*</r>, <r><a href="x">1</a><a href="y">2</a><a href="z">3</a></r>).obj)', '3');
+  q('string-join(for $i in match(<r><a>{{obj := object(), obj.name := text(), obj.url := @href}}</a>*</r>, <r><a href="x">1</a><a href="y">2</a><a href="z">3</a></r>).obj return concat($i.name, ":",$i.url), " ")', '1:x 2:y 3:z');
 
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := concat(., $abc, .)}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=XXX123XXX');

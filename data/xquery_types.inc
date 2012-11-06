@@ -1507,7 +1507,7 @@ begin
     i := values.indexOf(part);
     if i < 0 then begin
       if prototype = nil then raise EXQEvaluationException.Create('Couldn''t find sub object:  ' + name);
-      exit(prototype.hasProperty(part, value));
+      exit((prototype as TXQValueObject).hasProperty(part, value));
     end;
     if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('Expected object:  ' + name+ ' got '+values.get(i).toString);
     exit((values.get(i) as TXQValueObject).hasProperty(strCopyFrom(name, point + 1), value));
@@ -1520,7 +1520,7 @@ begin
   end;
   result := prototype <> nil;
   if not result then exit;
-  result := prototype.hasProperty(name, value);
+  result := (prototype as TXQValueObject).hasProperty(name, value);
 end;
 
 function TXQValueObject.clone: IXQValue;
