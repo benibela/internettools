@@ -159,7 +159,7 @@ procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
 //I: case insensitive
 
 type
-  TEncoding=(eUnknown,eWindows1252,eUTF8,eUTF16BE,eUTF16LE,eUTF32BE,eUTF32LE);
+  TEncoding=(eUnknown,eWindows1252,eUTF8,eUTF16BE,eUTF16LE,eUTF32BE,eUTF32LE,eUnknownUser1);
 
 //copy
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
