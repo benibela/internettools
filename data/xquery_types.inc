@@ -1617,8 +1617,22 @@ begin
   Result:=false;
 end;
 
+function TXQValueFunction.directClone: TXQValue;
+var
+  f: TXQValueFunction;
+begin
+  f := TXQValueFunction.create(body);
+  f.name := name;
+  f.namespace := namespace;
+  f.parameters := parameters;
+  SetLength(f.parameters, length(f.parameters));
+  f.resulttype := resulttype;
+  f.context := context;
+  result := f;
+end;
+
 function TXQValueFunction.clone: IXQValue;
 begin
-  result := TXQValueFunction.create(body);
+  result := directClone;
 end;
 

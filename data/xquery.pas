@@ -667,6 +667,7 @@ type
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
 
+    function directClone: TXQValue;
     function clone: IXQValue; override;
   end;
 
@@ -1520,6 +1521,7 @@ type
 
     function debugTextRepresentation: string; //**< Dump of the log as list of name=value pairs
 
+    function clone: TXQVariableChangeLog;
     function finalValues: TXQVariableChangeLog; //**< Remove all duplicates, so that only the last version of each variable remains
     procedure takeFrom(other: TXQVariableChangeLog); //**< Adds all variables from other to self, and clears other
     function condensed: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
@@ -2130,9 +2132,16 @@ begin
   Result := TXQStaticContext.Create;
   result.sender := sender;
   result.stripboundaryspace := stripboundaryspace;
-  result.modulevariables := modulevariables;
-  result.namespaces := namespaces;
+  if modulevariables <> nil then result.modulevariables := modulevariables.clone;
+  if namespaces <> nil then result.namespaces := namespaces.clone;
   result.functions := functions;
+  if length(result.functions) > 0 then begin
+    setlength(result.functions, length(result.functions));
+    for i:= 0 to high(result.functions) do begin
+      result.functions[i] := result.functions[i].directClone as TXQValueFunction;
+      result.functions[i].context.staticContext := result;
+    end;
+  end;
   result.importedmodules := importedmodules;
   if result.importedModules <> nil then begin
     result.importedModules := TStringList.Create;
@@ -3227,6 +3236,13 @@ begin
   result:=getName(0)+'='+get(0).toString;
   for i:=1 to high(vars) do
     result+=LineEnding+getName(i)+'='+get(i).toString;
+end;
+
+function TXQVariableChangeLog.clone: TXQVariableChangeLog;
+begin
+  result := TXQVariableChangeLog.create();
+  result.vars := vars;
+  setlength(result.vars, length(result.vars)); //detach
 end;
 
 function TXQVariableChangeLog.finalValues: TXQVariableChangeLog;
