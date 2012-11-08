@@ -11,7 +11,7 @@ type
 
 { TTreeParserDOM }
 
- TTreeParserDOM = class(TTreeParser)
+TTreeParserDOM = class(TTreeParser)
   function import(dom: TDOMDocument): TTreeDocument;
   function parseDOM(const document: String; const uri: string = ''): TTreeDocument;
   function parseDOMFromFile(const filename: string): TTreeDocument;
@@ -118,6 +118,7 @@ begin
   result.baseURI:=uri;
   result.documentURI:=uri;
   stringStream.Free;
+  temp.Free;
 end;
 
 function TTreeParserDOM.parseDOMFromFile(const filename: string): TTreeDocument;
@@ -126,6 +127,7 @@ var
 begin
   ReadXMLFile(temp, filename);
   result := import(temp);
+  temp.Free;
 end;
 
 end.
