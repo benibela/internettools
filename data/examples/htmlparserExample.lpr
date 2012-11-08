@@ -1,6 +1,6 @@
 program htmlparserExample;
 
-uses heaptrc, Interfaces, simpleinternet;
+uses heaptrc,  simpleinternet;
 
 var v: IXQValue;
 begin

@@ -31,7 +31,7 @@ interface
 {$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
 
 uses
-  Classes, SysUtils, internetAccess,Dialogs,
+  Classes, SysUtils, internetAccess,
   httpsend,  //this is the synapse http unit (from http://www.ararat.cz/synapse/doku.php/download)
   blcksock,
   ssl_openssl //needed for https

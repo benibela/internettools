@@ -1,5 +1,5 @@
 {**
-  @abstract(This units contains a XPath 2 / XQuery interpreter)
+  @abstract(This unit contains a XPath 2 / XQuery interpreter)
 
   The most important class is TXQueryEngine, which implements it, and IXQValue, which is the variant used to store the results.
 
