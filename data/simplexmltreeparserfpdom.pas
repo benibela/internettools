@@ -1,4 +1,29 @@
+{**
+  @abstract(This unit provides a wrapper around the standard fpc dom unit)
+
+  see TTreeParserDOM
+*}
 unit simplexmltreeparserfpdom;
+
+{
+Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+                          benito@benibela.de
+                          www.benibela.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+}
 
 {$mode objfpc}{$H+}
 
@@ -11,9 +36,15 @@ type
 
 { TTreeParserDOM }
 
+{** This class provides wrapper methods around the standard fpc DOM functions,
+    to convert the TDOMDocument class created by fpc to the TTreeDocument class used by the XQuery engine.
+*}
 TTreeParserDOM = class(TTreeParser)
+  //** Create a tree document from a standard fpc dom document
   function import(dom: TDOMDocument): TTreeDocument;
+  //** Reads a tree document from a string, using the standard fpc dom functions to parse it
   function parseDOM(const document: String; const uri: string = ''): TTreeDocument;
+  //** Loads a tree document from a file, using the standard fpc dom functions to parse it
   function parseDOMFromFile(const filename: string): TTreeDocument;
 end;
 
