@@ -974,6 +974,7 @@ var
   temp: TXQValue;
   sc: TXQStaticContext;
   ns: INamespace;
+  found: boolean;
 begin
   ns := namespace;
   if context.temporaryVariables <> nil then begin
@@ -992,11 +993,18 @@ begin
       else result := temp;
       exit();
     end;
+    if ns <> nil then
+      raiseEvaluationError('XPST0008', 'Variable '+value+' not found in module '+ns.getURL);
   end;
   if value = '$' then result := xqvalue('$') //default $$; as $
   else if value = 'line-ending' then result := xqvalue(LineEnding) //default $line-ending; as #13#10
   else result := xqvalue();
-  if assigned(context.staticContext.sender.OnEvaluateVariable) then context.staticContext.sender.OnEvaluateVariable(self, value, result );
+  if assigned(context.staticContext.sender.OnEvaluateVariable) then
+    found := context.staticContext.sender.OnEvaluateVariable(self, value, result )
+   else
+    found := false;
+  if result.isUndefined and not found then
+    raiseEvaluationError('XPST0008', 'Variable '+value+' not found');
 end;
 
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;

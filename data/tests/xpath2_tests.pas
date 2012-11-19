@@ -8,14 +8,15 @@ uses
   Classes, SysUtils;
 
 
-procedure unittests;
+procedure unittests(TestErrors:boolean);
+
 
 implementation
 
 uses xquery, simplehtmltreeparser, bbutils;
 
 
-procedure unittests;
+procedure unittests(TestErrors:boolean);
 var
   i: Integer;
   ps: TXQueryEngine;
@@ -55,6 +56,23 @@ var
     end end;
   end;
 
+  procedure f(a: string; c: string = '');
+   var
+     err: Boolean;
+   begin
+     if not TestErrors then exit;
+     err := false;
+     try
+     performUnitTest(a,'',c);
+
+     except on e: EXQEvaluationException do begin
+       err := true;
+     end; on e: EXQParsingException do begin
+       err := true;
+     end end;
+     if not err then raise Exception.Create('No error => Test failed ');
+   end;
+
 //var  time: TDateTime;
 var vars: TXQVariableChangeLog;
 begin
@@ -90,17 +108,21 @@ begin
   t('"$$;"',                   '$',                            '');
   t('">$$;<"',                 '>$<',                          '');
   t('">$$;<"',                 '>$<',                          '');
-  t('">$unknown;<"',           '><',                           '');
-  t('"$test;>$unknown;<"',     'tset><',                       '');
-  t('"$test;$unknown;$abc;"',  'tsetalphabet',                 '');
- // t('$abc;',                     'alphabet',                     '');
+
+  f('">$unknown;<"');
+  f('"$test;>$unknown;<"');
+  f('"$test;$unknown;$abc;"');
+
+  // t('$abc;',                     'alphabet',                     '');
   t('$abc',                     'alphabet',                     '');
- // t('$ABC;',                     '',                           ''); //case sensitive
-  t('$ABC',                     '',                            '');
+
+  f('$ABC;');
+  f('$ABC');
+  f('"$ABC;"');
+
   t('concat(">",$abc,''<'')',  '>alphabet<',                     '');
   t('''$abc;''',                   '$abc;',                        ''); //no variable matching in '
   t('"$abc;"',                   'alphabet',                        ''); //variable matching in "
-  t('"$ABC;"',                   '',                        '');
   t('"&quot;"',                   '&quot;',                        '');
   t('''&quot;''',                 '&quot;',                        '');
   t('"x&quot;y"',                   'x&quot;y',                        '');
@@ -1326,7 +1348,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
                //Variable defining
   t('x := 123', '123', '');
   t('$x', '123', '');
-  t('$X', '', '');
+  f('$X'); //fail test
   t('X := 456', '456', '');
   t('$x', '123', '');
   t('$X', '456', '');
@@ -2629,13 +2651,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
 
   performUnitTest('$abc','alphabet','');
-  performUnitTest('$ABC','','');
+  f('$ABC');
   vars.caseSensitive:=false;
   performUnitTest('$abc','alphabet','');
   performUnitTest('$ABC','alphabet','');
   vars.caseSensitive:=true;
   performUnitTest('$abc','alphabet','');
-  performUnitTest('$ABC','','');
+  f('$ABC');
 
 
   xml.parseTree('<?xml encoding="utf-8"?><html/>'); if xml.getLastTree.getEncoding <> eUTF8 then raise Exception.Create('xml encoding detection failed 1');

@@ -12,11 +12,13 @@ uses
 
 var
   start: TDateTime;
+  testerrors: boolean;
 begin
   start := now;
   bbutils_tests.unitTests;
-  xpath2_tests.unittests;
-  xquery1_tests.unittests;
+  testerrors := false; //disabled since they cause memory leaks, and drive the lazarus debugger mad
+  xpath2_tests.unittests(testerrors);
+  xquery1_tests.unittests(testerrors);
   extendedhtmlparser_tests.unitTests();
   writeln('OK  (time: ', (now-start)*24*60*60*1000:5:5,')');
 end.

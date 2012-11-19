@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, xquery, simplehtmltreeparser;
 
 //test for xquery 1 expressions that are not also xpath 2 expressions, or are listed in the XQuery standard
-procedure unittests;
+procedure unittests(testerrors: boolean);
 
 implementation
 
@@ -26,13 +26,11 @@ type
   procedure ImportModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
-procedure unittests;
+procedure unittests(testerrors: boolean);
 var
   count: integer;
   ps: TXQueryEngine;
   xml: TTreeParser;
-
-  TestErrors: boolean;
 
   function performUnitTest(s1,s2,s3: string): string;
   var rooted: Boolean;
@@ -567,7 +565,7 @@ begin
   m('import module namespace rename = "pseudo://test-module"; $rename:var', '123');
   m('import module namespace rename = "pseudo://test-module"; rename:func()', '456');
   m('import module namespace rename = "pseudo://test-module"; rename:internalref()', '123:456');
-  m('import module namespace rename = "pseudo://test-module"; $test:var', ''); //or raise error?
+  f('import module namespace rename = "pseudo://test-module"; $test:var');
 
   mr('module namespace test2 = "pseudo://test-module2"; import module "pseudo://test-module"; declare function test2:sumcalc($param){ concat("SUM: ", sum($param)) } declare function test2:wrapwrap() { test:internalref() } ');
   m('import module "pseudo://test-module2"; test2:sumcalc((1,2,3))', 'SUM: 6');
@@ -606,8 +604,8 @@ begin
   m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'true');
   m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,3) satisfies $xsy:abc mod 2 = 0', 'false');
 
-  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $abc mod 2 = 0', 'false'); //undefined variable becomes (). Raise error?
-  m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'false');
+  f('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $abc mod 2 = 0');
+  f('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $abc in (1,2,3) satisfies $xsy:abc mod 2 = 0');
 
   m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; "abc" eq "ABC"', 'true');
   m('declare default collation "http://www.benibela.de/2012/pxp/case-sensitive-clever"; "abc" eq "ABC"', 'false');
@@ -1499,8 +1497,6 @@ begin
 
 
 
-  TestErrors := false;
-  //TestErrors := true; disabled at default, since these test cause memory leaks
 
   m('"1" + 2', '3');
   ps.StaticContext.strictTypeChecking:=true;

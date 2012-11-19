@@ -708,21 +708,21 @@ type
   end;
 
   (***
-    @abstract(Event call back that is called to receive the value of the variable @code(variable)).
+    @abstract(Event callback that is called to receive the value of the variable @code(variable)). Should return true, if the value was changed. (returning false will cause an unknown variable exceptiono)
   *)
-  TXQEvaluateVariableEvent = procedure (sender: TObject; const variable: string; var value: IXQValue) of object;
+  TXQEvaluateVariableEvent = function (sender: TObject; const variable: string; var value: IXQValue): boolean of object;
   (***
-    @abstract(Event call back that is called to set the @code(value) of the variable @code(variable)).
+    @abstract(Event callback that is called to set the @code(value) of the variable @code(variable)).
   *)
   TXQDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
   (***
-    @abstract(Event call back that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
+    @abstract(Event callback that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
 
     The return value can be created with one of the xqvalue(..) functions.
   *)
   TXQDeclareExternalVariableEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue) of object;
   (***
-  @abstract(Event call back that is called to set a function @code(value) of a XQuery function declared as "declare function ... external").
+  @abstract(Event callback that is called to set a function @code(value) of a XQuery function declared as "declare function ... external").
 
   The function in @code(result) has already been initialized with the parameters and result type, only the term in @code(result.body) has to be set.@br
   You can either create an syntax tree for the function with the respective TXQTerm classes or derive a class from TXQTerm and override the evaluate function to calculate it natively.
@@ -1540,7 +1540,7 @@ type
     function condensed: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
     function collected: TXQVariableChangeLog; //**< Collects multiple assignments to single sequence assignment. (i.e. @code(a := 123, a := 456, a := 789) collected is equivalent to @code(a := (123, 456, 789))) (creates a new variable log that has to be freed)
 
-    procedure evaluateVariable(sender: TObject; const variable: string; var value: IXQValue); //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
+    function evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean; //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
     procedure defineVariable(sender: TObject; const variable: string; const value: IXQValue); //**< Sets @code(variable) to the @code(value)@br This is used as callback by the XQuery-Engine
   private
     shared: boolean;
@@ -3157,13 +3157,15 @@ begin
   exit(-1);
 end;
 
-procedure TXQVariableChangeLog.evaluateVariable(sender: TObject; const variable: string; var value: IXQValue);
+function TXQVariableChangeLog.evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
 var
   temp: TXQValue;
 begin
   ignore(sender);
-  if not hasVariable(variable, @temp) then exit;
-  value := temp;
+  temp := nil;
+  if not hasVariableOrObject(variable, @temp) then exit(false);
+  if temp <> nil then value := temp;
+  result := true;
 end;
 
 procedure TXQVariableChangeLog.defineVariable(sender: TObject; const variable: string; const value: IXQValue);

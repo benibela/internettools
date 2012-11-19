@@ -406,7 +406,7 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    procedure evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue);
+    function evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
@@ -729,14 +729,15 @@ begin
   result := FVariables;
 end;
 
-procedure THtmlTemplateParser.evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue);
+function THtmlTemplateParser.evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
 var
   temp: TXQValue;
 begin
   ignore(sender);
   if not FVariableLog.hasVariable(variable, @temp) then
-    if not FOldVariableLog.hasVariable(variable, @temp) then exit;
+    if not FOldVariableLog.hasVariable(variable, @temp) then exit(false);
   value := temp;
+  result := true;
 end;
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeNode;
