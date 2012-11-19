@@ -128,7 +128,7 @@ begin
   if t < f then exit(xqvalue);
   if t = f then exit(typ.create(f));
   len := t - f + 1;
-  if len > MaxInt then raise EXQEvaluationException.Create('Too large to operation ');
+  if len > MaxInt then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
   resseqseq := resseq.seq;
   resseqseq.setCount(len);
@@ -377,7 +377,7 @@ begin
         if qnameEqual(TXQValue_QName(a).str, TXQValue_QName(b).str) then exit(0)
         else exit(-2);
       end;
-      raise EXQEvaluationException.Create('QName compared');
+      raise EXQEvaluationException.Create('XPTY0004', 'QName compared');
     end else if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
       if ak = pvkDateTime then begin
         tempDateTime := TXQValueDateTimeClass(a.ClassType).create(b.toString);
@@ -581,7 +581,7 @@ function xqvalueContextNode(const context: TXQEvaluationContext): TTreeNode;
 begin
   if context.ParentElement <> nil then exit(context.ParentElement);
   if context.RootElement <> nil then exit(context.RootElement);
-  if context.staticContext.sender = nil then raise EXQEvaluationException.Create('Context sender is nil');
+  if context.staticContext.sender = nil then raise EXQEvaluationException.Create('XPTY0020', 'Context sender is nil');
   if context.staticContext.sender.ParentElement <> nil then exit(context.staticContext.sender.ParentElement);
   if context.staticContext.sender.RootElement <> nil then exit(context.staticContext.sender.RootElement);
   result := nil;
@@ -594,7 +594,7 @@ begin
   k := v.kind;
   if k = pvkNode then exit(v.toNode)
   else if (k = pvkSequence) and (v.getSequenceCount=1) and ((v as TXQValueSequence).seq[0].kind = pvkNode) then exit((v as TXQValueSequence).seq[0].toNode)
-  else raise EXQEvaluationException.Create('Expected node, got: '+v.debugAsStringWithTypeAnnotation());
+  else raise EXQEvaluationException.Create('XPTY0020', 'Expected node, got: '+v.debugAsStringWithTypeAnnotation());
 end;
 
 function xqvalueSameNode(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -641,12 +641,12 @@ begin
     pvkUndefined: result:=TXQValueSequence.create(0);
     pvkNode:
       if v.toNode <> nil then result := TXQValueSequence.create(v)
-      else raise EXQEvaluationException.Create('nil node');
+      else raise EXQEvaluationException.Create('pxp:INTERNAL', 'nil node');
     pvkSequence: begin
       result := TXQValueSequence.create(v.getSequenceCount);
       for x in v do begin
         if (x.kind <> pvkNode) or (x.toNode = nil) then
-          raise EXQEvaluationException.Create('invalid node');
+          raise EXQEvaluationException.Create('XPTY0004', 'invalid node');
         result.addChild(x);
       end;
       result.seq.sortInDocumentOrderUnchecked;
@@ -654,7 +654,7 @@ begin
         if result.seq[i].toNode = result.seq[i-1].toNode then
           result.seq.Delete(i);
     end;
-    else raise EXQEvaluationException.Create('expected node lists');
+    else raise EXQEvaluationException.Create('XPTY0004', 'expected node lists');
   end;
 end;
 
@@ -663,7 +663,7 @@ var a, b: TXQValueSequence;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
-    raise EXQEvaluationException.Create('invalid type for union');
+    raise EXQEvaluationException.Create('XPTY0004', 'invalid type for union');
   a := xqvalueToNormalizedNodeSeq(ta); //todo: optimize
   b := xqvalueToNormalizedNodeSeq(tb);
   a.addChildMerging(b);
@@ -678,7 +678,7 @@ var a,b, resseq: TXQValueSequence;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
-    raise EXQEvaluationException.Create('invalid type for intersect');
+    raise EXQEvaluationException.Create('XPTY0004', 'invalid type for intersect');
   ah := xqvalueToNormalizedNodeSeq(ta);
   bh := xqvalueToNormalizedNodeSeq(tb);
   if (ah.getSequenceCount = 0) or (bh.getSequenceCount=0) then
@@ -703,7 +703,7 @@ end;
 function getTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 begin
   if not (wrapper is TXQValueFunction) or not ((wrapper as TXQValueFunction).body is TXQTermSequenceType) then
-    raise EXQEvaluationException.Create('Expected type, got: '+wrapper.toString);
+    raise EXQEvaluationException.Create('XPTY0004', 'Expected type, got: '+wrapper.toString);
   result := TXQTermSequenceType((wrapper as TXQValueFunction).body);
 end;
 
@@ -730,7 +730,7 @@ function xqvalueTreatAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue)
 begin
   result := ta;
   if not getTypeInfo(tb).instanceOf(result, cxt) then
-    raise EXQEvaluationException.Create('treat as type not matched');
+    raise EXQEvaluationException.Create('XPTY0004', 'treat as type not matched');
 end;
 
 function xqvalueExcept(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -742,7 +742,7 @@ var ah,bh: IXQValue;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
-    raise EXQEvaluationException.Create('invalid type for intersect');
+    raise EXQEvaluationException.Create('XPTY0004', 'invalid type for intersect');
   ah := xqvalueToNormalizedNodeSeq(ta);
   bh := xqvalueToNormalizedNodeSeq(tb);
   if (ah.getSequenceCount = 0) or (bh.getSequenceCount=0) then
@@ -774,14 +774,20 @@ end;
 
 
 function xqFunctionError(const args: TXQVArray): IXQValue;
-var temp: string;
- i: Integer;
+var code: TStringArray;
 begin
-  temp:='';
-  for i:=0 to min(2, high(args)) do
-    temp += args[i].toString;
-  if i > 3 then temp += '(additional error arguments ignored)';
-  raise EXQEvaluationException.Create(temp);
+  if length(args) = 0 then
+    raise EXQEvaluationException.create('FOER0000', 'error function called'); //that's not an error, that's what the function does...
+
+  if args[0].isUndefined then code := qnameSplit('http://www.w3.org/2005/xqt-errors'#2'err:FOER0000')
+  else if args[0] is TXQValue_QName then code := qnameSplit((args[0] as TXQValue_QName).str)
+  else raise EXQEvaluationException.create('XPTY0004', 'expected QName');
+
+  if length(args) = 1 then
+    raise EXQEvaluationException.create(code[2], 'error function called', TNamespace.create(code[0], code[1]));
+  if length(args) = 2 then
+    raise EXQEvaluationException.create(code[2], args[1].toString, TNamespace.create(code[0], code[1]));
+  raise EXQEvaluationException.create(code[2], args[1].toString+':'+LineEnding+args[2].debugAsStringWithTypeAnnotation(), TNamespace.create(code[0], code[1]));
   result := xqvalue();
 end;
 
@@ -806,7 +812,8 @@ begin
   end;
   if v is TXQValueUndefined then exit(v);
   if v is TXQValue_AnyAtomicType then exit(v);
-  if not (v is TXQValueNode) then raise EXQEvaluationException.Create('Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
+  if not (v is TXQValueNode) then
+    raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
   case v.toNode.typ of
     tetOpen, tetDocument: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
     tetClose: result := xqvalue();
@@ -814,7 +821,7 @@ begin
     tetComment: result := TXQValueString.create(v.tonode.value);
     tetAttribute: result := TXQValue_untypedAtomic.create(TTreeAttribute(v.tonode).realvalue);
     tetProcessingInstruction: result := xqvalue(v.tonode.getAttribute(''));
-    else raise EXQEvaluationException.Create('Impossible node type');
+    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
   end;
 end;
 
@@ -845,7 +852,7 @@ end;
 
 function xqvalueBaseDecimalType(v: TXQ_Decimal; const typeref: IXQValue): IXQValue;
 begin
-  if typeref.kind <> pvkDecimal then raise EXQEvaluationException.Create('Expected decimal numeric type');
+  if typeref.kind <> pvkDecimal then raise EXQEvaluationException.Create('XPTY0004', 'Expected decimal numeric type');
   result := TXQValueDecimalClass(typeref.getClassType).create(v); //this assumes there are no user defined float/double/decimal types!
 end;
 
@@ -1539,7 +1546,7 @@ end;
 function xqFunctionGet_Property(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 2);
-  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.Create('Expected object');
+  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object');
   result := args[0].getProperty(args[1].toString);
 end;
 
@@ -1596,7 +1603,7 @@ begin
 
   if args[0].isUndefined or args[1].isUndefined then exit(xqvalue);
   if not (args[0] is TXQValue_Date) or not (args[1] is TXQValue_Time) then
-    raise EXQEvaluationException.Create('Invalid parameters for date time constructor: '+args[0].toString+','+args[1].toString);
+    raise EXQEvaluationException.Create('XPTY0004', 'Invalid parameters for date time constructor: '+args[0].toString+','+args[1].toString);
   //todo: error when timezones differ
   dt0 := args[0] as TXQValueDateTime;
   dt1 := args[1] as TXQValueDateTime;
@@ -1607,7 +1614,7 @@ begin
   resdt.value.secfraction := dt1.value.secfraction;
   if IsNan(dt0.value.timezone) then resdt.value.timezone := dt1.value.timezone
   else if IsNan(dt1.value.timezone) then resdt.value.timezone := dt0.value.timezone
-  else if dt0.value.timezone <> dt1.value.timezone then raise EXQEvaluationException.Create('Different timezones in: ' + args[0].toString + ' <> ' + args[1].toString);
+  else if dt0.value.timezone <> dt1.value.timezone then raise EXQEvaluationException.Create('FORG0008','Different timezones in: ' + args[0].toString + ' <> ' + args[1].toString);
   result := resdt;
 end;
 
@@ -1620,7 +1627,7 @@ function xqFunctionYear_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('Expected duration, got: ' + args[0].toString);
+  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() div 12);
 end;
 
@@ -1628,7 +1635,7 @@ function xqFunctionMonth_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('Expected duration, got: ' + args[0].toString);
+  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() mod 12);
 end;
 
@@ -1638,7 +1645,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('Expected duration time, got: ' + args[0].toString);
+  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration time, got: ' + args[0].toString);
   tempValue := (args[0] as TXQValue_duration).value;
   TXQValue_duration.setDayTime(tempValue, (args[0] as TXQValue_duration).toDayTime());
   if v <> 6 then result := xqvalue(tempValue.values[v])
@@ -1674,13 +1681,13 @@ begin
   if length(args) = 2 then begin
     if args[1].isUndefined then tz := getNaN
     else begin
-      if not (args[1] is TXQValue_duration) then raise EXQEvaluationException.Create('Expected duration, got: '+args[1].toString + ', when conerting '+args[0].toString);
+      if not (args[1] is TXQValue_duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: '+args[1].toString + ', when conerting '+args[0].toString);
       tz := (args[1] as TXQValue_duration).toDayTime() / SecsPerDay;
     end;
   end else tz := context.staticContext.sender.implicitTimezone;
 
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('Expected datetime, got: '+args[0].toString);
+  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('XPTY0004', 'Expected datetime, got: '+args[0].toString);
 
   if (IsNan(tz) and isnan((args[0] as TXQValueDateTime).value.timezone)) then exit(args[0]);
   resdt := TXQValueDateTimeClass(args[0].getClassType).create((args[0] as TXQValueDateTime).value);
@@ -1804,7 +1811,7 @@ begin
   requiredArgCount(args,1, 2);
   if length(args) = 2 then node := args[1].toNode
   else node := xqvalueContextNode(context);
-  if node = nil then raise EXQEvaluationException.Create('No context item node');
+  if node = nil then raise EXQEvaluationException.Create('XPDY0002', 'No context item node');
 
 
   testlang := lowercase(args[0].toString);
@@ -1844,7 +1851,7 @@ begin
   if length(args) = 1 then
     exit(TXQValue_QName.create(args[0].toString));
   if args[0].isUndefined or (args[0].toString = '') then begin
-    if pos(':', args[1].toString) > 0 then raise EXQEvaluationException.Create('Need namespace uri for '+args[1].toString);
+    if pos(':', args[1].toString) > 0 then raise EXQEvaluationException.Create('FOCA0002', 'Need namespace uri for '+args[1].toString);
     result := TXQValue_QName.create(args[1].toString);
   end else result := TXQValue_QName.create(args[0].toString+#2+args[1].toString)
 end;
@@ -1855,7 +1862,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('Expected QName, got: '+args[0].toString);
+  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
   splitted := qnameSplit((args[0] as TXQValueString).str);
   if splitted[1] = '' then exit(xqvalue);
   result := TXQValue_NCName.create(splitted[1]);
@@ -1867,7 +1874,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('Expected QName, got: '+args[0].toString);
+  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
   splitted := qnameSplit((args[0] as TXQValueString).str);
   result := TXQValue_NCName.create(splitted[2]);
 end;
@@ -1878,7 +1885,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('Expected QName, got: '+args[0].toString);
+  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
   splitted := qnameSplit((args[0] as TXQValueString).str);
   result := TXQValue_anyURI.create(splitted[0]);
 end;
@@ -1961,7 +1968,7 @@ begin
   if args[0].isUndefined then exit(xqvalue);
   rel := args[0].toString;
   if strIsAbsoluteURI(rel) then exit(xqvalue(rel));
-  if not strIsAbsoluteURI(base) then raise EXQEvaluationException.Create('Need absolute url to resolve relative url');
+  if not strIsAbsoluteURI(base) then raise EXQEvaluationException.Create('FORG0009', 'Need absolute url to resolve relative url');
   result := xqvalue(strResolveURI(rel, base));
 end;
 
@@ -2002,10 +2009,10 @@ begin
   url := args[0].toString;
   if url = '' then exit(xqvalue);
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
-  if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('Invalid url: '+url);
+  if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('FODC0005', 'Invalid url: '+url);
 
   node := xqvalueContextNode(context);
-  if node = nil then raise EXQEvaluationException.Create('Need  a loaded document to load a new one');
+  if node = nil then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Need  a loaded document to load a new one');
 
   if context.staticContext.sender.FExternalDocuments = nil then context.staticContext.sender.FExternalDocuments := TStringList.Create;
 
@@ -2015,18 +2022,18 @@ begin
   url := resolveDocURI(url, context);
 
   if not strContains(url, '://') then begin
-    if not FileExists(url) then raise EXQEvaluationException.Create('Failed to find document: ' + url);
+    if not FileExists(url) then raise EXQEvaluationException.Create('FODC0002', 'Failed to find document: ' + url);
     node := node.getDocument().getCreator.parseTreeFromFile(url)
   end else begin
     if context.staticContext.sender.FInternet = nil then begin
       if defaultInternetAccessClass = nil then
-        raise EXQEvaluationException.Create('To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
+        raise EXQEvaluationException.Create('pxp:INTERNAL', 'To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
       context.staticContext.sender.FInternet := defaultInternetAccessClass.create();
     end;
     node := node.getDocument().getCreator.parseTree(context.staticContext.sender.FInternet.get(url), url);
   end;
 
-  if node = nil then raise EXQEvaluationException.Create('Failed to load document: '+url);
+  if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to load document: '+url);
   //writeln(strFromPtr(node));
 
   context.staticContext.sender.FExternalDocuments.AddObject(url, node);
@@ -2263,7 +2270,7 @@ function xqFunctionZero_or_one(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,1);
   if args[0].getSequenceCount > 1 then
-    raise EXQEvaluationException.Create('Sequence contains more than one element');
+    raise EXQEvaluationException.Create('FORG0003', 'Sequence contains more than one element');
   result := args[0];
 end;
 
@@ -2271,7 +2278,7 @@ function xqFunctionOne_or_more(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,1);
   if args[0].getSequenceCount = 0 then
-    raise EXQEvaluationException.Create('Sequence contains no element');
+    raise EXQEvaluationException.Create('FORG0004', 'Sequence contains no element');
   result := args[0];
 end;
 
@@ -2279,7 +2286,7 @@ function xqFunctionexactly_one(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,1);
   if args[0].getSequenceCount <> 1 then
-    raise EXQEvaluationException.Create('Sequence contains not one element');
+    raise EXQEvaluationException.Create('FORG0005', 'Sequence contains not one element');
   result := args[0];
 end;
 
@@ -2366,7 +2373,7 @@ begin
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
     if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0] is TXQValue_duration) and not (args[0] is TXQValue_untypedAtomic) then
-      raise EXQEvaluationException.Create('Wrong type for sum');
+      raise EXQEvaluationException.Create('XPTY0004', 'Wrong type for sum');
     if ak = pvkSequence then result := args[0].getChild(1);
     if (result is TXQValue_untypedAtomic) or (result is TXQValueNode) then result := TXQValue_double.create(result.toDecimal);
     exit();
@@ -2375,7 +2382,7 @@ begin
   temp := castUntypedToDouble(args[0]);
   seq := (temp as TXQValueSequence).seq;
   case seq.getPromotedType of
-    pvkBoolean, pvkString: raise EXQEvaluationException.Create('Wrong type for sum');
+    pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Wrong type for sum');
     pvkDateTime: begin
       result := seq.getPromotedDateTimeType(true).create;
       for i:=0 to seq.Count-1 do
@@ -2416,7 +2423,7 @@ begin
   temp := castUntypedToDouble(args[0]);
   seq := (temp as TXQValueSequence).seq;
   case seq.getPromotedType of
-    pvkBoolean, pvkString: raise EXQEvaluationException.Create('Invalid types for average');
+    pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Invalid types for average');
     pvkDateTime: begin
       result := xqFunctionSum(args);
       (result as TXQValue_duration).multiplyComponents(1.0 / i);
@@ -2592,14 +2599,14 @@ end;
 function xqFunctionPosition(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,0,0);
-  if context.SeqValue = nil then raise EXQEvaluationException.Create('position() called but no sequence available');
+  if context.SeqValue = nil then raise EXQEvaluationException.Create('XPDY0002', 'position() called but no sequence available');
   result := xqvalue(context.SeqIndex);
 end;
 
 function xqFunctionLast(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,0,0);
-  if context.SeqValue = nil then raise EXQEvaluationException.Create('last() called but no sequence available');
+  if context.SeqValue = nil then raise EXQEvaluationException.Create('XPDY0002', 'last() called but no sequence available');
   result := xqvalue(context.SeqLength);
 end;
 

@@ -58,14 +58,14 @@ begin
   result := self;
 end;
 
-procedure TXQTerm.raiseParsingError(const s: string);
+procedure TXQTerm.raiseParsingError(const errcode, s: string);
 begin
-  raise EXQParsingException.Create(s);
+  raise EXQParsingException.Create(errcode, s);
 end;
 
-procedure TXQTerm.raiseEvaluationError(const s: string);
+procedure TXQTerm.raiseEvaluationError(const errcode, s: string);
 begin
-  raise EXQEvaluationException.Create(s);
+  raise EXQEvaluationException.Create(errcode, s);
 end;
 
 procedure TXQTerm.evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
@@ -101,10 +101,10 @@ function TXQTermReadObjectProperty.evaluate(const context: TXQEvaluationContext)
 var
   obj: IXQValue;
 begin
-  if length(children) = 0 then raiseEvaluationError('Found no term to read property from');
-  if length(children) > 1 then raiseEvaluationError('Can only read property from one term');
+  if length(children) = 0 then raiseEvaluationError('pxp:OBJ', 'Found no term to read property from');
+  if length(children) > 1 then raiseEvaluationError('pxp:OBJ', 'Can only read property from one term');
   obj:=children[0].evaluate(context);
-  if not (obj is TXQValueObject) then raiseEvaluationError('Expected object, got: '+obj.toString);
+  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
   result := (obj as TXQValueObject).getProperty(propname);
 end;
 
@@ -112,7 +112,7 @@ end;
 
 function TXQTermIf.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
-  if length(children)<>3 then raiseEvaluationError('if must have 3 arguments');
+  if length(children)<>3 then raiseEvaluationError('XPST0003', 'if must have 3 arguments');
   if children[0].evaluate(context).toBooleanEffective then result:=children[1].evaluate(context)
   else result:=children[2].evaluate(context);
 end;
@@ -127,7 +127,7 @@ end;
 
 function TXQTermFilterSequence.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
-  if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
+  if length(children) <> 2 then raiseEvaluationError('XPST0003', 'Invalid [] sequence filter');
   if children[0] is TXQTermNodeMatcher then begin
     result := TXQueryEngine.evaluateAccessList(self, context);
   end else begin
@@ -149,7 +149,7 @@ end;
 
 function TXQTermFilterSequence.toQueryCommand: TXQPathMatchingStep;
 begin
-  if length(children) <> 2 then raiseEvaluationError('invalid [] construct');
+  if length(children) <> 2 then raiseEvaluationError('XPST0003', 'invalid [] construct');
   result := children[0].toQueryCommand;
   setlength(result.filters, length(result.filters)+1);
   result.filters[high(result.filters)] := children[1];
@@ -157,7 +157,7 @@ end;
 
 procedure TXQTermFilterSequence.addToQueryList(var path: TXQPathMatching);
 begin
-  if length(children) <> 2 then raiseEvaluationError('Invalid [] sequence filter');
+  if length(children) <> 2 then raiseEvaluationError('XPST0003', 'Invalid [] sequence filter');
 
   children[0].addToQueryList(path);
   setlength(path[high(path)].filters, length(path[high(path)].filters) + 1);
@@ -176,7 +176,7 @@ constructor TXQTermDefineVariable.create(varname: TXQTerm; anamespace: INamespac
 begin
   if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).debugTermToString
   else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
-  else raiseParsingError('Invalid term to assign a variable to: '+varname.debugTermToString);
+  else raiseParsingError('XPST0003', 'Invalid term to assign a variable to: '+varname.debugTermToString);
   varname.Free;
   namespace := anamespace;
   if value <> nil then push(value);
@@ -185,9 +185,9 @@ end;
 function TXQTermDefineVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   //this is never called for true XQuery variables, they are handled from the module term.
-  if not assigned(context.staticContext.sender.OnDefineVariable) then raiseEvaluationError(':= can''t be used without a method assigned to the OnDefineVariable event');
-  if length(children) = 0 then raiseEvaluationError('Value missing');
-  if length(children) > 1 then raiseEvaluationError('Only one value can be assigned to a variable');
+  if not assigned(context.staticContext.sender.OnDefineVariable) then raiseEvaluationError('XPST0001', ':= can''t be used without a method assigned to the OnDefineVariable event');
+  if length(children) = 0 then raiseEvaluationError('XPST0003', 'Value missing');
+  if length(children) > 1 then raiseEvaluationError('XPST0003', 'Only one value can be assigned to a variable');
   result := children[0].evaluate(context);
 
   if namespace <> nil then context.staticContext.sender.OnDefineVariable(self, namespace.getPrefix + ':' + variablename, result)
@@ -243,7 +243,7 @@ var
   ns: INamespace;
 begin
   v := xqvalueAtomize(v);
-  if not castableAsBase(v) then raiseEvaluationError('impossible cast as');
+  if not castableAsBase(v) then raiseEvaluationError('XPTY0004', 'impossible cast as');
   if not atomicTypeInfo.InheritsFrom(TXQValue_QName) then result := atomicTypeInfo.createFromValue(v)
   else begin
     temp := trim(v.toString);
@@ -254,7 +254,7 @@ end;
 
 function TXQTermSequenceType.castableAs(v: IXQValue): boolean;
 begin
-  if kind <> tikAtomic then raiseEvaluationError('need atomic type for castable as');
+  if kind <> tikAtomic then raiseEvaluationError('XPST0051', 'need atomic type for castable as');
   v := xqvalueAtomize(v);
   result := castableAsBase(v);
 end;
@@ -347,7 +347,7 @@ var tempContext:TXQEvaluationContext;
       typeDelta: integer;
   begin
     if pos = high(children) then exit(children[pos].evaluate(tempContext).toBooleanEffective);
-    if not (children[pos] is TXQTermVariable) then raiseEvaluationError('Expected variable, but got '+children[pos].debugTermToString);
+    if not (children[pos] is TXQTermVariable) then raiseEvaluationError('err:XPST0003', 'Expected variable, but got '+children[pos].debugTermToString);
     if children[pos + 1] is TXQTermSequenceType then typeDelta:=1
     else typeDelta:=0;
 
@@ -355,7 +355,7 @@ var tempContext:TXQEvaluationContext;
     for v in children[pos+1+typeDelta].evaluate(tempContext) do begin
       if typeDelta <> 0 then
         if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v, context) then
-          raiseEvaluationError('Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
+          raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
       tempContext.temporaryVariables.pushAll;
       tempContext.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
       if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then begin
@@ -449,7 +449,7 @@ var
     procedure continueWithValue(v: IXQValue; index: integer = 1);
     begin
       if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, context)) then
-        raiseEvaluationError('Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
+        raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
 
       tempContext.temporaryVariables.pushAll;
       tempContext.temporaryVariables.add(vars[pos].varname, v, vars[pos].namespace);
@@ -615,7 +615,7 @@ begin
 
   if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex]) then
     if not func.checkTypes(evilkids, context) then
-      raiseEvaluationError('Invalid types for function call: '+func.versions[0].name);
+      raiseEvaluationError('XPTY0004', 'Invalid types for function call: '+func.versions[0].name);
 
 
   case kind of
@@ -624,7 +624,7 @@ begin
     xqfkComplex:
       result := TXQComplexFunctionInfo(func).func(context, evilkids);
     xqfkWrappedOperator: begin
-      if length(evilkids) <> 2 then raiseEvaluationError('Need two arguments for function: op:' + funcname);
+      if length(evilkids) <> 2 then raiseEvaluationError('XPST0003', 'Need two arguments for function: op:' + funcname);
       result := TXQOperatorInfo(func).func(context, evilkids[0], evilkids[1]);
     end;
     xqfkTypeConstructor:
@@ -634,7 +634,7 @@ begin
         result := qnameMake(ns, temp,  TXQValueStringClass(func));
       end else if length(evilkids) = 0 then result := TXQValueClass(func).createFromValue(nil)
       else if length(evilkids) = 1 then result := TXQValueClass(func).createFromValue(evilkids[0])
-      else raiseEvaluationError('Invalid argument count for constructor function');
+      else raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
     xqfkUnknown: begin
       vfunc := nil;
       ns := namespace;
@@ -650,7 +650,7 @@ begin
       if vfunc = nil then begin
         findKindIndex(namespace, funcname, kind, func);
         if kind <> xqfkUnknown then exit(evaluate(context));
-        raiseEvaluationError('Function '+funcname+' not found');
+        raiseEvaluationError('XPST0017', 'Function '+funcname+' not found');
       end;
 
       tempcontext := context;
@@ -727,8 +727,8 @@ end;
 function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
 var evilkids: TXQVArray;
 begin
-  if length(children)<2 then raiseEvaluationError('Not enough subterms');
-  if length(children)>2 then raiseEvaluationError('Too many subterms');
+  if length(children)<2 then raiseEvaluationError('XPST0003', 'Not enough subterms');
+  if length(children)>2 then raiseEvaluationError('XPST0003', 'Too many subterms');
 
 
   if (op.name = '/') or (op.name = '//') then
@@ -740,7 +740,7 @@ begin
   else begin
     evaluateChildren(context, evilkids);
     if not op.checkTypes(evilkids, context) then
-      raiseEvaluationError('Invalid types for binary operator: '+op.name+ ' '+op.followedBy);
+      raiseEvaluationError('XPTY0004', 'Invalid types for binary operator: '+op.name+ ' '+op.followedBy);
     result := op.func(context, evilkids[0], evilkids[1]);
   end;
 end;
@@ -833,7 +833,7 @@ function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
      if axis='preceding-sibling' then exit(qcPrecedingSibling);
      if axis='preceding' then exit(qcPreceding);
      if axis='ancestor-or-self' then exit(qcSameOrAncestor);
-     raise EXQEvaluationException.Create('Unknown axis: '+axis);
+     raise EXQEvaluationException.Create('XPST0010', 'Unknown axis: '+axis);
   end;
 
 begin
@@ -898,8 +898,8 @@ end;
 constructor TXQTermReadAttribute.create(avalue: string; func: boolean);
 begin
   if func then begin
-    if pos('::', avalue) > 0 then if strSplitGet('::', avalue) <> 'attribute' then raiseParsingError('Invalid axis for attribute test');
-    if (avalue <> 'attribute') and (avalue <> 'node') then raiseParsingError('invalid attribute test: '+avalue);
+    if pos('::', avalue) > 0 then if strSplitGet('::', avalue) <> 'attribute' then raiseParsingError('XPST0003', 'Invalid axis for attribute test');
+    if (avalue <> 'attribute') and (avalue <> 'node') then raiseParsingError('XPST0003', 'invalid attribute test: '+avalue);
     value := '*';
   end else begin
     if pos(':', avalue) > 0 then namespace := strSplitGet(':', avalue);
@@ -928,7 +928,7 @@ begin
   readvalue := value;
   readnamespace := namespace;
   if length(children) > 0 then begin
-    if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('Invalid subtype');
+    if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('XPST0003', 'Invalid subtype');
     readvalue := TXQTermNodeMatcher(children[0]).select;
     readnamespace := TXQTermNodeMatcher(children[0]).namespace;
   end;
@@ -963,7 +963,7 @@ end;
 constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
 begin
   value := avalue;
-  if value = '' then raiseEvaluationError('variable with empty name');
+  if value = '' then raiseEvaluationError('XPST0003', 'variable with empty name');
   //if value[1] = '$' then raiseEvaluationError('variable name starts with a double $:  ' + value);
   if value[length(value)] = ';' then delete(value, length(value), 1);
   if staticContext <> nil then staticContext.splitRawQName(namespace, value, xqdnkUnknown);
@@ -1052,7 +1052,7 @@ var
 begin
   v := children[0].evaluate(context);
   for i:=1 to high(children) - 1 do begin
-    if not (children[i] is TXQTermSequence) then raiseEvaluationError('Invalid case clause');
+    if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
     if children[i].children[0] is TXQTermVariable then start := 1
     else start := 0;
     for j := start to high(children[i].children) - 1 do
@@ -1167,7 +1167,7 @@ var
         doc.reverse.previous := doc;
         doc.deleteAll();
       end
-      else raiseEvaluationError('Unknown child node');
+      else raiseEvaluationError('pxp:INTERNAL', 'Unknown child node');
     end;
   end;
 
@@ -1249,7 +1249,7 @@ var
         baseOffset+=1;
         addKid;
       end else begin
-        if lastKid.typ <> tetText then raiseEvaluationError('Internal error: No atomic value before this one exist, but this one is not the first atomic value.');
+        if lastKid.typ <> tetText then raiseEvaluationError('pxp:INTERNAL', 'No atomic value before this one exist, but this one is not the first atomic value.');
         if firstAtomic then lastKid.value += v.toString
         else lastKid.value += ' ' + v.toString;
       end;
@@ -1374,7 +1374,7 @@ begin
       else tree.addAttribute('', strTrimLeft(valueToString(children[0].evaluate(subcontext^)), [#9,#10,#13,' ']));
     end;
     tetText, tetComment: tree.value := valueToString(nameValueEvaluated);
-    else raiseEvaluationError('Invalid type for constructor');
+    else raiseEvaluationError('pxp:INTERNAL','Invalid type for constructor');
   end;
   result := xqvalue(tree);
   if subcontext <> @context then begin
@@ -1409,7 +1409,7 @@ end;
 
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
-  raiseEvaluationError('Dead branch called');
+  raiseEvaluationError('pxp:INTERNAL', 'Dead branch called');
   ignore(context);
   result := nil;
 end;

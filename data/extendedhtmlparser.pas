@@ -1475,12 +1475,12 @@ begin
     for template in args[0] do begin
       if template is TXQValueString then temp.parseTemplate(template.toString)
       else if template is TXQValueNode then temp.parseTemplate(template.toNode.outerXML())
-      else raise EXQEvaluationException.Create('Invalid type for template. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
+      else raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Invalid type for template. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
       for html in args[1] do begin
         if not (html is TXQValueNode) then
-          raise EXQEvaluationException.Create('Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
+          raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
         temp.FHtmlTree := html.toNode;
-        if not temp.matchLastTrees then raise EXQEvaluationException.Create('Failed to match template to html');
+        if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match template to html');
         cols := temp.VariableChangeLogCondensed.collected;
         try
           if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then

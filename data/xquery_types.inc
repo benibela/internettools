@@ -199,7 +199,7 @@ class function TXQValue.createFromValue(const v: IXQValue): IXQValue;
 begin
   ignore(v);
   result := nil;
-  raise EXQEvaluationException.Create('Invalid constructor called');
+  raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid constructor called');
 end;
 
 class function TXQValue.instanceOf(const testType: TXQValueClass): boolean;
@@ -359,7 +359,7 @@ end;
 
 function TXQValue.clone: IXQValue;
 begin
-  raise EXQEvaluationException.Create('Clone on "abstract" base class called.');
+  raise EXQEvaluationException.Create('pxp:INTERNAL', 'Clone on "abstract" base class called.');
   result := nil;
 end;
 
@@ -728,7 +728,7 @@ end;
 constructor TXQValueDateTime.create(const str: string);
 begin
   if not tryCreateFromString(str,  dateFormat, @value) then
-    raise EXQEvaluationException.Create('Invalid conversion from '+str+' to date format ' + dateFormat);
+    raise EXQEvaluationException.Create('FORG0001', 'Invalid conversion from '+str+' to date format ' + dateFormat);
 end;
 
 class function TXQValueDateTime.createFromValue(const v: IXQValue): IXQValue;
@@ -743,7 +743,7 @@ end;
 constructor TXQValueDateTime.create(const str, format: string);
 begin
   if not tryCreateFromString(str, format, @value) then
-    raise EXQEvaluationException.Create('Invalid conversion from '+str+' to date format ' + format);
+    raise EXQEvaluationException.Create('FORG0001', 'Invalid conversion from '+str+' to date format ' + format);
 end;
 
 constructor TXQValueDateTime.create(const dt: TXQValueDateTimeData);
@@ -796,7 +796,7 @@ end;
 
 function TXQValueDateTime.toBooleanEffective: boolean;
 begin
-  raise EXQEvaluationException.Create('A datetime cannot be used a boolean');
+  raise EXQEvaluationException.Create('FORG0006', 'A datetime cannot be used a boolean');
   Result := false;
 end;
 
@@ -1436,10 +1436,10 @@ var
 begin
   obj := TXQValueObject.create();
   if v <> nil then begin
-    if (v.kind <> pvkSequence) or (v.getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('Argument to object constructor must be a sequence with an even number of elements');
+    if (v.kind <> pvkSequence) or (v.getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Argument to object constructor must be a sequence with an even number of elements');
     seq := v.toXQVList;
     for i:=0 to (seq.Count-1) div 2 do begin
-      if not (seq[2*i].kind = pvkString) then raise EXQEvaluationException.Create('Only string values are allowed as property names');
+      if not (seq[2*i].kind = pvkString) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Only string values are allowed as property names');
       obj.setMutable(seq[2*i].toString, seq[2*i+1]);
     end;
     seq.free;
@@ -1471,11 +1471,11 @@ begin
     base := strSplitGet('.', temp);
     i := values.indexOf(base);
     if i < 0 then begin
-      if not hasProperty(base, @old) then raise EXQEvaluationException.Create('Need object property '+temp+' to assign to '+name);
+      if not hasProperty(base, @old) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+temp+' to assign to '+name);
       values.add(base, old.clone);
       i := values.count-1;
     end;
-    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('Need object property '+temp+' to assign to '+name);
+    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+temp+' to assign to '+name);
     (values.get(i) as TXQValueObject).setMutable(temp, v);
   end;
 end;
@@ -1506,10 +1506,10 @@ begin
     part := copy(name,1,point-1);
     i := values.indexOf(part);
     if i < 0 then begin
-      if prototype = nil then raise EXQEvaluationException.Create('Couldn''t find sub object:  ' + name);
+      if prototype = nil then raise EXQEvaluationException.Create('pxp:OBJECT', 'Couldn''t find sub object:  ' + name);
       exit((prototype as TXQValueObject).hasProperty(part, value));
     end;
-    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('Expected object:  ' + name+ ' got '+values.get(i).toString);
+    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object:  ' + name+ ' got '+values.get(i).toString);
     exit((values.get(i) as TXQValueObject).hasProperty(strCopyFrom(name, point + 1), value));
   end;
 

@@ -97,7 +97,7 @@ begin
     'NFKD': p := utf8proc_NFKD(p);
     //'FULLY-NORMALIZED': ??
     '': exit(args[0]);
-    else raise EXQEvaluationException.Create('Unknown normalization method: '+method);
+    else raise EXQEvaluationException.Create('FOCH0003', 'Unknown normalization method: '+method);
   end;
 
   result :=xqvalue(UTF8String(p));

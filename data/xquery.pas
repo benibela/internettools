@@ -838,8 +838,8 @@ type
   protected
     procedure push(t: TXQTerm);
     function push(t: array of TXQTerm): TXQTerm;
-    procedure raiseParsingError(const s: string);
-    procedure raiseEvaluationError(const s: string);
+    procedure raiseParsingError(const errcode, s: string);
+    procedure raiseEvaluationError(const errcode, s: string);
     procedure evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
     function toQueryCommand: TXQPathMatchingStep; virtual;
     procedure addToQueryList(var path: TXQPathMatching); virtual;
@@ -1099,10 +1099,23 @@ type
     procedure setTerm(aterm: TXQTerm);
   end;
 
+  { EXQException }
+
+  EXQException = class(Exception)
+    errorCode: string;
+    namespace: INamespace;
+    constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+  end;
+
   //**Exception raised during the parsing of an expression
-  EXQParsingException = class(Exception);
+  EXQParsingException = class(EXQException)
+    constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+  end;
+
   //**Exception raised during the evaluation of an expression
-  EXQEvaluationException = class(Exception);
+  EXQEvaluationException = class(EXQException)
+    constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+  end;
 
   //** Event called by the trace(value,info) function. You should not free value and info
   type TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;
@@ -1639,6 +1652,7 @@ procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from,
         XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
         XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
         XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
+        XMLNamespaceURL_XQTErrors = 'http://www.w3.org/2005/xqt-errors';
         XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
         XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
 implementation
@@ -1670,6 +1684,40 @@ var
     TwoDigitYearCenturyWindow: 50;
   );
 
+{ EXQEvaluationException }
+
+constructor EXQEvaluationException.create(aerrcode, amessage: string; anamespace: INamespace);
+begin
+  inherited create(aerrcode, amessage, anamespace);
+end;
+
+{ EXQParsingException }
+
+constructor EXQParsingException.create(aerrcode, amessage: string; anamespace: INamespace);
+begin
+  inherited;
+end;
+
+
+
+{ EXQException }
+
+constructor EXQException.create(aerrcode, amessage: string; anamespace: INamespace = nil);
+var
+  temp: String;
+begin
+  if strBeginsWith(aerrcode, 'pxp:') then begin
+    delete(aerrcode, 1, 4);
+    namespace := TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
+  end else if anamespace = nil then namespace := TNamespace.create(XMLNamespaceURL_XQTErrors, 'err')
+  else namespace := anamespace;
+  errorCode:=aerrcode;
+  temp := '';
+  if namespace <> nil then temp += namespace.getPrefix + ':';
+  if aerrcode <> '' then temp += errorCode + ': ';
+  inherited create(temp + amessage);
+end;
+
 
 type
 
@@ -1678,7 +1726,6 @@ type
   TXQValueNumericPseudoType = class(TXQValue)
     class function classTypeName: string; override;
   end;
-
 
   class function TXQValueNumericPseudoType.classTypeName: string;
   begin
@@ -1870,8 +1917,8 @@ procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer =
 begin
   if maxc = -2 then maxc := minc;
   if (length(args) >= minc) and (length(args) <= maxc) then exit;
-  if minc = maxc then raise EXQEvaluationException.Create(IntToStr(length(args)) + ' arguments passed, need exactly '+IntToStr(minc))
-  else raise EXQEvaluationException.Create(IntToStr(length(args)) + ' arguments passed, need between '+IntToStr(minc)+ ' and ' + inttostr(maxc));
+  if minc = maxc then raise EXQEvaluationException.Create('XPST0017', IntToStr(length(args)) + ' arguments passed, need exactly '+IntToStr(minc))
+  else raise EXQEvaluationException.Create('XPST0017', IntToStr(length(args)) + ' arguments passed, need between '+IntToStr(minc)+ ' and ' + inttostr(maxc));
 end;
 
 
@@ -2093,7 +2140,7 @@ end;}
 function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
 begin
   result := nil;
-  raise EXQEvaluationException.Create('Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
+  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
 end;
 
 function xqvalue(v: TTreeNode): IXQValue;
@@ -2225,7 +2272,7 @@ end;
 
 function TXQTermModule.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
-  if context.staticContext.moduleNamespace <> nil then raiseEvaluationError('A module cannot be evaluated');
+  if context.staticContext.moduleNamespace <> nil then raiseEvaluationError('', 'A module cannot be evaluated');
   result := children[high(children)].evaluate(context);
 end;
 
@@ -2257,9 +2304,9 @@ begin
       functions[functionCount] := TXQTermDefineFunction(children[i]).define();
       functions[functionCount].context := context;
       if functions[functionCount].body = nil then begin
-        if not assigned(context.staticContext.sender.OnDeclareExternalFunction) then raiseParsingError('External function declared, but no callback registered to OnDeclareExternalFunction.');
+        if not assigned(context.staticContext.sender.OnDeclareExternalFunction) then raiseParsingError('XPDY0002', 'External function declared, but no callback registered to OnDeclareExternalFunction.');
         context.staticContext.sender.OnDeclareExternalFunction(context.staticContext.sender, context.staticContext, TXQTermDefineFunction(children[i]).namespace, TXQTermDefineFunction(children[i]).funcname, functions[functionCount]);
-        if functions[functionCount].body = nil then raiseEvaluationError('No function for external function ' + TXQTermDefineFunction(children[i]).funcname + ' given.');
+        if functions[functionCount].body = nil then raiseEvaluationError('XPDY0002','No function for external function ' + TXQTermDefineFunction(children[i]).funcname + ' given.');
       end;
       functionCount+=1;
     end;
@@ -2272,9 +2319,9 @@ begin
 
       ns := tempDefVar.namespace;
       if (ns = nil) and (context.staticContext.moduleNamespace <> nil) then
-        raiseEvaluationError('Unknown namespace prefix for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
+        raiseEvaluationError('XPST0008', 'Unknown namespace prefix for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
       if (context.staticContext.moduleNamespace  <> nil) and (context.staticContext.moduleNamespace  <> ns ) and (context.staticContext.moduleNamespace.getURL  <> ns.getURL ) then
-         raiseEvaluationError('Invalid namespace for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
+         raiseEvaluationError('XQST0048', 'Invalid namespace for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
 
       hasTypeDeclaration := (length(tempDefVar.children) > 0) and (tempDefVar.children[0] is TXQTermSequenceType);
       hasExpression := (length(tempDefVar.children) > 0) and not (tempDefVar.children[high(tempDefVar.children)] is TXQTermSequenceType);
@@ -2282,15 +2329,15 @@ begin
       tempValue := nil;
       if hasExpression then tempValue := tempDefVar.children[high(tempDefVar.children)].evaluate(context)
       else begin
-        if not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('External variable declared, but no callback registered to OnDeclareExternalVariable.');
+        if not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
         context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, tempDefVar.variablename, tempValue);
-        if tempValue = nil then raiseEvaluationError('No value for external variable ' + tempDefVar.variablename+ ' given.');
+        if tempValue = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + tempDefVar.variablename+ ' given.');
       end;
       vars.add(tempDefVar.variablename, tempValue, ns);
 
       if hasTypeDeclaration then
         if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(tempValue, context) then
-          raiseEvaluationError('Variable '+tempDefVar.variablename + ' with value ' +tempValue.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
+          raiseEvaluationError('XPTY0004', 'Variable '+tempDefVar.variablename + ' with value ' +tempValue.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
     end;
 end;
 
@@ -2333,7 +2380,7 @@ var
 begin
   temp := findNamespace(nsprefix, defaultNamespaceKind);
   if temp = nil then begin
-    if nsprefix <> '' then raise EXQEvaluationException.Create('Unknown namespace: '+nsprefix);
+    if nsprefix <> '' then raise EXQEvaluationException.Create('XPST0008', 'Unknown namespace prefix: '+nsprefix);
     exit;
   end;
   result := temp.getURL;
@@ -2366,13 +2413,13 @@ function TXQEvaluationContext.getRootHighest: TTreeNode;
 begin
   if (SeqValue <> nil) then begin
     if (SeqValue.kind = pvkNode) then result := SeqValue.toNode.document
-    else raise EXQEvaluationException.Create('Need context item that is a node to get root element');
+    else raise EXQEvaluationException.Create('XPDY0002', 'Need context item that is a node to get root element');
   end;
   if ParentElement <> nil then exit(ParentElement.getRootHighest)
   else if RootElement <> nil then exit(RootElement)
   else if staticContext.sender.ParentElement <> nil then exit(staticContext.sender.ParentElement.getRootHighest)
   else if staticContext.sender.RootElement <> nil then exit(staticContext.sender.RootElement)
-  else raise EXQEvaluationException.Create('no root element');
+  else raise EXQEvaluationException.Create('XPDY0002', 'no root element');
 end;
 
 { TXQuery }
@@ -2496,7 +2543,7 @@ begin
   else if select = 'processing-instruction' then exit([qmProcessingInstruction])
   else if select = 'document-node' then exit([qmDocument])
   else if select = 'attribute' then exit([qmAttribute])
-  else raise EXQParsingException.Create('Unknown element test: '+select);
+  else raise EXQParsingException.Create('XPST0003', 'Unknown element test: '+select);
 end;
 
 
@@ -2509,14 +2556,14 @@ begin
 
   if (result.matching = [qmProcessingInstruction])  then begin
     if children[0] is TXQTermNodeMatcher then begin;
-      if TXQTermNodeMatcher(children[0]).axis <> '' then raise EXQEvaluationException.Create('axis within element test is not allowed');
+      if TXQTermNodeMatcher(children[0]).axis <> '' then raise EXQEvaluationException.Create('XPST0003', 'axis within element test is not allowed');
       result.value := TXQTermNodeMatcher(children[0]).select;
     end else if children[0] is TXQTermString then
       result.value:=strTrimAndNormalize(TXQTermString(children[0]).value)
-    else raise EXQEvaluationException.Create('Invalid parameter for processing-instruction kind test: '+children[0].ToString);
+    else raise EXQEvaluationException.Create('XPST0003', 'Invalid parameter for processing-instruction kind test: '+children[0].ToString);
     include(result.matching, qmValue) ;
   end else if (select = 'element') or (select = 'attribute') or (select = 'schema-element')or (select = 'schema-attribute')  then begin
-    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('Invalid node test.');
+    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('XPST0003', 'Invalid node test.');
     if TXQTermNodeMatcher(children[0]).select <> '*' then begin
       Include(result.matching, qmValue);
       result.value:=TXQTermNodeMatcher(children[0]).select;
@@ -2524,21 +2571,21 @@ begin
         Include(result.matching, qmCheckNamespace);
         result.namespacePrefix:=TXQTermNodeMatcher(children[0]).namespace;
       end;
-    end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('Namespace:* not allowed in element test') ;
+    end else if TXQTermNodeMatcher(children[0]).hadNamespace then raise EXQEvaluationException.Create('XPST0003', 'Namespace:* not allowed in element test') ;
     if length(children) <= 1 then exit;
-    if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('Invalid type attribute: '+children[1].ToString);
+    if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('XPST0003', 'Invalid type attribute: '+children[1].ToString);
     result.requiredType := children[1] as TXQTermSequenceType;
   end else if select = 'document-node' then begin
-    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('Invalid option for document test');
-    if not (children[0] as TXQTermNodeMatcher).func or (  ((children[0] as TXQTermNodeMatcher).select <> 'element') and  ((children[0] as TXQTermNodeMatcher).select <> 'schema-element')) then raise EXQEvaluationException.Create('Invalid option for document(element) test');
+    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('XPST0003', 'Invalid option for document test');
+    if not (children[0] as TXQTermNodeMatcher).func or (  ((children[0] as TXQTermNodeMatcher).select <> 'element') and  ((children[0] as TXQTermNodeMatcher).select <> 'schema-element')) then raise EXQEvaluationException.Create('XPST0003', 'Invalid option for document(element) test');
     result := convertElementTestToPathMatchingStep((children[0]as TXQTermNodeMatcher).select, (children[0] as TXQTermNodeMatcher).children);
     result.matching:=result.matching * [qmCheckNamespace, qmValue] + [qmDocument, qmCheckOnSingleChild];
-  end else raise EXQEvaluationException.Create('Children not allowed for element test "'+select+'"');
+  end else raise EXQEvaluationException.Create('XPST0003', 'Children not allowed for element test "'+select+'"');
 end;
 
 function qnameSplit(s: string): TStringArray;
 begin
-  //splits URL #2 PREFIX : NAME
+  //splits URL #2 PREFIX : NAME  to  (URL, PREFIX, NAME)
   setlength(result, 3);
   if strContains(s, #2) then result[0] := strSplitGet(#2, s);
   if strContains(s, ':') then result[1] := strSplitGet(':', s);
@@ -2586,7 +2633,7 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
        or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
        or (w.instanceOfInternal(TXQValue_anyURI) and (typ.atomicTypeInfo.instanceOf(TXQValueString))) then
          exit(typ.castAs(result, context));
-    raise EXQEvaluationException.Create('Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
+    raise EXQEvaluationException.Create('XPTY0004', 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
   end;
 
 var
@@ -2598,8 +2645,8 @@ begin
   if typ.kind = tikAtomic then begin
     if not (result is TXQValueSequence) then
       exit(conversionSingle(result));
-    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then raise EXQEvaluationException.Create('Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
-    if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('Expected value, but got empty sequence.');
+    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+    if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.');
     for i := 0 to result.getSequenceCount - 1 do
       (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
   end;
@@ -2686,7 +2733,7 @@ begin
     pvkBoolean, pvkString,pvkSequence,pvkNode: result := evaluatedCondition.toBooleanEffective;
     pvkInt: result := evaluatedCondition.toInt65 = index;
     pvkDecimal: result := (evaluatedCondition.toDecimal = index);
-    pvkDateTime: raise EXQEvaluationException.create('Sequence filter returned invalid value');
+    pvkDateTime: raise EXQEvaluationException.create('FORG0006', 'Sequence filter returned invalid value');
   end;
 end;
 
@@ -2822,14 +2869,14 @@ begin
           else if cmp < 0 then begin insertSingle(m, child); exit; end
           else begin insertSingle(m + 1, child); exit; end;
         end;
-        raise EXQEvaluationException.Create('binary insert failed');
+        raise EXQEvaluationException.Create('pxp:INTERNAL', 'binary insert failed');
       end;
     end;
     pvkUndefined: ;
     pvkSequence:
       for s in child do
         addMerging(s); //TODO: optimize
-    else raise EXQEvaluationException.Create('invalid merging');
+    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
   end;
 end;
 
@@ -2897,7 +2944,7 @@ end;
 
 procedure TXQVList.checkIndex(i: integer);
 begin
-  if (i < 0) or (i >= fcount) then raise EXQEvaluationException.Create('Invalid index: '+IntToStr(i));
+  if (i < 0) or (i >= fcount) then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
 end;
 
 procedure TXQVList.reserve(cap: integer);
@@ -2993,10 +3040,10 @@ begin
     else exit(TXQValueDateTime);
   result := TXQValueDateTimeClass(items[0].getClassType);
   for i:=1 to count - 1 do begin
-    if result <> items[i].getClassType then raise EXQEvaluationException.Create('Mixed date/time/duration types');
+    if result <> items[i].getClassType then raise EXQEvaluationException.Create('FORG0006', 'Mixed date/time/duration types');
     //result := TXQValueDateTimeClass(commonClass(result, TXQValueClass(items[i])));
   end;
-  if (needDuration) and (not result.InheritsFrom(TXQValue_duration)) then raise EXQEvaluationException.Create('Expected duration type, got: '+result.ClassName);
+  if (needDuration) and (not result.InheritsFrom(TXQValue_duration)) then raise EXQEvaluationException.Create('FORG0006', 'Expected duration type, got: '+result.ClassName);
 end;
 
 
@@ -3008,15 +3055,15 @@ var
  base: String;
  i: Integer;
 begin
-  if readonly then raise EXQEvaluationException.Create('Readonly variable changelog modified');
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
   point := 0;
   if allowObjects then begin
     point := pos('.', name);
     if point > 0 then begin
       base := copy(name, 1, point - 1);
       i := indexOf(base);
-      if i < 0 then raise EXQEvaluationException.Create('Failed to find object variable '+base);
-      if not (get(i) is TXQValueObject) then raise EXQEvaluationException.Create('Variable '+base+' is not an object, but '+get(i).toString);
+      if i < 0 then raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+base);
+      if not (get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+base+' is not an object, but '+get(i).toString);
     end;
   end;
   SetLength(vars, length(vars)+1);
@@ -3167,7 +3214,7 @@ end;
 
 function TXQVariableChangeLog.pushAll: integer;
 begin
-  if readonly then raise EXQEvaluationException.Create('readonly variable change log modified');
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
   result := length(history);
   arrayAdd(history, length(vars));
 end;
@@ -3176,7 +3223,7 @@ procedure TXQVariableChangeLog.popAll(level: integer = -1);
 var s: integer;
  l: Integer;
 begin
-  if readonly then raise EXQEvaluationException.Create('readonly variable change log modified');
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
   if level > 0 then begin
     level := level - length(history);
     if level >= 0 then exit;
@@ -3318,7 +3365,7 @@ begin
           result.vars[p-1].fullname := vars[i].name;
           break;
         end;
-      if not found then raise EXQEvaluationException.Create('Assignment to object without an object');
+      if not found then raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to object without an object');
       continue;
     end;
     result.vars[p] := vars[i];
@@ -3337,7 +3384,7 @@ begin
     if splitName(variable, base, varname) then begin
       result := hasVariable(base, @temp, namespace);
       if not result then exit;
-      if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
+      if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
       result := (temp as TXQValueObject).hasProperty(varname, value);
       exit;
     end;
@@ -3360,7 +3407,7 @@ begin
 
   result := hasVariable(base, @temp, namespace);
   if not result then exit;
-  if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
+  if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
 
   TXQValueObject(temp).hasProperty(varname, value);
 end;
@@ -3664,7 +3711,7 @@ begin
     cxt.resultquery := result;
     result.fterm := cxt.parseModule();
     if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
-    if cxt.nextToken() <> '' then cxt.raiseParsingError('Unexpected characters after end of expression (possibly an additional closing bracket)');
+    if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
   finally
     cxt.free;
   end;
@@ -3677,7 +3724,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
 
   procedure raiseParsingError(err: string);
   begin
-    raise EXQParsingException.Create(err);
+    raise EXQParsingException.Create('pxp:CSS', err);
   end;
 
 //XPATH Expression tree construction
@@ -4140,7 +4187,7 @@ var
   begin
     if resultSeq.seq.count = 0 then onlyNodes := v is TXQValueNode;
     if onlyNodes <> (v is TXQValueNode) then
-      raise EXQEvaluationException.Create('Nodes and non-node values must not be mixed in step expressions [err:XPTY0018]');;
+      raise EXQEvaluationException.Create('XPTY0018', 'Nodes and non-node values must not be mixed in step expressions');;
     if onlyNodes then resultSeq.addChildMerging(v)
     else resultSeq.addChild(v);
   end;
@@ -4161,7 +4208,7 @@ begin
     else cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkElementType);
     if cachedNamespace <> nil then cachedNamespaceURL:=cachedNamespace.getURL
     else if not context.staticContext.useLocalNamespaces then begin
-      if command.namespacePrefix <> '' then raise EXQEvaluationException.Create('Unknown namespace prefix: '+command.namespacePrefix+' for element matching');
+      if command.namespacePrefix <> '' then raise EXQEvaluationException.Create('XPST0008', 'Unknown namespace prefix: '+command.namespacePrefix+' for element matching');
       cachedNamespaceURL:='';
       cachedNamespace := XMLNamespace_XMLSchema; //just assign something, so it is not nil. The value is not used
     end;
@@ -4236,7 +4283,7 @@ begin
       if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
       else if context.staticContext.sender.ParentElement <> nil then result := xqvalue(context.staticContext.sender.ParentElement)
-      else raise EXQEvaluationException.Create('No context');
+      else raise EXQEvaluationException.Create('XPTY0020', 'No context');
       result := expandSequence(result,query, context);
     end;
   end;
@@ -4273,13 +4320,13 @@ end;
 function xqvalueNodeStepChild(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(ta); ignore(tb); ignore(result);
-  raise EXQEvaluationException.Create('placeholder op:/ called');
+  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op:/ called');
 end;
 
 function xqvalueNodeStepDescendant(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(ta); ignore(tb); ignore(result);
-  raise EXQEvaluationException.Create('placeholder op: // called');
+  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: // called');
 end;
 
 
@@ -4299,7 +4346,7 @@ begin
   if i < 0 then begin
     i := collations.IndexOf(oldid);
     if i < 0 then
-      raise EXQEvaluationException.Create('Collation ' + id + ' is not defined');
+      raise EXQEvaluationException.Create('FOCH0002', 'Collation ' + id + ' is not defined');
   end;
   result:=TXQCollation(collations.Objects[i]);
 end;
