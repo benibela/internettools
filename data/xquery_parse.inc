@@ -252,52 +252,57 @@ begin
   word := nextToken();
 
   result := TXQTermSequenceType.Create();
-  result.allowNone:=false;
-  result.allowMultiple:=false;
+  try
+    result.allowNone:=false;
+    result.allowMultiple:=false;
 
-  result.name:=word;
-  if (isKindTestFunction(word)) or (word = 'empty-sequence') or (word = 'item') then begin
-    expect('(');
+    result.name:=word;
+    if (isKindTestFunction(word)) or (word = 'empty-sequence') or (word = 'item') then begin
+      expect('(');
 
-    skipWhitespaceAndComment();
-    if pos^ = ')' then expect(')')
-    else begin
-      result.push(parse());
-      if nextToken() = ',' then begin
-        result.push(parseSequenceType());
-        expect(')');
+      skipWhitespaceAndComment();
+      if pos^ = ')' then expect(')')
+      else begin
+        result.push(parse());
+        if nextToken() = ',' then begin
+          result.push(parseSequenceType());
+          expect(')');
+        end;
       end;
+
+      if (word = 'empty-sequence') then begin
+        result.kind:=tikNone;
+        if length(result.children) <> 0 then raiseParsingError('XPST0003', 'invalid sequence type');
+        exit
+      end else if word = 'item' then begin
+        result.kind:=tikAny;
+        if length(result.children) <> 0 then raiseParsingError('XPST0003', 'invalid sequence type');
+      end else begin
+         result.kind:=tikElementTest;
+         result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
+      end;
+    end else begin;
+      staticContext.splitRawQName(namespace, word, xqdnkType);
+      if (namespace = nil) then raiseParsingError('XPST0008', 'No schemas loaded for type '+word);
+      if namespace.getURL <> XMLNamespaceURL_XMLSchema then raiseParsingError('XQST0009', 'Invalid schema loaded: '+namespace.getURL+' by '+word);
+      result.kind:=tikAtomic;
+      result.atomicTypeInfo := TXQueryEngine.findTypeClass(word);
+      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: '+word);
     end;
 
-    if (word = 'empty-sequence') then begin
-      result.kind:=tikNone;
-      if length(result.children) <> 0 then raiseParsingError('XPST0003', 'invalid sequence type');
-      exit
-    end else if word = 'item' then begin
-      result.kind:=tikAny;
-      if length(result.children) <> 0 then raiseParsingError('XPST0003', 'invalid sequence type');
-    end else begin
-       result.kind:=tikElementTest;
-       result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
-    end;
-  end else begin;
-    staticContext.splitRawQName(namespace, word, xqdnkType);
-    if (namespace = nil) then raiseParsingError('XPST0008', 'No schemas loaded for type '+word);
-    if namespace.getURL <> XMLNamespaceURL_XMLSchema then raiseParsingError('XQST0009', 'Invalid schema loaded: '+namespace.getURL+' by '+word);
-    result.kind:=tikAtomic;
-    result.atomicTypeInfo := TXQueryEngine.findTypeClass(word);
-    if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: '+word);
-  end;
 
-
-  word := nextToken(true);
-  if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin
-    case word[1] of
-      '?': result.allowNone:=true;
-      '+': result.allowMultiple:=true;
-      '*': begin result.allowNone:=true; result.allowMultiple:=true; end;
+    word := nextToken(true);
+    if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin
+      case word[1] of
+        '?': result.allowNone:=true;
+        '+': result.allowMultiple:=true;
+        '*': begin result.allowNone:=true; result.allowMultiple:=true; end;
+      end;
+      pos+=1;
     end;
-    pos+=1;
+  except
+    result.free;
+    raise;
   end;
 end;
 
@@ -425,22 +430,27 @@ var
   word: String;
 begin
   result := TXQTermSomeEvery.Create(akind = 'every');
-  expect('$');
-  result.push(TXQTermVariable.Create(nextTokenQName(), staticContext));
-  skipWhitespaceAndComment();
-  if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
-  expect('in'); result.push(parse());
-  word := nextToken();
-  while word = ',' do begin
+  try
     expect('$');
-    result.push(TXQTermVariable.Create(nextToken(), staticContext));
+    result.push(TXQTermVariable.Create(nextTokenQName(), staticContext));
     skipWhitespaceAndComment();
     if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
     expect('in'); result.push(parse());
     word := nextToken();
+    while word = ',' do begin
+      expect('$');
+      result.push(TXQTermVariable.Create(nextToken(), staticContext));
+      skipWhitespaceAndComment();
+      if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
+      expect('in'); result.push(parse());
+      word := nextToken();
+    end;
+    Assert(word = 'satisfies');
+    result.push(parse());
+  except
+    result.free;
+    raise;
   end;
-  Assert(word = 'satisfies');
-  result.push(parse());
 end;
 
 function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstructor;
@@ -1001,45 +1011,50 @@ var astroot: TXQTerm;
     replace: PXQTerm;
 begin
   astroot := parseValue();
-  while true do begin
-    word := nextToken(true);
-    case word of
-      '', ',', ';', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
-        exit(astroot);
-      //'=', '+', '-', '*': pushBinaryOp(word);
-      '!': pushBinaryOp('!=');
-      '<', '>': case (pos+1)^ of
-        '<', '>': pushBinaryOp(word+word);
-        '=': pushBinaryOp(word+'=');
-        else pushBinaryOp(word);
+  try
+    while true do begin
+      word := nextToken(true);
+      case word of
+        '', ',', ';', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
+          exit(astroot);
+        //'=', '+', '-', '*': pushBinaryOp(word);
+        '!': pushBinaryOp('!=');
+        '<', '>': case (pos+1)^ of
+          '<', '>': pushBinaryOp(word+word);
+          '=': pushBinaryOp(word+'=');
+          else pushBinaryOp(word);
+        end;
+        '/':
+          if (pos+1)^ = '/' then
+            pushBinaryOp('//')
+          else pushBinaryOp('/');
+        '[': begin
+          expect('[');
+          replace := ripBinOpApart(@astroot, 10000);
+          replace^ := TXQTermFilterSequence.Create(replace^, parse());
+          expect(']');
+        end;
+        ':=': begin
+          expect(':=');
+          result := TXQTermDefineVariable.Create(astroot, nil, parse());
+          staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
+          exit;
+        end;
+        else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
+        else if (word[1] = '.') and AllowObjects then begin
+          expect(word);
+          replace := ripBinOpApart(@astroot, 10000);
+          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction)  then
+            replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
+           else
+            raiseParsingError('XPST0003', 'Unexpected .');
+        end else
+          raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word);
       end;
-      '/':
-        if (pos+1)^ = '/' then
-          pushBinaryOp('//')
-        else pushBinaryOp('/');
-      '[': begin
-        expect('[');
-        replace := ripBinOpApart(@astroot, 10000);
-        replace^ := TXQTermFilterSequence.Create(replace^, parse());
-        expect(']');
-      end;
-      ':=': begin
-        expect(':=');
-        result := TXQTermDefineVariable.Create(astroot, nil, parse());
-        staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
-        exit;
-      end;
-      else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
-      else if (word[1] = '.') and AllowObjects then begin
-        expect(word);
-        replace := ripBinOpApart(@astroot, 10000);
-        if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction)  then
-          replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
-         else
-          raiseParsingError('XPST0003', 'Unexpected .');
-      end else
-        raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word);
     end;
+  except
+    astroot.free;
+    raise;
   end;
   result := astroot;
 end;
@@ -1047,12 +1062,17 @@ end;
 function TXQParsingContext.parsePrimaryLevel: TXQTerm;
 begin
   result := parse;
-  if nextToken(true) = ',' then begin
-    result := TXQTermSequence.Create.push([result]);
-    while nextToken(true) = ',' do begin
-      expect(',');
-      result.push(parse);
+  try
+    if nextToken(true) = ',' then begin
+      result := TXQTermSequence.Create.push([result]);
+      while nextToken(true) = ',' do begin
+        expect(',');
+        result.push(parse);
+      end;
     end;
+  except
+    result.free;
+    raise;
   end;
 end;
 
@@ -1160,6 +1180,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     tempVar: TXQTermDefineVariable;
   begin
     funcTerm := TXQTermDefineFunction.create(nextTokenQName());
+    result.push(funcTerm);
     staticContext.splitRawQName(funcTerm.namespace, funcTerm.funcname, xqdnkFunction);
     expect('(');
     skipWhitespaceAndComment();
@@ -1186,7 +1207,6 @@ function TXQParsingContext.parseModule(): TXQTerm;
       end;
       'external': ;
     end;
-    result.push(funcTerm);
     if funcTerm.namespace = nil then raiseParsingError('XQST0060', 'No namespace for declared function: '+funcTerm.funcname);
     if (funcTerm.namespace.getURL = 'http://www.w3.org/XML/1998/namespace') or
        (funcTerm.namespace.getURL = 'http://www.w3.org/2001/XMLSchema') or
@@ -1214,125 +1234,130 @@ var
   namespace: INamespace;
 begin
   result := nil;
-  token := nextToken(true);
-  if token = 'xquery' then begin
-    requireXQuery();
-    expect(token); expect('version');
-    if parseStringLiteral <> '1.0' then raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0');
+  try
     token := nextToken(true);
-    if token = 'encoding' then begin
-      expect(token);
-      encoding := strEncodingFromName(parseStringLiteral);
+    if token = 'xquery' then begin
+      requireXQuery();
+      expect(token); expect('version');
+      if parseStringLiteral <> '1.0' then raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0');
+      token := nextToken(true);
+      if token = 'encoding' then begin
+        expect(token);
+        encoding := strEncodingFromName(parseStringLiteral);
+        expect(';');
+        token := nextToken(true);
+      end else if token = ';' then begin expect(token); token := nextToken(true); end
+      else raiseParsingError('XPST0003', 'expected encoding or ;');
+    end;
+
+    if token = 'module' then begin
+      requireModule;
+      expect(token); expect('namespace');
+      staticContext.moduleNamespace := TNamespace.create('', nextToken());
+      if system.pos(':', staticContext.moduleNamespace.getPrefix) > 0 then raiseParsingError('XPST0003', 'Namespace id must not begin with a namespace prefix itself');
+      expect('=');
+      (staticContext.moduleNamespace as TNamespace).url := parseStringLiteral;
       expect(';');
       token := nextToken(true);
-    end else if token = ';' then begin expect(token); token := nextToken(true); end
-    else raiseParsingError('XPST0003', 'expected encoding or ;');
-  end;
+      if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then
+        staticContext.sender.FModules.Add(IXQuery(resultquery));
+    end;
 
-  if token = 'module' then begin
-    requireModule;
-    expect(token); expect('namespace');
-    staticContext.moduleNamespace := TNamespace.create('', nextToken());
-    if system.pos(':', staticContext.moduleNamespace.getPrefix) > 0 then raiseParsingError('XPST0003', 'Namespace id must not begin with a namespace prefix itself');
-    expect('=');
-    (staticContext.moduleNamespace as TNamespace).url := parseStringLiteral;
-    expect(';');
-    token := nextToken(true);
-    if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then
-      staticContext.sender.FModules.Add(IXQuery(resultquery));
-  end;
-
-  while (token = 'declare') or (token = 'import') do begin
-    requireModule;
-    expect(token);
-    if token = 'import' then begin
-      case nextToken() of
-        'schema': importSchema;
-        'module': importModule;
-      end;
-    end else case nextToken() of //declare ...
-      'boundary-space':
+    while (token = 'declare') or (token = 'import') do begin
+      requireModule;
+      expect(token);
+      if token = 'import' then begin
         case nextToken() of
-          'preserve': staticContext.StripBoundarySpace:=false;
-          'strip': staticContext.StripBoundarySpace:=true;
-          else raiseParsingError('XPST0003', 'unknown boundary-space declaration');
+          'schema': importSchema;
+          'module': importModule;
         end;
-      'default': begin
-        token := nextToken();
-        case token of
-          'collation': staticContext.collation := staticContext.sender.getCollation(parseStringLiteral, staticContext.baseURI);
-          'order': begin
-            expect('empty');
-            case nextToken() of
-              'greatest': staticContext.emptyOrderSpec:=xqeoEmptyGreatest;
-              'least': staticContext.emptyOrderSpec:=xqeoEmptyLeast;
+      end else case nextToken() of //declare ...
+        'boundary-space':
+          case nextToken() of
+            'preserve': staticContext.StripBoundarySpace:=false;
+            'strip': staticContext.StripBoundarySpace:=true;
+            else raiseParsingError('XPST0003', 'unknown boundary-space declaration');
+          end;
+        'default': begin
+          token := nextToken();
+          case token of
+            'collation': staticContext.collation := staticContext.sender.getCollation(parseStringLiteral, staticContext.baseURI);
+            'order': begin
+              expect('empty');
+              case nextToken() of
+                'greatest': staticContext.emptyOrderSpec:=xqeoEmptyGreatest;
+                'least': staticContext.emptyOrderSpec:=xqeoEmptyLeast;
+              end;
+            end;
+            'element', 'function': begin
+              expect('namespace');
+              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseStringLiteral, '')
+              else staticContext.defaultFunctionNamespace := TNamespace.Create(parseStringLiteral, '')
+            end;
+            else raiseParsingError('XPST0003', 'Unknown default value');
+          end;
+        end;
+        'base-uri': staticContext.baseUri := parseStringLiteral;
+        'construction':
+          case nextToken() of
+            'strip': staticContext.constructionPreserve := false;
+            'preserve': staticContext.constructionPreserve := true
+            else raiseParsingError('XPST0003', 'invalid construction declaration');
+          end;
+        'ordering':
+          case nextToken() of
+            'unordered': staticContext.ordering:=false;
+            'ordered': staticContext.ordering:=true;
+            else raiseParsingError('XPST0003', 'invalid ordering mode');
+          end;
+        'copy-namespaces': begin
+           case nextToken() of
+             'preserve': staticContext.copyNamespacePreserve:=true;
+             'no-preserve': staticContext.copyNamespacePreserve:=false;
+             else raiseParsingError('XPST0003', 'Invalid copy-namespace');
+           end;
+           expect(',');
+           case nextToken() of
+             'inherit': staticContext.copyNamespaceInherit:=true;
+             'no-inherit': staticContext.copyNamespaceInherit:=false;
+             else raiseParsingError('XPST0003', 'Invalid copy-namespace');
+           end;
+         end;
+        'namespace': begin
+           nameSpaceName := nextTokenNCName();
+           expect('=');
+           nameSpaceURL := parseStringLiteral;
+           if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+           staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
+        end;
+        'variable': declareVariable();
+        'function': declareFunction;
+        'option': begin
+          token := nextTokenQName();
+          temp := parseStringLiteral;
+          namespace := staticContext.findNamespace(strSplitGet(':', token), xqdnkUnknown);
+          if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
+            case token of
+              'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
+              'extended-strings': readBoolean(AllowVariableUseInStringLiterals, temp);
+              'objects': readBoolean(AllowObjects, temp);
+              'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
+              'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
             end;
           end;
-          'element', 'function': begin
-            expect('namespace');
-            if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseStringLiteral, '')
-            else staticContext.defaultFunctionNamespace := TNamespace.Create(parseStringLiteral, '')
-          end;
-          else raiseParsingError('XPST0003', 'Unknown default value');
         end;
+        else raiseParsingError('XPST0003', 'Unknown declaration');
       end;
-      'base-uri': staticContext.baseUri := parseStringLiteral;
-      'construction':
-        case nextToken() of
-          'strip': staticContext.constructionPreserve := false;
-          'preserve': staticContext.constructionPreserve := true
-          else raiseParsingError('XPST0003', 'invalid construction declaration');
-        end;
-      'ordering':
-        case nextToken() of
-          'unordered': staticContext.ordering:=false;
-          'ordered': staticContext.ordering:=true;
-          else raiseParsingError('XPST0003', 'invalid ordering mode');
-        end;
-      'copy-namespaces': begin
-         case nextToken() of
-           'preserve': staticContext.copyNamespacePreserve:=true;
-           'no-preserve': staticContext.copyNamespacePreserve:=false;
-           else raiseParsingError('XPST0003', 'Invalid copy-namespace');
-         end;
-         expect(',');
-         case nextToken() of
-           'inherit': staticContext.copyNamespaceInherit:=true;
-           'no-inherit': staticContext.copyNamespaceInherit:=false;
-           else raiseParsingError('XPST0003', 'Invalid copy-namespace');
-         end;
-       end;
-      'namespace': begin
-         nameSpaceName := nextTokenNCName();
-         expect('=');
-         nameSpaceURL := parseStringLiteral;
-         if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
-         staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
-      end;
-      'variable': declareVariable();
-      'function': declareFunction;
-      'option': begin
-        token := nextTokenQName();
-        temp := parseStringLiteral;
-        namespace := staticContext.findNamespace(strSplitGet(':', token), xqdnkUnknown);
-        if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
-          case token of
-            'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
-            'extended-strings': readBoolean(AllowVariableUseInStringLiterals, temp);
-            'objects': readBoolean(AllowObjects, temp);
-            'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
-            'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
-          end;
-        end;
-      end;
-      else raiseParsingError('XPST0003', 'Unknown declaration');
+      token := nextToken(true);
+      if token = ';' then expect(';');
+      token := nextToken(true);
     end;
-    token := nextToken(true);
-    if token = ';' then expect(';');
-    token := nextToken(true);
+    if result <> nil then result.push(parsePrimaryLevel)
+    else result := parsePrimaryLevel();
+  except
+    result.free;
+    raise;
   end;
-  if result <> nil then result.push(parsePrimaryLevel)
-  else result := parsePrimaryLevel();
   if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) and (result is TXQTermModule) and (staticContext.moduleNamespace <> nil)  then begin
     resultquery.fterm := result;
     resultquery.initializeStaticContext(staticContext.sender.getEvaluationContext(staticContext));

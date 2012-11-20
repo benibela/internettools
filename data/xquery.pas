@@ -3706,16 +3706,21 @@ begin
   cxt.parsingModel:=model;
   cxt.engine := self;
   try
-    cxt.str := str;
-    cxt.pos := @cxt.str[1];
-    result := TXQuery.Create(cxt.staticContext);
-    result.staticContextShared := staticContextShared;
-    cxt.resultquery := result;
-    result.fterm := cxt.parseModule();
-    if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
-    if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
-  finally
-    cxt.free;
+    try
+      cxt.str := str;
+      cxt.pos := @cxt.str[1];
+      result := TXQuery.Create(cxt.staticContext);
+      result.staticContextShared := staticContextShared;
+      cxt.resultquery := result;
+      result.fterm := cxt.parseModule();
+      if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
+      if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
+    finally
+      cxt.free;
+    end;
+  except
+    result.free;
+    raise;
   end;
 end;
 

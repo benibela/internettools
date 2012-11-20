@@ -373,9 +373,12 @@ begin
     tempContext.temporaryVariables:=TXQVariableChangeLog.create();
     tempContext.temporaryVariables.allowObjects:=context.staticContext.sender.VariableChangelog.allowObjects;
   end;
-  result:=xqvalue(evaluateSomeEvery(0));
-  xqvalueSeqSqueeze(result);
-  if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
+  try
+    result:=xqvalue(evaluateSomeEvery(0));
+    xqvalueSeqSqueeze(result);
+  finally
+    if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables); //iff context.temporaryVariables = nil, we created the change log here
+  end;
 end;
 
 { TXQTermFor }
@@ -516,30 +519,34 @@ begin
     if vars[i].positionVarname <> '' then
       tempContext.temporaryVariables.add(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
   end;}
-  evaluateForLoop(0);
-  //setlength(tempContext.temporaryVariables.vars, oldlen);
+  try
+    evaluateForLoop(0);
+    //setlength(tempContext.temporaryVariables.vars, oldlen);
 
-  if sortingCache <> nil then begin
-    if sortingCache.Count > 0 then begin
-      sortingData.flower:=self;
-      sortingData.context:=@tempContext;
-      setlength(sortingData.collations, length(orders));
-      for i := 0 to high(orders) do
-        if orders[i].collation = '' then sortingData.collations[i] := nil
-        else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation, context.staticContext.baseURI);
-      stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
-      for i := 0 to sortingCache.Count - 1 do begin
-        xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
-        TOrderedTuple(sortingCache[i]).Free;
+    if sortingCache <> nil then begin
+      if sortingCache.Count > 0 then begin
+        sortingData.flower:=self;
+        sortingData.context:=@tempContext;
+        setlength(sortingData.collations, length(orders));
+        for i := 0 to high(orders) do
+          if orders[i].collation = '' then sortingData.collations[i] := nil
+          else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation, context.staticContext.baseURI);
+        stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
+        for i := 0 to sortingCache.Count - 1 do begin
+          xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
+          TOrderedTuple(sortingCache[i]).Free;
+        end;
       end;
+      FreeAndNil(sortingCache);
     end;
-    sortingCache.free;
-  end;
 
-  if finalResult = nil then result := TXQValueUndefined.create
-  else result := finalResult;
-  xqvalueSeqSqueeze(result);
-  if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables) //iff context.temporaryVariables = nil, we created the change log here
+    if finalResult = nil then result := TXQValueUndefined.create
+    else result := finalResult;
+    xqvalueSeqSqueeze(result);
+  finally
+    if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables); //iff context.temporaryVariables = nil, we created the change log here
+    FreeAndNil(sortingCache);
+  end;
 end;
 
 destructor TXQTermFlower.destroy;
