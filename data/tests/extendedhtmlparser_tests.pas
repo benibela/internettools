@@ -954,6 +954,11 @@ begin
        '{xquery version "1.0"; declare function triple($x) {$x * 3}; ()}<b>{$def := add(triple(.), $v1)}</b></r>', '<r><b/><b/><b>100</b></r>',
     '_result='#10'_result='#10'_result='#10'def=317');
 
+  t('<r><a>{text()}</a></r>', '<r><a>1</a><a>2</a></r>', '_result=1');
+  t('<r><a>{following-sibling::a/text()}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=2');
+  t('<r><a>{following-sibling::a/(text())}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=2');
+  t('<r><a>{following-sibling::a/concat("-",text(),"-")}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=-2-');
+
   extParser.free;
   sl.Free;
 end;

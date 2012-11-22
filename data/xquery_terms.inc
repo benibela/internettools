@@ -802,7 +802,7 @@ end;
 function TXQTermNodeMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue.clone
-  else if func and (axis = '') and (select = 'text') and (context.staticContext.sender.TextElement<>nil) then result := xqvalue(context.staticContext.sender.TextElement)
+  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.staticContext.sender.TextElement<>nil) then result := xqvalue(context.staticContext.sender.TextElement)
   else begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
