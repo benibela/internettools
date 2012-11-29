@@ -1031,16 +1031,23 @@ function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArr
 }
 
 var //node: TTreeNode;
-    replace: TStringList;
+    replaceNames, replaceValues: TStringArray;
     cmp: TStringComparisonFunc;
+    procedure addSingleValue(temp: string);
+    begin
+      arrayAdd(replaceNames, strSplitGet('=', temp));
+      arrayAdd(replaceValues, temp);
+    end;
+
     procedure add(s: string);
     var
       split: TStringArray;
       i: Integer;
+      temp: String;
     begin
+      if s = '' then exit;
       split := strSplit(s, '&');
-      for i:=0 to high(split) do
-        replace.add(split[i]);
+      for i:=0 to high(split) do addSingleValue(split[i]);
     end;
 
 
@@ -1060,8 +1067,8 @@ var //node: TTreeNode;
       begin
         if request <> '' then request += '&';
         if addToUsed then begin
-          replaced := replace.IndexOfName(n);
-          if replaced >= 0 then v := replace.ValueFromIndex[replaced];
+          replaced := arrayIndexOf(replaceNames, n);
+          if replaced >= 0 then v := replaceValues[replaced];
         end;
         request +=         urlHexEncode(n, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~'])
                    + '=' + urlHexEncode(v, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']);
@@ -1077,7 +1084,7 @@ var //node: TTreeNode;
         if temp.typ = tetOpen then begin
           if cmp(temp.value, 'textarea') then
             addToRequest(temp.getAttribute('name', cmp), temp.deepNodeText())
-          else if cmp(temp.value, 'input') then begin
+          else if cmp(temp.value, 'input') and (temp['name'] <> '') then begin
             typ := temp.getAttribute('type', cmp);
             if (typ = '') or cmp(typ, 'hidden') or cmp(typ, 'password') or cmp(typ, 'text') then
               addToRequest(temp.getAttribute('name', cmp), temp.getAttribute('value', cmp))
@@ -1105,8 +1112,9 @@ var //node: TTreeNode;
         temp := temp.next;
       end;
 
-      for i:=0 to replace.Count - 1 do begin
-        replace.GetNameValue(i, typ, value);
+      for i:=0 to high(replaceNames) do begin
+        typ := replaceNames[i];
+        value := replaceValues[i];
         if used.IndexOf(typ) < 0 then addToRequest(typ, value, false);
       end;
       used.free;
@@ -1130,6 +1138,7 @@ var //node: TTreeNode;
     end;
 
 var v: IXQValue;
+  first: Boolean;
 begin
   requiredArgCount(args, 1, 2);
 
@@ -1138,11 +1147,14 @@ begin
 
   cmp := @context.staticContext.nodeCollation.equal;
 
-  replace := TStringList.Create;
   if length(args) = 2 then begin
-    replace.CaseSensitive:=false;
+    first := true;
     for v in args[1] do
-      add(v.toString);
+      if first then begin
+        add(v.toString);
+        first := false;
+      end else
+        addSingleValue(v.toString)
   end;
 
   result := nil;
@@ -1150,7 +1162,6 @@ begin
     xqvalueSeqAdd(result, encodeForm(v.toNode));
   if result = nil then result := xqvalue;
 
-  replace.free;
 end;
 
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;

@@ -1213,11 +1213,12 @@ type
                   @br Returns the outer xml of a node as string (= inner-xml plus the opening/closing tag of the node itself) )
       @item(@code(form(<form>[, <override>]))
                   @br This creates the request corresponding to a html form. The request includes the value of all input/select/textarea descendants of the form parameter.
-                  @br You can use the override parameter to give a url encoded list of values replacing the default value of the form elements.
+                  @br You can use the override parameter to give a list of values replacing the default values of the form elements.
+                      (if you pass a sequence, the first string in the sequence might can multiple values like "a=b&c=d&e=f", the other ones are assumed to be a single value. The passed values are always url encoded)
                   @br It returns an object with these properties:
                   @br url: The url the form should be send to (includes the encoded data for a GET request)
                   @br method: POST or GET
-                  @br post: Url encoded post data (in future versions it might be multipart-encoded, if enctype is set) )
+                  @br post: Url encoded post data (in future versions it might be multipart-encoded, if enctype is set correspondingly) )
       @item(@code(split-equal(<list>, <string> [, <sep> = ' ']))
                   @br Treats the string <list> as a list of strings separated by <sep> and tests if <string> is contained in this list, which is useful for matching classes.
                   @br (This is almost the same as @code(tokenize(<list>, <sep>) = <string>), but more efficient, since <sep> is a string not a regexp, and no boxing of the list entries to the xq variant type occurs )
