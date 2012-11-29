@@ -104,6 +104,7 @@ function processedVariables: TXQVariableChangeLog;
 procedure freeThreadVars;
 
 threadvar defaultInternet: TInternetAccess;
+function defaultQueryEngine: TXQueryEngine;
 
 //**Initializes the defaultInternet variable
 procedure needInternetAccess;
@@ -222,6 +223,11 @@ begin
   defaultInternet.Free; defaultInternet := nil;
   templateParser.Free; templateParser := nil;
   tree.Free; tree := nil;
+end;
+
+function defaultQueryEngine: TXQueryEngine;
+begin
+  result := pxpParser;
 end;
 
 procedure needInternetAccess;
