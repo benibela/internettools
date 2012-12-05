@@ -946,7 +946,13 @@ begin
     testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
     if testNS then begin
       temp := context.findNamespace(readnamespace, xqdnkUnknown);
-      if temp <> nil then readnamespace:=temp.getURL;
+      if temp <> nil then readnamespace:=temp.getURL
+      else if readnamespace <> '' then begin
+        if not context.staticContext.useLocalNamespaces then raiseEvaluationError('XPST0081', 'Unknown namespace prefix: '+readnamespace+' for reading attribute: '+readvalue);
+        if context.SeqValue.toNode <> nil then readnamespace:=context.SeqValue.toNode.getNamespaceURL(readnamespace)
+        else readnamespace:='';
+        if readnamespace = '' then exit(xqvalue); //do not raise an exception if the namespace is unknown and the local namespace extension is enabled (so you can use unknown namespaces in css)
+      end;
     end;
     for i := 0 to tempel.attributes.Count - 1 do begin
       attrib := tempel.attributes.items[i];

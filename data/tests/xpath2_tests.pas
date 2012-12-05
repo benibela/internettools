@@ -1942,7 +1942,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(css(''a[href$=".html"]''), ",")', 'A3', '<a href="http://xyz.com">A1</a><a href="http://xyz.com/test.gif">A2</a><a href="http://xyz.com/test.html">A3</a>');
   t('string-join(css(''p[title*="hello"]''), ",")', 'P2,P3', '<p title="foobar">P1</p><p title="xyzhelloyzxy">P2</p><p title="hello">P3</p>');
   t('string-join(css(''p[*|title*="hello"]''), ",")', 'P2,P3', '');
+  ps.StaticContext.useLocalNamespaces:=true;
   t('string-join(css(''p[xyz|title*="hello"]''), ",")', '', '');
+  ps.StaticContext.useLocalNamespaces:=false;
   t('string-join(css(''p[|title*="hello"]''), ",")', 'P2,P3', '');
   t('string-join(css(''*.pastoral''), ",")', 'S1,Very green,P1,P2', '<span class="pastoral">S1</span><H1>Not green</H1><H1 class="pastoral">Very green</H1><p class="pastoral blue aqua marine">P1</p><p class="pastoral blue">P2</p>');
   t('string-join(css(''.pastoral''), ",")', 'S1,Very green,P1,P2', '');
@@ -2648,6 +2650,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('', '',  '<html xmlns="foobar"><svg:abc xmlns:svg="svgNS"> foobar </svg:abc> <svg2:def xmlns:svg2="svgNS"> foobar </svg2:def> <svg:xyz xmlns:svg="NS2"> 123 </svg:xyz>  </html>');
   t('string-join(for $i in html/svg:* return local-name($i), " ")', 'abc xyz');
   t('string-join(for $i in html/svg:* return $i, " ")', 'foobar 123');
+  t('', '',  '<html xmlns:test="foobar"><foobar test:abc="123" xmlns:test2="asasdasd" test2:abc="456"/></html>');
+  t('string-join(html/foobar/@test:abc, " ")', '123');
+  t('html/foobar/string-join(@test:abc, " ")', '123');
+  t('string-join(html/foobar/(concat(">", @test:abc, "<")), " ")', '>123<');
+  t('string-join(html/foobar/@test2:abc, " ")', '456');
+  t('html/foobar/string-join(@test2:abc, " ")', '456');
+  t('string-join(html/foobar/(concat(">", @test2:abc, "<")), " ")', '>456<');
 
 
   performUnitTest('$abc','alphabet','');
