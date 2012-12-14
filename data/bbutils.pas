@@ -7766,11 +7766,13 @@ var
 begin
   setlength(totient, n+1);
   totient[0] := 0;
+  //initialize array for numbers that are prime (also handles the case of numbers only divisible by 2)
   for p:=1 to n do totient[p] := 1;
 
+  //initialize array for numbers that are divisible by 4 (numbers divisible by 2 and not by 4 were handled above)
   j := 4;
   while j <= n do begin
-    e := (j) and (-j);
+    e := (j) and (-j);     //calculate the largest e (or k) with e = 2^k dividing j
     totient[j] := e shr 1;
     j += 4;
   end;
@@ -7796,7 +7798,7 @@ begin
             exps[e] := 0;
             e+=1;
             exps[e] += 1;
-          until  (e > exphigh) or (exps[e] < p);
+          until     e > exphigh) or (exps[e] < p);
 
           if exps[exphigh] = 0 then begin
             powers[exphigh + 1] := powers[exphigh] * p;
