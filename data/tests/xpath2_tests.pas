@@ -1631,7 +1631,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('obj.o := $obj', '', '');
   t('$obj.o.foo', '246', '');
   t('$obj.bar := 17', '17', '');
-               //,('$obj.o.bar', '', '')
+  t('$obj.o.bar', '', '');
   t('obj.o.foo := "new"', 'new', '');
   t('$obj.o.foo', 'new', '');
   t('$obj.foo', '246', '');
