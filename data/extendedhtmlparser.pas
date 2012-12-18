@@ -407,6 +407,7 @@ THtmlTemplateParser=class
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
     function evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
+    procedure defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
@@ -714,6 +715,25 @@ begin
   result := FTemplate.globalNamespaces;
 end;
 
+procedure THtmlTemplateParser.defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
+var
+  base: string;
+  varname: string;
+  temp: IXQValue;
+begin
+  if not FVariableLog.splitName(variable,base,varname) or not FVariableLog.allowObjects then begin
+    FVariableLog.defineVariable(sender, variable, value);
+    exit;
+  end;
+  if FVariableLog.hasVariable(base, nil) or not FOldVariableLog.hasVariable(base, nil) then begin
+    FVariableLog.defineVariable(sender, variable, value);
+    exit;
+  end;
+  temp := FOldVariableLog.get(base);
+  if not (temp is TXQValueObject) then raise EXQEvaluationException.create('pxp:OBJECT', 'Set object property, but variable is no object');
+  FVariableLog.defineVariable(sender, base, (temp as TXQValueObject).setImmutable(varname, value));
+end;
+
 function THtmlTemplateParser.GetVariableLogCondensed: TXQVariableChangeLog;
 begin
   if FVariableLogCondensed = nil then FVariableLogCondensed := FVariableLog.condensed;
@@ -884,9 +904,9 @@ var xpathText: TTreeNode;
 
     varnameindex := attribs.IndexOfName('var');
     if varnameindex >= 0 then
-      FVariableLog.add(Trim(replaceVars(attribs.Values['var'])), value)
+      defineXQVariable(nil,Trim(replaceVars(attribs.Values['var'])), value)
     else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
-      FVariableLog.add(FUnnamedVariableName, value);
+      defineXQVariable(nil, FUnnamedVariableName, value);
 
     templateStart := templateStart.templateReverse;
   end;
@@ -897,7 +917,7 @@ var xpathText: TTreeNode;
   begin
     varcount:=FVariableLog.count;
     read := performPXPEvaluation(templateStart.source);
-    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then FVariableLog.add(FUnnamedVariableName, read);
+    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then defineXQVariable(nil, FUnnamedVariableName, read);
     templateStart := templateStart.templateReverse;
   end;
 
@@ -1245,7 +1265,7 @@ begin
   FAttributeMatching.Values['class'] := 'list-contains';
 
   FQueryEngine := TXQueryEngine.create;
-  FQueryEngine.OnDefineVariable:= @FVariableLog.defineVariable;
+  FQueryEngine.OnDefineVariable:=@defineXQVariable;
   FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
