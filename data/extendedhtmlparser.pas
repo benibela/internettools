@@ -627,7 +627,7 @@ begin
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
   if templateType = tetCommandShortRead then begin
-    source := parser.parseQuery(strDecodeHTMLEntities(deepNodeText(),eUTF8)); //todo: use correct encoding
+    source := parser.parseQuery(deepNodeText()); //todo: use correct encoding
     term := source.Term;
     if term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(Term, nil, TXQTermNodeMatcher.Create('.'))
     else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
@@ -1126,11 +1126,8 @@ end;
 procedure THtmlTemplateParser.parseHTMLSimple(html, uri, contenttype: string);
 begin
   FHTML.trimText := FTrimTextNodes = ttnWhenLoading;
+  FHTML.TargetEncoding := OutputEncoding;
   FHtmlTree := FHTML.parseTree(html, (uri), contenttype);
-
-  //encoding trouble
-  if FHtmlTree is TTreeDocument then
-    TTreeDocument(FHtmlTree).setEncoding(outputEncoding,true,true);
 
   if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
     FHTML.removeEmptyTextNodes(true);
@@ -1171,7 +1168,7 @@ begin
       end;
     end;
   end;
-  FTemplate.getLastTree.setEncoding(outputEncoding,true,true);
+  FTemplate.getLastTree.setEncoding(outputEncoding,true,false); //todo: check this for &amp; in templates!
   lastTrimTextNodes := FTrimTextNodes;
 
 

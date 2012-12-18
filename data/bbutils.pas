@@ -7798,7 +7798,7 @@ begin
             exps[e] := 0;
             e+=1;
             exps[e] += 1;
-          until     e > exphigh) or (exps[e] < p);
+          until (   e > exphigh) or (exps[e] < p);
 
           if exps[exphigh] = 0 then begin
             powers[exphigh + 1] := powers[exphigh] * p;

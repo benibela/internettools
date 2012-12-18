@@ -542,7 +542,6 @@ var  u: TTreeNode;
 begin
   baseActions.clear;
 
-  (t as TTreeDocument).setEncoding(eUTF8,true,true);
   if not (t.typ in [tetOpen, tetDocument]) then raise Exception.Create('Empty template');
   u := t.findChild(tetOpen,'action',[tefoIgnoreText]);
   if u = nil then raise Exception.Create('Empty template');
@@ -582,6 +581,7 @@ begin
   tree := TTreeParser.Create;
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
+  tree.TargetEncoding:=eUTF8;
   readTree(tree.parseTreeFromFile(_dataPath+'template'));
   loadTemplates(baseActions);
   tree.free;
@@ -596,6 +596,7 @@ begin
   tree := TTreeParser.Create;
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
+  tree.TargetEncoding:=eUTF8;
   readTree(tree.parseTree(template));
   tree.Free;
 end;
