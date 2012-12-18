@@ -1136,7 +1136,7 @@ type
 
     This XQuery engine currently supports XPath 2.0 and XQuery 1.0, with some extensions and minor deviations.@br@br
 
-    Some very basic, standard XPath examples:
+    Some very basic, standard XPath examples, for people who do not have seen XPath before:
     @unorderedList(
       @item(@code("something") or @code("something") @br This returns the string 'something'. (see below))
       @item(@code($var)  @br This returns the value of the variable @code(var). (see below))
@@ -1163,7 +1163,7 @@ type
       @item(@code(for $x in @code(seq) return $x + 1) @br This adds 1 to all elements in the sequence @code(seq))
       @item(@code(some $x in @code(seq) satisfies condition) @br This returns true iff one element of @code(seq) satisfies @code(condition) )
       @item(@code(every $x in @code(seq) satisfies condition) @br This returns true iff every element of @code(seq) satisfies @code(condition) )
-      @item(@code(if (condition) then $x else $y) @br This returns @code(x) if @code(condition) is true, and @code(y) otherwise  )
+      @item(@code(if (condition) then $x else $y) @br This returns @code($x) if @code(condition) is true, and @code($y) otherwise  )
     )
 
     Differences between this implementation and standard XPath/XQuery (most differences can be turned off with the respective option or the field in the default StaticContext):
@@ -1172,7 +1172,7 @@ type
 
     @unorderedList(
     @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. (option: extended-strings))
-    @item(@code(var:=value) @br This assignes the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) )
+    @item(@code(var:=value) @br This assigns the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) )
     @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
           unless you use collations.)
     @item(The default type system is weaker typed, most values are automatically converted if necessary, e.g. "1" + 2 returns 3. @br
@@ -1202,11 +1202,11 @@ type
       @item(@code(eval(<string>)) @br This evaluates the string as a XQuery-expression. )
       @item(@code(css(<string>)) @br This evaluates the string as a css selector. )
       @item(@code(parse-date(<string>, <format>))
-                  @br Reads a date/time from string with the given format )
+                  @br Reads a date/time from string with the given format. The format is a standard Pascal format, using ymdhnsz (e.g. "yyyy-mm-dd"), not a XQuery 3.0 picture string. )
       @item(@code(parse-time(<string>, <format>))
-                  @br Reads a date/time from string with the given format )
+                  @br Reads a date/time from string with the given format. The format is a standard Pascal format (see above) )
       @item(@code(parse-datetime(<string>, <format>))
-                  @br Reads a date/time from string with the given format )
+                  @br Reads a date/time from string with the given format. The format is a standard Pascal format (see above) )
       @item(@code(inner-xml(<node>))
                   @br Returns the inner xml of a node as string (like innerHTML in javascript) )
       @item(@code(outer-xml(<node>))
