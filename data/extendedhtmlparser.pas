@@ -734,9 +734,11 @@ var
   temp: TXQValue;
 begin
   ignore(sender);
-  if not FVariableLog.hasVariable(variable, @temp) then
-    if not FOldVariableLog.hasVariable(variable, @temp) then exit(false);
-  value := temp;
+  temp := nil;
+  if not FVariableLog.hasVariableOrObject(variable, @temp) then
+    if not FOldVariableLog.hasVariableOrObject(variable, @temp) then exit(false);
+  if temp <> nil then value := temp
+  else value := xqvalue();
   result := true;
 end;
 
