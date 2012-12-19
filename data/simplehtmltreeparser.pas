@@ -364,6 +364,7 @@ end;
 
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
+function htmlStrEscape(s: string; attrib: boolean = false):string;
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
       XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -1168,6 +1169,12 @@ var known: TNamespaceList;
   function inner(n: TTreeNode): string; forward;
 
   function outer(n: TTreeNode): string;
+    function attribEscape(const s: string): string; inline;
+    begin
+      if html then result := htmlStrEscape(s, true)
+      else result := xmlStrEscape(s, true);
+    end;
+
   var attrib: TTreeAttribute;
       oldnamespacecount: integer;
       i: Integer;
@@ -1176,8 +1183,9 @@ var known: TNamespaceList;
     with n do
     case typ of
       tetText:
-        if html and (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then result := value
-        else result := xmlStrEscape(value);
+        if not html then result := xmlStrEscape(value)
+        else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then result := value
+        else result := htmlStrEscape(value);
       tetClose: result := '</'+getNodeName()+'>';
       tetComment: result := '<!--'+value+'-->';
       tetProcessingInstruction: begin
@@ -1219,7 +1227,7 @@ var known: TNamespaceList;
         if attributes <> nil then
           for attrib in attributes do
             if not attrib.isNamespaceNode then
-              result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue, true)+'"';
+              result += ' ' + attrib.getNodeName()+'="'+ attribEscape(attrib.realvalue)+'"';
 
         if (next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin
           if html then result += '>'
@@ -1237,7 +1245,7 @@ var known: TNamespaceList;
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
       end;
-      tetDocument: result := innerXML(insertLineBreaks);
+      tetDocument: if html then result := innerHTML(insertLineBreaks) else result := innerXML(insertLineBreaks);
     end;
   end;
 
@@ -2023,6 +2031,48 @@ begin
       end;
     end;
     i+=1;
+  end;
+  setlength(result, p - 1);
+end;
+
+function htmlStrEscape(s: string; attrib: boolean): string;
+var
+  i, p: Integer;
+  procedure push(const t:string); inline;
+  begin
+    if p + length(t) > length(result) + 1 then setlength(result, length(result) + 64);
+    move(t[1], result[p], length(t));
+    p+=length(t);
+  end;
+  procedure normal; inline;
+  begin
+    if p > length(result) then setlength(result, length(result) + 64);
+    result[p] := s[i];
+    p+=1;
+  end;
+begin
+  setlength(result, length(s));
+  p:=1;
+  i := 1;
+  if attrib then begin
+    while i <= length(s) do begin
+      case s[i] of
+        '&': push('&amp;');
+        '"': push('&quot;');
+        else normal;
+      end;
+      i+=1;
+    end
+  end else begin
+    while i <= length(s) do begin
+      case s[i] of
+        '&': push('&amp;');
+        '<': push('&lt;');
+        '>': push('&gt;');
+        else normal;
+      end;
+      i+=1;
+    end;
   end;
   setlength(result, p - 1);
 end;
