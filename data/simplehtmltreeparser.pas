@@ -176,6 +176,8 @@ TTreeNode = class
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
   function outerXML(insertLineBreaks: boolean = false):string;
   function innerXML(insertLineBreaks: boolean = false):string;
+  function outerHTML(insertLineBreaks: boolean = false):string;
+  function innerHTML(insertLineBreaks: boolean = false):string;
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
@@ -222,6 +224,7 @@ TTreeNode = class
   function clone: TTreeNode;
 protected
   function serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
+  function serializeHTML(nodeSelf: boolean; insertLineBreaks: boolean): string;
   function cloneShallow: TTreeNode;
 
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
@@ -326,7 +329,8 @@ private
   function findNamespace(const prefix: string): INamespace;
 
   function htmlTagWeight(s:string): integer;
-  function htmlTagAutoClosed(s:string): boolean;
+  class function htmlElementChildless(const s:string): boolean; static;
+  class function htmlElementIsCDATA(const s: string): boolean; static;
 public
   treeNodeClass: TTreeNodeClass; //**< Class of the tree nodes. You can subclass TTreeNode if you need to store additional data at every node
   globalNamespaces: TNamespaceList;
@@ -757,6 +761,16 @@ begin
   result := serializeXML(false, insertLineBreaks);
 end;
 
+function TTreeNode.outerHTML(insertLineBreaks: boolean): string;
+begin
+  result := serializeHTML(true, insertLineBreaks);
+end;
+
+function TTreeNode.innerHTML(insertLineBreaks: boolean): string;
+begin
+  result := serializeHTML(false, insertLineBreaks);
+end;
+
 function TTreeNode.getValue(): string;
 begin
   if self = nil then exit('');
@@ -1142,7 +1156,7 @@ begin
   result := false;
 end;
 
-function serializeXMLWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks: boolean): string;
+function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): string;
 var known: TNamespaceList;
   function requireNamespace(n: INamespace): string;
   begin //that function is useless the namespace should always be in known. But just for safety...
@@ -1161,7 +1175,9 @@ var known: TNamespaceList;
   begin
     with n do
     case typ of
-      tetText: result := xmlStrEscape(value);
+      tetText:
+        if html and (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then result := value
+        else result := xmlStrEscape(value);
       tetClose: result := '</'+getNodeName()+'>';
       tetComment: result := '<!--'+value+'-->';
       tetProcessingInstruction: begin
@@ -1205,8 +1221,9 @@ var known: TNamespaceList;
             if not attrib.isNamespaceNode then
               result += ' ' + attrib.getNodeName()+'="'+xmlStrEscape(attrib.realvalue, true)+'"';
 
-        if next = reverse then begin
-          result += '/>';
+        if (next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin
+          if html then result += '>'
+          else result += '/>';
           if insertLineBreaks then Result+=LineEnding;
           while known.count > oldnamespacecount do
             known.Delete(known.count-1);
@@ -1247,7 +1264,13 @@ function TTreeNode.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): s
 
 begin
   if self = nil then exit('');
-  result := serializeXMLWrapper(self, nodeSelf, insertLineBreaks);
+  result := serializationWrapper(self, nodeSelf, insertLineBreaks, false);
+end;
+
+function TTreeNode.serializeHTML(nodeSelf: boolean; insertLineBreaks: boolean): string;
+begin
+  if self = nil then exit('');
+  result := serializationWrapper(self, nodeSelf, insertLineBreaks, true);
 end;
 
 function TTreeNode.cloneShallow: TTreeNode;
@@ -1537,7 +1560,7 @@ begin
   end;
   new := newTreeNode(tetOpen, tagName, tagNameLen);
   if (FParsingModel = pmHTML) then //normal auto close
-    FAutoCloseTag:=htmlTagAutoClosed(new.value);
+    FAutoCloseTag:=htmlElementChildless(new.value);
 
   FElementStack.Add(new);
   if length(properties)>0 then begin
@@ -1615,7 +1638,7 @@ begin
     end;
 
     name := strFromPchar(tagName, tagNameLen);
-    if htmlTagAutoClosed(name) then begin
+    if htmlElementChildless(name) then begin
       parenDelta := 0;
       last := FCurrentElement;
       while last <> nil do begin
@@ -1739,15 +1762,25 @@ begin
   if striequal(s, '') then exit(100); //force closing of root element
 end;
 
-function TTreeParser.htmlTagAutoClosed(s: string): boolean;
+class function TTreeParser.htmlElementChildless(const s: string): boolean;
 begin
   //elements that should/must not have children
-  result:=striequal(s,'meta') or
-          striequal(s,'br') or
-          striequal(s,'input') or
-          striequal(s,'frame') or
-          striequal(s,'hr')or
-          striequal(s,'img');//or strliequal(s,'p');
+  //area, base, basefont, bgsound, br, col, command, embed, frame, hr, img, input, keygen, link, meta, param, source, track or wbr
+  //Regex ([a-z]+),  => striequal(s,'\1') or
+  if s = '' then exit(false);
+  result:=striequal(s,'area') or striequal(s,'base') or striequal(s,'basefont') or striequal(s,'bgsound') or striequal(s,'br') or striequal(s,'col')
+          or striequal(s,'command') or striequal(s,'embed') or striequal(s,'frame') or striequal(s,'hr') or striequal(s,'img') or striequal(s,'input')
+          or striequal(s,'keygen') or striequal(s,'link') or striequal(s,'meta') or striequal(s,'param') or striequal(s,'source') or striequal(s,'track')
+          or striequal(s,'wbr');
+
+  //elements listed above, not being void are probably (??) deprecated?
+  //void elements: area, base, br, col, command, embed, hr, img, input, keygen, link, meta, param, source, track, wbr
+
+end;
+
+class function TTreeParser.htmlElementIsCDATA(const s: string): boolean;
+begin
+  result := simplehtmlparser.htmlElementIsCDATA(pchar(s), length(s));
 end;
 
 constructor TTreeParser.Create;

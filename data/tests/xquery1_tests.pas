@@ -1582,6 +1582,22 @@ begin
   m('import module namespace circle1 = "pseudo://circle1"; import module namespace circle2 = "pseudo://circle2"; circle1:cf1(10)', '3628800');
 
 
+
+
+  //serialization tests
+  m('outer-xml(<html><meta/><link/><a/></html>)', '<html><meta/><link/><a/></html>');
+  m('outer-html(<html><meta/><link/><a/></html>)', '<html><meta><link><a></a></html>');
+  m('inner-xml(<html><meta/><link/><a/></html>)', '<meta/><link/><a/>');
+  m('inner-html(<html><meta/><link/><a/></html>)', '<meta><link><a></a>');
+  m('outer-xml(<script>&quot;&apos;&lt;&gt;</script>)', '<script>&quot;&apos;&lt;&gt;</script>');
+  m('outer-html(<script>&quot;&apos;&lt;&gt;</script>)', '<script>"''<></script>');
+  m('outer-xml(<script></script>)', '<script/>');
+  m('outer-html(<script></script>)', '<script></script>');
+  m('outer-xml(<style></style>)', '<style/>');
+  m('outer-html(<style></style>)', '<style></style>');
+
+
+
   writeln('XQuery: ', count, ' completed');
 
   helper.free;

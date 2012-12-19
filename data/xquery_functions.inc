@@ -1014,6 +1014,24 @@ begin
   result := xqvalue(node.innerXML())
 end;
 
+function xqFunctionOuter_HTML(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var node: TTreeNode;
+begin
+  requiredArgCount(args, 0, 1);
+  if length(args) = 1 then node := args[0].toNode
+  else node := xqvalueContextNode(context);
+  result := xqvalue(node.outerHTML())
+end;
+
+function xqFunctionInner_HTML(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var node: TTreeNode;
+begin
+  requiredArgCount(args, 0, 1);
+  if length(args) = 1 then node := args[0].toNode
+  else node := xqvalueContextNode(context);
+  result := xqvalue(node.innerHTML())
+end;
+
 function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 
 { string-join(

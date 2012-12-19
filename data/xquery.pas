@@ -1211,6 +1211,10 @@ type
                   @br Returns the inner xml of a node as string (like innerHTML in javascript) )
       @item(@code(outer-xml(<node>))
                   @br Returns the outer xml of a node as string (= inner-xml plus the opening/closing tag of the node itself) )
+      @item(@code(inner-html(<node>))
+                  @br Returns the inner html of a node as string (like inner-xml, but valid html) )
+      @item(@code(outer-html(<node>))
+                  @br Returns the outer html of a node as string (like outer-xml, but valid html) )
       @item(@code(form(<form>[, <override>]))
                   @br This creates the request corresponding to a html form. The request includes the value of all input/select/textarea descendants of the form parameter.
                   @br You can use the override parameter to give a list of values replacing the default values of the form elements.
@@ -4762,6 +4766,8 @@ pxp.registerFunction('parse-time',@xqFunctionParse_Time, []);
 pxp.registerFunction('deep-text',@xqFunctionDeep_Node_Text, []);
 pxp.registerFunction('outer-xml',@xqFunctionOuter_XML, []);
 pxp.registerFunction('inner-xml',@xqFunctionInner_XML, []);
+pxp.registerFunction('outer-html',@xqFunctionOuter_HTML, []);
+pxp.registerFunction('inner-html',@xqFunctionInner_HTML, []);
 pxp.registerFunction('form',@xqFunctionForm, []);
 pxp.registerFunction('eval',@xqFunctionEval, []);
 pxp.registerFunction('css',@xqFunctionCSS, []);

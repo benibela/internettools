@@ -33,7 +33,7 @@ uses
 
 
 type
-  TParsingOptions = set of (poScriptIsCDATA);
+  TParsingOptions = set of (poRespectHTMLCDATAElements);
   THTMLProperty=record
     name, value: pchar;
     nameLen, valueLen: longint;
@@ -75,6 +75,8 @@ type
   function findLinkWithText(const html:string;text: string):string;
   function findLinkWithProperty(const html:string;prop,value: string):string;
   function findTagPropertyValueWithProperty(const html:string;tag,prop_to_get,prop_must_match,value: string):string;
+
+  function htmlElementIsCDATA(const marker: pchar; const tempLen: integer): boolean;
 implementation
 uses bbutils;
 
@@ -90,7 +92,7 @@ procedure parseHTML(const html:string;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                     textEvent: TTextEvent; commentEvent: TTextEvent = nil);
 begin
-  parseML(html, [poScriptIsCDATA], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
+  parseML(html, [poRespectHTMLCDATAElements], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
 end;
 
 
@@ -216,8 +218,8 @@ begin
                 if leaveTagEvent(marker,tempLen) = prStop then
                   exit;
               if pos^ = '/'  then inc(pos);
-            end else if poScriptIsCDATA in options then
-              cdataTag:=strliequal(marker,'script',tempLen);
+            end else if poRespectHTMLCDATAElements in options then
+              cdataTag:=htmlElementIsCDATA(marker, tempLen);
             if pos^='>' then inc(pos);
             marker:=pos;
             //parse cdata script tag
@@ -351,6 +353,13 @@ begin
   parseHTML(html,@temp.enterTag,nil,nil);
   result:=temp.result;
   temp.free;
+end;
+
+function htmlElementIsCDATA(const marker: pchar; const tempLen: integer): boolean;
+begin
+  //    If the parent of current node is a style, script, xmp, iframe, noembed, noframes, or plaintext element, or if the parent of current node is noscript element
+  result := strliequal(marker,'style',tempLen) or strliequal(marker,'script',tempLen) or strliequal(marker,'xmp',tempLen) or strliequal(marker,'iframe',tempLen)
+            or strliequal(marker,'noembed',tempLen) or strliequal(marker,'noframes',tempLen) or strliequal(marker,'plaintext',tempLen);
 end;
 
 function findLinkWithProperty(const html:string;prop,value: string):string;
