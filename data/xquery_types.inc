@@ -1409,9 +1409,9 @@ begin
   ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
   if node = nil then exit('');
   case nodeFormat of
-    tnsText: result := jsonStrEscape(toString);
-    tnsXML: result := jsonStrEscape(node.outerXML());
-    tnsHTML: result := jsonStrEscape(node.outerHTML());
+    tnsText: result := xmlStrEscape(toString);
+    tnsXML: result := xmlStrEscape(node.outerXML());
+    tnsHTML: result := xmlStrEscape(node.outerHTML());
   end;
 end;
 
