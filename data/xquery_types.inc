@@ -40,15 +40,15 @@ begin
   result.flist:=nil;
 end;
 
-function TXQValueUndefined.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValueUndefined.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
-  ignore(xmlTextOnly);
+  ignore(nodeFormat);
   Result:='null';
 end;
 
-function TXQValueUndefined.xmlSerialize(xmlTextOnly: boolean; sequenceTag: string; elementTag: string; objectTag: string): string;
+function TXQValueUndefined.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
 begin
-  ignore(xmlTextOnly); ignore(elementTag); ignore(objectTag);
+  ignore(nodeFormat); ignore(elementTag); ignore(objectTag);
   Result:='<'+sequenceTag+'/>';
 end;
 
@@ -345,15 +345,15 @@ begin
   end;
 end;
 
-function TXQValue.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValue.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
-  ignore(xmlTextOnly);
+  ignore(nodeFormat);
   result := jsonStrEscape(toString);
 end;
 
-function TXQValue.xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
+function TXQValue.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
 begin
-  ignore(xmlTextOnly); ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
+  ignore(nodeFormat); ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
   result := xmlStrEscape(toString);
 end;
 
@@ -422,9 +422,9 @@ begin
   result:=xqvalue(bool);
 end;
 
-function TXQValueBoolean.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValueBoolean.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
-  ignore(xmlTextOnly);
+  ignore(nodeFormat);
   if bool then result := 'true' else result := 'false';
 end;
 
@@ -499,9 +499,9 @@ begin
   result:=extended(value);
 end;
 
-function TXQValueInt65.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValueInt65.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
-  ignore(xmlTextOnly);
+  ignore(nodeFormat);
   Result:=Int65ToStr(value);
 end;
 
@@ -593,9 +593,9 @@ begin
  Result:=value;
 end;
 
-function TXQValueDecimal.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValueDecimal.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
-  ignore(xmlTextOnly);
+  ignore(nodeFormat);
   if isnan(value) then result:='"NaN"'
   else if isPosInf(value) then result:='"INF"'
   else if isNegInf(value) then result:='"-INF"'
@@ -1256,26 +1256,26 @@ begin
   result := seqr;
 end;
 
-function TXQValueSequence.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValueSequence.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 var
   i: Integer;
 begin
   if seq.Count = 0 then exit('[]');
-  result := '[' + seq[0].jsonSerialize(xmlTextOnly);
+  result := '[' + seq[0].jsonSerialize(nodeFormat);
   for i := 1 to seq.Count-1 do
-    result := result + ', ' + seq[i].jsonSerialize(xmlTextOnly);
+    result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
   result += ']';
 end;
 
-function TXQValueSequence.xmlSerialize(xmlTextOnly: boolean; sequenceTag: string; elementTag: string; objectTag: string): string;
+function TXQValueSequence.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
 var
   i: Integer;
 begin
   if seq.Count = 0 then exit('<'+sequenceTag+'/>');
   result := '<'+sequenceTag+'>';
-  result += '<'+elementTag+'>' + seq[0].xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
+  result += '<'+elementTag+'>' + seq[0].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
   for i := 1 to seq.Count-1 do
-    result += '<'+elementTag+'>' + seq[i].xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
+    result += '<'+elementTag+'>' + seq[i].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
   result += '</'+sequenceTag+'>';
 end;
 
@@ -1394,19 +1394,25 @@ begin
   result := TXQValueNode.Create(node);
 end;
 
-function TXQValueNode.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValueNode.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
   if node = nil then exit('null');
-  if xmlTextOnly then result := jsonStrEscape(toString)
-  else result := jsonStrEscape(node.outerXML());
+  case nodeFormat of
+    tnsText: result := jsonStrEscape(toString);
+    tnsXML: result := jsonStrEscape(node.outerXML());
+    tnsHTML: result := jsonStrEscape(node.outerHTML());
+  end;
 end;
 
-function TXQValueNode.xmlSerialize(xmlTextOnly: boolean; sequenceTag: string; elementTag: string; objectTag: string): string;
+function TXQValueNode.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
 begin
   ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
   if node = nil then exit('');
-  if xmlTextOnly then result := xmlStrEscape(toString)
-  else result := node.outerXML();
+  case nodeFormat of
+    tnsText: result := jsonStrEscape(toString);
+    tnsXML: result := jsonStrEscape(node.outerXML());
+    tnsHTML: result := jsonStrEscape(node.outerHTML());
+  end;
 end;
 
 
@@ -1539,7 +1545,7 @@ begin
   result.prototype := self;
 end;
 
-function TXQValueObject.jsonSerialize(xmlTextOnly: boolean): string;
+function TXQValueObject.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 var
   temp: TXQValueObject;
   i: Integer;
@@ -1547,15 +1553,15 @@ begin
   result := '{';
   temp := (self.clone as TXQValueObject);
   if temp.values.count > 0 then begin
-    result += jsonStrEscape(temp.values.getName(0))+': '+temp.values.get(0).jsonSerialize(xmlTextOnly);
+    result += jsonStrEscape(temp.values.getName(0))+': '+temp.values.get(0).jsonSerialize(nodeFormat);
     for i:=1 to temp.values.count-1 do
-      result += ', '+jsonStrEscape(temp.values.getName(i))+': '+temp.values.get(i).jsonSerialize(xmlTextOnly);
+      result += ', '+jsonStrEscape(temp.values.getName(i))+': '+temp.values.get(i).jsonSerialize(nodeFormat);
   end;
   temp.free;
   result += '}';
 end;
 
-function TXQValueObject.xmlSerialize(xmlTextOnly: boolean; sequenceTag: string; elementTag: string; objectTag: string): string;
+function TXQValueObject.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
 var
   temp: TXQValueObject;
   i: Integer;
@@ -1564,9 +1570,9 @@ begin
   if temp.values.count = 0 then result := '<'+objectTag+'/>'
   else begin
     result :=  '<'+objectTag+'>';
-    result +=  '<'+temp.values.Names[0]+'>'+temp.values.get(0).xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[0]+'>';
+    result +=  '<'+temp.values.Names[0]+'>'+temp.values.get(0).xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[0]+'>';
     for i:=1 to temp.values.count-1 do
-      result +=  '<'+temp.values.Names[i]+'>'+temp.values.get(i).xmlSerialize(xmlTextOnly,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[i]+'>';
+      result +=  '<'+temp.values.Names[i]+'>'+temp.values.get(i).xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[i]+'>';
     result +=  '</'+objectTag+'>';
   end;
   temp.free;

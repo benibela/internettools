@@ -89,6 +89,8 @@ type
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
   TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkAny, xqdnkElementType,  xqdnkType, xqdnkFunction);
 
+  TTreeNodeSerialization = (tnsText, tnsXML, tnsHTML);
+
   { TXQStaticContext }
 
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
@@ -230,8 +232,8 @@ type
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
-    function jsonSerialize(xmlTextOnly: boolean = true): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
-    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
 
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
     function GetEnumerator: TXQValueEnumerator; //**< Returns an enumerator for @code(for var in value). For a sequence the enumerator runs over all values contained in the sequence, for other values it will do one iteration over the value of that value. The iterated values have the IXQValue interface type
@@ -280,8 +282,8 @@ type
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
-    function jsonSerialize(xmlTextOnly: boolean = true): string; virtual;
-    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; virtual;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; virtual;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; virtual;
 
     function clone: IXQValue; virtual;
 
@@ -326,8 +328,8 @@ type
     function getSequenceCount: integer; override;
     function clone: IXQValue; override;
 
-    function jsonSerialize(xmlTextOnly: boolean = true): string; override;
-    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
   private
     function GetEnumerator: TXQValueEnumerator;override;
@@ -355,7 +357,7 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(xmlTextOnly: boolean = true): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
   end;
 
 
@@ -381,7 +383,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(xmlTextOnly: boolean = true): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
 
     function clone: IXQValue; override;
   end;
@@ -410,7 +412,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(xmlTextOnly: boolean = true): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
 
     function clone: IXQValue; override;
   end;
@@ -549,8 +551,8 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(xmlTextOnly: boolean = true): string; override;
-    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
     procedure addChild(child: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence can not contain another sequence, so they will be merged)
     procedure addChildMerging(child: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that a xpath sequence can not contain another sequence, so they will be merged)
@@ -582,8 +584,8 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(xmlTextOnly: boolean = true): string; override;
-    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
   end;
 
   { TXQValueNode }
@@ -638,8 +640,8 @@ type
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
 
-    function jsonSerialize(xmlTextOnly: boolean = true): string; override;
-    function xmlSerialize(xmlTextOnly: boolean = true; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
   end;
 
@@ -1769,6 +1771,7 @@ procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end
 procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: Decimal); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
 
 {$I disableRangeOverflowChecks.inc}
 
