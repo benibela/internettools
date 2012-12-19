@@ -100,7 +100,7 @@ end;
 procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                     textEvent: TTextEvent; commentEvent: TTextEvent = nil);
-var pos,marker,htmlEnd: pchar;
+var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
     valueStart:char;
     tempLen:longint;
     properties:THTMLProperties;
@@ -218,13 +218,19 @@ begin
                 if leaveTagEvent(marker,tempLen) = prStop then
                   exit;
               if pos^ = '/'  then inc(pos);
-            end else if poRespectHTMLCDATAElements in options then
+            end else if poRespectHTMLCDATAElements in options then begin
               cdataTag:=htmlElementIsCDATA(marker, tempLen);
+              cdataTagStartMarker := marker;
+            end;
             if pos^='>' then inc(pos);
             marker:=pos;
             //parse cdata script tag
             if cdataTag then begin
-              while (pos+2<=htmlEnd) and ((pos^<>'<') or ((pos+1)^<>'/') or not ((pos+2)^ in ['a'..'z','A'..'Z'])) do
+              while (pos+tempLen<=htmlEnd) and
+                    ((pos^<>'<') or ((pos+1)^<>'/')              //check for                   </
+                      or not ((pos+2)^ in ['a'..'z','A'..'Z'])   //continued check for         </ [:alpha:]
+                      or not ((pos+tempLen+2)^ in [#9,#$A,#$C,' ','/','>'])
+                      or not strliEqual(cdataTagStartMarker, pos+2, tempLen) ) do //check for  </script    (or whatever opened that implicit cdata thing)
                 inc(pos);
               if Assigned(textEvent) then
                 if textEvent(marker, pos-marker) = prStop then
