@@ -49,11 +49,11 @@ begin
 end;
 
 {%REPEAT}
-{$DEFINE NO_ARRAY_UNITTEST}
+//{$DEFINE NO_ARRAY_UNITTEST}
 {%END-REPEAT}
 
-{$IFNDEF NO_ARRAY_UNITTEST}
-procedure arrayUnitTests;
+
+procedure intArrayUnitTests;
 var a: TLongintArray;
     len:longint;
     i: Integer;
@@ -87,14 +87,28 @@ begin
   test(arrayIndexOf(a, 23, 1, 2) = 1);
 
 
-  arrayDelete(a, 0);
+  arrayDeleteUnordered(a, 0);
   test(length(a) =2); test(a[0] = -42); test(a[1] = 23);
 
-  arrayDelete(a, 1);
+  arrayDeleteUnordered(a, 1);
   test(length(a) =1); test(a[0] = -42);
 
-  arrayDelete(a, 0);
+  arrayDeleteUnordered(a, 0);
   test(length(a) =0);
+
+  //new ordered delete
+  arrayAdd(a, [1,2,3,4,5]);
+  test(arrayCompare(a, [1,2,3,4,5]) = 0);
+  arrayDelete(a, 2);
+  test(arrayCompare(a, [1,2,4,5]) = 0);
+  arrayDelete(a, 0);
+  test(arrayCompare(a, [2,4,5]) = 0);
+  arrayDelete(a, 2);
+  test(arrayCompare(a, [2,4]) = 0);
+  arrayDelete(a, 1);
+  test(arrayCompare(a, [2]) = 0);
+  arrayDelete(a, 0);
+  test(arrayCompare(a, []) = 0);
 
   //fast
   len:=0;
@@ -108,7 +122,7 @@ begin
   test((length(a) = 4) and (len=4) and (a[0]=16)and (a[1]=17)and (a[2]=18)and (a[3]=19));
   arrayAddFast(a, len, 88);
   test((length(a) = 16) and (len=5) and (a[0]=16)and (a[1]=17)and (a[2]=18)and (a[3]=19)and (a[4]=88));
-  arrayDeleteFast(a, len, 88);
+  arrayDeleteUnorderedFast(a, len, 88);
   test((length(a) = 16) and (len=5) and (a[0]=16)and (a[1]=17)and (a[2]=18)and (a[3]=19)and (a[4]=88));
 
   //invert
@@ -144,7 +158,63 @@ begin
   end;}
 
 end;
-{$ENDIF}
+
+procedure stringArrayUnitTests;
+var a: TStringArray;
+    len: integer;
+begin
+  arrayAdd(a, 'hallo');
+  test(arrayEqual(a, ['hallo']));
+  arrayAdd(a, 'world');
+  test(arrayEqual(a, ['hallo', 'world']));
+  arrayAdd(a, 'foobar');
+  test(arrayEqual(a, ['hallo', 'world', 'foobar']));
+  arrayAdd(a, '123456');
+  test(arrayEqual(a, ['hallo', 'world', 'foobar', '123456']));
+  arrayAdd(a, ['789']);
+  test(arrayEqual(a, ['hallo', 'world', 'foobar', '123456', '789']));
+
+
+  arrayDelete(a, 1);
+  test(arrayEqual(a, ['hallo', 'foobar', '123456', '789']));
+  arrayDelete(a, 0);
+  test(arrayEqual(a, ['foobar', '123456', '789']));
+  arrayDelete(a, 2);
+  test(arrayEqual(a, ['foobar', '123456']));
+  arrayDelete(a, 1);
+  test(arrayEqual(a, ['foobar']));
+  arrayDelete(a, 0);
+  test(arrayEqual(a, []));
+
+  arrayAdd(a, ['a','b','c', 'd']);
+  test(arrayEqual(a, ['a','b','c', 'd']));
+
+  arrayDeleteUnordered(a, 0);
+  test(arrayEqual(a, ['d', 'b', 'c']));
+  arrayDeleteUnordered(a, 0);
+  test(arrayEqual(a, ['c', 'b']));
+  arrayDeleteUnordered(a, 1);
+  test(arrayEqual(a, ['c']));
+  arrayDeleteUnordered(a, 0);
+  test(arrayEqual(a, []));
+
+  //fast
+  arrayAdd(a, ['a','b','c', 'd']);
+  len := 4;
+
+  arrayDeleteFast(a, len, 1);
+  test(arrayEqual(a, ['a', 'c', 'd', '']));   test(len = 3);
+  arrayDeleteFast(a, len, 0);
+  test(arrayEqual(a, ['c', 'd', '', '']));   test(len = 2);
+  arrayDeleteFast(a, len, 1);
+  test(arrayEqual(a, ['c', '', '', '']));   test(len = 1);
+  arrayDeleteFast(a, len, 0);
+  test(arrayEqual(a, ['', '', '', '']));   test(len = 0);
+
+  test(arrayEqual(['a', '', ''], ['a', 'a', 'a']) = false);
+
+end;
+
 procedure stringUnitTests( );
 var
  sa: TStringArray;
@@ -578,7 +648,8 @@ begin
     raise Exception.Create('HTML Lineending -> UTF8-Konvertierung fehlgeschlagen');
 
   //========arrays=====
-  {$IFNDEF NO_ARRAY_UNITTEST}  arrayUnitTests(); {$ENDIF}
+  intArrayUnitTests();
+  stringArrayUnitTests;
 
   //========math=======
   test(modPow(2, 50, 100) = 24);

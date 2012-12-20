@@ -93,18 +93,24 @@ const __ELEMENT__DEFAULT__: T__ElementType__ = '';
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
-function arrayAdd(var a: T__ArrayType__; const a2: T__ArrayType__):longint; overload;
-//**Removes element at position i from a (destroying the order of the elements)@br
+function arrayAdd(var a: T__ArrayType__; const a2: array of T__ElementType__):longint; overload;
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: T__ArrayType__; const i: longint):T__ElementType__; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnordered(var a: T__ArrayType__; const i: longint):T__ElementType__; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: T__ArrayType__; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__): longint;
-//**Removes element at position i from a (destroying the order of the elements)@br
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint):T__ElementType__; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnorderedFast(var a: T__ArrayType__; var len: longint; const i: longint):T__ElementType__; overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer;
@@ -553,7 +559,7 @@ begin
   a[result]:=e;
 end;
 
-function arrayAdd(var a: T__ArrayType__; const a2: T__ArrayType__):longint;
+function arrayAdd(var a: T__ArrayType__; const a2: array of T__ElementType__):longint;
 var
   i: LongInt;
 begin
@@ -564,6 +570,19 @@ begin
 end;
 
 function arrayDelete(var a: T__ArrayType__; const i: longint): T__ElementType__;
+begin
+  if (i<0) or (i>high(a)) then exit(__ELEMENT__DEFAULT__);
+  result := a[i];
+  if i < high(a) then begin
+    {%COMPARE T__ElementType__ = string }a[i] := __ELEMENT__DEFAULT__; {%END-COMPARE}
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    {%COMPARE T__ElementType__ = string }FillChar(a[high(a)], sizeof(a[0]), 0); {%END-COMPARE}
+  end;
+  SetLength(a,high(a));
+end;
+
+
+function arrayDeleteUnordered(var a: T__ArrayType__; const i: longint): T__ElementType__;
 begin
   if (i<0) or (i>high(a)) then exit(__ELEMENT__DEFAULT__);
   result:=a[i];
@@ -594,6 +613,18 @@ begin
 end;
 
 function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint): T__ElementType__;
+begin
+  if (i<0) or (i>=len) then exit(__ELEMENT__DEFAULT__);
+  result:=a[i];
+  if i < high(a) then begin
+    {%COMPARE T__ElementType__ = string}a[i] := __ELEMENT__DEFAULT__;{%END-COMPARE}
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    {%COMPARE T__ElementType__ = string}FillChar(a[high(a)], sizeof(a[0]), 0);{%END-COMPARE}
+  end;
+  len-=1;
+end;
+
+function arrayDeleteUnorderedFast(var a: T__ArrayType__; var len: longint; const i: longint): T__ElementType__;
 begin
   if (i<0) or (i>=len) then exit(__ELEMENT__DEFAULT__);
   result:=a[i];
@@ -694,7 +725,7 @@ begin
   arraySliceIndices(b, slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then exit(-1);
   if slice2a - slice1a > slice2b - slice1b then exit(1);
-  for i:=0 to slice1b - slice1a do
+  for i:=0 to slice2a - slice1a do
     if a[slice1a+i] < b[slice1b+i] then exit(-1)
     else if a[slice1a+i] > b[slice1b+i] then exit(1);
   exit(0);

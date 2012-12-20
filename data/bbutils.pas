@@ -76,18 +76,24 @@ type
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TStringArray; const e: string):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
-function arrayAdd(var a: TStringArray; const a2: TStringArray):longint; overload;
-//**Removes element at position i from a (destroying the order of the elements)@br
+function arrayAdd(var a: TStringArray; const a2: array of string):longint; overload;
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TStringArray; const i: longint):string; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnordered(var a: TStringArray; const i: longint):string; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint;
-//**Removes element at position i from a (destroying the order of the elements)@br
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnorderedFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): integer;
@@ -118,18 +124,24 @@ function arrayEqual(a, b: array of string; slice1a: integer = -1; slice1b: integ
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TLongintArray; const e: longint):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
-function arrayAdd(var a: TLongintArray; const a2: TLongintArray):longint; overload;
-//**Removes element at position i from a (destroying the order of the elements)@br
+function arrayAdd(var a: TLongintArray; const a2: array of longint):longint; overload;
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongintArray; const i: longint):longint; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnordered(var a: TLongintArray; const i: longint):longint; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TLongintArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint): longint;
-//**Removes element at position i from a (destroying the order of the elements)@br
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnorderedFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): integer;
@@ -160,18 +172,24 @@ function arrayEqual(a, b: array of longint; slice1a: integer = -1; slice1b: inte
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TLongwordArray; const e: longword):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
-function arrayAdd(var a: TLongwordArray; const a2: TLongwordArray):longint; overload;
-//**Removes element at position i from a (destroying the order of the elements)@br
+function arrayAdd(var a: TLongwordArray; const a2: array of longword):longint; overload;
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongwordArray; const i: longint):longword; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnordered(var a: TLongwordArray; const i: longint):longword; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TLongwordArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword): longint;
-//**Removes element at position i from a (destroying the order of the elements)@br
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnorderedFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): integer;
@@ -202,18 +220,24 @@ function arrayEqual(a, b: array of longword; slice1a: integer = -1; slice1b: int
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TInt64Array; const e: int64):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
-function arrayAdd(var a: TInt64Array; const a2: TInt64Array):longint; overload;
-//**Removes element at position i from a (destroying the order of the elements)@br
+function arrayAdd(var a: TInt64Array; const a2: array of int64):longint; overload;
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TInt64Array; const i: longint):int64; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnordered(var a: TInt64Array; const i: longint):int64; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TInt64Array; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): longint;
-//**Removes element at position i from a (destroying the order of the elements)@br
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnorderedFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): integer;
@@ -244,18 +268,24 @@ function arrayEqual(a, b: array of int64; slice1a: integer = -1; slice1b: intege
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
 function arrayAdd(var a: TFloatArray; const e: float):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
-function arrayAdd(var a: TFloatArray; const a2: TFloatArray):longint; overload;
-//**Removes element at position i from a (destroying the order of the elements)@br
+function arrayAdd(var a: TFloatArray; const a2: array of float):longint; overload;
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TFloatArray; const i: longint):float; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnordered(var a: TFloatArray; const i: longint):float; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
 procedure arrayReserveFast(var a: TFloatArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): longint;
-//**Removes element at position i from a (destroying the order of the elements)@br
+//**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
+//**Removes element at position i from a (destroying the order of the elements)@br
+//**Returns e=a[i]
+function arrayDeleteUnorderedFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): integer;
@@ -722,7 +752,7 @@ begin
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TStringArray; const a2: TStringArray):longint;
+function arrayAdd(var a: TStringArray; const a2: array of string):longint;
 var
   i: LongInt;
 begin
@@ -733,6 +763,19 @@ begin
 end;
 
 function arrayDelete(var a: TStringArray; const i: longint): string;
+begin
+  if (i<0) or (i>high(a)) then exit('');
+  result := a[i];
+  if i < high(a) then begin
+    a[i] := ''; 
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    FillChar(a[high(a)], sizeof(a[0]), 0); 
+  end;
+  SetLength(a,high(a));
+end;
+
+
+function arrayDeleteUnordered(var a: TStringArray; const i: longint): string;
 begin
   if (i<0) or (i>high(a)) then exit('');
   result:=a[i];
@@ -763,6 +806,18 @@ begin
 end;
 
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint): string;
+begin
+  if (i<0) or (i>=len) then exit('');
+  result:=a[i];
+  if i < high(a) then begin
+    a[i] := '';
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    FillChar(a[high(a)], sizeof(a[0]), 0);
+  end;
+  len-=1;
+end;
+
+function arrayDeleteUnorderedFast(var a: TStringArray; var len: longint; const i: longint): string;
 begin
   if (i<0) or (i>=len) then exit('');
   result:=a[i];
@@ -863,7 +918,7 @@ begin
   arraySliceIndices(b, slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then exit(-1);
   if slice2a - slice1a > slice2b - slice1b then exit(1);
-  for i:=0 to slice1b - slice1a do
+  for i:=0 to slice2a - slice1a do
     if a[slice1a+i] < b[slice1b+i] then exit(-1)
     else if a[slice1a+i] > b[slice1b+i] then exit(1);
   exit(0);
@@ -884,7 +939,7 @@ begin
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TLongintArray; const a2: TLongintArray):longint;
+function arrayAdd(var a: TLongintArray; const a2: array of longint):longint;
 var
   i: LongInt;
 begin
@@ -895,6 +950,19 @@ begin
 end;
 
 function arrayDelete(var a: TLongintArray; const i: longint): longint;
+begin
+  if (i<0) or (i>high(a)) then exit(0);
+  result := a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  SetLength(a,high(a));
+end;
+
+
+function arrayDeleteUnordered(var a: TLongintArray; const i: longint): longint;
 begin
   if (i<0) or (i>high(a)) then exit(0);
   result:=a[i];
@@ -925,6 +993,18 @@ begin
 end;
 
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint): longint;
+begin
+  if (i<0) or (i>=len) then exit(0);
+  result:=a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  len-=1;
+end;
+
+function arrayDeleteUnorderedFast(var a: TLongintArray; var len: longint; const i: longint): longint;
 begin
   if (i<0) or (i>=len) then exit(0);
   result:=a[i];
@@ -1025,7 +1105,7 @@ begin
   arraySliceIndices(b, slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then exit(-1);
   if slice2a - slice1a > slice2b - slice1b then exit(1);
-  for i:=0 to slice1b - slice1a do
+  for i:=0 to slice2a - slice1a do
     if a[slice1a+i] < b[slice1b+i] then exit(-1)
     else if a[slice1a+i] > b[slice1b+i] then exit(1);
   exit(0);
@@ -1046,7 +1126,7 @@ begin
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TLongwordArray; const a2: TLongwordArray):longint;
+function arrayAdd(var a: TLongwordArray; const a2: array of longword):longint;
 var
   i: LongInt;
 begin
@@ -1057,6 +1137,19 @@ begin
 end;
 
 function arrayDelete(var a: TLongwordArray; const i: longint): longword;
+begin
+  if (i<0) or (i>high(a)) then exit(0);
+  result := a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  SetLength(a,high(a));
+end;
+
+
+function arrayDeleteUnordered(var a: TLongwordArray; const i: longint): longword;
 begin
   if (i<0) or (i>high(a)) then exit(0);
   result:=a[i];
@@ -1087,6 +1180,18 @@ begin
 end;
 
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint): longword;
+begin
+  if (i<0) or (i>=len) then exit(0);
+  result:=a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  len-=1;
+end;
+
+function arrayDeleteUnorderedFast(var a: TLongwordArray; var len: longint; const i: longint): longword;
 begin
   if (i<0) or (i>=len) then exit(0);
   result:=a[i];
@@ -1187,7 +1292,7 @@ begin
   arraySliceIndices(b, slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then exit(-1);
   if slice2a - slice1a > slice2b - slice1b then exit(1);
-  for i:=0 to slice1b - slice1a do
+  for i:=0 to slice2a - slice1a do
     if a[slice1a+i] < b[slice1b+i] then exit(-1)
     else if a[slice1a+i] > b[slice1b+i] then exit(1);
   exit(0);
@@ -1208,7 +1313,7 @@ begin
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TInt64Array; const a2: TInt64Array):longint;
+function arrayAdd(var a: TInt64Array; const a2: array of int64):longint;
 var
   i: LongInt;
 begin
@@ -1219,6 +1324,19 @@ begin
 end;
 
 function arrayDelete(var a: TInt64Array; const i: longint): int64;
+begin
+  if (i<0) or (i>high(a)) then exit(0);
+  result := a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  SetLength(a,high(a));
+end;
+
+
+function arrayDeleteUnordered(var a: TInt64Array; const i: longint): int64;
 begin
   if (i<0) or (i>high(a)) then exit(0);
   result:=a[i];
@@ -1249,6 +1367,18 @@ begin
 end;
 
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint): int64;
+begin
+  if (i<0) or (i>=len) then exit(0);
+  result:=a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  len-=1;
+end;
+
+function arrayDeleteUnorderedFast(var a: TInt64Array; var len: longint; const i: longint): int64;
 begin
   if (i<0) or (i>=len) then exit(0);
   result:=a[i];
@@ -1349,7 +1479,7 @@ begin
   arraySliceIndices(b, slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then exit(-1);
   if slice2a - slice1a > slice2b - slice1b then exit(1);
-  for i:=0 to slice1b - slice1a do
+  for i:=0 to slice2a - slice1a do
     if a[slice1a+i] < b[slice1b+i] then exit(-1)
     else if a[slice1a+i] > b[slice1b+i] then exit(1);
   exit(0);
@@ -1370,7 +1500,7 @@ begin
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TFloatArray; const a2: TFloatArray):longint;
+function arrayAdd(var a: TFloatArray; const a2: array of float):longint;
 var
   i: LongInt;
 begin
@@ -1381,6 +1511,19 @@ begin
 end;
 
 function arrayDelete(var a: TFloatArray; const i: longint): float;
+begin
+  if (i<0) or (i>high(a)) then exit(0);
+  result := a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  SetLength(a,high(a));
+end;
+
+
+function arrayDeleteUnordered(var a: TFloatArray; const i: longint): float;
 begin
   if (i<0) or (i>high(a)) then exit(0);
   result:=a[i];
@@ -1411,6 +1554,18 @@ begin
 end;
 
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint): float;
+begin
+  if (i<0) or (i>=len) then exit(0);
+  result:=a[i];
+  if i < high(a) then begin
+    
+    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
+    
+  end;
+  len-=1;
+end;
+
+function arrayDeleteUnorderedFast(var a: TFloatArray; var len: longint; const i: longint): float;
 begin
   if (i<0) or (i>=len) then exit(0);
   result:=a[i];
@@ -1511,7 +1666,7 @@ begin
   arraySliceIndices(b, slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then exit(-1);
   if slice2a - slice1a > slice2b - slice1b then exit(1);
-  for i:=0 to slice1b - slice1a do
+  for i:=0 to slice2a - slice1a do
     if a[slice1a+i] < b[slice1b+i] then exit(-1)
     else if a[slice1a+i] > b[slice1b+i] then exit(1);
   exit(0);
@@ -7798,7 +7953,7 @@ begin
             exps[e] := 0;
             e+=1;
             exps[e] += 1;
-          until (   e > exphigh) or (exps[e] < p);
+          until  (e > exphigh) or (exps[e] < p);
 
           if exps[exphigh] = 0 then begin
             powers[exphigh + 1] := powers[exphigh] * p;
