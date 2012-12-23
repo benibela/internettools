@@ -79,6 +79,8 @@ type
     procedure parseHeaderForCookies(header: string);
     function makeCookieHeader:string;
   public
+    class function parseHeaderForLocation(header: string): string; static;
+  public
     //in
     internetConfig: PInternetConfig;
     additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
@@ -279,6 +281,7 @@ procedure TInternetAccess.parseHeaderForCookies(header: string);
 var i,mark:longint;
     name,value:string;
 begin
+  //log('Header: ');  log(header);
   i:=1;
   while i<length(header) do begin
     if strlibeginswith(@header[i],length(header)-i,'Set-Cookie:') then begin
@@ -303,6 +306,7 @@ begin
 
       setCookie(name,value);
 
+      //log('=>Cookie'+name);      log('value:'+value);
     end else i+=1;
   end;
 end;
@@ -316,6 +320,30 @@ begin
   for i:=1 to high(cookies) do
     result+='; '+cookies[i].name+'='+cookies[i].value;
   result+=#13#10;
+end;
+
+class function TInternetAccess.parseHeaderForLocation(header: string): string;
+var i,mark:longint;
+begin
+  //log('PHFL Header: ');  log(header);
+  i:=1;
+  while i<length(header) do begin
+    if strlibeginswith(@header[i],length(header)-i,'Location:') then begin
+      i+=length('Location:');
+      //Name getrimmt finden
+      while header[i] = ' ' do i+=1;
+
+      mark:=i;
+      while not (header[i] in [#13,#10]) do i+=1;
+      result:=copy(header,mark,i-mark);
+
+      //log('====> Redirection to:'+result);
+      exit;
+    end;
+    while (i<=length(header)) and not (header[i] in [#13,#10]) do i+=1;
+    if (i <= length(header)) and (header[i] = #13) then i+=1;
+    if (i <= length(header)) and (header[i] = #10) then i+=1;
+  end;
 end;
 
 function TInternetAccess.getLastHTTPHeader(header: string): string;
