@@ -61,6 +61,7 @@ type
     newConnectionOpened:boolean;
     FLastHTTPHeaders: TStringList;
     function GetLastHTTPHeaders: TStringList; override;
+    function doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string;redirectionCount: integer): string;
     function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;override;
   public
     constructor create();override;
@@ -69,6 +70,9 @@ type
     procedure closeOpenedConnections();override;
 
     function internalHandle: TObject; override;
+
+  public
+    checkSSLCertificates: boolean;
   end;
   TW32InternetAccessClass = class of TW32InternetAccess;
 
@@ -204,6 +208,12 @@ The locator type is unknown.}
       s:='Handle bereits geschlossen'#13#10'Bitte nochmal versuchen';
     ERROR_INVALID_PARAMETER:
       s:='Ungültiger Parameter';
+    ERROR_INTERNET_SEC_CERT_NO_REV:
+      s := 'The SSL certificate was not revoked.';
+    ERROR_INTERNET_SEC_CERT_CN_INVALID:
+      s := 'Ungültiges SSL-Zertfikat (Falscher Seitenname)';
+    ERROR_INTERNET_SEC_CERT_DATE_INVALID :
+      s := 'Ungültiges SSL-Zertfikat (abgelaufen)';
     else
       s:='Unbekannter Internetfehler: ' + IntToStr(GetLastError);
   end;
@@ -261,7 +271,7 @@ begin
   result := FLastHTTPHeaders;
 end;
 
-function TW32InternetAccess.doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;
+function TW32InternetAccess.doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string;redirectionCount: integer): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
 var
   databuffer : array[0..4095] of char;
@@ -271,7 +281,7 @@ var
   dwcode : array[1..20] of char;
   res    : pchar;
   cookiestr:string;
-  operation: string;
+  operation, newurl: string;
   callResult: boolean;
   htmlOpenTagRead: boolean; htmlClosingTagRead: boolean;
   i: Integer;
@@ -318,10 +328,14 @@ begin
       raise EW32InternetException.create('Verbindungsaufbau zu ' + host + ' fehlgeschlagen');
   end;
 
-  if protocol='https' then
-    hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or  INTERNET_FLAG_RELOAD or INTERNET_FLAG_SECURE, 0)
-   else
-    hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD, 0);
+
+  if protocol='https' then begin
+    if checkSSLCertificates then
+      hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE, 0)
+     else
+      hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
+  end else
+    hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
     raise EW32InternetException.create('Aufruf von '+ url + ' fehlgeschlagen');//'Can''t connect');
@@ -349,12 +363,26 @@ begin
 
   lastHTTPResultCode := StrToIntDef(res, -1);
 
-  Result:='';
-  if (res ='200') or (res ='302') then begin
+
+  if (lastHTTPResultCode = 200) or (lastHTTPResultCode = 301) or (lastHTTPResultCode = 302) or (lastHTTPResultCode = 303) or (lastHTTPResultCode = 307) then begin
     dwNumber := sizeof(databuffer)-1;
     if HttpQueryInfo(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,dwNumber,dwindex) then
-      parseHeaderForCookies(databuffer);
+      parseHeaderForCookies(databuffer) //handle cookies ourself, our we could not have separate cookies for different connections
+     else
+      dwNumber := 0;
+  end else dwNumber := 0;
 
+  Result:='';
+  if ((lastHTTPResultCode = 301) or (lastHTTPResultCode = 302) or (lastHTTPResultCode = 303) or (lastHTTPResultCode = 307)) and (redirectionCount > 0) then begin
+    //handle redirection ourself, or we could not read cookies transmitted during redirections (for videlibri ubfu)
+    if dwNumber = 0 then exit;
+    newurl := parseHeaderForLocation(databuffer);
+    if newurl = '' then exit('');
+    if (pos('://',newurl) > 0) then decodeURL(Trim(newurl), protocol, host, url)
+    else url := trim(newurl);
+    result := doTransferRec(hcmGet, protocol, host, url, '', redirectionCount - 1);
+    exit;
+  end else if (lastHTTPResultCode =200) or (lastHTTPResultCode = 302) then begin
     if assigned(OnProgress) then begin
       dwCodeLen := 15;
       HttpQueryInfo(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, dwcodelen, dwIndex);
@@ -410,6 +438,12 @@ begin
     writeString(host+'_'+url+'##DATA##'+data+'##DATA-END##',result);
   {$endif}
 end;
+
+function TW32InternetAccess.doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;
+begin
+  result := doTransferRec(method, protocol, host, url, data, 10);
+end;
+
 
 constructor TW32InternetAccess.create();
 var proxyStr:string;
