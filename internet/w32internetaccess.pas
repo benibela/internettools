@@ -215,7 +215,7 @@ The locator type is unknown.}
     ERROR_INTERNET_SEC_CERT_DATE_INVALID :
       s := 'Ungültiges SSL-Zertfikat (abgelaufen)';
     ERROR_INTERNET_SEC_CERT_REV_FAILED:
-      s := 'Gültigkeitspr�fung des SSL-Zertifikates fehlgeschlagen';
+      s := 'Gültigkeitsprüfung des SSL-Zertifikates fehlgeschlagen';
     else
       s:='Unbekannter Internetfehler: ' + IntToStr(GetLastError);
   end;
@@ -342,20 +342,40 @@ begin
   if not assigned(hfile) then
     raise EW32InternetException.create('Aufruf von '+ url + ' fehlgeschlagen');//'Can''t connect');
 
+
   cookiestr:=makeCookieHeader;
   if cookiestr<>'' then
     HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
   for i:=0 to additionalHeaders.Count - 1 do
     HttpAddRequestHeaders(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
 
-  if data='' then
-    callResult:= httpSendRequest(hfile, nil,0,nil,0)
-   else
-    callResult:= httpSendRequest(hfile, postHeader, Length(postHeader), @data[1], Length(data));
-  if not callResult then
+
+  for i := 1 to 2 do begin //repeat if ssl certificate is wrong
+    if data='' then
+      callResult:= httpSendRequest(hfile, nil,0,nil,0)
+     else
+      callResult:= httpSendRequest(hfile, postHeader, Length(postHeader), @data[1], Length(data));
+
+    if callResult then break;
+
+    if not checkSSLCertificates then begin
+      //as suggested by http://msdn.microsoft.com/en-us/subscriptions/aa917690.aspx
+      temp := getLastError;
+      if (temp = ERROR_INTERNET_INVALID_CA) or (temp = ERROR_INTERNET_SEC_CERT_REV_FAILED) or (temp = ERROR_INTERNET_SEC_CERT_NO_REV) then begin
+        dwContentLength := sizeof(dwNumber);
+        InternetQueryOption (hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, dwContentLength);
+        dwNumber := dwNumber or SECURITY_FLAG_IGNORE_UNKNOWN_CA or SECURITY_FLAG_IGNORE_REVOCATION;
+        InternetSetOption (hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, sizeof (dwNumber) );
+        continue;
+      end;
+    end;
+
     raise EW32InternetException.create();
+  end;
       
+
   lastCompleteUrl:=protocol+'://'+host+url;
+
 
   dwIndex  := 0;
   dwCodeLen := 10;
@@ -364,7 +384,6 @@ begin
   res := pchar(@dwcode);
 
   lastHTTPResultCode := StrToIntDef(res, -1);
-
 
   if (lastHTTPResultCode = 200) or (lastHTTPResultCode = 301) or (lastHTTPResultCode = 302) or (lastHTTPResultCode = 303) or (lastHTTPResultCode = 307) then begin
     dwNumber := sizeof(databuffer)-1;
@@ -498,7 +517,7 @@ begin
   newConnectionOpened:=false;
   timeout:=2*60*1000;
   InternetSetOption(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
-  checkSSLCertificates := true;
+  checkSSLCertificates := false;
 end;
 
 
