@@ -214,6 +214,8 @@ The locator type is unknown.}
       s := 'Ungültiges SSL-Zertfikat (Falscher Seitenname)';
     ERROR_INTERNET_SEC_CERT_DATE_INVALID :
       s := 'Ungültiges SSL-Zertfikat (abgelaufen)';
+    ERROR_INTERNET_SEC_CERT_REV_FAILED:
+      s := 'Gültigkeitspr�fung des SSL-Zertifikates fehlgeschlagen';
     else
       s:='Unbekannter Internetfehler: ' + IntToStr(GetLastError);
   end;
@@ -374,6 +376,7 @@ begin
 
   Result:='';
   if ((lastHTTPResultCode = 301) or (lastHTTPResultCode = 302) or (lastHTTPResultCode = 303) or (lastHTTPResultCode = 307)) and (redirectionCount > 0) then begin
+    InternetCloseHandle(hfile);
     //handle redirection ourself, or we could not read cookies transmitted during redirections (for videlibri ubfu)
     if dwNumber = 0 then exit;
     newurl := parseHeaderForLocation(databuffer);
@@ -494,7 +497,8 @@ begin
   lastHost:='';
   newConnectionOpened:=false;
   timeout:=2*60*1000;
-  InternetSetOption(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4)
+  InternetSetOption(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
+  checkSSLCertificates := true;
 end;
 
 
