@@ -56,8 +56,8 @@ protected
   forwardProgressEvent: TProgressEvent;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  function doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string; redirectionCount:longint): string;
-  function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;override;
+  function doTransferRec(method:string; protocol,host,url: string;data:string; redirectionCount:longint): string;
+  function doTransfer(method:string; protocol,host,url: string;data:string): string;override;
   function GetLastHTTPHeaders: TStringList; override;
 public
   Referer: string;
@@ -134,7 +134,7 @@ begin
 end;
 
 
-function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol, host, url: string;
+function TSynapseInternetAccess.doTransferRec(method:string;protocol, host, url: string;
   data: string; redirectionCount:longint): string;
   procedure initConnection;
   var
@@ -155,7 +155,7 @@ function TSynapseInternetAccess.doTransferRec(method:THTTPConnectMethod;protocol
        connection.Headers.add(additionalHeaders[i]);
   end;
 
-var operation,newurl: string;
+var newurl: string;
   i: Integer;
   ok: Boolean;
 begin
@@ -167,15 +167,13 @@ begin
    if (not IsSSLloaded) then //check if ssl is actually loaded
       raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
 
- if method=hcmPost then operation:='POST'
-  else operation:='GET';
 
   initConnection;
-  ok := connection.HTTPMethod(operation,protocol+'://'+host+url);
+  ok := connection.HTTPMethod(method,protocol+'://'+host+url);
 
   if (not ok) and (checkEtcResolv) then begin
     initConnection;
-    ok := connection.HTTPMethod(operation,protocol+'://'+host+url);
+    ok := connection.HTTPMethod(method,protocol+'://'+host+url);
   end;
 
   if ok then begin
@@ -190,7 +188,7 @@ begin
              newurl := connection.Headers[i]; strSplitGet(':',newurl);
              if (pos('://',newurl) > 0) then decodeURL(Trim(newurl), protocol, host, url)
              else url := trim(newurl);
-             exit(doTransferRec(hcmGet, protocol, host, url, '', redirectionCount - 1));
+             exit(doTransferRec('GET', protocol, host, url, '', redirectionCount - 1));
            end;
        raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+protocol+'://'+host+url);
       end;
@@ -205,7 +203,7 @@ begin
     else FOnProgress(self,connection.DownloadSize,contentLength);
 end;
 
-function TSynapseInternetAccess.doTransfer(method:THTTPConnectMethod;protocol, host, url: string;
+function TSynapseInternetAccess.doTransfer(method:string;protocol, host, url: string;
   data: string): string;
 begin
   result:=doTransferRec(method, protocol, host, url, data, 10);

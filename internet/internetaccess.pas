@@ -50,12 +50,11 @@ type
   { TCustomInternetAccess }
 
   { TInternetAccess }
-  THTTPConnectMethod=(hcmGet, hcmPost);
   //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
-  TTransferStartEvent=procedure (sender: TObject; var method: THTTPConnectMethod; var protocol,host,url, data:string) of object;
-  TTransferEndEvent=procedure (sender: TObject; method: THTTPConnectMethod; protocol,host,url, data:string; var result: string) of object;
+  TTransferStartEvent=procedure (sender: TObject; var method: string; var protocol,host,url, data:string) of object;
+  TTransferEndEvent=procedure (sender: TObject; method: string; protocol,host,url, data:string; var result: string) of object;
   //**@abstract(Abstract base class for connections)
   //**There are two child classes TW32InternetAccess and TSynapseInternetAccess which
   //**you should assign once to defaultInternetAccessClass and then use this class
@@ -65,10 +64,9 @@ type
   private
     FOnTransferEnd: TTransferEndEvent;
     FOnTransferStart: TTransferStartEvent;
-    function transfer(method: THTTPConnectMethod; protocol,host,url, data:string):string;
   protected
     FOnProgress:TProgressEvent;
-    function doTransfer(method: THTTPConnectMethod; protocol,host,url, data:string):string;virtual;abstract;
+    function doTransfer(method: string; protocol,host,url, data:string):string;virtual;abstract;
     function GetLastHTTPHeaders: TStringList; virtual; abstract;
   protected
     //** Cookies receive from/to-send the server (only for backends that does not support cookies natively (i.e.. win32). Synapse has its own cookies)
@@ -97,20 +95,27 @@ type
     //**post the (url encoded) data to the url given as three parts and returns the page as string
     //** (override this if you want to sub class it)
     function post(protocol,host,url: string; data:string):string;
-    //**get the url as stream and optionally monitors the progress with a progressEvent
+    //**get the url as stream
     procedure get(totalUrl: string; stream:TStream);
-    //**get the url as string and optionally monitors the progress with a progressEvent
+    //**get the url as string
     function get(totalUrl: string):string;
-    //**get the url as stream and optionally monitors the progress with a progressEvent
+    //**get the url as stream
     procedure get(protocol,host,url: string; stream:TStream);
-    //**get the url as string and optionally monitors the progress with a progressEvent
+    //**get the url as string
     function get(protocol,host,url: string):string;
+
+    //**performs a http request
+    function request(method, url, data:string):string;
+    function request(method, protocol,host,url, data:string):string;
+
+
     //**checks if an internet connection exists
     function existsConnection():boolean;virtual;
     //**call this to open a connection (very unreliable). It will return true on success
     function needConnection():boolean;virtual;abstract;
     //**Should close all connections (doesn't work)
     procedure closeOpenedConnections();virtual;abstract;
+
     //**Encodes the passed string in the url encoded format
     class function urlEncodeData(data: string): string;
     //**Encodes all var=... pairs of data in the url encoded format
@@ -251,7 +256,7 @@ end;
 
 
 
-function TInternetAccess.transfer(method: THTTPConnectMethod; protocol, host, url, data: string):string;
+function TInternetAccess.request(method, protocol, host, url, data: string):string;
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
   if assigned(FOnTransferStart) then
@@ -374,7 +379,7 @@ end;
 function TInternetAccess.post(protocol, host, url: string; data: string
   ): string;
 begin
-  result:=transfer(hcmPost,protocol,host,url,data);
+  result:=request('POST',protocol,host,url,data);
 end;
 
 procedure TInternetAccess.get(totalUrl: string; stream: TStream);
@@ -402,7 +407,15 @@ end;
 
 function TInternetAccess.get(protocol, host, url: string): string;
 begin
-  result:=transfer(hcmGet, protocol, host, url, '');
+  result:=request('GET', protocol, host, url, '');
+end;
+
+function TInternetAccess.request(method, url, data: string): string;
+var
+  proto,host,local: string;
+begin
+  decodeURL(url, proto, host, local);
+  result := request(method, proto, host, local, data);
 end;
 
 

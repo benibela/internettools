@@ -61,8 +61,8 @@ type
     newConnectionOpened:boolean;
     FLastHTTPHeaders: TStringList;
     function GetLastHTTPHeaders: TStringList; override;
-    function doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string;redirectionCount: integer): string;
-    function doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;override;
+    function doTransferRec(method:string; protocol,host,url: string;data:string;redirectionCount: integer): string;
+    function doTransfer(method:string; protocol,host,url: string;data:string): string;override;
   public
     constructor create();override;
     destructor destroy;override;
@@ -273,7 +273,7 @@ begin
   result := FLastHTTPHeaders;
 end;
 
-function TW32InternetAccess.doTransferRec(method:THTTPConnectMethod; protocol,host,url: string;data:string;redirectionCount: integer): string;
+function TW32InternetAccess.doTransferRec(method:string; protocol,host,url: string;data:string;redirectionCount: integer): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
 var
   databuffer : array[0..4095] of char;
@@ -283,15 +283,13 @@ var
   dwcode : array[1..20] of char;
   res    : pchar;
   cookiestr:string;
-  operation, newurl: string;
+  newurl: string;
   callResult: boolean;
   htmlOpenTagRead: boolean; htmlClosingTagRead: boolean;
   i: Integer;
   headerOut: string;
   label getMore;
 begin
-  if method=hcmPost then operation:='POST'
-  else operation:='GET';
 //  {$ifdef debug}
 //  writeString(host+'_'+url+'_pre',operation+#13#10+host+#13#10+url+#13#10+data);
 //  {$endif}
@@ -333,11 +331,11 @@ begin
 
   if protocol='https' then begin
     if checkSSLCertificates then
-      hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE, 0)
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE, 0)
      else
-      hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
   end else
-    hfile := HttpOpenRequest(hLastConnection, pchar(operation), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
+    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
     raise EW32InternetException.create('Aufruf von '+ url + ' fehlgeschlagen');//'Can''t connect');
