@@ -1192,8 +1192,9 @@ var
   i, p: Integer;
 begin
   result := s;
+  if s = '' then exit;
   p := 1;
-  for i :=1 to length(result) do begin
+  for i :=1 to length(result) - 1 do begin
     case result[i] of
       #13: begin
         result[p] := #10;
@@ -1203,7 +1204,12 @@ begin
     end;
     p+=1;
   end;
-  setlength(result, p - 1);
+  case result[length(result)] of
+    #13: result[p] := #10;
+    else result[p] := result[length(result)]);
+  end;
+
+  setlength(result, p{ + 1 - 1});
   {str := StringReplace(str, #13#10, #10, [rfReplaceAll]);
   sr := StringReplace(str, #13, #10, [rfReplaceAll]);}
 end;
