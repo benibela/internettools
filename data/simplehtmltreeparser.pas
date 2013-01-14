@@ -1843,7 +1843,7 @@ begin
     cur := ord(s[i]);
     if (cur and $C0) = $80 then begin
       if (prev and $C0) = $C0 then good += 1
-      else if (prev and $80) = $80 then bad += 1;
+      else if (prev and $80) = $00 then bad += 1;
     end else begin
       if (prev and $C0) = $C0 then bad+=1
     end;
