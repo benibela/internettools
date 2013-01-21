@@ -730,7 +730,7 @@ function xqvalueTreatAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue)
 begin
   result := ta;
   if not getTypeInfo(tb).instanceOf(result, cxt) then
-    raise EXQEvaluationException.Create('XPTY0004', 'treat as type not matched');
+    raise EXQEvaluationException.Create('XPDY0050', 'treat as type not matched');
 end;
 
 function xqvalueExcept(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
