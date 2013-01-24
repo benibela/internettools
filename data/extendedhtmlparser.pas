@@ -400,6 +400,7 @@ THtmlTemplateParser=class
     function getHTMLTree: TTreeNode;
     function getTemplateTree: TTreeNode;
     function GetTemplateNamespace: TNamespaceList;
+    function GetTemplateHasRealVariableDefinitions: boolean;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -448,6 +449,8 @@ THtmlTemplateParser=class
     property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
     property AllowObjects: boolean read FObjects write FObjects; //**< If objects can be created and used. (e.g. @code( object(("a", 1, "b", 2)).a ) would become 1). When objects are enabled, variable names cannot contain points.  (default true)
     property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< If all XPath/XQuery expressions in the templates are kept in the same module. Only if true, XQuery variables/functions declared are accessible in other read commands. (declarations must be preceded by @code(xquery version "1.0";) and followed by an expression, if only @code(())) Global variables, declared with a simple $x := value, are always everywhere accessible. (default true)
+
+    property hasRealVariableDefinitions: boolean read GetTemplateHasRealVariableDefinitions; //**< If the currently loaded template contains := variable definitions (contrary to assign values to the default variable with {.} )  (CAN ONLY BE USED AFTER the template has been applied!)
 
     property TemplateTree: TTreeNode read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeNode read getHTMLTree; //**<A tree representation of the processed html file
@@ -713,6 +716,27 @@ end;
 function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;
 begin
   result := FTemplate.globalNamespaces;
+end;
+
+function THtmlTemplateParser.GetTemplateHasRealVariableDefinitions: boolean;
+  procedure stest(const t: TXQTerm);
+  var
+    i: Integer;
+  begin
+    if result or not assigned(t) then exit;
+    if t is TXQTermDefineVariable then result := true;
+    for i := 0 to high(t.children) do
+      stest(t.children[i]);
+  end;
+var
+  cur: TTemplateElement;
+begin
+  result := false;
+  cur := TTemplateElement(FTemplate.getLastTree.next);
+  while cur <> nil do begin
+    if cur.source <> nil then stest(cur.source.Term);
+    cur := cur.templateNext;
+  end;
 end;
 
 procedure THtmlTemplateParser.defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
