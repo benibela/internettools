@@ -257,11 +257,19 @@ end;
 
 
 function TInternetAccess.request(method, protocol, host, url, data: string):string;
+  function stripHashSymbol(s: string): string;
+  var i: integer;
+  begin
+    result := s;
+    i := pos('#', s);
+    if i > 0 then setlength(result, i-1);
+  end;
+
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
   if assigned(FOnTransferStart) then
     FOnTransferStart(self, method, protocol, host, url, data);
-  result:=doTransfer(method,protocol,host,url,data);
+    result:=doTransfer(method,protocol,host,stripHashSymbol(url),data);
   if internetConfig^.logToPath<>'' then
     writeString(internetConfig^.logToPath, protocol+'://'+host+url+'<-DATA:'+data,result);
   if assigned(FOnTransferEnd) then
