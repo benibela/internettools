@@ -383,17 +383,17 @@ begin
   post := '';
 
   if cururl <> '' then begin
-    if (url[1] = '$') and (url[length(url)] = ';') and (pos('$', copy(url, 2, length(url) - 1)) <= 0) and (pos(';', copy(url, 1, length(url) - 1)) <= 0) then begin;
-      tempvalue := THtmlTemplateParserBreaker(reader.parser).getVariable(copy(url, 2, length(url)-2));
+    if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
+    else begin
+      tempvalue := reader.parser.QueryEngine.parseXPath2('x"'+url+'"').evaluate();
       if tempvalue is TXQValueObject then begin
         cururl := tempvalue.getProperty('url').toString;
         post := tempvalue.getProperty('post').toString;
-      end else cururl:=tempvalue.toString;
-    end else
-      cururl := reader.parser.replaceVars(url);
+      end else cururl := tempvalue.toString;
+    end;;
     if cururl = '' then exit;
-    //allow pages without url to set variables.
   end else begin
+    //allow pages without url to set variables.
     reader.parser.parseHTML('<html></html>'); //apply template to empty "page"
     if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
     exit;
@@ -401,11 +401,11 @@ begin
 
   for j:=0 to high(postparams) do begin
     if post <> '' then post += '&';
-    tempname := reader.parser.replaceVars(postparams[j].name);
+    tempname := reader.parser.replaceEnclosedExpressions(postparams[j].name);
     if tempname = '' then
-      post += reader.parser.replaceVars(postparams[j].value) //no urlencode! parameter passes multiple values
+      post += reader.parser.replaceEnclosedExpressions(postparams[j].value) //no urlencode! parameter passes multiple values
      else
-      post += TInternetAccess.urlEncodeData(tempname)+'='+ TInternetAccess.urlEncodeData(reader.parser.replaceVars(postparams[j].value));
+      post += TInternetAccess.urlEncodeData(tempname)+'='+ TInternetAccess.urlEncodeData(reader.parser.replaceEnclosedExpressions(postparams[j].value));
   end;
 
   if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post internet page '+cururl+#13#10'Post: '+post);
@@ -433,7 +433,7 @@ begin
   if page='' then raise EInternetException.Create(url +' konnte nicht geladen werden');
 
   if template<>'' then begin
-    if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.parser.replaceVars(url), 1);
+    if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.parser.replaceEnclosedExpressions(url), 1);
 
     reader.processPage(page, cururl, reader.internet.getLastHTTPHeader('Content-Type'));
   end;
@@ -454,7 +454,7 @@ var
   pxp: IXQuery;
 begin
   if hasValueStr then
-    reader.parser.variableChangeLog.ValuesString[name] := reader.parser.replaceVars(value);
+    reader.parser.variableChangeLog.ValuesString[name] := reader.parser.replaceEnclosedExpressions(value);
   if valuex <> '' then begin
     pxp := reader.parser.parseQuery(valuex);
     if name <> '' then reader.parser.variableChangeLog.add(name, pxp.evaluate())

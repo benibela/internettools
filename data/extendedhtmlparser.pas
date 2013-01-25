@@ -89,7 +89,7 @@ TTemplateElement=class(TTreeNode)
   match: TTreeNode; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
-  test, condition, valuepxp, source, min, max: IXQuery;
+  test, condition, valuepxp, source, min, max, varname: IXQuery;
   textRegexs: array of TRegExpr;
 
   function templateReverse: TTemplateElement; inline;
@@ -239,7 +239,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   Template: @preformatted(<form>
   <template:switch>
     <input t:condition="(@type = ('checkbox', 'radio') and exists(@checked)) or (@type = ('hidden', 'password', 'text'))">{post:=concat(@name,'=',@value)}</input>
-    <select>{temp:=@name}<option t:condition="exists(@selected)">{post:=concat($temp;,'=',@value)}</option>?</select>
+    <select>{temp:=@name}<option t:condition="exists(@selected)">{post:=concat($temp,'=',@value)}</option>?</select>
     <textarea>{post:=concat(@name,'=',text())}</textarea>
   </template:switch>*
 </form>)
@@ -281,7 +281,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br Everything inside this tag is only used iff the immediate previous if/else block was not executed. @br
             You can chain several else blocks that have test attributes together after an starting if, to create an ifelse chain, in which
             only one if or else block is used.@br
-            E.g.: @code(<template:if test="$condition">..</template:if><template:else test="$condition2;$>..</template:else><template:else>..</template:else>) )
+            E.g.: @code(<template:if test="$condition">..</template:if><template:else test="$condition2">..</template:else><template:else>..</template:else>) )
       @item(@code(<template:loop [min="?"] [max="?"]>  .. </template:loop>)
         @br Everything inside this tag is repeated between [min,max] times. (default min=0, max=infinity)
         @br E.g. if you write @code(<template:loop>  X </template:loop> ), it has the same effect as XXXXX with the largest possible count of X <= max for a given html file.
@@ -429,8 +429,10 @@ THtmlTemplateParser=class
     //procedure addFunction(name:string;varCallFunc: TVariableCallbackFunction);overload;
     //procedure addFunction(name:string;notifyCallFunc: TNotifyCallbackFunction);overload;
 
-    //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace
-    function replaceVars(s:string;customReplace: TReplaceFunction=nil):string;
+    //**This replaces every $variable; in s with variables.values['variable'] or the value returned by customReplace (should not be used anymore)
+    function replaceVarsOld(s:string;customReplace: TReplaceFunction=nil):string; deprecated;
+    //**This treats str as extended string and evaluates the pxquery expression x"str"
+    function replaceEnclosedExpressions(str:string):string;
 
     function debugMatchings(const width: integer): string;
     function parseQuery(const expression: string): IXQuery; //**< Returns a IXQuery that accesses the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
@@ -836,8 +838,8 @@ begin
   result := template.condition.evaluate().toBoolean;
 end;
 
-function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeNode;
-  templateStart, templateEnd: TTemplateElement): Boolean;
+function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeNode; templateStart, templateEnd: TTemplateElement
+  ): boolean;
 
 var xpathText: TTreeNode;
 
@@ -906,7 +908,6 @@ var xpathText: TTreeNode;
    value:IXQValue;
    regexp: TRegExpr;
    oldvarcount: Integer;
-   varnameindex: Integer;
    attribs: tStringAttributeList;
    submatch: Integer;
    regex: String;
@@ -926,9 +927,8 @@ var xpathText: TTreeNode;
       regexp.free;
     end;
 
-    varnameindex := attribs.IndexOfName('var');
-    if varnameindex >= 0 then
-      defineXQVariable(nil,Trim(replaceVars(attribs.Values['var'])), value)
+    if templateStart.varname <> nil then
+      defineXQVariable(nil,Trim(performPXPEvaluation(templateStart.varname).toString), value)
     else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
       defineXQVariable(nil, FUnnamedVariableName, value);
 
@@ -1179,7 +1179,7 @@ begin
     FHTML.removeEmptyTextNodes(true);
 end;
 
-function THtmlTemplateParser.matchLastTrees: boolean;
+function THtmlTemplateParser.matchLastTrees: Boolean;
 var cur,last,realLast:TTemplateElement;
     temp: TTreeNode;
 begin
@@ -1409,7 +1409,7 @@ begin
   parseTemplate(strLoadFromFile(templatefilename),templatefilename);
 end;
 
-function THtmlTemplateParser.replaceVars(s: string; customReplace: TReplaceFunction): string;
+function THtmlTemplateParser.replaceVarsOld(s: string; customReplace: TReplaceFunction): string;
 var f,i:longint;
     temp,value:string;
     tempxqvalue: IXQValue;
@@ -1430,6 +1430,21 @@ begin
     end else Result+=s[i];
     i+=1;
   end;
+end;
+
+function THtmlTemplateParser.replaceEnclosedExpressions(str: string): string;
+var
+  standard: Boolean;
+  i: Integer;
+begin
+  standard := true;
+  for i:=1 to length(str) do
+    if str[i] in ['"', '{', '}' ] then begin
+      standard := false;
+      break;
+    end;
+  if standard then exit(str);
+  result := fQueryEngine.parseXPath2('x"'+str+'"').evaluate().toString; //todo: somehow cache the parsed xquery
 end;
 
 function THtmlTemplateParser.debugMatchings(const width: integer): string;
