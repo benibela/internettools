@@ -25,7 +25,7 @@ type
  TXQParsingContext = class
   engine: TXQueryEngine;
 
-  AllowVariableUseInStringLiterals: boolean;
+  AllowExtendedStrings: boolean;
   AllowObjects: boolean;
   parsingModel: TXQParsingModel;
   encoding: TEncoding;
@@ -56,6 +56,7 @@ type
   function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
+  function parseXString(): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
 
   function parseFlower(akind: string): TXQTermFlower;
   function parseSomeEvery(const akind: string): TXQTermSomeEvery;
@@ -65,7 +66,7 @@ type
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
-  //**from @code(1 + 2) it will parse @code(1) (since @code(1) is complete), from @code(function(1,2,3)) it will parse everything (since @code(function) can not be evaluated without its parameters))@br
+  //**e.g. from @code(1 + 2) it will parse @code(1) (since @code(1) is complete), from @code(function(1,2,3)) it will parse everything (since @code(function) can not be evaluated without its parameters))@br
   //**(observation: that kind of looks like it parses everything except binary operators)
   function parseValue: TXQTerm;        //left most token of an ExprSingle
   function parse: TXQTerm;             //ExprSingle
@@ -746,32 +747,12 @@ begin
 end;
 
 function TXQParsingContext.parseString(const w: string): TXQTerm;
-  var s: string;
-      lastStrStart, i: integer;
-  begin
-    s := StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]);
-    if parsingModel in [xqpmXQuery1] then s := replaceEntities(s);
-    if (not AllowVariableUseInStringLiterals) or (w[1] = '''') or (system.Pos('$', s) <= 0)  then
-      exit(TXQTermString.create(s));
-
-    result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'concat');
-    i := 1;
-    lastStrStart := 1;
-    while  i <= length(s) do begin
-      if s[i] = '$' then begin //Read variable
-        if lastStrStart < i then result.push(TXQTermString.create(copy(s, lastStrStart, i-lastStrStart)));
-        if i >= length(s) - 1 then raiseParsingError('pxp:XPST0003ext', 'Variable without name or ; at end of '+s);
-        lastStrStart:=i + 1;
-        while (i <= length(s)) and not (s[i] in [';',' ',#9,#13,#10]) do i+=1;
-        if i > length(s) then raiseParsingError('pxp:XPST0003ext', 'Variable without terminating ; in '+s);
-        if lastStrStart  = i then raiseParsingError('pxp:XPST0003ext', 'Variable without name ($;) in '+s);
-        result.push(TXQTermVariable.create(copy(s, lastStrStart, i-lastStrStart), staticContext));
-        i+=1;
-        lastStrStart:=i;
-      end else i+=1;
-    end;
-    if lastStrStart < length(str) then result.push(TXQTermString.Create(copy(s, lastStrStart, i - lastStrStart)));
-  end;
+var s: string;
+begin
+  s := StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]);
+  if parsingModel in [xqpmXQuery1] then s := replaceEntities(s);
+  exit(TXQTermString.create(s));
+end;
 
 function TXQParsingContext.parseStringLiteral: string;
 var
@@ -784,6 +765,71 @@ begin
   finally
     temp.free;
   end;
+end;
+
+function TXQParsingContext.parseXString: TXQTerm;
+  function functionIsConcat(nf: TXQTermNamedFunction): boolean;
+  begin
+    result := (nf.func <> nil) and (nf.func is TXQBasicFunctionInfo) and (TXQBasicFunctionInfo(nf.func).func = @xqFunctionConcat)
+              and (equalNamespaces(nf.namespace, nil) or equalNamespaces(nf.namespace, XMLNamespace_XPathFunctions) or equalNamespaces(nf.namespace, XMLNamespace_MyExtensions));
+  end;
+
+  procedure pushTerm(t: TXQTerm);
+  begin
+    if result = nil then
+      result := t
+    else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result)) then
+      result.push(t)
+    else
+     result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'concat', [result, t]);
+  end;
+
+  procedure pushRaw(from, too: pchar);
+  var
+    v: String;
+  begin
+    if too < from then exit;
+    v := strFromPchar(from, too - from + 1);
+    if parsingModel in [xqpmXQuery1] then v := replaceEntities(v);
+    if result <> nil then begin
+      if result is TXQTermString then TXQTermString(result).value += v
+      else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result))
+              and (TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)] is TXQTermString) then
+        TXQTermString(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value += v
+      else pushTerm(TXQTermString.create(v));
+    end else pushTerm(TXQTermString.create(v));
+  end;
+var
+  strsymb: Char;
+  mark: PChar;
+begin
+  result := nil;
+  strsymb := pos^; pos+=1;
+  if not (strsymb in ['''', '"']) then raiseParsingError('pxp:XPTS0003ext', 'Expected string start');
+  mark := pos;
+  while pos^ <> #0 do begin
+    while (pos^ <> strsymb) and not (pos^ in [#0, '{', '}']) do pos+=1;
+    pushRaw(mark, pos - 1);
+    if pos^ = #0 then break;
+    if pos^ = (pos+1)^ then begin //escaped like {{, '', "", }}
+      pos+=1;
+      mark := pos;
+      pos+=1;
+    end else case pos^ of
+      '}': raiseParsingError('pxp:XPTS0003ext',  'Single closing } not allowed in extended strings (use }})');
+      '{': begin
+        pos+=1;
+        pushTerm(parsePrimaryLevel);
+        expect('}');
+        mark := pos;
+      end;
+      else begin //string closed
+        expect(strsymb);
+        break;
+      end;
+    end;
+  end;
+  if result = nil then result := TXQTermString.create('');
 end;
 
 function TXQParsingContext.parseValue: TXQTerm;
@@ -839,7 +885,10 @@ begin
 
 
 
-    else begin
+    else if (word = 'x') and (pos^ in ['"', '''']) then begin
+      if not AllowExtendedStrings then raiseParsingError('pxp:XPTS0003ext', 'Extended string syntax was disabled');
+      exit(parseXString());
+    end else begin
       wordlookahead := nextToken(true);
       if wordlookahead='::' then word+=nextToken();
       if strEndsWith(word,'::') then begin
@@ -1339,7 +1388,7 @@ begin
           if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
             case token of
               'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
-              'extended-strings': readBoolean(AllowVariableUseInStringLiterals, temp);
+              'extended-strings': readBoolean(AllowExtendedStrings, temp);
               'objects': readBoolean(AllowObjects, temp);
               'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
               'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);

@@ -1140,8 +1140,8 @@ type
 
     Some very basic, standard XPath examples, for people who do not have seen XPath before:
     @unorderedList(
-      @item(@code("something") or @code("something") @br This returns the string 'something'. (see below))
-      @item(@code($var)  @br This returns the value of the variable @code(var). (see below))
+      @item(@code("something") or @code("something") @br This returns the string 'something'.)
+      @item(@code($var)  @br This returns the value of the variable @code(var).)
       @item(@code( a + b )  @br This returns the numerical sum of @code(a) and @code(b)@br
             Instead of +, you can also use one of operators @code(-, *, div, idiv, =, !=, <, >, <=, =>, to, or, and, eq, ne, lt, gt, le, ge) )
       @item(@code(1245.567)  @br This returns the number 1245.567)
@@ -1170,10 +1170,10 @@ type
 
     Differences between this implementation and standard XPath/XQuery (most differences can be turned off with the respective option or the field in the default StaticContext):
 
-    Changed syntax:@br
+    Extended syntax:@br
 
     @unorderedList(
-    @item(@code("something$var;...") @br This gives the string "something" with replaced variables, so every occurence of @code($var;) is replaced by the corresponding variable value. (option: extended-strings))
+    @item(@code(x"something{$var}{1+2+3}...") @br If a string is prefixed with an x, all expressions within {..}-parenthesis are evaluated and concattenated to the raw text, similarily to the value of a xquery direct attribute constructor. (option: extended-strings))
     @item(@code(var:=value) @br This assigns the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) )
     @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
           unless you use collations.)
@@ -1183,8 +1183,7 @@ type
           This basically allows you to do namespace prefix only matching. (option: use-local-namespaces)
           )
     @item(Element tests based on types of the xml are not supported (since it can not read schemas ) )
-    @item(Regex remarks: @unorderedList(
-      @item(If you use "-strings instead of '-strings, you have to escape $ as @code($$;).)
+    @item(Regex remarks: @unorderedList(                                                  )
       @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
       @item($0 and $& can be used as substitute for the
     whole regex, and $i or  ${i} is substituted with the i-th submatch, for any integer i. Therefore $12 is match 12, while ${1}2 is match 1 followed by digit 2)
@@ -1277,14 +1276,14 @@ type
 
 
     @br@br@bold(Compatibility to previous version)@br
-    The following breaking changes occured, to make it more standard compatible:
+    The following breaking changes occured to make it more standard compatible:
     @unorderedList(
     @item(Language changes:
       @unorderedList(
+        @item(Variables are no longer replaced inside "-strings. Instead x"-strings were added. All old uses of "$var;" therefore have to be replaced by x"{$var}" )
         @item(All string comparisons are now (non-localized ascii) case-insensitive, not only equal comparisons (as always mentioned in the documentation) )
         @item(Variables defined by a PXPath expression inside an PXPath eval call are exported to the outside)
         @item(== is no longer allowed as alias to =   )
-        @item(the meaning of " and ' has been exchanged (now: ' literal text, " text with variables) )
         @item(the function deepNodeText is now called deep-text)
         @item(regex flag s defaults to off)
       )
@@ -1326,7 +1325,7 @@ type
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
 
-    AllowVariableUseInStringLiterals: boolean; //**< If "...$var.. " should be replaced by the value of var, or remain a string literal
+    AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
     GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
 
     AutomaticallyRegisterParsedModules: boolean;
@@ -2722,6 +2721,7 @@ begin
   inherited Destroy;
 end;
 
+function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings
 
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}
@@ -3575,7 +3575,7 @@ constructor TXQueryEngine.create;
 begin
   self.CurrentDateTime:=now;
   ImplicitTimezone:=getNaN;
-  AllowVariableUseInStringLiterals:=true;
+  AllowExtendedStrings:=true;
   VariableChangelog := TXQVariableChangeLog.create();
   OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   OnDefineVariable:= @VariableChangelog.defineVariable;
@@ -3708,7 +3708,7 @@ begin
   if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
-  cxt.AllowVariableUseInStringLiterals := AllowVariableUseInStringLiterals;
+  cxt.AllowExtendedStrings := AllowExtendedStrings;
   cxt.AllowObjects:=VariableChangelog.allowObjects;
   cxt.staticContext := context;
   cxt.parsingModel:=model;

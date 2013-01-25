@@ -105,13 +105,17 @@ begin
 
 
                 //Variable tests
-  t('"$$;"',                   '$',                            '');
-  t('">$$;<"',                 '>$<',                          '');
-  t('">$$;<"',                 '>$<',                          '');
+  t('"$$;"',                   '$$;',                            '');
+  t('">$$;<"',                 '>$$;<',                          '');
 
-  f('">$unknown;<"');
-  f('"$test;>$unknown;<"');
-  f('"$test;$unknown;$abc;"');
+  t('x"$$;"',                   '$$;',                           '');
+  t('x">$$;<"',                 '>$$;<',                         '');
+  t('x"{$$}"',                 '$',                             '');
+  t('x">{$$}<"',               '>$<',                           '');
+
+  f('x">{$unknown}<"');
+  f('x"{$test}>{$unknown}<"');
+  f('x"{$test}{$unknown}{$abc}"');
 
   // t('$abc;',                     'alphabet',                     '');
   t('$abc',                     'alphabet',                     '');
@@ -122,11 +126,36 @@ begin
 
   t('concat(">",$abc,''<'')',  '>alphabet<',                     '');
   t('''$abc;''',                   '$abc;',                        ''); //no variable matching in '
-  t('"$abc;"',                   'alphabet',                        ''); //variable matching in "
+  t('"$abc;"',                   '$abc;',                        ''); //no variable matching in "
+  t('x"{$abc}"',                   'alphabet',                        ''); //variable matching in x"
+  t('x''{$abc}''',                   'alphabet',                        ''); //variable matching in x"
   t('"&quot;"',                   '&quot;',                        '');
   t('''&quot;''',                 '&quot;',                        '');
   t('"x&quot;y"',                   'x&quot;y',                        '');
   t('''x&quot;y''',                 'x&quot;y',                        '');
+
+  //more extended strings
+  t('x"123"', '123');
+  t('x"123{4+5+6}"', '12315');
+  t('x"123{4+5+6}789"', '12315789');
+  t('x"{1+2}{3+4}{5+6}"', '3711');
+  t('x"{{1+2}}{{3+4}}{{5+6}}"', '{1+2}{3+4}{5+6}');
+  t('x"""{1+2}""{3+4}""{5+6}"""', '"3"7"11"');
+  f('x"1234+5+6}"'); //single } not allowed
+  f('x"123{4+5+6}}"');
+  t('x"123{4+5+6}}}"', '12315}');
+  t('x"123" + 100 + x"77000"', '77223');
+
+  t('x''123''', '123');
+  t('x''123{4+5+6}''', '12315');
+  t('x''123{4+5+6}789''', '12315789');
+  t('x''{1+2}{3+4}{5+6}''', '3711');
+  t('x''{{1+2}}{{3+4}}{{5+6}}''', '{1+2}{3+4}{5+6}');
+  t('x''''''{1+2}''''{3+4}''''{5+6}''''''', '''3''7''11''');
+  f('x''1234+5+6}'''); //single } not allowed
+  f('x''123{4+5+6}}''');
+  t('x''123{4+5+6}}}''', '12315}');
+  t('x''123'' + 100 + x''77000''', '77223');
 
   //change base xml used for tests
   t('','', '<html attrib1="FIRST ATTRIBUTE" attrib2="SECOND ATTRIBUTE" attrib3="THIRD ATTRIBUTE">test:last text<!--comment!--><deep>:BEEP</deep>'#13#10+
@@ -1660,8 +1689,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$obj.a', 'b', '');
   t('$obj.b', '', '');
   t('$obj.c', '123', '');
-  t('"a$obj.c;b"', 'a123b', '');
+  t('"a$obj.c;b"', 'a$obj.c;b', '');
   t('''a$obj.c;b''', 'a$obj.c;b', '');
+  t('x"a{$obj.c}b"', 'a123b', '');
   t('type-of($obj.c)', 'integer', '');
   t('(object(("x", "y")), object(("u", "v")))', '', '');
   t('(object(("x", "y")), object(("u", "v")))[1].x', 'y', '');
@@ -1672,7 +1702,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return $i.a, "|")', 'x', '');
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return ($i.b,$i.c), "|")', 'Y|Z', '');
   t('string-join(for $i in (object(("abc", "123")), object(("abc", "456")), object(("abc", "789"))) return $i.abc, "|")', '123|456|789', '');
-  t('string-join(for $i in (object(("abc", "123")), object(("abc", "456")), object(("abc", "789"))) return "$i.abc;", "|")', '123|456|789', '');
+  t('string-join(for $i in (object(("abc", "123")), object(("abc", "456")), object(("abc", "789"))) return x"{$i.abc}", "|")', '123|456|789', '');
   t('string-join((i := object(("a", 1)), for $i in object(("a", "2")) return $i.a), "|")', '|2', '');
   t('string-join((i := object(("a", 1)), for $i in object(("b", "2")) return $i.a), "|")', '', '');
   t('string-join((i := object(("a", 1)), for $i in (object(("b", "2")),object(("a", "3"))) return $i.a), "|")', '|3', '');

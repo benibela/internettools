@@ -229,9 +229,10 @@ begin
   t('for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty greatest return $i', '3 4 5 1 2');
   t('for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 return $i', '3 4 5 1 2');
 
-  t('for $x at $i in ("a", "b", "c") return "($i;: $x;)"', '(1: a) (2: b) (3: c)'); //using extended string syntax
-  t('for $x at $i in ("a", "b", "c") let $j := $i * 2 return "($j;: $x;)"', '(2: a) (4: b) (6: c)');
-  t('for $x at $i in ("a", "b", "c") let $j := $i * 2 where $j != 4 return "($j;: $x;)"', '(2: a) (6: c)');
+  t('for $x at $i in ("a", "b", "c") return "($i;: $x;)"', '($i;: $x;) ($i;: $x;) ($i;: $x;)'); //old extended string syntax no longer exists
+  t('for $x at $i in ("a", "b", "c") return x"({$i}: {$x})"', '(1: a) (2: b) (3: c)'); //using new extended string syntax
+  t('for $x at $i in ("a", "b", "c") let $j := $i * 2 return x"({$j}: {$x})"', '(2: a) (4: b) (6: c)');
+  t('for $x at $i in ("a", "b", "c") let $j := $i * 2 where $j != 4 return x"({$j}: {$x})"', '(2: a) (6: c)');
 
   t('for $x in ("1", "2", "3") return type-of($x)', 'string string string');
   //t('for $x as xs:integer in ("1", "2", "3") return type-of($x)', 'integer integer integer'); //not actually allowed, read the standard wrong again
@@ -250,7 +251,7 @@ begin
   //from the standard
   t('let $j := 7 return (let $i := 5, $j := 20 * $i return $i, $j)', '5 7');
   t('let $j := 7 return (let $i := 5, $j := 20 * $i return ($i, $j))', '5 100');
-  t('for $car at $i in ("Ford", "Chevy"), $pet at $j in ("Cat", "Dog") return concat("$i;,$car;,$j;,$pet;")', '1,Ford,1,Cat 1,Ford,2,Dog 2,Chevy,1,Cat 2,Chevy,2,Dog');
+  t('for $car at $i in ("Ford", "Chevy"), $pet at $j in ("Cat", "Dog") return concat(x"{$i},{$car},{$j},{$pet}")', '1,Ford,1,Cat 1,Ford,2,Dog 2,Chevy,1,Cat 2,Chevy,2,Dog');
   t('let $inputvalues := (1,1141,100,200,144,51551,523) return fn:avg(for $x at $i in $inputvalues where $i mod 3 = 0 return $x)', '25825.5');
   t('for $e in //employee order by $e/salary descending return $e/name','23 Obama Sinclair Momo', '<r><employee><salary>1000000</salary><name>Obama</name></employee><employee><salary>1</salary><name>Momo</name></employee><employee><salary>7000000000000</salary><name>23</name></employee><employee><salary>90000</salary><name>Sinclair</name></employee></r>');
   t('for $b in /books/book[price < 100] order by $b/title return $b', '75.3Caesar 6Das Kapital 42The Hitchhiker''s Guide to the Galaxy', '<books><book><price>42</price><title>The Hitchhiker''s Guide to the Galaxy</title></book><book><price>1101010</price><title>How to use binary</title></book><book><price>6</price><title>Das Kapital</title></book><book><title>Das Kapital</title></book><book><price>753</price><title>Caesar</title></book><book><price>75.3</price><title>Caesar</title></book></books>');
@@ -461,28 +462,28 @@ begin
   t('typeswitch (1.0E1) case xs:integer return "int" case xs:decimal return "deci" case xs:double return "double" default return "unknown"', 'double');
   t('typeswitch ("as") case xs:integer return "int" case xs:decimal return "deci" case xs:double return "double" default return "unknown"', 'unknown');
   t('typeswitch (1) default return "defalone"', 'defalone');
-  t('typeswitch (1) default $var return "defalone: $var;"', 'defalone: 1');
-  t('typeswitch (1) case $i as xs:integer return "int: $i;" default $var return "def: $var;"', 'int: 1');
-  t('typeswitch (1.0) case $i as xs:integer return "int: $i;" default $var return "def: $var;"', 'def: 1');
+  t('typeswitch (1) default $var return x"defalone: {$var}"', 'defalone: 1');
+  t('typeswitch (1) case $i as xs:integer return x"int: {$i}" default $var return x"def: {$var}"', 'int: 1');
+  t('typeswitch (1.0) case $i as xs:integer return x"int: {$i}" default $var return x"def: {$var}"', 'def: 1');
   t('typeswitch (1) case xs:integer return "int" default return "unknown"', 'int');
   t('typeswitch (1) case integer return "int" default return "unknown"', 'int');
   t('let $a := 1 return typeswitch($a) case $x as integer return $x * 20 default $b return $b', '20');
   t('let $a := 1.0 return typeswitch($a) case $x as integer return $x * 20 default $b return $b', '1');
   t('let $a := 1 return typeswitch($a) case integer return $a * 20 default return $a', '20');
   t('let $a := 1.0 return typeswitch($a) case integer return $a * 20 default return $a', '1');
-  t('typeswitch(<element>123</element>) case $x as element() return outer-xml($x) default $y return "atomic: $y;"', '<element>123</element>');
-  t('typeswitch(12345) case $x as element() return outer-xml($x) default $y return "atomic: $y;"', 'atomic: 12345');
-  t('typeswitch(<element>123</element>) case $x as element(element) return outer-xml($x) default $y return "atomic: $y;"', '<element>123</element>');
-  t('typeswitch(<element>123</element>) case $x as element(foobar) return outer-xml($x) default $y return "atomic: $y;"', 'atomic: 123');
-  t('typeswitch(<foobar>123</foobar>) case $x as element(foobar) return outer-xml($x) default $y return "atomic: $y;"', '<foobar>123</foobar>');
-  t('typeswitch(<element>123</element>) case $x as element(*) return outer-xml($x) default $y return "atomic: $y;"', '<element>123</element>');
-  t('typeswitch(<!--comment!-->) case $x as element(*) return outer-xml($x) default $y return "atomic: $y;"', 'atomic: comment!');
-  t('typeswitch(<!--comment!-->) case $x as element(*) return outer-xml($x) case comment() return "comm" default $y return "atomic: $y;"', 'comm');
-  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction() return "pipi" default $y return "atomic: $y;"', 'pipi');
-  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction(PI) return "pipi" default $y return "atomic: $y;"', 'pipi');
-  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction(pim) return "pipi" default $y return "atomic: $y;"', 'atomic: ');
-  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction("PI") return "pipi" default $y return "atomic: $y;"', 'pipi');
-  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction("pim") return "pipi" default $y return "atomic: $y;"', 'atomic: ');
+  t('typeswitch(<element>123</element>) case $x as element() return outer-xml($x) default $y return x"atomic: {$y}"', '<element>123</element>');
+  t('typeswitch(12345) case $x as element() return outer-xml($x) default $y return x"atomic: {$y}"', 'atomic: 12345');
+  t('typeswitch(<element>123</element>) case $x as element(element) return outer-xml($x) default $y return x"atomic: {$y}"', '<element>123</element>');
+  t('typeswitch(<element>123</element>) case $x as element(foobar) return outer-xml($x) default $y return x"atomic: {$y}"', 'atomic: 123');
+  t('typeswitch(<foobar>123</foobar>) case $x as element(foobar) return outer-xml($x) default $y return x"atomic: {$y}"', '<foobar>123</foobar>');
+  t('typeswitch(<element>123</element>) case $x as element(*) return outer-xml($x) default $y return x"atomic: {$y}"', '<element>123</element>');
+  t('typeswitch(<!--comment!-->) case $x as element(*) return outer-xml($x) default $y return x"atomic: {$y}"', 'atomic: comment!');
+  t('typeswitch(<!--comment!-->) case $x as element(*) return outer-xml($x) case comment() return "comm" default $y return x"atomic: {$y}"', 'comm');
+  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction() return "pipi" default $y return x"atomic: {$y}"', 'pipi');
+  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction(PI) return "pipi" default $y return x"atomic: {$y}"', 'pipi');
+  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction(pim) return "pipi" default $y return x"atomic: {$y}"', 'atomic: ');
+  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction("PI") return "pipi" default $y return x"atomic: {$y}"', 'pipi');
+  t('typeswitch(<?PI?>) case $x as element(*) return outer-xml($x) case comment() return "comm" case processing-instruction("pim") return "pipi" default $y return x"atomic: {$y}"', 'atomic: ');
 
   t('<element>123</element> instance of element()', 'true');
   t('12345 instance of element()', 'false');
@@ -629,11 +630,11 @@ begin
   m('declare option pxp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever" string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'first second');
   m('declare option pxp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first second');
   m('declare option pxp:default-node-collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'second');
-  m('declare option pxp:extended-strings "on"; declare variable $foobar := 123; "var is $foobar;."', 'var is 123.');
-  m('declare option pxp:extended-strings "off"; declare variable $foobar := 123; "var is $foobar;."', 'var is $foobar;.');
-  m('declare option pxp:extended-strings "on"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; "var is $foobar;."', 'var is $foobar;.');
-  m('declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; "var is $foobar;."', 'var is 123.');
-  m('xquery version "1.0"; declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; "var is $foobar;."', 'var is 123.');
+  m('declare option pxp:extended-strings "on"; declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
+  f('declare option pxp:extended-strings "off"; declare variable $foobar := 123; x"var is {$foobar}."');
+  f('declare option pxp:extended-strings "on"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."');
+  m('declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
+  m('xquery version "1.0"; declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
 
 
   m('declare default order empty least; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty least return $i, " ")', '1 2 3 4 5');
@@ -1560,8 +1561,8 @@ begin
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg2:* return local-name($i)', 'a b');
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg3:* return local-name($i)', 'c');
 
-  m('declare option pxp:extended-strings "on"; let $a := 17 return ">$a;<" ', '>17<');
-  m('declare option pxp:extended-strings "off"; let $a := 17 return ">$a;<" ', '>$a;<');
+  m('declare option pxp:extended-strings "on"; let $a := 17 return x">{$a}<" ', '>17<');
+  f('declare option pxp:extended-strings "off"; let $a := 17 return x">{$a}<" ');
   m('declare option pxp:strict-type-checking "off"; "1" + 2 ', '3');
   //m('declare option pxp:strict-type-checking "on"; "1" + 2 ', '<fail>');
   m('declare option pxp:use-local-namespaces "on";  <r><a:b xmlns:a="xxx">!</a:b></r> / a:b ', '!');

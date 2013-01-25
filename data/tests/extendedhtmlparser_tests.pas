@@ -93,38 +93,38 @@ var data: array[1..285] of array[1..3] of string = (
  '<a><img width=120 src="abc.jpg"><img width=320 src="def.jpg"><img width=100 src="123.jpg"><img width=500 src="baum.jpg"></a>',
  'test=123.jpg'),
  //if tests (== strue)         (also tests variable reading for the first time)
- ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"$test;"="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
+ ('<a><b><template:read source="text()" var="test"/></b><template:if test=''$test="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
  '<a><b>abc</b><c>dies kommt raus</c></a>',
  'test=abc'#13#10'test=dies kommt raus'),
  //if test (== false),
- ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"$test;"="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
+ ('<a><b><template:read source="text()" var="test"/></b><template:if test=''$test="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
    '<a><b>abcd</b><c>dies kommt nicht raus</c></a>',
    'test=abcd'),
  //IF-Test (!= true)
- ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"$test;"!="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
+ ('<a><b><template:read source="text()" var="test"/></b><template:if test=''$test!="abc"''><c><template:read source="text()" var="test"/></c></template:if></a>',
   '<a><b>abcd</b><c>dies kommt raus</c></a>',
   'test=abcd'#13#10'test=dies kommt raus'),
  //IF-Test (!= false)
-  ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"abc"!="$test;"''><c><template:read source="text()" var="test"/></c></template:if></a>',
+  ('<a><b><template:read source="text()" var="test"/></b><template:if test=''"abc"!=$test''><c><template:read source="text()" var="test"/></c></template:if></a>',
   '<a><b>abc</b><c>dies kommt nicht raus</c></a>',
   'test=abc'),
  //Text + If
-   ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><c><template:read source="text()" var="test"/></c></template:if></b></a>',
+   ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"=x"{$test}"''><c><template:read source="text()" var="test"/></c></template:if></b></a>',
    '<a><b>nicht ok<c>dies kommt nicht raus</c></b></a>',
    'test=nicht ok'),
-  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><c><template:read source="text()" var="test"/></c></template:if></b></a>',
+  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"=x"{$test}"''><c><template:read source="text()" var="test"/></c></template:if></b></a>',
    '<a><b>ok<c>dies kommt raus!</c></b></a>',
    'test=ok'#13'test=dies kommt raus!'),
   //text + if + not closed
-  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><img><template:read source="@src" var="test"/></img></template:if></b></a>',
+  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"=x"{$test}''><img><template:read source="@src" var="test"/></img></template:if></b></a>',
    '<a><b>ok<img src="abc.png"></b></a>',
    'test=ok'#13'test=abc.png'),
    //text + if + not closed + text
-  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''><img><template:read source="@src" var="test"/></img><template:read source="text()" var="ende"/></template:if></b></a>',
+  ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"=x"{$test}''><img><template:read source="@src" var="test"/></img><template:read source="text()" var="ende"/></template:if></b></a>',
   '<a><b>ok<img src="abcd.png"></b></a>',
   'test=ok'#13'test=abcd.png'#13'ende=ok'),
   //text + if + not closed + text
- ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"="$test;"''>  <img><template:read source="@src" var="test"/><template:read source="text()" var="ende"/></img>  </template:if></b></a>',
+ ('<a><b><template:read source="text()" var="test"/><template:if test=''"ok"=x"{$test}''>  <img><template:read source="@src" var="test"/><template:read source="text()" var="ende"/></img>  </template:if></b></a>',
  '<a><b>ok<img src="abcd.png"></b></a>',
  'test=ok'#13'test=abcd.png'#13'ende='),
  //loop complete
@@ -165,7 +165,7 @@ var data: array[1..285] of array[1..3] of string = (
   ('<a><s><template:read source="text()" var="test"/></s><template:loop><b><template:read source="concat($test,text())" var="test"/></b></template:loop></a>',
    '<a><s>los:</s><b>1</b><b>2</b><b>3</b></a>',
    'test=los:'#13'test=los:1'#13'test=los:12'#13'test=los:123'),
-  ('<a><s><template:read source="text()" var="test"/></s><template:loop><c><template:loop><b><template:read source=''concat("$test;",text())'' var="test"/></b></template:loop></c></template:loop></a>',
+  ('<a><s><template:read source="text()" var="test"/></s><template:loop><c><template:loop><b><template:read source=''concat($test,text())'' var="test"/></b></template:loop></c></template:loop></a>',
    '<a><s>los:</s><c><b>a</b><b>b</b><b>c</b></c><c><b>1</b><b>2</b><b>3</b></c><c><b>A</b><b>B</b><b>C</b></c></a>',
    'test=los:'#13'test=los:a'#13'test=los:ab'#13'test=los:abc'#13'test=los:abc1'#13'test=los:abc12'#13'test=los:abc123'#13'test=los:abc123A'#13'test=los:abc123AB'#13'test=los:abc123ABC'),
  //deep-ode-text()
