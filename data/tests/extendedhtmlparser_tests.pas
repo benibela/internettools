@@ -959,6 +959,10 @@ begin
   t('<r><a>{following-sibling::a/(text())}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=2');
   t('<r><a>{following-sibling::a/concat("-",text(),"-")}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=-2-');
 
+  t( '<r><a>{$t}</a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 't=1'#10't=2'#10't=3'#10't=4');
+  t( '<r><a><t:read var="u" source="."/></a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 'u=1'#10'u=2'#10'u=3'#10'u=4');
+  t( '<r><a><t:read var="u{.}" source="."/></a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 'u1=1'#10'u2=2'#10'u3=3'#10'u4=4');
+
   extParser.free;
   sl.Free;
 end;

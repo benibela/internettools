@@ -647,7 +647,8 @@ begin
       setlength(term.children, 0);
       term.free;
     end;
-  end else source := cachePXP('source');
+  end else
+    source := cachePXP('source');
 
   if templateAttributes= nil then exit;
 
@@ -667,6 +668,8 @@ begin
     cacheRegExpr('list-contains', '(^|,) *', ' *(,|$)', true);
   end else if (templateType = tetCommandRead) then begin
     cacheRegExpr('regex', '', '', false);
+    if templateAttributes.IndexOfName('var') >= 0 then
+      varname := parser.parseQuery('x"'+templateAttributes.Values['var']+'"');
   end;
 end;
 
