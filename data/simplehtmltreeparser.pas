@@ -309,10 +309,11 @@ protected
   FTrees: TList;
   FCurrentTree: TTreeDocument;
   FXmlHeaderEncoding: TEncoding;
+  FRepairMissingStartTags, FRepairMissingEndTags: boolean;
 
 
   function newTreeNode(typ:TTreeNodeType; text: pchar; len:longint):TTreeNode;
-  function newTreeNode(typ:TTreeNodeType; s: string):TTreeNode;
+  function newTreeNode(typ:TTreeNodeType; s: string; offset: integer):TTreeNode;
   procedure autoCloseLastTag();
 
   function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
@@ -325,12 +326,14 @@ private
   FCurrentNamespaces: TNamespaceList;
   FCurrentNamespaceDefinitions: TList;
   FTargetEncoding: TEncoding;
+  FHasOpenedPTag: boolean;
   procedure pushNamespace(const url, prefix: string);
   function findNamespace(const prefix: string): INamespace;
 
   function htmlTagWeight(s:string): integer;
   class function htmlElementChildless(const s:string): boolean; static;
   class function htmlElementIsCDATA(const s: string): boolean; static;
+  class function htmlElementClosesPTag(const s: string): boolean; static;
 public
   treeNodeClass: TTreeNodeClass; //**< Class of the tree nodes. You can subclass TTreeNode if you need to store additional data at every node
   globalNamespaces: TNamespaceList;
@@ -350,6 +353,8 @@ public
 published
   //** Parsing model, see TParsingModel
   property parsingModel: TParsingModel read FParsingModel write FParsingModel;
+  property repairMissingStartTags: boolean read FrepairMissingStartTags write FrepairMissingStartTags ;
+  property repairMissingEndTags: boolean read FRepairMissingEndTags  write FRepairMissingEndTags ;
   //** If this is true (default), white space is removed from text nodes
   property trimText: boolean read FTrimText write FTrimText;
   //** If this is true (default is false) comments are included in the generated tree
@@ -376,6 +381,88 @@ var
 function equalNamespaces(const ans, bns: INamespace): boolean; inline;
 implementation
 uses xquery;
+
+type THTMLOmittedEndTagInfo = class
+  siblings, parents, additionallyclosed: TStringArray;
+  constructor create(somesiblings, someparents: array of string);
+  constructor create(somesiblings, someparents, someadditionallyclosed: array of string);
+end;
+
+{ THTMLOmittedEndTags }
+
+THTMLOmittedEndTags = class
+  tagInfo: array[0..25] of array of THTMLOmittedEndTagInfo;
+  procedure add(tag: THTMLOmittedEndTagInfo);
+  function find(tag: string): THTMLOmittedEndTagInfo;
+  destructor destroy; override;
+end;
+var omittedEndTags: THTMLOmittedEndTags;
+
+function arrayContainsI(const a: TStringArray; const s: string): boolean;
+var
+  i: Integer;
+begin
+  for i:=0 to high(a) do if strEqual(a[i], s) then exit(true);
+  exit(false);
+end;
+
+constructor THTMLOmittedEndTagInfo.create(somesiblings, someparents: array of string);
+var
+  i: Integer;
+begin
+  SetLength(siblings, length(somesiblings));
+  for i := 0 to high(siblings) do siblings[i] := somesiblings[i];
+  SetLength(parents, length(someparents));
+  for i := 0 to high(parents) do parents[i] := someparents[i];
+  for i := 1 to high(somesiblings) do
+    if somesiblings[i][1] <> somesiblings[0][1] then raise Exception.Create('initialization error');
+end;
+constructor THTMLOmittedEndTagInfo.create(somesiblings, someparents, someadditionallyclosed: array of string);
+var
+  i: Integer;
+begin
+  SetLength(siblings, length(somesiblings));
+  for i := 0 to high(siblings) do siblings[i] := somesiblings[i];
+  SetLength(parents, length(someparents));
+  for i := 0 to high(parents) do parents[i] := someparents[i];
+  SetLength(additionallyclosed, length(someadditionallyclosed));
+  for i := 0 to high(additionallyclosed) do additionallyclosed[i] := someadditionallyclosed[i];
+  for i := 1 to high(somesiblings) do
+    if somesiblings[i][1] <> somesiblings[0][1] then raise Exception.Create('initialization error');
+end;
+
+procedure THTMLOmittedEndTags.add(tag: THTMLOmittedEndTagInfo);
+var
+  idx: Integer;
+begin
+  idx := ord(tag.siblings[0][1]) - ord('a');
+  SetLength(tagInfo[idx], length(tagInfo[idx])+1);
+  tagInfo[idx][high(tagInfo[idx])] := tag;
+end;
+
+function THTMLOmittedEndTags.find(tag: string): THTMLOmittedEndTagInfo;
+var
+  idx: Integer;
+  i: Integer;
+begin
+  if tag = '' then exit(nil);
+  if (tag[1] >= 'a') and (tag[1] <= 'z') then idx := ord(tag[1]) - ord('a')
+  else if (tag[1] >= 'A') and (tag[1] <= 'Z') then idx := ord(tag[1]) - ord('A')
+  else exit(nil);
+  for i := 0 to high(tagInfo[idx]) do
+    if arrayContainsI(tagInfo[idx][i].siblings, tag) then exit(tagInfo[idx][i]);
+  exit(nil);
+end;
+
+destructor THTMLOmittedEndTags.destroy;
+var
+  i,j: Integer;
+begin
+  for i := 0 to high(tagInfo) do
+    for j := 0 to high(tagInfo[i]) do
+      tagInfo[i][j].free;
+  inherited destroy;
+end;
 
 
 { TAttributeEnumerator }
@@ -1455,12 +1542,10 @@ end;
 
 function TTreeParser.newTreeNode(typ:TTreeNodeType; text: pchar; len: longint): TTreeNode;
 begin
-  result := newTreeNode(typ, strFromPchar(text, len));
-  result.offset:=longint(text - @FCurrentFile[1]);
+  result := newTreeNode(typ, strFromPchar(text, len), longint(text - @FCurrentFile[1]));
 end;
 
-function TTreeParser.newTreeNode(typ: TTreeNodeType; s: string
-  ): TTreeNode;
+function TTreeParser.newTreeNode(typ: TTreeNodeType; s: string; offset: integer): TTreeNode;
 begin
   result:=treeNodeClass.Create;
   result.typ := typ;
@@ -1474,6 +1559,11 @@ begin
 
   if typ <> tetClose then result.parent := TTreeNode(FElementStack.Last)
   else result.parent := TTreeNode(FElementStack.Last).getParent();
+
+  if (typ = tetClose) and (parsingModel = pmHTML) then
+    FHasOpenedPTag := FHasOpenedPTag and not ((s = 'p') or (s = 'P'));
+
+  result.offset:=offset;
   //FCurrentElement.id:=FTemplateCount;
 end;
 
@@ -1485,11 +1575,11 @@ begin
   last := TTreeNode(FElementStack.Last);
   Assert(last<>nil);
   if last.typ = tetOpen then begin
-    new := newTreeNode(tetClose, last.value);
+    new := newTreeNode(tetClose, last.value, last.offset);
     //new := treeElementClass.create();
     //new.typ:=tetClose;
     //new.value:=last.value;
-    new.offset:=last.offset;
+    //new.offset:=last.offset;
     //new.next:=last.next;
     //last.next:=new;
     last.reverse:=new; new.reverse:=last;
@@ -1501,16 +1591,14 @@ end;
 function TTreeParser.enterTag(tagName: pchar; tagNameLen: longint;
   properties: THTMLProperties): TParsingResult;
 var
-  new,temp: TTreeNode;
-  i: Integer;
-  j: Integer;
-  enc: String;
-  first,last: PChar;
-  attrib: TTreeAttribute;
-begin
-  result:=prContinue;
+  tag: String;
 
-  if tagName^ = '?' then begin //processing instruction
+  procedure doReadProcessingInstruction;
+  var
+    enc: String;
+    new: TTreeNode;
+    first, last: PChar;
+  begin
     if strlEqual(tagName, '?xml', tagNameLen) then begin
       enc := lowercase(getProperty('encoding', properties));
       if enc = 'utf-8' then FXmlHeaderEncoding:=eUTF8
@@ -1532,41 +1620,67 @@ begin
       new.addAttributes(properties);
     end;
     new.initialized;
+  end;
+
+  procedure doRepairMissingEndTags;
+  var
+    omittedTag: THTMLOmittedEndTagInfo;
+    specialCaseOptGroup: Boolean;
+    closeFrom: Integer;
+    temp: TTreeNode;
+    i: Integer;
+  begin
+    omittedTag := omittedEndTags.find(tag);
+    if omittedTag <> nil then begin
+      specialCaseOptGroup := striEqual(tag, 'optgroup');
+      closeFrom := FElementStack.Count;
+      for i := FElementStack.Count-1 downto 0 do begin
+        temp :=TTreeNode(FElementStack[i]);
+        if not (temp.typ in [tetOpen, tetClose] {is there ever a close?}) then continue;
+        if arrayContainsI(omittedTag.parents, temp.value) then break;
+        if arrayContainsI(omittedTag.siblings, temp.value) or arrayContainsI(omittedTag.additionallyclosed, temp.value) then
+          closeFrom := i;
+      end;
+      for i:=closeFrom to FElementStack.count-1 do
+        autoCloseLastTag();
+    end;
+
+    if FHasOpenedPTag and htmlElementClosesPTag(tag) then begin
+      closeFrom := FElementStack.count;
+      for i := FElementStack.Count-1 downto 0 do begin
+        temp :=TTreeNode(FElementStack[i]);
+        if (temp.typ = tetOpen) and ((temp.value = 'p') or (temp.value = 'P')) then begin
+          closeFrom:=i;
+          break;
+        end;
+      end;
+      for i:=closeFrom to FElementStack.count-1 do
+        autoCloseLastTag();
+    end;
+  end;
+
+var
+  new: TTreeNode;
+  attrib: TTreeAttribute;
+begin
+  result:=prContinue;
+
+  if tagName^ = '?' then begin //processing instruction
+    doReadProcessingInstruction;
     exit;
   end;
 
   if FAutoCloseTag then autoCloseLastTag();
+
+  tag := strFromPchar(tagName, tagNameLen);
   if (FParsingModel = pmHTML) then begin
-    //table hack (don't allow two open td/tr unless separated by tr/table)
-    if strliEqual(tagName,'td',tagNameLen) then begin
-      for i:=FElementStack.Count-1 downto 0 do begin
-        temp :=TTreeNode(FElementStack[i]);
-        if not (temp.typ in  [tetDocument, tetOpen, tetClose]) then continue;
-        if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
-        if (temp.typ = tetClose) then break;
-        if (temp.typ = tetOpen) and (temp.value='td') then begin
-          for j:=FElementStack.count-1 downto i do
-            autoCloseLastTag();
-          break;
-        end;
-        (*if (temp.typ = [tetOpen]) and ((temp.value='tr') or (temp.value='table')) then *)break;
-      end;
-    end else if strliEqual(tagName,'tr',tagNameLen) then begin
-      for i:=FElementStack.Count-1 downto 0 do begin
-        temp :=TTreeNode(FElementStack[i]);
-        if not (temp.typ in  [tetDocument, tetOpen, tetClose]) then continue;
-        if (temp.value<>'tr') and (temp.value<>'td') and (temp.value<>'table') then continue;
-        if (temp.typ = tetClose) and ((temp.value='tr') or (temp.value='table')) then break;
-        if (temp.typ = tetOpen) and (temp.value='tr') then begin
-          for j:=FElementStack.count-1 downto i do
-            autoCloseLastTag();
-          break;
-        end;
-        if (temp.typ = tetOpen) and (temp.value='table') then break;
-      end;
-    end;
+    if repairMissingEndTags then
+      doRepairMissingEndTags;
+
+     FHasOpenedPTag := FHasOpenedPTag or (tag = 'p') or (tag = 'P');
   end;
-  new := newTreeNode(tetOpen, tagName, tagNameLen);
+
+  new := newTreeNode(tetOpen, tag, longint(tagName - @FCurrentFile[1]));
   if (FParsingModel = pmHTML) then //normal auto close
     FAutoCloseTag:=htmlElementChildless(new.value);
 
@@ -1791,6 +1905,26 @@ begin
   result := simplehtmlparser.htmlElementIsCDATA(pchar(s), length(s));
 end;
 
+class function TTreeParser.htmlElementClosesPTag(const s: string): boolean;
+begin
+  if s = '' then exit(false);
+  case s[1] of
+    'a', 'A': result := striequal(s, 'address') or striequal(s, 'article') or striequal(s, 'aside');
+    'b', 'B': result := striequal(s, 'blockquote');
+    'd', 'D': result := striequal(s, 'dir') or striequal(s, 'div') or striequal(s, 'dl');
+    'f', 'F': result := striequal(s, 'fieldset') or striequal(s, 'footer') or striequal(s, 'form');
+    'h', 'H': result := ((length(s) = 2) and (s[2] >= '1') and (s[2] <= '6') {h1,h2,...,h6}) or striequal(s, 'header') or striequal(s, 'hgroup') or striequal(s, 'hr');
+    'm', 'M': result := striequal(s, 'menu');
+    'n', 'N': result := striequal(s, 'nav');
+    'o', 'O': result := striequal(s, 'ol');
+    'p', 'P': result := striequal(s, 'p') or striequal(s, 'pre');
+    's', 'S': result := striequal(s, 'section');
+    't', 'T': result := striequal(s, 'table');
+    'u', 'U': result := striequal(s, 'ul');
+    else result := false;
+  end;
+end;
+
 constructor TTreeParser.Create;
 begin
   FElementStack := TList.Create;
@@ -1805,6 +1939,9 @@ begin
   FCurrentNamespaces := TNamespaceList.Create;
   globalNamespaces := TNamespaceList.Create;
   FTargetEncoding:=eUTF8;
+
+  FRepairMissingStartTags:=false; //??
+  FRepairMissingEndTags:=true;
   //FConvertEntities := true;
 end;
 
@@ -1895,12 +2032,14 @@ begin
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);
   FTemplateCount:=1;
+  FHasOpenedPTag := false;
 
   FXmlHeaderEncoding := strEncodingFromBOMRemove(FCurrentFile);
   if not (FXmlHeaderEncoding in [eUTF8, eUnknown]) then begin
     html := strConvertToUtf8(html, FXmlHeaderEncoding);
     FXmlHeaderEncoding:=eUTF8;
   end;
+
 
 
   //parse
@@ -2085,8 +2224,29 @@ end;
 initialization
   XMLNamespace_XML := TNamespace.Create(XMLNamespaceUrl_XML, 'xml');
   XMLNamespace_XMLNS := TNamespace.Create(XMLNamespaceUrl_XMLNS, 'xmlns');
+
+  omittedEndTags:=THTMLOmittedEndTags.Create;
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['li'], ['ol', 'ul', 'menu' {only if @type in toolbar state}]));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['dd', 'dt' {omitting dt closing tag not allowed if last}], ['dl']));
+
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['rt', 'rp'], ['ruby']));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['optgroup'], ['select' {useful? nesting selects might not be allowed}], ['option']));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['option'],  ['optgroup', 'select']));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['tbody', 'tfoot'], ['table'], ['colgroup', 'col']));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['thead'], ['table'], ['colgroup', 'col']));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['tr'], ['thead', 'tbody', 'tfoot', 'table' {table not allowed but safer so}], ['colgroup', 'col']));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['td', 'th'], ['tr', 'table', 'tbody', 'thead', 'tfoot' {only tr allowed """}], ['colgroup', 'col']));
+  //autoclosing of p tags not handled here, there are too many siblings "address, article, aside, blockquote, dir, div, dl, fieldset, footer, form, h1, h2, h3, h4, h5, h6, header, hgroup, hr, menu, nav, ol, p, pre, section, table, or ul, element, or if there is no more content in the parent element and the parent element is not an a element."
+
+  //?? these are not listed in allowed omitted end tags
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['colgroup'], ['table'], ['colgroup', 'col']));
+  omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['button'], ['']));
+
+
+
 finalization
   XMLNamespace_XML := nil;  //prevent heaptrc warning
   XMLNamespace_XMLNS := nil;
+  omittedEndTags.free;;
 end.
 
