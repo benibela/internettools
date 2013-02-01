@@ -284,6 +284,7 @@ end;
 ETreeParseException = class(Exception);
 { TTreeParser }
 
+TBasicParsingState = (bpmBeforeHtml, bpmBeforeHead, bpmInHead, bpmAfterHead, bpmInBody, bpmInFrameset, bpmAfterBody, bpmAfterAfterBody);
 //**Parsing model used to interpret the document
 //**pmStrict: every tag must be closed explicitely (otherwise an exception is raised)
 //**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised), detect encoding
@@ -315,6 +316,10 @@ protected
   function newTreeNode(typ:TTreeNodeType; text: pchar; len:longint):TTreeNode;
   function newTreeNode(typ:TTreeNodeType; s: string; offset: integer):TTreeNode;
   procedure autoCloseLastTag();
+  function autoCloseTill(const ctag: string): TTreeNode;
+
+  function prependTag(const tag: string): TTreeNode;
+  procedure doRepairMissingStartTags(const tag: string);
 
   function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
   function leaveTag(tagName: pchar; tagNameLen: longint):TParsingResult;
@@ -327,6 +332,8 @@ private
   FCurrentNamespaceDefinitions: TList;
   FTargetEncoding: TEncoding;
   FHasOpenedPTag: boolean;
+  FBasicParsingState: TBasicParsingState; //similar to html 5. Only used when repair start tags is enabled
+  FLastHead, flastbody, flasthtml: TTreeNode;
   procedure pushNamespace(const url, prefix: string);
   function findNamespace(const prefix: string): INamespace;
 
@@ -355,7 +362,7 @@ published
   property parsingModel: TParsingModel read FParsingModel write FParsingModel;
   property repairMissingStartTags: boolean read FrepairMissingStartTags write FrepairMissingStartTags ;
   property repairMissingEndTags: boolean read FRepairMissingEndTags  write FRepairMissingEndTags ;
-  //** If this is true (default), white space is removed from text nodes
+  //** If this is true (default is false), white space is removed from text nodes
   property trimText: boolean read FTrimText write FTrimText;
   //** If this is true (default is false) comments are included in the generated tree
   property readComments: boolean read FReadComments write FReadComments;
@@ -397,6 +404,7 @@ THTMLOmittedEndTags = class
   destructor destroy; override;
 end;
 var omittedEndTags: THTMLOmittedEndTags;
+    omittedStartTags: THTMLOmittedEndTags;
 
 function arrayContainsI(const a: TStringArray; const s: string): boolean;
 var
@@ -1345,6 +1353,7 @@ var known: TNamespaceList;
     while sub <> n.reverse do begin
       result += outer(sub);
       if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
+      else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
       else sub := sub.reverse.next;
     end;
   end;
@@ -1560,8 +1569,9 @@ begin
   if typ <> tetClose then result.parent := TTreeNode(FElementStack.Last)
   else result.parent := TTreeNode(FElementStack.Last).getParent();
 
-  if (typ = tetClose) and (parsingModel = pmHTML) then
-    FHasOpenedPTag := FHasOpenedPTag and not ((s = 'p') or (s = 'P'));
+  if (parsingModel = pmHTML) then
+    if (typ = tetClose) then
+      FHasOpenedPTag := FHasOpenedPTag and not ((s = 'p') or (s = 'P'));
 
   result.offset:=offset;
   //FCurrentElement.id:=FTemplateCount;
@@ -1587,6 +1597,90 @@ begin
   FElementStack.Delete(FElementStack.Count-1);
   FAutoCloseTag:=false;
 end;
+
+function TTreeParser.autoCloseTill(const ctag: string): TTreeNode;
+var
+  i: Integer;
+  temp: TTreeNode;
+  closeFrom: Integer;
+begin
+  result := nil;
+ for i := FElementStack.Count-1 downto 0 do begin
+    temp :=TTreeNode(FElementStack[i]);
+    if (temp.typ = tetOpen) and striEqual(temp.value, ctag) then begin
+      closeFrom:=i;
+      result := temp;;
+      break;
+    end;
+  end;
+  for i:=closeFrom to FElementStack.count-1 do
+    autoCloseLastTag();
+end;
+
+function TTreeParser.prependTag(const tag: string): TTreeNode;
+begin
+  result := newTreeNode(tetOpen, tag, FCurrentElement.offset+1);
+  FElementStack.Add(result);
+  result.initialized;
+end;
+
+procedure TTreeParser.doRepairMissingStartTags(const tag: string);
+  procedure goBack(t: TTreeNode);
+  begin
+    if t = nil  then exit;
+    if FCurrentElement = t.reverse then FCurrentElement := FCurrentElement.previous;
+    t.reverse.free;
+    t.reverse := nil;
+    FElementStack.Add(t);
+  end;
+
+var
+  omittedTag: THTMLOmittedEndTagInfo;
+begin
+  omittedTag := omittedStartTags.find(tag);
+  if (omittedTag <> nil) and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, omittedTag.parents[0]) then begin
+    prependTag(omittedTag.additionallyclosed[0]);
+    exit;
+  end;
+
+  if (FBasicParsingState = bpmBeforeHtml) and not striEqual(tag, 'html') then begin
+    flasthtml := prependTag('html');
+    FBasicParsingState:=bpmBeforeHead;
+  end;
+  if (FBasicParsingState = bpmBeforeHead) and not striEqual(tag, 'head') then begin
+    FBasicParsingState:=bpmInHead;
+    FLastHead := prependTag('head');
+  end;
+  if (FBasicParsingState = bpmInHead) and not (
+    striEqual(tag, 'base') or striEqual(tag, 'basefont') or striEqual(tag, 'bgsound') or striEqual(tag, 'link') or striEqual(tag, 'meta')
+    or striEqual(tag, 'title') or striEqual(tag, 'title') or striEqual(tag, 'noscript') or striEqual(tag, 'noframes') or striEqual(tag, 'style')
+    or striEqual(tag, 'script')) then begin
+      autoCloseTill('head');
+      FBasicParsingState:=bpmAfterHead;
+    end;
+  if FBasicParsingState = bpmAfterHead then begin
+    if striEqual(tag, 'body') or striEqual(tag, 'frameset') then exit;
+    if (FLastHead <> nil) and (striEqual(tag, 'base') or striEqual(tag, 'basefont') or striEqual(tag, 'bgsound') or striEqual(tag, 'link') or striEqual(tag, 'meta')
+    or striEqual(tag, 'title') or striEqual(tag, 'title') or striEqual(tag, 'noscript') or striEqual(tag, 'noframes') or striEqual(tag, 'style')
+    or striEqual(tag, 'script')
+    or striEqual(tag, 'head')) then begin
+      goBack(FLastHead);
+      FBasicParsingState:=bpmInHead;
+    end else begin
+      flastbody := prependTag('body');
+      FBasicParsingState:=bpmInBody;
+    end;
+  end;
+  if FBasicParsingState = bpmAfterAfterBody then begin
+    goBack(flasthtml);
+    FBasicParsingState:=bpmAfterBody;
+  end;
+  if FBasicParsingState = bpmAfterBody then begin
+    goBack(flastbody);
+    FBasicParsingState:=bpmInBody;
+  end;
+  //if FBasicParsingState = bpmInBody, bpmInFrameset..;
+  end;
 
 function TTreeParser.enterTag(tagName: pchar; tagNameLen: longint;
   properties: THTMLProperties): TParsingResult;
@@ -1622,6 +1716,7 @@ var
     new.initialized;
   end;
 
+
   procedure doRepairMissingEndTags;
   var
     omittedTag: THTMLOmittedEndTagInfo;
@@ -1645,19 +1740,10 @@ var
         autoCloseLastTag();
     end;
 
-    if FHasOpenedPTag and htmlElementClosesPTag(tag) then begin
-      closeFrom := FElementStack.count;
-      for i := FElementStack.Count-1 downto 0 do begin
-        temp :=TTreeNode(FElementStack[i]);
-        if (temp.typ = tetOpen) and ((temp.value = 'p') or (temp.value = 'P')) then begin
-          closeFrom:=i;
-          break;
-        end;
-      end;
-      for i:=closeFrom to FElementStack.count-1 do
-        autoCloseLastTag();
-    end;
+    if FHasOpenedPTag and htmlElementClosesPTag(tag) then
+      autoCloseTill('p')
   end;
+
 
 var
   new: TTreeNode;
@@ -1674,15 +1760,29 @@ begin
 
   tag := strFromPchar(tagName, tagNameLen);
   if (FParsingModel = pmHTML) then begin
-    if repairMissingEndTags then
-      doRepairMissingEndTags;
+    if (FBasicParsingState = bpmInBody) and repairMissingStartTags and striEqual(tag, 'body') then exit;
+    if repairMissingEndTags then doRepairMissingEndTags;
+    if repairMissingStartTags then doRepairMissingStartTags(tag)
+    else if striEqual(tag, 'body') then FBasicParsingState:=bpmInBody;
 
-     FHasOpenedPTag := FHasOpenedPTag or (tag = 'p') or (tag = 'P');
+    FHasOpenedPTag := FHasOpenedPTag or (tag = 'p') or (tag = 'P');
   end;
 
+
+  if (FParsingModel = pmHTML) then begin//normal auto close
+    case FBasicParsingState of
+      bpmBeforeHtml: if striEqual(tag, 'html') then FBasicParsingState:=bpmBeforeHead;
+      bpmBeforeHead: if striEqual(tag, 'head') then FBasicParsingState:=bpmInHead;
+      bpmInHead: if striEqual(tag, 'head') then exit; //skip
+      bpmAfterHead:
+        if striEqual(tag, 'body') then FBasicParsingState:=bpmInBody
+        else if striEqual(tag, 'frameset') then FBasicParsingState:=bpmInFrameset;
+      bpmInBody: if repairMissingStartTags and (striEqual(tag, 'body') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
+      bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
+    end;
+    FAutoCloseTag:=htmlElementChildless(tag);
+  end;
   new := newTreeNode(tetOpen, tag, longint(tagName - @FCurrentFile[1]));
-  if (FParsingModel = pmHTML) then //normal auto close
-    FAutoCloseTag:=htmlElementChildless(new.value);
 
   FElementStack.Add(new);
   if length(properties)>0 then begin
@@ -1728,6 +1828,31 @@ begin
   if FAutoCloseTag and (not strliequal(tagName, last.value, tagNameLen)) then autoCloseLastTag();
   FAutoCloseTag:=false;
 
+  if (FParsingModel = pmHTML) and repairMissingStartTags then begin
+    if (strliEqual(tagName, 'html', tagNameLen) or strliEqual(tagName, '', tagNameLen) ) then begin
+      case FBasicParsingState of
+        bpmBeforeHead: begin
+          prependTag('head'); autoCloseLastTag();
+          last := prependTag('body');
+          FBasicParsingState:=bpmInBody;
+        end;
+        bpmInHead: begin
+          autoCloseLastTag();
+          last := prependTag('body');
+          FBasicParsingState:=bpmInBody;
+        end;
+        bpmAfterHead: begin
+          last := prependTag('body');
+          FBasicParsingState:=bpmInBody;
+        end;
+        bpmAfterBody: begin
+          FBasicParsingState:=bpmAfterAfterBody;
+        end;
+      end;
+    end else if (FBasicParsingState = bpmInBody) and strliEqual(tagname, 'body', tagNameLen) then begin
+      FBasicParsingState:=bpmAfterBody;
+    end;
+  end;
   new := nil;
   if (strliequal(tagName, last.getNodeName, tagNameLen)) then begin
     new := newTreeNode(tetClose, tagName, tagNameLen);
@@ -1792,22 +1917,43 @@ begin
     //if no opening tag can be found the closing tag is ignored (not contained in tree)
   end;
 
-  if new <> nil then begin
-    if pos(':', new.value) > 0 then new.namespace := findNamespace(strSplitGet(':', new.value))
-    else new.namespace := FCurrentNamespace;
-    removedCurrentNamespace := false;
-    while (FCurrentNamespaceDefinitions.Count > 0) and (FCurrentNamespaceDefinitions[FCurrentNamespaceDefinitions.Count-1] = pointer(new.reverse)) do begin
-      if FCurrentNamespaces.items[FCurrentNamespaces.Count - 1].getPrefix = '' then
-        removedCurrentNamespace := true;
-      FCurrentNamespaceDefinitions.Delete(FCurrentNamespaceDefinitions.Count-1);
-      FCurrentNamespaces.Delete(FCurrentNamespaces.Count-1);
+  if new = nil then exit;
+
+  if pos(':', new.value) > 0 then new.namespace := findNamespace(strSplitGet(':', new.value))
+  else new.namespace := FCurrentNamespace;
+  removedCurrentNamespace := false;
+  while (FCurrentNamespaceDefinitions.Count > 0) and (FCurrentNamespaceDefinitions[FCurrentNamespaceDefinitions.Count-1] = pointer(new.reverse)) do begin
+    if FCurrentNamespaces.items[FCurrentNamespaces.Count - 1].getPrefix = '' then
+      removedCurrentNamespace := true;
+    FCurrentNamespaceDefinitions.Delete(FCurrentNamespaceDefinitions.Count-1);
+    FCurrentNamespaces.Delete(FCurrentNamespaces.Count-1);
+  end;
+  if removedCurrentNamespace then
+    FCurrentNamespace := findNamespace('');
+
+
+  if (FParsingModel = pmHTML) then begin
+    if (FBasicParsingState = bpmInHead) and strliEqual(tagName, 'head', tagNameLen)  then begin
+      FBasicParsingState:=bpmAfterHead;
+      FLastHead := new.reverse;
+    end else if (FBasicParsingState in [bpmInBody, bpmAfterBody]) and strliEqual(tagName, 'body', tagNameLen) then begin
+      FBasicParsingState:=bpmAfterBody;
+      if striEqual(new.value, 'body') then flastbody := new.reverse;
+    end else if (FBasicParsingState in [bpmInBody, bpmAfterBody, bpmAfterAfterBody]) and strliEqual(tagName, 'html', tagNameLen) then begin
+      FBasicParsingState:=bpmAfterAfterBody;
+      if striEqual(new.value, 'html') then flasthtml := new.reverse;
+      if flastbody = nil then begin
+        flastbody := flasthtml.previous;
+        while (flastbody <> nil) and (flastbody.typ <> tetClose) do flastbody := flastbody.previous;
+      end;
     end;
-    if removedCurrentNamespace then
-      FCurrentNamespace := findNamespace('');
   end;
 end;
 
 function TTreeParser.readText(text: pchar; textLen: longint): TParsingResult;
+var
+  tempLen: LongInt;
+  temp: PChar;
 begin
   result:=prContinue;
 
@@ -1827,6 +1973,19 @@ begin
 
   if textLen = 0 then
     exit;
+
+  if (FParsingModel = pmHTML) and repairMissingStartTags
+     and ( (FBasicParsingState in [bpmAfterBody, bpmAfterAfterBody])
+           or (not (FBasicParsingState in [bpmInBody, bpmInFrameset])
+               and ((FElementStack.Count = 0) or striEqual(TTreeNode(FElementStack.Last).value, 'head')
+                     or striEqual(TTreeNode(FElementStack.Last).value, 'html') or striEqual(TTreeNode(FElementStack.Last).value, ''))) )
+         then begin
+    tempLen := textLen;
+    temp := text;
+    strlTrim(temp, tempLen, [#0..' ']);
+    if tempLen > 0 then doRepairMissingStartTags('');
+  end;
+
 
   newTreeNode(tetText, text, textLen).initialized;
 end;
@@ -1929,7 +2088,7 @@ constructor TTreeParser.Create;
 begin
   FElementStack := TList.Create;
   treeNodeClass := TTreeNode;
-  FTrimText:=true;
+  FTrimText:=false;
   FReadComments:=false;
   FReadProcessingInstructions:=false;
   FAutoDetectHTMLEncoding:=true;
@@ -2033,6 +2192,10 @@ begin
   FElementStack.Add(FCurrentElement);
   FTemplateCount:=1;
   FHasOpenedPTag := false;
+  FBasicParsingState:=bpmBeforeHtml;
+  FLastHead := nil;
+  flastbody := nil;
+  flasthtml := nil;
 
   FXmlHeaderEncoding := strEncodingFromBOMRemove(FCurrentFile);
   if not (FXmlHeaderEncoding in [eUTF8, eUnknown]) then begin
@@ -2243,10 +2406,14 @@ initialization
   omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['button'], ['']));
 
 
+  omittedStartTags:=THTMLOmittedEndTags.Create;
+  omittedStartTags.add(THTMLOmittedEndTagInfo.Create(['tr'], ['table'], ['tbody', 'tfoot', 'thead']));
+  omittedStartTags.add(THTMLOmittedEndTagInfo.Create(['col'], ['table'], ['colgroup']));
 
 finalization
   XMLNamespace_XML := nil;  //prevent heaptrc warning
   XMLNamespace_XMLNS := nil;
-  omittedEndTags.free;;
+  omittedEndTags.free;
+  omittedStartTags.free;
 end.
 

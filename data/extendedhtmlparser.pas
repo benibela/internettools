@@ -457,7 +457,9 @@ THtmlTemplateParser=class
     property TemplateTree: TTreeNode read getTemplateTree; //**<A tree representation of the current template
     property HTMLTree: TTreeNode read getHTMLTree; //**<A tree representation of the processed html file
     property TemplateParser: TTreeParser read FTemplate; //**< X/HTML parser used to read the templates (public so you can change the parsing behaviour, if you really need it)
+    property HTMLParser: TTreeParser read FHTML; //**< X/HTML parser used to read the pages (public so you can change the parsing behaviour, if you really need it)
     property QueryEngine: TXQueryEngine read FQueryEngine; //**< XQuery engine used for evaluating query expressions contained in the template
+
   end;
 
 //** xml compatible namespace url to define new template prefixes
@@ -1275,6 +1277,7 @@ begin
   FTemplate.treeNodeClass:=TTemplateElement;
   FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
   FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
+  FTemplate.trimText:=true;
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
   FHTML.readComments:=true;

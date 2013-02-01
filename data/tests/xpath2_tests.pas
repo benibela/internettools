@@ -91,7 +91,9 @@ begin
   xml := TTreeParser.Create;
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
+  xml.repairMissingStartTags:=false;
   xml.TargetEncoding:=eUnknown;
+  xml.trimText:=true;
 
   t('',                          '',                                 '');
   t('''''',                      '',                                 '');
@@ -2703,6 +2705,87 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   xml.parseTree('<?xml encoding="windows-1252"?><html/>'); if xml.getLastTree.getEncoding <> eWindows1252 then raise Exception.Create('xml encoding detection failed 2');
   xml.parseTree('<?xml encoding="utf-8" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> eUTF8 then raise Exception.Create('xml encoding detection failed 3');
   xml.parseTree('<?xml encoding="windows-1252" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> eWindows1252 then raise Exception.Create('xml encoding detection failed 4');
+
+  //HTML parsing tests
+  xml.parsingModel:=pmHTML;
+  xml.repairMissingStartTags:=false;
+  t('outer-html(/)', '<table></table>', '<table></table>');
+  t('outer-html(/)', '<table><td>1</td><td>2</td><td>3</td></table>', '<table><td>1<td>2<td>3</table>');
+  t('outer-html(/)', '<table><td><table><td>1</td><td>2</td><td>3</td></table></td></table>', '<table><td><table><td>1<td>2<td>3</table></table>');
+  t('outer-html(/)', '<ol><li>1</li><li>2</li><li><ul><li>foo</li><li>bar</li></ul></li></ol>' , '<ol><li>1<li>2<li><ul><li>foo<li>bar');
+  t('outer-html(/)', '<select><option>1</option><option>2</option><optgroup><option>4</option><option>5</option></optgroup><optgroup><option>6</option><option>7</option></optgroup></select>' , '<select><option>1<option>2<optgroup><option>4<option>5<optgroup><option>6<option>7');
+  t('outer-html(/)', '<omg><button>A</button><button>B</button><button>C</button></omg>' , '<omg><button>A<button>B<button>C</omg>');
+  t('outer-html(/)', '<table><col><tr>17</tr></table>' , '<table><col><tr>17</table>');
+  t('outer-html(/table/tr)', '<tr>17</tr>' , '<table><col><tr>17</table>');
+  t('outer-html(/)', '<table><colgroup></colgroup><tr>17</tr></table>' , '<table><colgroup><tr>17</table>');
+  t('outer-html(/)', '<div><p>123</p><p>456</p><p>789</p><div>hi<p>abc</p><p>def</p></div></div>' , '<div><p>123<p>456<p>789<div>hi<p>abc<p>def</div>');
+  t('outer-html(/)', '<div><p>123<em>mausi</em></p><p>foo<i><b>bar</b></i></p><p>hallo</p></div>' , '<div><p>123<em>mausi<p>foo<i><b>bar<p>hallo'); //not entirely correct. The end tags are correctly inserted, but additional em/i/b start tags are leaking out
+
+  xml.repairMissingStartTags:=true;
+  t('outer-html(/)', '<html><head></head><body><table></table></body></html>', '<table></table>');
+  t('outer-html(/)', '<html><head></head><body><table></table></body></html>', '<body><table></table></body>');
+  t('outer-html(/)', '<html><head></head><body><table></table></body></html>', '<html><table></table></html>');
+  t('outer-html(/)', '<html><head></head><body><table></table></body></html>', '<html><head></head><table></table></html>');
+  t('outer-html(/)', '<html><head></head><body><table></table></body></html>', '<html><head></head><body><table></table></body></html>');
+  t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"></head><body><meta name="d"></body></html>', '<html><head><meta name="a"><meta name="b"/></head><meta name="c"><body><meta name="d"></body></html>');
+  t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"></head><body><meta name="d"></body></html>', '<head><meta name="a"><meta name="b"/></head><meta name="c"><body><meta name="d"></body></html>');
+  t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"></head><body><meta name="d"></body></html>', '<meta name="a"><meta name="b"/></head><meta name="c"><body><meta name="d"></body></html>');
+  t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"><meta name="d"></head><body></body></html>', '<meta name="a"><meta name="b"/></head><meta name="c"><meta name="d"></body></html>');
+  t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"></head><body>foobar<meta name="d"></body></html>', '<meta name="a"><meta name="b"/></head><meta name="c">foobar<meta name="d"></body></html>');
+  t('outer-html(/)', '<html><head><meta name="a"></head><body><unknown><meta name="b"><meta name="c">foobar<meta name="d"></unknown></body></html>', '<meta name="a"><unknown><meta name="b"/></head><meta name="c">foobar<meta name="d"></body></html>');
+  t('outer-html(/)', '<html><head></head><body>empty</body></html>', 'empty');
+  t('outer-html(/)', '<html><head></head><body>empty</body></html>', '<body>empty</body>');
+  t('outer-html(/)', '<html><head></head><body>empty</body></html>', '<html>empty</html>');
+  t('outer-html(/)', '<html><head></head><body>empty</body></html>', '<html><head></head>empty</html>');
+  t('outer-html(/)', '<html><head></head><body>empty</body></html>', '<html><head></head><body>empty</html>');
+  t('outer-html(/)', '<html><head></head><body><unknown></unknown></body></html>', '<unknown/>');
+  t('outer-html(/)', '<html><head></head><body><unknown></unknown></body></html>', '<body><unknown/></body>');
+  t('outer-html(/)', '<html><head></head><body><unknown></unknown></body></html>', '<html><unknown/></html>');
+  t('outer-html(/)', '<html><head></head><body><unknown></unknown></body></html>', '<html><head></head><unknown/></html>');
+  t('outer-html(/)', '<html><head></head><body><unknown></unknown></body></html>', '<html><head></head><body><unknown/></html>');
+
+  //  t('outer-html(/)', '<html><head></head><body></body></html>', ' ');
+  t('outer-html(/)', '<html><head></head><body></body></html>', '<body></body>');
+  t('outer-html(/)', '<html><head></head><body></body></html>', '<html></html>');
+  t('outer-html(/)', '<html><head></head><body></body></html>', '<html><head></head></html>');
+  t('outer-html(/)', '<html><head></head><body></body></html>', '<html><head></html>');
+  t('outer-html(/)', '<html><head></head><body></body></html>', '<html><head></head><body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>empty</body></html>', '<title>Hallo</title>empty');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body><h1>wtf</h1></body></html>', '<title>Hallo</title><h1>wtf</h1>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>abcempty</body></html>', '<title>Hallo</title><head>abc</head>empty');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body></body></html>', '<title>Hallo</title>');
+  t('outer-html(/)', '<html><head><meta charset="UTF-8"><style type="text/css">ass</style></head><body></body></html>', '<head><meta charset="UTF-8" /><style type="text/css">ass</style></head>');
+  t('outer-html(/)', '<!--[if !(IE 6) | !(IE 7) | !(IE 8) ] | !(IE 9) ><!--><html><!--<![endif]--><head><meta charset="UTF-8"><style type="text/css">ass</style></head><body></body></html>', '<!--[if !(IE 6) | !(IE 7) | !(IE 8) ] | !(IE 9) ><!--><html><!--<![endif]--><head><meta charset="UTF-8" /><style type="text/css">ass</style></head>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body></body></html>', '<title>Hallo</title><html><head></head></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?</body></html>', '<title>Hallo</title><html><head></head><body>WTF?</body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shit</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html>Stupid shit</html></body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupidshitthat html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html>Stupid <body>shit</body>that html is</html></body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shitthathtml is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html><body>Stupid shit</body>that </html>html is</body></html>');
+  xml.trimText:=false;
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shitthat html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html>Stupid <body>shit</body>that html is</html></body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shitthat html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html><body>Stupid shit</body>that </html>html is</body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shitthat html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html><body>Stupid shit</body></html>that html is</body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shit<unknown></unknown>that html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html><body>Stupid shit</body></html><unknown/>that html is</body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shit<div></div>that html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html><body>Stupid shit</body></html><div></div>that html is</body></html>');
+  t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?<div class="abc">Stupid shit</div><div></div>that html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<div class="abc"><html><body>Stupid shit</body></html><div></div>that html is</body></html>');
+  t('outer-html(/)', '<html><head></head><body><div class="content"> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tr></tbody></table> </div><font color="black"><br></font></body></html>', '<html><body><div class="content"><html><body> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tbody></table> </body></html><font color="black"><br></font>'); //wrongly: </div> should be at end
+  //did not work: &#252; is converted to &amp;#252???? t('outer-html(/)', '<html><head></head><body><div class="content"> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tr></tbody></table> <font color="black"><br></font></body></html>', '<html><body><div class="content"><html><body> <table><tbody><tr><td colspan="9">Ausweis g&#252;ltig bis: 05.05.2013</td></tbody></table> </body></html><font color="black"><br></font>');
+
+//  t('outer-html(/)', '', '<html><body><div class="content"><html><body><table width="99%"><tbody><tr><td>12345</td><td>&#160;&#160;>  S.L.<br/>></td><td>Entliehen/Bereitgestellt: 5</td><td>Geb&#252;ühren: 2,00&#160;&#8364;</ €</td></tr></tbody></table><br/>><table><tbody><tr><td colspan="9">Ausweis g&#252;ültig bis: 05.05.2013</td><td></td></tr><tr></tr><tr></tr></tbody></table><br/>></div></body></html><!-- Your output data goes in here --><font color="black"><br></font>');
+
+  //xml.readComments:=true;
+  //t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shit<!-- ?? -->that html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html><body>Stupid shit</body><!-- ?? --></html>that html is</body></html>');
+  //t('outer-html(/)', '<html><head><title>Hallo</title></head><body>WTF?Stupid shit<!-- ?? -->that html is</body></html>', '<title>Hallo</title><html><head></head><body>WTF?<html><body>Stupid shit</body></html><!-- ?? -->that html is</body></html>');
+
+
+  //todo:insert body when nothing is there, insert body before text
+
+
+  t('outer-html(/)', '<html><head></head><body><table><td>1</td><td>2</td><td>3</td></table></body></html>', '<table><td>1<td>2<td>3</table>');
+  t('outer-html(/)', '<html><head></head><body><table><tbody><tr><td>1</td></tr></tbody></table></body></html>', '<table><tr><td>1</td></tr></table>');
+  t('outer-html(/)', '<html><head></head><body><table><colgroup><col></colgroup><tbody><tr>17</tr></tbody></table></body></html>' , '<table><col><tr>17</table>');
+
+
 
   writeln('XPath 2: ', i, ' completed');
 
