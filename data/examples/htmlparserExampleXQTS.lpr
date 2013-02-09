@@ -370,6 +370,7 @@ begin
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
+  tree.repairMissingStartTags:=false;
   inputfiles:=TStringList.Create;
   inputqueries := TStringList.Create;
   inputmodules := TStringList.Create;
