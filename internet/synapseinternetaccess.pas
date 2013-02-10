@@ -150,9 +150,11 @@ function TSynapseInternetAccess.doTransferRec(method:string;protocol, host, url:
      connection.Headers.Add('Referer: '+Referer);
    connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml,*/*');;
    connection.Protocol:='1.1';
-   if additionalHeaders.Count > 0 then
-     for i := 0 to additionalHeaders.Count - 1 do
-       connection.Headers.add(additionalHeaders[i]);
+   for i := 0 to additionalHeaders.Count - 1 do
+     if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
+       connection.Headers.add(additionalHeaders[i])
+     else
+       connection.MimeType := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
   end;
 
 var newurl: string;

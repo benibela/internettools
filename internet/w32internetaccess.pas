@@ -288,6 +288,7 @@ var
   htmlOpenTagRead: boolean; htmlClosingTagRead: boolean;
   i: Integer;
   headerOut: string;
+  overridenPostHeader: string;
   label getMore;
 begin
 //  {$ifdef debug}
@@ -344,15 +345,21 @@ begin
   cookiestr:=makeCookieHeader;
   if cookiestr<>'' then
     HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+  overridenPostHeader := postHeader;
   for i:=0 to additionalHeaders.Count - 1 do
-    HttpAddRequestHeaders(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+    for i := 0 to additionalHeaders.Count - 1 do
+      if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
+        HttpAddRequestHeaders(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+       else
+        overridenPostHeader := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
+
 
 
   for i := 1 to 2 do begin //repeat if ssl certificate is wrong
     if data='' then
       callResult:= httpSendRequest(hfile, nil,0,nil,0)
      else
-      callResult:= httpSendRequest(hfile, postHeader, Length(postHeader), @data[1], Length(data));
+      callResult:= httpSendRequest(hfile, overridenPostHeader, Length(overridenPostHeader), @data[1], Length(data));
 
     if callResult then break;
 

@@ -72,7 +72,8 @@ type
 
      <page url="url to send the request to"
            templateFile="File containing a single page template (optional)"  >
-       <post name="post variable name"> Daten (optional) </post>
+       <header name="header name">value (optional) </header>
+       <post name="post variable name"> value (optional) </post>
        ...
        <template>A single page template (optional) </template>
      </page>
@@ -118,8 +119,7 @@ type
       variables for a post request to send to the url. @br
       If the name attribute exists, the content is url encoded, otherwise not. @br @code()
       (currently the value attribute and the contained text are treated as string to send.
-       In future versions, the contained text will be evaluated as xpath expression.
-       Older version (like Xidel 0.5) do not support the value-attribute)  @br
+       In future versions, the contained text will be evaluated as xpath expression.)  @br
       If no <post> children exist, a GET request is send.
 
       The template that should be applied to the downloaded page, can be given directly in a <template> element, or
@@ -253,7 +253,7 @@ type
     url:string;
     templateFile:string;
     template:string;
-    postparams:array of TProperty;
+    headers, postparams:array of TProperty;
     condition: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
@@ -353,7 +353,18 @@ begin
         if t.hasAttribute('value') then postparams[high(postparams)].value:=t['value']
         else postparams[high(postparams)].value:=t.deepNodeText(); //support old for a while
       end else if SameText(t.value, 'template') then
-        template:=t.innerXML();
+        template:=t.innerXML()
+      else if SameText(t.value, 'header') then begin
+        setlength(headers, length(headers)+1);
+        if t.hasAttribute('value') then headers[high(headers)].value:=t['value']
+        else headers[high(headers)].value:=t.deepNodeText();
+        if t.hasAttribute('name') then headers[high(headers)].name:=t['name']
+        else if pos(':', headers[high(headers)].value) > 0 then begin
+          headers[high(headers)].name := strSplitGet(':', headers[high(headers)].value);
+          headers[high(headers)].name := trim(headers[high(headers)].name);
+          headers[high(headers)].value := trim(headers[high(headers)].value);
+        end;
+      end;
     end;
     t := t.getNextSibling();
   end;
@@ -415,9 +426,15 @@ begin
 
 
   case guessType(cururl) of
-    rtRemoteURL:
+    rtRemoteURL: begin
+      for j := 0 to high(headers) do
+        reader.internet.additionalHeaders.Add(headers[j].name + ': ' + reader.parser.replaceEnclosedExpressions(headers[j].value));
+
       if post='' then page:=reader.internet.get(cururl)
       else page:=reader.internet.post(cururl, post);
+
+      if length(headers) > 0 then reader.internet.additionalHeaders.Clear;
+    end;
     rtFile:
       page := strLoadFromFileUTF8(cururl);
     rtXML: begin
