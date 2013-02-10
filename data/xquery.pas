@@ -1403,7 +1403,10 @@ type
   protected
     function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
+    function parseXStringNullTerminated(str: string): TXQuery;
+
     function getEvaluationContext(staticContextOverride: TXQStaticContext): TXQEvaluationContext;
+
 
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: TXQTerm; const context: TXQEvaluationContext);
@@ -3750,6 +3753,38 @@ begin
       cxt.resultquery := result;
       result.fterm := cxt.parseModule();
       if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
+      if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
+    finally
+      cxt.free;
+    end;
+  except
+    result.free;
+    raise;
+  end;
+end;
+
+function TXQueryEngine.parseXStringNullTerminated(str: string): TXQuery;
+var cxt: TXQParsingContext;
+    context: TXQStaticContext;
+begin
+  context := StaticContext.clone();
+  if str = '' then begin
+    result := TXQuery.Create(context, TXQTermSequence.Create);
+    exit;
+  end;
+  if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
+  cxt := TXQParsingContext.Create;
+  cxt.encoding:=eUTF8;
+  cxt.AllowExtendedStrings := true;
+  cxt.staticContext := context;
+  cxt.parsingModel:=xqpmXPath2;
+  cxt.engine := self;
+  try
+    try
+      cxt.str := str;
+      cxt.pos := @cxt.str[1];
+      result := TXQuery.Create(cxt.staticContext);
+      result.fterm := cxt.parseXString(true);
       if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
     finally
       cxt.free;

@@ -56,7 +56,7 @@ type
   function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
-  function parseXString(): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
+  function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
   function parseJSONLikeObjectConstructor(): TXQTermJSONObjectConstructor; //**<
 
   function parseFlower(akind: string): TXQTermFlower;
@@ -768,7 +768,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseXString: TXQTerm;
+function TXQParsingContext.parseXString(nullterminatedString: boolean): TXQTerm;
   function functionIsConcat(nf: TXQTermNamedFunction): boolean;
   begin
     result := (nf.func <> nil) and (nf.func is TXQBasicFunctionInfo) and (TXQBasicFunctionInfo(nf.func).func = @xqFunctionConcat)
@@ -805,8 +805,12 @@ var
   mark: PChar;
 begin
   result := nil;
-  strsymb := pos^; pos+=1;
-  if not (strsymb in ['''', '"']) then raiseParsingError('pxp:XPTS0003ext', 'Expected string start');
+  if nullterminatedString then strsymb := #0
+  else begin
+    strsymb := pos^;
+    pos+=1;
+    if not (strsymb in ['''', '"']) then raiseParsingError('pxp:XPTS0003ext', 'Expected string start');
+  end;
   mark := pos;
   while pos^ <> #0 do begin
     while (pos^ <> strsymb) and not (pos^ in [#0, '{', '}']) do pos+=1;

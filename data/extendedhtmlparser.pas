@@ -1438,6 +1438,17 @@ begin
   end;
 end;
 
+type
+
+TXQueryEngineBreaker = class(TXQueryEngine)
+  function parserEnclosedExpressionsString(s: string): IXQuery;
+end;
+
+function TXQueryEngineBreaker.parserEnclosedExpressionsString(s: string): IXQuery;
+begin
+  result := parseXStringNullTerminated(s);
+end;
+
 function THtmlTemplateParser.replaceEnclosedExpressions(str: string): string;
 var
   standard: Boolean;
@@ -1445,12 +1456,12 @@ var
 begin
   standard := true;
   for i:=1 to length(str) do
-    if str[i] in ['"', '{', '}' ] then begin
+    if str[i] in ['{', '}' ] then begin
       standard := false;
       break;
     end;
   if standard then exit(str);
-  result := fQueryEngine.parseXPath2('x"'+str+'"').evaluate().toString; //todo: somehow cache the parsed xquery
+  result := TXQueryEngineBreaker(fQueryEngine).parserEnclosedExpressionsString(str).evaluate().toString; //todo: somehow cache the parsed xquery
 end;
 
 function THtmlTemplateParser.debugMatchings(const width: integer): string;

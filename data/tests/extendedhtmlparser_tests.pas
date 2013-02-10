@@ -728,6 +728,11 @@ var previoushtml: string;
       checklog(expected);
     end;
 
+    procedure xstring(const inp,exp: string);
+    begin
+      if extParser.replaceEnclosedExpressions(inp) <> exp then raise Exception.Create('#0-Xstring test failed: got: '+extParser.replaceEnclosedExpressions(inp)+' expected ' + exp);
+    end;
+
     procedure q(const template, expected: string; html: string = '');
     var
       query: IXQuery;
@@ -962,6 +967,13 @@ begin
   t( '<r><a>{$t}</a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 't=1'#10't=2'#10't=3'#10't=4');
   t( '<r><a><t:read var="u" source="."/></a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 'u=1'#10'u=2'#10'u=3'#10'u=4');
   t( '<r><a><t:read var="u{.}" source="."/></a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 'u1=1'#10'u2=2'#10'u3=3'#10'u4=4');
+
+
+  xstring('hallo"''"''world', 'hallo"''"''world');
+  xstring('foo{1+2}bar', 'foo3bar');
+  xstring('foo{1+2}{1+3}bar', 'foo34bar');
+  xstring('foo{1+2}"''{1+3}bar', 'foo3"''4bar');
+  xstring('foo{{1+2}}{{1+3}}bar', 'foo{1+2}{1+3}bar');
 
   extParser.free;
   sl.Free;
