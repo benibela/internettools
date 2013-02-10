@@ -1420,6 +1420,20 @@ begin
   inherited destroy;
 end;
 
+{ TXQTermJSONObjectConstructor }
+
+function TXQTermJSONObjectConstructor.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  obj: TXQValueObject;
+  i: Integer;
+begin
+  obj := TXQValueObject.create();
+  if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
+  for i := 0 to length(children) div 2 - 1 do
+    obj.setMutable(children[i*2].evaluate(context).toString, children[i*2+1].evaluate(context));
+  result := obj;
+end;
+
 
 { TXQTermDefineFunction }
 

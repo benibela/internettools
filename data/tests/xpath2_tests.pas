@@ -1709,7 +1709,23 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join((i := object(("a", 1)), for $i in object(("b", "2")) return $i.a), "|")', '', '');
   t('string-join((i := object(("a", 1)), for $i in (object(("b", "2")),object(("a", "3"))) return $i.a), "|")', '|3', '');
 
-
+  //New object syntax
+  t('object(("hallo", 123)).hallo', '123'); //old
+  t('({"hallo": 123}).hallo', '123');
+  t('({"hallo": 123, "foobar": 456, "xyz": 789}).foobar', '456');
+  t('({"nest": {"ing": "birdy"}}).nest.ing', 'birdy');
+  t('string-join(({"array": (1, 2, 3)}).array, " ")', '1 2 3');
+  t('{"hallo": 123}.hallo', '123');
+  t('{}.hallo', ''); //no exception on undefined properties
+  t('string-join({"array": (1, 2, 3)}.array, " ")', '1 2 3');
+  t('string-join({"array": [1, 2, 3]}.array, " ")', '1 2 3'); //allow [] arrays as well. JSONiq, here we come!
+  t('string-join({"array": (1)}.array, " ")', '1');
+  t('string-join({"array": [1]}.array, " ")', '1');
+  t('string-join({"array": ()}.array, " ")', '');
+  t('string-join({"array": []}.array, " ")', '');
+  t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[1].a', '10');
+  t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[2].a', '20');
+  t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[3].a', '30');
 
                //Tests based on failed XQTS tests
   t('count(a/attribute::*)', '0', '<a></a>');

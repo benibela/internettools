@@ -926,9 +926,9 @@ begin
   m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10.0) instance of xs:integer', 'false');
   m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10.0) instance of xs:decimal', 'true');
   m('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(10.0) instance of xs:double', 'false');
-  {f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:integer', 'false');
+  (*f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:integer', 'false');
   f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:decimal', 'false');
-  f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:double', 'true'); conversion fail}
+  f('declare function f($a as xs:anyAtomicType) as xs:decimal { $a }; f(1e1) instance of xs:double', 'true'); conversion fail*)
 
   m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10) instance of xs:integer', 'false');
   m('declare function f($a as xs:anyAtomicType) as xs:double { $a }; f(10) instance of xs:decimal', 'false');
@@ -1488,6 +1488,9 @@ begin
   m('let $obj := object(("a", "b")) return $obj.a', 'b');
   //m('(let $obj := object(("a", "b")) return $obj.a := 17).a', '17'); //seems that does not work as it does not find $obj in the := call. (which is good, since it will probably crash)
   t('for $obj in (object(("a", "b")), object(("a", "c")), object(("a", "d"))) return $obj.a', 'b c d');
+  t('let $obj := {"hallo": 123, "foobar": 456, "xyz": 789} return $obj.foobar + $obj.hallo + $obj.xyz', '1368');
+  t('for $obj in ({"a": 123}, {"a": 1000}, {}, {"a": 10000}) return $obj.a', '123 1000 10000');
+  t('let $obj := {"nest": {"ing": "birdy"}} return $obj.nest.ing', 'birdy');
 
   m('declare namespace p="http://www.w3.org/2001/XMLSchema"; p:integer(1)', '1');
   m('<x xmlns:p="http://www.w3.org/2005/xpath-functions">{p:concat(1,2,3)}</x>', '123');

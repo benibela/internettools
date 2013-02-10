@@ -50,13 +50,14 @@ type
   function nextTokenQName(lookahead: boolean=false): string; inline;
 
 
-  function parseSequenceLike(target: TXQTerm): TXQTerm;
+  function parseSequenceLike(target: TXQTerm; closingChar: char = ')'): TXQTerm;
   function parseQNameContinuation: string;
   function parseSequenceType(): TXQTermSequenceType;
   function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
   function parseXString(): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
+  function parseJSONLikeObjectConstructor(): TXQTermJSONObjectConstructor; //**<
 
   function parseFlower(akind: string): TXQTermFlower;
   function parseSomeEvery(const akind: string): TXQTermSomeEvery;
@@ -217,20 +218,20 @@ begin
   result := nextToken(lookahead);
 end;
 
-function TXQParsingContext.parseSequenceLike(target: TXQTerm): TXQTerm;
+function TXQParsingContext.parseSequenceLike(target: TXQTerm; closingChar: char ): TXQTerm;
 var
   t: String;
 begin
   result := target;
   skipWhitespaceAndComment();
-  if pos^ = ')' then begin expect(')'); exit(); end;
+  if pos^ = closingChar then begin expect(closingChar); exit(); end;
   result.push(parse());
   t := nextToken();
   while t = ',' do begin
     result.push(parse());
     t := nextToken();
   end;
-  if t <> ')' then raiseParsingError('XPST0003', 'Expected closing parenthesis: )');
+  if t <> closingChar then raiseParsingError('XPST0003', 'Expected closing parenthesis: '+ closingChar);
 end;
 
 function TXQParsingContext.parseQNameContinuation: string;
@@ -832,6 +833,36 @@ begin
   if result = nil then result := TXQTermString.create('');
 end;
 
+function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTermJSONObjectConstructor;
+  function parseJSONArray: TXQTerm;
+  begin
+    expect('[');
+    result := parseSequenceLike(TXQTermSequence.Create, ']');
+  end;
+
+var
+  token: String;
+begin
+  //expect('{'); parsed by caller
+  result := TXQTermJSONObjectConstructor.create();
+  try
+    skipWhitespaceAndComment();
+    if pos^ = '}' then begin expect('}'); exit;end;
+    repeat
+      result.push(parseValue);
+      expect(':');
+      if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString);
+      skipWhitespaceAndComment();
+      if pos^ = '[' then result.push(parseJSONArray)
+      else result.push(parseValue);
+      token := nextToken();
+    until (token <> ',');
+    if token <> '}' then raiseParsingError('pxp:OBJ', 'Expected "}" or ",", but got '+token);
+  except
+    FreeAndNil(result);
+  end;
+end;
+
 function TXQParsingContext.parseValue: TXQTerm;
 var
   word: String;
@@ -881,8 +912,12 @@ begin
     '<': begin
       requireXQuery('to use constructors (this error can also mean an invalid < )');
       result := parseDirectConstructor(word);
-    end
+    end;
 
+    '{': begin
+      if not AllowObjects then raiseParsingError('XPST0003', 'Unexpected {. (Enable object extension, to create a json like object) ');
+      exit(parseJSONLikeObjectConstructor);
+    end
 
 
     else if (word = 'x') and (pos^ in ['"', '''']) then begin
@@ -1008,9 +1043,6 @@ begin
         raiseParsingError('XPST0075', 'Schema validation is not supported');
       end;
 
-
-
-
       result := TXQTermNodeMatcher.Create(word);
     end;
   end;
@@ -1093,7 +1125,7 @@ begin
         else if (word[1] = '.') and AllowObjects then begin
           expect(word);
           replace := ripBinOpApart(@astroot, 10000);
-          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction)  then
+          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor)  then
             replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
            else
             raiseParsingError('XPST0003', 'Unexpected .');

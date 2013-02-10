@@ -1061,7 +1061,6 @@ var //node: TTreeNode;
     var
       split: TStringArray;
       i: Integer;
-      temp: String;
     begin
       if s = '' then exit;
       split := strSplit(s, '&');

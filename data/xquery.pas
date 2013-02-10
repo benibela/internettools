@@ -1067,6 +1067,14 @@ type
     destructor destroy; override;
   end;
 
+  { TXQTermConstructor }
+
+  { TXQTermJSONObjectConstructor }
+
+  TXQTermJSONObjectConstructor = class(TXQTerm)
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+  end;
+
   { TXQTermModule }
 
   TXQTermModule = class(TXQTerm)
@@ -1174,13 +1182,25 @@ type
 
     @unorderedList(
     @item(@code(x"something{$var}{1+2+3}...") @br If a string is prefixed with an x, all expressions within {..}-parenthesis are evaluated and concattenated to the raw text, similarily to the value of a xquery direct attribute constructor. (option: extended-strings))
-    @item(@code(var:=value) @br This assigns the value @code(value) to the variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) )
+    @item(@code(var:=value) @br This assigns the value @code(value) to the global variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) )
     @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
           unless you use collations.)
     @item(The default type system is weaker typed, most values are automatically converted if necessary, e.g. "1" + 2 returns 3. @br
           (option: strict-type-checking))
     @item(If a namespace prefix is unknown, the namespace is resolved using the current context item. @br
           This basically allows you to do namespace prefix only matching. (option: use-local-namespaces)
+          )
+    @item(JSON-objects: There is basic support for JSON like objects. (option: objects)
+          @br E.g. you can write @code({"foobar": 123, "hallo": "world!"}) to create a object with two properties.
+          @br These properties can be accessed with the usual OOP property dot syntax, i.e. @code({"name": 123}.name) will evaluate to @code(123).
+          @br If an object is assigned to a variable, you can append the dot to the variable name, e.g. @code(let $obj := {"name": 123} return $obj.name).
+              (drawback: variable names are not allowed to contains dots, if this extension is enabled)
+          @br Within an object constructor arrays can be created with json and XPath-syntax like @code({"array": [1, 2, 3]}) and @code({"array": (1, 2, 3)}).
+          @br Objects are immutable, but the properties of objects that are global variables can seemingly be changed with @code($obj.property := newvalue).
+              This creates a new object with name @code($obj) that has all the properties of the old objects plus the changed properties.@br
+          @br Objects can be assigned to each other (e.g. @code(obj1 := {}, obj2 := {}, obj2.prop := 123, obj1.sub := obj2 ) ).
+          @br Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers).
+          @br An alternative, older object creation syntax is the object-function (see below).
           )
     @item(Element tests based on types of the xml are not supported (since it can not read schemas ) )
     @item(Regex remarks: @unorderedList(                                                  )
@@ -1232,10 +1252,8 @@ type
                   @br Returns true iff the equation @code ( i = a * n + b ) can be solved by an non-negative integer @code(n).
                   (This is used to implement the css functions like nth-child ) )
       @item(@code(var := object())
-                  @br This creates an object var, whose properties can be accessed like @code(var.propertyname).
-                  @br Objects can be assigned to each other (e.g. @code(obj1 := object(), obj2 := object(), obj2.prop := 123, obj1.sub := obj2 ) ).
-                                       Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers). @br
-                                       However, objects are still preliminary/experimental.)
+                  @br This creates an object with name @code($var). Default values can be passed as sequence of name/value pairs.
+                  )
       @item(@code(get-property(<object>, <name>))
                   @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled
                   )
@@ -1689,6 +1707,7 @@ var
     LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
     TwoDigitYearCenturyWindow: 50;
   );
+
 
 { EXQEvaluationException }
 
