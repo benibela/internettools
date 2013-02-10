@@ -1532,6 +1532,7 @@ begin
   temp := THtmlTemplateParser.create; //TODO: optimize
   try
     temp.TemplateParser.parsingModel:=pmHTML;
+
     temp.QueryEngine.StaticContext.Free;
     temp.QueryEngine.StaticContext := context.staticContext.clone();
     temp.QueryEngine.staticContext.sender := temp.QueryEngine;
