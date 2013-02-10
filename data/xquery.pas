@@ -1196,6 +1196,7 @@ type
           @br If an object is assigned to a variable, you can append the dot to the variable name, e.g. @code(let $obj := {"name": 123} return $obj.name).
               (drawback: variable names are not allowed to contains dots, if this extension is enabled)
           @br Within an object constructor arrays can be created with json and XPath-syntax like @code({"array": [1, 2, 3]}) and @code({"array": (1, 2, 3)}).
+             (warning: Currently json arrays are translated to sequences, i.e. flattened. This might change in later versions!)
           @br Objects are immutable, but the properties of objects that are global variables can seemingly be changed with @code($obj.property := newvalue).
               This creates a new object with name @code($obj) that has all the properties of the old objects plus the changed properties.@br
           @br Objects can be assigned to each other (e.g. @code(obj1 := {}, obj2 := {}, obj2.prop := 123, obj1.sub := obj2 ) ).
@@ -1272,6 +1273,14 @@ type
                   @br see THtmlTemplateParser for the full template reference.
                   (This function is not actually declared in xquery.pas, but in extendedhtmlparser.pas, so it is only available if latter unit is included in any uses clause. )
                   )
+      @item(@code(json(<string>))
+                  @br Reads a json object/value from a string and converts it in an pxp object/value (see object extension above).
+                  @br Only available if the xquery_json unit is in the uses clause.
+                  @br Arrays are converted to sequencecs i.e. flattened (this might change in future versions)
+                  )
+      @item(@code(serialize-json(<object>))
+                  @br Converts an pxp value to a json string.
+                  @br Only available if the xquery_json unit is in the uses clause.)
       @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions",
             which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
 

@@ -13,7 +13,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser, bbutils;
+uses xquery, simplehtmltreeparser, bbutils, xquery_json;
 
 
 procedure unittests(TestErrors:boolean);
@@ -1726,6 +1726,28 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[1].a', '10');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[2].a', '20');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[3].a', '30');
+
+  //Json tests
+  t('json(''{"a": 123}'').a', '123');
+  t('json(''"123"'')', '123');
+  t('json(''12.7'')', '12.7');
+  t('json(''2000000000'')', '2000000000');
+  t('json(''2000000000000000'')', '2000000000000000');
+  t('json(''true'')', 'true');
+  t('json(''[1, 2, 3]'')', '1');
+  t('string-join(json(''[1, 2, 3]''), " ")', '1 2 3');
+  t('string-join(json(''[1, 2, 3, [4, 5, 6], [7] ]''), " ")', '1 2 3 4 5 6 7');
+  t('count(json(''[1, 2, 3, [4, 5, 6], [7] ]''))', '7'); //todo: fix?
+  t('json(''[{"hallo": "world"}]'')[1].hallo', 'world'); //carefully, ({}) != ({})[1] == {}. Fix?
+  t('json(''[{"hallo": "world"}, {hallo: 1000}]'')[2].hallo', '1000'); //carefully, ({}) != ({})[1] == {}. Fix?
+
+  t('serialize-json(123)', '123');
+  t('serialize-json(123.6)', '123.6');
+  t('serialize-json("123a")', '"123a"');
+  t('serialize-json((1,2,3))', '[1, 2, 3]');
+  t('serialize-json((1,2,"3!", true(),false()))', '[1, 2, "3!", true, false]');
+  t('serialize-json({"foo": 123, "bar": 0.456})', '{"foo": 123, "bar": 0.456}');
+  t('serialize-json({"xml": /})', '{"xml": "<foobar>123</foobar>"}', '<foobar>123</foobar>');
 
                //Tests based on failed XQTS tests
   t('count(a/attribute::*)', '0', '<a></a>');

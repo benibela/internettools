@@ -1549,15 +1549,16 @@ function TXQValueObject.jsonSerialize(nodeFormat: TTreeNodeSerialization): strin
 var
   temp: TXQValueObject;
   i: Integer;
+  tempi: IXQValue;
 begin
   result := '{';
-  temp := (self.clone as TXQValueObject);
+  tempi := self.clone; //keep reference in scope
+  temp := (tempi as TXQValueObject);
   if temp.values.count > 0 then begin
     result += jsonStrEscape(temp.values.getName(0))+': '+temp.values.get(0).jsonSerialize(nodeFormat);
     for i:=1 to temp.values.count-1 do
       result += ', '+jsonStrEscape(temp.values.getName(i))+': '+temp.values.get(i).jsonSerialize(nodeFormat);
   end;
-  temp.free;
   result += '}';
 end;
 
@@ -1565,8 +1566,10 @@ function TXQValueObject.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenc
 var
   temp: TXQValueObject;
   i: Integer;
+  tempi: IXQValue;
 begin
-  temp := (self.clone as TXQValueObject);
+  tempi := self.clone; //keep reference in scope
+  temp := (tempi as TXQValueObject);
   if temp.values.count = 0 then result := '<'+objectTag+'/>'
   else begin
     result :=  '<'+objectTag+'>';
@@ -1575,7 +1578,6 @@ begin
       result +=  '<'+temp.values.Names[i]+'>'+temp.values.get(i).xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[i]+'>';
     result +=  '</'+objectTag+'>';
   end;
-  temp.free;
 end;
 
 function TXQValueObject.getProperty(const name: string): IXQValue;
