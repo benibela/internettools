@@ -1426,9 +1426,10 @@ type
     //**< Evaluates a path expression, created from the given term in the given context.
     class function evaluateAccessList(term: TXQTerm; const context: TXQEvaluationContext): IXQValue;
 
-
+  public
     class procedure registerNativeModule(const module: TXQNativeModule);
 
+  protected
     function findNamespace(const nsprefix: string): INamespace;
     class function findOperator(const name: string): TXQOperatorInfo;
     class function findTypeClass(const name: string): TXQValueClass;
@@ -3776,6 +3777,7 @@ begin
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowExtendedStrings := true;
+  cxt.AllowObjects:=true;
   cxt.staticContext := context;
   cxt.parsingModel:=xqpmXPath2;
   cxt.engine := self;
