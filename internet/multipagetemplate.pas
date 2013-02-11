@@ -674,6 +674,8 @@ end;
 
 procedure TMultipageTemplateReader.processPage(page, cururl, contenttype: string);
 begin
+  parser.variableChangeLog.add('url', cururl);
+  parser.variableChangeLog.add('raw', page);
   parser.parseHTML(page, cururl, contenttype);
 
   if Assigned(onPageProcessed) then
