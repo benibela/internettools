@@ -974,6 +974,20 @@ begin
   xstring('foo{1+2}{1+3}bar', 'foo34bar');
   xstring('foo{1+2}"''{1+3}bar', 'foo3"''4bar');
   xstring('foo{{1+2}}{{1+3}}bar', 'foo{1+2}{1+3}bar');
+  xstring('{1+2}', '3');
+  xstring('{1+2}"', '3"');
+  xstring('"{1+2}', '"3');
+  xstring('{1+2}{3+4}', '37');
+  xstring('{1+2}{3+4}"', '37"');
+  xstring('"{1+2}{3+4}', '"37');
+
+  xstring('{{1+2}}', '{1+2}');
+  xstring('{{1+2}}"', '{1+2}"');
+  xstring('"{{1+2}}', '"{1+2}');
+  xstring('{{1+2}}{3+4}', '{1+2}7');
+  xstring('{{1+2}}{3+4}"', '{1+2}7"');
+  xstring('"{{1+2}}{3+4}', '"{1+2}7');
+
 
   extParser.free;
   sl.Free;

@@ -815,7 +815,7 @@ begin
   while pos^ <> #0 do begin
     while (pos^ <> strsymb) and not (pos^ in [#0, '{', '}']) do pos+=1;
     pushRaw(mark, pos - 1);
-    if pos^ = #0 then break;
+    if pos^ = #0 then begin mark := pos; break; end;
     if pos^ = (pos+1)^ then begin //escaped like {{, '', "", }}
       pos+=1;
       mark := pos;
@@ -834,6 +834,7 @@ begin
       end;
     end;
   end;
+  if nullterminatedString then pushRaw(mark, pos - 1);
   if result = nil then result := TXQTermString.create('');
 end;
 
