@@ -5,7 +5,7 @@ unit xquery_json;
 interface
 
 uses
-  Classes, SysUtils, fpjson, xquery, xquery_utf8;
+  Classes, SysUtils, fpjson, xquery;
 
 
 implementation
