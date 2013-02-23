@@ -33,7 +33,7 @@ interface
 
 {$IFDEF COMPILE_W32_INTERNETACCESS}
 uses
-  windows,Classes, SysUtils,dialogs,
+  windows,Classes, SysUtils,
   wininet,
   internetaccess;
 
@@ -80,6 +80,7 @@ const TEMPORARY_DIRECTORY='T:\theInternet\';
 
 {$ENDIF}
 implementation
+uses bbutils;
 //uses bbdebugtools;
 
 {$IFDEF COMPILE_W32_INTERNETACCESS}
@@ -347,11 +348,10 @@ begin
     HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
   overridenPostHeader := postHeader;
   for i:=0 to additionalHeaders.Count - 1 do
-    for i := 0 to additionalHeaders.Count - 1 do
-      if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
-        HttpAddRequestHeaders(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
-       else
-        overridenPostHeader := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
+    if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
+      HttpAddRequestHeaders(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
+     else
+      overridenPostHeader := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
 
 
 
@@ -359,7 +359,7 @@ begin
     if data='' then
       callResult:= httpSendRequest(hfile, nil,0,nil,0)
      else
-      callResult:= httpSendRequest(hfile, overridenPostHeader, Length(overridenPostHeader), @data[1], Length(data));
+      callResult:= httpSendRequest(hfile, pchar(overridenPostHeader), Length(overridenPostHeader), @data[1], Length(data));
 
     if callResult then break;
 
@@ -407,7 +407,7 @@ begin
     if newurl = '' then exit('');
     if (pos('://',newurl) > 0) then decodeURL(Trim(newurl), protocol, host, url)
     else url := trim(newurl);
-    result := doTransferRec(hcmGet, protocol, host, url, '', redirectionCount - 1);
+    result := doTransferRec('GET', protocol, host, url, '', redirectionCount - 1);
     exit;
   end else if (lastHTTPResultCode =200) or (lastHTTPResultCode = 302) then begin
     if assigned(OnProgress) then begin
@@ -466,7 +466,7 @@ begin
   {$endif}
 end;
 
-function TW32InternetAccess.doTransfer(method:THTTPConnectMethod; protocol,host,url: string;data:string): string;
+function TW32InternetAccess.doTransfer(method:string; protocol,host,url: string;data:string): string;
 begin
   result := doTransferRec(method, protocol, host, url, data, 10);
 end;
