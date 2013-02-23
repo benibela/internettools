@@ -181,7 +181,7 @@ begin
   if ok then begin
     //for i:=0 to connection.Headers.Count-1 do
     //  writeln(connection.Headers[i]);
-     if (connection.ResultCode = 200) or ((connection.ResultCode = 302) and (connection.document.Size > 512)) then
+     if (connection.ResultCode = 200) {or ((connection.ResultCode = 302) and (connection.document.Size > 512))} then
        result:=ReadStrFromStream(connection.Document, connection.Document.Size)
       else begin
        if ((connection.ResultCode = 301) or (connection.ResultCode = 302) or (connection.ResultCode = 303) or (connection.ResultCode = 307)) and (redirectionCount > 0) then
