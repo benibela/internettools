@@ -17,7 +17,7 @@ function xqFunctionJson(const args: TXQVArray): IXQValue;
 
   function convert(data: TJSONData): IXQValue;
   var
-    seq: TXQValueSequence;
+    seq: TXQValueJSONArray;
     obj: TXQValueObject;
     i: Integer;
   begin
@@ -28,7 +28,7 @@ function xqFunctionJson(const args: TXQVArray): IXQValue;
     if data is TJSONBoolean then exit(xqvalue(data.AsBoolean));
     if data is TJSONNull then exit(xqvalue);
     if data is TJSONArray then begin
-      seq := TXQValueSequence.create();
+      seq := TXQValueJSONArray.create();
       for i := 0 to data.Count - 1 do seq.addChild(convert(TJSONArray(data)[i]));
       exit(seq);
     end;
@@ -69,10 +69,26 @@ begin
   result := xqvalue(a.jsonSerialize(tnsXML));
 end;
 
-var fn: TXQNativeModule;
+function xqFunctionMembers(const args: TXQVArray): IXQValue;
+var
+  a: IXQValue;
+  ara: TXQValueJSONArray;
+  i: Integer;
+begin
+  requiredArgCount(args, 1);
+  a := args[0];
+  if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.debugAsStringWithTypeAnnotation());
+  ara := a as TXQValueJSONArray;;
+  result := xqvalue();
+  for i := 0 to ara.seq.Count-1 do
+    xqvalueSeqAdd(result, ara.seq[i]);
+end;
+
+var jn: TXQNativeModule;
 initialization
-  fn := TXQueryEngine.findNativeModule(XMLNamespaceURL_XPathFunctions);
-  fn.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as xs:object']);
-  fn.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as xs:anyAtomicType*) as xs:string']);
+  jn := TXQueryEngine.findNativeModule(XMLNamespaceURL_XPathFunctions);
+  jn.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as xs:object']);
+  jn.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as xs:anyAtomicType*) as xs:string']);
+  jn.registerFunction('members', @xqFunctionMembers, ['($arg as xs:array) as item()*']);
 end.
 

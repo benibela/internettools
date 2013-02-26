@@ -333,6 +333,28 @@ begin
   for i:= 0 to high(children) do result += children[i].getContextDependencies;
 end;
 
+{ TXQTermArray }
+
+function TXQTermJSONArray.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  i: Integer;
+  tempSeq: TXQValueJSONArray;
+begin
+  tempSeq := TXQValueJSONArray.create(length(children));
+  for i := 0 to high(children) do
+    tempSeq.addChild(children[i].evaluate(context));
+  result := tempSeq;
+end;
+
+function TXQTermJSONArray.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+end;
+
+
 { TXQTermSomeEvery }
 
 constructor TXQTermSomeEvery.create(every: boolean);
@@ -712,6 +734,44 @@ begin
 
   exit(false);
 end;
+
+{ TXQDynamicFunctionCall }
+
+constructor TXQTermDynamicFunctionCall.create(func: TXQTerm; arg: TXQTerm);
+begin
+  if func <> nil then begin
+    push(func);
+    if arg <> nil then push(arg);
+  end;
+end;
+
+function TXQTermDynamicFunctionCall.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  func: IXQValue;
+  index: Integer;
+begin
+  if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
+  func := children[0].evaluate(context);
+  if func is TXQValueSequence then func := func.getChild(0);
+  if func is TXQValueJSONArray then begin
+    if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices given');
+    index := children[1].evaluate(context).toInt64;
+    if (index < 1) or (index > (func as TXQValueJSONArray).seq.Count) then exit(xqvalue);
+    result := (func as TXQValueJSONArray).seq[index-1];
+  end else if func is TXQValueObject then begin
+    if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices given');
+    result := func.getProperty(children[1].evaluate(context).ToString);
+  end else raiseEvaluationError('XPST003', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
+end;
+
+function TXQTermDynamicFunctionCall.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+end;
+
 
 
 

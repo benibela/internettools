@@ -57,7 +57,9 @@ type
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
-  function parseJSONLikeObjectConstructor(): TXQTermJSONObjectConstructor; //**<
+  function parseJSONLikeObjectConstructor(): TXQTermJSONObjectConstructor; //**< parses an json object constructor { "name": value, .. }
+  function parseJSONLikeArray(): TXQTermJSONArray;
+
 
   function parseFlower(akind: string): TXQTermFlower;
   function parseSomeEvery(const akind: string): TXQTermSomeEvery;
@@ -768,7 +770,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseXString(nullterminatedString: boolean): TXQTerm;
+function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
   function functionIsConcat(nf: TXQTermNamedFunction): boolean;
   begin
     result := (nf.func <> nil) and (nf.func is TXQBasicFunctionInfo) and (TXQBasicFunctionInfo(nf.func).func = @xqFunctionConcat)
@@ -839,12 +841,6 @@ begin
 end;
 
 function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTermJSONObjectConstructor;
-  function parseJSONArray: TXQTerm;
-  begin
-    expect('[');
-    result := parseSequenceLike(TXQTermSequence.Create, ']');
-  end;
-
 var
   token: String;
 begin
@@ -858,8 +854,7 @@ begin
       expect(':');
       if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString);
       skipWhitespaceAndComment();
-      if pos^ = '[' then result.push(parseJSONArray)
-      else result.push(parseValue);
+      result.push(parseValue);
       token := nextToken();
     until (token <> ',');
     if token <> '}' then raiseParsingError('pxp:OBJ', 'Expected "}" or ",", but got '+token);
@@ -867,6 +862,12 @@ begin
     FreeAndNil(result);
     raise
   end;
+end;
+
+function TXQParsingContext.parseJSONLikeArray: TXQTermJSONArray;
+begin
+  //expect('['); parsed by caller
+  result := parseSequenceLike(TXQTermJSONArray.Create, ']') as TXQTermJSONArray;
 end;
 
 function TXQParsingContext.parseValue: TXQTerm;
@@ -921,8 +922,12 @@ begin
     end;
 
     '{': begin
-      if not AllowObjects then raiseParsingError('XPST0003', 'Unexpected {. (Enable object extension, to create a json like object) ');
+      if not AllowObjects then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension, to create a json like object) ');
       exit(parseJSONLikeObjectConstructor);
+    end;
+    '[': begin
+      if not AllowObjects then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension, to create a json like array) ');
+      exit(parseJSONLikeArray());
     end
 
 
@@ -1121,6 +1126,12 @@ begin
           replace^ := TXQTermFilterSequence.Create(replace^, parse());
           expect(']');
         end;
+        '(': begin
+          expect('(');
+          replace := ripBinOpApart(@astroot, 10000); //TODO: check
+          replace^ := TXQTermDynamicFunctionCall.Create(replace^, parse());
+          expect(')');
+        end;
         ':=': begin
           expect(':=');
           result := TXQTermDefineVariable.Create(astroot, nil, parse());
@@ -1131,7 +1142,7 @@ begin
         else if (word[1] = '.') and AllowObjects then begin
           expect(word);
           replace := ripBinOpApart(@astroot, 10000);
-          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor)  then
+          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor)  or (replace^ is TXQTermDynamicFunctionCall) then
             replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
            else
             raiseParsingError('XPST0003', 'Unexpected .');

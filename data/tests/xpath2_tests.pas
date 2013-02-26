@@ -1720,11 +1720,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('{"hallo": 123}.hallo', '123');
   t('{}.hallo', ''); //no exception on undefined properties
   t('string-join({"array": (1, 2, 3)}.array, " ")', '1 2 3');
-  t('string-join({"array": [1, 2, 3]}.array, " ")', '1 2 3'); //allow [] arrays as well. JSONiq, here we come!
+  t('string-join(members({"array": [1, 2, 3]}.array), " ")', '1 2 3');
   t('string-join({"array": (1)}.array, " ")', '1');
-  t('string-join({"array": [1]}.array, " ")', '1');
+  t('string-join(members({"array": [1]}.array), " ")', '1');
   t('string-join({"array": ()}.array, " ")', '');
-  t('string-join({"array": []}.array, " ")', '');
+  t('string-join(members({"array": []}.array), " ")', '');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[1].a', '10');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[2].a', '20');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[3].a', '30');
@@ -1736,12 +1736,31 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('json(''2000000000'')', '2000000000');
   t('json(''2000000000000000'')', '2000000000000000');
   t('json(''true'')', 'true');
-  t('json(''[1, 2, 3]'')', '1');
-  t('string-join(json(''[1, 2, 3]''), " ")', '1 2 3');
-  t('string-join(json(''[1, 2, 3, [4, 5, 6], [7] ]''), " ")', '1 2 3 4 5 6 7');
-  t('count(json(''[1, 2, 3, [4, 5, 6], [7] ]''))', '7'); //todo: fix?
-  t('json(''[{"hallo": "world"}]'')[1].hallo', 'world'); //carefully, ({}) != ({})[1] == {}. Fix?
-  t('json(''[{"hallo": "world"}, {hallo: 1000}]'')[2].hallo', '1000'); //carefully, ({}) != ({})[1] == {}. Fix?
+  t('members(json(''[1, 2, 3]''))', '1');
+  t('string-join(members(json(''[1, 2, 3]'')), " ")', '1 2 3');
+  t('string-join(members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
+  t('count(json(''[1, 2, 3, [4, 5, 6], [7] ]''))', '1'); //todo: fix?
+  t('json(''[{"hallo": "world"}]'')(1).hallo', 'world');
+  t('json(''[{"hallo": "world"}, {hallo: 1000}]'')(2).hallo', '1000');
+
+  t('[4,5,6](0)', '');
+  t('[4,5,6](1)', '4');
+  t('[4,5,6](2)', '5');
+  t('[4,5,6](3)', '6');
+  t('[4,5,6](4)', '');
+  t('[4](0)', '');
+  t('[4](1)', '4');
+  t('[4](2)', '');
+  t('[](0)', '');
+  t('[](1)', '');
+
+  t('{"foobar": 123, "maus": 456}("foobar")', '123');
+  t('{"foobar": 123, "maus": 456}("maus")', '456');
+  t('{"foobar": 123, "maus": 456}("unkn")', '');
+  t('{"foobar": 123, "argh": [9,8,7]}("argh")(1)', '9');
+  t('{"foobar": 123, "argh": [9,8,7]}("argh")(2)', '8');
+
+  t('[{"foobar": 123, "maus": 456}](1)("foobar")', '123');
 
   t('serialize-json(123)', '123');
   t('serialize-json(123.6)', '123.6');

@@ -81,7 +81,7 @@ type
 
 
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkFunction);
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkFunction);
 
   //**Type used for XQuery decimal types
   Decimal = Extended;
@@ -519,7 +519,7 @@ type
 
   //**< Type for a sequence containg an arbitrary number (>= 0) of other IXQValue
   TXQValueSequence = class (TXQValue_AnySimpleType)
-    seq: TXQVList;    //**< pointer to a list of the contained sequence values.@br Attention: An owned pvtSequence has to be destroyed with xqvalueDestroy
+    seq: TXQVList;    //**< pointer to a list of the contained sequence values.
 
     constructor create(capacity: integer = 0);
     constructor create(firstChild: IXQValue);
@@ -540,8 +540,8 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
 
-    function toArray: TXQVArray; override; //**< Converts the TXQValue dynamically to an array
-    function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toArray: TXQVArray; override; //**< Converts the TXQValue dynamically to a Pascal array
+    function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence
 
     function getSequenceCount: integer; override;
     function getChild(i: integer): IXQValue; override;
@@ -559,6 +559,7 @@ type
 
     destructor Destroy; override;
   end;
+
 
   { TXQValueNode }
 
@@ -637,12 +638,42 @@ type
     procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
     function setImmutable(const name: string; const s: string): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
 
+    function toBooleanEffective: boolean; override;
+
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
+  end;
+
+  //**< Experimental type for a JSON array of other IXQValue
+
+  { TXQValueJSONArray }
+
+  TXQValueJSONArray = class (TXQValue_AnySimpleType)
+    seq: TXQVList;
+
+    constructor create(capacity: integer = 0); reintroduce; virtual;
+
+    class function classKind: TXQValueKind; override;
+    class function classTypeName: string; override;
+
+    function isUndefined: boolean; override;
+
+    function GetEnumeratorMembers: TXQValueEnumerator;
+
+    function toBooleanEffective: boolean; override;
+
+    function clone: IXQValue; override;
+
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+
+    procedure addChild(child: IXQValue); inline;  //**< Simply adds a value to the sequence
+
+    destructor Destroy; override;
   end;
 
   { TXQValueFunction }
@@ -872,6 +903,13 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
+  { TXQTermArray }
+
+  TXQTermJSONArray = class(TXQTerm)
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
+  end;
+
   { TXQTermType }
 
   type
@@ -983,6 +1021,16 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
   private
     class function findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+  end;
+
+  { TXQDynamicFunctionCall }
+
+  { TXQTermDynamicFunctionCall }
+
+  TXQTermDynamicFunctionCall = class (TXQTerm)
+    constructor create(func: TXQTerm = nil; arg: TXQTerm = nil);
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermBinaryOp }
@@ -1720,6 +1768,7 @@ var
     LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
     TwoDigitYearCenturyWindow: 50;
   );
+
 
 
 { EXQEvaluationException }
@@ -4814,6 +4863,7 @@ xs.registerType(TXQValueDecimal);
 xs.registerType(TXQValueString);
 xs.registerType(TXQValueDateTime);
 xs.registerType(TXQValueObject);
+xs.registerType(TXQValueJSONArray); //that should be in another namespace, but that cannot be really handled yet
 xs.registerType(TXQValue_AnyAtomicType);
 xs.registerType(TXQValue_AnySimpleType);
 xs.registerType(TXQValue);

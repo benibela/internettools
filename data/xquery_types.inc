@@ -329,6 +329,15 @@ begin
       end;
       result+=')';
     end;
+    pvkArray      : begin
+      result := 'array: [';
+      if TXQValueSequence(self).seq.Count > 0 then begin
+        result += TXQValueSequence(self).seq[0].debugAsStringWithTypeAnnotation(textOnly);
+        for i:=1 to TXQValueSequence(self).seq.Count-1 do
+          result += ', ' + (TXQValueSequence(self).seq[i]).debugAsStringWithTypeAnnotation(textOnly);
+      end;
+      result+=']';
+    end;
     pvkObject: begin
       result := 'object: {';
       tempp := self.clone; //need temporary variable to keep the reference count > 0
@@ -1453,12 +1462,12 @@ begin
   result := obj;
 end;
 
-class function TXQValueObject.classkind: TXQValueKind;
+class function TXQValueObject.classKind: TXQValueKind;
 begin
   Result:=pvkObject;
 end;
 
-class function TXQValueObject.classtypeName: string;
+class function TXQValueObject.classTypeName: string;
 begin
   Result:='object';
 end;
@@ -1500,6 +1509,11 @@ end;
 function TXQValueObject.setImmutable(const name: string; const s: string): TXQValueObject;
 begin
   result := setImmutable(name,xqvalue(s));
+end;
+
+function TXQValueObject.toBooleanEffective: boolean;
+begin
+  result := true;
 end;
 
 function TXQValueObject.hasProperty(const name: string; value: PXQValue): boolean;
@@ -1596,6 +1610,87 @@ begin
   result.vars := (result.tempobj as TXQValueObject).values;
   result.idx:=-1;
 end;
+
+
+{ TXQValueJSONArray }
+
+constructor TXQValueJSONArray.create(capacity: integer);
+begin
+  seq := TXQVList.create(capacity);
+end;
+
+class function TXQValueJSONArray.classKind: TXQValueKind;
+begin
+  Result:=pvkArray;
+end;
+
+class function TXQValueJSONArray.classTypeName: string;
+begin
+  Result:='array';
+end;
+
+function TXQValueJSONArray.isUndefined: boolean;
+begin
+  Result:=false;
+end;
+
+function TXQValueJSONArray.GetEnumeratorMembers: TXQValueEnumerator;
+begin
+  result.fcurrentidx:=-1;
+  result.flist:=seq;
+end;
+
+function TXQValueJSONArray.toBooleanEffective: boolean;
+begin
+  result := true;
+end;
+
+function TXQValueJSONArray.clone: IXQValue;
+var
+  i: Integer;
+  seqr: TXQValueJSONArray;
+begin
+  seqr := TXQValueJSONArray.Create(seq.Count);
+  for i:=0 to seq.Count-1 do
+    seqr.seq.Add(seq[i].clone);
+  result := seqr;
+end;
+
+function TXQValueJSONArray.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+var
+  i: Integer;
+begin
+  if seq.Count = 0 then exit('[]');
+  result := '[' + seq[0].jsonSerialize(nodeFormat);
+  for i := 1 to seq.Count-1 do
+    result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
+  result += ']';
+end;
+
+function TXQValueJSONArray.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string
+  ): string;
+var
+  i: Integer;
+begin
+  if seq.Count = 0 then exit('<'+sequenceTag+'/>');
+  result := '<'+sequenceTag+'>';
+  result += '<'+elementTag+'>' + seq[0].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
+  for i := 1 to seq.Count-1 do
+    result += '<'+elementTag+'>' + seq[i].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
+  result += '</'+sequenceTag+'>';
+end;
+
+procedure TXQValueJSONArray.addChild(child: IXQValue);
+begin
+  seq.add(child);
+end;
+
+destructor TXQValueJSONArray.Destroy;
+begin
+  seq.Free;
+  inherited Destroy;
+end;
+
 
 { TXQValueFunction }
 

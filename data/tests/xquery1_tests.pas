@@ -1605,6 +1605,13 @@ begin
   m('outer-html(<foobar>&lt;&gt;&amp;&quot;&apos;</foobar>)', '<foobar>&lt;&gt;&amp;"''</foobar>');
 
 
+  //Some JSON
+  t('let $a := [10,20,30] return $a(1)', '10');
+  t('let $a := [10,20,30] return $a(2)', '20');
+  t('let $a := [10,20,30] return $a(3)', '30');
+  t('let $a := {"a": 78} return $a("a")', '78');
+  t('let $a := {"a": 78}, $b := [$a] return $b(1)("a")', '78');
+  t('let $a := [100], $b := {"x": $a} return $b("x")(1)', '100');
 
   writeln('XQuery: ', count, ' completed');
 
