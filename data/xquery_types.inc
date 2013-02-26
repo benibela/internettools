@@ -1187,7 +1187,7 @@ end;
 
 function TXQValueSequence.toBooleanEffective: boolean;
 begin
-  result := (getSequenceCount > 0) and (seq[0] is TXQValueNode);
+  result := (getSequenceCount > 0) and ( (seq[0] is TXQValueNode) or (seq[0] is TXQValueObject) or (seq[0] is TXQValueJSONArray));
 end;
 
 function TXQValueSequence.toInt65: int65;

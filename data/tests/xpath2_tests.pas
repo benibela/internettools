@@ -1816,9 +1816,21 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('jn:size([(), (), ()])', '0');
   t('for $a in true return true', 'true');
   t('for $a in false return false', 'false');
-  ps.AllowJSONLiterals:=false;
 
   //Tests based on examples in the JSONiq spec
+  t('if (jn:null()) then "T" else "F"', 'F');
+  t('if ({}) then "T" else "F"', 'T');
+  t('if ({ "foo": false } ) then "T" else "F"', 'T');
+  t('if ( { "foo": 3, "bar":4 }) then "T" else "F"', 'T');
+  t('if ({ "foo": 3 }) then "T" else "F"', 'T');
+  t('if ( [1] ) then "T" else "F"', 'T');
+  t('if ( ( [1], jn:null()  ) ) then "T" else "F"', 'T');
+  t('if ( [null] ) then "T" else "F"', 'T');
+  t('if ( [] ) then "T" else "F"', 'T');
+  t('if (()) then "T" else "F"', 'F');
+
+  ps.AllowJSONLiterals:=false;
+
   t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');
   t('serialize-json(          [ [1, 2, 3],            [4, 5, 6],            [7, 8, 9]          ])', '[[1, 2, 3], [4, 5, 6], [7, 8, 9]]');
   t('serialize-json([ 10 to 15 ])', '[10, 11, 12, 13, 14, 15]');
