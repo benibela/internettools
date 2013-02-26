@@ -1613,6 +1613,16 @@ begin
   t('let $a := {"a": 78}, $b := [$a] return $b(1)("a")', '78');
   t('let $a := [100], $b := {"x": $a} return $b("x")(1)', '100');
 
+  //JSON examples from JSONiq spec
+  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');
+  t('serialize-json(let $x := { "eyes" : "blue", "hair" : "fuchsia" } let $y := { "eyes" : brown, "hair" : "brown" } return { "eyes" : $x("eyes"), "hair" : $y("hair") })', '{"eyes": "blue", "hair": "brown"}');
+  t('let $wd := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] return $wd(1)', 'Sunday');
+  t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(1))', '["mercury", "venus", "earth", "mars"]');
+  t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(2)(2))', '"tuesday"');
+
+
+
+
   writeln('XQuery: ', count, ' completed');
 
   helper.free;

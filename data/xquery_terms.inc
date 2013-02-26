@@ -747,21 +747,31 @@ end;
 
 function TXQTermDynamicFunctionCall.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
-  func: IXQValue;
-  index: Integer;
+  func, v: IXQValue;
+  index: IXQValue;
 begin
   if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
-  if func is TXQValueSequence then func := func.getChild(0);
-  if func is TXQValueJSONArray then begin
-    if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices given');
-    index := children[1].evaluate(context).toInt64;
-    if (index < 1) or (index > (func as TXQValueJSONArray).seq.Count) then exit(xqvalue);
-    result := (func as TXQValueJSONArray).seq[index-1];
-  end else if func is TXQValueObject then begin
-    if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices given');
-    result := func.getProperty(children[1].evaluate(context).ToString);
-  end else raiseEvaluationError('XPST003', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
+  if func.isUndefined then exit(xqvalue());
+  if (func is TXQValueSequence) and (func.getSequenceCount = 1) then func := func.getChild(0);
+
+  if func is TXQValueFunction then begin
+    raiseEvaluationError('XPST0003', 'Dynamic function call is not yet implemented');
+    //TODO
+  end;
+
+  if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices or object prop given');
+  index := children[1].evaluate(context);
+  result := xqvalue();
+  for v in func do begin
+    if v is TXQValueJSONArray then begin
+      if (index.toInt64 < 1) or (index.toInt64 > (v as TXQValueJSONArray).seq.Count) then continue;
+      xqvalueSeqAdd(result, (v as TXQValueJSONArray).seq[index.toInt64-1]);
+    end else if v is TXQValueObject then begin
+      xqvalueSeqAdd(result, v.getProperty(index.ToString));
+    end else raiseEvaluationError('XPST003', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
+  end;
+
 end;
 
 function TXQTermDynamicFunctionCall.getContextDependencies: TXQContextDependencies;
@@ -1490,7 +1500,7 @@ begin
   obj := TXQValueObject.create();
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do
-    obj.setMutable(children[i*2].evaluate(context).toString, children[i*2+1].evaluate(context));
+    obj.setMutable(children[i*2].evaluate(context).toString, children[i*2+1].evaluate(context));   //todo: empty sequence becomes null, sequence becomes array
   result := obj;
 end;
 

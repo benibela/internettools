@@ -854,7 +854,7 @@ begin
       expect(':');
       if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString);
       skipWhitespaceAndComment();
-      result.push(parseValue);
+      result.push(parse);
       token := nextToken();
     until (token <> ',');
     if token <> '}' then raiseParsingError('pxp:OBJ', 'Expected "}" or ",", but got '+token);

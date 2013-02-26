@@ -1762,6 +1762,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   t('[{"foobar": 123, "maus": 456}](1)("foobar")', '123');
 
+  t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(1), " ")', 'a o x');
+  t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(2), " ")', 'y');
+
   t('serialize-json(123)', '123');
   t('serialize-json(123.6)', '123.6');
   t('serialize-json("123a")', '"123a"');
@@ -1770,7 +1773,17 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('serialize-json({"foo": 123, "bar": 0.456})', '{"foo": 123, "bar": 0.456}');
   t('serialize-json({"xml": /})', '{"xml": "<foobar>123</foobar>"}', '<foobar>123</foobar>');
 
-               //Tests based on failed XQTS tests
+  //Tests based on examples in the JSONiq spec
+  t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');
+  t('serialize-json(          [ [1, 2, 3],            [4, 5, 6],            [7, 8, 9]          ])', '[[1, 2, 3], [4, 5, 6], [7, 8, 9]]');
+  t('serialize-json([ 10 to 15 ])', '[10, 11, 12, 13, 14, 15]');
+  t('serialize-json({            "id" : 404,     "name" : "Stanco Grease Pot",   "price" : 6.49,    "weight" : 3.8,     "uses" : ["Grease storage","Backpacking pot"] })', '{"id": 404, "name": "Stanco Grease Pot", "price": 6.49, "weight": 3.8, "uses": ["Grease storage", "Backpacking pot"]}');
+  t('serialize-json({"Sunday" : 1,     "Monday" : 1 + 1,    "Tuesday" : 3 * 1,    "Wednesday" : 8 div 2,    "Thursday" : 5,   "Friday" : count(for $i in 1 to 6 return $i),           "Saturday": 10 - 3 })','{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+
+
+
+
+  //Tests based on failed XQTS tests
   t('count(a/attribute::*)', '0', '<a></a>');
   t('count(a/attribute::node())', '0', '<a></a>'); //my
   t('count(a/attribute::node())', '2', '<a a="abc" x="foo"></a>'); //my
