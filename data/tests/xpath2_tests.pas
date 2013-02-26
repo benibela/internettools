@@ -83,6 +83,7 @@ begin
   vars.add('eval', '''abc'' = ''abc''');
 
   ps := TXQueryEngine.Create;
+  ps.AllowJSONLiterals:=false;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.StaticContext.useLocalNamespaces:=false;
   ps.ImplicitTimezone:=-5 / HoursPerDay;
@@ -1795,6 +1796,27 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('serialize-json(jn:object({"a": ()}))', '{"a": null}');
   t('serialize-json(jn:object({"a": (1,2,3)[0]}))', '{"a": null}');
   t('serialize-json(jn:object({"a": []}))', '{"a": []}');
+
+  t('true', '');
+  t('false', '');
+  t('jn:is-null(null)', 'false');
+  ps.AllowJSONLiterals:=true;
+  t('true', 'true');
+  t('false', 'false');
+  t('jn:is-null(null)', 'true');
+  t('./true', '');
+  t('./false', '');
+  t('jn:is-null(./null)', 'false');
+  t('./(true)', 'true');
+  t('./(false)', 'false');
+  t('jn:is-null(./(null))', 'true');
+  t('count((null, null, null))', '3');
+  t('jn:size([null, null, null])', '3');
+  t('jn:size([null, (), null])', '2');
+  t('jn:size([(), (), ()])', '0');
+  t('for $a in true return true', 'true');
+  t('for $a in false return false', 'false');
+  ps.AllowJSONLiterals:=false;
 
   //Tests based on examples in the JSONiq spec
   t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');

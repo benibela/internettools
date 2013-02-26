@@ -28,6 +28,7 @@ type
   AllowExtendedStrings: boolean;
   AllowPropertyDotNotation: boolean;
   AllowJSON: boolean;
+  AllowJSONLiterals: Boolean;
   parsingModel: TXQParsingModel;
   encoding: TEncoding;
   staticContext: TXQStaticContext;
@@ -76,6 +77,8 @@ type
   function parse: TXQTerm;             //ExprSingle
   function parsePrimaryLevel: TXQTerm; //Expr
   function parseModule(): TXQTerm;
+
+  procedure postProcessJSONLiterals(var t: TXQTerm);
 end;
 
 
@@ -1435,15 +1438,25 @@ begin
           token := nextTokenQName();
           temp := parseStringLiteral;
           namespace := staticContext.findNamespace(strSplitGet(':', token), xqdnkUnknown);
-          if (namespace <> nil) and (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
-            case token of
-              'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
-              'extended-strings': readBoolean(AllowExtendedStrings, temp);
-              'json': readBoolean(AllowJSON, temp);
-              'property-dot-notation': readBoolean(AllowPropertyDotNotation, temp);
-              'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
-              'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
-            end;
+          if namespace <> nil then begin
+            if (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
+              case token of
+                'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
+                'extended-strings': readBoolean(AllowExtendedStrings, temp);
+                'json': readBoolean(AllowJSON, temp);
+                'property-dot-notation': readBoolean(AllowPropertyDotNotation, temp);
+                'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
+                'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
+              end;
+            end else if namespace.getURL = 'http://jsoniq.org/functions' then
+              case token of
+                'jsoniq-boolean-and-null-literals':
+                  case temp of
+                    'yes': AllowJSONLiterals:=true;
+                    'no': AllowJSONLiterals:=false;
+                    else raiseParsingError('XQST0013', 'Unknown option value: '+temp+' for '+token+' (allowed is yes/no)');
+                  end;
+              end;
           end;
         end;
         else raiseParsingError('XPST0003', 'Unknown declaration');
@@ -1462,5 +1475,39 @@ begin
     resultquery.fterm := result;
     resultquery.initializeStaticContext(staticContext.sender.getEvaluationContext(staticContext));
   end;
+
+  if AllowJSONLiterals and (result <> nil) then
+    postprocessJSONLiterals(result);
+end;
+
+procedure TXQParsingContext.postProcessJSONLiterals(var t: TXQTerm);
+var
+  i: Integer;
+begin
+  if t = nil then exit;
+  if (length(t.children) = 0) and (t is TXQTermNodeMatcher) and not (t as TXQTermNodeMatcher).hadNamespace then begin
+    case (t as TXQTermNodeMatcher).select of
+      'true': begin t.free; t := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'true'); end;
+      'false': begin t.free; t := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'false'); end;
+      'null': if GlobalStaticNamespaces.namespaces['jn'] <> nil then begin t.free; t := TXQTermNamedFunction.create(GlobalStaticNamespaces.namespaces['jn'], 'null'); end;
+    end;
+    exit;
+  end;
+  if t is TXQTermBinaryOp then begin
+    if (TXQTermBinaryOp(t).op.name = '/') or (TXQTermBinaryOp(t).op.name = '//') then begin
+      for i := 0 to high(t.children) do
+        if not (t.children[i] is TXQTermNodeMatcher) then postProcessJSONLiterals(t.children[i]);
+      exit;
+    end;
+  end;
+  if t is TXQTermFlower then begin
+    for i := 0 to high(TXQTermFlower(t).vars) do postProcessJSONLiterals(TXQTermFlower(t).vars[i].expr);
+    for i := 0 to high(TXQTermFlower(t).orders) do postProcessJSONLiterals(TXQTermFlower(t).orders[i].expr);
+    postProcessJSONLiterals(TXQTermFlower(t).returned);
+    if TXQTermFlower(t).where <> nil then postProcessJSONLiterals(TXQTermFlower(t).where);
+  end else if t is TXQTermDefineVariable then begin
+    for i := 1 to high(t.children) do postProcessJSONLiterals(t.children[i]);
+  end else if t <> nil then
+    for i := 0 to high(t.children) do postProcessJSONLiterals(t.children[i]);
 end;
 

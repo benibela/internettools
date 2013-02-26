@@ -81,7 +81,7 @@ type
 
 
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkFunction);
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
 
   //**Type used for XQuery decimal types
   Decimal = Extended;
@@ -680,9 +680,14 @@ type
 
   { TXQValueJSONNull }
 
-  TXQValueJSONNull = class(TXQValueUndefined)
+  TXQValueJSONNull = class(TXQValue_AnyAtomicType)
     class function classTypeName: string; override;
+    class function classKind: TXQValueKind; override;
     function clone: IXQValue; override;
+
+
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
   end;
 
   { TXQValueFunction }
@@ -1412,6 +1417,7 @@ type
 
     AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
     AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
+    AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
     GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
 
     AutomaticallyRegisterParsedModules: boolean;
@@ -3689,6 +3695,7 @@ begin
   ImplicitTimezone:=getNaN;
   AllowExtendedStrings:=true;
   AllowJSON:=AllowJSONDefaultInternal;
+  AllowJSONLiterals:=true;
   VariableChangelog := TXQVariableChangeLog.create();
   OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   OnDefineVariable:= @VariableChangelog.defineVariable;
@@ -3824,6 +3831,7 @@ begin
   cxt.AllowExtendedStrings := AllowExtendedStrings;
   cxt.AllowPropertyDotNotation:=VariableChangelog.allowPropertyDotNotation;
   cxt.AllowJSON:=allowJSON;
+  cxt.AllowJSONLiterals:=AllowJSON and AllowJSONLiterals;
   cxt.staticContext := context;
   cxt.parsingModel:=model;
   cxt.engine := self;
@@ -3861,6 +3869,7 @@ begin
   cxt.AllowExtendedStrings := true;
   cxt.AllowPropertyDotNotation:=VariableChangelog.allowPropertyDotNotation;
   cxt.AllowJSON:=AllowJSON;
+  cxt.AllowJSONLiterals:=AllowJSON and AllowJSONLiterals;
   cxt.staticContext := context;
   cxt.parsingModel:=xqpmXPath2;
   cxt.engine := self;

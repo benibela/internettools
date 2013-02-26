@@ -147,6 +147,7 @@ begin
   ps.ImplicitTimezone:=-5 / HoursPerDay;
   ps.OnEvaluateVariable:=@vars.evaluateVariable;
   ps.OnDefineVariable:=@vars.defineVariable;
+  ps.AllowJSONLiterals:=false;
   xml := TTreeParser.Create;
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
@@ -1612,6 +1613,11 @@ begin
   t('let $a := {"a": 78} return $a("a")', '78');
   t('let $a := {"a": 78}, $b := [$a] return $b(1)("a")', '78');
   t('let $a := [100], $b := {"x": $a} return $b("x")(1)', '100');
+  t('let $a := true return $a', '');
+  ps.AllowJSONLiterals:=true;
+  t('let $a := true return $a', 'true');
+  t('for $a in (true, false, null) return $a', 'true false ');
+  ps.AllowJSONLiterals:=false;
 
   //JSON examples from JSONiq spec
   t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');

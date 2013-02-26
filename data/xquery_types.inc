@@ -1698,9 +1698,27 @@ begin
   Result:='null';
 end;
 
+class function TXQValueJSONNull.classKind: TXQValueKind;
+begin
+  Result:=pvkNull;
+end;
+
 function TXQValueJSONNull.clone: IXQValue;
 begin
   Result:=TXQValueJSONNull.create;
+end;
+
+function TXQValueJSONNull.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+begin
+  ignore(nodeFormat);
+  Result:='null';
+end;
+
+function TXQValueJSONNull.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string
+  ): string;
+begin
+  ignore(nodeFormat); ignore(elementTag); ignore(objectTag);
+  Result:='<'+sequenceTag+'/>';
 end;
 
 
