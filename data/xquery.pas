@@ -228,7 +228,7 @@ type
     function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
 
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
-    function getChild(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
+    function getChild(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
@@ -720,6 +720,7 @@ type
     procedure insertSingle(i: integer; child: IXQValue); //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
   public
     constructor create(capacity: integer = 0);
+    procedure insert(i: integer; value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(child: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addMerging(child: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
@@ -1740,6 +1741,8 @@ procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from,
         XMLNamespaceURL_XQTErrors = 'http://www.w3.org/2005/xqt-errors';
         XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
         XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
+
+var GlobalStaticNamespaces: TNamespaceList;
 implementation
 uses base64;
 
@@ -2909,6 +2912,23 @@ begin
   list[i] := AValue;
 end;
 
+
+procedure TXQVList.insert(i: integer; value: IXQValue);
+var
+ v: IXQValue;
+begin
+  assert(value <> nil);
+  case value.kind of
+    pvkSequence: begin
+      for v in value do begin
+        insertSingle(i, v);
+        i+=1;
+      end;
+    end;
+    pvkUndefined: ;
+    else insertSingle(i, value);
+  end;
+end;
 
 procedure TXQVList.add(child: IXQValue);
 var
@@ -4483,6 +4503,7 @@ end;
 function TXQueryEngine.findNamespace(const nsprefix: string): INamespace;
 begin
   if (self <> nil) and (GlobalNamespaces <> nil) and (GlobalNamespaces.hasNamespacePrefix(nsprefix, result)) then exit;
+  if GlobalStaticNamespaces.hasNamespacePrefix(nsprefix, result) then exit;
   case nsprefix of
     'xml': result := XMLNamespace_XML;
     'xmlns': result := XMLNamespace_XMLNS;
@@ -4839,6 +4860,7 @@ nativeModules := TStringList.Create;
 globalTypeParsingContext := TXQParsingContext.Create;
 globalTypeParsingContext.staticContext := TXQStaticContext.Create;
 //namespaces
+GlobalStaticNamespaces:=TNamespaceList.Create;
 XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
 XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
 XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
@@ -5106,6 +5128,7 @@ collations.Free;
 nativeModules.free;
 globalTypeParsingContext.staticContext.Free;
 globalTypeParsingContext.free;
+GlobalStaticNamespaces.Free;
 {$DEFINE PXP_DERIVED_TYPES_FINALIZATION}
 {$I xquery_derived_types.inc}
 end.

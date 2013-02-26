@@ -852,7 +852,7 @@ begin
     repeat
       result.push(parseValue);
       expect(':');
-      if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString);
+      //if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString); //removed as json-iq allows variables there
       skipWhitespaceAndComment();
       result.push(parse);
       token := nextToken();

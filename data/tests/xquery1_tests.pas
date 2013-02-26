@@ -1619,9 +1619,10 @@ begin
   t('let $wd := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] return $wd(1)', 'Sunday');
   t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(1))', '["mercury", "venus", "earth", "mars"]');
   t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(2)(2))', '"tuesday"');
-
-
-
+  t('let $o := { "a" : 1, "b" : 2 } return jn:keys($o)', 'a b');  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" }  for $key in jn:keys($map) return serialize-json({ $key : $map($key) })', '{"eyes": "blue"} {"hair": "fuchsia"}');
+  t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] return jn:members($planets)', 'mercury venus earth mars');
+  t('let $a := [1 to 10] return jn:size($a)', '10');
+  t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] for $i in 1 to jn:size($planets) return $planets($i)', 'mercury venus earth mars');
 
   writeln('XQuery: ', count, ' completed');
 

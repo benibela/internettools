@@ -10,7 +10,7 @@ uses
 
 implementation
 
-uses jsonparser;
+uses jsonparser, simplehtmltreeparser;
 
 
 function xqFunctionJson(const args: TXQVArray): IXQValue;
@@ -69,6 +69,29 @@ begin
   result := xqvalue(a.jsonSerialize(tnsXML));
 end;
 
+function xqFunctionKeys(const args: TXQVArray): IXQValue;
+var
+  a: IXQValue;
+  obj: TXQValueObject;
+  i: Integer;
+  resseq: TXQValueSequence;
+begin
+  requiredArgCount(args, 1);
+  a := args[0];
+  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
+  if not (a is TXQValueObject) then raise EXQEvaluationException.create('pxp:OBJ', 'Expected object, got: '+a.debugAsStringWithTypeAnnotation());
+  obj := a as TXQValueObject;
+
+  resseq := TXQValueSequence.create();
+  while obj <> nil do begin
+    for i := obj.values.count - 1 downto 0 do
+      resseq.seq.insert(0, xqvalue(obj.values.getName(i))); //TODO: optimize
+    obj := obj.prototype as TXQValueObject;
+  end;
+  result := resseq;
+end;
+
+
 function xqFunctionMembers(const args: TXQVArray): IXQValue;
 var
   a: IXQValue;
@@ -77,6 +100,7 @@ var
 begin
   requiredArgCount(args, 1);
   a := args[0];
+  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
   if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.debugAsStringWithTypeAnnotation());
   ara := a as TXQValueJSONArray;;
   result := xqvalue();
@@ -84,11 +108,44 @@ begin
     xqvalueSeqAdd(result, ara.seq[i]);
 end;
 
-var jn: TXQNativeModule;
+function xqFunctionSize(const args: TXQVArray): IXQValue;
+var
+  a: IXQValue;
+begin
+  requiredArgCount(args, 1);
+  a := args[0];
+  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
+  if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.debugAsStringWithTypeAnnotation());
+  result := xqvalue((a as TXQValueJSONArray).seq.Count);
+end;
+
+
+var jn, pxp: TXQNativeModule;
+    XMLNamespace_JSONiqFunctions: INamespace;
 initialization
-  jn := TXQueryEngine.findNativeModule(XMLNamespaceURL_XPathFunctions);
-  jn.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as xs:object']);
-  jn.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as xs:anyAtomicType*) as xs:string']);
+  XMLNamespace_JSONiqFunctions:=TNamespace.create('http://jsoniq.org/functions', 'jn');
+  GlobalStaticNamespaces.add(XMLNamespace_JSONiqFunctions);
+  //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/types', 'js');
+  //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/function-library', 'libjn');
+  //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/errors', 'jerr');
+  //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/updates', 'jupd');
+
+
+  jn := TXQNativeModule.Create(XMLNamespace_JSONiqFunctions);
+  TXQueryEngine.registerNativeModule(jn);
+  jn.registerFunction('keys', @xqFunctionKeys, ['($arg as xs:object) as xs:string*']);
   jn.registerFunction('members', @xqFunctionMembers, ['($arg as xs:array) as item()*']);
+
+  //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
+  //TODO: 6.8. jn:is-null 6.9. jn:json-doc 6.12. jn:null 6.13. jn:object
+  jn.registerFunction('parse-json', @xqFunctionJson, ['($arg as xs:string) as item()']); //TODO: options
+  jn.registerFunction('size', @xqFunctionSize, ['($arg as xs:array) as xs:integer']);
+
+  pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
+  pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()']);
+  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as xs:anyAtomicType*) as xs:string']);
+
+finalization
+  jn.free;
 end.
 

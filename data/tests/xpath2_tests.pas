@@ -1720,11 +1720,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('{"hallo": 123}.hallo', '123');
   t('{}.hallo', ''); //no exception on undefined properties
   t('string-join({"array": (1, 2, 3)}.array, " ")', '1 2 3');
-  t('string-join(members({"array": [1, 2, 3]}.array), " ")', '1 2 3');
+  t('string-join(jn:members({"array": [1, 2, 3]}.array), " ")', '1 2 3');
   t('string-join({"array": (1)}.array, " ")', '1');
-  t('string-join(members({"array": [1]}.array), " ")', '1');
+  t('string-join(jn:members({"array": [1]}.array), " ")', '1');
   t('string-join({"array": ()}.array, " ")', '');
-  t('string-join(members({"array": []}.array), " ")', '');
+  t('string-join(jn:members({"array": []}.array), " ")', '');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[1].a', '10');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[2].a', '20');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[3].a', '30');
@@ -1736,9 +1736,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('json(''2000000000'')', '2000000000');
   t('json(''2000000000000000'')', '2000000000000000');
   t('json(''true'')', 'true');
-  t('members(json(''[1, 2, 3]''))', '1');
-  t('string-join(members(json(''[1, 2, 3]'')), " ")', '1 2 3');
-  t('string-join(members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
+  t('jn:members(json(''[1, 2, 3]''))', '1');
+  t('string-join(jn:members(json(''[1, 2, 3]'')), " ")', '1 2 3');
+  t('string-join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
   t('count(json(''[1, 2, 3, [4, 5, 6], [7] ]''))', '1'); //todo: fix?
   t('json(''[{"hallo": "world"}]'')(1).hallo', 'world');
   t('json(''[{"hallo": "world"}, {hallo: 1000}]'')(2).hallo', '1000');
@@ -1772,6 +1772,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('serialize-json((1,2,"3!", true(),false()))', '[1, 2, "3!", true, false]');
   t('serialize-json({"foo": 123, "bar": 0.456})', '{"foo": 123, "bar": 0.456}');
   t('serialize-json({"xml": /})', '{"xml": "<foobar>123</foobar>"}', '<foobar>123</foobar>');
+
+  t('jn:size([])', '0');
+  t('jn:size([1])', '1');
+  t('jn:size([1,2])', '2');
+  t('jn:size([1 to 10])', '10');
 
   //Tests based on examples in the JSONiq spec
   t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');
