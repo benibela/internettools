@@ -1742,6 +1742,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('count(json(''[1, 2, 3, [4, 5, 6], [7] ]''))', '1'); //todo: fix?
   t('json(''[{"hallo": "world"}]'')(1).hallo', 'world');
   t('json(''[{"hallo": "world"}, {hallo: 1000}]'')(2).hallo', '1000');
+  t('json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
+  t('json(''{"hallo": "world"} {hallo: 1000}'')[2].hallo', '1000');
+  t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
+  t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
+  f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo');
 
   t('[4,5,6](0)', '');
   t('[4,5,6](1)', '4');
