@@ -37,7 +37,8 @@ function xqFunctionJson(const args: TXQVArray): IXQValue;
       for i := 0 to data.Count-1 do obj.setMutable(TJSONObject(data).Names[i], convert(TJSONObject(data).Elements[TJSONObject(data).Names[i]]));//todo optimize
       exit(obj);
     end;
-    raise EXQEvaluationException.create('pxp:OBJ', 'Unknown json value: '+data.AsJSON);
+    if data = nil then raise EXQEvaluationException.create('pxp:OBJ', 'Invalid JSON: "'+args[0].toString+'"')
+    else raise EXQEvaluationException.create('pxp:OBJ', 'Unknown JSON value: '+data.AsJSON);
   end;
 
 var
