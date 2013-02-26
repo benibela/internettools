@@ -1692,6 +1692,19 @@ begin
 end;
 
 
+
+class function TXQValueJSONNull.classTypeName: string;
+begin
+  Result:='null';
+end;
+
+function TXQValueJSONNull.clone: IXQValue;
+begin
+  Result:=TXQValueJSONNull.create;
+end;
+
+
+
 { TXQValueFunction }
 
 constructor TXQValueFunction.create(aterm: TXQTerm);

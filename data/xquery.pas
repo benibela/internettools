@@ -676,6 +676,15 @@ type
     destructor Destroy; override;
   end;
 
+  //**undefined/empty sequence
+
+  { TXQValueJSONNull }
+
+  TXQValueJSONNull = class(TXQValueUndefined)
+    class function classTypeName: string; override;
+    function clone: IXQValue; override;
+  end;
+
   { TXQValueFunction }
   TXQFunctionParameter = record
     namespace: INamespace;
@@ -1772,7 +1781,7 @@ var
     TwoDigitYearCenturyWindow: 50;
   );
 
-
+{ TXQValueJSONNull }
 
 { EXQEvaluationException }
 
@@ -4886,6 +4895,7 @@ xs.registerType(TXQValueString);
 xs.registerType(TXQValueDateTime);
 xs.registerType(TXQValueObject);
 xs.registerType(TXQValueJSONArray); //that should be in another namespace, but that cannot be really handled yet
+xs.registerType(TXQValueJSONNull); //that should be in another namespace, but that cannot be really handled yet
 xs.registerType(TXQValue_AnyAtomicType);
 xs.registerType(TXQValue_AnySimpleType);
 xs.registerType(TXQValue);
@@ -5132,3 +5142,4 @@ GlobalStaticNamespaces.Free;
 {$DEFINE PXP_DERIVED_TYPES_FINALIZATION}
 {$I xquery_derived_types.inc}
 end.
+

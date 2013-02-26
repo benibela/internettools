@@ -13,6 +13,20 @@ implementation
 uses jsonparser, simplehtmltreeparser;
 
 
+function xqFunctionIsNull(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 1, 1);
+  result := args[0];
+  xqvalueSeqSqueeze(result);
+  result := xqvalue(result is TXQValueJSONNull);
+end;
+
+function xqFunctionNull(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 0, 0);
+  result := TXQValueJSONNull.create;
+end;
+
 function xqFunctionObject(const args: TXQVArray): IXQValue;
 var resobj: TXQValueObject;
     procedure merge(another: TXQValueObject);
@@ -51,7 +65,7 @@ function xqFunctionJson(const args: TXQVArray): IXQValue;
     if data is TJSONInt64Number then exit(xqvalue(data.AsInt64));
     if data is TJSONString then exit(xqvalue(data.AsString));
     if data is TJSONBoolean then exit(xqvalue(data.AsBoolean));
-    if data is TJSONNull then exit(xqvalue);
+    if data is TJSONNull then exit(TXQValueJSONNull.create);
     if data is TJSONArray then begin
       seq := TXQValueJSONArray.create();
       for i := 0 to data.Count - 1 do seq.addChild(convert(TJSONArray(data)[i]));
@@ -162,7 +176,9 @@ initialization
   jn.registerFunction('members', @xqFunctionMembers, ['($arg as xs:array) as item()*']);
 
   //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
-  //TODO: 6.8. jn:is-null 6.9. jn:json-doc 6.12. jn:null
+  //TODO:  6.9. jn:json-doc
+  jn.registerFunction('is-null', @xqFunctionIsNull, ['($arg as item()) as xs:boolean']);
+  jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
   jn.registerFunction('object', @xqFunctionObject, ['($arg as xs:object*) as object()']);
   jn.registerFunction('parse-json', @xqFunctionJson, ['($arg as xs:string) as item()']); //TODO: options
   jn.registerFunction('size', @xqFunctionSize, ['($arg as xs:array) as xs:integer']);
