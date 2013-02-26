@@ -254,7 +254,7 @@ type
     templateFile:string;
     template:string;
     headers, postparams:array of TProperty;
-    condition: string;
+    condition, method: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
   end;
@@ -343,6 +343,7 @@ begin
   url := t.getAttribute('url', url);
   templateFile := t.getAttribute('templateFile', templateFile);
   condition := t['test'];
+  method:='';
 
   t := t.getFirstChild();
   while t <> nil do begin
@@ -364,9 +365,16 @@ begin
           headers[high(headers)].name := trim(headers[high(headers)].name);
           headers[high(headers)].value := trim(headers[high(headers)].value);
         end;
+      end else if SameText(t.value, 'method') then begin
+        if t.hasAttribute('value') then method:=t['value']
+        else method:=t.deepNodeText();
       end;
     end;
     t := t.getNextSibling();
+  end;
+  if method = '' then begin
+    if Length(postparams) = 0 then method:='GET'
+    else method:='POST';
   end;
 end;
 
@@ -430,8 +438,7 @@ begin
       for j := 0 to high(headers) do
         reader.internet.additionalHeaders.Add(headers[j].name + ': ' + reader.parser.replaceEnclosedExpressions(headers[j].value));
 
-      if post='' then page:=reader.internet.get(cururl)
-      else page:=reader.internet.post(cururl, post);
+      page:=reader.internet.request(method, cururl, post);
 
       if length(headers) > 0 then reader.internet.additionalHeaders.Clear;
     end;
