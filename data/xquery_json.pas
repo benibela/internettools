@@ -13,6 +13,31 @@ implementation
 uses jsonparser, simplehtmltreeparser;
 
 
+function xqFunctionObject(const args: TXQVArray): IXQValue;
+var resobj: TXQValueObject;
+    procedure merge(another: TXQValueObject);
+    var
+      i: Integer;
+    begin
+      if another.prototype <> nil then merge(another.prototype as TXQValueObject);
+      for i := 0 to another.values.count-1 do begin
+        if resobj.values.hasVariable(another.values.getName(i),nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
+        resobj.values.add(another.values.getName(i), another.values.get(i));
+      end;
+    end;
+
+var v: IXQValue;
+begin
+  requiredArgCount(args, 1);
+  resobj := TXQValueObject.create();
+  for v in args[0] do begin
+    if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.debugAsStringWithTypeAnnotation());
+    if resobj.prototype = nil then resobj.prototype := v
+    else merge(v as TXQValueObject);
+  end;
+  result := resobj;
+end;
+
 function xqFunctionJson(const args: TXQVArray): IXQValue;
 
   function convert(data: TJSONData): IXQValue;
@@ -137,7 +162,8 @@ initialization
   jn.registerFunction('members', @xqFunctionMembers, ['($arg as xs:array) as item()*']);
 
   //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
-  //TODO: 6.8. jn:is-null 6.9. jn:json-doc 6.12. jn:null 6.13. jn:object
+  //TODO: 6.8. jn:is-null 6.9. jn:json-doc 6.12. jn:null
+  jn.registerFunction('object', @xqFunctionObject, ['($arg as xs:object*) as object()']);
   jn.registerFunction('parse-json', @xqFunctionJson, ['($arg as xs:string) as item()']); //TODO: options
   jn.registerFunction('size', @xqFunctionSize, ['($arg as xs:array) as xs:integer']);
 

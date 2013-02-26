@@ -1778,6 +1778,12 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('jn:size([1,2])', '2');
   t('jn:size([1 to 10])', '10');
 
+  t('serialize-json(jn:object(()))', '{}');
+  t('serialize-json(jn:object({"a": 123}))', '{"a": 123}');
+  t('serialize-json(jn:object({"a": 123, "b": 456}))', '{"a": 123, "b": 456}');
+  t('serialize-json(jn:object(({"a": 123}, {"b": 456})))', '{"a": 123, "b": 456}');
+  t('serialize-json(jn:object(({"z": -1}, jn:object(({"a": 123}, {"b": 456})), {"c": 17})))', '{"z": -1, "a": 123, "b": 456, "c": 17}');
+
   //Tests based on examples in the JSONiq spec
   t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');
   t('serialize-json(          [ [1, 2, 3],            [4, 5, 6],            [7, 8, 9]          ])', '[[1, 2, 3], [4, 5, 6], [7, 8, 9]]');

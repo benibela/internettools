@@ -1623,6 +1623,9 @@ begin
   t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] return jn:members($planets)', 'mercury venus earth mars');
   t('let $a := [1 to 10] return jn:size($a)', '10');
   t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] for $i in 1 to jn:size($planets) return $planets($i)', 'mercury venus earth mars');
+  t('let $object1 := { "Captain" : "Kirk" } let $object2 := { "First officer" : "Spock" } return serialize-json(jn:object(($object1, $object2)))', '{"Captain": "Kirk", "First officer": "Spock"}');
+  t('serialize-json(jn:object(for $d at $i in ("Sunday", "Monday", "Tuesday",  "Wednesday",  "Thursday",  "Friday",  "Saturday" ) return { $d : $i }  ))', '{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+
 
   writeln('XQuery: ', count, ' completed');
 
