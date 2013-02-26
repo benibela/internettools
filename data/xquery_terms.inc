@@ -393,7 +393,7 @@ begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
     tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-    tempContext.temporaryVariables.allowObjects:=context.staticContext.sender.VariableChangelog.allowObjects;
+    tempContext.temporaryVariables.allowPropertyDotNotation:=context.staticContext.sender.VariableChangelog.allowPropertyDotNotation;
   end;
   try
     result:=xqvalue(evaluateSomeEvery(0));
@@ -526,7 +526,7 @@ begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
     tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-    tempContext.temporaryVariables.allowObjects:=context.staticContext.sender.VariableChangelog.allowObjects;
+    tempContext.temporaryVariables.allowPropertyDotNotation:=context.staticContext.sender.VariableChangelog.allowPropertyDotNotation;
   end;
 
   //oldVarCount := tempContext.temporaryVariables.count;

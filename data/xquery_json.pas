@@ -258,6 +258,7 @@ end;
 var jn, pxp: TXQNativeModule;
     XMLNamespace_JSONiqFunctions: INamespace;
 initialization
+  AllowJSONDefaultInternal := true;
   XMLNamespace_JSONiqFunctions:=TNamespace.create('http://jsoniq.org/functions', 'jn');
   GlobalStaticNamespaces.add(XMLNamespace_JSONiqFunctions);
   //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/types', 'js');

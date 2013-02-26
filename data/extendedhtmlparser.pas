@@ -449,7 +449,7 @@ THtmlTemplateParser=class
     property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.XQGlobalTrimNodes which controls, how the values are returned.
     property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assigned to a variable, it is assigned to this one. (Default: _result)
     property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
-    property AllowObjects: boolean read FObjects write FObjects; //**< If objects can be created and used. (e.g. @code( object(("a", 1, "b", 2)).a ) would become 1). When objects are enabled, variable names cannot contain points.  (default true)
+    property AllowPropertyDotNotation: boolean read FObjects write FObjects; //**< If object properties can be accessed with $object.propertyname (e.g. @code( object(("a", 1, "b", 2)).a ) would become 1). When objects are enabled, variable names cannot contain points.  (default true)
     property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< If all XPath/XQuery expressions in the templates are kept in the same module. Only if true, XQuery variables/functions declared are accessible in other read commands. (declarations must be preceded by @code(xquery version "1.0";) and followed by an expression, if only @code(())) Global variables, declared with a simple $x := value, are always everywhere accessible. (default true)
 
     property hasRealVariableDefinitions: boolean read GetTemplateHasRealVariableDefinitions; //**< If the currently loaded template contains := variable definitions (contrary to assign values to the default variable with {.} )  (CAN ONLY BE USED AFTER the template has been applied!)
@@ -752,7 +752,7 @@ var
   varname: string;
   temp: IXQValue;
 begin
-  if not FVariableLog.splitName(variable,base,varname) or not FVariableLog.allowObjects then begin
+  if not FVariableLog.splitName(variable,base,varname) or not FVariableLog.allowPropertyDotNotation then begin
     FVariableLog.defineVariable(sender, variable, value);
     exit;
   end;
@@ -1198,7 +1198,7 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
   FreeAndNil(FVariableLogCondensed);
-  FVariableLog.allowObjects:=FObjects;
+  FVariableLog.allowPropertyDotNotation:=FObjects;
 
   if FTemplate.getLastTree <> nil then begin
     if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin

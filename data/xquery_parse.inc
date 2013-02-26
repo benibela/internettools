@@ -26,7 +26,8 @@ type
   engine: TXQueryEngine;
 
   AllowExtendedStrings: boolean;
-  AllowObjects: boolean;
+  AllowPropertyDotNotation: boolean;
+  AllowJSON: boolean;
   parsingModel: TXQParsingModel;
   encoding: TEncoding;
   staticContext: TXQStaticContext;
@@ -922,11 +923,11 @@ begin
     end;
 
     '{': begin
-      if not AllowObjects then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension, to create a json like object) ');
+      if not AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension, to create a json like object) ');
       exit(parseJSONLikeObjectConstructor);
     end;
     '[': begin
-      if not AllowObjects then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension, to create a json like array) ');
+      if not AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension, to create a json like array) ');
       exit(parseJSONLikeArray());
     end
 
@@ -1139,7 +1140,7 @@ begin
           exit;
         end;
         else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
-        else if (word[1] = '.') and AllowObjects then begin
+        else if (word[1] = '.') and AllowPropertyDotNotation then begin
           expect(word);
           replace := ripBinOpApart(@astroot, 10000);
           if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor)  or (replace^ is TXQTermDynamicFunctionCall) then
@@ -1438,7 +1439,8 @@ begin
             case token of
               'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
               'extended-strings': readBoolean(AllowExtendedStrings, temp);
-              'objects': readBoolean(AllowObjects, temp);
+              'json': readBoolean(AllowJSON, temp);
+              'property-dot-notation': readBoolean(AllowPropertyDotNotation, temp);
               'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
               'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
             end;

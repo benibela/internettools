@@ -1248,9 +1248,9 @@ type
     @item(If a namespace prefix is unknown, the namespace is resolved using the current context item. @br
           This basically allows you to do namespace prefix only matching. (option: use-local-namespaces)
           )
-    @item(JSON-objects: There is basic support for JSON like objects. (option: objects)
+    @item(JSON-objects: There is basic support for JSON like objects. (option: json)
           @br E.g. you can write @code({"foobar": 123, "hallo": "world!"}) to create a object with two properties.
-          @br These properties can be accessed with the usual OOP property dot syntax, i.e. @code({"name": 123}.name) will evaluate to @code(123).
+          @br These properties can be accessed with the usual OOP property dot syntax, i.e. @code({"name": 123}.name) will evaluate to @code(123)  (can be changed with the option property-dot-notation).
           @br If an object is assigned to a variable, you can append the dot to the variable name, e.g. @code(let $obj := {"name": 123} return $obj.name).
               (drawback: variable names are not allowed to contains dots, if this extension is enabled)
           @br Within an object constructor arrays can be created with json and XPath-syntax like @code({"array": [1, 2, 3]}) and @code({"array": (1, 2, 3)}).
@@ -1411,6 +1411,7 @@ type
     OnCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
 
     AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
+    AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
     GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
 
     AutomaticallyRegisterParsedModules: boolean;
@@ -1587,7 +1588,7 @@ type
   TXQVariableChangeLog = class
     caseSensitive: boolean; //**< If true, variables are case-sensitive, otherwise case-insensitive
     readonly: boolean; //**< If true, modifying the variable value raises an error
-    allowObjects: boolean;  //**< If true, object properties are changed when variables like obj.propname are added. (more precise, a copy of the object would be made in which that property has the new value)
+    allowPropertyDotNotation: boolean;  //**< If true, object properties are changed when variables like obj.propname are added. (more precise, a copy of the object would be made in which that property has the new value)
 
     procedure add(name: string; const value: IXQValue; const namespace: INamespace = nil); //**< Add a variable
     procedure add(const name: string; const value: string); //**< Add a variable (@code(value) is converted to a IXQValue)
@@ -1751,7 +1752,8 @@ procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from,
         XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
         XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
 
-var GlobalStaticNamespaces: TNamespaceList;
+var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are known in all XPath/XQuery expressions, even if they are not declared there
+    AllowJSONDefaultInternal: boolean = false; //**< Default setting for JSON (internally used).
 implementation
 uses base64;
 
@@ -3175,7 +3177,7 @@ var
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
   point := 0;
-  if allowObjects then begin
+  if allowPropertyDotNotation then begin
     point := pos('.', name);
     if point > 0 then begin
       base := copy(name, 1, point - 1);
@@ -3385,7 +3387,7 @@ end;
 constructor TXQVariableChangeLog.create();
 begin
   caseSensitive:=true;
-  allowObjects:=true;
+  allowPropertyDotNotation:=true;
   pushAll;
 end;
 
@@ -3500,7 +3502,7 @@ var temp: txqvalue;
   varname: string;
   i: Integer;
 begin
-  if allowObjects then begin
+  if allowPropertyDotNotation then begin
     if splitName(variable, base, varname) then begin
       result := hasVariable(base, @temp, namespace);
       if not result then exit;
@@ -3520,7 +3522,7 @@ var temp: txqvalue;
   base: string;
   varname: string;
 begin
-  if not allowObjects then
+  if not allowPropertyDotNotation then
     exit(hasVariable(variable, value, namespace));
   if not splitName(variable, base, varname) then
     exit(hasVariable(variable, value, namespace));
@@ -3686,6 +3688,7 @@ begin
   self.CurrentDateTime:=now;
   ImplicitTimezone:=getNaN;
   AllowExtendedStrings:=true;
+  AllowJSON:=AllowJSONDefaultInternal;
   VariableChangelog := TXQVariableChangeLog.create();
   OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   OnDefineVariable:= @VariableChangelog.defineVariable;
@@ -3819,7 +3822,8 @@ begin
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowExtendedStrings := AllowExtendedStrings;
-  cxt.AllowObjects:=VariableChangelog.allowObjects;
+  cxt.AllowPropertyDotNotation:=VariableChangelog.allowPropertyDotNotation;
+  cxt.AllowJSON:=allowJSON;
   cxt.staticContext := context;
   cxt.parsingModel:=model;
   cxt.engine := self;
@@ -3855,7 +3859,8 @@ begin
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowExtendedStrings := true;
-  cxt.AllowObjects:=true;
+  cxt.AllowPropertyDotNotation:=VariableChangelog.allowPropertyDotNotation;
+  cxt.AllowJSON:=AllowJSON;
   cxt.staticContext := context;
   cxt.parsingModel:=xqpmXPath2;
   cxt.engine := self;
