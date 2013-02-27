@@ -2626,7 +2626,7 @@ begin
   //          |                |                     ||
   //       boolean          datetime                node
 
-  if (a in [pvkUndefined, pvkSequence]) or (b in [pvkUndefined,pvkSequence]) then exit(pvkUndefined);
+  if (a in [pvkUndefined, pvkSequence, pvkNull]) or (b in [pvkUndefined,pvkSequence,pvkNull]) then exit(pvkUndefined);
   //leafes
   if (a = pvkDateTime) and (b = pvkDateTime) then exit(pvkDateTime);
   if (a = pvkBoolean) and (b = pvkBoolean) then exit(pvkBoolean);
@@ -2768,6 +2768,7 @@ class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: T
     if wpre is TXQValueNode then w := xqvalueAtomize(wpre)
     else w := wpre;
     if typ.instanceOf(w, context) then exit(true);
+    if (w.kind = pvkNull) and (typ.allowNone) then exit(true);
     if (w is TXQValue_untypedAtomic)
        or (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) and ((w is TXQValue_float) or (w is TXQValue_double)))
        or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
@@ -2839,10 +2840,10 @@ function sequenceFilterConditionSatisfied(evaluatedCondition: IXQValue; const in
 begin
   case evaluatedCondition.kind of
     pvkUndefined: result := false;
-    pvkBoolean, pvkString,pvkSequence,pvkNode: result := evaluatedCondition.toBooleanEffective;
     pvkInt: result := evaluatedCondition.toInt65 = index;
     pvkDecimal: result := (evaluatedCondition.toDecimal = index);
     pvkDateTime: raise EXQEvaluationException.create('FORG0006', 'Sequence filter returned invalid value');
+    else {pvkBoolean, pvkString,pvkSequence,pvkNode,pvkArray,pvkObject,pvkNull:} result := evaluatedCondition.toBooleanEffective;
   end;
 end;
 

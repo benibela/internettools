@@ -33,7 +33,7 @@ begin
   bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
+     (ak in [pvkUndefined, pvkBoolean, pvkNull]) or (bk in [pvkUndefined, pvkBoolean, pvkNull]) then
     exit(xqvalue());
 
   if (ak = pvkInt) and (bk = pvkInt) then
@@ -76,7 +76,7 @@ begin
   bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
+     (ak in [pvkUndefined, pvkBoolean, pvkNull]) or (bk in [pvkUndefined, pvkBoolean, pvkNull]) then
     exit(xqvalue);
 
   if (ak = pvkInt) and (bk = pvkInt) then
@@ -159,7 +159,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
+     (ak in [pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkBoolean, pvkUndefined, pvkNull]) then
     exit((xqvalue));
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
@@ -198,7 +198,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
+     (ak in [pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkBoolean, pvkUndefined, pvkNull]) then
     exit((xqvalue));
 
   if (ak = pvkDateTime) then begin
@@ -240,7 +240,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
+     (ak in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) then
     exit(xqvalue);
 
   if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and (a.canConvertToInt65))) and
@@ -274,7 +274,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
+     (ak in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) then
     exit(xqvalue);
 
   if (ak = pvkInt) and (bk = pvkInt) then begin
@@ -345,7 +345,7 @@ var tempDateTime: TXQValueDateTime;
 begin
   ak := a.kind; bk := b.kind;
   result:=-2;
-  if (ak <> pvkUndefined) and (bk <> pvkUndefined) then begin
+  if not (ak in [pvkUndefined, pvkNull]) and not (bk in [pvkUndefined, pvkNull]) then begin
     if (ak = bk) and not (ak in [pvkString,pvkNode]) then begin
       case ak of
         pvkBoolean:
@@ -462,7 +462,7 @@ end;
 
 function xqvalueEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
-  if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then
+  if not (a.kind in [pvkUndefined, pvkNull]) and not (b.kind in [pvkUndefined, pvkNull]) then
     result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
     result := xqvalue();
@@ -470,7 +470,7 @@ end;
 
 function xqvalueUnequalAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
-  if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then
+  if not (a.kind in [pvkUndefined, pvkNull]) and not (b.kind in [pvkUndefined, pvkNull]) then
     result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
     result := xqvalue;
@@ -480,7 +480,7 @@ procedure xqvalueCompareAtomic(a, b: IXQValue; var result: IXQValue; accept1: in
 var
  compres: Integer;
 begin
-  if (a.kind <> pvkUndefined) and (b.kind <> pvkUndefined) then begin
+  if not (a.kind in [pvkUndefined,pvkNull]) and not (b.kind in [pvkUndefined, pvkNull]) then begin
     compres := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone);
     result := xqvalue((compres = accept1) or (compres = accept2) );
   end else
@@ -513,7 +513,7 @@ var
  ak, bk: TXQValueKind;
 begin
   ak := a.kind; bk := b.kind;
-  if (ak = pvkUndefined) or (bk = pvkUndefined) then
+  if (ak in [pvkUndefined, pvkNull]) or (bk in [pvkUndefined, pvkNull]) then
     result := false
   else if (ak <> pvkSequence) and (bk <> pvkSequence) then begin
     compres := xqvalueCompareAtomicBase(a,b,collation, implicitTimezone);

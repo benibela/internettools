@@ -75,6 +75,7 @@ var
 
 //var  time: TDateTime;
 var vars: TXQVariableChangeLog;
+  tempb: Boolean;
 begin
 //  time := Now;
   vars:= TXQVariableChangeLog.create();
@@ -1740,103 +1741,119 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('jn:members(json(''[1, 2, 3]''))', '1');
   t('string-join(jn:members(json(''[1, 2, 3]'')), " ")', '1 2 3');
   t('string-join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
-  t('count(json(''[1, 2, 3, [4, 5, 6], [7] ]''))', '1'); //todo: fix?
-  t('json(''[{"hallo": "world"}]'')(1).hallo', 'world');
-  t('json(''[{"hallo": "world"}, {hallo: 1000}]'')(2).hallo', '1000');
-  t('json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
-  t('json(''{"hallo": "world"} {hallo: 1000}'')[2].hallo', '1000');
-  t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
-  t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
-  f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo');
 
-  t('[4,5,6](0)', '');
-  t('[4,5,6](1)', '4');
-  t('[4,5,6](2)', '5');
-  t('[4,5,6](3)', '6');
-  t('[4,5,6](4)', '');
-  t('[4](0)', '');
-  t('[4](1)', '4');
-  t('[4](2)', '');
-  t('[](0)', '');
-  t('[](1)', '');
+  for tempb := false to true do begin
+    ps.StaticContext.strictTypeChecking:=tempb;
+    t('count(json(''[1, 2, 3, [4, 5, 6], [7] ]''))', '1'); //todo: fix?
+    t('json(''[{"hallo": "world"}]'')(1).hallo', 'world');
+    t('json(''[{"hallo": "world"}, {hallo: 1000}]'')(2).hallo', '1000');
+    t('json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
+    t('json(''{"hallo": "world"} {hallo: 1000}'')[2].hallo', '1000');
+    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
+    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
+    f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo');
 
-  t('{"foobar": 123, "maus": 456}("foobar")', '123');
-  t('{"foobar": 123, "maus": 456}("maus")', '456');
-  t('{"foobar": 123, "maus": 456}("unkn")', '');
-  t('{"foobar": 123, "argh": [9,8,7]}("argh")(1)', '9');
-  t('{"foobar": 123, "argh": [9,8,7]}("argh")(2)', '8');
+    t('[4,5,6](0)', '');
+    t('[4,5,6](1)', '4');
+    t('[4,5,6](2)', '5');
+    t('[4,5,6](3)', '6');
+    t('[4,5,6](4)', '');
+    t('[4](0)', '');
+    t('[4](1)', '4');
+    t('[4](2)', '');
+    t('[](0)', '');
+    t('[](1)', '');
 
-  t('[{"foobar": 123, "maus": 456}](1)("foobar")', '123');
+    t('{"foobar": 123, "maus": 456}("foobar")', '123');
+    t('{"foobar": 123, "maus": 456}("maus")', '456');
+    t('{"foobar": 123, "maus": 456}("unkn")', '');
+    t('{"foobar": 123, "argh": [9,8,7]}("argh")(1)', '9');
+    t('{"foobar": 123, "argh": [9,8,7]}("argh")(2)', '8');
 
-  t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(1), " ")', 'a o x');
-  t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(2), " ")', 'y');
+    t('[{"foobar": 123, "maus": 456}](1)("foobar")', '123');
 
-  t('serialize-json(123)', '123');
-  t('serialize-json(123.6)', '123.6');
-  t('serialize-json("123a")', '"123a"');
-  t('serialize-json((1,2,3))', '[1, 2, 3]');
-  t('serialize-json((1,2,"3!", true(),false()))', '[1, 2, "3!", true, false]');
-  t('serialize-json({"foo": 123, "bar": 0.456})', '{"foo": 123, "bar": 0.456}');
-  t('serialize-json({"xml": /})', '{"xml": "<foobar>123</foobar>"}', '<foobar>123</foobar>');
+    t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(1), " ")', 'a o x');
+    t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(2), " ")', 'y');
 
-  t('jn:size([])', '0');
-  t('jn:size([1])', '1');
-  t('jn:size([1,2])', '2');
-  t('jn:size([1 to 10])', '10');
+    t('serialize-json(123)', '123');
+    t('serialize-json(123.6)', '123.6');
+    t('serialize-json("123a")', '"123a"');
+    t('serialize-json((1,2,3))', '[1, 2, 3]');
+    t('serialize-json((1,2,"3!", true(),false()))', '[1, 2, "3!", true, false]');
+    t('serialize-json({"foo": 123, "bar": 0.456})', '{"foo": 123, "bar": 0.456}');
+    t('serialize-json({"xml": /})', '{"xml": "<foobar>123</foobar>"}', '<foobar>123</foobar>');
 
-  t('jn:is-null(jn:null())', 'true');
-  t('jn:is-null(127)', 'false');
+    t('jn:size([])', '0');
+    t('jn:size([1])', '1');
+    t('jn:size([1,2])', '2');
+    t('jn:size([1 to 10])', '10');
 
-  t('serialize-json(jn:object(()))', '{}');
-  t('serialize-json(jn:object({"a": 123}))', '{"a": 123}');
-  t('serialize-json(jn:object({"a": 123, "b": 456}))', '{"a": 123, "b": 456}');
-  t('serialize-json(jn:object(({"a": 123}, {"b": 456})))', '{"a": 123, "b": 456}');
-  t('serialize-json(jn:object(({"z": -1}, jn:object(({"a": 123}, {"b": 456})), {"c": 17})))', '{"z": -1, "a": 123, "b": 456, "c": 17}');
-  t('serialize-json(jn:object({"a": jn:null()}))', '{"a": null}');
-  t('serialize-json(jn:object({"a": ()}))', '{"a": null}');
-  t('serialize-json(jn:object({"a": (1,2,3)[0]}))', '{"a": null}');
-  t('serialize-json(jn:object({"a": []}))', '{"a": []}');
+    t('jn:is-null(jn:null())', 'true');
+    t('jn:is-null(127)', 'false');
 
-  t('true', '');
-  t('false', '');
-  t('jn:is-null(null)', 'false');
-  ps.AllowJSONLiterals:=true;
-  t('true', 'true');
-  t('false', 'false');
-  t('jn:is-null(null)', 'true');
-  t('./true', '');
-  t('./false', '');
-  t('jn:is-null(./null)', 'false');
-  t('./(true)', 'true');
-  t('./(false)', 'false');
-  t('jn:is-null(./(null))', 'true');
-  t('count((null, null, null))', '3');
-  t('jn:size([null, null, null])', '3');
-  t('jn:size([null, (), null])', '2');
-  t('jn:size([(), (), ()])', '0');
-  t('for $a in true return true', 'true');
-  t('for $a in false return false', 'false');
+    t('serialize-json(jn:object(()))', '{}');
+    t('serialize-json(jn:object({"a": 123}))', '{"a": 123}');
+    t('serialize-json(jn:object({"a": 123, "b": 456}))', '{"a": 123, "b": 456}');
+    t('serialize-json(jn:object(({"a": 123}, {"b": 456})))', '{"a": 123, "b": 456}');
+    t('serialize-json(jn:object(({"z": -1}, jn:object(({"a": 123}, {"b": 456})), {"c": 17})))', '{"z": -1, "a": 123, "b": 456, "c": 17}');
+    t('serialize-json(jn:object({"a": jn:null()}))', '{"a": null}');
+    t('serialize-json(jn:object({"a": ()}))', '{"a": null}');
+    t('serialize-json(jn:object({"a": (1,2,3)[0]}))', '{"a": null}');
+    t('serialize-json(jn:object({"a": []}))', '{"a": []}');
 
-  //Tests based on examples in the JSONiq spec
-  t('if (jn:null()) then "T" else "F"', 'F');
-  t('if ({}) then "T" else "F"', 'T');
-  t('if ({ "foo": false } ) then "T" else "F"', 'T');
-  t('if ( { "foo": 3, "bar":4 }) then "T" else "F"', 'T');
-  t('if ({ "foo": 3 }) then "T" else "F"', 'T');
-  t('if ( [1] ) then "T" else "F"', 'T');
-  t('if ( ( [1], jn:null()  ) ) then "T" else "F"', 'T');
-  t('if ( [null] ) then "T" else "F"', 'T');
-  t('if ( [] ) then "T" else "F"', 'T');
-  t('if (()) then "T" else "F"', 'F');
+    t('true', '');
+    t('false', '');
+    if not ps.StaticContext.strictTypeChecking then  t('jn:is-null(null)', 'false');
+    ps.AllowJSONLiterals:=true;
+    t('true', 'true');
+    t('false', 'false');
+    t('jn:is-null(null)', 'true');
+    t('./true', '');
+    t('./false', '');
+    if not ps.StaticContext.strictTypeChecking then t('jn:is-null(./null)', 'false');
+    t('./(true)', 'true');
+    t('./(false)', 'false');
+    t('jn:is-null(./(null))', 'true');
+    t('count((null, null, null))', '3');
+    t('jn:size([null, null, null])', '3');
+    t('jn:size([null, (), null])', '2');
+    t('jn:size([(), (), ()])', '0');
+    t('for $a in true return true', 'true');
+    t('for $a in false return false', 'false');
 
-  ps.AllowJSONLiterals:=false;
+    //Tests based on examples in the JSONiq spec
+    t('if (jn:null()) then "T" else "F"', 'F');
+    t('if ({}) then "T" else "F"', 'T');
+    t('if ({ "foo": false } ) then "T" else "F"', 'T');
+    t('if ( { "foo": 3, "bar":4 }) then "T" else "F"', 'T');
+    t('if ({ "foo": 3 }) then "T" else "F"', 'T');
+    t('if ( [1] ) then "T" else "F"', 'T');
+    t('if ( ( [1], jn:null()  ) ) then "T" else "F"', 'T');
+    t('if ( [null] ) then "T" else "F"', 'T');
+    t('if ( [] ) then "T" else "F"', 'T');
+    t('if (()) then "T" else "F"', 'F');
 
-  t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');
-  t('serialize-json(          [ [1, 2, 3],            [4, 5, 6],            [7, 8, 9]          ])', '[[1, 2, 3], [4, 5, 6], [7, 8, 9]]');
-  t('serialize-json([ 10 to 15 ])', '[10, 11, 12, 13, 14, 15]');
-  t('serialize-json({            "id" : 404,     "name" : "Stanco Grease Pot",   "price" : 6.49,    "weight" : 3.8,     "uses" : ["Grease storage","Backpacking pot"] })', '{"id": 404, "name": "Stanco Grease Pot", "price": 6.49, "weight": 3.8, "uses": ["Grease storage", "Backpacking pot"]}');
-  t('serialize-json({"Sunday" : 1,     "Monday" : 1 + 1,    "Tuesday" : 3 * 1,    "Wednesday" : 8 div 2,    "Thursday" : 5,   "Friday" : count(for $i in 1 to 6 return $i),           "Saturday": 10 - 3 })','{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+    t('() + 1', '');
+    t('null + 1', '');
+    t('() eq 1', '');
+    t('null eq 1', '');
+    t('1 + ()', '');
+    t('1 + null', '');
 
+    t('(null, 2) = (1, 3)', 'false');
+    t('(1, null, 3) = (1, 3)', 'true');
+    t('(null, 1, null, 3) = (1, 3, null)', 'true');
+    t('(null, null) = (1, 3, null)', 'false');
+
+    t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');
+    t('serialize-json(          [ [1, 2, 3],            [4, 5, 6],            [7, 8, 9]          ])', '[[1, 2, 3], [4, 5, 6], [7, 8, 9]]');
+    t('serialize-json([ 10 to 15 ])', '[10, 11, 12, 13, 14, 15]');
+    t('serialize-json({            "id" : 404,     "name" : "Stanco Grease Pot",   "price" : 6.49,    "weight" : 3.8,     "uses" : ["Grease storage","Backpacking pot"] })', '{"id": 404, "name": "Stanco Grease Pot", "price": 6.49, "weight": 3.8, "uses": ["Grease storage", "Backpacking pot"]}');
+    t('serialize-json({"Sunday" : 1,     "Monday" : 1 + 1,    "Tuesday" : 3 * 1,    "Wednesday" : 8 div 2,    "Thursday" : 5,   "Friday" : count(for $i in 1 to 6 return $i),           "Saturday": 10 - 3 })','{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+    ps.AllowJSONLiterals:=false;
+  end;
+
+  ps.StaticContext.strictTypeChecking:=false;
 
 
 
