@@ -37,7 +37,7 @@ var resobj: TXQValueObject;
     begin
       if another.prototype <> nil then merge(another.prototype as TXQValueObject);
       for i := 0 to another.values.count-1 do begin
-        if resobj.values.hasVariable(another.values.getName(i),nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
+        if resobj.hasProperty(another.values.getName(i),nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
         resobj.values.add(another.values.getName(i), another.values.get(i));
       end;
     end;
