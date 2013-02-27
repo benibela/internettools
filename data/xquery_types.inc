@@ -1275,6 +1275,7 @@ var
   i: Integer;
 begin
   if seq.Count = 0 then exit('[]');
+  if seq.Count = 1 then exit(seq[0].jsonSerialize(nodeFormat));
   result := '[' + seq[0].jsonSerialize(nodeFormat);
   for i := 1 to seq.Count-1 do
     result := result + ', ' + seq[i].jsonSerialize(nodeFormat);

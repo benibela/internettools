@@ -762,7 +762,7 @@ begin
 
   if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices or object prop given');
   index := children[1].evaluate(context);
-  result := xqvalue();
+  result := nil;
   for v in func do begin
     if v is TXQValueJSONArray then begin
       if (index.toInt64 < 1) or (index.toInt64 > (v as TXQValueJSONArray).seq.Count) then continue;
@@ -771,6 +771,8 @@ begin
       xqvalueSeqAdd(result, v.getProperty(index.ToString));
     end else raiseEvaluationError('XPST003', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
   end;
+  //this returns a sequence of a single value instead that value, if func is a sequence with multiple values (from which only one has that property). Does it matter?
+  if result = nil then result := xqvalue();
 
 end;
 

@@ -2395,7 +2395,7 @@ begin
     url := strRemoveFileURLPrefix(url);
     if not FileExists(url) then raise EXQEvaluationException.Create('FODC0002', 'Failed to find document: ' + url);
     contenttype := '';
-    exit(strLoadFromFile(url));
+    exit(strLoadFromFileUTF8(url));
   end;
   if sender.FInternet = nil then begin
     if defaultInternetAccessClass = nil then
