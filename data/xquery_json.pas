@@ -269,20 +269,22 @@ initialization
 
   jn := TXQNativeModule.Create(XMLNamespace_JSONiqFunctions);
   TXQueryEngine.registerNativeModule(jn);
-  jn.registerFunction('keys', @xqFunctionKeys, ['($arg as xs:object) as xs:string*']);
-  jn.registerFunction('members', @xqFunctionMembers, ['($arg as xs:array) as item()*']);
+  jn.registerFunction('keys', @xqFunctionKeys, ['($arg as object()) as xs:string*']);
+  jn.registerFunction('members', @xqFunctionMembers, ['($arg as array()) as item()*']);
 
+  //TODO: fn:string/fn:data errors
   //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
   //TODO:  6.9. jn:json-doc
+//  jn.registerFunction('encode-for-roundtrip', @xqFunctionEncode_For_Roundtrip, ['jn:encode-for-roundtrip($items as item()*) as json-item()* ', 'jn:encode-for-roundtrip($items as item()*, $options as object()) as json-item()* ']);
   jn.registerFunction('is-null', @xqFunctionIsNull, ['($arg as item()) as xs:boolean']);
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
-  jn.registerFunction('object', @xqFunctionObject, ['($arg as xs:object*) as object()']);
-  jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string) as item()', '($arg as xs:string, $options as xs:object) as item()*']);
-  jn.registerFunction('size', @xqFunctionSize, ['($arg as xs:array) as xs:integer']);
+  jn.registerFunction('object', @xqFunctionObject, ['($arg as object()*) as object()']);
+  jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string) as item()', '($arg as xs:string, $options as object()) as item()*']);
+  jn.registerFunction('size', @xqFunctionSize, ['($arg as array()) as xs:integer']);
 
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
   pxp.registerFunction('json', @xqFunctionParseJson, ['($arg as xs:string) as item()*']);
-  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as xs:anyAtomicType*) as xs:string']);
+  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 
 finalization
   jn.free;

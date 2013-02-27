@@ -4856,6 +4856,7 @@ begin
   SetLength(info.versions, length(typeChecking));
   for i:= 0 to high(typeChecking) do
     with globalTypeParsingContext  do begin
+      AllowJSON:=AllowJSONDefaultInternal; //todo: improve json modularization?
       str:=typeChecking[i];
       pos:=@globalTypeParsingContext.str[1];
       skipWhitespaceAndComment();
