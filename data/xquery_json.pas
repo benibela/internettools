@@ -10,7 +10,7 @@ uses
 
 implementation
 
-uses jsonscanner, simplehtmltreeparser, int65math;
+uses jsonscanner, simplehtmltreeparser, int65math, bbutils;
 
 
 function xqFunctionIsNull(const args: TXQVArray): IXQValue;
@@ -105,7 +105,9 @@ var
       tempFloat: Extended;
     begin
       if TryStrToInt65(scanner.CurTokenString, temp65) then exit(xqvalue(temp65));
-      if TryStrToFloat(scanner.CurTokenString, tempFloat) then exit(xqvalue(tempFloat));
+      if TryStrToFloat(scanner.CurTokenString, tempFloat) then
+        if striContains(scanner.CurTokenString, 'E') then exit(TXQValue_double.create(tempFloat))
+        else exit(TXQValueDecimal.create(tempFloat));
       raiseError('Invalid number');
     end;
 

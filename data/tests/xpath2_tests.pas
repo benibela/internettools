@@ -1801,6 +1801,16 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('serialize-json(jn:object({"a": (1,2,3)[0]}))', '{"a": null}');
     t('serialize-json(jn:object({"a": []}))', '{"a": []}');
 
+    t('jn:parse-json(''{"a": 123}'').a instance of xs:integer', 'true');
+    t('jn:parse-json(''{"a": 123.0}'').a instance of xs:decimal', 'true');
+    t('jn:parse-json(''{"a": 123E1}'').a instance of xs:double', 'true');
+    t('jn:parse-json(''{"a": 123E1}'').a instance of xs:decimal', 'false');
+    t('serialize-json(xs:long(2))', '2');
+    //t('serialize-json(xs:decimal(2))', '2.0');
+    //t('serialize-json(xs:double(2))', '2E0');
+    t('serialize-json(xs:decimal(2))', '2'); //todo: which one is correct
+    t('serialize-json(xs:double(2))', '2');
+
     t('true', '');
     t('false', '');
     if not ps.StaticContext.strictTypeChecking then  t('jn:is-null(null)', 'false');

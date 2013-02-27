@@ -608,7 +608,12 @@ begin
   if isnan(value) then result:='"NaN"'
   else if isPosInf(value) then result:='"INF"'
   else if isNegInf(value) then result:='"-INF"'
-  else result := myDecimalToStr(value);
+  else begin
+    result := myDecimalToStr(value);
+    {if ((self is TXQValue_double) or (self is TXQValue_float)) and not striContains(result, 'E') then result += 'E0'
+    else if not striContains(result, 'E')  and not striContains(result, '.') then
+      result += '.0';}
+  end;
 end;
 
 function TXQValueDecimal.clone: IXQValue;
