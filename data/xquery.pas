@@ -131,6 +131,9 @@ type
     destructor Destroy; override;
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
+
+    function resolveDocURI(url: string): string;
+    function retrieveFromURI(url: string; out contenttype: string): string;
   end;
 
   { TXQEvaluationContext }
@@ -1466,6 +1469,8 @@ type
     FModules: TInterfaceList;
 
   protected
+    DefaultParser: TTreeParser; //used by fn:doc if no context node is there
+
     function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
     function parseXStringNullTerminated(str: string): TXQuery;
@@ -2375,6 +2380,32 @@ begin
   else namespace := findNamespace('', defaultNamespaceKind);
 end;
 
+function TXQStaticContext.resolveDocURI(url: string): string;
+begin
+  result := strResolveURI(url, baseURI);
+end;
+
+function TXQStaticContext.retrieveFromURI(url: string; out contenttype: string): string;
+begin
+  {$IFNDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
+  raise EXQEvaluationException.create('pxp:CONFIG', 'Retrieving external documents is not allowed. (define ALLOW_EXTERNAL_DOC_DOWNLOAD to activate it)');
+  {$ENDIF}
+  url := resolveDocURI(url);
+  if not strContains(url, '://') or striBeginsWith(url, 'file:/') then begin
+    url := strRemoveFileURLPrefix(url);
+    if not FileExists(url) then raise EXQEvaluationException.Create('FODC0002', 'Failed to find document: ' + url);
+    contenttype := '';
+    exit(strLoadFromFile(url));
+  end;
+  if sender.FInternet = nil then begin
+    if defaultInternetAccessClass = nil then
+      raise EXQEvaluationException.Create('pxp:CONFIG', 'To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
+    sender.FInternet := defaultInternetAccessClass.create();
+  end;
+  result := sender.FInternet.get(url);
+  contenttype := sender.FInternet.getLastHTTPHeader('Content-Type');
+end;
+
 { TXQTermModule }
 
 
@@ -2475,7 +2506,7 @@ begin
   result := xqvalueCompareAtomicBase(a, b, staticContext.collation, staticContext.sender.ImplicitTimezone);
 end;
 
-function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): iNamespace;
+function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
 begin
   if ((defaultNamespaceKind in [xqdnkAny, xqdnkElementType]) or ((nsprefix <> '') and (defaultNamespaceKind <> xqdnkFunction))) {<- dynamic namespaces are only created from node constructors}
      and (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
@@ -2516,6 +2547,7 @@ begin
   if system.pos(':', name) > 0 then namespace := findNamespace(strSplitGet(':', name), defaultNamespaceKind)
   else namespace := findNamespace('', defaultNamespaceKind);
 end;
+
 
 function TXQEvaluationContext.getRootHighest: TTreeNode;
 begin
@@ -3720,6 +3752,7 @@ var
 begin
   VariableChangelog.Free;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}FInternet.Free;{$endif}
+  DefaultParser.Free;
   clear;
   if FInternalDocuments <> nil then begin;
     for i:= 0 to FInternalDocuments.count - 1 do

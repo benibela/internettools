@@ -299,6 +299,9 @@ function strJoin(const sl: TStringArray; const sep: string = ', '; limit: Intege
 //**Converts a str to a bool (for fpc versions previous 2.2)
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
 
+//**Removes a file:// prefix from filename if it is there
+function strRemoveFileURLPrefix(const filename: string): string;
+
 //**loads a file as string. The filename is directly passed to the fpc rtl and uses the system
 //**encoding @seealso(strLoadFromFileUTF8)
 function strLoadFromFile(filename:string):string;
@@ -1206,7 +1209,7 @@ begin
   end;
   case result[length(result)] of
     #13: result[p] := #10;
-    else result[p] := result[length(result)]);
+    else result[p] := result[length(result)];
   end;
 
   setlength(result, p{ + 1 - 1});
@@ -1797,7 +1800,7 @@ begin
     result:=Def;
 end;
 
-function killFileURLPrefix(const filename: string): string;
+function strRemoveFileURLPrefix(const filename: string): string;
 begin
   result := filename;
 
@@ -1812,7 +1815,7 @@ end;
 function strLoadFromFile(filename: string): string;
 var f:TFileStream;
 begin
-  f:=TFileStream.Create(killFileURLPrefix(filename),fmOpenRead);
+  f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmOpenRead);
   result := '';
   SetLength(result,f.Size);
   if f.size>0 then
@@ -1823,7 +1826,7 @@ end;
 procedure strSaveToFile(filename: string;str:string);
 var f:TFileStream;
 begin
-  f:=TFileStream.Create(killFileURLPrefix(filename),fmCreate);
+  f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmCreate);
   if length(str)>0 then f.Write(str[1],length(str));
   f.Free;
 end;

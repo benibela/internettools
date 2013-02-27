@@ -5,7 +5,7 @@ unit xquery_json;
 interface
 
 uses
-  Classes, SysUtils, fpjson, xquery;
+  Classes, SysUtils, xquery;
 
 
 implementation
@@ -26,6 +26,8 @@ begin
   requiredArgCount(args, 0, 0);
   result := TXQValueJSONNull.create;
 end;
+
+
 
 function xqFunctionObject(const args: TXQVArray): IXQValue;
 var resobj: TXQValueObject;
@@ -168,7 +170,6 @@ var
   end;
 
 var
-  data: TJSONData;
   multipleTopLevelItems: Boolean;
 
 
@@ -203,6 +204,24 @@ begin
   a := args[0];
   result := xqvalue(a.jsonSerialize(tnsXML));
 end;
+
+function xqFunctionJSON_Doc(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  url: String;
+  data: String;
+  contenttype: string;
+  temp: TXQVarray;
+begin
+  requiredArgCount(args, 1);
+  url := args[0].toString;
+  if url = '' then exit(xqvalue);
+
+  data := context.staticContext.retrieveFromURI(url, contenttype);
+  setlength(temp, 1);
+  temp[0] := xqvalue(data);
+  result := xqFunctionParseJson(temp);
+end;
+
 
 function xqFunctionKeys(const args: TXQVArray): IXQValue;
 var
@@ -277,6 +296,7 @@ initialization
   //TODO:  6.9. jn:json-doc
 //  jn.registerFunction('encode-for-roundtrip', @xqFunctionEncode_For_Roundtrip, ['jn:encode-for-roundtrip($items as item()*) as json-item()* ', 'jn:encode-for-roundtrip($items as item()*, $options as object()) as json-item()* ']);
   jn.registerFunction('is-null', @xqFunctionIsNull, ['($arg as item()) as xs:boolean']);
+  jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?']);
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
   jn.registerFunction('object', @xqFunctionObject, ['($arg as object()*) as object()']);
   jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string) as item()', '($arg as xs:string, $options as object()) as item()*']);

@@ -2018,59 +2018,47 @@ begin
   result := xqvalue(urlHexEncode(args[0].toString, [#32..#126]));
 end;
 
-function resolveDocURI(s: string; const context: TXQEvaluationContext): string;
-begin
-  result := strResolveURI(s, context.staticContext.baseURI);
-  writeln(stderr, 'YY: ', result, ' ::',context.staticContext.baseURI);
-  if strBeginsWith(result, 'file:') then begin
-    delete(result, 1, 5);
-    while (length(result) > 1) and (result[1] = '/') and (result[2] = '/') do delete(result,1,1);
-  end;
-end;
-
 function xqFunctionDoc(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   url: String;
   node: TTreeNode;
+  data: String;
+  contenttype: string;
+  parser: TTreeParser;
 begin
   requiredArgCount(args, 1);
   url := args[0].toString;
   if url = '' then exit(xqvalue);
-  {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
+  {$ifndef ALLOW_EXTERNAL_DOC_DOWNLOAD}
+  raise EXQEvaluationException.Create('pxp:CONFIG', 'Using fn:doc is not allowed');
+  {$endif}
+
   if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('FODC0005', 'Invalid url: '+url);
 
-  node := xqvalueContextNode(context);
-  if node = nil then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Need  a loaded document to load a new one');
+  url := context.staticContext.resolveDocURI(url);
 
   if context.staticContext.sender.FExternalDocuments = nil then context.staticContext.sender.FExternalDocuments := TStringList.Create;
 
   if context.staticContext.sender.FExternalDocuments.IndexOf(url) >= 0 then
     exit(xqvalue(TTreeNode(context.staticContext.sender.FExternalDocuments.Objects[context.staticContext.sender.FExternalDocuments.IndexOf(url)])));
 
-  url := resolveDocURI(url, context);
+  data := context.staticContext.retrieveFromURI(url, contenttype);
 
-  if not strContains(url, '://') then begin
-    if not FileExists(url) then raise EXQEvaluationException.Create('FODC0002', 'Failed to find document: ' + url);
-    node := node.getDocument().getCreator.parseTreeFromFile(url)
-  end else begin
-    if context.staticContext.sender.FInternet = nil then begin
-      if defaultInternetAccessClass = nil then
-        raise EXQEvaluationException.Create('pxp:INTERNAL', 'To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
-      context.staticContext.sender.FInternet := defaultInternetAccessClass.create();
-    end;
-    node := node.getDocument().getCreator.parseTree(context.staticContext.sender.FInternet.get(url), url);
+  node := xqvalueContextNode(context);
+  parser := nil;
+  if (node <> nil) and (node.getDocument() <> nil) then parser := node.getDocument().getCreator;
+  if parser = nil then parser := context.staticContext.sender.defaultParser;
+  if parser = nil then begin
+    context.staticContext.sender.defaultParser := TTreeParser.Create;
+    parser := context.staticContext.sender.defaultParser;
   end;
 
-  if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to load document: '+url);
-  //writeln(strFromPtr(node));
+  node := parser.parseTree(data, url, contenttype);
+  if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url);
 
   context.staticContext.sender.FExternalDocuments.AddObject(url, node);
 
   result := xqvalue(node);
-
-  {$else}
-  raise EXQEvaluationException.Create('Using fn:doc is not allowed');
-  {$endif}
 end;
 
 function xqFunctionDoc_Available(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2080,14 +2068,13 @@ begin
   requiredArgCount(args, 1);
   url := args[0].toString;
   if url = '' then exit(xqvalueFalse);
-  url := resolveDocURI(url, context);
+  url := context.staticContext.resolveDocURI(url);
   if (url = '') then exit(xqvalueFalse);
-  if not strContains(url, '://') and not FileExists(url) then exit(xqvalueFalse);
+  if not strContains(url, '://') or striBeginsWith(url, 'file:/') then exit(xqvalue(FileExists(strRemoveFileURLPrefix(url))));
+  result := xqvalueFalse;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
   if TXQValue_anyURI.canCreateFromstring(url) then
     result := xqvalueTrue;
-  {$else}
-  result := xqvalueFalse;
   {$endif}
 end;
 
