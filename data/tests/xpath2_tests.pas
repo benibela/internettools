@@ -1730,6 +1730,16 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[1].a', '10');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[2].a', '20');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[3].a', '30');
+  t('{} instance of object()', 'true');
+  t('{"a": 123, "b": 16} instance of object()', 'true');
+  t('{} instance of array()', 'false');
+  t('[] instance of object()', 'false');
+  t('[] instance of object()', 'false');
+  t('[] instance of array()', 'true');
+  t('[123] instance of array()', 'true');
+
+  t('{} instance of json-item()', 'true');
+  t('[123] instance of json-item()', 'true');
 
   //Json tests
   t('json(''{"a": 123}'').a', '123');
@@ -1830,8 +1840,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('jn:size([(), (), ()])', '0');
     t('for $a in true return true', 'true');
     t('for $a in false return false', 'false');
+    t('serialize-json([1 to 3, 4 to 6])', '[1, 2, 3, 4, 5, 6]');
+    t('serialize-json([[1 to 3], [4 to 6]])', '[[1, 2, 3], [4, 5, 6]]');
 
     f('serialize-json(jn:object(({"a": 1}, {"b": 2}, {"a": 3})))');
+
 
     //Tests based on examples in the JSONiq spec
     t('if (jn:null()) then "T" else "F"', 'F');

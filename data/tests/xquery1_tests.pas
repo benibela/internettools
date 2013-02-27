@@ -1632,6 +1632,37 @@ begin
   t('let $object1 := { "Captain" : "Kirk" } let $object2 := { "First officer" : "Spock" } return serialize-json(jn:object(($object1, $object2)))', '{"Captain": "Kirk", "First officer": "Spock"}');
   t('serialize-json(jn:object(for $d at $i in ("Sunday", "Monday", "Tuesday",  "Wednesday",  "Thursday",  "Friday",  "Saturday" ) return { $d : $i }  ))', '{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
 
+  t('let $a := for $b in (1,2,3) return $b+1 return $a', '2 3 4');
+  t('string-join(let $a := for $b in (1,2,3) return $b+1 return $a, " ")', '2 3 4');
+  t('let $a := for $b in (1,2,3) return $b+1 let $b := 17 return $b', '17');
+  t('let $a := for $b in (1,2,3) return $b+1 for $b in $a return $b', '2 3 4');
+
+  //JSON lib tests
+  mr('module namespace libjn = "pseudo://libjn-test-module"; '+
+     'declare function libjn:accumulate($o as object()*) as object() { jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } ) };'+
+     'declare function libjn:descendant-objects($i as json-item()) as object()* { if ($i instance of object()) then ( $i, for $v in libjn:values($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else if ($i instance of array()) then ( for $v in jn:members($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else () };'+
+     'declare function libjn:descendant-pairs($o as object()) { for $k in jn:keys($o) return ( { $k : $o($k) }, if ($o($k) instance of object()) then libjn:descendant-pairs($o($k)) else () ) };'+
+     'declare function libjn:flatten($a as array()) as item()* { for $value in jn:members($a) return if ($value instance of array()) then libjn:flatten($value) else $value }; '+
+     'declare function libjn:intersect($o as object()*) { jn:object( let $common-keys := jn:keys(($o[1]))[ every $object in ($o[position() >= 2]) satisfies jn:keys($object) = . ] for $key in $common-keys let $values := $o($key) return if (count($values) eq 1) then { $key : $values } else { $key : [ $values ] } ) };'+
+     'declare function libjn:project($o as object(), $s as xs:string*) as object() { jn:object( for $key in libjn:value-intersect($s, jn:keys($o)) return { $key : $o($key) } ) };'+
+     'declare function libjn:values($i as object()) as item()* { for $k in jn:keys($i) return $i($k) };'+
+     'declare function libjn:value-intersect( $arg1 as xs:anyAtomicType* ,    $arg2 as xs:anyAtomicType* )  as xs:anyAtomicType* {distinct-values($arg1[.=$arg2])} ;'); //that's a funcx function, but needed here
+
+  m('import module namespace test = "pseudo://libjn-test-module"; serialize-json(test:accumulate(({"a": 1}, { "b": 2}, { "a": 3})))', '{"a": [1, 3], "b": 2}');
+  t('jn:keys({"a": 23, "o": {"foo": "bar"}})', 'a o');
+  m('import module namespace test = "pseudo://libjn-test-module"; string-join(for $i in test:values({"a": 23, "o": {"foo": "bar"}}) return serialize-json($i), " ")', '23 {"foo": "bar"}');
+  //m('import module namespace test = "pseudo://libjn-test-module"; string-join(for $i in test:descendant-objects((1,2,[{"a": 1}], {"a": 23, "o": {"foo": "bar"}})) return serialize-json($i), " ")', ''); //useless test
+  m('import module namespace test = "pseudo://libjn-test-module"; string-join(for $i in test:descendant-objects([{"a": 1}, {"a": 23, "o": {"foo": "bar"}}]) return serialize-json($i), " ")', '{"a": 1} {"a": 23, "o": {"foo": "bar"}} {"foo": "bar"}');
+  m('import module namespace test = "pseudo://libjn-test-module"; let $o := { "first" : 1, "second" : {  "first" : "a",  "second" : "b"  } }; string-join(for $i in test:descendant-pairs($o) return serialize-json($i), " ")', '{"first": 1} {"second": {"first": "a", "second": "b"}} {"first": "a"} {"second": "b"}');
+  m('import module namespace test = "pseudo://libjn-test-module"; let $o := { "first" : 1, "second" : {  "first" : "a",  "second" : "b"  } }; string-join(for $i in test:descendant-pairs($o)("first") return serialize-json($i), " ")', '1 "a"');
+  m('import module namespace test = "pseudo://libjn-test-module"; serialize-json(test:flatten([[1 to 3, [1, 2]], 10, 11]))', '[1, 2, 3, 1, 2, 10, 11]');
+  m('import module namespace test = "pseudo://libjn-test-module"; serialize-json(test:intersect( ( {"a": 1, "b": 2, "c": 3}, {"a": 17} ) ))', '{"a": [1, 17]}');
+  m('import module namespace test = "pseudo://libjn-test-module"; let $o := { "Captain" : "Kirk", "First Officer" : "Spock", "Engineer" : "Scott" } return serialize-json(test:project($o, ("Captain", "First Officer")))', '{"Captain": "Kirk", "First Officer": "Spock"}');
+  m('import module namespace test = "pseudo://libjn-test-module"; let $o := {"Captain": "Kirk", "First Officer": "Spock", "Engineer": "Scott" } return serialize-json(test:project($o, "XQuery Evangelist"))', '{}');
+
+
+
+
 
   writeln('XQuery: ', count, ' completed');
 
