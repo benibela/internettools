@@ -71,7 +71,14 @@ TReplaceFunction = procedure (variable: string; var value:string) of object;
 
 ETemplateParseException = class(Exception);
 EHTMLParseException = class(Exception);
-EHTMLParseMatchingException = class(EHTMLParseException);
+
+{ EHTMLParseMatchingException }
+
+EHTMLParseMatchingException = class(EHTMLParseException)
+  partialMatches: string;
+  constructor create(const mes, matches: string);
+end;
+
 THtmlTemplateParser=class;
 
 TStringAttributeList = tStringList;
@@ -466,7 +473,7 @@ THtmlTemplateParser=class
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 implementation
 
-uses math;
+uses math, strutils;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchText;
@@ -498,6 +505,14 @@ begin
 end;
 
 procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
+
+{ EHTMLParseMatchingException }
+
+constructor EHTMLParseMatchingException.create(const mes, matches: string);
+begin
+  inherited create(mes);
+  partialMatches:=matches;
+end;
 
 function TTemplateElement.templateReverse: TTemplateElement;
 begin
@@ -828,7 +843,7 @@ begin
           for k:= 0 to high(htmlList) do if striEqual(templateList[j], htmlList[k]) then begin found := true; break; end;
           if not found then exit(false);
         end;
-      end else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind');
+      end else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind','');
       {todo: cacheRegExpr('regex', '', '', false);
       cacheRegExpr('starts-with', '^', '.*$', true);
       cacheRegExpr('ends-with', '^.*', '$', true);
@@ -1187,6 +1202,7 @@ end;
 function THtmlTemplateParser.matchLastTrees: Boolean;
 var cur,last,realLast:TTemplateElement;
     temp: TTreeNode;
+    err: String;
 begin
   FreeAndNil(FVariables);
   if FKeepOldVariables = kpvForget then
@@ -1244,13 +1260,17 @@ begin
     cur := TTemplateElement(FTemplate.getLastTree.next);
     if cur = nil then raise EHTMLParseException.Create('No template');
     cur := cur.templateNext;
-    realLast := cur;
-    last := cur;
+    realLast := nil;
+    last := nil;
     while cur <> nil do begin
       case cur.templateType of
         tetHTMLOpen, tetHTMLText: begin
           if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
-            raise EHTMLParseMatchingException.create('Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10'Couldn''t find a match for: '+cur.toString+#13#10'Previous element is:'+reallast.toString+#13#10'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString);
+            err := 'Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10+
+                   'Couldn''t find a match for: '+cur.toString+#13#10;
+            if realLast <> nil then err += 'Previous element is:'+reallast.toString+#13#10;
+            if last <> nil then err += 'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString;
+            raise EHTMLParseMatchingException.create(err, debugMatchings(80));
           end;
           last:=cur;
         end;

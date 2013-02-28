@@ -229,6 +229,7 @@ type
 
 implementation
 
+
 { TTemplateActionLoop }
 
 type
@@ -257,6 +258,8 @@ type
     condition, method: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
+  private
+    templateName: string;
   end;
 
   { TTemplateActionCallAction }
@@ -342,6 +345,7 @@ begin
   SetLength(postparams, 0);
   url := t.getAttribute('url', url);
   templateFile := t.getAttribute('templateFile', templateFile);
+  templateName := templateFile;
   condition := t['test'];
   method:='';
 
@@ -395,7 +399,7 @@ begin
 
   if template<>'' then begin
     if Assigned(reader.onLog) then reader.onLog(reader, 'Parse Template From File: '+reader.template.path+templateFile, 2);
-    reader.parser.parseTemplate(template,templateFile);
+    reader.parser.parseTemplate(template, templateName);
   end;
 
   cururl := url;
@@ -577,6 +581,19 @@ begin
   baseActions:=TTemplateAction.Create;
 end;
 
+procedure setTemplateNames(a: TTemplateAction; baseName: string='');
+var
+  i: Integer;
+begin
+  if a is TTemplateActionLoadPage then begin
+    baseName+=' page:'+TTemplateActionLoadPage(a).url;
+    if TTemplateActionLoadPage(a).templateName = '' then TTemplateActionLoadPage(a).templateName:='(template of'+baseName+')';
+  end else if a is TTemplateActionMain then
+      baseName+=' action:'+TTemplateActionMain(a).name;
+  for i := 0 to high(a.children) do
+    setTemplateNames(a.children[i], baseName);
+end;
+
 procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
   procedure loadTemplates(a: TTemplateAction);
   var i:longint;
@@ -590,7 +607,7 @@ procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname:
       b.template:=strLoadFromFile(self.path+b.templateFile);
       if b.template='' then
         raise ETemplateReader.create('Template-Datei "'+self.path+b.templateFile+'" konnte nicht geladen werden');
-    end;
+    end
   end;
 var
   tree: TTreeParser;
@@ -608,6 +625,7 @@ begin
   tree.TargetEncoding:=eUTF8;
   readTree(tree.parseTreeFromFile(_dataPath+'template'));
   loadTemplates(baseActions);
+  setTemplateNames(baseActions);
   tree.free;
 end;
 
@@ -622,6 +640,7 @@ begin
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
   tree.TargetEncoding:=eUTF8;
   readTree(tree.parseTree(template));
+  setTemplateNames(baseActions);
   tree.Free;
 end;
 
