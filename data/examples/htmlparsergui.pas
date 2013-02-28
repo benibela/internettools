@@ -17,6 +17,7 @@ type
     Button2: TButton;
     Button3: TButton;
     Button4: TButton;
+    CheckBoxJSON: TCheckBox;
     CheckBoxTextOnly: TCheckBox;
     CheckBoxverbose: TCheckBox;
     CheckBoxOptions: TCheckBox;
@@ -45,6 +46,7 @@ type
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure Button3Click(Sender: TObject);
+    procedure CheckBoxJSONChange(Sender: TObject);
     procedure CheckBoxOptionsChange(Sender: TObject);
     procedure htmlparserVariableRead(variable: string; value: string);
   private
@@ -60,7 +62,7 @@ var
 
 implementation
 
-uses bbutils;
+uses bbutils, {xquery_utf8, }xquery_json;
 {$R *.lfm}
 
 { TForm1 }
@@ -73,7 +75,8 @@ begin
   if not CheckBoxEntities.Checked then htmlparser.OutputEncoding:=eUnknown;
   try
     htmlparser.AllowVeryShortNotation:=CheckBoxShortnotatin.Checked;
-    htmlparser.AllowObjects:=CheckBoxObjects.Checked;
+    htmlparser.AllowPropertyDotNotation:=CheckBoxObjects.Checked;
+    htmlparser.QueryEngine.AllowJSON:=CheckBoxJSON.Checked;
     htmlparser.parseTemplate(memo1.Lines.Text);
     htmlparser.trimTextNodes:=TTrimTextNodes(trimming.ItemIndex);
     memo3.Clear;
@@ -118,8 +121,9 @@ begin
   try
     ppath.OnEvaluateVariable:=@vars.evaluateVariable;
     ppath.OnDefineVariable:=@vars.defineVariable;
-    ppath.AllowVariableUseInStringLiterals:=CheckBoxVarsInStrs.Checked;
-    vars.allowObjects:=CheckBoxObjects.Checked;
+    ppath.AllowExtendedStrings:=CheckBoxVarsInStrs.Checked;
+    vars.allowPropertyDotNotation:=CheckBoxObjects.Checked;
+    ppath.AllowJSON:=CheckBoxJSON.Checked;
 
     if (sender as tbutton).tag = 1 then ppath.parseXQuery1(memo1.lines.Text)
     else ppath.parseXPath2(memo1.Lines.text);
@@ -135,6 +139,11 @@ begin
     ppath.Free;
     vars.Free;
   end;
+end;
+
+procedure TForm1.CheckBoxJSONChange(Sender: TObject);
+begin
+
 end;
 
 procedure TForm1.CheckBoxOptionsChange(Sender: TObject);
