@@ -376,10 +376,6 @@ begin
     end;
     t := t.getNextSibling();
   end;
-  if method = '' then begin
-    if Length(postparams) = 0 then method:='GET'
-    else method:='POST';
-  end;
 end;
 
 procedure TTemplateActionLoadPage.perform(reader: TMultipageTemplateReader);
@@ -390,7 +386,8 @@ var
   page: String;
   tempname: String;
   j: Integer;
-  tempvalue: IXQValue;
+  tempvalue: TXQValue;
+  curmethod: String;
 begin
   if condition <> '' then begin
     cachedCondition := reader.parser.parseQuery(condition); //TODO: long term cache
@@ -403,17 +400,19 @@ begin
   end;
 
   cururl := url;
+  curmethod := method;
   post := '';
 
   if cururl <> '' then begin
     if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
-    else begin
-      tempvalue := reader.parser.QueryEngine.parseXPath2('x"'+url+'"').evaluate();
+    else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
+       reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), @tempvalue) then begin
       if tempvalue is TXQValueObject then begin
         cururl := tempvalue.getProperty('url').toString;
+        curmethod := tempvalue.getProperty('method').toString;
         post := tempvalue.getProperty('post').toString;
       end else cururl := tempvalue.toString;
-    end;;
+    end else cururl := reader.parser.replaceEnclosedExpressions(url);
     if cururl = '' then exit;
   end else begin
     //allow pages without url to set variables.
@@ -431,6 +430,11 @@ begin
       post += TInternetAccess.urlEncodeData(tempname)+'='+ TInternetAccess.urlEncodeData(reader.parser.replaceEnclosedExpressions(postparams[j].value));
   end;
 
+  if curmethod = '' then begin
+    if (Length(postparams) = 0) and (post = '') then curmethod:='GET'
+    else curmethod:='POST';
+  end;
+
   if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post internet page '+cururl+#13#10'Post: '+post);
 
   if guessType(cururl) = rtFile then
@@ -442,7 +446,7 @@ begin
       for j := 0 to high(headers) do
         reader.internet.additionalHeaders.Add(headers[j].name + ': ' + reader.parser.replaceEnclosedExpressions(headers[j].value));
 
-      page:=reader.internet.request(method, cururl, post);
+      page:=reader.internet.request(curmethod, cururl, post);
 
       if length(headers) > 0 then reader.internet.additionalHeaders.Clear;
     end;
