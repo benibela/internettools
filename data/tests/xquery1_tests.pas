@@ -1660,7 +1660,8 @@ begin
   m('import module namespace test = "pseudo://libjn-test-module"; let $o := { "Captain" : "Kirk", "First Officer" : "Spock", "Engineer" : "Scott" } return serialize-json(test:project($o, ("Captain", "First Officer")))', '{"Captain": "Kirk", "First Officer": "Spock"}');
   m('import module namespace test = "pseudo://libjn-test-module"; let $o := {"Captain": "Kirk", "First Officer": "Spock", "Engineer": "Scott" } return serialize-json(test:project($o, "XQuery Evangelist"))', '{}');
 
-
+  m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2([1,2,3]), " ")', '1 2 3');
+  m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2((1,2,3)), " ")', '1 2 3');
 
 
 
