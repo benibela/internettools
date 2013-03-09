@@ -1243,21 +1243,32 @@ begin
   if len < 0 then len := 0;
 end;
 
-function xqFunctionString_join(const args: TXQVArray): IXQValue;
-var sep,resstr: string;
+function join(const list: IXQValue; const sep: string = ' '): IXQValue;
+var resstr: string;
  v: IXQValue;
  first: Boolean;
 begin
-  requiredArgCount(args,2);
-  sep:=args[1].toString;
   resstr := '';
   first := true;
-  for v in args[0] do begin
+  for v in list do begin
     if not first then resstr += sep;
     first := false;
     resstr += v.toString;
   end;
   result := xqvalue(resstr);
+end;
+
+function xqFunctionString_join(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args,2);
+  result := join(args[0], args[1].toString);
+end;
+
+function xqFunctionJoin(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args,1, 2);
+  if length(args) = 1 then result := join(args[0])
+  else result := join(args[0], args[1].toString);
 end;
 
 function xqFunctionSubstring(const args: TXQVArray): IXQValue;

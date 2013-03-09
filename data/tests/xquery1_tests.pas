@@ -54,7 +54,7 @@ var
   begin
     try
     count+=1;
-    got := performUnitTest('string-join('+a+', " ")',b,c);
+    got := performUnitTest('join('+a+')',b,c);
     if got<>b then
       raise Exception.Create('XQuery Test failed: '+IntToStr(count)+ ': '+a+#13#10'got: "'+got+'" expected "'+b+'"');
 

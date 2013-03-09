@@ -1321,6 +1321,9 @@ type
       @item(@code(get-property(<object>, <name>))
                   @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled
                   )
+      @item(@code(join(<sequence>[, <seperator>]))
+                  @br This is the same as string-join, but without type checking. If seperator is omitted it becomes " ".
+                  )
       @item(@code(match(<template>, <node>))
                   @br Performs pattern matching between the template and the nodes, and returns a list or an object of matched values.@br
                   @br E.g. @code(match(<a>{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code(<a>FOO</a>), and
@@ -4971,7 +4974,7 @@ pxp.registerFunction('css',@xqFunctionCSS, []);
 pxp.registerFunction('is-nth',@xqFunctionIs_Nth, []);
 pxp.registerFunction('type-of',@xqFunctionType_of, []);
 pxp.registerFunction('get-property',@xqFunctionGet_Property, []);
-
+pxp.registerFunction('join',@xqFunctionJoin,[]);
 
 //standard functions
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
