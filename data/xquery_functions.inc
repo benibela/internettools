@@ -1399,7 +1399,7 @@ begin
   result := xqvalue(temp);
 end;
 
-function xqFunctionFilter(const args: TXQVArray): IXQValue;
+function xqFunctionExtract(const args: TXQVArray): IXQValue;
 var
  regEx: TRegExpr;
 begin

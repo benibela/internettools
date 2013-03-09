@@ -229,7 +229,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('filter(''reg123ex'', ''[0-9]+'')',             '123',             '');
   t('filter(''regexREGEX'', ''.G.'')',              'EGE',             '');
   t('filter(''abcdxabcdefx'', ''b[^x]*'')',         'bcd',             '');
+  t('extract(''abcdxabcdefx'', ''b[^x]*'')',         'bcd',             '');
   t('filter(''hallo welt'', ''(.*) (.*)'')',        'hallo welt',      '');
+  t('extract(''hallo welt'', ''(.*) (.*)'')',        'hallo welt',      '');
   t('filter(''hallo welt'', ''(.*) (.*)'', ''0'')', 'hallo welt',      '');
   t('filter(''hallo welt'', ''(.*) (.*)'', ''1'')', 'hallo',           '');
   t('filter(''hallo welt'', ''(.*) (.*)'', ''2'')', 'welt',            '');

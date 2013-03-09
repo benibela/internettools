@@ -1284,9 +1284,10 @@ type
 
       @item(@code(deep-text()) @br This is the concatenated plain text of the every tag inside the current text.
                                       You can also pass a separator like deep-text(' ') to separate text of different nodes.)
-      @item(@code(filter(<string>,<regex>[,<match>,[<flags>]])) @br This applies the regex <regex> to <string> and returns only the matching part.
+      @item(@code(extract(<string>,<regex>[,<match>,[<flags>]])) @br This applies the regex <regex> to <string> and returns only the matching part.
                                                                     If the <match> argument is used, only the <match>-th submatch will be returned
-                                                                    (<match> must be a string containing a number). )
+                                                                    (<match> must be a string containing a number). @br
+                                                                    (This functions used to be called filter, but was renamed to due to XQuery 3))
       @item(@code(eval(<string>)) @br This evaluates the string as a XQuery-expression. )
       @item(@code(css(<string>)) @br This evaluates the string as a css selector. )
       @item(@code(parse-date(<string>, <format>))
@@ -1311,10 +1312,6 @@ type
                   @br url: The url the form should be send to (includes the encoded data for a GET request)
                   @br method: POST or GET
                   @br post: Url encoded post data (in future versions it might be multipart-encoded, if enctype is set correspondingly) )
-      @item(@code(split-equal(<list>, <string> [, <sep> = ' ']))
-                  @br Treats the string <list> as a list of strings separated by <sep> and tests if <string> is contained in this list, which is useful for matching classes.
-                  @br (This is almost the same as @code(tokenize(<list>, <sep>) = <string>), but more efficient, since <sep> is a string not a regexp, and no boxing of the list entries to the xq variant type occurs )
-                  )
       @item(@code(is-nth(<i:int>, <a:int>, <b:int>))
                   @br Returns true iff the equation @code ( i = a * n + b ) can be solved by an non-negative integer @code(n).
                   (This is used to implement the css functions like nth-child ) )
@@ -4957,8 +4954,9 @@ xs.registerType(TXQValueTrueNumericPseudoType);
 
 
 //my functions
-pxp.registerFunction('filter',@xqFunctionFilter, []);
-pxp.registerFunction('split-equal',@xqFunctionSplitEqual,[]);
+pxp.registerFunction('filter',@xqFunctionExtract, []); //to be removed
+pxp.registerFunction('extract',@xqFunctionExtract, []); //to be removed
+pxp.registerFunction('split-equal',@xqFunctionSplitEqual,[]); //to be removed ?
 pxp.registerFunction('parse-date',@xqFunctionParse_Date, []);
 pxp.registerFunction('parse-datetime',@xqFunctionParse_Datetime, []);
 pxp.registerFunction('parse-time',@xqFunctionParse_Time, []);
