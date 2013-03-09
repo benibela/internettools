@@ -163,6 +163,10 @@ begin
   t('x''123{4+5+6}}}''', '12315}');
   t('x''123'' + 100 + x''77000''', '77223');
 
+  t('type-of(x"{1}")', 'string');
+  t('x"{(1,2,3)}"', '1 2 3');
+  t('x">{(1,2,3)}<"', '>1 2 3<');
+
   //change base xml used for tests
   t('','', '<html attrib1="FIRST ATTRIBUTE" attrib2="SECOND ATTRIBUTE" attrib3="THIRD ATTRIBUTE">test:last text<!--comment!--><deep>:BEEP</deep>'#13#10+
           '<adv><table id="t1"><tr><td><!-- cya -->first col</td><td bgcolor="red">2nd col</td></tr></table>'#13#10+

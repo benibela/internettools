@@ -790,8 +790,12 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
 
   procedure pushTerm(t: TXQTerm);
   begin
-    if result = nil then
+    if not (t is TXQTermString) then
+      t := TXQTermNamedFunction.create(XMLNamespace_MyExtensions, 'join', [t]);
+    if (result = nil) and (t is TXQTermString) then
       result := t
+    else if result = nil then
+      result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'concat', [t])
     else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result)) then
       result.push(t)
     else
