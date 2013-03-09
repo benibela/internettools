@@ -372,7 +372,10 @@ function intLog(n,b: longint): longint; overload;
 //**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
 procedure intFactor(const n,p: longint; out e, r:longint);
 
+function gcd(a,b: integer): integer; //**< Calculates the greatest common denominator
 function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
+function gcd(a,b: int64): int64; //**< Calculates the greatest common denominator
+function lcm(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
 function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
 {%REPEAT T__INT__NUMBER__, [longint, int64]}
 function modPow(i, e, m: T__INT__NUMBER__): T__INT__NUMBER__; //**< Calculates i^e mod m in O(log(e)) and never exceeding m
@@ -2063,6 +2066,14 @@ begin
   end;
 end;
 
+function gcd(a, b: integer): integer;
+begin
+  if b<a then exit(gcd(b,a));
+  if a=0 then exit(b);
+  if a=b then exit(a);
+  result:=gcd(b mod a, a);
+end;
+
 function gcd(a, b: cardinal): cardinal;
 begin
   if b<a then exit(gcd(b,a));
@@ -2071,12 +2082,26 @@ begin
   result:=gcd(b mod a, a);
 end;
 
+function gcd(a, b: int64): int64;
+begin
+  if b<a then exit(gcd(b,a));
+  if a=0 then exit(b);
+  if a=b then exit(a);
+  result:=gcd(b mod a, a);
+end;
+
+function lcm(a, b: int64): int64;
+begin
+  result := a * b div gcd(a,b);
+end;
+
 function coprime(a,b:cardinal): boolean;
 begin
   if (a = 1) or (b=1) then exit(true);
   if (a = 0) or (b=0) then exit(false);//according to wikipedia
   result:=gcd(a,b) = 1;
 end;
+
 
 
 {%REPEAT T__INT__NUMBER__, [longint, int64]}
