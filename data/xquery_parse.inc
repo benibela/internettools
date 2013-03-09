@@ -291,8 +291,9 @@ begin
       end;
     end else if AllowJSON and ((word = 'array') or (word = 'object') or (word = 'json-item') or (word = 'structured-item')) then begin
       expect('('); expect(')');
-      case word of                                //TODO: FIX this! structured-item() matches (node() | json-item()), json-item matches array()|object(). And this should not be here, but in xquery_json (need parsing modifying module)
-        'json-item', 'structured-item': Result.kind:=tikAny;
+      case word of
+        'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := TXQValueJSONIQItem; end;
+        'structured-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := TXQValueJSONIQStructuredItem; end;
         'array', 'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := TXQueryEngine.findTypeClass(word); end;
         else raiseParsingError('XPST0003', 'WTF??');
       end;

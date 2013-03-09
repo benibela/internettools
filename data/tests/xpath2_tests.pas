@@ -1746,6 +1746,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   t('{} instance of json-item()', 'true');
   t('[123] instance of json-item()', 'true');
+  t('123 instance of json-item()', 'false');
+  t('(/) instance of json-item()', 'false');
+
+  t('{} instance of structured-item()', 'true');
+  t('[123] instance of structured-item()', 'true');
+  t('123 instance of structured-item()', 'false');
+  t('(/) instance of structured-item()', 'true');
 
   //Json tests
   t('json(''{"a": 123}'').a', '123');
@@ -1850,7 +1857,6 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('serialize-json([[1 to 3], [4 to 6]])', '[[1, 2, 3], [4, 5, 6]]');
 
     f('serialize-json(jn:object(({"a": 1}, {"b": 2}, {"a": 3})))');
-
 
     //Tests based on examples in the JSONiq spec
     t('if (jn:null()) then "T" else "F"', 'F');

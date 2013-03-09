@@ -563,11 +563,15 @@ type
     destructor Destroy; override;
   end;
 
+  //** Type for jsoniq structured-item()
+  TXQValueJSONIQStructuredItem = class(TXQValue)
+
+  end;
 
   { TXQValueNode }
 
   //** Type for a node
-  TXQValueNode = class (TXQValue)
+  TXQValueNode = class (TXQValueJSONIQStructuredItem)
     node: TTreeNode; //**< pointer to a tree element in the html tree.@br Attention: this tree is shared, you don't have to free anything, but the pointer becomes invalid if the tree is free
 
     constructor create(anode: TTreeNode = nil); reintroduce; virtual;
@@ -613,6 +617,11 @@ type
     function GetEnumerator: TXQValueObjectPropertyEnumerator;
   end;
 
+  //** Type corresponding to jsoniq json-item()
+  TXQValueJSONIQItem = class (TXQValueJSONIQStructuredItem)
+
+  end;
+
   { TXQValueObject }
 
   //**(Experimental) object type.
@@ -620,7 +629,7 @@ type
   //**The objects can be used mutable and immutable. If used immutable, they still appear mutable, but every change creates a new object
   //**that is linked to the previous objects (i.e. has the old object as prototype). @br
   //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
-  TXQValueObject = class (TXQValue)
+  TXQValueObject = class (TXQValueJSONIQItem)
     values: TXQVariableChangeLog;
     prototype: IXQValue;
 
@@ -651,11 +660,9 @@ type
 
   end;
 
-  //**< Experimental type for a JSON array of other IXQValue
 
-  { TXQValueJSONArray }
-
-  TXQValueJSONArray = class (TXQValue_AnySimpleType)
+  //** Experimental type for a JSON array of other IXQValue
+  TXQValueJSONArray = class (TXQValueJSONIQItem)
     seq: TXQVList;
 
     constructor create(capacity: integer = 0); reintroduce; virtual;
