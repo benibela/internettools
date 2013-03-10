@@ -7633,7 +7633,14 @@ begin
   result := true;
 end;
 
-function strResolveURI(rel, base: string): string;
+
+
+function strResolveURIReal(rel, base: string): string;
+  function isWindowsFileUrl(): boolean;
+  begin
+    result := stribeginswith(base, 'file:///') and (length(base) >= 11) and (base[10] = ':') and (base[11] in ['/', '\']);
+  end;
+
 var
   schemeLength: SizeInt;
   p: SizeInt;
@@ -7641,16 +7648,17 @@ var
   i: Integer;
   relparams: string;
 begin
-  if strIsAbsoluteURI(rel) or (base = '') then exit(rel);
   p := pos('#', base);
   if p > 0 then delete(base, p, length(base) - p + 1);
   p := pos('?', base);
   if p > 0 then delete(base, p, length(base) - p + 1);
   schemeLength := pos(':', base); schemeLength+=1;
-  while base[schemeLength] = '/' do schemeLength+=1;
+  if (schemeLength <= length(base)) and (base[schemeLength] = '/') then schemeLength+=1;
+  if (schemeLength <= length(base)) and (base[schemeLength] = '/') then schemeLength+=1;
   if strBeginsWith(rel, '/') then begin
-    if strBeginsWith(base, 'file') then p := schemeLength - 1
-    else p := strIndexOf(base, '/', schemeLength);
+    if isWindowsFileUrl() then  //Windows file:///c:/ special case
+      schemeLength += 3;
+    p := strIndexOf(base, '/', schemeLength);
     delete(base, p, length(base) - p + 1);
     exit(base+rel);
   end;
@@ -7662,6 +7670,7 @@ begin
   relsplit:=strSplit(rel, '/');
   basesplit:=strSplit(strCopyFrom(base,schemeLength),'/');
   basesplit[0] := copy(base,1,schemeLength-1) + basesplit[0];
+  if isWindowsFileUrl() then begin basesplit[0] += '/' + basesplit[1]; arrayDelete(basesplit, 1); end;
   for i:=high(relsplit) downto 0 do if relsplit[i] = '.' then arrayDelete(relsplit, i);
 
   if (length(basesplit) > 1) then SetLength(basesplit, high(basesplit));
@@ -7680,6 +7689,42 @@ begin
     arrayAdd(basesplit, relsplit[i]);
   end;
   result := strJoin(basesplit, '/') + '/' + relparams;
+end;
+
+function strResolveURI(rel, base: string): string;
+var
+    schemaLength: SizeInt;
+  baseIsAbsolute: Boolean;
+  isWindowsFileUrl: Boolean;
+begin
+  if strIsAbsoluteURI(rel) or (base = '') then exit(rel);
+
+  schemaLength := pos(':', base);
+  isWindowsFileUrl := (schemaLength = 2) and (length(base) >= 3) and (base[3] in ['/', '\']) and ((length(base) = 3) or (base[4] <> '/'));;
+  if isWindowsFileUrl and (pos('\', base) > 0) or (pos('\', rel) > 0) then begin
+    //handle paths with \ by replacing all \ with /, handling that normal, and then replace back by \, if there were \ in base (i.e. result will have same separators as base)
+    result := strResolveURI(StringReplace(rel, '\', '/', [rfReplaceAll]), StringReplace(base, '\', '/', [rfReplaceAll]));
+    if pos('/', base) = 0 then result := StringReplace(result, '/', '\', [rfReplaceAll]);
+    exit;
+  end;
+  if (schemaLength = 0)  or (pos('/', base) < schemaLength)  //no schema
+    or isWindowsFileUrl then begin //or c:/foo/bar
+
+      baseIsAbsolute := strbeginswith(base, '/');
+      if baseIsAbsolute then base := 'file://' + base
+      else base := 'file:///' + base;
+      result := strResolveURIReal(rel, base);
+      if baseIsAbsolute or (strbeginswith(rel, '/') and not isWindowsFileUrl) then
+        exit(strcopyfrom(result, length('file:///')))
+       else
+        exit(strcopyfrom(result, length('file:///') + 1))
+  end;
+
+  if strbeginswith(rel, '//') and (schemaLength > 0) then
+    exit(copy(base, 1, schemaLength) + rel); //protocol relative uri
+
+
+  result := strResolveURIReal(rel, base);
 end;
 
 function intLog10(i: longint): longint;

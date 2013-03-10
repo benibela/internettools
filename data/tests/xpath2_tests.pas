@@ -2788,14 +2788,16 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('outer-xml(//c/ancestor::*[3])', '', '');
 
 
-  t('base-uri(/)', '', '!<root xml:base="http://www.example.org"><!--comment--><sub1 xml:base="foobar"><sub1a xml:base="123" attrib="maus"/></sub1><sub2 xml:base="test/xyz"/><sub3 xml:base="456/"/><sub4 xml:base="http://www.benibela.de"/></root>');
+  t('base-uri(/)', '', '!<root xml:base="http://www.example.org"><!--comment--><sub1 xml:base="foobar"><sub1a xml:base="123" attrib="maus"/></sub1><sub2 xml:base="test/xyz"><sub2b xml:base="tiu/"/><sub2c xml:base="tiv"/></sub2><sub3 xml:base="456/"/><sub4 xml:base="http://www.benibela.de"/></root>');
   //t('empty(base-uri(/))', 'true'); ??
   t('base-uri(/root)', 'http://www.example.org');
+  t('base-uri(/root/sub1)', 'http://www.example.org/foobar'); //check this: there should not be a / between example.org and foobar? just string concatening?
   t('base-uri(/root/sub1)', 'http://www.example.org/foobar');
-  t('base-uri(/root/sub1)', 'http://www.example.org/foobar');
-  t('base-uri(/root/sub1/sub1a)', 'http://www.example.org/foobar/123');
-  t('base-uri(/root/sub1/sub1a/@attrib)', 'http://www.example.org/foobar/123');
+  t('base-uri(/root/sub1/sub1a)', 'http://www.example.org/123');
+  t('base-uri(/root/sub1/sub1a/@attrib)', 'http://www.example.org/123');
   t('base-uri(/root/sub2)', 'http://www.example.org/test/xyz');
+  t('base-uri(/root/sub2/sub2b)', 'http://www.example.org/test/tiu/');
+  t('base-uri(/root/sub2/sub2c)', 'http://www.example.org/test/tiv');
   t('base-uri(/root/sub4)', 'http://www.benibela.de');
   t('base-uri(/root/comment())', 'http://www.example.org');
   t('base-uri(/root/comment()) instance of xs:string', 'false');

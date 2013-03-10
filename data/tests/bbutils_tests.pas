@@ -37,7 +37,8 @@ begin
 end;
 procedure test(a, b: string; name: string = '');
 begin
-  if a <> b then raise Exception.Create('test: '+name+': '+a+' <> '+b);
+  if a <> b then
+    raise Exception.Create('test: '+name+': '+a+' <> '+b);
 end;
 procedure test(a, b: integer; name: string = '');
 begin
@@ -703,7 +704,299 @@ begin
   for i:=0 to 100 do
     if ar64[i]<>i*10 then
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
-//  writeln(stderr,'okidoki');
+
+
+
+  test(strResolveURI('/foobar', 'http://example.org'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org'), 'http://example.org/foobar');
+  test(strResolveURI('../foobar', 'http://example.org'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org'), 'http://example.org/foobar/');
+  test(strResolveURI('../foobar/', 'http://example.org'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('../foobar/xyz', 'http://example.org'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('../foobar/xyz/', 'http://example.org'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/'), 'http://example.org/foobar');
+  test(strResolveURI('../foobar', 'http://example.org/'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/'), 'http://example.org/foobar/');
+  test(strResolveURI('../foobar/', 'http://example.org/'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('../foobar/xyz', 'http://example.org/'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org/'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('../foobar/xyz/', 'http://example.org/'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/abc'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc'), 'http://example.org/foobar');
+  test(strResolveURI('../foobar', 'http://example.org/abc'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc'), 'http://example.org/foobar/');
+  test(strResolveURI('../foobar/', 'http://example.org/abc'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('../foobar/xyz', 'http://example.org/abc'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org/abc'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('../foobar/xyz/', 'http://example.org/abc'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/abc/'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc/'), 'http://example.org/abc/foobar');
+  test(strResolveURI('../foobar', 'http://example.org/abc/'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc/'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc/'), 'http://example.org/abc/foobar/');
+  test(strResolveURI('../foobar/', 'http://example.org/abc/'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc/'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc/'), 'http://example.org/abc/foobar/xyz');
+  test(strResolveURI('../foobar/xyz', 'http://example.org/abc/'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc/'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org/abc/'), 'http://example.org/abc/foobar/xyz/');
+  test(strResolveURI('../foobar/xyz/', 'http://example.org/abc/'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/abc/def'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc/def'), 'http://example.org/abc/foobar');
+  test(strResolveURI('../foobar', 'http://example.org/abc/def'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc/def'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc/def'), 'http://example.org/abc/foobar/');
+  test(strResolveURI('../foobar/', 'http://example.org/abc/def'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc/def'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc/def'), 'http://example.org/abc/foobar/xyz');
+  test(strResolveURI('../foobar/xyz', 'http://example.org/abc/def'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc/def'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org/abc/def'), 'http://example.org/abc/foobar/xyz/');
+  test(strResolveURI('../foobar/xyz/', 'http://example.org/abc/def'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/abc/def/ghi'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/def/foobar');
+  test(strResolveURI('../foobar', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc/def/ghi'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/def/foobar/');
+  test(strResolveURI('../foobar/', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc/def/ghi'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/def/foobar/xyz');
+  test(strResolveURI('../foobar/xyz', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc/def/ghi'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/def/foobar/xyz/');
+  test(strResolveURI('../foobar/xyz/', 'http://example.org/abc/def/ghi'), 'http://example.org/abc/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/abc?/def'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc?/def'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc?/def'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc?/def'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc?/def'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc?/def'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc?/def'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org/abc?/def'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/abc#/def'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc#/def'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc#/def'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc#/def'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc#/def'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc#/def'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc#/def'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/./././xyz/', 'http://example.org/abc#/def'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('//www.foobar.de', 'http://example.org/abc#/def'), 'http://www.foobar.de');
+  test(strResolveURI('//www.foobar.de', 'https://example.org/abc#/def'), 'https://www.foobar.de');
+  test(strResolveURI('//www.foobar.de/', 'http://example.org/abc#/def'), 'http://www.foobar.de/');
+  test(strResolveURI('//www.foobar.de/', 'https://example.org/abc#/def'), 'https://www.foobar.de/');
+  test(strResolveURI('//www.foobar.de/123', 'http://example.org/abc#/def'), 'http://www.foobar.de/123');
+  test(strResolveURI('//www.foobar.de/456', 'https://example.org/abc#/def'), 'https://www.foobar.de/456');
+
+
+  test(strResolveURI('/foobar', 'file:///tmp'), 'file:///foobar');
+  test(strResolveURI('foobar', 'file:///tmp'), 'file:///foobar');
+  test(strResolveURI('../foobar', 'file:///tmp'), 'file:///foobar');
+  test(strResolveURI('/foobar/', 'file:///tmp'), 'file:///foobar/');
+  test(strResolveURI('foobar/', 'file:///tmp'), 'file:///foobar/');
+  test(strResolveURI('../foobar/', 'file:///tmp'), 'file:///foobar/');
+
+  test(strResolveURI('/foobar', 'file:///tmp/'), 'file:///foobar');
+  test(strResolveURI('foobar', 'file:///tmp/'), 'file:///tmp/foobar');
+  test(strResolveURI('../foobar', 'file:///tmp/'), 'file:///foobar');
+  test(strResolveURI('/foobar/', 'file:///tmp/'), 'file:///foobar/');
+  test(strResolveURI('foobar/', 'file:///tmp/'), 'file:///tmp/foobar/');
+  test(strResolveURI('../foobar/', 'file:///tmp/'), 'file:///foobar/');
+
+  test(strResolveURI('/foobar', 'file:///tmp/xyz'), 'file:///foobar');
+  test(strResolveURI('foobar', 'file:///tmp/xyz'), 'file:///tmp/foobar');
+  test(strResolveURI('../foobar', 'file:///tmp/xyz'), 'file:///foobar');
+  test(strResolveURI('/foobar/', 'file:///tmp/xyz'), 'file:///foobar/');
+  test(strResolveURI('foobar/', 'file:///tmp/xyz'), 'file:///tmp/foobar/');
+  test(strResolveURI('../foobar/', 'file:///tmp/xyz'), 'file:///foobar/');
+
+  test(strResolveURI('/foobar', 'file:///tmp/xyz/'), 'file:///foobar');
+  test(strResolveURI('foobar', 'file:///tmp/xyz/'), 'file:///tmp/xyz/foobar');
+  test(strResolveURI('../foobar', 'file:///tmp/xyz/'), 'file:///tmp/foobar');
+  test(strResolveURI('/foobar/', 'file:///tmp/xyz/'), 'file:///foobar/');
+  test(strResolveURI('foobar/', 'file:///tmp/xyz/'), 'file:///tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', 'file:///tmp/xyz/'), 'file:///tmp/foobar/');
+
+
+  test(strResolveURI('/foobar', '/tmp'), '/foobar');
+  test(strResolveURI('foobar', '/tmp'), '/foobar');
+  test(strResolveURI('../foobar', '/tmp'), '/foobar');
+  test(strResolveURI('/foobar/', '/tmp'), '/foobar/');
+  test(strResolveURI('foobar/', '/tmp'), '/foobar/');
+  test(strResolveURI('../foobar/', '/tmp'), '/foobar/');
+
+  test(strResolveURI('/foobar', 'tmp'), '/foobar');
+  test(strResolveURI('foobar', 'tmp'), 'foobar');
+  test(strResolveURI('../foobar', 'tmp'), 'foobar');
+  test(strResolveURI('/foobar/', 'tmp'), '/foobar/');
+  test(strResolveURI('foobar/', 'tmp'), 'foobar/');
+  test(strResolveURI('../foobar/', 'tmp'), 'foobar/');
+
+  test(strResolveURI('/foobar', '/tmp/'), '/foobar');
+  test(strResolveURI('foobar', '/tmp/'), '/tmp/foobar');
+  test(strResolveURI('../foobar', '/tmp/'), '/foobar');
+  test(strResolveURI('/foobar/', '/tmp/'), '/foobar/');
+  test(strResolveURI('foobar/', '/tmp/'), '/tmp/foobar/');
+  test(strResolveURI('../foobar/', '/tmp/'), '/foobar/');
+
+  test(strResolveURI('/foobar', '/tmp/xyz'), '/foobar');
+  test(strResolveURI('foobar', '/tmp/xyz'), '/tmp/foobar');
+  test(strResolveURI('../foobar', '/tmp/xyz'), '/foobar');
+  test(strResolveURI('/foobar/', '/tmp/xyz'), '/foobar/');
+  test(strResolveURI('foobar/', '/tmp/xyz'), '/tmp/foobar/');
+  test(strResolveURI('../foobar/', '/tmp/xyz'), '/foobar/');
+
+  test(strResolveURI('/foobar', '/tmp/xyz/'), '/foobar');
+  test(strResolveURI('foobar', '/tmp/xyz/'), '/tmp/xyz/foobar');
+  test(strResolveURI('../foobar', '/tmp/xyz/'), '/tmp/foobar');
+  test(strResolveURI('/foobar/', '/tmp/xyz/'), '/foobar/');
+  test(strResolveURI('foobar/', '/tmp/xyz/'), '/tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', '/tmp/xyz/'), '/tmp/foobar/');
+
+    //Windows local path resolving
+
+  test(strResolveURI('/foobar', 'file:///c:/'), 'file:///c:/foobar');
+  test(strResolveURI('foobar', 'file:///c:/'), 'file:///c:/foobar');
+  test(strResolveURI('../foobar', 'file:///c:/'), 'file:///c:/foobar');
+  test(strResolveURI('/foobar/', 'file:///c:/'), 'file:///c:/foobar/');
+  test(strResolveURI('foobar/', 'file:///c:/'), 'file:///c:/foobar/');
+  test(strResolveURI('../foobar/', 'file:///c:/'), 'file:///c:/foobar/');
+  test(strResolveURI('../../foobar/', 'file:///c:/'), 'file:///c:/foobar/');
+  test(strResolveURI('../.././../foobar/', 'file:///c:/'), 'file:///c:/foobar/');
+  test(strResolveURI('../../.././../../././foobar/', 'file:///c:/'), 'file:///c:/foobar/');
+
+  test(strResolveURI('/foobar', 'file:///c:/tmp'), 'file:///c:/foobar');
+  test(strResolveURI('foobar', 'file:///c:/tmp'), 'file:///c:/foobar');
+  test(strResolveURI('../foobar', 'file:///c:/tmp'), 'file:///c:/foobar');
+  test(strResolveURI('/foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
+  test(strResolveURI('foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
+  test(strResolveURI('../foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
+  test(strResolveURI('../../foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
+  test(strResolveURI('../.././../foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
+  test(strResolveURI('../../.././../../././foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
+
+  test(strResolveURI('/foobar', 'file:///c:/tmp/xyz'), 'file:///c:/foobar');
+  test(strResolveURI('foobar', 'file:///c:/tmp/xyz'), 'file:///c:/tmp/foobar');
+  test(strResolveURI('../foobar', 'file:///c:/tmp/xyz'), 'file:///c:/foobar');
+  test(strResolveURI('/foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
+  test(strResolveURI('foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/tmp/foobar/');
+  test(strResolveURI('../foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
+  test(strResolveURI('../../foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
+  test(strResolveURI('../.././../foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
+  test(strResolveURI('../../.././../../././foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
+
+  test(strResolveURI('/foobar', 'file:///c:/tmp/xyz/'), 'file:///c:/foobar');
+  test(strResolveURI('foobar', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/xyz/foobar');
+  test(strResolveURI('../foobar', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/foobar');
+  test(strResolveURI('/foobar/', 'file:///c:/tmp/xyz/'), 'file:///c:/foobar/');
+  test(strResolveURI('foobar/', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/foobar/');
+
+
+  test(strResolveURI('/foobar', 'c:/'), 'c:/foobar');
+  test(strResolveURI('foobar', 'c:/'), 'c:/foobar');
+  test(strResolveURI('../foobar', 'c:/'), 'c:/foobar');
+  test(strResolveURI('/foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('../foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('../../foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('../.././../foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('../../.././../../././foobar/', 'c:/'), 'c:/foobar/');
+
+  test(strResolveURI('/foobar', 'c:/tmp/xyz'), 'c:/foobar');
+  test(strResolveURI('foobar', 'c:/tmp/xyz'), 'c:/tmp/foobar');
+  test(strResolveURI('../foobar', 'c:/tmp/xyz'), 'c:/foobar');
+  test(strResolveURI('/foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('foobar/', 'c:/tmp/xyz'), 'c:/tmp/foobar/');
+  test(strResolveURI('../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('../../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('../.././../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('../../.././../../././foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+
+
+  test(strResolveURI('\foobar', 'c:\'), 'c:\foobar');
+  test(strResolveURI('foobar', 'c:\'), 'c:\foobar');
+  test(strResolveURI('..\foobar', 'c:\'), 'c:\foobar');
+  test(strResolveURI('\foobar\', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('foobar\', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('..\foobar\', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('..\..\foobar\', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('..\..\.\..\foobar\', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('..\..\..\.\..\..\.\.\foobar\', 'c:\'), 'c:\foobar\');
+
+  test(strResolveURI('\foobar', 'c:\tmp\xyz'), 'c:\foobar');
+  test(strResolveURI('foobar', 'c:\tmp\xyz'), 'c:\tmp\foobar');
+  test(strResolveURI('..\foobar', 'c:\tmp\xyz'), 'c:\foobar');
+  test(strResolveURI('\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('foobar\', 'c:\tmp\xyz'), 'c:\tmp\foobar\');
+  test(strResolveURI('..\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('..\..\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('..\..\.\..\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('..\..\..\.\..\..\.\.\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
+
+
+  test(strResolveURI('/foobar', 'c:\'), 'c:\foobar');
+  test(strResolveURI('foobar', 'c:\'), 'c:\foobar');
+  test(strResolveURI('../foobar', 'c:\'), 'c:\foobar');
+  test(strResolveURI('/foobar/', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('foobar/', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('../foobar/', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('../../foobar/', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('../.././../foobar/', 'c:\'), 'c:\foobar\');
+  test(strResolveURI('../../.././../../././foobar/', 'c:\'), 'c:\foobar\');
+
+  test(strResolveURI('/foobar', 'c:\tmp\xyz'), 'c:\foobar');
+  test(strResolveURI('foobar', 'c:\tmp\xyz'), 'c:\tmp\foobar');
+  test(strResolveURI('../foobar', 'c:\tmp\xyz'), 'c:\foobar');
+  test(strResolveURI('/foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('foobar/', 'c:\tmp\xyz'), 'c:\tmp\foobar\');
+  test(strResolveURI('../foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('../../foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('../.././../foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
+  test(strResolveURI('../../.././../../././foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
+
+
+  test(strResolveURI('\foobar', 'c:/'), 'c:/foobar');
+  test(strResolveURI('foobar', 'c:/'), 'c:/foobar');
+  test(strResolveURI('..\foobar', 'c:/'), 'c:/foobar');
+  test(strResolveURI('\foobar\', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('foobar\', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('..\foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('..\..\foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('..\..\.\..\foobar/', 'c:/'), 'c:/foobar/');
+  test(strResolveURI('..\..\..\.\..\..\.\.\foobar/', 'c:/'), 'c:/foobar/');
+
+  test(strResolveURI('\foobar', 'c:/tmp/xyz'), 'c:/foobar');
+  test(strResolveURI('foobar', 'c:/tmp/xyz'), 'c:/tmp/foobar');
+  test(strResolveURI('..\foobar', 'c:/tmp/xyz'), 'c:/foobar');
+  test(strResolveURI('\foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('foobar/', 'c:/tmp/xyz'), 'c:/tmp/foobar/');
+  test(strResolveURI('..\foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('..\../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('..\..\.\..\foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
+  test(strResolveURI('..\..\..\.\..\..\.\./foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
 end;
 
 
