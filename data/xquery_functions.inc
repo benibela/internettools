@@ -2057,10 +2057,12 @@ begin
 
   node := xqvalueContextNode(context);
   parser := nil;
-  if (node <> nil) and (node.getDocument() <> nil) then parser := node.getDocument().getCreator;
+  if (node <> nil) and (node.document is TTreeDocument) then parser := node.getDocument().getCreator;
   if parser = nil then parser := context.staticContext.sender.defaultParser;
   if parser = nil then begin
     context.staticContext.sender.defaultParser := TTreeParser.Create;
+    context.staticContext.sender.defaultParser.readComments:=true;
+    context.staticContext.sender.defaultParser.readProcessingInstructions:=true;
     parser := context.staticContext.sender.defaultParser;
   end;
 
