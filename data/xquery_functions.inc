@@ -2055,18 +2055,23 @@ begin
 
   data := context.staticContext.retrieveFromURI(url, contenttype);
 
-  node := xqvalueContextNode(context);
-  parser := nil;
-  if (node <> nil) and (node.document is TTreeDocument) then parser := node.getDocument().getCreator;
-  if parser = nil then parser := context.staticContext.sender.defaultParser;
-  if parser = nil then begin
-    context.staticContext.sender.defaultParser := TTreeParser.Create;
-    context.staticContext.sender.defaultParser.readComments:=true;
-    context.staticContext.sender.defaultParser.readProcessingInstructions:=true;
-    parser := context.staticContext.sender.defaultParser;
-  end;
+  if assigned(context.staticContext.sender.OnParseDoc) then begin
+    node := nil;
+    context.staticContext.sender.onParseDoc(context.staticContext.sender, data, url, contenttype, node);
+  end else begin
+    node := xqvalueContextNode(context);
+    parser := nil;
+    if (node <> nil) and (node.document is TTreeDocument) then parser := node.getDocument().getCreator;
+    if parser = nil then parser := context.staticContext.sender.defaultParser;
+    if parser = nil then begin
+      context.staticContext.sender.defaultParser := TTreeParser.Create;
+      context.staticContext.sender.defaultParser.readComments:=true;
+      context.staticContext.sender.defaultParser.readProcessingInstructions:=true;
+      parser := context.staticContext.sender.defaultParser;
+    end;
 
-  node := parser.parseTree(data, url, contenttype);
+    node := parser.parseTree(data, url, contenttype);
+  end;
   if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url);
 
   context.staticContext.sender.FExternalDocuments.AddObject(url, node);

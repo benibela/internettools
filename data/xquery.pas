@@ -1200,8 +1200,10 @@ type
     constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
   end;
 
-  //** Event called by the trace(value,info) function. You should not free value and info
+  //** Event called by the fn:trace(value,info) function.
   type TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;
+  //** Event called by the fn:doc to parse a downloaded document.
+  type TXQParseDocEvent = procedure (sender: TXQueryEngine; data, url, contenttype: string; var node: TTreeNode) of object;
   { TXQueryEngine }
 
   TXQParsingModel = (xqpmXPath2, xqpmXQuery1{, xqpmXPath3, xqpmXquery3});
@@ -1424,6 +1426,7 @@ type
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
+    OnParseDoc: TXQParseDocEvent; //**< Event called by fn:doc (if nil, a default xml parser is used)
 
     AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
     AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
