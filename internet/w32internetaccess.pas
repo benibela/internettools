@@ -56,13 +56,13 @@ type
   TW32InternetAccess=class(TInternetAccess)
   protected
     hSession,hLastConnection: hInternet;
-    lastProtocol,lastHost:string;
+    lastProtocol,lastHost,lastPort:string;
     lastCompleteUrl: string;
     newConnectionOpened:boolean;
     FLastHTTPHeaders: TStringList;
     function GetLastHTTPHeaders: TStringList; override;
-    function doTransferRec(method:string; protocol,host,url: string;data:string;redirectionCount: integer): string;
-    function doTransfer(method:string; protocol,host,url: string;data:string): string;override;
+    function doTransferRec(method:string; fullUrl: string;data:string;redirectionCount: integer): string;
+    function doTransfer(method:string; fullUrl: string;data:string): string;override;
   public
     constructor create();override;
     destructor destroy;override;
@@ -274,8 +274,9 @@ begin
   result := FLastHTTPHeaders;
 end;
 
-function TW32InternetAccess.doTransferRec(method:string; protocol,host,url: string;data:string;redirectionCount: integer): string;
+function TW32InternetAccess.doTransferRec(method:string; fullUrl: string;data:string;redirectionCount: integer): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
+const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', '');
 var
   databuffer : array[0..4095] of char;
   hfile: hInternet;
@@ -290,6 +291,7 @@ var
   i: Integer;
   headerOut: string;
   overridenPostHeader: string;
+  decoded: TDecodedUrl;
   label getMore;
 begin
 //  {$ifdef debug}
@@ -306,41 +308,39 @@ begin
   if not assigned(hSession) Then
     raise EW32InternetException.create('No internet session created');
 
-  if (lastProtocol<>protocol) or (lastHost<>host) then begin
+  decoded := decodeURL(fullUrl);
+
+  if (lastProtocol<>decoded.protocol) or (lastHost<>decoded.host) or (lastPort <> decoded.port) then begin
     if hLastConnection<>nil then
       InternetCloseHandle(hLastConnection);
-    lastProtocol:=protocol;
-    lastHost:=host;
-    if protocol='http' then begin
+    lastProtocol:=decoded.protocol;
+    lastHost:=decoded.host;
+    if decoded.protocol='http' then begin
       tempPort:=80;
       temp:=INTERNET_SERVICE_HTTP;
-    end else if protocol='https' then begin
+    end else if decoded.protocol='https' then begin
       tempPort:=443;
       temp:=INTERNET_SERVICE_HTTP;
     end;
-    if pos(':',host)>0 then begin
-      tempPort:=StrToIntDef(copy(host,pos(':',host)+1,length(host)),-1);
-      if tempPort=-1 then
-        raise EInternetException.create('Invalid port in url: '+protocol+host+url);
-      host:=copy(host,1,pos(':',host)-1);
-    end;
+    if decoded.port <> '' then
+      tempPort := StrToIntDef(decoded.port, 80);
     lastCompleteUrl:='';
-    hLastConnection:=InternetConnect(hSession,pchar(host),tempPort,'',nil,temp,0,0);
+    hLastConnection:=InternetConnect(hSession,pchar(decoded.host),tempPort,'',nil,temp,0,0);
     if hLastConnection=nil then
-      raise EW32InternetException.create('Verbindungsaufbau zu ' + host + ' fehlgeschlagen');
+      raise EW32InternetException.create('Verbindungsaufbau zu ' + decoded.host + ' fehlgeschlagen');
   end;
 
 
-  if protocol='https' then begin
+  if decoded.protocol='https' then begin
     if checkSSLCertificates then
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE, 0)
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE, 0)
      else
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
   end else
-    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(url), nil, pchar(lastCompleteUrl), nil, INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
+    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
-    raise EW32InternetException.create('Aufruf von '+ url + ' fehlgeschlagen');//'Can''t connect');
+    raise EW32InternetException.create('Aufruf von '+ fullUrl + ' fehlgeschlagen');//'Can''t connect');
 
 
   cookiestr:=makeCookieHeader;
@@ -379,7 +379,7 @@ begin
   end;
       
 
-  lastCompleteUrl:=protocol+'://'+host+url;
+  lastCompleteUrl:=fullUrl;
 
 
   dwIndex  := 0;
@@ -405,9 +405,9 @@ begin
     if dwNumber = 0 then exit;
     newurl := parseHeaderForLocation(databuffer);
     if newurl = '' then exit('');
-    if (pos('://',newurl) > 0) then decodeURL(Trim(newurl), protocol, host, url)
-    else url := trim(newurl);
-    result := doTransferRec('GET', protocol, host, url, '', redirectionCount - 1);
+    if (pos('://',newurl) > 0) then fullUrl := trim(newurl)
+    else fullUrl := strResolveURI(trim(newurl), fullUrl);
+    result := doTransferRec('GET', fullUrl, '', redirectionCount - 1);
     exit;
   end else if (lastHTTPResultCode =200) or (lastHTTPResultCode = 302) then begin
     if assigned(OnProgress) then begin
@@ -445,7 +445,7 @@ begin
   end else if res='0' then
     raise EW32InternetException.create('Internetverbindung fehlgeschlagen')
    else
-    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+protocol+'://'+host+url);
+    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+fullUrl);
 
   lastHTTPHeaders.Clear;
   if not HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
@@ -466,9 +466,9 @@ begin
   {$endif}
 end;
 
-function TW32InternetAccess.doTransfer(method:string; protocol,host,url: string;data:string): string;
+function TW32InternetAccess.doTransfer(method:string; fullUrl: string;data:string): string;
 begin
-  result := doTransferRec(method, protocol, host, url, data, 10);
+  result := doTransferRec(method, fullUrl, data, 10);
 end;
 
 

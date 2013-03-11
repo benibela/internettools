@@ -53,8 +53,8 @@ type
   //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
-  TTransferStartEvent=procedure (sender: TObject; var method: string; var protocol,host,url, data:string) of object;
-  TTransferEndEvent=procedure (sender: TObject; method: string; protocol,host,url, data:string; var result: string) of object;
+  TTransferStartEvent=procedure (sender: TObject; var method: string; var fullUrl, data:string) of object;
+  TTransferEndEvent=procedure (sender: TObject; method: string; fullUrl, data:string; var result: string) of object;
   //**@abstract(Abstract base class for connections)
   //**There are two child classes TW32InternetAccess and TSynapseInternetAccess which
   //**you should assign once to defaultInternetAccessClass and then use this class
@@ -66,7 +66,7 @@ type
     FOnTransferStart: TTransferStartEvent;
   protected
     FOnProgress:TProgressEvent;
-    function doTransfer(method: string; protocol,host,url, data:string):string;virtual;abstract;
+    function doTransfer(method: string; totalUrl, data:string):string;virtual;abstract;
     function GetLastHTTPHeaders: TStringList; virtual; abstract;
   protected
     //** Cookies receive from/to-send the server (only for backends that does not support cookies natively (i.e.. win32). Synapse has its own cookies)
@@ -105,7 +105,7 @@ type
     function get(protocol,host,url: string):string;
 
     //**performs a http request
-    function request(method, url, data:string):string;
+    function request(method, fullUrl, data:string):string;
     function request(method, protocol,host,url, data:string):string;
 
 
@@ -133,7 +133,12 @@ type
   TInternetAccessClass=class of TInternetAccess;
 
 
-procedure decodeURL(const totalURL: string; out protocol, host, url: string);
+  TDecodedUrl = record
+    protocol, username, password, host, port, path, params, linktarget: string;
+  end;
+
+//procedure decodeURL(const totalURL: string; out protocol, host, url: string);
+function decodeURL(const totalURL: string): TDecodedUrl;
 
 type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
 
@@ -153,7 +158,7 @@ uses bbutils;
 //==============================================================================
 //                            TInternetAccess
 //==============================================================================
-procedure decodeURL(const totalURL: string; out protocol, host, url: string);
+(*procedure decodeURL(const totalURL: string; out protocol, host, url: string);
 var slash,points: integer;
     port:string;
 begin
@@ -181,6 +186,71 @@ begin
   host:=copy(url,1,points-1);
   delete(url,1,slash-1);
   if url = '' then url := '/';
+end;      *)
+
+function decodeURL(const totalURL: string): TDecodedUrl;
+var url: String;
+    userPos: SizeInt;
+    slashPos: SizeInt;
+    p: SizeInt;
+    paramPos: SizeInt;
+    targetPos: SizeInt;
+begin
+  result.protocol:='http';
+  result.port:='80';
+
+  url:=totalURL;
+  if pos('://', url) > 0 then begin
+    result.protocol := strSplitGet('://', url);
+    case LowerCase(result.protocol) of
+      'http': result.port:='80';
+      'https': result.port:='443';
+    end;
+  end;
+
+  userPos := pos('@', url);
+  slashPos := pos('/', url);
+  paramPos := pos('?', url);
+  targetPos := pos('#', url);
+
+  if (userPos > 0)
+     and ((userPos < slashPos) or (slashPos = 0))
+     and ((userPos < paramPos) or (paramPos = 0))
+     and ((userPos < targetPos) or (targetPos = 0))  then begin //username:password@...
+    result.username := strSplitGet('@', url);
+    if strContains(result.username, ':') then
+      result.password:=strSplitGet(':', result.username);
+  end;
+
+  result.host := strSplitGet('/', url);
+  if slashPos > 0 then url := '/' + url;
+
+  if strBeginsWith(result.host, '[') then begin  //[::1 IPV6 address]
+    delete(result.host, 1, 1);
+    p := pos(']', result.host);
+    if p > 0 then begin
+      result.host:=copy(result.host, 1, p-1);
+      result.port:=strCopyFrom(result.host, p+1);
+      if strBeginsWith(result.port, ':') then delete(result.port, 1, 1);
+    end;
+  end else begin //host:port
+    p := pos(':', result.host);
+    if p > 0 then begin
+      result.port:=copy(result.host, 1, p-1);
+      result.host:=strCopyFrom(result.host, p+1);
+    end;
+  end;
+
+  if paramPos > 0 then begin
+    result.path := strSplitGet('?', url);
+    if targetPos > 0 then begin
+      result.params := '?' + strSplitGet('#', url);
+      result.linktarget:='#'+url;
+    end;
+  end else if targetPos > 0 then begin
+    result.path := strSplitGet('#', url);
+    result.linktarget:='#'+url;
+  end else result.path := url;
 end;
 
 function guessType(const data: string): TRetrieveType;
@@ -257,6 +327,12 @@ end;
 
 
 function TInternetAccess.request(method, protocol, host, url, data: string):string;
+begin
+  if not strBeginsWith(url, '/') then url := '/' + url;
+  result := request(method, protocol+'://'+host+url,data);
+end;
+
+function TInternetAccess.request(method, fullUrl, data: string): string;
   function stripHashSymbol(s: string): string;
   var i: integer;
   begin
@@ -264,16 +340,15 @@ function TInternetAccess.request(method, protocol, host, url, data: string):stri
     i := pos('#', s);
     if i > 0 then setlength(result, i-1);
   end;
-
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
   if assigned(FOnTransferStart) then
-    FOnTransferStart(self, method, protocol, host, url, data);
-    result:=doTransfer(method,protocol,host,stripHashSymbol(url),data);
+    FOnTransferStart(self, method, fullUrl, data);
+  result:=doTransfer(method,stripHashSymbol(fullUrl),data);
   if internetConfig^.logToPath<>'' then
-    writeString(internetConfig^.logToPath, protocol+'://'+host+url+'<-DATA:'+data,result);
+    writeString(internetConfig^.logToPath, fullUrl+'<-DATA:'+data,result);
   if assigned(FOnTransferEnd) then
-    FOnTransferEnd(self, method, protocol, host, url, data, Result);
+    FOnTransferEnd(self, method, fullUrl, data, Result);
 end;
 
 
@@ -378,10 +453,8 @@ begin
 end;
 
 function TInternetAccess.post(totalUrl: string;data:string):string;
-var protocol, host, url: string;
 begin
-  decodeURL(totalUrl,protocol,host,url);
-  result:=post(protocol,host,url,data);
+  result := request('POST', totalUrl, data);
 end;
 
 function TInternetAccess.post(protocol, host, url: string; data: string
@@ -399,10 +472,8 @@ begin
 end;
 
 function TInternetAccess.get(totalUrl: string):string;
-var protocol, host, url: string;
 begin
-  decodeURL(totalUrl,protocol,host,url);
-  result:=get(protocol,host,url);
+  result:=request('GET', totalUrl, '');
 end;
 
 procedure TInternetAccess.get(protocol, host, url: string; stream: TStream);
@@ -418,13 +489,6 @@ begin
   result:=request('GET', protocol, host, url, '');
 end;
 
-function TInternetAccess.request(method, url, data: string): string;
-var
-  proto,host,local: string;
-begin
-  decodeURL(url, proto, host, local);
-  result := request(method, proto, host, local, data);
-end;
 
 
 function TInternetAccess.existsConnection(): boolean;
