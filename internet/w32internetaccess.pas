@@ -84,7 +84,58 @@ const TEMPORARY_DIRECTORY='T:\theInternet\';
 
 {$ENDIF}
 implementation
+
 uses bbutils;
+
+resourcestring
+  rsNoInternetSessionCre = 'No internet session created';
+  rsConnectingTo0SFailed = 'Connecting to %0:s failed';
+  rsReceivingFrom0SFaile = 'Receiving from %0:s failed.';
+  rsInternetRequestFaile = 'Internet request failed';
+  rsHTTPErrorCode0SNWhen = 'HTTP Error code: %0:s\nWhen connecting to %1:s';
+  rsFailedToConnectToThe = 'Failed to connect to the internet.';
+  rsNoInternetHandlesAva = 'No internet handles available. Restart your computer.';
+  rsConnectionTimedOut = 'Connection timed out';
+  rsExtendedInternetConn = 'Extended internet connection failure:';
+  rsInternalErrorInWinin = 'Internal error in wininet.dll';
+  rsInvalidUrl = 'Invalid url';
+  rsUnrecognizedUrlSchem = 'Unrecognized url scheme';
+  rsDNSRequestFailedProb = 'DNS request failed. Probably missing an internet connection or invalid host name.';
+  rsProtocolNotFound = 'Protocol not found';
+  rsInvalidParameter = 'Invalid parameter';
+  rsInvalidParameterLeng = 'Invalid parameter length';
+  rsTheRequestOptionCanN = 'The request option can not be set, only queried.';
+  rsInternetHasBeenShutd = 'Internet has been shutdown. Restart your computer.';
+  rsInvalidInternetOpera = 'Invalid internet operation.';
+  rsOperationCancelled = 'Operation cancelled.';
+  rsInvalidHandle = 'Invalid handle (type).';
+  rsIncorrectHandle = 'Incorrect handle (state).';
+  rsInvalidProxyUsage = 'Invalid proxy usage';
+  rsRegistryCorrupted = 'Registry corrupted / not found.';
+  rsCorruptedRegistry = 'Corrupted registry.';
+  rsDirectInternetAccess = 'Direct internet access currently not possible.';
+  rsIncorrectFormatForHt = 'Incorrect format for http request.';
+  rsInternetItemNotFound = 'Internet item not found.';
+  rsFailedToCreateConnec = 'Failed to create connection.';
+  rsInternetConnectionAb = 'Internet connection aborted';
+  rsInternetConnectionRe = 'Internet connection reseted';
+  rsNeedRetriedRequest = 'Need retried request';
+  rsUnsecurePage = 'Unsecure page';
+  rsInternetHandleAlread = 'Internet handle already exists.';
+  rsServerAnsweredWithou = 'Server answered without header';
+  rsHTTPHeaderNotFound = 'HTTP header not found';
+  rsServerResponseIsInva = 'Server response is invalid.';
+  rsInvalidHttpHeader = 'Invalid http header';
+  rsInvalidHttpQueryRequ = 'Invalid http query request';
+  rsHttpHeaderAlreadyExi = 'Http header already exists';
+  rsInvalidInternetHandl = 'Invalid internet handle';
+  rsTheSSLCertificateWas = 'The SSL certificate was not revoked.';
+  rsInvalidSSLCertificat = 'Invalid SSL certificate (invalid site name)';
+  rsInvalidSSLCertificat2 = 'Invalid SSL certificate (too old)';
+  rsFailedToValidateSSLC = 'Failed to validate SSL certificate';
+  rsUnknownInternetError = 'Unknown internet error: ';
+  rsWindowsErrorMessage = 'Windows error message: ';
+
 //uses bbdebugtools;
 
 {$IFDEF COMPILE_W32_INTERNETACCESS}
@@ -135,94 +186,94 @@ The locator type is unknown.}
   s:='';
   case GetLastError of
     ERROR_INTERNET_OUT_OF_HANDLES:
-      s:='Keine Internethandles mehr verfÃ¼gbar.'#13#10'Bitte starten sie den Computer neu und versuchen es erneut';
+      s:=rsNoInternetHandlesAva;
     ERROR_INTERNET_TIMEOUT:
-      s:='Time out, meine Verbindungsanfrage wurde nicht beantwortet'#13#10'Verbindungsversuch fehlgeschlagen.';
+      s:=rsConnectionTimedOut;
     ERROR_INTERNET_EXTENDED_ERROR: begin
       setlength(s,4096);
       temp2:=length(s);
       InternetGetLastResponseInfo({$ifndef DELPHI_WININET}@{$endif}temp1,@s[1],temp2);
       setlength(s,temp2);
-      s:='Erweiterter Internetfehler: '#13#10+s;
+      s:=rsExtendedInternetConn+#13#10+s;
     end;
     ERROR_INTERNET_INTERNAL_ERROR:
-      s:='Interner Fehler in WinInet.dll'#13#10'Fehler bitte melden';
+      s:=rsInternalErrorInWinin;
     ERROR_INTERNET_INVALID_URL:
-      s:='Falsche URL'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidUrl;
     ERROR_INTERNET_UNRECOGNIZED_SCHEME:
-      s:='Unbekanntes URL-Schema'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsUnrecognizedUrlSchem;
     ERROR_INTERNET_NAME_NOT_RESOLVED:
-      s:='DNS fehlgeschlagen'#13#10'Wahrscheinlich keine Verbindung zum Internet';
+      s:=rsDNSRequestFailedProb;
     ERROR_INTERNET_PROTOCOL_NOT_FOUND:
-      s:='Protokoll nicht gefunden'#13#10'Entweder Programmierfehler oder Fehler in Windows handelt';
+      s:=rsProtocolNotFound;
     ERROR_INTERNET_INVALID_OPTION:
-      s:='Falscher Parameter'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidParameter;
     ERROR_INTERNET_BAD_OPTION_LENGTH:
-      s:='Falscher Parameterlänge'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidParameterLeng;
     ERROR_INTERNET_OPTION_NOT_SETTABLE:
-      s:='The request option can not be set, only queried.'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsTheRequestOptionCanN;
     ERROR_INTERNET_SHUTDOWN:
-      s:='Windowsinternetfunktionen werden leider gerade deaktiviert.'#13#10'Bitte starten sie den Computer neu und versuchen es erneut';
+      s:=rsInternetHasBeenShutd;
     ERROR_INTERNET_INVALID_OPERATION:
-      s:='Ungültige Operation'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidInternetOpera;
     ERROR_INTERNET_OPERATION_CANCELLED:
-      s:='Verbindung abgebrochen'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen (wenn auch harmlosen) Programmierfehler handelt';
+      s:=rsOperationCancelled;
     ERROR_INTERNET_INCORRECT_HANDLE_TYPE:
-      s:='Falscher Handle für Operation'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidHandle;
     ERROR_INTERNET_INCORRECT_HANDLE_STATE:
-      s:='Handle im falschen Modus'#13#10'Bitte nochmal versuchen';
+      s:=rsIncorrectHandle;
     ERROR_INTERNET_NOT_PROXY_REQUEST        :
-      s:='Verbindungsart kann nicht über einen Proxy übertragen werden'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidProxyUsage;
     ERROR_INTERNET_REGISTRY_VALUE_NOT_FOUND:
-      s:='Wichtigen Registryeintrag nicht gefunden'#13#10'Ursache: Wahrscheinlich Fehler in Windows oder im Internet Explorer';
+      s:=rsRegistryCorrupted;
     ERROR_INTERNET_BAD_REGISTRY_PARAMETER:
-      s:='Ein wichtiger Registryeintrag hat den falsche Wert'#13#10'Ursache: Wahrscheinlich Fehler in Windows oder im Internet Explorer';
+      s:=rsCorruptedRegistry;
     ERROR_INTERNET_NO_DIRECT_ACCESS:
-      s:='Direkte Verbindung momentan nicht möglich'#13#10'Bitte nochmal versuchen';
+      s:=rsDirectInternetAccess;
     ERROR_INTERNET_INCORRECT_FORMAT:
-      s:='Falsches Format für Anfrage'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsIncorrectFormatForHt;
     ERROR_INTERNET_ITEM_NOT_FOUND:
-      s:='Internet_Item_Not_Found'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInternetItemNotFound;
     ERROR_INTERNET_CANNOT_CONNECT:
-      s:='Internetverbindung konnte nicht hergestellt werden'#13#10'Bitte nochmal versuchen oder ignorieren';
+      s:=rsFailedToCreateConnec;
     ERROR_INTERNET_CONNECTION_ABORTED:
-      s:='Internetverbindung unterbrochen'#13#10'Bitte nochmal versuchen oder beenden';
+      s:=rsInternetConnectionAb;
     ERROR_INTERNET_CONNECTION_RESET:
-      s:='Internetverbindung unterbrochen/reseted'#13#10'Bitte nochmal versuchen oder ignorieren';
+      s:=rsInternetConnectionRe;
     ERROR_INTERNET_FORCE_RETRY:
-      s:='Windows fordert Wiederholung der Anforderung'#13#10'Kann wahrscheinlich wie die meisten Windowsfehler durch einen Neustart behoben werden';
+      s:=rsNeedRetriedRequest;
     ERROR_INTERNET_MIXED_SECURITY:
-      s:='Teilweise unsicherer Inhalt';
+      s:=rsUnsecurePage;
     {ERROR_INTERNET_SSL_CERT_CN_INVALID:
       s:='Sicherheitszertifikat des Servers ungültig';}
     ERROR_INTERNET_HANDLE_EXISTS :
-      s:='Handle existiert bereits'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInternetHandleAlread;
     ERROR_HTTP_HEADER_NOT_FOUND :
-      s:='Header nicht gefunden'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsHTTPHeaderNotFound;
     ERROR_HTTP_DOWNLEVEL_SERVER:
-      s:='Server hat mit Header-losen Daten geantwortet'#13#10'Bitte nochmal versuchen';
+      s:=rsServerAnsweredWithou;
     ERROR_HTTP_INVALID_SERVER_RESPONSE:
-      s:='Serverantwort nicht verstanden'#13#10'Bitte nochmal versuchen';
+      s:=rsServerResponseIsInva;
     ERROR_HTTP_INVALID_HEADER:
-      s:='Header ungültig'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidHttpHeader;
     ERROR_HTTP_INVALID_QUERY_REQUEST:
-      s:='Falsche Parameter bei HttpQueryInfo'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsInvalidHttpQueryRequ;
     ERROR_HTTP_HEADER_ALREADY_EXISTS:
-      s:='Headervalue existiert bereits'#13#10'Fehler bitte melden, da es sich wahrscheinlich um einen Programmierfehler handelt';
+      s:=rsHttpHeaderAlreadyExi;
     ERROR_INVALID_HANDLE:
-      s:='Handle bereits geschlossen'#13#10'Bitte nochmal versuchen';
+      s:=rsInvalidInternetHandl;
     ERROR_INVALID_PARAMETER:
-      s:='UngÃ¼ltiger Parameter';
+      s:=rsInvalidParameter;
     ERROR_INTERNET_SEC_CERT_NO_REV:
-      s := 'The SSL certificate was not revoked.';
+      s :=rsTheSSLCertificateWas;
     ERROR_INTERNET_SEC_CERT_CN_INVALID:
-      s := 'UngÃ¼ltiges SSL-Zertfikat (Falscher Seitenname)';
+      s :=rsInvalidSSLCertificat;
     ERROR_INTERNET_SEC_CERT_DATE_INVALID :
-      s := 'UngÃ¼ltiges SSL-Zertfikat (abgelaufen)';
+      s := rsInvalidSSLCertificat2;
     ERROR_INTERNET_SEC_CERT_REV_FAILED:
-      s := 'GÃ¼ltigkeitsprÃ¼fung des SSL-Zertifikates fehlgeschlagen';
+      s := rsFailedToValidateSSLC;
     else
-      s:='Unbekannter Internetfehler: ' + IntToStr(GetLastError);
+      s:=rsUnknownInternetError + IntToStr(GetLastError);
   end;
   inherited create(s);
 end;
@@ -230,7 +281,7 @@ end;
 constructor EW32InternetException.create(s:string;showError:boolean=false);
 begin
   create();
-  details:='Windowsfehlermeldung: '+Message;
+  details:=rsWindowsErrorMessage+Message;
   Message:=s;
 end;
 
@@ -264,7 +315,7 @@ var
   label getMore;
 begin
   if not assigned(hSession) Then
-    raise EW32InternetException.create('No internet session created');
+    raise EW32InternetException.create(rsNoInternetSessionCre);
 
   if (lastProtocol<>decoded.protocol) or (lastHost<>decoded.host) or (lastPort <> decoded.port) then begin
     if hLastConnection<>nil then
@@ -283,7 +334,7 @@ begin
     lastCompleteUrl:='';
     hLastConnection:=InternetConnect(hSession,pchar(decoded.host),tempPort,'',nil,temp,0,0);
     if hLastConnection=nil then
-      raise EW32InternetException.create('Verbindungsaufbau zu ' + decoded.host + ' fehlgeschlagen');
+      raise EW32InternetException.create(format(rsConnectingTo0SFailed, [decoded.host]));
   end;
 
 
@@ -296,7 +347,7 @@ begin
     hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
-    raise EW32InternetException.create('Aufruf von '+ decoded.combined + ' fehlgeschlagen');//'Can''t connect');
+    raise EW32InternetException.create(format(rsReceivingFrom0SFaile, [decoded.combined])); //'Can''t connect');
 
 
   cookiestr:=makeCookieHeader;
@@ -382,9 +433,9 @@ begin
         OnProgress(self,length(result),dwContentLength);
     end;
   end else if res='0' then
-    raise EW32InternetException.create('Internetverbindung fehlgeschlagen')
+    raise EW32InternetException.create(rsInternetRequestFaile)
    else
-    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+decoded.combined, StrToIntDef(res, 999));
+    raise EW32InternetException.create(format(rsHTTPErrorCode0SNWhen, [res, decoded.combined]), StrToIntDef(res, 999));
 
   lastHTTPHeaders.Clear;
   if not HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
@@ -447,7 +498,7 @@ begin
                             nil,nil,0)
   end;
   if hSession=nil then
-    raise EW32InternetException.create('Leider konnte keine Internetverbindung aufgebaut werden.'#13#10'Bitte überprüfen Sie, ob Sie im Internet sind.',true);
+    raise EW32InternetException.create(rsFailedToConnectToThe, true);
   hLastConnection:=nil;
   lastHost:='';
   newConnectionOpened:=false;
