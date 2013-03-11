@@ -258,7 +258,6 @@ var
   cookiestr:string;
   newurl: string;
   callResult: boolean;
-  htmlOpenTagRead: boolean; htmlClosingTagRead: boolean;
   i: Integer;
   headerOut: string;
   overridenPostHeader: string;
@@ -374,28 +373,13 @@ begin
     end;
     dwRead:=0;
     dwNumber := sizeof(databuffer)-1;
-    htmlOpenTagRead:=false;
-    htmlClosingTagRead:=false;
-
-   getMore:
-   SetLastError(0);
+    SetLastError(0);
     while (InternetReadfile(hfile,@databuffer,dwNumber,DwRead)) and (dwread>0) do begin
       temp:=length(result);
       setLength(result,temp+dwRead);
       move(dataBuffer[0],result[temp+1],dwRead);
-      if temp=0 then
-        htmlOpenTagRead:=pos('<html',lowercase(databuffer))>0; //check if it is html file
-      if htmlOpenTagRead then
-        htmlClosingTagRead:=pos('</html',lowercase(databuffer))>0;
       if assigned(OnProgress) then
         OnProgress(self,length(result),dwContentLength);
-//      if length(result)<2*dwNumber;
-    end;
-
-    if htmlOpenTagRead and not htmlClosingTagRead then begin
-      htmlOpenTagRead:=false;
-      sleep(1500);
-      goto getmore;
     end;
   end else if res='0' then
     raise EW32InternetException.create('Internetverbindung fehlgeschlagen')
