@@ -794,6 +794,24 @@ begin
   test(strResolveURI('/foobar/xyz/', 'http://example.org/abc?/def'), 'http://example.org/foobar/xyz/');
   test(strResolveURI('foobar/xyz/', 'http://example.org/abc?/def'), 'http://example.org/foobar/xyz/');
 
+  test(strResolveURI('/foobar', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org/abc?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/xyz/', 'http://example.org?/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
+
   test(strResolveURI('/foobar', 'http://example.org/abc#/def'), 'http://example.org/foobar');
   test(strResolveURI('foobar', 'http://example.org/abc#/def'), 'http://example.org/foobar');
   test(strResolveURI('/foobar/', 'http://example.org/abc#/def'), 'http://example.org/foobar/');
@@ -802,6 +820,24 @@ begin
   test(strResolveURI('foobar/xyz', 'http://example.org/abc#/def'), 'http://example.org/foobar/xyz');
   test(strResolveURI('/foobar/xyz/', 'http://example.org/abc#/def'), 'http://example.org/foobar/xyz/');
   test(strResolveURI('foobar/./././xyz/', 'http://example.org/abc#/def'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/./././xyz/', 'http://example.org/abc#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
+
+  test(strResolveURI('/foobar', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('foobar', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar');
+  test(strResolveURI('/foobar/', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('foobar/', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar/');
+  test(strResolveURI('/foobar/xyz', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('foobar/xyz', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz');
+  test(strResolveURI('/foobar/xyz/', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
+  test(strResolveURI('foobar/./././xyz/', 'http://example.org#/def/ass/adda/sfasa'), 'http://example.org/foobar/xyz/');
 
   test(strResolveURI('//www.foobar.de', 'http://example.org/abc#/def'), 'http://www.foobar.de');
   test(strResolveURI('//www.foobar.de', 'https://example.org/abc#/def'), 'https://www.foobar.de');

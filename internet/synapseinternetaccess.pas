@@ -56,8 +56,8 @@ protected
   forwardProgressEvent: TProgressEvent;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  function doTransferRec(method:string; fullUrl: string;data:string; redirectionCount:longint): string;
-  function doTransfer(method:string; fullUrl: string;data:string): string;override;
+  function doTransferRec(method:string; url: TDecodedUrl; data:string; redirectionCount:longint): string;
+  function doTransfer(method:string; const url: TDecodedUrl; data:string): string;override;
   function GetLastHTTPHeaders: TStringList; override;
 public
   Referer: string;
@@ -134,7 +134,7 @@ begin
 end;
 
 
-function TSynapseInternetAccess.doTransferRec(method:string; fullUrl: string; data: string; redirectionCount:longint): string;
+function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; data: string; redirectionCount:longint): string;
   procedure initConnection;
   var
     i: Integer;
@@ -164,16 +164,18 @@ begin
   contentLength:=-1;
   lastProgressLength:=-1;
 
- if strBeginsWith(fullUrl, 'https://') then
-   if (not IsSSLloaded) then //check if ssl is actually loaded
-      raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
+  if url.path = '' then url.path:='/';
+
+  if url.protocol = 'https' then
+    if (not IsSSLloaded) then //check if ssl is actually loaded
+       raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
 
   initConnection;
-  ok := connection.HTTPMethod(method,fullUrl);
+  ok := connection.HTTPMethod(method,url.combined);
 
   if (not ok) and (checkEtcResolv) then begin
     initConnection;
-    ok := connection.HTTPMethod(method,fullUrl);
+    ok := connection.HTTPMethod(method,url.combined);
   end;
 
   if ok then begin
@@ -186,16 +188,14 @@ begin
          for i:=0 to connection.Headers.Count-1 do
            if stribeginswith(connection.Headers[i], 'Location:') then begin
              newurl := connection.Headers[i]; strSplitGet(':',newurl);
-             if (pos('://',newurl) > 0) then fullUrl := trim(newurl)
-             else fullUrl := strResolveURI(trim(newurl), fullUrl);
-             exit(doTransferRec('GET', fullUrl, '', redirectionCount - 1));
+             exit(doTransferRec('GET', url.resolved(trim(newurl)), '', redirectionCount - 1));
            end;
-       raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+fullUrl);
+       raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+url.combined);
       end;
   end else
-    raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+fullUrl);
+    raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
 
-  Referer:=fullUrl;
+  Referer:=url.combined;
   lastHTTPResultCode := connection.ResultCode;
 
   if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then
@@ -203,9 +203,9 @@ begin
     else FOnProgress(self,connection.DownloadSize,contentLength);
 end;
 
-function TSynapseInternetAccess.doTransfer(method:string;fullUrl: string; data: string): string;
+function TSynapseInternetAccess.doTransfer(method:string;const url: TDecodedUrl; data: string): string;
 begin
-  result:=doTransferRec(method, fullUrl, data, 10);
+  result:=doTransferRec(method, url, data, 10);
 end;
 
 function TSynapseInternetAccess.GetLastHTTPHeaders: TStringList;

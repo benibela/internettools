@@ -47,14 +47,22 @@ type
 
     procedure setProxy(proxy: string);
   end;
+  { TDecodedUrl }
+
+  TDecodedUrl = record
+    protocol, username, password, host, port, path, params, linktarget: string;
+    function combined: string;
+    function resolved(rel: string): TDecodedUrl;
+  end;
+
   { TCustomInternetAccess }
 
   { TInternetAccess }
   //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
-  TTransferStartEvent=procedure (sender: TObject; var method: string; var fullUrl, data:string) of object;
-  TTransferEndEvent=procedure (sender: TObject; method: string; fullUrl, data:string; var result: string) of object;
+  TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
+  TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
   //**@abstract(Abstract base class for connections)
   //**There are two child classes TW32InternetAccess and TSynapseInternetAccess which
   //**you should assign once to defaultInternetAccessClass and then use this class
@@ -66,7 +74,7 @@ type
     FOnTransferStart: TTransferStartEvent;
   protected
     FOnProgress:TProgressEvent;
-    function doTransfer(method: string; totalUrl, data:string):string;virtual;abstract;
+    function doTransfer(method: string; const url: TDecodedUrl;  data:string):string;virtual;abstract;
     function GetLastHTTPHeaders: TStringList; virtual; abstract;
   protected
     //** Cookies receive from/to-send the server (only for backends that does not support cookies natively (i.e.. win32). Synapse has its own cookies)
@@ -107,6 +115,8 @@ type
     //**performs a http request
     function request(method, fullUrl, data:string):string;
     function request(method, protocol,host,url, data:string):string;
+    function request(method: string; url: TDecodedUrl; data:string):string;
+
 
 
     //**checks if an internet connection exists
@@ -133,12 +143,6 @@ type
   TInternetAccessClass=class of TInternetAccess;
 
 
-  { TDecodedUrl }
-
-  TDecodedUrl = record
-    protocol, username, password, host, port, path, params, linktarget: string;
-    function encoded: string;
-  end;
 
 //procedure decodeURL(const totalURL: string; out protocol, host, url: string);
 function decodeURL(const totalURL: string): TDecodedUrl;
@@ -307,7 +311,7 @@ end;
 
 { TDecodedUrl }
 
-function TDecodedUrl.encoded: string;
+function TDecodedUrl.combined: string;
 begin
   result := '';
   if protocol <> '' then result += protocol+'://';
@@ -322,6 +326,12 @@ begin
   result += path;
   result += params;
   result += linktarget;
+end;
+
+function TDecodedUrl.resolved(rel: string): TDecodedUrl;
+begin
+  if (pos('://',rel) > 0) then result := decodeURL(rel)
+  else result := decodeURL(strResolveURI(rel, combined));
 end;
 
 { TInternetConfig }
@@ -357,22 +367,20 @@ begin
 end;
 
 function TInternetAccess.request(method, fullUrl, data: string): string;
-  function stripHashSymbol(s: string): string;
-  var i: integer;
-  begin
-    result := s;
-    i := pos('#', s);
-    if i > 0 then setlength(result, i-1);
-  end;
+begin
+  result := request(method, decodeURL(fullUrl), data);
+end;
+
+function TInternetAccess.request(method: string; url: TDecodedUrl; data: string): string;
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
   if assigned(FOnTransferStart) then
-    FOnTransferStart(self, method, fullUrl, data);
-  result:=doTransfer(method,stripHashSymbol(fullUrl),data);
+    FOnTransferStart(self, method, url, data);
+  result:=doTransfer(method,url,data);
   if internetConfig^.logToPath<>'' then
-    writeString(internetConfig^.logToPath, fullUrl+'<-DATA:'+data,result);
+    writeString(internetConfig^.logToPath, url.combined+'<-DATA:'+data,result);
   if assigned(FOnTransferEnd) then
-    FOnTransferEnd(self, method, fullUrl, data, Result);
+    FOnTransferEnd(self, method, url, data, Result);
 end;
 
 

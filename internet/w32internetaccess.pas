@@ -61,8 +61,8 @@ type
     newConnectionOpened:boolean;
     FLastHTTPHeaders: TStringList;
     function GetLastHTTPHeaders: TStringList; override;
-    function doTransferRec(method:string; fullUrl: string;data:string;redirectionCount: integer): string;
-    function doTransfer(method:string; fullUrl: string;data:string): string;override;
+    function doTransferRec(method:string; decoded: TDecodedUrl; data:string;redirectionCount: integer): string;
+    function doTransfer(method:string; const url: TDecodedUrl; data:string): string;override;
   public
     constructor create();override;
     destructor destroy;override;
@@ -274,7 +274,7 @@ begin
   result := FLastHTTPHeaders;
 end;
 
-function TW32InternetAccess.doTransferRec(method:string; fullUrl: string;data:string;redirectionCount: integer): string;
+function TW32InternetAccess.doTransferRec(method:string; decoded: TDecodedUrl; data:string;redirectionCount: integer): string;
 const postHeader='Content-Type: application/x-www-form-urlencoded';
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', '');
 var
@@ -291,7 +291,6 @@ var
   i: Integer;
   headerOut: string;
   overridenPostHeader: string;
-  decoded: TDecodedUrl;
   label getMore;
 begin
 //  {$ifdef debug}
@@ -307,8 +306,6 @@ begin
 
   if not assigned(hSession) Then
     raise EW32InternetException.create('No internet session created');
-
-  decoded := decodeURL(fullUrl);
 
   if (lastProtocol<>decoded.protocol) or (lastHost<>decoded.host) or (lastPort <> decoded.port) then begin
     if hLastConnection<>nil then
@@ -340,7 +337,7 @@ begin
     hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
-    raise EW32InternetException.create('Aufruf von '+ fullUrl + ' fehlgeschlagen');//'Can''t connect');
+    raise EW32InternetException.create('Aufruf von '+ decoded.combined + ' fehlgeschlagen');//'Can''t connect');
 
 
   cookiestr:=makeCookieHeader;
@@ -379,7 +376,7 @@ begin
   end;
       
 
-  lastCompleteUrl:=fullUrl;
+  lastCompleteUrl:=decoded.combined;
 
 
   dwIndex  := 0;
@@ -405,9 +402,7 @@ begin
     if dwNumber = 0 then exit;
     newurl := parseHeaderForLocation(databuffer);
     if newurl = '' then exit('');
-    if (pos('://',newurl) > 0) then fullUrl := trim(newurl)
-    else fullUrl := strResolveURI(trim(newurl), fullUrl);
-    result := doTransferRec('GET', fullUrl, '', redirectionCount - 1);
+    result := doTransferRec('GET', decoded.resolved(trim(newurl)), '', redirectionCount - 1);
     exit;
   end else if (lastHTTPResultCode =200) or (lastHTTPResultCode = 302) then begin
     if assigned(OnProgress) then begin
@@ -445,7 +440,7 @@ begin
   end else if res='0' then
     raise EW32InternetException.create('Internetverbindung fehlgeschlagen')
    else
-    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+fullUrl);
+    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+decoded.combined);
 
   lastHTTPHeaders.Clear;
   if not HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
@@ -466,9 +461,9 @@ begin
   {$endif}
 end;
 
-function TW32InternetAccess.doTransfer(method:string; fullUrl: string;data:string): string;
+function TW32InternetAccess.doTransfer(method:string; const url: TDecodedUrl;data:string): string;
 begin
-  result := doTransferRec(method, fullUrl, data, 10);
+  result := doTransferRec(method, url, data, 10);
 end;
 
 
