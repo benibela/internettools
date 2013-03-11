@@ -39,9 +39,13 @@ uses
 
 
 type
+
+  { EW32InternetException }
+
   EW32InternetException=class(EInternetException)
     constructor create();
     constructor create(s:string;showError:boolean=false);
+    constructor create(s:string;httpStatusCode: integer);
   end;
 
   { TInternetAccess }
@@ -230,6 +234,12 @@ begin
   Message:=s;
 end;
 
+constructor EW32InternetException.create(s: string; httpStatusCode: integer);
+begin
+  create(s);
+  errorCode:=httpStatusCode;
+end;
+
 function TW32InternetAccess.GetLastHTTPHeaders: TStringList;
 begin
   result := FLastHTTPHeaders;
@@ -390,7 +400,7 @@ begin
   end else if res='0' then
     raise EW32InternetException.create('Internetverbindung fehlgeschlagen')
    else
-    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+decoded.combined);
+    raise EW32InternetException.create('HTTP Error code: '+res+#13#10+'Beim Aufruf von '+decoded.combined, StrToIntDef(res, 999));
 
   lastHTTPHeaders.Clear;
   if not HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
