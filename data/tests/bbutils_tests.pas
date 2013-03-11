@@ -655,6 +655,7 @@ begin
   test(strDecodeHTMLEntities('"&nbsp"',eWindows1252,false), '"'#$A0'"');
   test(strDecodeHTMLEntities('&nbsp',eUTF8,false), #$C2#$A0);
   test(strDecodeHTMLEntities('&nbsp',eWindows1252,false), #$A0);
+  test(strDecodeHTMLEntities('&123;&456',eUTF8,false), '&123;&456');
 
   //========arrays=====
   intArrayUnitTests();

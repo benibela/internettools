@@ -3107,7 +3107,7 @@ begin
 
     while (p<=lastChar) do begin
       inc(resLen);
-      if (p^='&') and (strict or ((p+1)^<>' ')) then begin
+      if (p^='&') and (strict or ((p+1)^ in ['a'..'z','A'..'Z','#'])) then begin
          inc(p);
          if p^ = #0 then break;
          if p^ = '#' then begin

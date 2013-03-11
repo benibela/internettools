@@ -2279,7 +2279,7 @@ var i,curCode: longint;
 begin
   reswriteln('    while (p<=lastChar) do begin');
   reswriteln('      inc(resLen);');
-  reswriteln('      if (p^=''&'') and (strict or ((p+1)^<>'' '')) then begin');
+  reswriteln('      if (p^=''&'') and (strict or ((p+1)^ in [''a''..''z'',''A''..''Z'',''#''])) then begin');
   reswriteln('         inc(p);');
   reswriteln('         if p^ = #0 then break;');
   reswriteln('         if p^ = ''#'' then begin');
