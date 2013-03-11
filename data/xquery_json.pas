@@ -224,6 +224,17 @@ begin
   result := xqFunctionParseJson(temp);
 end;
 
+function xqFunctionJSON(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  s: String;
+begin
+  requiredArgCount(args, 1);
+  s := args[0].toString;
+  if striBeginsWith(s, 'http://') or striBeginsWith(s, 'https://') or striBeginsWith(s, 'file://') then
+     result := xqFunctionJSON_Doc(context, args)
+   else
+     result := xqFunctionParseJson(args);
+end;
 
 function xqFunctionKeys(const args: TXQVArray): IXQValue;
 var
@@ -305,7 +316,7 @@ initialization
   jn.registerFunction('size', @xqFunctionSize, ['($arg as array()) as xs:integer']);
 
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
-  pxp.registerFunction('json', @xqFunctionParseJson, ['($arg as xs:string) as item()*']);
+  pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*']);
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 
 finalization
