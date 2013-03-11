@@ -230,45 +230,6 @@ begin
   Message:=s;
 end;
 
-
-{$ifdef debug}procedure saveAbleURL(var url:string);
-var temp:integer;
-begin
-  for temp:=1 to length(url) do
-    if url[temp] in ['/','?','&',':','\','*','"','<','>','|'] then
-      url[temp]:='#';
-
-end;
-function readString(url: string):string;
-var tempdebug:TFileStream;
-begin
-  saveAbleURL(url);
-  tempdebug:=TFileStream.create('E:\temp\delete\'+url,fmOpenRead);
-  setlength(result,tempdebug.size);
-  tempdebug.readBuffer(result[1],tempdebug.size);
-  tempdebug.free;
-end;
-procedure writeString(url,value: string);
-var tempdebug:TFileStream;
-begin
-  saveAbleURL(url);
-  url:=copy(url,1,200);
-  url:=TEMPORARY_DIRECTORY+url;
-  try
-  if fileexists(url) then
-    tempdebug:=TFileStream.create(url+'_____'+inttostr(random(99999999)),fmCreate)
-   else
-    tempdebug:=TFileStream.create(Utf8ToAnsi(url),fmCreate);
-  if value<>'' then
-    tempdebug.writebuffer(value[1],length(value))
-   else
-    tempdebug.Write('empty',5);
-  tempdebug.free;
-  except
-  end;
-end;
-{$endif}
-
 function TW32InternetAccess.GetLastHTTPHeaders: TStringList;
 begin
   result := FLastHTTPHeaders;
@@ -293,17 +254,6 @@ var
   overridenPostHeader: string;
   label getMore;
 begin
-//  {$ifdef debug}
-//  writeString(host+'_'+url+'_pre',operation+#13#10+host+#13#10+url+#13#10+data);
-//  {$endif}
-  {$ifdef simulateInet}
-  if data='' then
-    result:=readString(url)
-  else
-    result:=readString(url+'##DATA##'+data+'##DATA-END##');
-  exit;
-  {$endif}
-
   if not assigned(hSession) Then
     raise EW32InternetException.create('No internet session created');
 
@@ -431,7 +381,7 @@ begin
         OnProgress(self,length(result),dwContentLength);
 //      if length(result)<2*dwNumber;
     end;
-    {$ifdef debug}writeString('res_'+host+'_'+url,inttostr(GetTickCount)+': '+ inttostr(getlasterror));{$endif}
+
     if htmlOpenTagRead and not htmlClosingTagRead then begin
       htmlOpenTagRead:=false;
       sleep(1500);
@@ -452,13 +402,6 @@ begin
 
 
   InternetCloseHandle(hfile);
-
-  {$ifdef debug}
-  if data='' then
-    writeString(host+'_'+url,result)
-   else
-    writeString(host+'_'+url+'##DATA##'+data+'##DATA-END##',result);
-  {$endif}
 end;
 
 function TW32InternetAccess.doTransfer(method:string; const url: TDecodedUrl;data:string): string;
@@ -471,7 +414,6 @@ constructor TW32InternetAccess.create();
 var proxyStr:string;
     timeout: longint;
 begin
-  {$ifdef debug}randomize;{$endif}
   lastCompleteUrl:='';
   FLastHTTPHeaders := TStringList.Create;
   additionalHeaders := TStringList.Create;
