@@ -133,8 +133,11 @@ type
   TInternetAccessClass=class of TInternetAccess;
 
 
+  { TDecodedUrl }
+
   TDecodedUrl = record
     protocol, username, password, host, port, path, params, linktarget: string;
+    function encoded: string;
   end;
 
 //procedure decodeURL(const totalURL: string; out protocol, host, url: string);
@@ -195,49 +198,51 @@ var url: String;
     p: SizeInt;
     paramPos: SizeInt;
     targetPos: SizeInt;
+    nextSep: SizeInt;
+    temp: String;
 begin
   result.protocol:='http';
-  result.port:='80';
+  result.port:='';
 
   url:=totalURL;
-  if pos('://', url) > 0 then begin
+  if pos('://', url) > 0 then
     result.protocol := strSplitGet('://', url);
-    case LowerCase(result.protocol) of
-      'http': result.port:='80';
-      'https': result.port:='443';
-    end;
-  end;
 
   userPos := pos('@', url);
   slashPos := pos('/', url);
   paramPos := pos('?', url);
   targetPos := pos('#', url);
+  nextSep := length(url)+1;
+  if ((slashPos <> 0) and (slashPos < nextSep)) then nextSep:=slashPos;
+  if ((paramPos <> 0) and (paramPos < nextSep)) then nextSep:=paramPos;
+  if ((targetPos <> 0) and (targetPos < nextSep)) then nextSep:=targetPos;
 
-  if (userPos > 0)
-     and ((userPos < slashPos) or (slashPos = 0))
-     and ((userPos < paramPos) or (paramPos = 0))
-     and ((userPos < targetPos) or (targetPos = 0))  then begin //username:password@...
+  if (userPos > 0) and ((userPos < nextSep) or (nextSep = 0)) then begin //username:password@...
+    nextSep -= userPos;
     result.username := strSplitGet('@', url);
-    if strContains(result.username, ':') then
-      result.password:=strSplitGet(':', result.username);
+    if strContains(result.username, ':') then begin
+      temp:=strSplitGet(':', result.username);
+      result.password:=result.username;
+      result.username:=temp;
+    end;
   end;
 
-  result.host := strSplitGet('/', url);
-  if slashPos > 0 then url := '/' + url;
+  result.host := copy(url, 1, nextSep-1);
+  url := strCopyFrom(url, nextSep);
 
   if strBeginsWith(result.host, '[') then begin  //[::1 IPV6 address]
     delete(result.host, 1, 1);
     p := pos(']', result.host);
     if p > 0 then begin
-      result.host:=copy(result.host, 1, p-1);
       result.port:=strCopyFrom(result.host, p+1);
+      result.host:=copy(result.host, 1, p-1);
       if strBeginsWith(result.port, ':') then delete(result.port, 1, 1);
     end;
   end else begin //host:port
     p := pos(':', result.host);
     if p > 0 then begin
-      result.port:=copy(result.host, 1, p-1);
-      result.host:=strCopyFrom(result.host, p+1);
+      result.port:=strCopyFrom(result.host, p+1);
+      result.host:=copy(result.host, 1, p-1);
     end;
   end;
 
@@ -246,7 +251,7 @@ begin
     if targetPos > 0 then begin
       result.params := '?' + strSplitGet('#', url);
       result.linktarget:='#'+url;
-    end;
+    end else result.params := '?' + url;
   end else if targetPos > 0 then begin
     result.path := strSplitGet('#', url);
     result.linktarget:='#'+url;
@@ -298,6 +303,25 @@ begin
   tempdebug.free;
   except
   end;
+end;
+
+{ TDecodedUrl }
+
+function TDecodedUrl.encoded: string;
+begin
+  result := '';
+  if protocol <> '' then result += protocol+'://';
+  if username <> '' then begin
+    result += username;
+    if password <> '' then result += ':'+password;
+    Result+='@';
+  end;
+  if strContains(host, ':') then result += '['+host+']'
+  else result += host;
+  if port <> '' then result += ':'+port;
+  result += path;
+  result += params;
+  result += linktarget;
 end;
 
 { TInternetConfig }

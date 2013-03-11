@@ -43,7 +43,7 @@
         <PackageName Value="internettools"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="14">
+    <Units Count="15">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -109,6 +109,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="xquery_json"/>
       </Unit13>
+      <Unit14>
+        <Filename Value="internetaccess_tests.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="internetaccess_tests"/>
+      </Unit14>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
