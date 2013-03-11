@@ -376,7 +376,7 @@ end;
 
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
-function htmlStrEscape(s: string; attrib: boolean = false):string;
+function htmlStrEscape(s: string; attrib: boolean = false; encoding: TEncoding = eUnknown):string;
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
       XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -1254,6 +1254,7 @@ end;
 
 function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): string;
 var known: TNamespaceList;
+  encoding: TEncoding;
   function requireNamespace(n: INamespace): string;
   begin //that function is useless the namespace should always be in known. But just for safety...
     if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
@@ -1266,7 +1267,7 @@ var known: TNamespaceList;
   function outer(n: TTreeNode): string;
     function attribEscape(const s: string): string; inline;
     begin
-      if html then result := htmlStrEscape(s, true)
+      if html then result := htmlStrEscape(s, true, encoding)
       else result := xmlStrEscape(s, true);
     end;
 
@@ -1280,7 +1281,7 @@ var known: TNamespaceList;
       tetText:
         if not html then result := xmlStrEscape(value)
         else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then result := value
-        else result := htmlStrEscape(value);
+        else result := htmlStrEscape(value, false, encoding);
       tetClose: result := '</'+getNodeName()+'>';
       tetComment: result := '<!--'+value+'-->';
       tetProcessingInstruction: begin
@@ -1359,6 +1360,8 @@ var known: TNamespaceList;
   end;
 begin
   known := TNamespaceList.Create;
+  encoding := eUnknown;
+  if base.document is TTreeDocument then encoding := TTreeDocument(base.document).FEncoding;
   if nodeSelf then result := outer(base)
   else result := inner(base);
   known.free;
@@ -2337,7 +2340,7 @@ begin
   setlength(result, p - 1);
 end;
 
-function htmlStrEscape(s: string; attrib: boolean): string;
+function htmlStrEscape(s: string; attrib: boolean; encoding: TEncoding): string;
 var
   i, p: Integer;
   procedure push(const t:string); inline;
@@ -2361,6 +2364,8 @@ begin
       case s[i] of
         '&': push('&amp;');
         '"': push('&quot;');
+        #$A0: if encoding = eWindows1252 then push('&nbsp;') else normal;
+        #$C2: if (encoding = eUTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end else normal;
         else normal;
       end;
       i+=1;
@@ -2371,6 +2376,8 @@ begin
         '&': push('&amp;');
         '<': push('&lt;');
         '>': push('&gt;');
+        #$A0: if encoding = eWindows1252 then push('&nbsp;') else normal;
+        #$C2: if (encoding = eUTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end  else normal;
         else normal;
       end;
       i+=1;

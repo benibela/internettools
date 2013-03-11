@@ -2956,6 +2956,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('outer-html(/)', '<html><head></head><body><div class="content"> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tr></tbody></table> </div><font color="black"><br></font></body></html>', '<html><body><div class="content"><html><body> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tbody></table> </body></html><font color="black"><br></font>'); //wrongly: </div> should be at end
   //did not work: &#252; is converted to &amp;#252???? t('outer-html(/)', '<html><head></head><body><div class="content"> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tr></tbody></table> <font color="black"><br></font></body></html>', '<html><body><div class="content"><html><body> <table><tbody><tr><td colspan="9">Ausweis g&#252;ltig bis: 05.05.2013</td></tbody></table> </body></html><font color="black"><br></font>');
 
+  xml.TargetEncoding:=eUnknown;
+  t('outer-html(/)', '<html><head></head><body>&amp;auml;&amp;nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
+  xml.TargetEncoding:=eUTF8;
+  t('outer-html(/)', '<html><head></head><body>ä&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
+  xml.TargetEncoding:=eWindows1252;
+  t('outer-html(/)', '<html><head></head><body>'#228'&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
+  t('outer-html(/)', '<html><head></head><body>&nbsp;'#228'&nbsp;</body></html>', '<html>&nbsp&auml;&nbsp;</html>');
 //  t('outer-html(/)', '', '<html><body><div class="content"><html><body><table width="99%"><tbody><tr><td>12345</td><td>&#160;&#160;>  S.L.<br/>></td><td>Entliehen/Bereitgestellt: 5</td><td>Geb&#252;ühren: 2,00&#160;&#8364;</ €</td></tr></tbody></table><br/>><table><tbody><tr><td colspan="9">Ausweis g&#252;ültig bis: 05.05.2013</td><td></td></tr><tr></tr><tr></tr></tbody></table><br/>></div></body></html><!-- Your output data goes in here --><font color="black"><br></font>');
 
   //xml.readComments:=true;
