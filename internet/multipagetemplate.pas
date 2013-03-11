@@ -706,6 +706,10 @@ procedure TMultipageTemplateReader.processPage(page, cururl, contenttype: string
 begin
   parser.variableChangeLog.add('url', cururl);
   parser.variableChangeLog.add('raw', page);
+
+  if not strContains(cururl, '://') then
+    cururl := strResolveURI(cururl, 'file://' + strPrependIfMissing(GetCurrentDir, '/'));
+
   parser.parseHTML(page, cururl, contenttype);
 
   if Assigned(onPageProcessed) then

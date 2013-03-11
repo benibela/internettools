@@ -461,6 +461,10 @@ function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [
 //**<Replaces all #13#10 or #13 by #10
 function strNormalizeLineEndings(const s: string): string;
 
+//**< Prepends expectedStart, if s does not starts with expectedStart
+function strPrependIfMissing(const s: string; const expectedStart: string): string;
+//**< Appends expectedEnd, if s does not end with expectedEnd
+function strAppendIfMissing(const s: string; const expectedEnd: string): string;
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first part is returned as function result, the second one is again assign to remainingPart
@@ -571,7 +575,7 @@ procedure intFactor(const n,p: longint; out e, r:longint);
 function gcd(a,b: integer): integer; //**< Calculates the greatest common denominator
 function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
 function gcd(a,b: int64): int64; //**< Calculates the greatest common denominator
-function lcm(a,b: int64): int64; //**< Calculates the greatest common denominator
+function lcm(a,b: int64): int64; //**< Checks if two numbers are coprime
 function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
 
 function modPow(i, e, m: longint): longint; //**< Calculates i^e mod m in O(log(e)) and never exceeding m
@@ -2219,6 +2223,18 @@ begin
   setlength(result, p{ + 1 - 1});
   {str := StringReplace(str, #13#10, #10, [rfReplaceAll]);
   sr := StringReplace(str, #13, #10, [rfReplaceAll]);}
+end;
+
+function strPrependIfMissing(const s: string; const expectedStart: string): string;
+begin
+  if strbeginswith(s, expectedStart) then exit(s)
+  else exit(expectedStart + s);
+end;
+
+function strAppendIfMissing(const s: string; const expectedEnd: string): string;
+begin
+  if strendswith(s, expectedEnd) then exit(s)
+  else exit(s + expectedEnd);
 end;
 
 function strSplitGet(const separator: string; var remainingPart: string): string;
@@ -7633,9 +7649,7 @@ begin
   result := true;
 end;
 
-
-
-function strResolveURIReal(rel, base: string): string;
+function strResolveURIReal(rel, base: string): string;  //base must be an absolute uri
   function isWindowsFileUrl(): boolean;
   begin
     result := stribeginswith(base, 'file:///') and (length(base) >= 11) and (base[10] = ':') and (base[11] in ['/', '\']);
@@ -7823,6 +7837,7 @@ begin
   if (a = 0) or (b=0) then exit(false);//according to wikipedia
   result:=gcd(a,b) = 1;
 end;
+
 
 
 
