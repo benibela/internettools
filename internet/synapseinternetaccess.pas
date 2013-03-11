@@ -190,7 +190,7 @@ begin
              newurl := connection.Headers[i]; strSplitGet(':',newurl);
              exit(doTransferRec('GET', url.resolved(trim(newurl)), '', redirectionCount - 1));
            end;
-       raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+url.combined);
+       raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+url.combined, connection.ResultCode);
       end;
   end else
     raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);

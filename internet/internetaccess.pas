@@ -137,8 +137,14 @@ type
     property OnTransferEnd: TTransferEndEvent read FOnTransferEnd write FOnTransferEnd;
     property OnProgress: TProgressEvent read FOnProgress write FOnProgress;
   end;
+
+  { EInternetException }
+
   EInternetException=class(Exception)
     details:string;
+    errorCode: integer;
+    constructor create(amessage: string);
+    constructor create(amessage: string; aerrorCode: integer);
   end;
   TInternetAccessClass=class of TInternetAccess;
 
@@ -307,6 +313,20 @@ begin
   tempdebug.free;
   except
   end;
+end;
+
+{ EInternetException }
+
+constructor EInternetException.create(amessage: string);
+begin
+  inherited Create(amessage);
+  errorCode:=-1;
+end;
+
+constructor EInternetException.create(amessage: string; aerrorCode: integer);
+begin
+  inherited Create(amessage);
+  Self.errorCode:=aerrorCode;
 end;
 
 { TDecodedUrl }
