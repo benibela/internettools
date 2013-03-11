@@ -25,12 +25,6 @@ uses
 
 
 //This generate the strDecodeHTMLEntities function of bbutils.pas
-//I'm not sure, if a simple binary search in the entity list would have been a
-//better solution. The first idea was to create a string trie, which (theoretical)
-//performance is the optimal, but it turned out, that this tree (realized with nested case
-//statements( creates a 20 mb pascal file/function which is so large that fpc can't
-//even compile it.
-
 
 type TEntity=record s:string; c:longint; end;
 
@@ -1476,8 +1470,8 @@ const entities: array[1..2138] of TEntity=(
 (s:'&natur;';c:$0266E),
 (s:'&natural;';c:$0266E),
 (s:'&naturals;';c:$02115),
-(s:'&nbsp;';c:$00020),
-(s:'&nbsp';c:$00020),
+(s:'&nbsp;';c:$000A0),
+(s:'&nbsp';c:$000A0),
 (s:'&ncap;';c:$02A43),
 (s:'&ncaron;';c:$00148),
 (s:'&ncedil;';c:$00146),
@@ -2205,89 +2199,73 @@ var
   s: String;
   i: Integer;
 begin
-  totalresult+=('const entityMap: array['+IntToStr(low(entities))+'..'+IntToStr(high(entities))+'] of array[eUnknown..eUTF8] of string=(')+LineEnding;
+  totalresult+=('const entityMap: array['+IntToStr(low(entities))+'..'+IntToStr(high(entities))+'] of array[0..1] of string=(')+LineEnding;
   for ent:=low(entities) to high(entities) do begin
-    totalresult+=('('''+strcopyfrom(entities[ent].s,4)+''',');
+    totalresult+=('('''+strcopyfrom(entities[ent].s,3)+''',');
     enc:=low(TEncoding);inc(enc);
-    for enc:=enc to eUTF8 do begin
+    for enc:=eUTF8 to eUTF8 do begin
       s := strGetUnicodeCharacter(entities[ent].c, enc);
       for i:=1 to length(s) do
         totalresult+='#'+IntToStr(ord(s[i]));
       if enc <> eUTF8 then totalresult+=',';
     end;
     totalresult+=(')');
-    if ent <> high(entities) then totalresult+=(',')+LineEnding
-    else totalresult+=LineEnding;
+    if ent <> high(entities) then totalresult+=(',');
+    if ent mod 5 = 0 then totalresult+=LineEnding
+    else totalresult+=#9;
   end;
   totalresult+=(');')+LineEnding;
+end;
+
+procedure writeln_SDHE_Indices();
+var
+  lowcase: Boolean;
+  cn: Char;
+  c: Char;
+  i: Integer;
+begin
+  totalresult+='const entityIndices: array[boolean] of array[0..25] of array [0..1] of integer = (';
+  for lowcase := false to true do begin
+    totalresult+='('+LineEnding;
+    for cn := 'a' to 'z' do begin
+      if not lowcase then c := upCase(cn)
+      else c := cn;
+      totalresult+='(';
+      for i := low(entities) to high(entities) do
+        if entities[i].s[2] = c then begin
+          totalresult+=IntToStr(i);
+          break;
+        end;
+      totalresult+=', ';
+      for i := high(entities) downto low(entities) do
+        if entities[i].s[2] = c then begin
+          totalresult+=IntToStr(i);
+          break;
+        end;
+
+      totalresult+=')';
+      if cn <> 'z' then totalresult+=', ';
+      if ord(cn) mod 5 = 0 then totalresult+=LineEnding
+      else totalresult+=#9;
+    end;
+    totalresult+=')';
+    if not lowcase then totalresult+=', ';
+  end;
+  totalresult+=');'+LineEnding;
 end;
 
 const SDHE_Start: string =
 'var code,j,resLen:integer;'+LineEnding+
 '    lastChar: pchar;'+LineEnding+
-'    entity,entityStart, entityEnd, entityBase: longint;'+LineEnding+
-'    entitys: string;'+LineEnding+
+'    entity,entityStart, entityEnd, entityMid, entityBase: longint;'+LineEnding+
+'    ok: boolean;'+LineEnding+
+'    entityStr: string;'+LineEnding+
 'begin'+LineEnding+
-'  if encoding = eUnknown then encoding := eUtf8 else if encoding > eUTF8 then raise exception.create(''Entity conversion is only supported for utf-8 and latin1 for this encoding.'');'+LineEnding+
 '  setLength(result,l);'+LineEnding+
 '  lastChar:=@p[l-1];'+LineEnding+
 '  ResLen:=0;'+LineEnding;
 
 
-
-
-//const MAX_NESTED_DEEP = 3;
-{procedure write_SDHE_Trie(startSeq,indent: string; deep: longint);
-var i: longint;
-  sl: TStringList;
-  lc: Char;
-  j: longint;
-  s: String;
-begin
-  sl:=TStringList.Create;
-
-  j:=-1;
-  for i:=low(entities) to high(entities) do
-    if strbeginswith(entities[i].s, startSeq) then begin
-      sl.AddObject(entities[i].s, tobject(pointer(i)));
-      if entities[i].s = startSeq then j := i;
-    end;
-
- // assert((sl.Count = 1) = (sl.IndexOf(startSeq)>-1));
-
-  if PtrUInt(pointer(sl.Objects[0])) + sl.Count - 1 <> PtrUInt(pointer(sl.Objects[sl.count-1])) then
-    raise Exception.Create('Non consecutive list');
-
-  if ((j=-1) or (sl.Count>1)) and (deep < MAX_NESTED_DEEP) then begin
-    reswriteln(indent,'inc(p);');
-    reswriteln(indent,'case p^ of');
-    lc := #0;
-    for i:=0 to sl.Count-1 do begin
-      if (length(sl[i]) > length(startSeq)) and (sl[i][length(startSeq)+1] <> lc) then begin
-        lc := sl[i][length(startSeq)+1];
-        reswriteln(indent,'''',lc,''': begin');
-        reswrite_SDHE_Trie( startSeq + lc,indent+'  ', deep+1);
-        reswriteln(indent,'end;');
-      end;
-    end;
-    if j <> -1 then
-      reswriteln(indent, 'else entity := ',j,';');
-
-    reswriteln(indent,'end;');
-  end else if deep >= MAX_NESTED_DEEP then begin//if sl.count = 1 then begin
-    reswriteln(indent, 'inc(p);');
-    for i:=0 to sl.count-1 do begin
-      reswrite(indent, '  ');
-      if i <> 0 then reswrite('else ');
-      reswriteln('if strbeginswith(p, ''',strcopyfrom(sl[i], length(startSeq)+1),''') then begin entity:=',PtrUInt(pointer(sl.Objects[i])),'; inc(p, ',length(sl[i])-length(startSeq),'); end //',sl[i]);
-    end;
-  end else begin
-    reswriteln(indent, 'inc(p);');
-    reswriteln(indent, 'entity := ',j,';');
-  end;
-  sl.free;
-end;
-}
 procedure reswriteln(s:string);
 begin
   totalresult+=s+LineEnding;
@@ -2316,9 +2294,9 @@ begin
   reswriteln('             else raise exception.create(''???'');');
   reswriteln('             inc(p);');
   reswriteln('           end;');
-  reswriteln('           entitys := strGetUnicodeCharacter(entity, encoding);');
-  reswriteln('           for j:=1 to length(entitys) do begin');
-  reswriteln('             result[reslen] := entitys[j];');
+  reswriteln('           entityStr := strGetUnicodeCharacter(entity, encoding);');
+  reswriteln('           for j:=1 to length(entityStr) do begin');
+  reswriteln('             result[reslen] := entityStr[j];');
   reswriteln('             inc(reslen);');
   reswriteln('           end; dec(reslen);');
   reswriteln('           if p^ = '';'' then inc(p)');
@@ -2326,41 +2304,39 @@ begin
   reswriteln('         end else begin');
 
   reswriteln('           entity := -1; entityStart:=0; entityEnd := -1;');
-  reswriteln('           code := (ord(p^) shl 8) or ord((p+1)^);');
-  reswriteln('           inc(p,2);');
-  reswriteln('           case code of ');
+  reswriteln('           if p^ in [''A''..''Z''] then begin entityStart := entityIndices[false][(ord(p^) - ord(''A''))][0]; entityEnd := entityIndices[false][(ord(p^) - ord(''A''))][1]; end');
+  reswriteln('           else if p^ in [''a''..''z''] then begin entityStart := entityIndices[true][(ord(p^) - ord(''a''))][0]; entityEnd := entityIndices[true][(ord(p^) - ord(''a''))][1]; end');
+  reswriteln('           else raise Exception.Create(''Expected letter after &, got: ''+p);');
+  reswriteln('           ok := false;');
 
-  curCode:=-1;
-  curEntityStart := 0;
-  for i:=low(entities) to high(entities) do begin
-    newCode := (ord(entities[i].s[2]) shl 8) or ord(entities[i].s[3]);
-    if newCode <> curCode then begin
-      if curCode <> -1 then begin
-        reswriteln('               entityStart := '+IntToStr(curEntityStart)+';');
-        reswriteln('               entityEnd := '+IntToStr( i-1)+';');
-        reswriteln('             end;');
-      end;
-      reswriteln('             '+IntToStr(newCode)+': begin');
-      curCode:=newCode;
-      curEntityStart:=i;
-    end;
-  end;
-  reswriteln('               entityStart := ' + IntToStr( curEntityStart)+';');
-  reswriteln('               entityEnd := ' +  IntToStr(high(entities))+';');
-  reswriteln('             end;');
+  reswriteln('           while entityEnd > entityStart + 8 do begin');
+  reswriteln('             entityMid := (entityStart + entityEnd) div 2;');
+  reswriteln('             ok := true;');
+  reswriteln('             for j := 1 to length(entityMap[entityMid][0]) do');
+  reswriteln('               if p[j] > entityMap[entityMid][0][j] then begin entityStart := entityMid + 1; ok := false; break; end');
+  reswriteln('               else if p[j] < entityMap[entityMid][0][j] then begin entityEnd := entityMid - 1; ok := false; break; end;');
+  reswriteln('             if ok then begin entity := entityMid; break; end;');
+  reswriteln('             ok := false;');
   reswriteln('           end;');
-
-  reswriteln('           for j:=entityStart to entityEnd do ');
-  reswriteln('              if strbeginswith(p, entityMap[j][eUnknown]) then begin entity:=j; break;end;');
+  reswriteln('           if not ok then');
+  reswriteln('             for j:=entityStart to entityEnd do ');
+  reswriteln('               if strbeginswith(p+1, entityMap[j][0]) then begin entity:=j; break;end;');
 
   reswriteln('           if (entity <> -1) then begin');
-  reswriteln('             inc(p, length(entityMap[entity][eUnknown]));');
-  reswriteln('             for j:=1 to length(entityMap[entity][encoding]) do begin');
-  reswriteln('               result[reslen] := entityMap[entity][encoding][j];');
+  reswriteln('             if (entity > low(entityMap)) and (strBeginsWith(p+1, entityMap[entity-1][0])) then dec(entity); //some entities exist twice, with/out ;');
+  reswriteln('             inc(p, 1+length(entityMap[entity][0]));');
+  reswriteln('             entityStr := entityMap[entity][1];');
+  reswriteln('             if not (encoding in [eUnknown, eUtf8]) then entityStr := strConvertFromUtf8(entityStr, encoding);');
+  reswriteln('             for j:=1 to length(entityStr) do begin');
+  reswriteln('               result[reslen] := entityStr[j];');
   reswriteln('               inc(reslen);');
   reswriteln('             end; dec(reslen);');
-  reswriteln('           end else if strict then result[reslen] := ''?''');
-  reswriteln('           else begin result[reslen] := ''&''; dec(p,2); end;');
+  reswriteln('           end else if strict then begin');
+  reswriteln('             result[reslen] := ''?'';');
+  reswriteln('             while not (p^ in ['';'', #0]) do');
+  reswriteln('               inc(p);');
+  reswriteln('             if p^ <> #0 then inc(p);');
+  reswriteln('           end else begin result[reslen] := ''&''; end;');
   reswriteln('         end;');
   reswriteln('      end else begin result[reslen]:=p^; inc(p); end;');
   reswriteln('    end;');
@@ -2375,6 +2351,7 @@ const SDHE_End: string =
 begin
   reswriteln(SDHE_Header);
   writeln_SDHE_Map();
+  writeln_SDHE_Indices();
   reswriteln(SDHE_Start);
   write_SDHE_For_Encoding();
   reswriteln(SDHE_End);
@@ -2400,7 +2377,6 @@ begin
 
   for i:=low(entities)+1 to high(entities) do begin
     if (entities[i-1].s > entities[i].s) and (entities[i-1].s <> entities[i].s+';') then raise Exception.Create('table not sorted: '+entities[i-1].s+' > '+entities[i].s);
-    if (entities[i-1].s='&nbsp;') and (entities[i-1].c<>$20) then raise Exception.Create('bad nbsp replacement');
     if length(entities[i].s) < 3 then raise Exception.Create('too short: '+entities[i].s);
   end;
 
