@@ -1,3 +1,20 @@
+{**
+  @abstract(This unit extends the XQuery interpreter with JSONiq)
+
+  Including this unit in the uses clause will add JSONiq support to the xquery.TXQueryEngine.
+  I.e.
+
+  1. It will activate the JSONiq syntax extensions for objects {...} and arrays [...]
+
+  2. It will activate the JSON literals: true, false, null
+
+  3. It will declare the jn namespace and add the following functions:@br
+     jn:keys, jn:members, jn:is-null, jn:json-doc, jn:null, jn:object, jn:parse-json, jn:size,
+     pxp:json, pxp:serialize-json
+
+  @author Benito van der Zander (http://www.benibela.de)
+*}
+
 unit xquery_json;
 
 {$mode objfpc}{$H+}

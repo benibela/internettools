@@ -1350,8 +1350,8 @@ type
                   )
       @item(@code(json(<string>))
                   @br Reads a json object/value from a string and converts it in an pxp object/value (see object extension above).
+                  @br If the string is an url the json is loaded from there (i.e. be aware of possible security issues when using it. jn:parse-json from xquery_json / JSONiq will only parse it)
                   @br Only available if the xquery_json unit is in the uses clause.
-                  @br Arrays are converted to sequencecs i.e. flattened (this might change in future versions)
                   )
       @item(@code(serialize-json(<object>))
                   @br Converts an pxp value to a json string.
