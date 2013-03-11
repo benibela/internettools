@@ -2960,6 +2960,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('outer-html(/)', '<html><head></head><body>&amp;auml;&amp;nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
   xml.TargetEncoding:=eUTF8;
   t('outer-html(/)', '<html><head></head><body>ä&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
+  t('outer-html(/)', '<html><head><script>&nbsp&auml;&nbsp;</script></head><body></body></html>', '<html><script>&nbsp&auml;&nbsp;</script></html>');
   xml.TargetEncoding:=eWindows1252;
   t('outer-html(/)', '<html><head></head><body>'#228'&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
   t('outer-html(/)', '<html><head></head><body>&nbsp;'#228'&nbsp;</body></html>', '<html>&nbsp&auml;&nbsp;</html>');

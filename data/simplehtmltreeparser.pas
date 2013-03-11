@@ -161,7 +161,7 @@ TTreeNode = class
 //otherwise use the functions
   //procedure deleteNext(); //**<delete the next node (you have to delete the reverse tag manually)
   procedure deleteAll(); //**<deletes the tree
-  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
+  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean; trimText: boolean; skipHTMLCData: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
   //Complex search functions.
@@ -738,7 +738,7 @@ procedure TTreeDocument.setEncoding(new: TEncoding; convertFromOldToNew: Boolean
 begin
   if self = nil then exit;
   if (FEncoding = eUnknown) or not convertFromOldToNew then FEncoding:= new;
-  if convertFromOldToNew or convertEntities then changeEncoding(FEncoding, new, convertEntities, FCreator.FTrimText);
+  if convertFromOldToNew or convertEntities then changeEncoding(FEncoding, new, convertEntities, FCreator.FTrimText, FCreator.parsingModel = pmHTML);
   FEncoding := new;
 end;
 
@@ -766,7 +766,7 @@ begin
   Free;
 end;
 
-procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
+procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean; skipHTMLCData: boolean);
   function change(s: string): string;
   begin
     result := strChangeEncoding(s, from, toe);
@@ -792,6 +792,10 @@ begin
             attrib.value := change(attrib.value);
             attrib.realvalue := change(attrib.realvalue);
           end;
+        if skipHTMLCData and htmlElementIsCDATA(pchar(tree.value), length(tree.value)) then begin
+          tree := tree.next;
+          while (tree <> nil) and (tree.typ = tetText) do tree := tree.next;
+        end;
       end;
       else raise ETreeParseException.Create('Unkown tree element: '+tree.outerXML());
     end;
