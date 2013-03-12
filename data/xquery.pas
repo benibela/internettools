@@ -1486,6 +1486,7 @@ type
 
     //** Returns the collation for an url id
     class function getCollation(id:string; base: string): TXQCollation;
+
   private
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
@@ -1526,6 +1527,8 @@ type
   public
     class procedure registerNativeModule(const module: TXQNativeModule);
 
+    //** Last parsed query
+    property LastQuery: IXQuery read FLastQuery;
   protected
     function findNamespace(const nsprefix: string): INamespace;
     class function findOperator(const name: string): TXQOperatorInfo;
@@ -3948,6 +3951,7 @@ begin
       cxt.pos := @cxt.str[1];
       result := TXQuery.Create(cxt.staticContext);
       result.fterm := cxt.parseXString(true);
+      if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
       if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
     finally
       cxt.free;
