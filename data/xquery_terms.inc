@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 function TXQTerm.getContextDependencies: TXQContextDependencies;
 begin
-  result := [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+  result := ALL_CONTEXT_DEPENDENCIES;
 end;
 
 function TXQTerm.debugTermToString: string;
@@ -77,6 +77,15 @@ begin
     results[i] := children[i].evaluate(context);
 end;
 
+function TXQTerm.getChildrenContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i := 0 to high(children) do
+    result += children[i].getContextDependencies;
+end;
+
 function TXQTerm.toQueryCommand: TXQPathMatchingStep;
 begin
   result.typ:=qcFunctionSpecialCase;
@@ -108,6 +117,11 @@ begin
   result := (obj as TXQValueObject).getProperty(propname);
 end;
 
+function TXQTermReadObjectProperty.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=children[0].getContextDependencies;
+end;
+
 { TXQTermIf }
 
 function TXQTermIf.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -115,6 +129,11 @@ begin
   if length(children)<>3 then raiseEvaluationError('XPST0003', 'if must have 3 arguments');
   if children[0].evaluate(context).toBooleanEffective then result:=children[1].evaluate(context)
   else result:=children[2].evaluate(context);
+end;
+
+function TXQTermIf.getContextDependencies: TXQContextDependencies;
+begin
+  result := getChildrenContextDependencies;
 end;
 
 { TXQTermFilterSequence }
@@ -143,8 +162,10 @@ var
   i: Integer;
 begin
   result := [];
-  for i := 0 to high(children) do
-    result += children[i].getContextDependencies;
+  if length(children) = 0 then exit;
+  result := children[0].getContextDependencies;
+  for i := 1 to high(children) do
+    result += children[i].getContextDependencies - [xqcdFocusDocument, xqcdFocusOther]; //since the focus are the sequence values there are no dependancies on the old focus
 end;
 
 function TXQTermFilterSequence.toQueryCommand: TXQPathMatchingStep;
@@ -403,6 +424,11 @@ begin
   end;
 end;
 
+function TXQTermSomeEvery.getContextDependencies: TXQContextDependencies;
+begin
+  result := getChildrenContextDependencies;
+end;
+
 { TXQTermFor }
 
 type TOrderedTuple = class
@@ -571,6 +597,20 @@ begin
   end;
 end;
 
+function TXQTermFlower.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := getChildrenContextDependencies;
+  if where <> nil then result += where.getContextDependencies;
+  if returned <> nil then Result += returned.getContextDependencies;
+  if Result = ALL_CONTEXT_DEPENDENCIES then exit;
+  for i:=0 to high(vars) do
+    result += vars[i].expr.getContextDependencies;
+  for i:=0 to high(orders) do
+    result += orders[i].expr.getContextDependencies;
+end;
+
 destructor TXQTermFlower.destroy;
 var
   i: Integer;
@@ -695,6 +735,18 @@ begin
   end;
 end;
 
+function TXQTermNamedFunction.getContextDependencies: TXQContextDependencies;
+
+begin
+  case kind of
+    xqfkBasic:           result := getChildrenContextDependencies + []; //all basic functions are pure
+    xqfkComplex:         result := getChildrenContextDependencies + TXQComplexFunctionInfo(func).contextDependencies;
+    xqfkWrappedOperator: result := getChildrenContextDependencies + TXQOperatorInfo(func).contextDependencies;
+    xqfkTypeConstructor: result := getChildrenContextDependencies;
+    else                 Result := ALL_CONTEXT_DEPENDENCIES;
+  end;
+end;
+
 class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
   aindex: Integer;
@@ -777,11 +829,8 @@ begin
 end;
 
 function TXQTermDynamicFunctionCall.getContextDependencies: TXQContextDependencies;
-var
-  i: Integer;
 begin
-  result := [];
-  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+  result := getChildrenContextDependencies;
 end;
 
 
@@ -826,7 +875,7 @@ end;
 
 function TXQTermBinaryOp.getContextDependencies: TXQContextDependencies;
 begin
-    result := [xqcdContextCollation, xqcdContextTime, xqcdContextOther] + children[0].getContextDependencies + children[1].getContextDependencies;
+    result := op.contextDependencies + getChildrenContextDependencies;
 end;
 
 procedure TXQTermBinaryOp.addToQueryList(var path: TXQPathMatching);
@@ -883,7 +932,7 @@ end;
 
 function TXQTermNodeMatcher.getContextDependencies: TXQContextDependencies;
 begin
-    result := [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextOther];
+  result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusOther, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 end;
 
 function TXQTermNodeMatcher.debugTermToString: string;
@@ -1040,7 +1089,7 @@ end;
 
 function TXQTermReadAttribute.getContextDependencies: TXQContextDependencies;
 begin
-    result := [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextOther];
+    result := ALL_CONTEXT_DEPENDENCIES - [xqcdContextTime, xqcdContextVariables];
 end;
 
 { TXQTermVariable }
@@ -1154,6 +1203,11 @@ begin
   end;
   i := high(children);
   result := evaluateWithChangedVariable(children[i].children[high(children[i].children)], children[i].children[0], v);
+end;
+
+function TXQTermTypeSwitch.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=getChildrenContextDependencies;
 end;
 
 { TXQTermConstructor }
@@ -1478,6 +1532,11 @@ begin
       context.namespaces.Delete(context.namespaces.Count-1);
 end;
 
+function TXQTermConstructor.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=getChildrenContextDependencies + [xqcdContextOther {namespaces}];
+end;
+
 function TXQTermConstructor.isNamespaceConstructor: boolean;
 begin
   result := (typ = tetAttribute)
@@ -1504,6 +1563,11 @@ begin
   for i := 0 to length(children) div 2 - 1 do
     obj.setMutable(children[i*2].evaluate(context).toString, children[i*2+1].evaluate(context));   //todo: empty sequence becomes null, sequence becomes array
   result := obj;
+end;
+
+function TXQTermJSONObjectConstructor.getContextDependencies: TXQContextDependencies;
+begin
+  result := getChildrenContextDependencies;
 end;
 
 
@@ -1548,6 +1612,6 @@ end;
 
 function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;
 begin
-  result := [xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+  result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusDocument, xqcdFocusOther];
 end;
 

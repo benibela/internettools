@@ -100,6 +100,15 @@ var
     end end;
   end;
 
+  procedure scd(query: string; context: TXQContextDependencies);
+  var
+    got: TXQContextDependencies;
+  begin
+    got := ps.parseXQuery1(query).Term.getContextDependencies;
+    if got <> context then
+      raise Exception.Create('Static context dependacy check failed, got: '+inttostr(integer(got)) +' expected: ' + inttostr(integer(context)));
+  end;
+
   procedure mr(s1: string); //module register
   begin
     try
@@ -1663,6 +1672,14 @@ begin
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2([1,2,3]), " ")', '1 2 3');
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2((1,2,3)), " ")', '1 2 3');
 
+
+  scd('1+2+3', []);
+  scd('.', [xqcdFocusDocument, xqcdContextCollation]); //too much
+  scd('string()', [xqcdFocusDocument]);
+  //scd('data()', [xqcdFocusDocument]);??
+  scd('foo / bar', [xqcdFocusDocument, xqcdContextCollation]);
+  scd('/ bar', [xqcdFocusDocument, xqcdContextCollation]);
+  scd('x"{1+2+3}{$var}"', [xqcdContextVariables]);
 
 
   writeln('XQuery: ', count, ' completed');

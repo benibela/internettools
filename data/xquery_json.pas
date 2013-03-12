@@ -326,14 +326,14 @@ initialization
   //TODO:  6.9. jn:json-doc
 //  jn.registerFunction('encode-for-roundtrip', @xqFunctionEncode_For_Roundtrip, ['jn:encode-for-roundtrip($items as item()*) as json-item()* ', 'jn:encode-for-roundtrip($items as item()*, $options as object()) as json-item()* ']);
   jn.registerFunction('is-null', @xqFunctionIsNull, ['($arg as item()) as xs:boolean']);
-  jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?']);
+  jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?'], [xqcdContextOther]);
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
   jn.registerFunction('object', @xqFunctionObject, ['($arg as object()*) as object()']);
   jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string) as item()', '($arg as xs:string, $options as object()) as item()*']);
   jn.registerFunction('size', @xqFunctionSize, ['($arg as array()) as xs:integer']);
 
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
-  pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*']);
+  pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*'], [xqcdContextOther]);
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 
 finalization
