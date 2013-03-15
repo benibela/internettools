@@ -51,6 +51,7 @@ TSynapseInternetAccess=class(TInternetAccess)
     const Value: String);
 protected
   //synapse will automatically handle keep alive
+  lastConnectedUrl: TDecodedUrl;
   connection: THTTPSend;
   lastProgressLength,contentLength:longint;
   forwardProgressEvent: TProgressEvent;
@@ -170,6 +171,13 @@ begin
     if (not IsSSLloaded) then //check if ssl is actually loaded
        raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
 
+  if (lastConnectedUrl.username <> '') and (lastConnectedUrl.password <> '') and (url.username = '') and (url.password = '') and (lastConnectedUrl.host = url.host) and (lastConnectedUrl.port = url.port) and (lastConnectedUrl.protocol = url.protocol) then begin
+    //remember username/password from last connection (=> allows to follows urls within passwort protected areas)
+    url.username := lastConnectedUrl.username;
+    url.password := lastConnectedUrl.password;
+  end;
+
+
   initConnection;
   ok := connection.HTTPMethod(method,url.combined);
 
@@ -179,6 +187,8 @@ begin
   end;
 
   if ok then begin
+    lastConnectedUrl := url;
+
     //for i:=0 to connection.Headers.Count-1 do
     //  writeln(connection.Headers[i]);
      if (connection.ResultCode = 200) {or ((connection.ResultCode = 302) and (connection.document.Size > 512))} then
@@ -195,6 +205,7 @@ begin
   end else
     raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
 
+  url.username:=''; url.password:=''; url.linktarget:=''; //keep it secret in referer
   Referer:=url.combined;
   lastHTTPResultCode := connection.ResultCode;
 
