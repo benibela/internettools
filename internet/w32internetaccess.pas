@@ -335,8 +335,7 @@ begin
     if decoded.port <> '' then
       tempPort := StrToIntDef(decoded.port, 80);
     lastCompleteUrl:='';
-    lastUser:=decoded.username;
-    lastPass:=decoded.password;
+    //huh? wininet seems to remember the password, if it is set once and continues sending it with new requests, even if is unset. (tested with WINE and Windows 7)
     if (lastUser = '') and (lastPass = '') then hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,nil,            nil,temp,0,0)
     else if lastPass = '' then                  hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,pchar(lastUser),nil,temp,0,0)
     else                                        hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,pchar(lastUser),pchar(lastPass),temp,0,0);
