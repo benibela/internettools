@@ -53,6 +53,7 @@ type
     protocol, username, password, host, port, path, params, linktarget: string;
     function combined: string;
     function resolved(rel: string): TDecodedUrl;
+    function serverConnectionOnly: TDecodedUrl;
   end;
 
   { TCustomInternetAccess }
@@ -352,6 +353,15 @@ function TDecodedUrl.resolved(rel: string): TDecodedUrl;
 begin
   if (pos('://',rel) > 0) then result := decodeURL(rel)
   else result := decodeURL(strResolveURI(rel, combined));
+end;
+
+function TDecodedUrl.serverConnectionOnly: TDecodedUrl;
+begin
+  result.protocol := protocol;
+  result.username := username;
+  result.password := password;
+  result.host := host;
+  result.port := port;
 end;
 
 { TInternetConfig }
