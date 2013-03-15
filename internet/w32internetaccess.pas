@@ -60,7 +60,7 @@ type
   TW32InternetAccess=class(TInternetAccess)
   protected
     hSession,hLastConnection: hInternet;
-    lastProtocol,lastHost,lastPort:string;
+    lastProtocol,lastHost,lastPort,lastUser,lastPass:string;
     lastCompleteUrl: string;
     newConnectionOpened:boolean;
     FLastHTTPHeaders: TStringList;
@@ -317,11 +317,14 @@ begin
   if not assigned(hSession) Then
     raise EW32InternetException.create(rsNoInternetSessionCre);
 
-  if (lastProtocol<>decoded.protocol) or (lastHost<>decoded.host) or (lastPort <> decoded.port) then begin
+  if (lastProtocol<>decoded.protocol) or (lastHost<>decoded.host) or (lastPort <> decoded.port)
+     or (lastUser <> decoded.username) or (lastPass <> decoded.password) then begin
     if hLastConnection<>nil then
       InternetCloseHandle(hLastConnection);
     lastProtocol:=decoded.protocol;
     lastHost:=decoded.host;
+    lastUser:=decoded.username;
+    lastPass:=decoded.password;
     if decoded.protocol='http' then begin
       tempPort:=80;
       temp:=INTERNET_SERVICE_HTTP;
@@ -332,19 +335,22 @@ begin
     if decoded.port <> '' then
       tempPort := StrToIntDef(decoded.port, 80);
     lastCompleteUrl:='';
-    hLastConnection:=InternetConnect(hSession,pchar(decoded.host),tempPort,'',nil,temp,0,0);
+    lastUser:=decoded.username;
+    lastPass:=decoded.password;
+    if (lastUser = '') and (lastPass = '') then hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,nil,            nil,temp,0,0)
+    else if lastPass = '' then                  hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,pchar(lastUser),nil,temp,0,0)
+    else                                        hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,pchar(lastUser),pchar(lastPass),temp,0,0);
     if hLastConnection=nil then
       raise EW32InternetException.create(format(rsConnectingTo0SFailed, [decoded.host]));
   end;
 
-
   if decoded.protocol='https' then begin
     if checkSSLCertificates then
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE, 0)
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
      else
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
   end else
-    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
+    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastCompleteUrl), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
     raise EW32InternetException.create(format(rsReceivingFrom0SFaile, [decoded.combined])); //'Can''t connect');
