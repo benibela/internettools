@@ -1714,6 +1714,11 @@ begin
   Result:=TXQValueJSONNull.create;
 end;
 
+function TXQValueJSONNull.toString: string;
+begin
+  result:='null';
+end;
+
 function TXQValueJSONNull.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
   ignore(nodeFormat);

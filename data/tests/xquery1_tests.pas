@@ -1641,7 +1641,7 @@ begin
   t('let $a := true return $a', '');
   ps.AllowJSONLiterals:=true;
   t('let $a := true return $a', 'true');
-  t('for $a in (true, false, null) return $a', 'true false ');
+  t('for $a in (true, false, null) return $a', 'true false null');
   ps.AllowJSONLiterals:=false;
 
   //JSON examples from JSONiq spec

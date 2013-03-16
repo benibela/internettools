@@ -695,6 +695,7 @@ type
     class function classKind: TXQValueKind; override;
     function clone: IXQValue; override;
 
+    function toString: string; override;
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
