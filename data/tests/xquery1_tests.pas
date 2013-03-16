@@ -144,6 +144,22 @@ var
        raise Exception.Create('XPath Test failed: '+IntToStr(count)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
   end;
 
+
+  procedure jsoniqlibtests(ns: string);
+  begin
+    m('import module namespace test = "'+ns+'"; serialize-json(test:accumulate(({"a": 1}, { "b": 2}, { "a": 3})))', '{"a": [1, 3], "b": 2}');
+    t('jn:keys({"a": 23, "o": {"foo": "bar"}})', 'a o');
+    m('import module namespace test = "'+ns+'"; string-join(for $i in test:values({"a": 23, "o": {"foo": "bar"}}) return serialize-json($i), " ")', '23 {"foo": "bar"}');
+    //m('import module namespace test = "'+ns+'"; string-join(for $i in test:descendant-objects((1,2,[{"a": 1}], {"a": 23, "o": {"foo": "bar"}})) return serialize-json($i), " ")', ''); //useless test
+    m('import module namespace test = "'+ns+'"; string-join(for $i in test:descendant-objects([{"a": 1}, {"a": 23, "o": {"foo": "bar"}}]) return serialize-json($i), " ")', '{"a": 1} {"a": 23, "o": {"foo": "bar"}} {"foo": "bar"}');
+    m('import module namespace test = "'+ns+'"; let $o := { "first" : 1, "second" : {  "first" : "a",  "second" : "b"  } }; string-join(for $i in test:descendant-pairs($o) return serialize-json($i), " ")', '{"first": 1} {"second": {"first": "a", "second": "b"}} {"first": "a"} {"second": "b"}');
+    m('import module namespace test = "'+ns+'"; let $o := { "first" : 1, "second" : {  "first" : "a",  "second" : "b"  } }; string-join(for $i in test:descendant-pairs($o)("first") return serialize-json($i), " ")', '1 "a"');
+    m('import module namespace test = "'+ns+'"; serialize-json(test:flatten([[1 to 3, [1, 2]], 10, 11]))', '[1, 2, 3, 1, 2, 10, 11]');
+    m('import module namespace test = "'+ns+'"; serialize-json(test:intersect( ( {"a": 1, "b": 2, "c": 3}, {"a": 17} ) ))', '{"a": [1, 17]}');
+    m('import module namespace test = "'+ns+'"; let $o := { "Captain" : "Kirk", "First Officer" : "Spock", "Engineer" : "Scott" } return serialize-json(test:project($o, ("Captain", "First Officer")))', '{"Captain": "Kirk", "First Officer": "Spock"}');
+    m('import module namespace test = "'+ns+'"; let $o := {"Captain": "Kirk", "First Officer": "Spock", "Engineer": "Scott" } return serialize-json(test:project($o, "XQuery Evangelist"))', '{}');
+  end;
+
 var vars: TXQVariableChangeLog;
   helper: THelper;
 begin
@@ -1646,7 +1662,12 @@ begin
   t('let $a := for $b in (1,2,3) return $b+1 let $b := 17 return $b', '17');
   t('let $a := for $b in (1,2,3) return $b+1 for $b in $a return $b', '2 3 4');
 
-  //JSON lib tests
+
+
+  //JSON lib tests, using definitions in xquery_json
+  jsoniqlibtests('http://jsoniq.org/function-library');
+
+  //JSON lib tests, directly defind
   mr('module namespace libjn = "pseudo://libjn-test-module"; '+
      'declare function libjn:accumulate($o as object()*) as object() { jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } ) };'+
      'declare function libjn:descendant-objects($i as json-item()) as object()* { if ($i instance of object()) then ( $i, for $v in libjn:values($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else if ($i instance of array()) then ( for $v in jn:members($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else () };'+
@@ -1657,17 +1678,7 @@ begin
      'declare function libjn:values($i as object()) as item()* { for $k in jn:keys($i) return $i($k) };'+
      'declare function libjn:value-intersect( $arg1 as xs:anyAtomicType* ,    $arg2 as xs:anyAtomicType* )  as xs:anyAtomicType* {distinct-values($arg1[.=$arg2])} ;'); //that's a funcx function, but needed here
 
-  m('import module namespace test = "pseudo://libjn-test-module"; serialize-json(test:accumulate(({"a": 1}, { "b": 2}, { "a": 3})))', '{"a": [1, 3], "b": 2}');
-  t('jn:keys({"a": 23, "o": {"foo": "bar"}})', 'a o');
-  m('import module namespace test = "pseudo://libjn-test-module"; string-join(for $i in test:values({"a": 23, "o": {"foo": "bar"}}) return serialize-json($i), " ")', '23 {"foo": "bar"}');
-  //m('import module namespace test = "pseudo://libjn-test-module"; string-join(for $i in test:descendant-objects((1,2,[{"a": 1}], {"a": 23, "o": {"foo": "bar"}})) return serialize-json($i), " ")', ''); //useless test
-  m('import module namespace test = "pseudo://libjn-test-module"; string-join(for $i in test:descendant-objects([{"a": 1}, {"a": 23, "o": {"foo": "bar"}}]) return serialize-json($i), " ")', '{"a": 1} {"a": 23, "o": {"foo": "bar"}} {"foo": "bar"}');
-  m('import module namespace test = "pseudo://libjn-test-module"; let $o := { "first" : 1, "second" : {  "first" : "a",  "second" : "b"  } }; string-join(for $i in test:descendant-pairs($o) return serialize-json($i), " ")', '{"first": 1} {"second": {"first": "a", "second": "b"}} {"first": "a"} {"second": "b"}');
-  m('import module namespace test = "pseudo://libjn-test-module"; let $o := { "first" : 1, "second" : {  "first" : "a",  "second" : "b"  } }; string-join(for $i in test:descendant-pairs($o)("first") return serialize-json($i), " ")', '1 "a"');
-  m('import module namespace test = "pseudo://libjn-test-module"; serialize-json(test:flatten([[1 to 3, [1, 2]], 10, 11]))', '[1, 2, 3, 1, 2, 10, 11]');
-  m('import module namespace test = "pseudo://libjn-test-module"; serialize-json(test:intersect( ( {"a": 1, "b": 2, "c": 3}, {"a": 17} ) ))', '{"a": [1, 17]}');
-  m('import module namespace test = "pseudo://libjn-test-module"; let $o := { "Captain" : "Kirk", "First Officer" : "Spock", "Engineer" : "Scott" } return serialize-json(test:project($o, ("Captain", "First Officer")))', '{"Captain": "Kirk", "First Officer": "Spock"}');
-  m('import module namespace test = "pseudo://libjn-test-module"; let $o := {"Captain": "Kirk", "First Officer": "Spock", "Engineer": "Scott" } return serialize-json(test:project($o, "XQuery Evangelist"))', '{}');
+  jsoniqlibtests('pseudo://libjn-test-module');
 
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2([1,2,3]), " ")', '1 2 3');
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2((1,2,3)), " ")', '1 2 3');
@@ -1752,7 +1763,7 @@ begin
   case namespace of
     'pseudo://circle2':
       ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ');
-    'http://www.w3.org/2005/xpath-functions': ;
+    'http://www.w3.org/2005/xpath-functions', 'http://jsoniq.org/function-library': ;
     else raise Exception.Create('Invalid namespace: '+namespace)
   end;
 end;

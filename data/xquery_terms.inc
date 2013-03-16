@@ -682,7 +682,7 @@ begin
 
   assert((kind = xqfkUnknown) or (func <> nil));
 
-  if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex]) then
+  if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
     if not func.checkTypes(evilkids, context) then
       raiseEvaluationError('XPTY0004', 'Invalid types for function call: '+func.versions[0].name);
 
@@ -704,22 +704,30 @@ begin
       end else if length(evilkids) = 0 then result := TXQValueClass(func).createFromValue(nil)
       else if length(evilkids) = 1 then result := TXQValueClass(func).createFromValue(evilkids[0])
       else raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
-    xqfkUnknown: begin
-      vfunc := nil;
-      ns := namespace;
-      sc := context.findModuleStaticContext(ns);
-      if sc <> nil then
-        for i := 0 to high(sc.functions) do
-          if (sc.functions[i].name = funcname)
-             and  (length(sc.functions[i].parameters) = length(children))
-             and ((sc.functions[i].namespace = ns) or ((ns <> nil) and (sc.functions[i].namespace <> nil) and (sc.functions[i].namespace.getURL = ns.getURL))) then begin
-            vfunc := sc.functions[i];
-            break;
-          end;
-      if vfunc = nil then begin
-        findKindIndex(namespace, funcname, kind, func);
-        if kind <> xqfkUnknown then exit(evaluate(context));
-        raiseEvaluationError('XPST0017', 'Function '+funcname+' not found');
+    xqfkUnknown, xqfkNativeInterpreted: begin
+      if kind <> xqfkNativeInterpreted then begin
+        vfunc := nil;
+        ns := namespace;
+        sc := context.findModuleStaticContext(ns);
+        if sc <> nil then
+          for i := 0 to high(sc.functions) do
+            if (sc.functions[i].name = funcname)
+               and  (length(sc.functions[i].parameters) = length(children))
+               and ((sc.functions[i].namespace = ns) or ((ns <> nil) and (sc.functions[i].namespace <> nil) and (sc.functions[i].namespace.getURL = ns.getURL))) then begin
+              vfunc := sc.functions[i];
+              break;
+            end;
+        if vfunc = nil then begin
+          findKindIndex(namespace, funcname, kind, func);
+          if kind <> xqfkUnknown then exit(evaluate(context));
+          {if namespace <> nil then raiseEvaluationError('XPST0017', 'Function {'+ namespace.geturl+'}'+namespace.getPrefix+':'+funcname+' not found')
+          else }raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found');
+        end;
+      end else begin
+        if TXQInterpretedFunctionInfo(func).func = nil then
+          TXQInterpretedFunctionInfo(func).initialize();
+        vfunc :=  TXQInterpretedFunctionInfo(func).func;
+        sc := context.staticContext;
       end;
 
       tempcontext := context;
@@ -730,7 +738,6 @@ begin
       result := vfunc.body.evaluate(tempcontext);
       result := TXQAbstractFunctionInfo.convertType(result, vfunc.resulttype, context);
       tempcontext.temporaryVariables.free;
-      exit;
     end;
   end;
 end;
@@ -739,11 +746,12 @@ function TXQTermNamedFunction.getContextDependencies: TXQContextDependencies;
 
 begin
   case kind of
-    xqfkBasic:           result := getChildrenContextDependencies + []; //all basic functions are pure
-    xqfkComplex:         result := getChildrenContextDependencies + TXQComplexFunctionInfo(func).contextDependencies;
-    xqfkWrappedOperator: result := getChildrenContextDependencies + TXQOperatorInfo(func).contextDependencies;
-    xqfkTypeConstructor: result := getChildrenContextDependencies;
-    else                 Result := ALL_CONTEXT_DEPENDENCIES;
+    xqfkBasic:             result := getChildrenContextDependencies + []; //all basic functions are pure
+    xqfkComplex:           result := getChildrenContextDependencies + TXQComplexFunctionInfo(func).contextDependencies;
+    xqfkWrappedOperator:   result := getChildrenContextDependencies + TXQOperatorInfo(func).contextDependencies;
+    xqfkNativeInterpreted: result := getChildrenContextDependencies + TXQInterpretedFunctionInfo(func).contextDependencies;
+    xqfkTypeConstructor:   result := getChildrenContextDependencies;
+    else                   Result := ALL_CONTEXT_DEPENDENCIES;
   end;
 end;
 
@@ -767,6 +775,12 @@ begin
   afunc := module.findComplexFunction(name);
   if afunc <> nil then begin
     akind:=xqfkComplex;
+    exit(true);
+  end;
+
+  afunc := module.findInterpretedFunction(name);
+  if afunc <> nil then begin
+    akind:=xqfkNativeInterpreted;
     exit(true);
   end;
 

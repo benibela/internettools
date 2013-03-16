@@ -304,8 +304,8 @@ begin
 end;
 
 
-var jn, pxp: TXQNativeModule;
-    XMLNamespace_JSONiqFunctions: INamespace;
+var jn, pxp, libjn: TXQNativeModule;
+    XMLNamespace_JSONiqFunctions, XMLNamespace_JSONiqLibraryFunctions: INamespace;
 initialization
   AllowJSONDefaultInternal := true;
   XMLNamespace_JSONiqFunctions:=TNamespace.create('http://jsoniq.org/functions', 'jn');
@@ -336,7 +336,21 @@ initialization
   pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*'], [xqcdContextOther]);
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 
+
+  XMLNamespace_JSONiqLibraryFunctions:=TNamespace.create('http://jsoniq.org/function-library', 'libjn');
+  libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
+  libjn.registerInterpretedFunction('accumulate', '($o as object()*) as object()', 'jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
+  libjn.registerInterpretedFunction('descendant-objects', '($i as json-item()) as object()*', 'if ($i instance of object()) then ( $i, for $v in libjn:values($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else if ($i instance of array()) then ( for $v in jn:members($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else () ');;
+  libjn.registerInterpretedFunction('descendant-pairs', '($o as object())', 'for $k in jn:keys($o) return ( { $k : $o($k) }, if ($o($k) instance of object()) then libjn:descendant-pairs($o($k)) else () )');
+  libjn.registerInterpretedFunction('flatten', '($a as array()) as item()* ', 'for $value in jn:members($a) return if ($value instance of array()) then libjn:flatten($value) else $value ');
+  libjn.registerInterpretedFunction('intersect', '($o as object()*)', 'jn:object( let $common-keys := jn:keys(($o[1]))[ every $object in ($o[position() >= 2]) satisfies jn:keys($object) = . ] for $key in $common-keys let $values := $o($key) return if (count($values) eq 1) then { $key : $values } else { $key : [ $values ] } )');
+  libjn.registerInterpretedFunction('project', '($o as object(), $s as xs:string*) as object()', 'jn:object( for $key in distinct-values(jn:keys($o)[.=$s]) return { $key : $o($key) } )');
+  libjn.registerInterpretedFunction('values', '($i as object()) as item()*', 'for $k in jn:keys($i) return $i($k) ');
+
+  TXQueryEngine.registerNativeModule(libjn);
+
 finalization
+  libjn.free;
   jn.free;
 end.
 

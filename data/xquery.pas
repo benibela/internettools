@@ -830,14 +830,28 @@ type
     function checkTypes(const values: TXQVArray; const context:TXQEvaluationContext): boolean;
     destructor Destroy; override;
   end;
-  //**Information about a basic xquery function   (pure/independent of current context)
+  //**Information about a basic xquery function   (basic => function is pure/independent of current context)
   TXQBasicFunctionInfo = class(TXQAbstractFunctionInfo)
     func: TXQBasicFunction;
   end;
-  //**Information about a complex xquery function (dependent of current context)
+  //**Information about a complex xquery function (complex => function dependents of current context)
   TXQComplexFunctionInfo = class(TXQAbstractFunctionInfo)
     func: TXQComplexFunction;
     contextDependencies: TXQContextDependencies;
+  end;
+  //**Information about a complex xquery function (interpreted => the function is defined as XQuery function)
+
+  { TXQInterpretedFunctionInfo }
+
+  TXQInterpretedFunctionInfo = class(TXQAbstractFunctionInfo)
+    namespace: INamespace;
+    funcBody: string;
+    parameterNames: array of string;
+    contextDependencies: TXQContextDependencies;
+    term: TXQTerm;
+    func: TXQValueFunction;
+    procedure initialize();
+    destructor Destroy; override;
   end;
   //**Information about a xquery binary operator
   TXQOperatorInfo = class(TXQAbstractFunctionInfo)
@@ -1038,7 +1052,7 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown);
+  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown);
 
   { TXQTermNamedFunction }
 
@@ -1762,6 +1776,9 @@ type
   //** Registers a function that does depend on the context.
   //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
   procedure registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+  //** Registers a function from a XQuery body
+  //**TypeChecking must a standard XQuery function declarations (without the function name but WITH the variable names) (it uses a simplified parser, so only space whitespace is allowed)
+  procedure registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   //** Registers a binary operator
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   procedure registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
@@ -1769,9 +1786,9 @@ type
 
   function findBasicFunction(const name: string): TXQBasicFunctionInfo;
   function findComplexFunction(const name: string): TXQComplexFunctionInfo;
+  function findInterpretedFunction(const name: string): TXQInterpretedFunctionInfo;
 protected
-  basicFunctions: TStringList;
-  complexFunctions: TStringList;
+  basicFunctions, complexFunctions, interpretedFunctions: TStringList;
   binaryOps, binaryOpFunctions: TStringList;
   types: TStringList;
   procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
@@ -1823,10 +1840,53 @@ var
     LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
     TwoDigitYearCenturyWindow: 50;
   );
+  interpretedFunctionSynchronization: TRTLCriticalSection;
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 
-{ TXQValueJSONNull }
+{ TXQInterpretedFunctionInfo }
+
+procedure TXQInterpretedFunctionInfo.initialize();
+var
+  temp: TXQueryEngine;
+  tempQuery: TXQuery;
+  i: Integer;
+begin
+  if term <> nil then exit;
+  if term = nil then begin
+   EnterCriticalsection(interpretedFunctionSynchronization);
+   try
+     temp := TXQueryEngine.create;
+     try
+       if namespace <> nil then temp.GlobalNamespaces.add(namespace);
+       tempQuery := temp.parseTerm(funcBody, xqpmXQuery1, temp.StaticContext);
+       term := tempQuery.fterm;
+       tempQuery.fTerm := nil;
+       tempQuery.Free;
+     finally
+       temp.free;
+     end;
+     func := TXQValueFunction.create;
+     setlength(func.parameters, length(versions[0].types));
+     for i:= 0 to high(func.parameters) do begin
+       func.parameters[i].seqtype := versions[0].types[i];
+       func.parameters[i].name := parameterNames[i];
+     end;
+     func.resulttype := versions[0].returnType;
+     func.body := term;
+   finally
+     LeaveCriticalsection(interpretedFunctionSynchronization);
+   end;
+  end;
+end;
+
+destructor TXQInterpretedFunctionInfo.Destroy;
+begin
+  func.free;
+  term.Free;
+  inherited Destroy;
+end;
+
 
 { EXQEvaluationException }
 
@@ -2823,7 +2883,8 @@ begin
   if typ.kind = tikAtomic then begin
     if not (result is TXQValueSequence) then
       exit(conversionSingle(result));
-    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then
+      raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
     if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.');
     for i := 0 to result.getSequenceCount - 1 do
       (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
@@ -4826,6 +4887,9 @@ begin
   complexFunctions:=TStringList.Create;
   complexFunctions.Sorted := true;
   complexFunctions.OwnsObjects:=true;
+  interpretedFunctions:=TStringList.Create;
+  interpretedFunctions.Sorted := true;
+  interpretedFunctions.OwnsObjects:=true;
   binaryOps:=TStringList.Create;
   binaryOps.Sorted := true;
   binaryOps.OwnsObjects:=true;
@@ -4841,12 +4905,14 @@ destructor TXQNativeModule.Destroy;
 begin
   basicFunctions.Clear;
   complexFunctions.Clear;
+  interpretedFunctions.Clear;
   binaryOps.Clear;
 
   basicFunctions.free;
   complexFunctions.free;
   binaryOps.free;
   binaryOpFunctions.Free;
+  interpretedFunctions.free;
   types.free;
   inherited Destroy;
 end;
@@ -4872,6 +4938,28 @@ begin
   complexFunctions.AddObject(name, temp);
   parseTypeChecking(temp, typeChecking);
   if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
+end;
+
+procedure TXQNativeModule.registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+var
+  temp: TXQInterpretedFunctionInfo;
+  decl: String;
+  i: Integer;
+begin
+  temp := TXQInterpretedFunctionInfo.Create;
+  temp.namespace := namespace;
+  temp.funcBody:=func;
+  temp.contextDependencies:=contextDependencies;
+  interpretedFunctions.AddObject(name, temp);
+  parseTypeChecking(temp, [typeDeclaration]);
+  temp.versions[0].name:=name; //just for error printing
+
+  decl := typeDeclaration;
+  setlength(temp.parameterNames, length(temp.versions[0].types));
+  for i := 0 to high(temp.parameterNames) do begin
+    strSplitGet('$', decl);
+    temp.parameterNames[i] := strSplitGet(' ', decl); //hack
+  end;
 end;
 
 procedure TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
@@ -4918,6 +5006,16 @@ begin
   i := complexFunctions.IndexOf(name);
   if i >= 0 then exit(TXQComplexFunctionInfo(complexFunctions.Objects[i]));
   if parent <> nil then exit(parent.findComplexFunction(name));
+  result := nil;
+end;
+
+function TXQNativeModule.findInterpretedFunction(const name: string): TXQInterpretedFunctionInfo;
+var
+  i: Integer;
+begin
+  i := interpretedFunctions.IndexOf(name);
+  if i >= 0 then exit(TXQInterpretedFunctionInfo(interpretedFunctions.Objects[i]));
+  if parent <> nil then exit(parent.findInterpretedFunction(name));
   result := nil;
 end;
 
@@ -5219,7 +5317,9 @@ commonValuesUndefined := TXQValueUndefined.create;
 commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
 
+InitCriticalSection(interpretedFunctionSynchronization)
 finalization
+DoneCriticalsection(interpretedFunctionSynchronization);
 xs.free;
 pxp.free;
 fn.free;

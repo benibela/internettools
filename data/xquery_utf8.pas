@@ -107,7 +107,6 @@ end;
 function xqFunctionString_to_codepoints(const args: TXQVArray): IXQValue;
 var temp: string;
  i: Integer;
- cp: Integer;
  resseq: TXQValueSequence;
  scanner: TUTF8Scanner;
 begin
