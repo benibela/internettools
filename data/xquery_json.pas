@@ -176,7 +176,7 @@ var
   begin
     if not repeatCurToken then nextToken;
     case scanner.CurToken of
-      tkEOF: exit;
+      tkEOF: exit(xqvalue());
       tkWhitespace: result := parse();
       tkString: result := xqvalue(scanner.CurTokenString);
       tkNumber: result := parseNumber;
@@ -329,7 +329,7 @@ initialization
   jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?'], [xqcdContextOther]);
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
   jn.registerFunction('object', @xqFunctionObject, ['($arg as object()*) as object()']);
-  jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string) as item()', '($arg as xs:string, $options as object()) as item()*']);
+  jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as item()', '($arg as xs:string?, $options as object()) as item()*']);
   jn.registerFunction('size', @xqFunctionSize, ['($arg as array()) as xs:integer']);
 
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);

@@ -1775,6 +1775,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
     t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
     f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo');
+    t('jn:parse-json(())', '');
 
     t('[4,5,6](0)', '');
     t('[4,5,6](1)', '4');
