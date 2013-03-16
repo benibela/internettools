@@ -1773,6 +1773,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
     t('json(''{"hallo": "world"} {hallo: 1000}'')[2].hallo', '1000');
     t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
+    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {})[1].hallo', 'world');
     t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
     f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo');
     t('jn:parse-json(())', '');

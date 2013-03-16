@@ -190,16 +190,16 @@ var
 
 var
   multipleTopLevelItems: Boolean;
-
+  value: TXQValue;
 
 begin
   requiredArgCount(args, 1, 2);
 
   multipleTopLevelItems := true;
-  if length(args) = 2 then begin
-    if (args[1].getProperty('jsoniq-multiple-top-level-items').getSequenceCount > 2) or not (args[1].getProperty('jsoniq-multiple-top-level-items').getChild(1) is TXQValueBoolean) then
-      raise EXQEvaluationException.create('jerr:JNTY0020', 'Expected true/false got: '+args[1].getProperty('jsoniq-multiple-top-level-items').debugAsStringWithTypeAnnotation()+' for property jsoniq-multiple-top-level-items');
-    multipleTopLevelItems:=args[1].getProperty('jsoniq-multiple-top-level-items').toBoolean;
+  if (length(args) = 2) and (args[1] is TXQValueObject) and ((args[1] as TXQValueObject).hasProperty('jsoniq-multiple-top-level-items', @value)) then begin
+    if (value.getSequenceCount > 2) or not (value.getChild(1) is TXQValueBoolean) then
+      raise EXQEvaluationException.create('jerr:JNTY0020', 'Expected true/false got: '+value.debugAsStringWithTypeAnnotation()+' for property jsoniq-multiple-top-level-items');
+    multipleTopLevelItems:=value.toBoolean;
   end;
 
   scanner := TJSONScanner.Create(args[0].toString);
