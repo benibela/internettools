@@ -1235,6 +1235,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     moduleURL: String;
     at: array of string;
     module: TXQuery;
+    nativeModule: TXQNativeModule;
   begin
     skipWhitespaceAndComment();
     moduleName := '';
@@ -1250,9 +1251,17 @@ function TXQParsingContext.parseModule(): TXQTerm;
 
     module := engine.findModule(moduleURL);
     if module = nil then begin
-      engine.onImportModule(engine, moduleURL, at);
+      if assigned(engine.OnImportModule) then engine.onImportModule(engine, moduleURL, at);
       module := engine.findModule(moduleURL);
-      if module = nil then raiseParsingError('XQST0059', 'Unknown module: '+moduleURL);
+      if module = nil then begin
+        nativeModule := engine.findNativeModule(moduleURL);
+        if nativeModule = nil then raiseParsingError('XQST0059', 'Unknown module: '+moduleURL);
+        if moduleName <> '' then begin
+          if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+          staticContext.namespaces.add(TNamespace.create(nativeModule.namespace.getURL, moduleName));
+        end;
+        exit;
+      end;
     end;
     if staticContext.importedModules = nil then
       staticContext.importedModules := TStringList.Create;

@@ -1672,6 +1672,7 @@ begin
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2([1,2,3]), " ")', '1 2 3');
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2((1,2,3)), " ")', '1 2 3');
 
+  m('import module namespace rename = "http://www.w3.org/2005/xpath-functions"; rename:concat(1,2,3)', '123');
 
   scd('1+2+3', []);
   scd('.', [xqcdFocusDocument, xqcdContextCollation]); //too much
@@ -1748,10 +1749,12 @@ end;
 
 procedure THelper.ImportModule(sender: TObject; const namespace: string; const at: array of string);
 begin
-  if namespace = 'pseudo://circle2' then
-    ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ')
-  else
-    raise Exception.Create('Invalid namespace: '+namespace)
+  case namespace of
+    'pseudo://circle2':
+      ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ');
+    'http://www.w3.org/2005/xpath-functions': ;
+    else raise Exception.Create('Invalid namespace: '+namespace)
+  end;
 end;
 
 end.
