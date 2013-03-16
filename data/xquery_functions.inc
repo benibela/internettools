@@ -1034,6 +1034,7 @@ end;
 
 function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 
+//That is horrible outdated:
 { string-join(
     for $i in $form//* return
       if (node-name($i) = 'input' and ($i/type = ('hidden', 'password', 'text') or ($i/@type = ('radio', 'checked')  and exists($i/@checked)) ) ) then
@@ -1067,6 +1068,10 @@ var //node: TTreeNode;
       for i:=0 to high(split) do addSingleValue(split[i]);
     end;
 
+    function urlEncode(const s: string): string;
+    begin
+       result := urlHexEncode(s, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']);
+    end;
 
     function encodeForm(const form: TTreeNode): IXQValue;
     var
@@ -1078,18 +1083,21 @@ var //node: TTreeNode;
       request: string;
       used: TStringList;
       i: Integer;
-      procedure addToRequest(const n: string; v: string; addToUsed: boolean = true);
+
+      procedure addToRequest(n: string; v: string; addToUsed: boolean = true);
       var
         replaced: Integer;
       begin
         if request <> '' then request += '&';
+        n := urlEncode(n);
+
         if addToUsed then begin
           replaced := arrayIndexOf(replaceNames, n);
-          if replaced >= 0 then v := replaceValues[replaced];
-        end;
-        request +=         urlHexEncode(n, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~'])
-                   + '=' + urlHexEncode(v, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']);
-        if addToUsed then used.Add(n);
+          if replaced >= 0 then v := replaceValues[replaced]
+          else v := urlEncode(v);
+          request += n + '=' + v;
+          used.Add(n);
+        end else request += n + '=' + v;
       end;
 
     begin
@@ -1097,7 +1105,7 @@ var //node: TTreeNode;
       used := TStringList.Create;
       used.CaseSensitive:=false;
       temp := form.getFirstChild();
-      while temp <> form.reverse do begin
+      while (temp <> nil) and (temp <> form.reverse) do begin
         if temp.typ = tetOpen then begin
           if cmp(temp.value, 'textarea') then
             addToRequest(temp.getAttribute('name', cmp), temp.deepNodeText())
@@ -1148,14 +1156,16 @@ var //node: TTreeNode;
 
 
       {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-      if form.getDocument() <> nil then value := strResolveURI(value, form.getDocument().baseURI);
+      if form.hasDocument() and (form.getDocument() <> nil) then value := strResolveURI(value, form.getDocument().baseURI);
       value := strResolveURI(value, context.staticContext.baseURI);
       {$ENDIF}
       (result as TXQValueObject).setMutable('url', value);
     end;
 
 var v: IXQValue;
-  first: Boolean;
+  temp: IXQValue;
+  tempobj: TXQValueObject;
+  i: Integer;
 begin
   requiredArgCount(args, 1, 2);
 
@@ -1164,15 +1174,17 @@ begin
 
   cmp := @context.staticContext.nodeCollation.equal;
 
-  if length(args) = 2 then begin
-    first := true;
+  if length(args) = 2 then
     for v in args[1] do
-      if first then begin
-        add(v.toString);
-        first := false;
-      end else
-        addSingleValue(v.toString)
-  end;
+      if not (v is TXQValueObject) then add(v.toString)
+      else begin
+        temp := v.clone;
+        tempobj := temp as TXQValueObject;
+        for i:=0 to tempobj.values.count-1 do begin
+          arrayAdd(replaceNames, urlEncode(tempobj.values.Names[i]));
+          arrayAdd(replaceValues, urlEncode(tempobj.values.Values[i].toString));
+        end;
+      end;
 
   result := nil;
   for v in args[0] do

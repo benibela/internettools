@@ -195,7 +195,8 @@ TTreeNode = class
   function getPrevious(): TTreeNode; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
   function getRootHighest(): TTreeNode;    //**< Returns the highest node ancestor
   function getRootElement(): TTreeNode;    //**< Returns the highest element node ancestor
-  function getDocument(): TTreeDocument; //**< Returns the document node containing this node
+  function getDocument(): TTreeDocument; //**< Returns the document node containing this node. Raises an exception if there is no associated document
+  function hasDocument(): boolean; //**< Returns if this node is contained in a document
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
   function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
@@ -983,6 +984,11 @@ end;
 function TTreeNode.getDocument: TTreeDocument;
 begin
   result := document as TTreeDocument;
+end;
+
+function TTreeNode.hasDocument: boolean;
+begin
+  result := document is TTreeDocument;
 end;
 
 function TTreeNode.getNodeName: string;

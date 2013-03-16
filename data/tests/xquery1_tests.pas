@@ -725,6 +725,11 @@ begin
   m('declare default element namespace "http://example.org"; declare namespace test = "override";  let $i := <bar xmlns="http://example.org"> <bing> Lentils </bing>  </bar> return $i/test:bing', '');
 
 
+  t('form(<form/>, {"a": "b", "c": "d"}).url', 'pseudo://test?a=b&c=d');
+  t('form(<form action="http://example.org"/>, {"a": "b", "c": "d"}).url', 'http://example.org?a=b&c=d');
+  t('form(<form><input name="c" value="foo"/></form>, {"a": "b", "c": "d"}).url', 'pseudo://test?c=d&a=b');
+  t('form(<form><input name="c" value="foo"/><input name="x" value="y"/></form>, {"a": "b", "c": "d"}).url', 'pseudo://test?c=d&x=y&a=b');
+
 
   //Tests based on failed XQTS tests
   t('empty(text {"some text"}/..)', 'true');

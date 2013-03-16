@@ -1347,8 +1347,10 @@ type
                   @br Returns the outer html of a node as string (like outer-xml, but valid html) )
       @item(@code(form(<form>[, <override>]))
                   @br This creates the request corresponding to a html form. The request includes the value of all input/select/textarea descendants of the form parameter.
-                  @br You can use the override parameter to give a list of values replacing the default values of the form elements.
-                      (if you pass a sequence, the first string in the sequence might can multiple values like "a=b&c=d&e=f", the other ones are assumed to be a single value. The passed values are always url encoded)
+                  @br You can use the override parameter to give a sequence of values replacing the default values of the form elements.
+                  @br A value is either a string, e.g. @code("name=value&name2=...") which has to be url encoded and is splitted at the &-separators to override each parameter separately. (so the order of the name=value pairs is changed to the order of the input elements in the form)
+                  @br Or a JSON-like object @code({"name": "value", ...}), in which the properties must not be url encodeded (i.e. the form method url encodes each property) and in which each property overrides the corresponding parameter.
+                  @br
                   @br It returns an object with these properties:
                   @br url: The url the form should be send to (includes the encoded data for a GET request)
                   @br method: POST or GET
