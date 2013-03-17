@@ -218,7 +218,7 @@ end;
 function TXQTermDefineVariable.getContextDependencies: TXQContextDependencies;
 begin
   Result:=[];
-  if length(children) > 1 then result := children[high(children)].getContextDependencies;
+  if length(children) > 0 then result := children[high(children)].getContextDependencies;
   result += [xqcdContextVariables];
 end;
 

@@ -815,7 +815,7 @@ type
     returnType: TXQTermSequenceType;
   end;
 
-  //**The dynamic/static context values a query depends on
+  //**The dynamic/static context values a query depends on (internal used for optimizations)
   //**xqcdFocusDocument: context item/node
   //**xqcdFocusOther: context position/size
   //**xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther: context, obvious

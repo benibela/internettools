@@ -1697,6 +1697,7 @@ begin
   scd('foo / bar', [xqcdFocusDocument, xqcdContextCollation]);
   scd('/ bar', [xqcdFocusDocument, xqcdContextCollation]);
   scd('x"{1+2+3}{$var}"', [xqcdContextVariables]);
+  scd('abc:=//title', [xqcdContextVariables,xqcdFocusDocument,xqcdContextCollation]);
 
 
   writeln('XQuery: ', count, ' completed');
