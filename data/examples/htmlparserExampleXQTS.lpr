@@ -244,10 +244,10 @@ begin
   try
   compareTree.clearTrees;
   tree1 := compareTree.parseTree(a);
-  tree1.changeEncoding(eUTF8,eUTF8,true,false);
+  //tree1.changeEncoding(eUTF8,eUTF8,true,false);
   sorttree(tree1);
   tree2 := compareTree.parseTree(b);
-  tree2.changeEncoding(eUTF8,eUTF8,true,false);
+  //tree2.changeEncoding(eUTF8,eUTF8,true,false);
   sorttree(tree2);
   result := tree1.outerXML() = tree2.outerXML();
 
@@ -349,6 +349,7 @@ begin
   compareTree.trimText:=false;
   compareTree.readComments:=true;
   compareTree.readProcessingInstructions:=true;
+  compareTree.TargetEncoding:=eUTF8;
   buffer1 := TStringList.Create;
   buffer2 := TStringList.Create;
   buffer3 := TStringList.Create;
@@ -357,8 +358,10 @@ begin
   pxp := TXQueryEngine.create;
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
   pxp.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
-  pxp.AllowVariableUseInStringLiterals := false;
-  pxp.VariableChangelog.allowObjects:=false;
+  pxp.AllowExtendedStrings := false;
+  pxp.AllowJSON:=false;
+  pxp.AllowJSONLiterals:=false;
+  pxp.VariableChangelog.allowPropertyDotNotation:=false;
   pxp.StaticContext.collation := pxp.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   pxp.StaticContext.stripBoundarySpace:=true;
   pxp.StaticContext.strictTypeChecking:=true;
