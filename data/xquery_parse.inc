@@ -48,12 +48,12 @@ type
   procedure expect(c: char);
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
-  function nextTokenNCName(lookahead: boolean=false): string; inline;
-  function nextTokenQName(lookahead: boolean=false): string; inline;
+  function nextTokenNCName(): string; inline; //returns a NCName (todo: raise an error if not an NCName)
+  function nextTokenMaybeQName(): string; inline; //returns a QName, if there is one, or the same as nextToken otherwise
+  function nextTokenQName(allowWildcards: boolean=false): string; inline; //returns a QName (todo: raise an error if not a QName)
 
 
   function parseSequenceLike(target: TXQTerm; closingChar: char = ')'): TXQTerm;
-  function parseQNameContinuation: string;
   function parseSequenceType(): TXQTermSequenceType;
   function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
@@ -151,9 +151,9 @@ begin
 end;
 
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
-function TXQParsingContext.nextToken(lookahead: boolean=false): string;
-const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', '$'];
+const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', ':', '@', '$'];
 const START_SYMBOLS = ['-'];
+function TXQParsingContext.nextToken(lookahead: boolean=false): string;
 var start:pchar;
    numberE, numberPoint: boolean;
 begin
@@ -176,6 +176,8 @@ begin
         else pos+=1;
     until pos^ in [#0];
     pos+=1;
+  end else if (pos^ = ':') and ((pos+1)^ in ['=', ':']) then begin
+    pos+=2;
   end else if pos^ in (SYMBOLS + START_SYMBOLS) then begin
     if lookahead then exit(pos^)
     else begin
@@ -200,10 +202,6 @@ begin
         else pos+=1;
       end;
     until not (pos^ in ['0'..'9']);
-  end else if (pos^ = '@') and ((pos+1)^='*') then begin
-    pos+=2;
-  end else if (pos^ = ':') and ((pos+1)^='=') then begin
-    pos+=2;
   end else begin
     repeat
       pos+=1;
@@ -214,14 +212,26 @@ begin
   if lookahead then pos:=start;
 end;
 
-function TXQParsingContext.nextTokenNCName(lookahead: boolean): string;
+function TXQParsingContext.nextTokenNCName(): string;
 begin
-  result := nextToken(lookahead);
+  result := nextToken(false);
 end;
 
-function TXQParsingContext.nextTokenQName(lookahead: boolean): string;
+function TXQParsingContext.nextTokenMaybeQName(): string;
 begin
-  result := nextToken(lookahead);
+  result := nextToken();
+  if (pos^ = ':') and not ((pos+1)^ in (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*'])) then begin //same check in parseValue for matchers
+    expect(':');
+    result += ':' + nextToken();
+  end;
+end;
+
+function TXQParsingContext.nextTokenQName(allowWildcards: boolean): string;
+begin
+  result := nextTokenMaybeQName();
+  //todo check that it is really a QName
+  if result = '' then raiseParsingError('XPST0003', 'Expected QName');
+  if (not allowWildcards) and ((result[1] = '*') or (result[length(result)] = '*')) then raiseParsingError('XPST0003', 'Expected QName, got: *');
 end;
 
 function TXQParsingContext.parseSequenceLike(target: TXQTerm; closingChar: char ): TXQTerm;
@@ -240,13 +250,6 @@ begin
   if t <> closingChar then raiseParsingError('XPST0003', 'Expected closing parenthesis: '+ closingChar);
 end;
 
-function TXQParsingContext.parseQNameContinuation: string;
-begin
-  if (pos^ = ':') and (((pos - 1)^ = '*') or ((pos + 1)^ = '*')) then result := nextToken()
-  else if ((pos - 1)^ = ':') and (((pos)^ = '*') or ((pos - 1)^ = '*')) then result := nextToken()
-  else result := '';
-end;
-
 function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
 begin
   result := (word = 'text') or (word = 'node') or (word = 'comment') or (word = 'processing-instruction')
@@ -257,7 +260,7 @@ function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
 var word: string;
   namespace: INamespace;
 begin
-  word := nextToken();
+  word := nextTokenQName();
 
   result := TXQTermSequenceType.Create();
   try
@@ -325,8 +328,7 @@ end;
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
   procedure parseVariableName(out name: string; out namespace: INamespace);
   begin
-    name := nextToken;
-    if name <> '$' then raiseParsingError('XPST0003', 'Expected variable name');
+    if nextToken() <> '$' then raiseParsingError('XPST0003', 'Expected variable name');
     name := nextTokenQName();
     staticContext.splitRawQName(namespace, name, xqdnkUnknown);
   end;
@@ -455,7 +457,7 @@ begin
     word := nextToken();
     while word = ',' do begin
       expect('$');
-      result.push(TXQTermVariable.Create(nextToken(), staticContext));
+      result.push(TXQTermVariable.Create(nextTokenQName(), staticContext));
       skipWhitespaceAndComment();
       if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
       expect('in'); result.push(parse());
@@ -550,7 +552,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
   function parsePIConstructor: TXQTermConstructor;
   var marker: PChar;
   begin
-    result := TXQTermConstructor.create(tetProcessingInstruction, txqtermstring.create(nextToken()));
+    result := TXQTermConstructor.create(tetProcessingInstruction, txqtermstring.create(nextTokenQName()));
     skipWhitespace();
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do pos+=1;
@@ -577,11 +579,11 @@ var
   lastWasCData: Boolean;
   i: Integer;
 begin
-  name := nextToken();
+  name := nextTokenMaybeQName();
   if name = '!' then exit(parseCommentConstructor)
   else if name = '?' then exit(parsePIConstructor);
   result := TXQTermConstructor.create(tetOpen, TXQTermString.create(name));
-  token := nextToken();
+  token := nextTokenMaybeQName();
   while (token <> '>') and (token <> '/') and (token <> '') do begin
     attribute := TXQTermConstructor.create(tetAttribute, TXQTermString.create(token));
     expect('=');
@@ -602,7 +604,7 @@ begin
       attribute.Free;
     end else result.push(attribute);
     expect(marker^);
-    token := nextToken();
+    token := nextTokenMaybeQName();
   end;
   if token = '' then raiseParsingError('XPST0003', 'Attribute expected');
   if token = '/' then begin
@@ -627,7 +629,7 @@ begin
       case pos^ of
         '/': begin
           pos += 1;
-          if nextToken <> name then raiseParsingError('XPST0003', 'Expected matching closing tag');
+          if nextTokenQName() <> name then raiseParsingError('XPST0003', 'Expected matching closing tag');
           expect('>');
 
           if Result.implicitNamespaces <> nil then
@@ -677,7 +679,7 @@ begin
   else raiseParsingError('XPST0003', 'Unknown constructor name');
   expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute]) ;
   if expectName then begin
-    token := nextToken();
+    token := nextTokenMaybeQName();
     if token = '{' then begin
       result.nameValue := parsePrimaryLevel;
       expect('}');
@@ -716,7 +718,7 @@ var
 begin
   requireXQuery('for extensions');
   expect('#');
-  pragma := nextToken();
+  pragma := nextTokenQName();
   if system.pos(':', pragma) = 0 then raiseParsingError('XPST0003', 'Extension name requires namespace');
   while (pos^ <> #0) and ((pos^ <> '#') or ((pos+1)^ <> ')')) do
     pos += 1;
@@ -866,7 +868,7 @@ begin
     skipWhitespaceAndComment();
     if pos^ = '}' then begin expect('}'); exit;end;
     repeat
-      result.push(parseValue);
+      result.push(parse);
       expect(':');
       //if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString); //removed as json-iq allows variables there
       skipWhitespaceAndComment();
@@ -902,7 +904,7 @@ begin
       if word <> '$' then raiseParsingError('XPST0003', 'Invalid characters after $');
       exit(TXQTermVariable.Create(nextTokenQName(), staticContext));
     end;
-    '@': exit(TXQTermReadAttribute.create(strcopyfrom(word,2) + parseQNameContinuation));
+    '@': exit(TXQTermReadAttribute.create(nextTokenQName(true)));
     '+', '-': begin
       wordlookahead:=nextToken(true);
       if (word = '-') and
@@ -919,7 +921,11 @@ begin
       exit(parseSequenceLike(TXQTermSequence.Create)); //only sequence or priority brackets
     end;
 
-    '*': exit(TXQTermNodeMatcher.Create(word + parseQNameContinuation));
+    '*': if pos^ <> ':' then exit(TXQTermNodeMatcher.Create(word))
+         else begin
+           expect(':');
+           exit(TXQTermNodeMatcher.Create(word + ':' + nextTokenNCName()))
+         end;
     '/': begin
       if pos^ = '/' then begin expect('/'); word+='/';end;
       skipWhitespaceAndComment();
@@ -952,14 +958,14 @@ begin
       exit(parseXString());
     end else begin
       wordlookahead := nextToken(true);
-      if wordlookahead='::' then word+=nextToken();
-      if strEndsWith(word,'::') then begin
+      if wordlookahead='::' then begin
         word+=nextToken();
+        word+=nextTokenQName(true);
         wordlookahead := nextToken(true);
-      end;
-      if ((wordlookahead = '*') and strEndsWith(word, ':') and not strEndsWith(word, '::'))
-         or (strEndsWith(word, '::*') and strBeginsWith(wordlookahead, ':')) then begin
-        word += nextToken();
+      end else if (wordlookahead = ':') and (pos^ = ':') and not (((pos+1)^ in (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']))) then begin
+        expect(':');
+        if pos^ = '*' then word += ':' + nextToken() {will add :* }
+        else word += ':' + nextTokenNCName();
         wordlookahead := nextToken(true);
       end;
 
@@ -1044,7 +1050,7 @@ begin
         constr := wordlookahead = '{';
         if not constr then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)
           temp := pos;
-          nextToken();
+          nextTokenMaybeQName();
           if nextToken() = '{' then constr := true;
           pos := temp;
         end;
@@ -1123,7 +1129,7 @@ begin
     while true do begin
       word := nextToken(true);
       case word of
-        '', ',', ';', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
+        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
           exit(astroot);
         //'=', '+', '-', '*': pushBinaryOp(word);
         '!': pushBinaryOp('!=');
@@ -1376,8 +1382,7 @@ begin
     if token = 'module' then begin
       requireModule;
       expect(token); expect('namespace');
-      staticContext.moduleNamespace := TNamespace.create('', nextToken());
-      if system.pos(':', staticContext.moduleNamespace.getPrefix) > 0 then raiseParsingError('XPST0003', 'Namespace id must not begin with a namespace prefix itself');
+      staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
       expect('=');
       (staticContext.moduleNamespace as TNamespace).url := parseStringLiteral;
       expect(';');

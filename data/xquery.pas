@@ -5197,7 +5197,7 @@ fn.registerFunction('document-uri',@xqFunctionDocument_Uri, ['($arg as node()?) 
 
 fn.registerFunction('doc', @xqFunctionDoc, ['($uri as xs:string?) as document-node()?']);
 fn.registerFunction('doc-available', @xqFunctionDoc_Available, ['($uri as xs:string?) as xs:boolean']);
-fn.registerFunction('collection', @xqFunctionCollection, ['fn:collection() as node()*', '($arg as xs:string?) as node()*']);
+fn.registerFunction('collection', @xqFunctionCollection, ['() as node()*', '($arg as xs:string?) as node()*']);
 
 
 fn.registerFunction('root', @xqFunctionRoot, ['() as node()', '($arg as node()?) as node()?'], [xqcdFocusDocument]);

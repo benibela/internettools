@@ -385,7 +385,12 @@ begin
   t('outer-xml(let $x := (1,2,<a>s</a>,<a>t</a> / text(),3) return <t h="{$x}">(: ass :){(: ass :)$x}</t>)', '<t h="1 2 s t 3">(: ass :)1 2<a>s</a>t3</t>');
   t('outer-xml(<t h="{(1,2,<a>s</a>,<a>t</a> / text(),3)}">(: ass :){(: ass :)(1,2,<a>s</a>,<a>t</a> / text(),3)(:?:)(::)}</t>)', '<t h="1 2 s t 3">(: ass :)1 2<a>s</a>t3</t>');
 
-
+  t('<a foo="123"/> / @foo', '123');
+  t('<a foo="123"/> / @   foo', '123');
+  t('<a pxp:foo="123"/> / @   pxp:foo', '123');
+  t('<a foo="123"/> / attribute::  foo', '123');
+  t('<a foo="123"/> / attribute   ::foo', '123');
+  t('<a foo="123"/> / attribute :: foo', '123');
 
 
   t('outer-xml(element empty {})', '<empty/>');
@@ -1648,6 +1653,13 @@ begin
   t('let $a := true return $a', 'true');
   t('for $a in (true, false, null) return $a', 'true false null');
   ps.AllowJSONLiterals:=false;
+
+  t('serialize-json(<r><a>AA</a><b>BB</b></r> / {(a): b})', '{"AA": "<b>BB</b>"}');
+  t('serialize-json(<r><a>AA</a><b>BB</b></r> / {./a: b})', '{"AA": "<b>BB</b>"}');
+  t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a: b})', '{"AA": "<b>BB</b>"}');
+  t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a : b})', '{"AA": "<b>BB</b>"}');
+  //t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a:b})', '{"AA": "<b>BB</b>"}'); ??? what that's supposed to be?
+
 
   //JSON examples from JSONiq spec
   t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');

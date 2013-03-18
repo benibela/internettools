@@ -1807,6 +1807,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('serialize-json((1,2,"3!", true(),false()))', '[1, 2, "3!", true, false]');
     t('serialize-json({"foo": 123, "bar": 0.456})', '{"foo": 123, "bar": 0.456}');
     t('serialize-json({"xml": /})', '{"xml": "<foobar>123</foobar>"}', '<foobar>123</foobar>');
+    t('serialize-json({1+2+3: 4+5+6, 2+1*3: 7})', '{"6": 15, "5": 7}');
 
     t('jn:size([])', '0');
     t('jn:size([1])', '1');
