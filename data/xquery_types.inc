@@ -439,18 +439,23 @@ end;
 
 { TXQValueInt65 }
 
+constructor TXQValueInt65.create;
+begin
+  inherited create;
+end;
+
 constructor TXQValueInt65.create(const aint: int65);
 begin
   inherited create;
   value := aint;
 end;
 
-class function TXQValueInt65.classkind: TXQValueKind;
+class function TXQValueInt65.classKind: TXQValueKind;
 begin
   Result := pvkInt;
 end;
 
-class function TXQValueInt65.classtypeName: string;
+class function TXQValueInt65.classTypeName: string;
 begin
   result := 'integer';
 end;

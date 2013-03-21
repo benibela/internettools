@@ -720,8 +720,9 @@ begin
         if vfunc = nil then begin
           findKindIndex(namespace, funcname, kind, func);
           if kind <> xqfkUnknown then exit(evaluate(context));
-          {if namespace <> nil then raiseEvaluationError('XPST0017', 'Function {'+ namespace.geturl+'}'+namespace.getPrefix+':'+funcname+' not found')
-          else }raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found');
+          //if namespace <> nil then raiseEvaluationError('XPST0017', 'Function {'+ namespace.geturl+'}'+namespace.getPrefix+':'+funcname+' not found')
+          //else }
+          raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found');
         end;
       end else begin
         if TXQInterpretedFunctionInfo(func).func = nil then

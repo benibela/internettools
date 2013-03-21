@@ -369,7 +369,8 @@ type
   TXQValueInt65 = class (TXQValue_AnyAtomicType)
     value:  int65;
 
-    constructor create(const aint: int65 = 0); reintroduce; virtual;
+    constructor create(); reintroduce; virtual;
+    constructor create(const aint: int65); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
     class function classTypeName: string; override;
