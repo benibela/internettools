@@ -348,11 +348,11 @@ function unequal(const a: array of int64): boolean;
 type TProcedureOfObject=procedure () of object;
 function procedureToMethod(proc: TProcedure): TMethod;
 //**Calls proc in an new thread
-procedure threadedCall(proc: TProcedureOfObject; finished: TNotifyEvent); overload;
+procedure threadedCall(proc: TProcedureOfObject; isfinished: TNotifyEvent); overload;
 //**Calls proc in an new thread
-procedure threadedCall(proc: TProcedureOfObject; finished: TProcedureOfObject);overload;
+procedure threadedCall(proc: TProcedureOfObject; isfinished: TProcedureOfObject);overload;
 //**Calls proc in an new thread
-procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);overload;
+procedure threadedCall(proc: TProcedure; isfinished: TProcedureOfObject);overload;
 
 //------------------------------Stringfunctions--------------------------
 //All of them start with 'str' or 'widestr' so can find them easily
@@ -1782,7 +1782,7 @@ type
 TThreadedCall = class(TThread)
   proc: TProcedureOfObject;
   procedure Execute; override;
-  constructor create(aproc: TProcedureOfObject;finished: TNotifyEvent);
+  constructor create(aproc: TProcedureOfObject;isfinished: TNotifyEvent);
 end;
 
 procedure TThreadedCall.Execute;
@@ -1790,11 +1790,11 @@ begin
   proc();
 end;
 
-constructor TThreadedCall.create(aproc: TProcedureOfObject;finished: TNotifyEvent);
+constructor TThreadedCall.create(aproc: TProcedureOfObject;isfinished: TNotifyEvent);
 begin
   self.proc:=aproc;
   FreeOnTerminate:=true;
-  OnTerminate:=finished;
+  OnTerminate:=isfinished;
   inherited create(false);
 end;
 
@@ -1804,24 +1804,24 @@ begin
   result.Data:=nil;
 end;
 
-procedure threadedCallBase(proc: TProcedureOfObject; finished: TNotifyEvent);
+procedure threadedCallBase(proc: TProcedureOfObject; isfinished: TNotifyEvent);
 begin
-  TThreadedCall.Create(proc,finished);
+  TThreadedCall.Create(proc,isfinished);
 end;
 
-procedure threadedCall(proc: TProcedureOfObject; finished: TNotifyEvent);
+procedure threadedCall(proc: TProcedureOfObject; isfinished: TNotifyEvent);
 begin
-  threadedCallBase(proc,finished);
+  threadedCallBase(proc,isfinished);
 end;
 
-procedure threadedCall(proc: TProcedureOfObject; finished: TProcedureOfObject);
+procedure threadedCall(proc: TProcedureOfObject; isfinished: TProcedureOfObject);
 begin
-  threadedCallBase(proc, TNotifyEvent(finished));
+  threadedCallBase(proc, TNotifyEvent(isfinished));
 end;
 
-procedure threadedCall(proc: TProcedure; finished: TProcedureOfObject);
+procedure threadedCall(proc: TProcedure; isfinished: TProcedureOfObject);
 begin
-  threadedCallBase(TProcedureOfObject(procedureToMethod(proc)),TNotifyEvent(finished));
+  threadedCallBase(TProcedureOfObject(procedureToMethod(proc)),TNotifyEvent(isfinished));
 end;
 
 
@@ -2613,7 +2613,7 @@ begin
       result:=-1;
       curpos+=1;
     end;
-    (*$F5..$F7: i+=4;  //not allowed after rfc3629
+    (* $F5..$F7: i+=4;  //not allowed after rfc3629
     $F8..$FB: i+=5;  //"
     $FC..$FD: i+=6;  //"
     $FE..$FF: i+=1; //invalid*)
