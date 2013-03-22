@@ -435,7 +435,7 @@ begin
     else curmethod:='POST';
   end;
 
-  if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post internet page '+cururl+#13#10'Post: '+post);
+  if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post ('+curmethod+') internet page '+cururl+#13#10'Post: '+post);
 
   if guessType(cururl) = rtFile then
     cururl := strResolveURI(cururl, reader.lastURL);
