@@ -2508,12 +2508,13 @@ end;
 function TXQTermModule.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if context.staticContext.moduleNamespace <> nil then raiseEvaluationError('', 'A module cannot be evaluated');
+  if children[high(children)] = nil then raiseEvaluationError('', 'A XQuery expression that does not return a value cannot be evaluated.');
   result := children[high(children)].evaluate(context);
 end;
 
 function TXQTermModule.getContextDependencies: TXQContextDependencies;
 begin
-  if length(children) = 0 then exit([]);
+  if (length(children) = 0) or (children[high(children)] = nil) then exit([]);
   Result:=children[high(children)].getContextDependencies;
 end;
 
