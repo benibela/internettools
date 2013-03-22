@@ -1251,6 +1251,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     moduleURL := parseStringLiteral;
     at := nil;
     if nextToken(true) = 'at' then begin
+      expect('at');
       arrayAdd(at, parseStringLiteral);
       while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseStringLiteral); end;
     end;

@@ -1616,6 +1616,7 @@ begin
   ps.AutomaticallyRegisterParsedModules := true;
   ps.parseXQuery1('module namespace test3 = "pseudo://test-module3"; declare function test3:double($x) { 2*$x}; declare variable $test3:var := 17');
   m('import module "pseudo://test-module3"; test3:double(10)', '20');
+  m('import module "pseudo://test-module3" at "whatever"; test3:double(10)', '20');
   m('import module namespace test4 = "pseudo://test-module3"; test4:double(10) + $test4:var', '37');
   ps.OnImportModule:=@helper.ImportModule;
 
