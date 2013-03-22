@@ -734,6 +734,8 @@ begin
   t('form(<form action="http://example.org"/>, {"a": "b", "c": "d"}).url', 'http://example.org?a=b&c=d');
   t('form(<form><input name="c" value="foo"/></form>, {"a": "b", "c": "d"}).url', 'pseudo://test?c=d&a=b');
   t('form(<form><input name="c" value="foo"/><input name="x" value="y"/></form>, {"a": "b", "c": "d"}).url', 'pseudo://test?c=d&x=y&a=b');
+  t('form(<form><input name="c" value="foo"/><input name="x" value="y"/></form>, {"a": "b$", "c%2": "d%"}).url', 'pseudo://test?c=foo&x=y&a=b%24&c%252=d%25');
+  t('form(<form><input name="c%2" value="foo"/><input name="x" value="y"/></form>, {"a": "b$", "c%2": "d%"}).url', 'pseudo://test?c%252=d%25&x=y&a=b%24');
 
 
   //Tests based on failed XQTS tests

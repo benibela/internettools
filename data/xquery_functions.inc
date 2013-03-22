@@ -1050,7 +1050,7 @@ function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArr
 }
 
 var //node: TTreeNode;
-    replaceNames, replaceValues: TStringArray;
+    replaceNames, replaceValues: TStringArray;  //names are NOT url encoded, values ARE url encoded
     cmp: TStringComparisonFunc;
     procedure addSingleValue(temp: string);
     begin
@@ -1089,15 +1089,13 @@ var //node: TTreeNode;
         replaced: Integer;
       begin
         if request <> '' then request += '&';
-        n := urlEncode(n);
-
         if addToUsed then begin
           replaced := arrayIndexOf(replaceNames, n);
           if replaced >= 0 then v := replaceValues[replaced]
           else v := urlEncode(v);
-          request += n + '=' + v;
+          request += urlEncode(n) + '=' + v;
           used.Add(n);
-        end else request += n + '=' + v;
+        end else request += urlEncode(n) + '=' + v;
       end;
 
     begin
@@ -1144,7 +1142,7 @@ var //node: TTreeNode;
       end;
       used.free;
 
-      typ := form.getAttribute('method', 'GET', cmp);
+      typ := UpperCase(form.getAttribute('method', 'GET', cmp));
       value := form.getAttribute('action', cmp);
 
       result := TXQValueObject.create();
@@ -1181,7 +1179,7 @@ begin
         temp := v.clone;
         tempobj := temp as TXQValueObject;
         for i:=0 to tempobj.values.count-1 do begin
-          arrayAdd(replaceNames, urlEncode(tempobj.values.Names[i]));
+          arrayAdd(replaceNames, tempobj.values.Names[i]);
           arrayAdd(replaceValues, urlEncode(tempobj.values.Values[i].toString));
         end;
       end;
