@@ -73,9 +73,6 @@ type
     procedure closeOpenedConnections();override;
 
     function internalHandle: TObject; override;
-
-  public
-    checkSSLCertificates: boolean;
   end;
   TW32InternetAccessClass = class of TW32InternetAccess;
 
@@ -338,12 +335,12 @@ begin
   end;
 
   if decoded.protocol='https' then begin
-    if checkSSLCertificates then
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
+    if internetConfig^.checkSSLCertificates then
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
      else
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
+      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
   end else
-    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
+    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
     raise EW32InternetException.create(format(rsReceivingFrom0SFaile, [decoded.combined])); //'Can''t connect');
@@ -369,7 +366,7 @@ begin
 
     if callResult then break;
 
-    if not checkSSLCertificates then begin
+    if not internetConfig^.checkSSLCertificates then begin
       //as suggested by http://msdn.microsoft.com/en-us/subscriptions/aa917690.aspx
       temp := getLastError;
       if (temp = ERROR_INTERNET_INVALID_CA) or (temp = ERROR_INTERNET_SEC_CERT_REV_FAILED) or (temp = ERROR_INTERNET_SEC_CERT_NO_REV) then begin
@@ -449,7 +446,7 @@ end;
 
 function TW32InternetAccess.doTransfer(method:string; const url: TDecodedUrl;data:string): string;
 begin
-  result := doTransferRec(method, url, data, 10);
+  result := doTransferRec(UpperCase(method), url, data, 10);
 end;
 
 
@@ -500,7 +497,6 @@ begin
   newConnectionOpened:=false;
   timeout:=2*60*1000;
   InternetSetOption(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
-  checkSSLCertificates := false;
 end;
 
 

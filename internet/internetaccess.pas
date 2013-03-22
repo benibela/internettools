@@ -43,6 +43,8 @@ type
 
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
+    checkSSLCertificates: boolean; //**< If ssl certificates should be checked in https connections (currently only for w32internetaccess)
+
     logToPath: string;
 
     procedure setProxy(proxy: string);
