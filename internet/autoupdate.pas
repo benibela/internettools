@@ -147,7 +147,7 @@ private
 
 private
   finstallerurl,fallChanges,fallFixes,fallAdds:string;
-  finstallerBaseName: string; //installer url without path
+  finstallerBaseName: string; //installer url without path (downloaded file)
   finstallerParameters: string; //parameter to pass to the installer
   finstallerNeedRestart: boolean; //if the programm have to be restarted after the installer is called (default: true)
   fbuildinfolastbuild: longint;
@@ -168,6 +168,8 @@ public
   constructor create(currentVersion:TVersionNumber;installDir,versionsURL,changelogURL: string);
   {** check if the user can write in the application directory and is therefore able to install the update. }
   function hasDirectoryWriteAccess:boolean;
+  {** check if the installer can be run (on linux it depends on write access, on windows it can always run) }
+  function canRunInstaller: boolean;
   {** checks if an update exists }
   function existsUpdate:boolean;
   {** returns a list of the performed changes}
@@ -186,7 +188,7 @@ public
 end;
 implementation
 
-uses FileUtil,process{$IFDEF UNIX},BaseUnix{$ENDIF};
+uses FileUtil,process{$IFDEF UNIX},BaseUnix{$ENDIF}{$IFDEF WINDOWS},windows,ShellApi{$endif};
 function isOurPlatform(p: string):boolean;
 begin
   p:=UpperCase(p);
@@ -228,7 +230,7 @@ var
   actualFileName: String;
 begin
   //write a file to test it
-  //TODO: Possible that this won't work on newer Windows, but I can't test it there
+  //TODO: Possible that this won't work on newer Windows, but I can't test it there (should work if asInvoker is set in requestedExecutionLevel in the manifest)
   if finstallDir='' then exit(false);
   try
     actualFileName:=finstallDir+testFileName;
@@ -246,7 +248,7 @@ begin
   if Win32Platform=VER_PLATFORM_WIN32_WINDOWS then result:=true //no file permissions exists on win98
   else if Win32Platform=VER_PLATFORM_WIN32_NT then begin
     f:=CreateFile(pchar(copy(finstallDir,1,length(finstallDir)-1) ),GENERIC_WRITE, FILE_SHARE_WRITE or FILE_SHARE_READ, nil,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL or FILE_FLAG_BACKUP_SEMANTICS,0);
-    if f=INVALID_HANDLE_VALUE then result:=false
+    if f=INVALID_HANDLE_VALUE then result:=false //this will probably always fail if program is running due to locking
     else begin
       result:=true;
       closehandle(f);
@@ -255,6 +257,16 @@ begin
   {$ELSE}
   result:=false;
   {$ENDIF}                             *)
+end;
+
+function TAutoUpdater.canRunInstaller: boolean;
+begin
+  if finstallerParameters='' then exit(false);
+  if hasDirectoryWriteAccess then exit(true);
+  {$IFDEF WINDOWS}
+  if Win32MajorVersion >= 6 then exit(true); //use shellexecute runas there. TODO: does it also work in older versions?
+  {$ENDIF}
+  exit(false);
 end;
 
 
@@ -406,7 +418,7 @@ begin
     ftempDir:=ftempDir+DirectorySeparator;
   try
     //RemoveDir(copy(ftempDir,1,length(ftempdir)-1));
-    mkdir(copy(ftempDir,1,length(ftempdir)-1));
+    ForceDirectory(copy(ftempDir,1,length(ftempdir)-1));
   except
     if not DirectoryExists(copy(ftempDir,1,length(ftempdir)-1)) then
       raise exception.create('Temporäres Verzeichnis '+ftempDir+' konnte nicht erstellt werden');
@@ -430,7 +442,7 @@ begin
     end;
     {$IFDEF UNIX}
     if finstallerParameters<>'' then begin
-      //set file permissions
+      //set file permissions             f
       FpChmod(Utf8ToAnsi(ftempDir+finstallerBaseName), S_IRWXU or S_IRGRP or S_IXGRP or S_IROTH or S_IXOTH);
     end;
     {$ENDIF}
@@ -446,7 +458,26 @@ begin
   result:=(finstallerParameters<>'') and finstallerNeedRestart;
 end;
 
+
+
 procedure TAutoUpdater.installUpdate;
+  {$IFDEF WINDOWS}
+    procedure runAsAdmin(cmdline: string);
+    var
+      prog: String;
+    begin
+      cmdline:=trim(cmdline);
+      if length(cmdline) = 0 then exit;
+      if cmdline[1] = '"' then begin
+        delete(cmdline, 1, 1);
+        prog := strSplitGet('"', cmdline)
+      end else if cmdline[1] = '''' then begin
+        delete(cmdline, 1, 1);
+        prog := strSplitGet('''', cmdline)
+      end else if cmdline[1] <> '"' then prog := strSplitGet(' ', cmdline);
+      ShellExecute(0, 'runas', pchar(prog), pchar(cmdline), pchar(finstallDir), SW_SHOWNORMAL);
+    end;
+  {$ENDIF}
 var realParameter: string;
     p:tprocess;
 begin
@@ -454,13 +485,25 @@ begin
     ShowMessage('Sorry, I can''t install the update automatically.'#13#10'Please start the file '+downloadedFileName+' yourself.');
     raise Exception.Create('Can''t start installer');
   end;
-  p:=TProcess.Create(nil);
-  try
-    p.CommandLine:=getInstallerCommand;
-    p.Execute;
-  finally
-    p.free;
+  if hasDirectoryWriteAccess then begin
+    p:=TProcess.Create(nil);
+    try
+      p.CommandLine:=getInstallerCommand;
+      p.Execute;
+    finally
+      p.free;
+    end;
+    exit;
   end;
+
+  {$IFDEF WINDOWS}
+  if Win32MajorVersion >= 6 then begin
+    runAsAdmin(getInstallerCommand);
+    exit;
+  end;
+  {$ENDIF}
+
+  raise Exception.Create('Could not start installer');
 end;
 
 destructor TAutoUpdater.destroy;

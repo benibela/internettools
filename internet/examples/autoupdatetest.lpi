@@ -13,8 +13,34 @@
     <VersionInfo>
       <StringTable ProductVersion=""/>
     </VersionInfo>
-    <BuildModes Count="1">
+    <BuildModes Count="2">
       <Item1 Name="default" Default="True"/>
+      <Item2 Name="win32">
+        <MacroValues Count="1">
+          <Macro1 Name="LCLWidgetType" Value="win32"/>
+        </MacroValues>
+        <CompilerOptions>
+          <Version Value="11"/>
+          <PathDelim Value="\"/>
+          <SearchPaths>
+            <OtherUnitFiles Value="U:\components\pascal\data;..\..\import\synapse;U:\components\pascal\internet;U:\components\lazarus\dialogs;U:\components\pascal\system;\home\benito\hg\components\pascal\data\;\home\benito\hg\components\pascal\internet\;\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\system\"/>
+            <SrcPath Value="\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\import\synapse\;..\..\import\synapse"/>
+          </SearchPaths>
+          <Parsing>
+            <SyntaxOptions>
+              <UseAnsiStrings Value="False"/>
+            </SyntaxOptions>
+          </Parsing>
+          <CodeGeneration>
+            <TargetCPU Value="i386"/>
+            <TargetOS Value="win32"/>
+          </CodeGeneration>
+          <Other>
+            <CompilerPath Value="$(CompPath)"/>
+          </Other>
+          <LCLWidgetType Value="win32"/>
+        </CompilerOptions>
+      </Item2>
     </BuildModes>
     <PublishOptions>
       <Version Value="2"/>
