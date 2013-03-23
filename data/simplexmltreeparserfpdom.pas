@@ -36,10 +36,8 @@ type
 
 { TTreeParserDOM }
 
-{** This class provides wrapper methods around the standard fpc DOM functions,
-    to convert the TDOMDocument class created by fpc to the TTreeDocument class used by the XQuery engine.
-*}
-TTreeParserDOM = class(TTreeParser)
+{** Base class for TTreeParserDOM *}
+TTreeParserDOMBase = class(TTreeParser)
   //** Create a tree document from a standard fpc dom document
   function import(dom: TDOMDocument): TTreeDocument;
   //** Reads a tree document from a string, using the standard fpc dom functions to parse it
@@ -48,12 +46,22 @@ TTreeParserDOM = class(TTreeParser)
   function parseDOMFromFile(const filename: string): TTreeDocument;
 end;
 
+{** This class provides wrapper methods around the standard fpc DOM functions,
+    to convert the TDOMDocument class created by fpc to the TTreeDocument class used by the XQuery engine.
+*}
+TTreeParserDOM = class(TTreeParserDOMBase)
+  //** Reads a tree document from a string, using the standard fpc dom functions to parse it
+  function parseTree(html: string; uri: string = ''; contentType: string = ''): TTreeDocument; override;
+  //** Loads a tree document from a file, using the standard fpc dom functions to parse it
+  function parseTreeFromFile(filename: string): TTreeDocument; override;
+end;
+
 implementation
 
 
 { TTreeParserDOM }
 
-function TTreeParserDOM.import(dom: TDOMDocument): TTreeDocument;
+function TTreeParserDOMBase.import(dom: TDOMDocument): TTreeDocument;
 var doc: TTreeDocument;
   namespaces: TNamespaceList;
   function getNamespace(const url, prefix: string): INamespace;
@@ -72,26 +80,26 @@ var doc: TTreeDocument;
   begin
     nscount := namespaces.Count;
     if node is TDOMElement then begin
-      new := TTreeNode.createElementPair(node.NodeName);
+      new := TTreeNode.createElementPair(UTF8Encode(node.NodeName));
       if node.HasAttributes then
         for i := 0 to node.Attributes.Length - 1 do begin
-          new.addAttribute(node.Attributes[i].NodeName, node.Attributes[i].NodeValue);
+          new.addAttribute(UTF8Encode(node.Attributes[i].NodeName), UTF8Encode(node.Attributes[i].NodeValue));
           if node.Attributes[i].NamespaceURI <> '' then
-            new.attributes.Items[new.attributes.count - 1].namespace := getNamespace(node.Attributes[i].NamespaceURI, node.Attributes[i].Prefix);
+            new.attributes.Items[new.attributes.count - 1].namespace := getNamespace(UTF8Encode(node.Attributes[i].NamespaceURI), UTF8Encode(node.Attributes[i].Prefix));
         end;
       for i := 0 to node.ChildNodes.Count - 1 do
         importNode(new, node.ChildNodes[i]);
     end else begin
-      if (node is TDOMText) or (node is TDOMCDATASection) then new := TTreeNode.create(tetText, node.NodeValue)
-      else if node is TDOMComment then new := TTreeNode.create(tetComment, node.NodeValue)
+      if (node is TDOMText) or (node is TDOMCDATASection) then new := TTreeNode.create(tetText, UTF8Encode(node.NodeValue))
+      else if node is TDOMComment then new := TTreeNode.create(tetComment, UTF8Encode(node.NodeValue))
       else if node is TDOMProcessingInstruction then begin
-        new := TTreeNode.create(tetProcessingInstruction, node.NodeName);
-        new.addAttribute('', node.NodeValue);
+        new := TTreeNode.create(tetProcessingInstruction, UTF8Encode(node.NodeName));
+        new.addAttribute('', UTF8Encode(node.NodeValue));
       end else exit;
     end;
 
     if node.NamespaceURI <> '' then
-      new.namespace := getNamespace(node.NamespaceURI, node.Prefix);
+      new.namespace := getNamespace(UTF8Encode(node.NamespaceURI), UTF8Encode(node.Prefix));
 
 
     parent.addChild(new);
@@ -138,7 +146,7 @@ begin
   result := doc;
 end;
 
-function TTreeParserDOM.parseDOM(const document: String; const uri: string): TTreeDocument;
+function TTreeParserDOMBase.parseDOM(const document: String; const uri: string): TTreeDocument;
 var
   temp: TXMLDocument;
   stringStream: TStringStream;
@@ -152,13 +160,23 @@ begin
   temp.Free;
 end;
 
-function TTreeParserDOM.parseDOMFromFile(const filename: string): TTreeDocument;
+function TTreeParserDOMBase.parseDOMFromFile(const filename: string): TTreeDocument;
 var
   temp: TXMLDocument;
 begin
   ReadXMLFile(temp, filename);
   result := import(temp);
   temp.Free;
+end;
+
+function TTreeParserDOM.parseTree(html: string; uri: string; contentType: string): TTreeDocument;
+begin
+  Result:=parseDOM(html, uri);
+end;
+
+function TTreeParserDOM.parseTreeFromFile(filename: string): TTreeDocument;
+begin
+  Result:=parseDOMFromFile(filename);
 end;
 
 end.
