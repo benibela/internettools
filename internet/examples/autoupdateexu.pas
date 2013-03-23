@@ -45,7 +45,7 @@ var
 
 implementation
 
-uses internetAccess, {$IFDEF WIN32}w32InternetAccess{$ELSE}synapseinternetaccess{$ENDIF};
+uses internetAccess, {$IFDEF WINDOWS}w32InternetAccess{$ELSE}synapseinternetaccess{$ENDIF};
 
 { TForm1 }
 
@@ -88,7 +88,7 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  {$IFDEF WIN32}
+  {$IFDEF WINDOWS}
   defaultInternetAccessClass:=TW32InternetAccess;
   {$ELSE}
   defaultInternetAccessClass:=TSynapseInternetAccess;

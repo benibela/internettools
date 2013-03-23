@@ -23,7 +23,7 @@ unit w32internetaccess;
 interface
 
 //{$DEFINE DELPHI_WININET} //If you use the Delphi wininet unit. Search for   "unit wininet" inurl:wininet.pas   to find one. (and then add {$mode delphi} there)
-{$IFDEF WIN32}
+{$IFDEF WINDOWS}
 {$DEFINE COMPILE_W32_INTERNETACCESS}  //If this unit should be compiled
 {$ENDIF}
 

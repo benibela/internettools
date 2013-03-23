@@ -20,7 +20,7 @@ unit synapseinternetaccess;
 
 {$mode objfpc}{$H+}
 
-{$IFNDEF WIN32}
+{$IFNDEF WINDOWS}
 {$DEFINE COMPILE_SYNAPSE_INTERNETACCESS} //If this unit should be compiled. Not enabled on windows, since you can use w32internetaccess there
 {$ENDIF}
 
@@ -78,11 +78,11 @@ implementation
 
 {$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
 
-uses synautil,ssl_openssl_lib,bbutils{$ifndef win32},netdb{$endif};
+uses synautil,ssl_openssl_lib,bbutils{$ifndef WINDOWS},netdb{$endif};
 
 { TSynapseInternetAccess }
 
-{$ifdef win32}
+{$ifdef WINDOWS}
 function checkEtcResolv(): boolean;
 begin
   result := false;
@@ -268,7 +268,7 @@ begin
  result:=connection;
 end;
 
-{$ifndef win32}
+{$ifndef WINDOWS}
 initialization
 InitCriticalSection(resolvConfCS);
 finalization

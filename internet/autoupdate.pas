@@ -244,19 +244,6 @@ begin
   except
     result:=false;
   end;
-  (*{$IFDEF WIN32}
-  if Win32Platform=VER_PLATFORM_WIN32_WINDOWS then result:=true //no file permissions exists on win98
-  else if Win32Platform=VER_PLATFORM_WIN32_NT then begin
-    f:=CreateFile(pchar(copy(finstallDir,1,length(finstallDir)-1) ),GENERIC_WRITE, FILE_SHARE_WRITE or FILE_SHARE_READ, nil,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL or FILE_FLAG_BACKUP_SEMANTICS,0);
-    if f=INVALID_HANDLE_VALUE then result:=false //this will probably always fail if program is running due to locking
-    else begin
-      result:=true;
-      closehandle(f);
-    end;
-  end else result:=false;
-  {$ELSE}
-  result:=false;
-  {$ENDIF}                             *)
 end;
 
 function TAutoUpdater.canRunInstaller: boolean;

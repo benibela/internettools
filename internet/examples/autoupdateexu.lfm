@@ -12,34 +12,34 @@ object Form1: TForm1
   ClientHeight = 405
   ClientWidth = 637
   OnCreate = FormCreate
-  LCLVersion = '0.9.29'
+  LCLVersion = '1.1'
   object Label1: TLabel
     Left = 16
-    Height = 20
+    Height = 15
     Top = 16
-    Width = 87
+    Width = 83
     Caption = 'Cur-Version:'
     ParentColor = False
   end
   object Label2: TLabel
     Left = 15
-    Height = 20
+    Height = 15
     Top = 46
-    Width = 93
+    Width = 85
     Caption = 'Version-URL:'
     ParentColor = False
   end
   object Label3: TLabel
     Left = 14
-    Height = 20
+    Height = 15
     Top = 72
-    Width = 95
+    Width = 82
     Caption = 'Change-URL:'
     ParentColor = False
   end
   object Edit1: TEdit
     Left = 96
-    Height = 29
+    Height = 25
     Top = 13
     Width = 533
     Anchors = [akTop, akLeft, akRight]
@@ -48,7 +48,7 @@ object Form1: TForm1
   end
   object Edit2: TEdit
     Left = 96
-    Height = 29
+    Height = 25
     Top = 40
     Width = 533
     Anchors = [akTop, akLeft, akRight]
@@ -57,7 +57,7 @@ object Form1: TForm1
   end
   object Edit3: TEdit
     Left = 96
-    Height = 29
+    Height = 25
     Top = 67
     Width = 533
     Anchors = [akTop, akLeft, akRight]
