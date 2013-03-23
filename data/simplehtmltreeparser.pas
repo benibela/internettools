@@ -896,7 +896,7 @@ begin
   result := getAttribute(a, @caseInsensitiveCompare);
 end;
 
-function TTreeNode.getAttribute(const a: string; const cmpFunction: TStringComparisonFunc = nil): string; overload;
+function TTreeNode.getAttribute(const a: string; const cmpFunction: TStringComparisonFunc): string; overload;
 begin
   if not getAttributeTry(a, result, cmpFunction) then
     result:='';

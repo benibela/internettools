@@ -4630,14 +4630,16 @@ end;
 
 function xqvalueNodeStepChild(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
-  ignore(cxt); ignore(ta); ignore(tb); ignore(result);
+  ignore(cxt); ignore(ta); ignore(tb);
   raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op:/ called');
+  result := xqvalue();
 end;
 
 function xqvalueNodeStepDescendant(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
-  ignore(cxt); ignore(ta); ignore(tb); ignore(result);
+  ignore(cxt); ignore(ta); ignore(tb);
   raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: // called');
+  result := xqvalue();
 end;
 
 

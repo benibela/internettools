@@ -737,6 +737,7 @@ var
   n, p: Integer;
   temp: string;
 begin
+  result := '';
   p := 1;
   n := strIndexOf(s, '&');
   while n > 0 do begin
