@@ -575,7 +575,7 @@ destructor TAttributeList.Destroy;
 var
   i: Integer;
 begin
-  for i:= 0 to count - 1 do Items[i].Free;
+  clear;
   inherited Destroy;
 end;
 
