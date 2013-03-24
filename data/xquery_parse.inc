@@ -1100,6 +1100,11 @@ end;
 function TXQParsingContext.parse: TXQTerm;
 var astroot: TXQTerm;
 
+  function parseSomething: TXQTerm;
+  begin
+    result := parse();
+    if result = nil then raiseParsingError('XPST0003', 'Unexpected query end');
+  end;
 
   procedure pushBinaryOp(const v: string);
   var res: TXQTermBinaryOp;
@@ -1118,8 +1123,10 @@ var astroot: TXQTerm;
       res.push(parseSequenceType()); //assume we read instance of/cast/castable/treat as
       if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) and (not (res.children[high(res.children)] as TXQTermSequenceType).isSingleType()) then
         raiseParsingError('XPST0003', 'Need single typ for cast');
-    end else
-      res.push(parseValue())
+    end else begin
+      res.push(parseValue());
+      if res.children[high(res.children)] = nil then raiseParsingError('XPST0003', 'Unexpected query end');
+    end;
   end;
 
   var word: string;
@@ -1152,12 +1159,12 @@ begin
         '(': begin
           expect('(');
           replace := ripBinOpApart(@astroot, 10000); //TODO: check
-          replace^ := TXQTermDynamicFunctionCall.Create(replace^, parse());
+          replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseSomething());
           expect(')');
         end;
         ':=': begin
           expect(':=');
-          result := TXQTermDefineVariable.Create(astroot, nil, parse());
+          result := TXQTermDefineVariable.Create(astroot, nil, parseSomething());
           staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
           exit;
         end;
