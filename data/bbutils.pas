@@ -572,6 +572,12 @@ function intLog(n,b: longint): longint; overload;
 //**Given a number n, this procedure calculates the maximal integer e, so that n = p^e * r
 procedure intFactor(const n,p: longint; out e, r:longint);
 
+
+function intSqrt(const i: longint): longint;
+
+function intSqrt(const i: int64): int64;
+
+
 function gcd(a,b: integer): integer; //**< Calculates the greatest common denominator
 function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
 function gcd(a,b: int64): int64; //**< Calculates the greatest common denominator
@@ -3620,6 +3626,44 @@ begin
     e += 1;
   end;
 end;
+
+
+function intSqrt(const i: longint): longint;
+var
+  e, eo: longint;
+begin
+  if i = 0 then exit(0);
+  if i = 1 then exit(1);
+  if i < 0 then raise Exception.Create('Negative sqrt is not defined');
+  Result := i div 2;
+  e := abs(i - Result*Result);
+  eo := e + 1;
+  while (e < eo) do begin
+    eo := e;
+    Result := (Result + i div Result) div 2;
+    e := abs(i - Result*Result); ;
+  end;
+  while (Result * Result > i) do Result := Result - 1; //what's the point of this?
+end;
+
+function intSqrt(const i: int64): int64;
+var
+  e, eo: int64;
+begin
+  if i = 0 then exit(0);
+  if i = 1 then exit(1);
+  if i < 0 then raise Exception.Create('Negative sqrt is not defined');
+  Result := i div 2;
+  e := abs(i - Result*Result);
+  eo := e + 1;
+  while (e < eo) do begin
+    eo := e;
+    Result := (Result + i div Result) div 2;
+    e := abs(i - Result*Result); ;
+  end;
+  while (Result * Result > i) do Result := Result - 1; //what's the point of this?
+end;
+
 
 function gcd(a, b: integer): integer;
 begin
