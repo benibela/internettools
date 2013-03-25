@@ -56,6 +56,8 @@ TTreeParserDOM = class(TTreeParserDOMBase)
   function parseTreeFromFile(filename: string): TTreeDocument; override;
 end;
 
+EXMLReadError = XMLRead.EXMLReadError;
+
 implementation
 
 
