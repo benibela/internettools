@@ -1434,6 +1434,8 @@ procedure strSwapEndianWord(var str: string);
 var
   i: Integer;
 begin
+  UniqueString(str);
+  assert(length(str) and 1 = 0);
   i := 1;
   while i < length(str) do begin
     PWord(@str[i])^ := SwapEndian(PWord(@str[i])^);
@@ -1445,6 +1447,8 @@ procedure strSwapEndianDWord(var str: string);
 var
   i: Integer;
 begin
+  UniqueString(str);
+  assert(length(str) and 1 = 0);
   i := 1;
   while i < length(str) do begin
     PDWord(@str[i])^ := SwapEndian(PDWord(@str[i])^);

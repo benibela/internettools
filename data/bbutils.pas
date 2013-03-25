@@ -2414,6 +2414,8 @@ procedure strSwapEndianWord(var str: string);
 var
   i: Integer;
 begin
+  UniqueString(str);
+  assert(length(str) and 1 = 0);
   i := 1;
   while i < length(str) do begin
     PWord(@str[i])^ := SwapEndian(PWord(@str[i])^);
@@ -2425,6 +2427,8 @@ procedure strSwapEndianDWord(var str: string);
 var
   i: Integer;
 begin
+  UniqueString(str);
+  assert(length(str) and 1 = 0);
   i := 1;
   while i < length(str) do begin
     PDWord(@str[i])^ := SwapEndian(PDWord(@str[i])^);
@@ -2493,7 +2497,7 @@ begin
     end;
     {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF}: result := strConvertToUtf8FromUTF32N(str);
     {$IFDEF ENDIAN_BIG}eUTF32LE{$ELSE}eUTF32BE{$ENDIF}: begin
-      result := str;
+      result := str + '';
       strSwapEndianDWord(result);
       result := strConvertToUtf8FromUTF32N(result);
     end
