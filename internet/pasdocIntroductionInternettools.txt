@@ -5,7 +5,36 @@
 
 If you just want to download things, you can use the function @link(simpleinternet.retrieve retrieve) of the unit simpleinternet.@br@br
 
-You can also further @noAutoLink(process) the data with the function @link(simpleinternet.process process) of the same unit.
+You can also further @noAutoLink(process) the data with the function @link(simpleinternet.process process) of the same unit.@br@br
+
+For example, this will write the title of a webpage:
+
+@longCode(#
+  uses simpleinternet;
+  writeln(process('http://example.org', '//title').toString);
+#)
+
+This will write the destination of all links there:
+
+@longCode(#
+  uses simpleinternet;
+  var v: IXQValue;
+  begin
+    for v in process('http://example.org', '//a/@href') do
+      writeln(v.toString);      
+  end.
+#)
+
+And this will write the destination and name of all links :
+
+@longCode(#
+  uses simpleinternet;
+  var v: IXQValue;
+  begin
+    for v in process('http://example.org', '//a/concat(., ": ", @href)') do
+      writeln(v.toString);      
+  end.
+#)
 
 @section(1 AnchorNameXYZ Accessing the internet/downloading things)
 

@@ -123,7 +123,7 @@ type
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
 
-    //**ignored
+    //ignored
     ordering: boolean;  //**< unused
     constructionPreserve: boolean; //**< unused
 
@@ -1252,7 +1252,7 @@ type
 
     @bold(Syntax of a XQuery / XPath / Pseudo-XPath-Expression)
 
-    This XQuery engine currently supports XPath 2.0 and XQuery 1.0, with some extensions and minor deviations.@br@br
+    This XQuery engine currently supports XPath 2.0, XQuery 1.0 and JSONiq, with some extensions and minor deviations.@br@br
 
     Some very basic, standard XPath examples, for people who do not have seen XPath before:
     @unorderedList(
@@ -1298,21 +1298,28 @@ type
     @item(If a namespace prefix is unknown, the namespace is resolved using the current context item. @br
           This basically allows you to do namespace prefix only matching. (option: use-local-namespaces)
           )
-    @item(JSON-objects: There is basic support for JSON like objects. (option: json)
-          @br E.g. you can write @code({"foobar": 123, "hallo": "world!"}) to create a object with two properties.
-          @br These properties can be accessed with the usual OOP property dot syntax, i.e. @code({"name": 123}.name) will evaluate to @code(123)  (can be changed with the option property-dot-notation).
+    @item(JSON-objects: JSON/JSONiq objects are supported. (option: json)
+          @br Arrays can be created with @code(  [a,b,c] )
+          @br Like a sequence they store a list of values, and can be nested with each other and within sequences.
+          @br
+          @br Object can be created with @code({"foobar": 123, "hallo": "world!", ...})
+          @br They stores a set of values as associative map.
+              The values can be accessed similar to a function call, e.g.: @code({"name": value, ...}("name")).
+          @br This implementation also provides an alternative property syntax, where these properties can be accessed with the usual OOP property dot syntax,
+              i.e. @code({"name": 123}.name) will evaluate to @code(123)  (can be changed with the option property-dot-notation).
           @br If an object is assigned to a variable, you can append the dot to the variable name, e.g. @code(let $obj := {"name": 123} return $obj.name).
               (drawback: variable names are not allowed to contains dots, if this extension is enabled)
-          @br Within an object constructor arrays can be created with json and XPath-syntax like @code({"array": [1, 2, 3]}) and @code({"array": (1, 2, 3)}).
-             (warning: Currently json arrays are translated to sequences, i.e. flattened. This might change in later versions!)
           @br Objects are immutable, but the properties of objects that are global variables can seemingly be changed with @code($obj.property := newvalue).
               This creates a new object with name @code($obj) that has all the properties of the old objects plus the changed properties.@br
           @br Objects can be assigned to each other (e.g. @code(obj1 := {}, obj2 := {}, obj2.prop := 123, obj1.sub := obj2 ) ).
           @br Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers).
           @br An alternative, older object creation syntax is the object-function (see below).
+          @br
+          @br The additional module xquery_json implements all JSONiq functions, except JSONiq update and roundtrip-serialization.
+          @br Using it also activates the JSONiq literal mode, in which @code(true, false, null) evaluate to @code(true(), false(), jn:null()). (option: json-literals).
           )
     @item(Element tests based on types of the xml are not supported (since it can not read schemas ) )
-    @item(Regex remarks: @unorderedList(                                                  )
+    @item(Regex remarks: @unorderedList(
       @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
       @item($0 and $& can be used as substitute for the
     whole regex, and $i or  ${i} is substituted with the i-th submatch, for any integer i. Therefore $12 is match 12, while ${1}2 is match 1 followed by digit 2)
@@ -1326,49 +1333,51 @@ type
 
       @item(@code(deep-text()) @br This is the concatenated plain text of the every tag inside the current text.
                                       You can also pass a separator like deep-text(' ') to separate text of different nodes.)
-      @item(@code(extract(<string>,<regex>[,<match>,[<flags>]])) @br This applies the regex <regex> to <string> and returns only the matching part.
-                                                                    If the <match> argument is used, only the <match>-th submatch will be returned
-                                                                    (<match> must be a string containing a number). @br
-                                                                    (This functions used to be called filter, but was renamed to due to XQuery 3))
-      @item(@code(eval(<string>)) @br This evaluates the string as a XQuery-expression. )
-      @item(@code(css(<string>)) @br This evaluates the string as a css selector. )
-      @item(@code(parse-date(<string>, <format>))
-                  @br Reads a date/time from string with the given format. The format is a standard Pascal format, using ymdhnsz (e.g. "yyyy-mm-dd"), not a XQuery 3.0 picture string. )
-      @item(@code(parse-time(<string>, <format>))
-                  @br Reads a date/time from string with the given format. The format is a standard Pascal format (see above) )
-      @item(@code(parse-datetime(<string>, <format>))
-                  @br Reads a date/time from string with the given format. The format is a standard Pascal format (see above) )
-      @item(@code(inner-xml(<node>))
+      @item(@code(extract($string as xs:string, $regex as xs:string [, $match as xs:integer,[$flags as xs:string]])) @br
+            This applies the regex $regex to $string and returns only the matching part.
+            If the $match argument is used, only the $match-th submatch will be returned
+            @br (This functions used to be called filter, but was renamed to due to XQuery 3))
+      @item(@code(eval($query as xs:string)) @br This evaluates $query as a XQuery-expression. )
+      @item(@code(css($css as xs:string)) @br This evaluates the $css string as a css selector. )
+      @item(@code(parse-date($input as xs:string, $format as xs:string))
+                  @br Reads a date/time from string with the given format. $format is a standard Pascal format, using ymdhnsz (e.g. "yyyy-mm-dd"), not a XQuery 3.0 picture string. )
+      @item(@code(parse-time(input as xs:string, $format as xs:string))
+                  @br Reads a date/time from string with the given format. $format is a standard Pascal format (see above) )
+      @item(@code(parse-datetime($input as xs:string, $format as xs:string))
+                  @br Reads a date/time from string with the given format. $format is a standard Pascal format (see above) )
+      @item(@code(inner-xml($node as node()))
                   @br Returns the inner xml of a node as string (like innerHTML in javascript) )
-      @item(@code(outer-xml(<node>))
+      @item(@code(outer-xml($node as node()))
                   @br Returns the outer xml of a node as string (= inner-xml plus the opening/closing tag of the node itself) )
-      @item(@code(inner-html(<node>))
+      @item(@code(inner-html($node as node()))
                   @br Returns the inner html of a node as string (like inner-xml, but valid html) )
-      @item(@code(outer-html(<node>))
+      @item(@code(outer-html($node as node()))
                   @br Returns the outer html of a node as string (like outer-xml, but valid html) )
-      @item(@code(form(<form>[, <override>]))
-                  @br This creates the request corresponding to a html form. The request includes the value of all input/select/textarea descendants of the form parameter.
-                  @br You can use the override parameter to give a sequence of values replacing the default values of the form elements.
+      @item(@code(form($form as node()*[, $override as item()*]))
+                  @br This creates the request corresponding to a html form. The request includes the value of all input/select/textarea descendants of the $form parameter.
+                  @br You can use the $override parameter to give a sequence of values replacing the default values of the form elements.
                   @br A value is either a string, e.g. @code("name=value&name2=...") which has to be url encoded and is splitted at the &-separators to override each parameter separately. (so the order of the name=value pairs is changed to the order of the input elements in the form)
                   @br Or a JSON-like object @code({"name": "value", ...}), in which the properties must not be url encodeded (i.e. the form method url encodes each property) and in which each property overrides the corresponding parameter.
                   @br
-                  @br It returns an object with these properties:
+                  @br It returns a JSON object with these properties:
                   @br url: The url the form should be send to (includes the encoded data for a GET request)
                   @br method: POST or GET
                   @br post: Url encoded post data (in future versions it might be multipart-encoded, if enctype is set correspondingly) )
-      @item(@code(is-nth(<i:int>, <a:int>, <b:int>))
-                  @br Returns true iff the equation @code ( i = a * n + b ) can be solved by an non-negative integer @code(n).
+      @item(@code(is-nth($i as xs:integer, $a as xs:integer, $b as xs:integer))
+                  @br Returns true iff the equation @code( i = a * n + b ) can be solved by an non-negative integer @code(n).
                   (This is used to implement the css functions like nth-child ) )
       @item(@code(var := object())
                   @br This creates an object with name @code($var). Default values can be passed as sequence of name/value pairs.
+                  @br A alternative syntax is @code( {} )
                   )
-      @item(@code(get-property(<object>, <name>))
+      @item(@code(get-property($obj as object(), $name as xs:string))
                   @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled
+                  @br Deprecated, now the JSONiq syntax @code($obj($name)) should be used. This function may be removed in later versions.
                   )
-      @item(@code(join(<sequence>[, <seperator>]))
+      @item(@code(join($sequence as xs:item()*[, $seperator as xs:string]))
                   @br This is the same as string-join, but without type checking. If seperator is omitted it becomes " ".
                   )
-      @item(@code(match(<template>, <node>))
+      @item(@code(match($template as item(), $node as node()+))
                   @br Performs pattern matching between the template and the nodes, and returns a list or an object of matched values.@br
                   @br E.g. @code(match(<a>{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code(<a>FOO</a>), and
                            @code(match(<a>*{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code((<a>FOO</a>, <a>BAR</a>))
@@ -1383,14 +1392,14 @@ type
                   @br see THtmlTemplateParser for the full template reference.
                   (This function is not actually declared in xquery.pas, but in extendedhtmlparser.pas, so it is only available if latter unit is included in any uses clause. )
                   )
-      @item(@code(json(<string>))
-                  @br Reads a json object/value from a string and converts it in an pxp object/value (see object extension above).
+      @item(@code(json($source as xs:string))
+                  @br Reads a json object/value from a string and converts it to an object/value (see object extension above).
                   @br If the string is an url the json is loaded from there (i.e. be aware of possible security issues when using it. jn:parse-json from xquery_json / JSONiq will only parse it)
-                  @br Only available if the xquery_json unit is in the uses clause.
+                  @br Only available if the xquery_json unit is included in an uses clause.
                   )
-      @item(@code(serialize-json(<object>))
-                  @br Converts an pxp value to a json string.
-                  @br Only available if the xquery_json unit is in the uses clause.)
+      @item(@code(serialize-json($object as item()* ))
+                  @br Converts an xq value to a json string.
+                  @br Only available if the xquery_json unit is included in an uses clause.)
       @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions",
             which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
 
@@ -1539,7 +1548,7 @@ type
     //** Initialize a query by performing the first step
     class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;const context: TXQEvaluationContext): IXQValue;
 
-    //**< Evaluates a path expression, created from the given term in the given context.
+    //** Evaluates a path expression, created from the given term in the given context.
     class function evaluateAccessList(term: TXQTerm; const context: TXQEvaluationContext): IXQValue;
 
   public
