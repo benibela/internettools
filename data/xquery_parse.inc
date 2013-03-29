@@ -752,7 +752,7 @@ begin
       'quot': result += '"';
       'apos': result += '''';
       else begin
-        if temp[1] <> '#' then raiseParsingError('XPST0003', 'Invalid entity');
+        if (temp = '') or (temp[1] <> '#') then raiseParsingError('XPST0003', 'Invalid entity');
         delete(temp,1,1);
         if temp[1] = 'x' then result += strGetUnicodeCharacter(StrToInt('$'+strcopyfrom(temp,2)), staticContext.stringEncoding)
         else result += strGetUnicodeCharacter(StrToInt(temp), staticContext.stringEncoding);
