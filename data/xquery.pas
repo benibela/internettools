@@ -2060,6 +2060,7 @@ begin
     else result:=0;
 end;
 
+
 function myStrToDecimal(s:string): decimal;
 begin
   s := trim(s);
@@ -2068,23 +2069,30 @@ begin
     else if striEqual(s, '-INF') then result:=getNegInf
     else {if strliEqual(string(v.varstr), 'NaN') then }result:=getNaN;
 end;
-function myDecimalToStr(const v:decimal): string;
+{$ifdef FPC_HAS_TYPE_EXTENDED}
+function myDecimalToStr(const v:extended): string;
 begin
   if frac(v) = 0 then begin
     if  (v >= -9200000000000000000) and (v <= 9200000000000000000) then result := IntToStr(trunc(v))
     else result := FloatToStrF(V, ffFixed, 16, 0, FormatSettings)
   end else result := FloatToStrF(V, ffGeneral, 16, 0, FormatSettings);
 end;
+{$endif FPC_HAS_TYPE_EXTENDED}
+{$ifdef FPC_HAS_TYPE_SINGLE}
 function myDecimalToStr(const v:single): string;
 begin
   if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
   result := FloatToStrF(V, ffGeneral, 8, 0, FormatSettings);
 end;
+{$endif FPC_HAS_TYPE_SINGLE}
+{$ifdef FPC_HAS_TYPE_DOUBLE}
 function myDecimalToStr(const v:double): string;
 begin
   if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
   result := FloatToStrF(V, ffGeneral, 16, 0, FormatSettings);
 end;
+{$endif FPC_HAS_TYPE_DOUBLE}
+
 
 function jsonStrEscape(s: string):string;
 var
