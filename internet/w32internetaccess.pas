@@ -188,7 +188,7 @@ The locator type is unknown.}
     ERROR_INTERNET_EXTENDED_ERROR: begin
       setlength(s,4096);
       temp2:=length(s);
-      InternetGetLastResponseInfo({$ifndef DELPHI_WININET}@{$endif}temp1,@s[1],temp2);
+      InternetGetLastResponseInfoA({$ifndef DELPHI_WININET}@{$endif}temp1,@s[1],@temp2);
       setlength(s,temp2);
       s:=rsExtendedInternetConn+#13#10+s;
     end;
@@ -326,9 +326,9 @@ begin
     if decoded.port <> '' then
       tempPort := StrToIntDef(decoded.port, 80);
     //huh? wininet seems to remember the password, if it is set once and continues sending it with new requests, even if is unset. (tested with WINE and Windows 7)
-    if (decoded.username = '') and (decoded.password = '') then hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,nil,            nil,temp,0,0)
-    else if decoded.password = '' then                  hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,pchar(decoded.username),nil,temp,0,0)
-    else                                        hLastConnection:= InternetConnect(hSession,pchar(decoded.host),tempPort,pchar(decoded.username),pchar(decoded.password),temp,0,0);
+    if (decoded.username = '') and (decoded.password = '') then hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,nil,            nil,temp,0,0)
+    else if decoded.password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(decoded.username),nil,temp,0,0)
+    else                                        hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(decoded.username),pchar(decoded.password),temp,0,0);
     if hLastConnection=nil then
       raise EW32InternetException.create(format(rsConnectingTo0SFailed, [decoded.host]));
     lastConnectedUrl := decoded;
@@ -336,11 +336,11 @@ begin
 
   if decoded.protocol='https' then begin
     if internetConfig^.checkSSLCertificates then
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
+      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
      else
-      hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
+      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
   end else
-    hfile := HttpOpenRequest(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
+    hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then
     raise EW32InternetException.create(format(rsReceivingFrom0SFaile, [decoded.combined])); //'Can''t connect');
@@ -348,11 +348,11 @@ begin
 
   cookiestr:=makeCookieHeader;
   if cookiestr<>'' then
-    HttpAddRequestHeaders(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+    HttpAddRequestHeadersA(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
   overridenPostHeader := postHeader;
   for i:=0 to additionalHeaders.Count - 1 do
     if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
-      HttpAddRequestHeaders(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
+      HttpAddRequestHeadersA(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
      else
       overridenPostHeader := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
 
@@ -360,9 +360,9 @@ begin
 
   for i := 1 to 2 do begin //repeat if ssl certificate is wrong
     if data='' then
-      callResult:= httpSendRequest(hfile, nil,0,nil,0)
+      callResult:= httpSendRequestA(hfile, nil,0,nil,0)
      else
-      callResult:= httpSendRequest(hfile, pchar(overridenPostHeader), Length(overridenPostHeader), @data[1], Length(data));
+      callResult:= httpSendRequestA(hfile, pchar(overridenPostHeader), Length(overridenPostHeader), @data[1], Length(data));
 
     if callResult then break;
 
@@ -371,9 +371,9 @@ begin
       temp := getLastError;
       if (temp = ERROR_INTERNET_INVALID_CA) or (temp = ERROR_INTERNET_SEC_CERT_REV_FAILED) or (temp = ERROR_INTERNET_SEC_CERT_NO_REV) then begin
         dwContentLength := sizeof(dwNumber);
-        InternetQueryOption (hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, dwContentLength);
+        InternetQueryOptionA(hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, @dwContentLength);
         dwNumber := dwNumber or SECURITY_FLAG_IGNORE_UNKNOWN_CA or SECURITY_FLAG_IGNORE_REVOCATION;
-        InternetSetOption (hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, sizeof (dwNumber) );
+        InternetSetOptionA(hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, sizeof (dwNumber) );
         continue;
       end;
     end;
@@ -386,7 +386,7 @@ begin
 
   dwIndex  := 0;
   dwCodeLen := 10;
-  if not HttpQueryInfo(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, dwcodeLen, dwIndex) then
+  if not HttpQueryInfoA(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, @dwcodeLen, @dwIndex) then
     raise EW32InternetException.create();
   res := pchar(@dwcode);
 
@@ -394,7 +394,7 @@ begin
 
   if (lastHTTPResultCode = 200) or (lastHTTPResultCode = 301) or (lastHTTPResultCode = 302) or (lastHTTPResultCode = 303) or (lastHTTPResultCode = 307) then begin
     dwNumber := sizeof(databuffer)-1;
-    if HttpQueryInfo(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,dwNumber,dwindex) then
+    if HttpQueryInfoA(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,@dwNumber,@dwindex) then
       parseHeaderForCookies(databuffer) //handle cookies ourself, our we could not have separate cookies for different connections
      else
       dwNumber := 0;
@@ -412,7 +412,7 @@ begin
   end else if (lastHTTPResultCode =200) or (lastHTTPResultCode = 302) then begin
     if assigned(OnProgress) then begin
       dwCodeLen := 15;
-      HttpQueryInfo(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, dwcodelen, dwIndex);
+      HttpQueryInfoA(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, @dwcodelen, @dwIndex);
       res := pchar(@dwcode);
       dwContentLength:=StrToIntDef(res,1*1024*1024);
       OnProgress(self,0,dwContentLength);
@@ -420,7 +420,7 @@ begin
     dwRead:=0;
     dwNumber := sizeof(databuffer)-1;
     SetLastError(0);
-    while (InternetReadfile(hfile,@databuffer,dwNumber,DwRead)) and (dwread>0) do begin
+    while (InternetReadfile(hfile,@databuffer,dwNumber,@DwRead)) and (dwread>0) do begin
       temp:=length(result);
       setLength(result,temp+dwRead);
       move(dataBuffer[0],result[temp+1],dwRead);
@@ -433,10 +433,10 @@ begin
     raise EW32InternetException.create(format(rsHTTPErrorCode0SNWhen, [res, decoded.combined]), StrToIntDef(res, 999));
 
   lastHTTPHeaders.Clear;
-  if not HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
+  if not HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
     if (GetLastError = ERROR_INSUFFICIENT_BUFFER) and (i > 0) then begin
       setlength(headerOut, i+1);
-      HttpQueryInfo(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @headerOut[1], @i, nil);
+      HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @headerOut[1], @i, nil);
       lastHTTPHeaders.Text:=headerOut;
     end;
 
@@ -460,7 +460,7 @@ begin
   if defaultInternetConfiguration.userAgent='' then
     defaultInternetConfiguration.userAgent:='Mozilla 3.0 (compatible)';
   if defaultInternetConfiguration.tryDefaultConfig then
-    hSession:=InternetOpen(pchar(defaultInternetConfiguration.userAgent),
+    hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
                             INTERNET_OPEN_TYPE_PRECONFIG,
                             nil,nil,0)
   else if defaultInternetConfiguration.useProxy then begin
@@ -483,11 +483,11 @@ begin
         proxyStr:=proxyStr+':'+defaultInternetConfiguration.proxyHTTPSPort;
     end;
 
-    hSession:=InternetOpen(pchar(defaultInternetConfiguration.userAgent),
+    hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
                             INTERNET_OPEN_TYPE_PROXY,
                             pchar(proxyStr),nil,0)
   end else begin
-    hSession:=InternetOpen(pchar(defaultInternetConfiguration.userAgent),
+    hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
                             INTERNET_OPEN_TYPE_DIRECT,
                             nil,nil,0)
   end;
@@ -496,7 +496,7 @@ begin
   hLastConnection:=nil;
   newConnectionOpened:=false;
   timeout:=2*60*1000;
-  InternetSetOption(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
+  InternetSetOptionA(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
 end;
 
 
