@@ -7,7 +7,10 @@ begin
   writeln('Print the numbers of 1 to 5 and multiply by 10:');
   for v in process('', '1 to 5') do
     writeln('  ', v.toString, ' * 10 = ', v.toInt64 * 10);
-
+  writeln;
+  writeln('Print the numbers of 1 to 5 and multiply by 10 (in XPath):');
+  for v in process('', '(1 to 5) / x"  {.} * 10 = {. * 10}"') do
+    writeln(v.toString);
 
   writeln;
 
