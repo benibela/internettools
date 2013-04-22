@@ -7,7 +7,7 @@ unit internettools_utf8;
 interface
 
 uses
-  LazarusPackageIntf;
+  xquery_utf8, LazarusPackageIntf;
 
 implementation
 

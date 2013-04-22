@@ -6,7 +6,7 @@
       <Version Value="11"/>
       <SearchPaths>
         <IncludeFiles Value="data;/home/benito/hg/components/lazarus/dialogs/"/>
-        <OtherUnitFiles Value="data;internet;import/regexpr/source;/home/benito/hg/components/lazarus/dialogs/"/>
+        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse"/>
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
       <Other>
@@ -16,7 +16,7 @@
         <CompilerPath Value="$(CompPath)"/>
       </Other>
     </CompilerOptions>
-    <Files Count="23">
+    <Files Count="24">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -109,6 +109,10 @@
         <Filename Value="data/simplexmltreeparserfpdom.pas"/>
         <UnitName Value="simplexmltreeparserfpdom"/>
       </Item23>
+      <Item24>
+        <Filename Value="data/xquery_json.pas"/>
+        <UnitName Value="xquery_json"/>
+      </Item24>
     </Files>
     <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="1">
