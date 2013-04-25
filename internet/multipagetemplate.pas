@@ -41,11 +41,13 @@ type
   protected
     procedure addChildFromTree(t: TTreeNode);
     procedure performChildren(reader: TMultipageTemplateReader);
+    function cloneChildren(theResult: TTemplateAction): TTemplateAction;
   public
     children: array of TTemplateAction;
     procedure initFromTree(t: TTreeNode); virtual;
     procedure addChildrenFromTree(t: TTreeNode);
     procedure perform(reader: TMultipageTemplateReader); virtual; abstract;
+    function clone: TTemplateAction; virtual;
     procedure clear;
     destructor Destroy; override;
   end;
@@ -176,6 +178,8 @@ type
     //**Find the first <variable> element definining a variable with the given name. @br
     //**Only returns the value of the value attribute, ignoring any contained xpath expression
     function findVariableValue(aname: string): string;
+
+    function clone: TMultiPageTemplate;
     //function getAccountObject():TCustomAccountAccess;override;
   end;
 
@@ -233,10 +237,14 @@ implementation
 { TTemplateActionLoop }
 
 type
+
+  { TTemplateActionMain }
+
   TTemplateActionMain = class(TTemplateAction)
     name: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
   end;
 
   { TTemplateActionVariable }
@@ -246,6 +254,7 @@ type
     hasValueStr: boolean;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
   end;
 
   { TTemplateActionLoadPage }
@@ -258,6 +267,7 @@ type
     condition, method: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
   private
     templateName: string;
   end;
@@ -268,6 +278,7 @@ type
     action: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
   end;
 
   { TTemplateActionLoop }
@@ -276,6 +287,7 @@ type
     varname, list, test: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
   end;
 
 { THtmlTemplateParserBreaker }
@@ -322,6 +334,14 @@ begin
   end;
 end;
 
+function TTemplateActionLoop.clone: TTemplateAction;
+begin
+  Result:=cloneChildren(TTemplateActionLoop.Create);
+  TTemplateActionLoop(result).varname:=varname;
+  TTemplateActionLoop(result).list:=list;
+  TTemplateActionLoop(result).test:=test;
+end;
+
 { TTemplateActionCallAction }
 
 procedure TTemplateActionCallAction.initFromTree(t: TTreeNode);
@@ -336,6 +356,12 @@ begin
   act := reader.findAction(action);
   if act = nil then raise Exception.Create('Could not find action: '+action);
   act.perform(reader);
+end;
+
+function TTemplateActionCallAction.clone: TTemplateAction;
+begin
+  Result:=cloneChildren(TTemplateActionCallAction.Create);
+  TTemplateActionCallAction(result).action:=action;
 end;
 
 { TTemplateActionLoadPage }
@@ -472,6 +498,20 @@ begin
   if Assigned(reader.onLog) then reader.onLog(reader, 'page finished', 2);
 end;
 
+function TTemplateActionLoadPage.clone: TTemplateAction;
+begin
+  Result:=cloneChildren(TTemplateActionLoadPage.Create);
+  TTemplateActionLoadPage(result).url := url;
+  TTemplateActionLoadPage(result).templateFile := templateFile;
+  TTemplateActionLoadPage(result).template:=template;
+  TTemplateActionLoadPage(result).headers := headers;
+  SetLength(TTemplateActionLoadPage(result).headers, length(headers));
+  TTemplateActionLoadPage(result).postparams := postparams;
+  SetLength(TTemplateActionLoadPage(result).postparams, length(postparams));
+  TTemplateActionLoadPage(result).condition:=condition;
+  TTemplateActionLoadPage(result).method:=method;
+end;
+
 { TTemplateActionVariable }
 
 procedure TTemplateActionVariable.initFromTree(t: TTreeNode);
@@ -495,6 +535,15 @@ begin
 
 end;
 
+function TTemplateActionVariable.clone: TTemplateAction;
+begin
+  Result:=cloneChildren(TTemplateActionVariable.Create);
+  TTemplateActionVariable(result).name:=name;
+  TTemplateActionVariable(result).value:=value;
+  TTemplateActionVariable(result).valuex:=valuex;
+  TTemplateActionVariable(result).hasValueStr:=hasValueStr;
+end;
+
 { TTemplateActionMain }
 
 procedure TTemplateActionMain.initFromTree(t: TTreeNode);
@@ -506,6 +555,12 @@ end;
 procedure TTemplateActionMain.perform(reader: TMultipageTemplateReader);
 begin
   performChildren(reader);
+end;
+
+function TTemplateActionMain.clone: TTemplateAction;
+begin
+  Result:=cloneChildren(TTemplateActionMain.Create);
+  TTemplateActionMain(result).name:=name;
 end;
 
 { TTemplateAction }
@@ -542,6 +597,15 @@ begin
   for i:=0 to high(children) do children[i].perform(reader);
 end;
 
+function TTemplateAction.cloneChildren(theResult: TTemplateAction): TTemplateAction;
+var
+  i: Integer;
+begin
+  setlength(result.children, length(children));
+  for i := 0 to high(children) do
+    result.children[i] := children[i].clone;
+end;
+
 procedure TTemplateAction.addChildrenFromTree(t: TTreeNode);
 begin
   t := t.getFirstChild();
@@ -549,6 +613,11 @@ begin
     addChildFromTree(t);
     t := t.getNextSibling();
   end;
+end;
+
+function TTemplateAction.clone: TTemplateAction;
+begin
+  result := TTemplateAction.Create;
 end;
 
 procedure TTemplateAction.clear;
@@ -690,6 +759,14 @@ end;
 
 begin
   result:=find(baseActions);
+end;
+
+function TMultiPageTemplate.clone: TMultiPageTemplate;
+begin
+  result := TMultiPageTemplate.create();
+  result.path:=path;
+  result.name:=name;
+  result.baseActions:=baseActions.clone;
 end;
 
 procedure TMultipageTemplateReader.setTemplate(atemplate: TMultiPageTemplate);
