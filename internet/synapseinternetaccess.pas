@@ -177,6 +177,7 @@ begin
     url.password := lastConnectedUrl.password;
   end;
 
+  url.linktarget := '';
 
   initConnection;
   ok := connection.HTTPMethod(method,url.combined);
