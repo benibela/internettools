@@ -53,6 +53,7 @@ const MAX_TOTAL_EXPS=128; //**<Maximal count of sub-expressions, if you are usin
 type
   TXQueryEngine=class;
   TXQValue = class;
+  PXQValue = ^TXQValue;
   TXQVList=class;
   IXQValue=interface;
   TXQVArray = array of IXQValue;
@@ -162,6 +163,9 @@ type
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
     function getRootHighest: TTreeNode;
+
+    function hasVariable(const name: string; out value: IXQValue; const ns: INamespace): boolean;
+    function getVariable(const name: string; const ns: INamespace): IXQValue;
   end;
 
 
@@ -301,8 +305,6 @@ type
   private
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (private because it wraps the object instance in a IXQValue. which may free it, if there is not another interface variable pointing to it )
   end;
-  PXQValue = ^TXQValue;
-
 
   { TXQValue_AnySimpleType }
 
@@ -2680,6 +2682,44 @@ begin
   else if staticContext.sender.ParentElement <> nil then exit(staticContext.sender.ParentElement.getRootHighest)
   else if staticContext.sender.RootElement <> nil then exit(staticContext.sender.RootElement)
   else raise EXQEvaluationException.Create('XPDY0002', 'no root element');
+end;
+
+function TXQEvaluationContext.hasVariable(const name: string; out value: IXQValue; const ns: INamespace): boolean;
+var
+  temp: TXQValue;
+  sc: TXQStaticContext;
+begin
+  temp := nil;
+  value := nil;
+  if temporaryVariables <> nil then begin
+    result := temporaryVariables.hasVariableOrObject(name, @temp, ns);
+    value := temp;
+    if result then exit;
+  end;
+  sc := findModuleStaticContext(ns);
+  if (sc <> nil) and (sc.moduleVariables <> nil) then begin
+    result := sc.moduleVariables.hasVariableOrObject(name, @temp, ns);
+    value := temp;
+    exit;
+  end;
+  if name = '$' then begin result := true; value := xqvalue('$'); end //default $$; as $
+  else if name = 'line-ending' then begin result := true; value := xqvalue(LineEnding); end //default $line-ending; as #13#10
+  else result := false;
+  if assigned(staticContext.sender.OnEvaluateVariable) then
+    result := result or staticContext.sender.OnEvaluateVariable(staticContext.sender, name, value)
+end;
+
+function TXQEvaluationContext.getVariable(const name: string; const ns: INamespace): IXQValue;
+var
+  sc: TXQStaticContext;
+  found: boolean;
+begin
+  found := hasVariable(name, result, ns);
+  if not found then begin
+    if ns <> nil then raise EXQEvaluationException.Create('XPST0008', 'Variable '+name+' not found in module '+ns.getURL)
+    else raise EXQEvaluationException.Create('XPST0008', 'Variable '+name+' not found');
+  end;
+  if result = nil then result := xqvalue();
 end;
 
 { TXQuery }
@@ -5134,6 +5174,7 @@ pxp.registerFunction('inner-html',@xqFunctionInner_HTML, []);
 pxp.registerFunction('form',@xqFunctionForm, []);
 pxp.registerFunction('eval',@xqFunctionEval, []);
 pxp.registerFunction('css',@xqFunctionCSS, []);
+pxp.registerFunction('get',@xqFunctionGet, ['($name as xs:string)','($name as xs:string, $def as item()*)'], [xqcdContextVariables]);
 pxp.registerFunction('is-nth',@xqFunctionIs_Nth, []);
 pxp.registerFunction('type-of',@xqFunctionType_of, []);
 pxp.registerFunction('get-property',@xqFunctionGet_Property, []);

@@ -1119,41 +1119,8 @@ begin
 end;
 
 function TXQTermVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
-var
-  temp: TXQValue;
-  sc: TXQStaticContext;
-  ns: INamespace;
-  found: boolean;
 begin
-  ns := namespace;
-  if context.temporaryVariables <> nil then begin
-    temp := nil;
-    if context.temporaryVariables.hasVariableOrObject(value, @temp, ns) then begin
-      if temp = nil then result := xqvalue()
-      else result := temp;
-      exit();
-    end;
-  end;
-  sc := context.findModuleStaticContext(ns);
-  if (sc <> nil) and (sc.moduleVariables <> nil) then begin
-    temp := nil;
-    if sc.moduleVariables.hasVariableOrObject(value, @temp, ns) then begin
-      if temp = nil then result := xqvalue()
-      else result := temp;
-      exit();
-    end;
-    if ns <> nil then
-      raiseEvaluationError('XPST0008', 'Variable '+value+' not found in module '+ns.getURL);
-  end;
-  if value = '$' then result := xqvalue('$') //default $$; as $
-  else if value = 'line-ending' then result := xqvalue(LineEnding) //default $line-ending; as #13#10
-  else result := xqvalue();
-  if assigned(context.staticContext.sender.OnEvaluateVariable) then
-    found := context.staticContext.sender.OnEvaluateVariable(self, value, result )
-   else
-    found := false;
-  if result.isUndefined and not found then
-    raiseEvaluationError('XPST0008', 'Variable '+value+' not found');
+  result := context.getVariable(value, namespace);
 end;
 
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;

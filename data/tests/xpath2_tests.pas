@@ -138,6 +138,11 @@ begin
   t('"x&quot;y"',                   'x&quot;y',                        '');
   t('''x&quot;y''',                 'x&quot;y',                        '');
 
+  t('get("abc")', 'alphabet');
+  t('get("test")', 'tset');
+  t('get("unknown")', '');
+  t('get("unknown", 42)', '42');
+
   //more extended strings
   t('x"123"', '123');
   t('x"{{123}}"', '{123}');
