@@ -56,6 +56,7 @@ type
     function combined: string;
     function resolved(rel: string): TDecodedUrl;
     function serverConnectionOnly: TDecodedUrl;
+    procedure prepareSelfForRequest(const lastConnectedURL: TDecodedUrl);
   end;
 
   { TCustomInternetAccess }
@@ -364,6 +365,19 @@ begin
   result.password := password;
   result.host := host;
   result.port := port;
+end;
+
+procedure TDecodedUrl.prepareSelfForRequest(const lastConnectedURL: TDecodedUrl);
+begin
+  if path = '' then path:='/';
+  if (lastConnectedUrl.username <> '') and (lastConnectedUrl.password <> '')
+     and (username = '') and (password = '')
+     and (lastConnectedUrl.host = host) and (lastConnectedUrl.port = port) and (lastConnectedUrl.protocol = protocol) then begin
+    //remember username/password from last connection (=> allows to follows urls within passwort protected areas)
+    username := lastConnectedUrl.username;
+    password := lastConnectedUrl.password;
+  end;
+  linktarget := '';
 end;
 
 { TInternetConfig }

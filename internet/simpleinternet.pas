@@ -113,15 +113,21 @@ implementation
 
 {$IFNDEF USE_SYNAPSE_WRAPPER}
 {$IFNDEF USE_WININET_WRAPPER}
+{$IFNDEF USE_ANDROID_WRAPPER}
 {$IFNDEF USE_NO_WRAPPER}
 
 //use default wrapper
 {$IFDEF WINDOWS}
 {$DEFINE USE_WININET_WRAPPER}
 {$ELSE}
+{$IFDEF ANDROID}
+{$DEFINE USE_ANDROID_WRAPPER}
+{$ELSE}
 {$DEFINE USE_SYNAPSE_WRAPPER}
 {$ENDIF}
+{$ENDIF}
 
+{$ENDIF}
 {$ENDIF}
 {$ENDIF}
 {$ENDIF}
@@ -132,6 +138,9 @@ uses bbutils, extendedhtmlparser
 {$ENDIF}
 {$IFDEF USE_WININET_WRAPPER}
 , w32internetaccess
+{$ENDIF}
+{$IFDEF USE_ANDROID_WRAPPER}
+, androidinternetaccess
 {$ENDIF}
 ;
 
@@ -240,8 +249,11 @@ begin
     {$IFDEF USE_WININET_WRAPPER}
     defaultInternetAccessClass := TW32InternetAccess;
     {$ENDIF}
+    {$IFDEF USE_ANDROID_WRAPPER}
+    defaultInternetAccessClass := TAndroidInternetAccess;
+    {$ENDIF}
     if defaultInternetAccessClass = nil then
-      raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse and wininet');
+      raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse, wininet or android');
   end;
   defaultInternet := defaultInternetAccessClass.create;
 end;

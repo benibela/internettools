@@ -165,19 +165,11 @@ begin
   contentLength:=-1;
   lastProgressLength:=-1;
 
-  if url.path = '' then url.path:='/';
-
   if url.protocol = 'https' then
     if (not IsSSLloaded) then //check if ssl is actually loaded
        raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
 
-  if (lastConnectedUrl.username <> '') and (lastConnectedUrl.password <> '') and (url.username = '') and (url.password = '') and (lastConnectedUrl.host = url.host) and (lastConnectedUrl.port = url.port) and (lastConnectedUrl.protocol = url.protocol) then begin
-    //remember username/password from last connection (=> allows to follows urls within passwort protected areas)
-    url.username := lastConnectedUrl.username;
-    url.password := lastConnectedUrl.password;
-  end;
-
-  url.linktarget := '';
+  url.prepareSelfForRequest(lastConnectedUrl);
 
   initConnection;
   ok := connection.HTTPMethod(method,url.combined);
