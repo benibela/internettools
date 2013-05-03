@@ -74,7 +74,7 @@ implementation
 
 {$IFDEF COMPILE_ANDROID_INTERNETACCESS}
 
-uses bbutils, CustomDrawnInt;
+uses bbutils, CustomDrawnInt, bbjniutils;
 
 type THttpMethod = (hmDelete, hmGet, hmHead, hmOptions, hmPost, hmPut, hmTrace);
 const methodCamelNames: array[THttpMethod] of string = ('Delete', 'Get', 'Head', 'Options', 'Post', 'Put', 'Trace');
@@ -105,17 +105,10 @@ type TClassInformation = record
     jmStatusLineGetReasonPhrase: jmethodID;
     jiStatusLine: jclass;
     jmStatusLineGetStatusCode: jmethodID;
-    jcInputStream: jclass;
-    jmInputStreamRead: jmethodID;
     jmDefaultHttpClientGetParams: jmethodID;
     jmHttpParamsSetParameter: jmethodID;
     jcHttpHost: jclass;
     jmHttpHostConstructor: jmethodID;
-    //jcIOException: jclass;
-    //jcClientProtocolException: jclass;
-    jmThrowableGetMessage: jmethodID;
-    jmClassGetName: jmethodID;
-    jmObjectGetClass: jmethodID;
 end;
 
 //threadvar initialized: boolean;
@@ -126,18 +119,13 @@ end;
 //and saving them in a global reference causes more trouble than the refinding them everytime
 function initializeClasses: TClassInformation;
 
-  function getc(n: pchar): jclass;
+  function getc(n: pchar): jclass; inline;
   begin
-    result := javaEnvRef^^.FindClass(javaEnvRef, n);
-    if (result = nil) or (javaEnvRef^^.ExceptionCheck(javaEnvRef)<>0) then
-      raise EInternetException.Create('TAndroidInternetAccess: Failed to find class: '+string(n));
-
+    result := j.getclass(n);
   end;
-  function getm(c: jclass; n, sig: pchar): jmethodID;
+  function getm(c: jclass; n, sig: pchar): jmethodID; inline;
   begin
-    result := javaEnvRef^^.GetMethodID(javaEnvRef, c, n, sig);
-    if (result = nil) or (javaEnvRef^^.ExceptionCheck(javaEnvRef)<>0) then
-      raise EInternetException.Create('TAndroidInternetAccess: Failed to find method: '+string(n)+' '+string(sig));
+    result := j.getmethod(c, n, sig);
   end;
 
 var
@@ -146,13 +134,10 @@ var
   jiHeader: jclass;
   m: THttpMethod;
   jiHttpParams: jclass;
-  jcThrowable: jclass;
-  jcClass: jclass;
-  jcObject: jclass;
 
 begin
   //if initialized then exit(cache);
-  with result do begin
+  with result do begin    //TODO: merge with androidutils of VideLibri
 
      jcDefaultHttpClient := getc('org/apache/http/impl/client/DefaultHttpClient');
      jmDefaultHttpClientConstructor := getm(jcDefaultHttpClient, '<init>', '()V');
@@ -201,20 +186,6 @@ begin
        jcMethods[m] := getc(pchar('org/apache/http/client/methods/Http'+methodCamelNames[m]));
        jmMethodConstructors[m] := getm(jcMethods[m], '<init>', '(Ljava/lang/String;)V');
      end;
-
-
-     jcInputStream := getc('java/io/InputStream');
-     jmInputStreamRead := getm(jcInputStream, 'read', '([B)I');
-
-     //jcIOException := getc('java/io/IOException');;
-     //jcClientProtocolException:=getc('org/apache/http/client/ClientProtocolException');;
-     jcThrowable := getc('java/lang/Throwable');
-     jmThrowableGetMessage := getm(jcThrowable, 'getMessage', '()Ljava/lang/String;');
-
-     jcObject := getc('java/lang/Object');
-     jmObjectGetClass := getm(jcObject, 'getClass', '()Ljava/lang/Class;');
-     jcClass := getc('java/lang/Class');
-     jmClassGetName := getm(jcClass, 'getName', '()Ljava/lang/String;');
 
    end;
  // initialized:=true;
@@ -281,77 +252,6 @@ var jRequest: jvalue;
     end;
   end;
 
-
-  function jStringToStringAndDelete(s: jobject): string;
-  var chars: pchar;
-  begin
-    if s = nil then exit('< (null) >');
-    //setlength(result, javaEnvRef^^.GetStringUTFLength(javaEnvRef, s));
-    chars := javaEnvRef^^.GetStringUTFChars(javaEnvRef, s, nil);
-    if chars = nil then result := ''
-    else result := chars;
-    javaEnvRef^^.ReleaseStringUTFChars(javaEnvRef, s, chars);
-    javaEnvRef^^.DeleteLocalRef(javaEnvRef, s);
-  end;
-
-
-  procedure RethrowJavaExceptionIfThereIsOne;
-  var je: jthrowable;
-      temp: jobject;
-      message: String;
-  begin
-    if javaEnvRef^^.ExceptionCheck(javaEnvRef) <> JNI_FALSE then begin
-      with classInfos do begin
-        je := javaEnvRef^^.ExceptionOccurred(javaEnvRef);
-        debugln('A');
-        javaEnvRef^^.ExceptionDescribe(javaEnvRef);
-        debugln('B');
-        javaEnvRef^^.ExceptionClear(javaEnvRef);
-        debugln('C');
-        temp:= javaEnvRef^^.CallObjectMethod(javaEnvRef, je, jmObjectGetClass);
-        debugln('D');
-        message := 'Java Internet Exception '
-                       + jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, temp, jmClassGetName)) + ': '
-                       + jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, je, jmThrowableGetMessage));
-        debugln('E');
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, temp);
-        debugln('F');
-        debugln(message);
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, je);
-        debugln('G');
-        raise EInternetException.create(message);
-      end;
-    end;
-  end;
-
-  function readInputStreamAndDelete(stream: jobject): string;
-  var wrappedBuffer: jvalue;
-      len: integer;
-      oldlen: Integer;
-  begin
-    if stream = nil then raise EInternetException.create('No stream');
-    with classInfos do begin
-      result := '';
-      wrappedBuffer.l := javaEnvRef^^.NewByteArray(javaEnvRef, 16384);
-      len := javaEnvRef^^.CallIntMethodA(javaEnvRef, stream,  jmInputStreamRead, @wrappedBuffer);;
-      RethrowJavaExceptionIfThereIsOne;
-      while len >= 0 do begin
-        if len > 0 then begin
-          oldlen := length(result);
-          setlength(result, oldlen + len);
-          javaEnvRef^^.GetByteArrayRegion(javaEnvRef, wrappedBuffer.l, 0, len, @result[oldlen+1]); //todo: faster way than copying?
-        end;
-        len := javaEnvRef^^.CallIntMethodA(javaEnvRef, stream,  jmInputStreamRead, @wrappedBuffer);;
-        RethrowJavaExceptionIfThereIsOne;
-      end;
-
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, wrappedBuffer.l);
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, stream);
-    end;
-  end;
-
-
-
 var
   i: Integer;
 
@@ -390,28 +290,27 @@ begin
     //send
     jResponse := javaEnvRef^^.CallObjectMethodA(javaEnvRef, jhttpclient,  jmDefaultHttpClientExecute, @jRequest);;
 
+    j.RethrowJavaExceptionIfThereIsOne(EInternetException); //if there is an exception during execute, do NOT delete the jRespone (having it in a finally block caused sigsegv, because it is an invalid not-nil value)
 
-      RethrowJavaExceptionIfThereIsOne;
-
-      DebugLn('???H');
+    try
       //process
       jResult := javaEnvRef^^.CallObjectMethod(javaEnvRef, jResponse,  jmHttpResponseGetEntity);
 
       jStatusLine := javaEnvRef^^.CallObjectMethod(javaEnvRef, jResponse, jmHttpResponseGetStatusLine);
       resultCode := javaEnvRef^^.CallIntMethod(javaEnvRef, jStatusLine, jmStatusLineGetStatusCode);
-      resultString := jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jStatusLine, jmStatusLineGetReasonPhrase));
+      resultString := j.jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jStatusLine, jmStatusLineGetReasonPhrase));
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, jStatusLine);
 
       try
         if (resultCode >= 200) and (resultCode <= 250) then begin
-          result := readInputStreamAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jResult,  jmHttpEntityGetContent));
+          result := j.inputStreamToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jResult,  jmHttpEntityGetContent));
 
           lastHTTPHeaders.Clear;
           jHeaderIterator := javaEnvRef^^.CallObjectMethod(javaEnvRef, jResponse,  jmHttpMessageHeaderIterator);
           while javaEnvRef^^.CallBooleanMethod(javaEnvRef, jHeaderIterator,  jmHeaderIteratorHasNext) <> 0 do begin
             jHeader := javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeaderIterator,  jmHeaderIteratorNextHeader);
-            lastHTTPHeaders.Add(jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeader, jmHeaderGetName)) + '='+
-                                jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeader, jmHeaderGetValue)));
+            lastHTTPHeaders.Add(j.jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeader, jmHeaderGetName)) + '='+
+                                j.jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeader, jmHeaderGetValue)));
             javaEnvRef^^.DeleteLocalRef(javaEnvRef, jHeader);
           end;
           javaEnvRef^^.DeleteLocalRef(javaEnvRef, jHeaderIterator);
@@ -432,9 +331,10 @@ begin
       Referer:=url.combined;
       lastConnectedUrl := url;
       lastHTTPResultCode := ResultCode;
-    DebugLn('???I');
-    if  jResponse <> nil then javaEnvRef^^.DeleteLocalRef(javaEnvRef, jResponse);
-    DebugLn('???J');
+    finally
+      if  jResponse <> nil then
+      javaEnvRef^^.DeleteLocalRef(javaEnvRef, jResponse);
+    end;
   end;
 end;
 

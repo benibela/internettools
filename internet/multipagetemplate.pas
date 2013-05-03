@@ -55,6 +55,8 @@ type
 
   { TMultiPageTemplate }
 
+  type TLoadTemplateFile = function(name: string): string;
+
   (***@abstract(A multi page template, which defines which and how pages are processed. @br )
 
     A multi page template defines a list of actions, each listing variables to set as well as pages to download and
@@ -171,6 +173,9 @@ type
     procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
     //**Loads the template directly from a string. @br Loading pattern-matching templates with the templateFile attribute is not supported
     procedure loadTemplateFromString(template: string; aname: string = 'unknown');
+    //**Loads this template from a directory. @br The multipage template is read from the file template, and
+    //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
+    procedure loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string = 'unknown');
     destructor destroy;override;
 
     //**Returns a <action> element with the given id
@@ -649,6 +654,7 @@ begin
   baseActions.addChildrenFromTree(u.getParent());
 end;
 
+
 constructor TMultiPageTemplate.create();
 begin
   baseActions:=TTemplateAction.Create;
@@ -668,38 +674,12 @@ begin
 end;
 
 procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
-  procedure loadTemplates(a: TTemplateAction);
-  var i:longint;
-    b: TTemplateActionLoadPage;
-  begin
-    for i:=0 to high(a.children) do
-      loadTemplates(a.children[i]);
-    if a is TTemplateActionLoadPage then begin
-      b := TTemplateActionLoadPage(a);
-      if b.templateFile = '' then exit;
-      b.template:=strLoadFromFile(self.path+b.templateFile);
-      if b.template='' then
-        raise ETemplateReader.create('Template-Datei "'+self.path+b.templateFile+'" konnte nicht geladen werden');
-    end
-  end;
-var
-  tree: TTreeParser;
 begin
-  IncludeTrailingPathDelimiter(_dataPath);
-  self.path:=_dataPath;
-  self.name:=aname;
   if not FileExists(_dataPath+'template') then
     raise Exception.Create('Template '+_dataPath+' nicht gefunden');
-
-
-  tree := TTreeParser.Create;
-  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
-  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
-  tree.TargetEncoding:=eUTF8;
-  readTree(tree.parseTreeFromFile(_dataPath+'template'));
-  loadTemplates(baseActions);
-  setTemplateNames(baseActions);
-  tree.free;
+  IncludeTrailingPathDelimiter(_dataPath);
+  self.path:=_dataPath;
+  loadTemplateWithCallback(@strLoadFromFileUTF8, aname);
 end;
 
 procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string);
@@ -715,6 +695,38 @@ begin
   readTree(tree.parseTree(template));
   setTemplateNames(baseActions);
   tree.Free;
+end;
+
+procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string);
+  procedure loadTemplates(a: TTemplateAction);
+  var i:longint;
+    b: TTemplateActionLoadPage;
+  begin
+    for i:=0 to high(a.children) do
+      loadTemplates(a.children[i]);
+    if a is TTemplateActionLoadPage then begin
+      b := TTemplateActionLoadPage(a);
+      if b.templateFile = '' then exit;
+      b.template:=loadSomething(_dataPath+b.templateFile);
+      if b.template='' then
+        raise ETemplateReader.create('Template-Datei "'+self.path+b.templateFile+'" konnte nicht geladen werden');
+    end
+  end;
+var
+  tree: TTreeParser;
+begin
+  self.path:=_dataPath;
+  self.name:=aname;
+
+
+  tree := TTreeParser.Create;
+  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
+  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
+  tree.TargetEncoding:=eUTF8;
+  readTree(tree.parseTree(loadSomething(_dataPath+'template'), 'template'));
+  loadTemplates(baseActions);
+  setTemplateNames(baseActions);
+  tree.free;
 end;
 
 
