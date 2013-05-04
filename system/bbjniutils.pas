@@ -5,7 +5,7 @@ unit bbjniutils;
 interface
 
 uses
-  Classes, SysUtils, jni, CustomDrawnInt;
+  Classes, SysUtils, jni;
 
 type EAndroidInterfaceException = class(Exception);
 
@@ -58,22 +58,45 @@ type
 end;
 
 const javaEnvRef: integer = $deadbeef; //block access to CustomDrawnInt.javaEnvRef because it is not thread safe
-threadvar j: TJavaEnv; //this is a record to reduce the overhead caused by being a threadvar (i.e. you can write with j ...)
+threadvar j: TJavaEnv; //this is an object to reduce the overhead caused by being a threadvar (i.e. you can write with j ...)
+
+var jvmref: PJavaVM;
+    jActivityObject: jobject;
+
+var onLoad: function: integer;
 
 function needJ: TJavaEnv;
+
+
+function JNI_OnLoad(vm:PJavaVM;reserved:pointer):jint; cdecl;
+procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); cdecl;
+
 
 implementation
 
-uses bbutils;
+uses bbutils {$IFDEF CD_Android}, customdrawnint{$endif};
 
 function needJ: TJavaEnv;
 begin
+  {$IFDEF CD_Android}if jvmref = nil then jvmref:=javaVMRef;{$endif}
   if j.env = nil then
-    if javaVMRef^^.GetEnv(javaVMRef,@j.env,JNI_VERSION_1_4) <> 0 then
+    if jvmref^^.GetEnv(jvmref,@j.env,JNI_VERSION_1_4) <> 0 then
       raise EAndroidInterfaceException.create('Failed to get VM environment');
   if j.env = nil then
     raise EAndroidInterfaceException.create('Failed to get VM environment');
   result := j;
+end;
+
+function JNI_OnLoad(vm: PJavaVM; reserved: pointer): jint; cdecl;
+begin
+  jvmref := vm;
+  if assigned(onLoad) then result := onload()
+  else result := JNI_VERSION_1_4;
+end;
+
+procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); cdecl;
+begin
+
 end;
 
 function TJavaEnv.getclass(n: pchar): jclass;
@@ -220,7 +243,7 @@ end;
 {$ifdef android}
 function TJavaEnv.getAssets: jobject;
 begin
-  result := callObjMethodChecked(javaActivityObject, getmethod('android/content/Context', 'getAssets', '()Landroid/content/res/AssetManager;'));
+  result := callObjMethodChecked(jActivityObject, getmethod('android/content/Context', 'getAssets', '()Landroid/content/res/AssetManager;'));
 end;
 
 function TJavaEnv.getAssetAsString(name: string): string;

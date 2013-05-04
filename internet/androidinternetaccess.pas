@@ -74,7 +74,7 @@ implementation
 
 {$IFDEF COMPILE_ANDROID_INTERNETACCESS}
 
-uses bbutils, CustomDrawnInt, bbjniutils;
+uses bbutils, bbjniutils;
 
 type THttpMethod = (hmDelete, hmGet, hmHead, hmOptions, hmPost, hmPut, hmTrace);
 const methodCamelNames: array[THttpMethod] of string = ('Delete', 'Get', 'Head', 'Options', 'Post', 'Put', 'Trace');
@@ -360,11 +360,7 @@ begin
   additionalHeaders := TStringList.Create;
   FLastHTTPHeaders := TStringList.Create;
 
-  if javaEnvRef = nil then
-    if javaVMRef^^.GetEnv(javaVMRef,@javaEnvRef,JNI_VERSION_1_4) <> 0 then
-      raise EInternetException.create('Failed to get VM environment');
-  if javaEnvRef = nil then
-    raise EInternetException.create('Failed to get VM environment');
+  javaEnvRef:=needJ.env;
 
   with initializeClasses do begin
 
