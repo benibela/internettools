@@ -1,6 +1,7 @@
 unit bbjniutils;
 
 {$mode objfpc}{$H+}
+{$modeswitch advancedrecords}
 
 interface
 
@@ -9,18 +10,23 @@ uses
 
 type EAndroidInterfaceException = class(Exception);
 
-//{$modeswitch advancedrecords}
 
 type
 
 { TJavaEnv }
 
- TJavaEnv = object
+ TJavaEnv = record
   env: PJNIEnv;
 
   function getclass(n: pchar): jclass;
   function getmethod(c: jclass; n, sig: pchar): jmethodID;
   function getmethod(classname: pchar; n, sig: pchar): jmethodID;
+  function getfield(c: jclass; n, sig: pchar): jfieldID;
+
+  function getObjectField(obj: jobject; id: jfieldID): jobject;
+  function getStringField(obj: jobject; id: jfieldID): string;
+  function getIntField(obj: jobject; id: jfieldID): jint;
+  function getBooleanField(obj: jobject; id: jfieldID): boolean;
 
   procedure callVoidMethod(obj: jobject; methodID: jmethodID); inline;
   procedure callVoidMethod(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
@@ -32,13 +38,28 @@ type
   function callObjMethodChecked(obj: jobject;  methodID: jmethodID): jobject; inline;
   function callObjMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
 
+  procedure SetObjectField(Obj:JObject;FieldID:JFieldID;Val:JObject);
+  procedure SetStringField(Obj:JObject;FieldID:JFieldID;Val:string);
+  procedure SetIntField(Obj:JObject;FieldID:JFieldID; i: jint);
+  procedure SetBooleanField(Obj:JObject;FieldID:JFieldID; b: Boolean);
+  procedure SetObjectArrayElement(a: jobject; index: integer; v: jobject);
+
+  function newObject(c: jclass; m: jmethodID): jobject;
+  function newObject(c: jclass; m: jmethodID; args: Pjvalue): jobject;
+  function newObjectArray(len: integer; c: jclass; def: jobject): jobject;
+
+  function newGlobalRefAndDelete(obj: jobject): jobject;
   procedure deleteLocalRef(obj: jobject); inline;
+  procedure deleteGlobalRef(obj: jobject);
 
   function stringToJString(s: string): jobject;
   function jStringToStringAndDelete(s: jobject): string;
 
   procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
   procedure RethrowJavaExceptionIfThereIsOne();
+
+  procedure ThrowNew(c: jclass; error: string);
+  procedure ThrowNew(c: pchar; error: string);
 
   function inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead: jmethodID): string;
   function inputStreamToStringAndDelete(stream: jobject): string; //same as in androidinternetaccess
@@ -57,7 +78,7 @@ type
   function commonMethods_AssetManager_Open_StringInputStream: jmethodID; //todo cache
 end;
 
-const javaEnvRef: integer = $deadbeef; //block access to CustomDrawnInt.javaEnvRef because it is not thread safe
+const javaEnvRef: cardinal = $deadbeef; //block access to CustomDrawnInt.javaEnvRef because it is not thread safe
 threadvar j: TJavaEnv; //this is an object to reduce the overhead caused by being a threadvar (i.e. you can write with j ...)
 
 var jvmref: PJavaVM;
@@ -74,11 +95,12 @@ procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); cdecl;
 
 implementation
 
-uses bbutils {$IFDEF CD_Android}, customdrawnint{$endif};
+uses bbutils ,lclproc{$IFDEF CD_Android}, customdrawnint{$endif};
 
 function needJ: TJavaEnv;
 begin
   {$IFDEF CD_Android}if jvmref = nil then jvmref:=javaVMRef;{$endif}
+  debugln(inttostr( ThreadID)+' needJ: '+strFromPtr(j.env));
   if j.env = nil then
     if jvmref^^.GetEnv(jvmref,@j.env,JNI_VERSION_1_4) <> 0 then
       raise EAndroidInterfaceException.create('Failed to get VM environment');
@@ -116,6 +138,31 @@ end;
 function TJavaEnv.getmethod(classname: pchar; n, sig: pchar): jmethodID;
 begin
   result := getmethod(getclass(classname), n, sig);
+end;
+
+function TJavaEnv.getfield(c: jclass; n, sig: pchar): jfieldID;
+begin
+  result := j.env^^.GetFieldID(env, c, n, sig);
+end;
+
+function TJavaEnv.getObjectField(obj: jobject; id: jfieldID): jobject;
+begin
+  result := env^^.GetObjectField(env, obj, id);
+end;
+
+function TJavaEnv.getStringField(obj: jobject; id: jfieldID): string;
+begin
+  result := jStringToStringAndDelete(getObjectField(obj, id));
+end;
+
+function TJavaEnv.getIntField(obj: jobject; id: jfieldID): jint;
+begin
+  result := env^^.GetIntField(env, obj, id);
+end;
+
+function TJavaEnv.getBooleanField(obj: jobject; id: jfieldID): boolean;
+begin
+  result := env^^.GetBooleanField(env, obj, id) <> JNI_FALSE;
 end;
 
 procedure TJavaEnv.callVoidMethod(obj: jobject; methodID: jmethodID); inline;
@@ -162,9 +209,65 @@ begin
   RethrowJavaExceptionIfThereIsOne();
 end;
 
+procedure TJavaEnv.SetObjectField(Obj: JObject; FieldID: JFieldID; Val: JObject);
+begin
+  j.env^^.SetObjectField(env, Obj, FieldID, val);
+end;
+
+procedure TJavaEnv.SetStringField(Obj: JObject; FieldID: JFieldID; Val: string);
+var
+  temp: jobject;
+begin
+  temp := stringToJString(val);
+  SetObjectField(Obj, FieldID, temp);
+  deleteLocalRef(temp);
+end;
+
+procedure TJavaEnv.SetIntField(Obj: JObject; FieldID: JFieldID; i: jint);
+begin
+  j.env^^.SetIntField(env, Obj, FieldID, i);
+end;
+
+procedure TJavaEnv.SetBooleanField(Obj: JObject; FieldID: JFieldID; b: Boolean);
+begin
+  if b then j.env^^.SetBooleanField(env, Obj, FieldID, JNI_TRUE)
+  else j.env^^.SetBooleanField(env, Obj, FieldID, JNI_FALSE)
+end;
+
+procedure TJavaEnv.SetObjectArrayElement(a: jobject; index: integer; v: jobject);
+begin
+  j.env^^.SetObjectArrayElement(env, a, index, v);
+end;
+
+function TJavaEnv.newObject(c: jclass; m: jmethodID): jobject;
+begin
+  result := env^^.NewObject(env, c, m);
+end;
+
+function TJavaEnv.newObject(c: jclass; m: jmethodID; args: Pjvalue): jobject;
+begin
+  result := env^^.NewObjectA(env, c, m, args);
+end;
+
+function TJavaEnv.newObjectArray(len: integer; c: jclass; def: jobject): jobject;
+begin
+  result := env^^.NewObjectArray(env,   len, c, def);
+end;
+
+function TJavaEnv.newGlobalRefAndDelete(obj: jobject): jobject;
+begin
+  result := env^^.NewGlobalRef(env, obj);
+  deleteLocalRef(obj);
+end;
+
 procedure TJavaEnv.deleteLocalRef(obj: jobject);
 begin
   env^^.DeleteLocalRef(env, obj);
+end;
+
+procedure TJavaEnv.deleteGlobalRef(obj: jobject);
+begin
+  env^^.DeleteGlobalRef(env, obj);
 end;
 
 function TJavaEnv.stringToJString(s: string): jobject;
@@ -207,6 +310,16 @@ end;
 procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne;
 begin
   RethrowJavaExceptionIfThereIsOne(EAndroidInterfaceException);
+end;
+
+procedure TJavaEnv.ThrowNew(c: jclass; error: string);
+begin
+  env^^.ThrowNew(env, c, pchar(error));
+end;
+
+procedure TJavaEnv.ThrowNew(c: pchar; error: string);
+begin
+  ThrowNew(getclass(c), error);
 end;
 
 
