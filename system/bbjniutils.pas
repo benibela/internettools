@@ -98,14 +98,22 @@ implementation
 uses bbutils ,lclproc{$IFDEF CD_Android}, customdrawnint{$endif};
 
 function needJ: TJavaEnv;
+var attachArgs: JavaVMAttachArgs;
 begin
   {$IFDEF CD_Android}if jvmref = nil then jvmref:=javaVMRef;{$endif}
   debugln(inttostr( ThreadID)+' needJ: '+strFromPtr(j.env));
-  if j.env = nil then
-    if jvmref^^.GetEnv(jvmref,@j.env,JNI_VERSION_1_4) <> 0 then
+  if j.env = nil then begin
+    attachArgs.version:=JNI_VERSION_1_2;
+    attachArgs.name:=nil;
+    attachArgs.group:=nil;
+    if jvmref^^.AttachCurrentThread(jvmref,@j.env,@attachArgs) <> 0 then
       raise EAndroidInterfaceException.create('Failed to get VM environment');
-  if j.env = nil then
-    raise EAndroidInterfaceException.create('Failed to get VM environment');
+    //if jvmref^^.GetEnv(jvmref,@j.env,JNI_VERSION_1_4) <> 0 then
+    //  raise EAndroidInterfaceException.create('Failed to get VM environment');
+    if j.env = nil then
+      raise EAndroidInterfaceException.create('Failed to get VM environment');
+
+  end;
   result := j;
 end;
 
