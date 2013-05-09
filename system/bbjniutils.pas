@@ -358,7 +358,7 @@ end;
 
 function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
 begin
-  result := inputStreamToStringAndDelete(commonMethods_InputStream_Read_B);
+  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B);DebugLn();
 end;
 
 {$ifdef android}
