@@ -234,8 +234,6 @@ var jRequest: jvalue;
       wrappedData := javaEnvRef^^.NewByteArray(javaEnvRef, length(data));
       if wrappedData = nil then raise EInternetException.create('Failed to allocate JNI array');
       javaEnvRef^^.SetByteArrayRegion(javaEnvRef, wrappedData, 0, length(data), @data[1]); //todo: faster way than copying?
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, wrappedData);
-
 
       //entity = new ByteArrayEntity(data)
       jentity.l := javaEnvRef^^.NewObjectA(javaEnvRef, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
