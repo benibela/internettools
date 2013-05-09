@@ -22,6 +22,8 @@ type
   function getmethod(c: jclass; n, sig: pchar): jmethodID;
   function getmethod(classname: pchar; n, sig: pchar): jmethodID;
   function getfield(c: jclass; n, sig: pchar): jfieldID;
+  function getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
+  function getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
 
   function getObjectField(obj: jobject; id: jfieldID): jobject;
   function getStringField(obj: jobject; id: jfieldID): string;
@@ -37,6 +39,11 @@ type
   procedure callVoidMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
   function callObjMethodChecked(obj: jobject;  methodID: jmethodID): jobject; inline;
   function callObjMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
+
+  procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID); inline;
+  procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
+  function callStaticObjMethod(obj: jobject;  methodID: jmethodID): jobject; inline;
+  function callStaticObjMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
 
   procedure SetObjectField(Obj:JObject;FieldID:JFieldID;Val:JObject);
   procedure SetStringField(Obj:JObject;FieldID:JFieldID;Val:string);
@@ -153,6 +160,18 @@ begin
   result := j.env^^.GetFieldID(env, c, n, sig);
 end;
 
+function TJavaEnv.getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
+begin
+  result := env^^.GetStaticMethodID(env, c, n, sig);
+  if (result = nil) or (env^^.ExceptionCheck(env)<>0) then
+    raise EAndroidInterfaceException.Create('TAndroidInternetAccess: Failed to find method: '+string(n)+' '+string(sig));
+end;
+
+function TJavaEnv.getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
+begin
+  result := getstaticmethod(getclass(classname), n, sig);
+end;
+
 function TJavaEnv.getObjectField(obj: jobject; id: jfieldID): jobject;
 begin
   result := env^^.GetObjectField(env, obj, id);
@@ -215,6 +234,26 @@ function TJavaEnv.callObjMethodChecked(obj: jobject; methodID: jmethodID; args: 
 begin
   result := callObjMethod(obj, methodID, args);
   RethrowJavaExceptionIfThereIsOne();
+end;
+
+procedure TJavaEnv.callStaticVoidMethod(obj: jobject; methodID: jmethodID);
+begin
+  env^^.CallStaticVoidMethod(env, obj, methodID);
+end;
+
+procedure TJavaEnv.callStaticVoidMethod(obj: jobject; methodID: jmethodID; args: Pjvalue);
+begin
+  env^^.CallStaticVoidMethodA(env, obj, methodID, args);
+end;
+
+function TJavaEnv.callStaticObjMethod(obj: jobject; methodID: jmethodID): jobject;
+begin
+  result := env^^.CallStaticObjectMethod(env, obj, methodID);
+end;
+
+function TJavaEnv.callStaticObjMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
+begin
+  result := env^^.CallStaticObjectMethodA(env, obj, methodID, args);
 end;
 
 procedure TJavaEnv.SetObjectField(Obj: JObject; FieldID: JFieldID; Val: JObject);
