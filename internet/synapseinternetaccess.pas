@@ -218,6 +218,8 @@ begin
 end;
 
 constructor TSynapseInternetAccess.create();
+var
+  temp: String;
 begin
   additionalHeaders := TStringList.Create;
 
@@ -234,6 +236,18 @@ begin
     if defaultInternetConfiguration.proxyHTTPName<>'' then begin
       connection.ProxyHost:=defaultInternetConfiguration.proxyHTTPName;
       connection.ProxyPort:=defaultInternetConfiguration.proxyHTTPPort;
+    end;
+    if defaultInternetConfiguration.proxySOCKSName <>'' then begin
+      temp := defaultInternetConfiguration.proxySOCKSName;
+      if strContains(temp, '@') then begin
+        connection.Sock.SocksUsername:=strSplitGet('@', temp);
+        if strContains(connection.Sock.SocksUsername, ':') then begin
+          connection.Sock.SocksPassword:=strSplit(connection.Sock.SocksUsername, ':')[1];
+          connection.Sock.SocksUsername:=strSplit(connection.Sock.SocksUsername, ':')[0];
+        end;
+      end;
+      connection.Sock.SocksIP:=temp;
+      connection.Sock.SocksPort:=defaultInternetConfiguration.proxySOCKSPort;
     end;
     //TODO: https proxy
   end;

@@ -483,6 +483,15 @@ begin
         proxyStr:=proxyStr+':'+defaultInternetConfiguration.proxyHTTPSPort;
     end;
 
+    if defaultInternetConfiguration.proxySOCKSName<>'' then begin
+      if pos('//',defaultInternetConfiguration.proxySOCKSName)>0 then
+        proxyStr:=proxyStr+' socks='+defaultInternetConfiguration.proxySOCKSName
+       else
+        proxyStr:=proxyStr+' socks=socks://'+defaultInternetConfiguration.proxySOCKSName;
+      if defaultInternetConfiguration.proxySOCKSPort<>'' then
+        proxyStr:=proxyStr+':'+defaultInternetConfiguration.proxySOCKSPort;
+    end;
+
     hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
                             INTERNET_OPEN_TYPE_PROXY,
                             pchar(proxyStr),nil,0)

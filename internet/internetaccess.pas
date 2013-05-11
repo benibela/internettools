@@ -40,6 +40,7 @@ type
     useProxy: Boolean; //**< should a proxy be used
     proxyHTTPName, proxyHTTPPort: string; //**< proxy used for http
     proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for https (not always supported, currently only with wininet)
+    proxySOCKSName, proxySOCKSPort: string; //**< socks proxy
 
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
