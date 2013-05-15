@@ -140,7 +140,8 @@ uses bbutils, extendedhtmlparser
 , w32internetaccess
 {$ENDIF}
 {$IFDEF USE_ANDROID_WRAPPER}
-, androidinternetaccess
+, androidinternetaccess      //if the androidinternetaccess unit is not found, you need to add the directory containing this (simpleinternet) unit to the search paths
+                             //(it is not included in the lpk, because it depends on the lcl, while all other units depend only on the fcl)
 {$ENDIF}
 ;
 
