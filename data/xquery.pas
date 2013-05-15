@@ -123,6 +123,7 @@ type
     stringEncoding: TEncoding;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
+    objectsRestrictedToJSONTypes: boolean; //**< When false, all values can be stored in object properties; when true all property values are JSON values (e.g. sequences become arrays, () becomes null, xml is serialized, ...)
 
     //ignored
     ordering: boolean;  //**< unused
@@ -1316,6 +1317,9 @@ type
           @br Objects can be assigned to each other (e.g. @code(obj1 := {}, obj2 := {}, obj2.prop := 123, obj1.sub := obj2 ) ).
           @br Then @code(obj1.sub.prop = 123), but changing obj1.sub.prop won't change obj2.prop (i.e. the objects are always copied, there are no pointers).
           @br An alternative, older object creation syntax is the object-function (see below).
+          @br At default all values are allowed as object properties.
+              If the option pure-json-objects is enabled, property values are converted to pure JSON types. (empty sequence => null, sequences => array, nodes => string)
+          @br
           @br
           @br The additional module xquery_json implements all JSONiq functions, except JSONiq update and roundtrip-serialization.
           @br Using it also activates the JSONiq literal mode, in which @code(true, false, null) evaluate to @code(true(), false(), jn:null()). (option: json-literals).
@@ -2438,6 +2442,7 @@ begin
   result.stringEncoding:=stringEncoding;
   result.strictTypeChecking:=strictTypeChecking;
   Result.useLocalNamespaces:=useLocalNamespaces;
+  result.objectsRestrictedToJSONTypes:=objectsRestrictedToJSONTypes;
 end;
 
 destructor TXQStaticContext.Destroy;

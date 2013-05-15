@@ -1663,6 +1663,12 @@ begin
   t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a : b})', '{"AA": "<b>BB</b>"}');
   //t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a:b})', '{"AA": "<b>BB</b>"}'); ??? what that's supposed to be?
 
+  m('declare option pxp:pure-json-objects "off"; {"a": <foo>bar</foo>}.a', 'bar');
+  m('declare option pxp:pure-json-objects "off"; jn:is-null({"a": ()}.a)', 'false');
+  m('declare option pxp:pure-json-objects "on"; {"a": <foo>bar</foo>}.a', '<foo>bar</foo>');
+  m('declare option pxp:pure-json-objects "on"; jn:is-null({"a": ()}.a)', 'true');
+//  m('declare option pxp:pure-json-objects "on"; {a: <foo>bar</foo>}.a', 'bar');
+
 
   //JSON examples from JSONiq spec
   t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');

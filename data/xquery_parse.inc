@@ -1482,6 +1482,7 @@ begin
                 'property-dot-notation': readBoolean(AllowPropertyDotNotation, temp);
                 'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
                 'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
+                'pure-json-objects': readBoolean(staticContext.objectsRestrictedToJSONTypes, temp);
               end;
             end else if namespace.getURL = 'http://jsoniq.org/functions' then
               case token of

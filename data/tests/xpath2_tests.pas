@@ -1895,11 +1895,22 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('serialize-json([ 10 to 15 ])', '[10, 11, 12, 13, 14, 15]');
     t('serialize-json({            "id" : 404,     "name" : "Stanco Grease Pot",   "price" : 6.49,    "weight" : 3.8,     "uses" : ["Grease storage","Backpacking pot"] })', '{"id": 404, "name": "Stanco Grease Pot", "price": 6.49, "weight": 3.8, "uses": ["Grease storage", "Backpacking pot"]}');
     t('serialize-json({"Sunday" : 1,     "Monday" : 1 + 1,    "Tuesday" : 3 * 1,    "Wednesday" : 8 div 2,    "Thursday" : 5,   "Friday" : count(for $i in 1 to 6 return $i),           "Saturday": 10 - 3 })','{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+
     ps.AllowJSONLiterals:=false;
+
   end;
+
 
   ps.StaticContext.strictTypeChecking:=false;
 
+  t('jn:is-null({"a": ()}("a"))', 'false');
+  f('{"a": (10,20,30,40,50)}.a(3)');
+  t('{"a": (10,20,30,40,50)}.a[3]', '30');
+  ps.StaticContext.objectsRestrictedToJSONTypes:=true;
+  t('jn:is-null({"a": ()}("a"))', 'true');
+  t('{"a": (10,20,30,40,50)}.a(3)', '30');
+  t('{"a": (10,20,30,40,50)}.a[3]', '');
+  ps.StaticContext.objectsRestrictedToJSONTypes:=false;
 
 
   //Tests based on failed XQTS tests
