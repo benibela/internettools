@@ -2143,6 +2143,28 @@ begin
   setlength(result, p-1);
 end;
 
+function urlHexDecode(s: string): string;
+var
+  p: Integer;
+  i: Integer;
+  temp: String;
+begin
+  SetLength(result, length(s));
+  p := 1;
+  while i <= length(s) do begin
+    case s[i] of
+      '+': result[p] := ' ';
+      '%': if (i + 2 <= length(s)) and (s[i+1] in ['a'..'f','A'..'F','0'..'9']) and (s[i+2] in ['a'..'f','A'..'F','0'..'9']) then begin
+        result[p] := chr(StrToInt('$'+s[i+1]+s[i+2])); //todo: optimize
+        i+=2;
+      end else raise EXQEvaluationException.Create('pxp:uri', 'Invalid input string at: '+copy(s,i,10))
+      else result[p] := s[i];
+    end;
+    i+=1;
+    p+=1;
+  end;
+  setlength(result, p-1);
+end;
 
 
 procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
@@ -5184,6 +5206,10 @@ pxp.registerFunction('is-nth',@xqFunctionIs_Nth, []);
 pxp.registerFunction('type-of',@xqFunctionType_of, []);
 pxp.registerFunction('get-property',@xqFunctionGet_Property, []);
 pxp.registerFunction('join',@xqFunctionJoin,[]);
+
+pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
+pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
+
 
 //standard functions
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);

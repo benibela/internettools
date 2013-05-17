@@ -1667,6 +1667,14 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$temp', '12', '');
   t('type-of($temp)', 'byte', '');
 
+  t('uri-decode(uri-encode("! # $ % & '' ( ) * + , / : ; = ? @ [ ]"))', '! # $ % & '' ( ) * + , / : ; = ? @ [ ]');
+  t('uri-decode("%20%41+")', ' A ');
+  t('uri-decode(">%4d<")', '>M<');
+  t('uri-decode("%4D")', 'M');
+  f('uri-decode("%")', '%');
+  f('uri-decode("%A")', '%A'); //invalid input, ignore it
+  f('uri-decode("%XY")', '%XY');
+  t('uri-encode(" A ")', '%20A%20');
 
                //Objects extension
   t('obj := xs:object()', '', '');

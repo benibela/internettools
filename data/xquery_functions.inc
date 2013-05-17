@@ -2047,6 +2047,13 @@ begin
   result := xqvalue(urlHexEncode(args[0].toString, [#32..#126]));
 end;
 
+function xqFunctionDecode_Uri(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args,1);
+  result := xqvalue(urlHexDecode(args[0].toString));
+end;
+
+
 function xqFunctionDoc(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   url: String;
