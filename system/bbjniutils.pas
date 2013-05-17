@@ -28,17 +28,26 @@ type
   function getObjectField(obj: jobject; id: jfieldID): jobject;
   function getStringField(obj: jobject; id: jfieldID): string;
   function getIntField(obj: jobject; id: jfieldID): jint;
+  function getLongField(obj: jobject; id: jfieldID): jlong;
   function getBooleanField(obj: jobject; id: jfieldID): boolean;
 
   procedure callVoidMethod(obj: jobject; methodID: jmethodID); inline;
   procedure callVoidMethod(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
-  function callObjMethod(obj: jobject;  methodID: jmethodID): jobject; inline;
-  function callObjMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
+  function callObjectMethod(obj: jobject;  methodID: jmethodID): jobject; inline;
+  function callObjectMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
+  function callBooleanMethod(obj: jobject;  methodID: jmethodID): boolean; inline;
+  function callBooleanMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): boolean; inline;
+  function callIntMethod(obj: jobject;  methodID: jmethodID): jint; inline;
+  function callIntMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jint; inline;
 
   procedure callVoidMethodChecked(obj: jobject; methodID: jmethodID); inline;
   procedure callVoidMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
-  function callObjMethodChecked(obj: jobject;  methodID: jmethodID): jobject; inline;
-  function callObjMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
+  function callObjectMethodChecked(obj: jobject;  methodID: jmethodID): jobject; inline;
+  function callObjectMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
+  function callBooleanMethodChecked(obj: jobject;  methodID: jmethodID): boolean; inline;
+  function callBooleanMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): boolean; inline;
+  function callIntMethodChecked(obj: jobject;  methodID: jmethodID): jint; inline;
+  function callIntMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jint; inline;
 
   procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID); inline;
   procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
@@ -48,6 +57,7 @@ type
   procedure SetObjectField(Obj:JObject;FieldID:JFieldID;Val:JObject);
   procedure SetStringField(Obj:JObject;FieldID:JFieldID;Val:string);
   procedure SetIntField(Obj:JObject;FieldID:JFieldID; i: jint);
+  procedure SetLongField(Obj:JObject;FieldID:JFieldID; i: jlong);
   procedure SetBooleanField(Obj:JObject;FieldID:JFieldID; b: Boolean);
   procedure SetObjectArrayElement(a: jobject; index: integer; v: jobject);
 
@@ -59,7 +69,8 @@ type
   procedure deleteLocalRef(obj: jobject); inline;
   procedure deleteGlobalRef(obj: jobject);
 
-  function stringToJString(s: string): jobject;
+  function NewStringUTF8(s: string): jobject;
+  function stringToJString(s: string): jobject; //deprecated
   function jStringToStringAndDelete(s: jobject): string;
 
   procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
@@ -70,6 +81,8 @@ type
 
   function inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead: jmethodID): string;
   function inputStreamToStringAndDelete(stream: jobject): string; //same as in androidinternetaccess
+
+  function getMapProperty(map: jobject; value: jobject): jobject;
 
   {$ifdef android}
   function getAssets: jobject;
@@ -187,6 +200,11 @@ begin
   result := env^^.GetIntField(env, obj, id);
 end;
 
+function TJavaEnv.getLongField(obj: jobject; id: jfieldID): jlong;
+begin
+  result := env^^.GetLongField(env, obj, id);
+end;
+
 function TJavaEnv.getBooleanField(obj: jobject; id: jfieldID): boolean;
 begin
   result := env^^.GetBooleanField(env, obj, id) <> JNI_FALSE;
@@ -202,14 +220,34 @@ begin
   env^^.CallVoidMethodA(env, obj, methodID, args);
 end;
 
-function TJavaEnv.callObjMethod(obj: jobject; methodID: jmethodID): jobject; inline;
+function TJavaEnv.callObjectMethod(obj: jobject; methodID: jmethodID): jobject; inline;
 begin
   result := env^^.CallObjectMethod(env, obj, methodID);
 end;
 
-function TJavaEnv.callObjMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
+function TJavaEnv.callObjectMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
 begin
   result := env^^.CallObjectMethodA(env, obj, methodID, args);
+end;
+
+function TJavaEnv.callBooleanMethod(obj: jobject; methodID: jmethodID): boolean;
+begin
+  result := env^^.CallBooleanMethod(env, obj, methodID) <> JNI_FALSE;
+end;
+
+function TJavaEnv.callBooleanMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): boolean;
+begin
+  result := env^^.CallBooleanMethodA(env, obj, methodID, args) <> JNI_FALSE;
+end;
+
+function TJavaEnv.callIntMethod(obj: jobject; methodID: jmethodID): jint;
+begin
+  result := env^^.CallIntMethod(env, obj, methodID);
+end;
+
+function TJavaEnv.callIntMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): jint;
+begin
+  result := env^^.CallIntMethodA(env, obj, methodID, args);
 end;
 
 procedure TJavaEnv.callVoidMethodChecked(obj: jobject; methodID: jmethodID);
@@ -224,15 +262,39 @@ begin
   RethrowJavaExceptionIfThereIsOne();
 end;
 
-function TJavaEnv.callObjMethodChecked(obj: jobject; methodID: jmethodID): jobject;
+function TJavaEnv.callObjectMethodChecked(obj: jobject; methodID: jmethodID): jobject;
 begin
-  result := callObjMethod(obj, methodID);
+  result := callObjectMethod(obj, methodID);
   RethrowJavaExceptionIfThereIsOne();
 end;
 
-function TJavaEnv.callObjMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
+function TJavaEnv.callObjectMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
 begin
-  result := callObjMethod(obj, methodID, args);
+  result := callObjectMethod(obj, methodID, args);
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callBooleanMethodChecked(obj: jobject; methodID: jmethodID): boolean;
+begin
+  result := env^^.CallBooleanMethod(env, obj, methodID) <> JNI_FALSE;
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callBooleanMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue): boolean;
+begin
+  result := env^^.CallBooleanMethodA(env, obj, methodID, args) <> JNI_FALSE;
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callIntMethodChecked(obj: jobject; methodID: jmethodID): jint;
+begin
+  result := env^^.CallIntMethod(env, obj, methodID);
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callIntMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue): jint;
+begin
+  result := env^^.CallIntMethodA(env, obj, methodID, args);
   RethrowJavaExceptionIfThereIsOne();
 end;
 
@@ -275,6 +337,11 @@ begin
   j.env^^.SetIntField(env, Obj, FieldID, i);
 end;
 
+procedure TJavaEnv.SetLongField(Obj: JObject; FieldID: JFieldID; i: jlong);
+begin
+  j.env^^.SetLongField(env, Obj, FieldID, i);
+end;
+
 procedure TJavaEnv.SetBooleanField(Obj: JObject; FieldID: JFieldID; b: Boolean);
 begin
   if b then j.env^^.SetBooleanField(env, Obj, FieldID, JNI_TRUE)
@@ -315,6 +382,11 @@ end;
 procedure TJavaEnv.deleteGlobalRef(obj: jobject);
 begin
   env^^.DeleteGlobalRef(env, obj);
+end;
+
+function TJavaEnv.NewStringUTF8(s: string): jobject;
+begin
+  result := env^^.NewStringUTF(env, pchar(s));
 end;
 
 function TJavaEnv.stringToJString(s: string): jobject;
@@ -400,10 +472,15 @@ begin
   result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B);DebugLn();
 end;
 
+function TJavaEnv.getMapProperty(map: jobject; value: jobject): jobject;
+begin
+  result := callObjectMethod(map, getmethod('java/util/Map', 'get', '(Ljava/lang/Object;)Ljava/lang/Object;'), @value);
+end;
+
 {$ifdef android}
 function TJavaEnv.getAssets: jobject;
 begin
-  result := callObjMethodChecked(jActivityObject, getmethod('android/content/Context', 'getAssets', '()Landroid/content/res/AssetManager;'));
+  result := callObjectMethodChecked(jActivityObject, getmethod('android/content/Context', 'getAssets', '()Landroid/content/res/AssetManager;'));
 end;
 
 function TJavaEnv.getAssetAsString(name: string): string;
@@ -441,7 +518,7 @@ begin
   end;
 
   temp := stringToJString(name);
-  stream := callObjMethodChecked(assets, jmAssetManagerOpen, @temp);
+  stream := callObjectMethodChecked(assets, jmAssetManagerOpen, @temp);
   deleteLocalRef(temp);
 
   result := inputStreamToStringAndDelete(stream, jmInputStreamRead);

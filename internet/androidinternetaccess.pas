@@ -79,7 +79,6 @@ uses bbutils,
 
 type THttpMethod = (hmDelete, hmGet, hmHead, hmOptions, hmPost, hmPut, hmTrace);
 const methodCamelNames: array[THttpMethod] of string = ('Delete', 'Get', 'Head', 'Options', 'Post', 'Put', 'Trace');
-threadvar javaEnvRef: PJNIEnv;
 type TClassInformation = record
     jcDefaultHttpClient: jclass;
     jmDefaultHttpClientConstructor: jmethodID;
@@ -239,11 +238,11 @@ var jRequest: jvalue;
   begin
     //jRequest.addHeader(n, v)
     with classInfos do begin
-      args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, pchar(n));
-      args[1].l := javaEnvRef^^.NewStringUTF(javaEnvRef, pchar(v));
-      javaEnvRef^^.CallVoidMethodA(javaEnvRef, jRequest.l,  jmHttpMessageAddHeader, @args[0]);;
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[1].l);
+      args[0].l := j.NewStringUTF8(n);
+      args[1].l := j.NewStringUTF8(v);
+      j.CallVoidMethod(jRequest.l,  jmHttpMessageAddHeader, @args[0]);;
+      j.DeleteLocalRef(args[0].l);
+      j.DeleteLocalRef(args[1].l);
     end;
   end;
 
@@ -254,22 +253,22 @@ var jRequest: jvalue;
   begin
     with classInfos do begin
       if data = '' then exit;
-      wrappedData := javaEnvRef^^.NewByteArray(javaEnvRef, length(data));
+      wrappedData := j.env^^.NewByteArray(j.env, length(data));
       if wrappedData = nil then raise EInternetException.create('Failed to allocate JNI array');
-      javaEnvRef^^.SetByteArrayRegion(javaEnvRef, wrappedData, 0, length(data), @data[1]); //todo: faster way than copying?
+      j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, length(data), @data[1]); //todo: faster way than copying?
 
       //entity = new ByteArrayEntity(data)
-      jentity.l := javaEnvRef^^.NewObjectA(javaEnvRef, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
+      jentity.l := j.env^^.NewObjectA(j.env, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
       //entity.setContentType(..)
       if additionalHeaders.IndexOfName('Content-Type') < 0 then begin
-        temp.l := javaEnvRef^^.NewStringUTF(javaEnvRef, 'application/x-www-form-urlencoded');
-        javaEnvRef^^.CallVoidMethodA(javaEnvRef, jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, temp.l);
+        temp.l := j.NewStringUTF8('application/x-www-form-urlencoded');
+        j.CallVoidMethod(jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
+        j.DeleteLocalRef(temp.l);
       end;
       //httprequest.setEntity(entity)
-      javaEnvRef^^.CallVoidMethodA(javaEnvRef, jRequest.l,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
+      j.CallVoidMethod(jRequest.l,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
 
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, wrappedData);
+      j.DeleteLocalRef(wrappedData);
     end;
   end;
 
@@ -283,9 +282,10 @@ var
   resultString: string;
 begin
   result:='';
-  if javaEnvRef^^.ExceptionCheck(javaEnvRef) <> JNI_FALSE then begin
-    javaEnvRef^^.ExceptionDescribe(javaEnvRef);
-    javaEnvRef^^.ExceptionClear(javaEnvRef);
+  needJ;
+  if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
+    j.env^^.ExceptionDescribe(j.env);
+    j.env^^.ExceptionClear(j.env);
     DebugLn('Warning: Ignoring exception');
   end;
 
@@ -297,9 +297,9 @@ begin
   try
     with classInfos do begin;
       //HttpGet httpget = new HttpGet(url);
-      jUrl.l := javaEnvRef^^.NewStringUTF(javaEnvRef, pchar(url.combined));
-      jRequest.l := javaEnvRef^^.NewObjectA(javaEnvRef, jcMethods[m], jmMethodConstructors[m], @jUrl);
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, jUrl.l);
+      jUrl.l := j.NewStringUTF8(pchar(url.combined));
+      jRequest.l := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
+      j.DeleteLocalRef(jUrl.l);
 
       if Referer <> '' then
         addHeader('Referer', Referer);
@@ -309,42 +309,42 @@ begin
         setRequestData();
 
       //send
-      jResponse := javaEnvRef^^.CallObjectMethodA(javaEnvRef, jhttpclient,  jmDefaultHttpClientExecute, @jRequest);;
+      jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @jRequest);;
 
       j.RethrowJavaExceptionIfThereIsOne(EInternetException); //if there is an exception during execute, do NOT delete the jRespone (having it in a finally block caused sigsegv, because it is an invalid not-nil value)
 
       try
         //process
-        jResult := javaEnvRef^^.CallObjectMethod(javaEnvRef, jResponse,  jmHttpResponseGetEntity);
+        jResult := j.CallObjectMethod(jResponse,  jmHttpResponseGetEntity);
 
-        jStatusLine := javaEnvRef^^.CallObjectMethod(javaEnvRef, jResponse, jmHttpResponseGetStatusLine);
-        resultCode := javaEnvRef^^.CallIntMethod(javaEnvRef, jStatusLine, jmStatusLineGetStatusCode);
-        resultString := j.jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jStatusLine, jmStatusLineGetReasonPhrase));
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, jStatusLine);
+        jStatusLine := j.CallObjectMethod(jResponse, jmHttpResponseGetStatusLine);
+        resultCode := j.CallIntMethod(jStatusLine, jmStatusLineGetStatusCode);
+        resultString := j.jStringToStringAndDelete(j.CallObjectMethod(jStatusLine, jmStatusLineGetReasonPhrase));
+        j.DeleteLocalRef(jStatusLine);
 
         try
           if (resultCode >= 200) and (resultCode <= 250) then begin
-            result := j.inputStreamToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jResult,  jmHttpEntityGetContent));
+            result := j.inputStreamToStringAndDelete(j.CallObjectMethod(jResult,  jmHttpEntityGetContent));
 
             lastHTTPHeaders.Clear;
-            jHeaderIterator := javaEnvRef^^.CallObjectMethod(javaEnvRef, jResponse,  jmHttpMessageHeaderIterator);
-            while javaEnvRef^^.CallBooleanMethod(javaEnvRef, jHeaderIterator,  jmHeaderIteratorHasNext) <> 0 do begin
-              jHeader := javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeaderIterator,  jmHeaderIteratorNextHeader);
-              lastHTTPHeaders.Add(j.jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeader, jmHeaderGetName)) + '='+
-                                  j.jStringToStringAndDelete(javaEnvRef^^.CallObjectMethod(javaEnvRef, jHeader, jmHeaderGetValue)));
-              javaEnvRef^^.DeleteLocalRef(javaEnvRef, jHeader);
+            jHeaderIterator := j.CallObjectMethod(jResponse,  jmHttpMessageHeaderIterator);
+            while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
+              jHeader := j.CallObjectMethod(jHeaderIterator,  jmHeaderIteratorNextHeader);
+              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + '='+
+                                  j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetValue)));
+              j.DeleteLocalRef(jHeader);
             end;
-            javaEnvRef^^.DeleteLocalRef(javaEnvRef, jHeaderIterator);
+            j.DeleteLocalRef(jHeaderIterator);
           end else
             raise EInternetException.Create('Transfer failed: '+inttostr(ResultCode)+': '+resultString+#13#10'when talking to: '+url.combined, resultCode);
             //raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
         finally
-          javaEnvRef^^.DeleteLocalRef(javaEnvRef, jResult);
+          j.DeleteLocalRef(jResult);
         end;
 
-        if javaEnvRef^^.ExceptionCheck(javaEnvRef) <> JNI_FALSE then begin
-          javaEnvRef^^.ExceptionDescribe(javaEnvRef);
-          javaEnvRef^^.ExceptionClear(javaEnvRef);
+        if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
+          j.env^^.ExceptionDescribe(j.env);
+          j.env^^.ExceptionClear(j.env);
           DebugLn('Warning: Ignoring exception');
         end;
 
@@ -354,7 +354,7 @@ begin
         lastHTTPResultCode := ResultCode;
       finally
         if  jResponse <> nil then
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, jResponse);
+        j.DeleteLocalRef(jResponse);
       end;
     end;
   finally
@@ -381,11 +381,12 @@ var args:array[0..1] of jvalue;
     jparams: jobject;
     jlhttpclient: jobject;
     tempClasses: TClassInformation;
+    javaEnvRef: PJNIEnv;
 begin
   additionalHeaders := TStringList.Create;
   FLastHTTPHeaders := TStringList.Create;
 
-  javaEnvRef:=needJ.env;
+  javaEnvRef:=needJ.env; //todo, use j. directl
 
   tempClasses := initializeClasses;
   try
@@ -439,7 +440,7 @@ destructor TAndroidInternetAccess.destroy;
 begin
   additionalHeaders.free;
   FLastHTTPHeaders.Free;
-  if jhttpclient <> nil then javaEnvRef^^.DeleteGlobalRef(javaEnvRef, jhttpclient)
+  if jhttpclient <> nil then needj.DeleteGlobalRef(jhttpclient)
   else DebugLn('Invalid jhttpclient reference (nil)');
   inherited destroy;
 end;
