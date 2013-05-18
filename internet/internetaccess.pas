@@ -100,6 +100,7 @@ type
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
     property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last request
     function getLastHTTPHeader(header: string): string; //**< Reads a certain HTTP header received by the last request
+    function getLastContentType: string; //**< Same as getLastHTTPHeader('Content-Type') but easier to remember and without magic string
   public
     constructor create();virtual;
     //**post the (url encoded) data to the given url and returns the resulting document
@@ -524,6 +525,11 @@ begin
     if striBeginsWith(headers[i], header) then
       exit(trim(strCopyFrom(headers[i], length(header) + 1)));
   exit('');
+end;
+
+function TInternetAccess.getLastContentType: string;
+begin
+  result := getLastHTTPHeader('Content-Type');
 end;
 
 constructor TInternetAccess.create();
