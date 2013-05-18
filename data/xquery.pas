@@ -3409,8 +3409,8 @@ begin
     if point > 0 then begin
       base := copy(name, 1, point - 1);
       i := indexOf(base);
-      if i < 0 then raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+base);
-      if not (get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+base+' is not an object, but '+get(i).toString);
+      if i < 0 then raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+base+LineEnding+'(when accessing: '+name+')');
+      if not (get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+base+' is not an object, but '+get(i).toString+LineEnding+'(when accessing: '+name+')');
     end;
   end;
   SetLength(vars, length(vars)+1);

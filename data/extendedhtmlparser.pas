@@ -444,7 +444,7 @@ THtmlTemplateParser=class
     function debugMatchings(const width: integer): string;
     function parseQuery(const expression: string): IXQuery; //**< Returns a IXQuery that accesses the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
-    property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables
+    property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables (variableChangeLog is usually faster)
     property variableChangeLog: TXQVariableChangeLog read FVariableLog; //**<All assignments to a variables during the matching of the template. You can use TStrings.GetNameValue to get the variable/value in a certain line
     property oldVariableChangeLog: TXQVariableChangeLog read FOldVariableLog; //**<All assignments to a variable during the matching of previous templates. (see TKeepPreviousVariables)
     property VariableChangeLogCondensed: TXQVariableChangeLog read GetVariableLogCondensed; //**< VariableChangeLog with duplicated objects removed (i.e. if you have obj := object(), obj.a := 1, obj.b := 2, obj := object(); the normal change log will contain 4 objects (like {}, {a:1}, {a:1,b:2}, {}), but the condensed log only two {a:1,b:2}, {})
