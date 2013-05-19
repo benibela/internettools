@@ -2151,6 +2151,7 @@ var
 begin
   SetLength(result, length(s));
   p := 1;
+  i := 1;
   while i <= length(s) do begin
     case s[i] of
       '+': result[p] := ' ';
