@@ -42,6 +42,7 @@ type
     procedure addChildFromTree(t: TTreeNode);
     procedure performChildren(reader: TMultipageTemplateReader);
     function cloneChildren(theResult: TTemplateAction): TTemplateAction;
+    function parseQuery(reader: TMultipageTemplateReader; query: string): IXQuery;
   public
     children: array of TTemplateAction;
     procedure initFromTree(t: TTreeNode); virtual;
@@ -286,6 +287,30 @@ type
     function clone: TTemplateAction; override;
   end;
 
+  { TTemplateActionChoose }
+
+  TTemplateActionChoose = class(TTemplateAction)
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
+
+  { TTemplateActionChooseWhen }
+
+  TTemplateActionChooseWhen = class(TTemplateAction)
+    test: string;
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
+
+  { TTemplateActionChooseOtherwise }
+
+  TTemplateActionChooseOtherwise = class(TTemplateAction)
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
   { TTemplateActionLoop }
 
   TTemplateActionLoop = class(TTemplateAction)
@@ -299,6 +324,77 @@ type
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
   function getVariable(name: string): IXQValue;
+end;
+
+{ TTemplateActionChooseOtherwise }
+
+procedure TTemplateActionChooseOtherwise.initFromTree(t: TTreeNode);
+begin
+  inherited initFromTree(t);
+  addChildrenFromTree(t);
+end;
+
+procedure TTemplateActionChooseOtherwise.perform(reader: TMultipageTemplateReader);
+begin
+  raise ETemplateReader.create('when is only allowed within a choose element');
+end;
+
+function TTemplateActionChooseOtherwise.clone: TTemplateAction;
+begin
+  result := cloneChildren(TTemplateActionChooseOtherwise.Create);
+end;
+
+{ TTemplateActionChooseWhen }
+
+procedure TTemplateActionChooseWhen.initFromTree(t: TTreeNode);
+begin
+  inherited initFromTree(t);
+  addChildrenFromTree(t);
+  test := t['test'];
+end;
+
+procedure TTemplateActionChooseWhen.perform(reader: TMultipageTemplateReader);
+begin
+  raise ETemplateReader.create('when is only allowed within a choose element');
+end;
+
+function TTemplateActionChooseWhen.clone: TTemplateAction;
+begin
+  result := cloneChildren(TTemplateActionChooseWhen.Create);
+  TTemplateActionChooseWhen(result).test:=test;
+end;
+
+{ TTemplateActionChoose }
+
+procedure TTemplateActionChoose.initFromTree(t: TTreeNode);
+begin
+  inherited initFromTree(t);
+  addChildrenFromTree(t);
+end;
+
+procedure TTemplateActionChoose.perform(reader: TMultipageTemplateReader);
+var
+  i: Integer;
+  j: Integer;
+begin
+  for i := 0 to high(children) do
+    if (children[i] is TTemplateActionChooseWhen) then begin
+       if (TTemplateActionChooseWhen(children[i]).parseQuery(reader, TTemplateActionChooseWhen(children[i]).test).evaluate().toBoolean) then begin
+         for j := 0 to high(children[i].children) do
+           children[i].children[j].perform(reader);
+         exit;
+       end;
+    end else if children[i] is TTemplateActionChooseOtherwise then begin
+      for j := 0 to high(children[i].children) do
+        children[i].children[j].perform(reader);
+      exit;
+    end else raise ETemplateReader.create('Only when and otherwise are allowed in choose. Got: '+children[i].ClassName);
+
+end;
+
+function TTemplateActionChoose.clone: TTemplateAction;
+begin
+  result := cloneChildren(TTemplateActionChoose.Create);
 end;
 
 function THtmlTemplateParserBreaker.getVariable(name: string): IXQValue;
@@ -531,7 +627,7 @@ var
   pxp: IXQuery;
 begin
   if hasValueStr then
-    reader.parser.variableChangeLog.ValuesString[name] := reader.parser.replaceEnclosedExpressions(value);
+    reader.parser. variableChangeLog.ValuesString[name] := reader.parser.replaceEnclosedExpressions(value);
   if valuex <> '' then begin
     pxp := reader.parser.parseQuery(valuex);
     if name <> '' then reader.parser.variableChangeLog.add(name, pxp.evaluate())
@@ -591,6 +687,9 @@ begin
   else if SameText(t.value, 'actions') then addChildrenFromTree(t)
   else if SameText(t.value, 'page') then addChild(TTemplateActionLoadPage)
   else if SameText(t.value, 'call') then addChild(TTemplateActionCallAction)
+  else if SameText(t.value, 'choose') then addChild(TTemplateActionChoose)
+  else if SameText(t.value, 'when') then addChild(TTemplateActionChooseWhen)
+  else if SameText(t.value, 'otherwise') then addChild(TTemplateActionChooseOtherwise)
   else if SameText(t.value, 'loop') then addChild(TTemplateActionLoop)
   else raise Exception.Create('Unknown template node: '+t.outerXML);
 end;
@@ -609,6 +708,11 @@ begin
   setlength(result.children, length(children));
   for i := 0 to high(children) do
     result.children[i] := children[i].clone;
+end;
+
+function TTemplateAction.parseQuery(reader: TMultipageTemplateReader; query: string): IXQuery;
+begin
+  result := reader.parser.parseQuery(query);
 end;
 
 procedure TTemplateAction.addChildrenFromTree(t: TTreeNode);
