@@ -59,7 +59,7 @@ protected
 public
   Referer: string;
 
-  constructor create();override;
+  constructor create;override;
   destructor destroy;override;
   function needConnection():boolean;override;
   procedure closeOpenedConnections();override;
@@ -69,6 +69,8 @@ end;
 TAndroidInternetAccessClass = class of TAndroidInternetAccess;
 
 {$ENDIF}
+
+var defaultHttpClientClass: jclass = nil;
 
 implementation
 
@@ -122,7 +124,7 @@ end;
 //finds the necessary JNI classes
 //was supposed to cache the classes and call findclass only once, but the jclass is garbage collected,
 //and saving them in a global reference causes more trouble than the refinding them everytime
-function initializeClasses: TClassInformation;
+function initializeClasses(): TClassInformation;
 
   function getc(n: pchar): jclass; inline;
   begin
@@ -139,7 +141,8 @@ var
 begin
   //if initialized then exit(cache);
   with result do begin    //TODO: merge with androidutils of VideLibri
-     jcDefaultHttpClient := getc('org/apache/http/impl/client/DefaultHttpClient');
+     jcDefaultHttpClient := defaultHttpClientClass;
+     if jcDefaultHttpClient = nil then jcDefaultHttpClient := getc('org/apache/http/impl/client/DefaultHttpClient');
      jmDefaultHttpClientConstructor := getm(jcDefaultHttpClient, '<init>', '()V');
      jmDefaultHttpClientExecute := getm(jcDefaultHttpClient, 'execute', '(Lorg/apache/http/client/methods/HttpUriRequest;)Lorg/apache/http/HttpResponse;');
      jmDefaultHttpClientGetParams := getm(jcDefaultHttpClient, 'getParams', '()Lorg/apache/http/params/HttpParams;');
@@ -197,7 +200,7 @@ var
   m: THttpMethod;
 begin
   with info do begin
-    j.deleteLocalRef(jcDefaultHttpClient);
+    if jcDefaultHttpClient <> defaultHttpClientClass then j.deleteLocalRef(jcDefaultHttpClient);
     j.deleteLocalRef(jiHttpParams);
     j.deleteLocalRef(jcHttpHost);
     j.deleteLocalRef(jiHttpMessage);
@@ -293,7 +296,7 @@ begin
 
   m := methodStringToMethod(method);
 
-  classInfos := initializeClasses; //todo: cache?
+  classInfos := initializeClasses(); //todo: cache?
   try
     with classInfos do begin;
       //HttpGet httpget = new HttpGet(url);
@@ -388,7 +391,7 @@ begin
 
   javaEnvRef:=needJ.env; //todo, use j. directl
 
-  tempClasses := initializeClasses;
+  tempClasses := initializeClasses();
   try
     with tempClasses do begin
       jlhttpclient := javaEnvRef^^.NewObject(javaEnvRef, jcDefaultHttpClient, jmDefaultHttpClientConstructor);
