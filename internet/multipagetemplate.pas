@@ -705,6 +705,7 @@ function TTemplateAction.cloneChildren(theResult: TTemplateAction): TTemplateAct
 var
   i: Integer;
 begin
+  result := theResult;
   setlength(result.children, length(children));
   for i := 0 to high(children) do
     result.children[i] := children[i].clone;
@@ -727,6 +728,7 @@ end;
 function TTemplateAction.clone: TTemplateAction;
 begin
   result := TTemplateAction.Create;
+  cloneChildren(result);
 end;
 
 procedure TTemplateAction.clear;
