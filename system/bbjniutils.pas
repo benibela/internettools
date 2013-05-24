@@ -115,13 +115,13 @@ procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); cdecl;
 
 implementation
 
-uses bbutils ,lclproc{$IFDEF CD_Android}, customdrawnint{$endif};
+uses bbutils {$IFDEF CD_Android}, customdrawnint{$endif};
 
 function needJ: TJavaEnv;
 var attachArgs: JavaVMAttachArgs;
 begin
   {$IFDEF CD_Android}if jvmref = nil then jvmref:=javaVMRef;{$endif}
-  debugln(inttostr( ThreadID)+' needJ: '+strFromPtr(j.env));
+  //debugln(inttostr( ThreadID)+' needJ: '+strFromPtr(j.env));
   if j.env = nil then begin
     attachArgs.version:=JNI_VERSION_1_2;
     attachArgs.name:=nil;
@@ -469,7 +469,7 @@ end;
 
 function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
 begin
-  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B);DebugLn();
+  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B);
 end;
 
 function TJavaEnv.getMapProperty(map: jobject; value: jobject): jobject;
