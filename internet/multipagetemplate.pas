@@ -54,6 +54,21 @@ type
   end;
   TTemplateActionClass = class of TTemplateAction;
 
+  { TTemplateActionMeta }
+
+  TTemplateActionMeta = class(TTemplateAction)
+    description: string;
+    variables: array of record
+      name: string;
+      hasDef: boolean;
+      def: string;
+      description: string;
+    end;
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
+
   { TMultiPageTemplate }
 
   type TLoadTemplateFile = function(name: string): string;
@@ -324,6 +339,43 @@ type
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
   function getVariable(name: string): IXQValue;
+end;
+
+{ TTemplateActionMeta }
+
+procedure TTemplateActionMeta.initFromTree(t: TTreeNode);
+var
+  e: TTreeNode;
+begin
+  e := t.next;
+  while e <> nil do begin
+    if (e.typ = tetOpen) then
+      case e.value of
+        'description': description:=e.deepNodeText();
+        'variable': begin
+          SetLength(variables, length(variables)+1);
+          with variables[high(variables)] do begin
+            name := e['name'];
+            hasDef:= e.hasAttribute('default');
+            if hasDef then def := e['default'];
+            description := e.findChild(tetOpen, 'description',  []).deepNodeText();;
+          end;
+        end;
+      end;
+    e := e.getNextSibling();
+  end;
+end;
+
+procedure TTemplateActionMeta.perform(reader: TMultipageTemplateReader);
+begin
+
+end;
+
+function TTemplateActionMeta.clone: TTemplateAction;
+begin
+  Result:=TTemplateActionMeta.Create;
+  TTemplateActionMeta(result).Description := description;
+  TTemplateActionMeta(result).variables:=variables;
 end;
 
 { TTemplateActionChooseOtherwise }
@@ -691,6 +743,7 @@ begin
   else if SameText(t.value, 'when') then addChild(TTemplateActionChooseWhen)
   else if SameText(t.value, 'otherwise') then addChild(TTemplateActionChooseOtherwise)
   else if SameText(t.value, 'loop') then addChild(TTemplateActionLoop)
+  else if SameText(t.value, 'meta') then addChild(TTemplateActionMeta)
   else raise Exception.Create('Unknown template node: '+t.outerXML);
 end;
 
