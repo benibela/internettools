@@ -302,6 +302,15 @@ type
     function clone: TTemplateAction; override;
   end;
 
+  { TTemplateActionIf }
+
+  TTemplateActionIf = class(TTemplateAction)
+    test: string;
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
+
   { TTemplateActionChoose }
 
   TTemplateActionChoose = class(TTemplateAction)
@@ -339,6 +348,26 @@ type
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
   function getVariable(name: string): IXQValue;
+end;
+
+procedure TTemplateActionIf.initFromTree(t: TTreeNode);
+begin
+  test := t['test'];
+end;
+
+procedure TTemplateActionIf.perform(reader: TMultipageTemplateReader);
+var
+  i: Integer;
+begin
+  if parseQuery(reader, test).evaluate().toBooleanEffective then
+    for i := 0 to high(children) do
+      children[i].perform(reader);
+end;
+
+function TTemplateActionIf.clone: TTemplateAction;
+begin
+  result := cloneChildren(TTemplateActionIf.Create);
+  TTemplateActionIf(result).test := test;
 end;
 
 { TTemplateActionMeta }
@@ -744,6 +773,7 @@ begin
   else if SameText(t.value, 'otherwise') then addChild(TTemplateActionChooseOtherwise)
   else if SameText(t.value, 'loop') then addChild(TTemplateActionLoop)
   else if SameText(t.value, 'meta') then addChild(TTemplateActionMeta)
+  else if SameText(t.value, 'if') then addChild(TTemplateActionIf)
   else raise Exception.Create('Unknown template node: '+t.outerXML);
 end;
 
