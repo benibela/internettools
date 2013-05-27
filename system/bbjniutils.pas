@@ -22,6 +22,7 @@ type
   function getmethod(c: jclass; n, sig: pchar): jmethodID;
   function getmethod(classname: pchar; n, sig: pchar): jmethodID;
   function getfield(c: jclass; n, sig: pchar): jfieldID;
+  function getfield(classname: pchar; n, sig: pchar): jfieldID;
   function getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
   function getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
 
@@ -39,6 +40,8 @@ type
   function callBooleanMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): boolean; inline;
   function callIntMethod(obj: jobject;  methodID: jmethodID): jint; inline;
   function callIntMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jint; inline;
+  function callStringMethod(obj: jobject;  methodID: jmethodID): string; inline;
+  function callStringMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): string; inline;
 
   procedure callVoidMethodChecked(obj: jobject; methodID: jmethodID); inline;
   procedure callVoidMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
@@ -48,6 +51,8 @@ type
   function callBooleanMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): boolean; inline;
   function callIntMethodChecked(obj: jobject;  methodID: jmethodID): jint; inline;
   function callIntMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jint; inline;
+  function callStringMethodChecked(obj: jobject;  methodID: jmethodID): string; inline;
+  function callStringMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): string; inline;
 
   procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID); inline;
   procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
@@ -173,6 +178,11 @@ begin
   result := j.env^^.GetFieldID(env, c, n, sig);
 end;
 
+function TJavaEnv.getfield(classname: pchar; n, sig: pchar): jfieldID;
+begin
+  result := j.env^^.GetFieldID(env, getclass(classname), n, sig);
+end;
+
 function TJavaEnv.getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
 begin
   result := env^^.GetStaticMethodID(env, c, n, sig);
@@ -250,6 +260,16 @@ begin
   result := env^^.CallIntMethodA(env, obj, methodID, args);
 end;
 
+function TJavaEnv.callStringMethod(obj: jobject; methodID: jmethodID): string;
+begin
+  result := jStringToStringAndDelete(env^^.CallObjectMethod(env, obj, methodID));
+end;
+
+function TJavaEnv.callStringMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): string;
+begin
+  result := jStringToStringAndDelete(env^^.CallObjectMethodA(env, obj, methodID, args));
+end;
+
 procedure TJavaEnv.callVoidMethodChecked(obj: jobject; methodID: jmethodID);
 begin
   callVoidMethod(obj, methodID);
@@ -295,6 +315,18 @@ end;
 function TJavaEnv.callIntMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue): jint;
 begin
   result := env^^.CallIntMethodA(env, obj, methodID, args);
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callStringMethodChecked(obj: jobject; methodID: jmethodID): string;
+begin
+  result := callStringMethod(obj, methodID);
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callStringMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue): string;
+begin
+  result := callStringMethod(obj, methodID, args);
   RethrowJavaExceptionIfThereIsOne();
 end;
 
