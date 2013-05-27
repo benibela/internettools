@@ -352,7 +352,9 @@ end;
 
 procedure TTemplateActionIf.initFromTree(t: TTreeNode);
 begin
+  inherited initFromTree(t);
   test := t['test'];
+  addChildrenFromTree(t);
 end;
 
 procedure TTemplateActionIf.perform(reader: TMultipageTemplateReader);
