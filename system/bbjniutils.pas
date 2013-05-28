@@ -59,12 +59,15 @@ type
   function callStaticObjMethod(obj: jobject;  methodID: jmethodID): jobject; inline;
   function callStaticObjMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
 
-  procedure SetObjectField(Obj:JObject;FieldID:JFieldID;Val:JObject);
-  procedure SetStringField(Obj:JObject;FieldID:JFieldID;Val:string);
-  procedure SetIntField(Obj:JObject;FieldID:JFieldID; i: jint);
-  procedure SetLongField(Obj:JObject;FieldID:JFieldID; i: jlong);
-  procedure SetBooleanField(Obj:JObject;FieldID:JFieldID; b: Boolean);
-  procedure SetObjectArrayElement(a: jobject; index: integer; v: jobject);
+  procedure SetObjectField(Obj:JObject;FieldID:JFieldID;Val:JObject); inline;
+  procedure SetStringField(Obj:JObject;FieldID:JFieldID;Val:string); inline;
+  procedure SetIntField(Obj:JObject;FieldID:JFieldID; i: jint); inline;
+  procedure SetLongField(Obj:JObject;FieldID:JFieldID; i: jlong); inline;
+  procedure SetBooleanField(Obj:JObject;FieldID:JFieldID; b: Boolean); inline;
+
+  procedure setObjectArrayElement(a: jobject; index: integer; v: jobject); inline;
+  function getObjectArrayElement(a: jobject; index: integer): jobject; inline;
+  function getArrayLength(a: jobject): jint; inline;
 
   function newObject(c: jclass; m: jmethodID): jobject;
   function newObject(c: jclass; m: jmethodID; args: Pjvalue): jobject;
@@ -84,7 +87,7 @@ type
   procedure ThrowNew(c: jclass; error: string);
   procedure ThrowNew(c: pchar; error: string);
 
-  function inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead: jmethodID): string;
+  function inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead, jmInputStreamClose: jmethodID): string;
   function inputStreamToStringAndDelete(stream: jobject): string; //same as in androidinternetaccess
 
   function getMapProperty(map: jobject; value: jobject): jobject;
@@ -92,14 +95,16 @@ type
   {$ifdef android}
   function getAssets: jobject;
   function getAssetAsString(name: string): string;
-  function getAssetAsString(name: string; jmAssetManagerOpen, jmInputStreamRead: jmethodID): string;
+  function getAssetAsString(name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID): string;
   function getAssetAsString(assets: jobject; name: string): string;
-  function getAssetAsString(assets: jobject; name: string; jmAssetManagerOpen, jmInputStreamRead: jmethodID): string;
+  function getAssetAsString(assets: jobject; name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID): string;
 
   {$endif}
 
 
-  function commonMethods_InputStream_Read_B: jmethodID; //todo cache
+  function commonClasses_InputStream: jclass; //todo cache
+  function commonMethods_InputStream_Read_B(inputStream: jclass = nil): jmethodID; //todo cache
+  function commonMethods_InputStream_Close(inputStream: jclass = nil): jmethodID; //todo cache
   function commonMethods_AssetManager_Open_StringInputStream: jmethodID; //todo cache
 end;
 
@@ -380,9 +385,19 @@ begin
   else j.env^^.SetBooleanField(env, Obj, FieldID, JNI_FALSE)
 end;
 
-procedure TJavaEnv.SetObjectArrayElement(a: jobject; index: integer; v: jobject);
+procedure TJavaEnv.setObjectArrayElement(a: jobject; index: integer; v: jobject);
 begin
   j.env^^.SetObjectArrayElement(env, a, index, v);
+end;
+
+function TJavaEnv.getObjectArrayElement(a: jobject; index: integer): jobject;
+begin
+  result := env^^.GetObjectArrayElement(env, a, index);
+end;
+
+function TJavaEnv.getArrayLength(a: jobject): jint;
+begin
+  result := env^^.GetArrayLength(env, a);
 end;
 
 function TJavaEnv.newObject(c: jclass; m: jmethodID): jobject;
@@ -474,7 +489,7 @@ begin
 end;
 
 
-function TJavaEnv.inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead: jmethodID): string;
+function TJavaEnv.inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead, jmInputStreamClose: jmethodID): string;
 var wrappedBuffer: jvalue;
     len: integer;
     oldlen: Integer;
@@ -491,17 +506,21 @@ begin
       setlength(result, oldlen + len);
       env^^.GetByteArrayRegion(env, wrappedBuffer.l, 0, len, @result[oldlen+1]); //todo: faster way than copying?
     end;
-    len := env^^.CallIntMethodA(env, stream,  jmInputStreamRead, @wrappedBuffer);;
-    RethrowJavaExceptionIfThereIsOne;
+    len := callIntMethodChecked(stream,  jmInputStreamRead, @wrappedBuffer);;
   end;
+  callVoidMethodChecked(stream, jmInputStreamClose);
 
-  env^^.DeleteLocalRef(env, wrappedBuffer.l);
-  env^^.DeleteLocalRef(env, stream);
+  DeleteLocalRef(wrappedBuffer.l);
+  DeleteLocalRef(stream);
 end;
 
 function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
+var
+  streamClass: jclass;
 begin
-  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B);
+  streamClass := commonClasses_InputStream;
+  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B(streamClass), commonMethods_InputStream_Close(streamClass));
+  deleteLocalRef(streamClass);
 end;
 
 function TJavaEnv.getMapProperty(map: jobject; value: jobject): jobject;
@@ -520,19 +539,25 @@ begin
   result := getAssetAsString(getAssets, name);
 end;
 
-function TJavaEnv.getAssetAsString(name: string; jmAssetManagerOpen, jmInputStreamRead: jmethodID): string;
+function TJavaEnv.getAssetAsString(name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID): string;
 begin
-  result := getAssetAsString(getAssets, name, jmAssetManagerOpen, jmInputStreamRead);
+  result := getAssetAsString(getAssets, name, jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose);
 end;
 
 function TJavaEnv.getAssetAsString(assets: jobject; name: string): string;
+var
+  stream: jclass;
 begin
+  stream := commonClasses_InputStream;
   result := getAssetAsString(name,
                              commonMethods_AssetManager_Open_StringInputStream,
-                             commonMethods_InputStream_Read_B);
+                             commonMethods_InputStream_Read_B(stream),
+                             commonMethods_InputStream_Close(stream));
+  deleteLocalRef(stream);
 end;
 
-function TJavaEnv.getAssetAsString(assets: jobject; name: string; jmAssetManagerOpen, jmInputStreamRead: jmethodID): string;
+function TJavaEnv.getAssetAsString(assets: jobject; name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID
+  ): string;
 var
   temp: jobject;
   stream: jobject;
@@ -553,15 +578,33 @@ begin
   stream := callObjectMethodChecked(assets, jmAssetManagerOpen, @temp);
   deleteLocalRef(temp);
 
-  result := inputStreamToStringAndDelete(stream, jmInputStreamRead);
+  result := inputStreamToStringAndDelete(stream, jmInputStreamRead, jmInputStreamClose);
 end;
 
 
-
-
-function TJavaEnv.commonMethods_InputStream_Read_B: jmethodID;
+function TJavaEnv.commonClasses_InputStream: jclass;
 begin
-  result := getmethod('java/io/InputStream', 'read', '([B)I');
+  result := getclass('java/io/InputStream');
+end;
+
+function TJavaEnv.commonMethods_InputStream_Read_B(inputStream: jclass): jmethodID;
+var
+  localinputstream: jclass;
+begin
+  if inputStream = nil then localinputStream := commonClasses_InputStream
+  else localinputstream := inputStream;
+  result := getmethod(commonClasses_InputStream, 'read', '([B)I');
+  if inputStream = nil then deleteLocalRef(localinputstream);
+end;
+
+function TJavaEnv.commonMethods_InputStream_Close(inputStream: jclass): jmethodID;
+var
+  localinputstream: jclass;
+begin
+  if inputStream = nil then localinputStream := commonClasses_InputStream
+  else localinputstream := inputStream;
+  result := getmethod(localinputstream, 'close', '()V');
+  if inputStream = nil then deleteLocalRef(localinputstream);
 end;
 
 function TJavaEnv.commonMethods_AssetManager_Open_StringInputStream: jmethodID;
