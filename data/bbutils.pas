@@ -563,6 +563,10 @@ function strIsAbsoluteURI(const s: string): boolean;
 //**base may be relative itself (e.g. strResolveURI('foo/bar', 'test/') becomes 'test/foo/bar')
 function strResolveURI(rel, base: string): string;
 
+//**Levenshtein distance between s and t
+//**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space
+function strSimilarity(const s, t: string): integer;
+
 //----------------Mathematical functions-------------------------------
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
 //**log 10 rounded down (= number of digits in base 10 - 1)
@@ -3568,6 +3572,42 @@ begin
 
 
   result := strResolveURIReal(rel, base);
+end;
+
+function strSimilarity(const s, t: string): integer;
+//see http://en.wikipedia.org/wiki/Levenshtein_distance
+var v: array[0..1] of array of integer;
+  i,j : Integer;
+  cost, v0, v1: Integer;
+begin
+  if s = t then exit(0);
+  if s = '' then exit(length(t));
+  if t = '' then exit(length(s));
+
+  // create two work vectors of integer distances
+  setlength(v[0], length(t) + 1);
+  setlength(v[1], length(t) + 1);
+
+  for i := 0 to high(v[0]) do
+    v[0,i] := i;
+
+  v0 := 0;
+  v1 := 1;
+
+  for i := 1 to length(s) do begin
+    v[v1,0] := i + 1;
+
+    for j := 1 to length(t) do begin
+      if s[i] = t[j] then cost := 0
+      else cost := 1;
+      v[v1,j] := min(v[v1,j-1] + 1, min(v[v0,j] + 1, v[v0,j-1] + cost));
+    end;
+
+    v0 := 1 - v0;
+    v1 := 1 - v1;
+  end;
+
+  exit(v[v1, length(t)]);
 end;
 
 function intLog10(i: longint): longint;
