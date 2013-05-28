@@ -1832,7 +1832,7 @@ procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from,
 var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are known in all XPath/XQuery expressions, even if they are not declared there
     AllowJSONDefaultInternal: boolean = false; //**< Default setting for JSON (internally used).
 implementation
-uses base64;
+uses base64, strutils;
 
 var
   XQFormats : TFormatSettings = (

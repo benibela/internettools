@@ -668,6 +668,31 @@ begin
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
+  function suggestions: string;
+  function strSimilar(const s, ref: string): boolean;
+  begin
+    result := strContains(s, ref) or strContains(ref, s)
+              or (strSimilarity(funcname, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
+  end;
+  var
+    module: TXQNativeModule;
+    i: Integer;
+  begin
+    result := '';
+    if namespace = nil then exit();
+    module := TXQueryEngine.findNativeModule(namespace.getURL);
+    while module <> nil do begin
+      for  i := 0 to module.basicFunctions.Count - 1 do
+        if strSimilar(funcname, module.basicFunctions[i]) then
+          result += module.basicFunctions[i]+' ';
+      for i := 0 to module.complexFunctions.Count - 1 do
+        if strSimilar(funcname, module.complexFunctions[i]) then
+          result += module.complexFunctions[i]+' ';
+      module := module.parent;
+    end;
+    if result <> '' then result := LineEnding +'Did you mean: '+ result;
+  end;
+
 var
   evilkids: TXQVArray;
   tempcontext: TXQEvaluationContext;
@@ -722,7 +747,7 @@ begin
           if kind <> xqfkUnknown then exit(evaluate(context));
           //if namespace <> nil then raiseEvaluationError('XPST0017', 'Function {'+ namespace.geturl+'}'+namespace.getPrefix+':'+funcname+' not found')
           //else }
-          raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found');
+          raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found. '+suggestions);
         end;
       end else begin
         if TXQInterpretedFunctionInfo(func).func = nil then
