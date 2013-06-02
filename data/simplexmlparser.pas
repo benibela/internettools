@@ -51,7 +51,7 @@ type
 procedure parseXML(xml:string; enterTag:TEnterTagEvent; leaveTag: TLeaveTagEvent; textRead: TTextEvent;
                    outputEncoding: TEncoding);
 
-function getProperty(propertyName: string; properties:TProperties):string;
+function getProperty(propertyName: string; properties:TProperties; const def: string = ''):string;
 procedure addProperty(propertyName,value: string;var properties:TProperties);
 procedure setProperty(propertyName,value: string;var properties:TProperties);
 implementation
@@ -134,14 +134,14 @@ begin
 end;
 
 
-function getProperty(propertyName: string; properties:TProperties):string;
+function getProperty(propertyName: string; properties:TProperties; const def: string = ''):string;
 var i:longint;
 begin
   propertyName:=LowerCase(propertyName);
   for i:=0 to high(properties) do
     if LowerCase(properties[i].name)=propertyName then
       exit(properties[i].value);
-  result:='';
+  result:=def;
 end;
 
 procedure addProperty(propertyName, value: string; var properties: TProperties);
