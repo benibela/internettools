@@ -102,6 +102,7 @@ type
   {$endif}
 
 
+  function commonClasses_String: jclass; //todo cache
   function commonClasses_InputStream: jclass; //todo cache
   function commonMethods_InputStream_Read_B(inputStream: jclass = nil): jmethodID; //todo cache
   function commonMethods_InputStream_Close(inputStream: jclass = nil): jmethodID; //todo cache
@@ -579,6 +580,11 @@ begin
   deleteLocalRef(temp);
 
   result := inputStreamToStringAndDelete(stream, jmInputStreamRead, jmInputStreamClose);
+end;
+
+function TJavaEnv.commonClasses_String: jclass;
+begin
+  result := getclass('java/lang/String');
 end;
 
 
