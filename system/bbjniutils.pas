@@ -67,6 +67,8 @@ type
 
   procedure setObjectArrayElement(a: jobject; index: integer; v: jobject); inline;
   function getObjectArrayElement(a: jobject; index: integer): jobject; inline;
+  procedure setStringArrayElement(a: jobject; index: integer; v: string); inline;
+  function getStringArrayElement(a: jobject; index: integer): string; inline;
   function getArrayLength(a: jobject): jint; inline;
 
   function newObject(c: jclass; m: jmethodID): jobject;
@@ -396,6 +398,20 @@ begin
   result := env^^.GetObjectArrayElement(env, a, index);
 end;
 
+procedure TJavaEnv.setStringArrayElement(a: jobject; index: integer; v: string);
+var
+  temp: jobject;
+begin
+  temp := stringToJString(v);
+  j.env^^.SetObjectArrayElement(env, a, index, temp);
+  deleteLocalRef(temp);
+end;
+
+function TJavaEnv.getStringArrayElement(a: jobject; index: integer): string;
+begin
+  result := jStringToStringAndDelete(getObjectArrayElement(a, index));
+end;
+
 function TJavaEnv.getArrayLength(a: jobject): jint;
 begin
   result := env^^.GetArrayLength(env, a);
@@ -445,7 +461,7 @@ end;
 function TJavaEnv.jStringToStringAndDelete(s: jobject): string;
 var chars: pchar;
 begin
-  if s = nil then exit('< (null) >');
+  if s = nil then exit('');
   //setlength(result, env^^.GetStringUTFLength(env, s));
   chars := env^^.GetStringUTFChars(env, s, nil);
   if chars = nil then result := ''
