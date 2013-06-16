@@ -1557,7 +1557,7 @@ begin
     end;
     {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF}: result := strConvertToUtf8FromUTF32N(str);
     {$IFDEF ENDIAN_BIG}eUTF32LE{$ELSE}eUTF32BE{$ENDIF}: begin
-      result := str;
+      result := str + '' {is this needed or not?};
       strSwapEndianDWord(result);
       result := strConvertToUtf8FromUTF32N(result);
     end
