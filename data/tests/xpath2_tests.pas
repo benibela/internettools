@@ -1829,6 +1829,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
     t('jn:is-null(jn:null())', 'true');
     t('jn:is-null(127)', 'false');
+    t('jn:is-null(json("{''test'': null}").test)', 'true');
 
     t('serialize-json(jn:object(()))', '{}');
     t('serialize-json(jn:object({"a": 123}))', '{"a": 123}');

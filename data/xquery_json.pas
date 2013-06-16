@@ -182,9 +182,11 @@ var
       tkNumber: result := parseNumber;
       tkFalse: result := xqvalueFalse;
       tkTrue: result := xqvalueTrue;
+      tkNull: result := TXQValueJSONNull.create;
       tkCurlyBraceOpen: result := parseObject;
       tkSquaredBraceOpen: result := parseArray;
       tkComma, tkColon, tkCurlyBraceClose, tkSquaredBraceClose, tkIdentifier, tkUnknown: raise EXQEvaluationException.create('jerr:JNDY002', 'JSON parsing failed at: '+scanner.CurLine);
+      else raise EXQEvaluationException.create('jerr:JNDY002', 'JSON parsing failed (unrecognized token) at: '+scanner.CurLine);
     end;
   end;
 
