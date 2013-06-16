@@ -438,10 +438,12 @@ var ar8: array[0..100] of shortint;
     ar32: array[0..100] of longint;
     ar64: array[0..100] of int64;
     ai32: TLongintArray;
+    sa: TStringArray;
     j: Integer;
     y,m,d: integer;
     ms: double;
     tz: TDateTime;
+    order: TBinarySearchChoosen;
 begin
   //parse date function
   for i:=1 to high(strs) do
@@ -789,8 +791,10 @@ begin
     SetLength(ai32, i);
     for j := 0 to high(ai32) do ai32[j] := 10 * j;
     for j := 0 to high(ai32) do begin
-      test(arrayBinarySearch(ai32, 10*j), j);
-      test(arrayBinarySearch(ai32, 10*j + 1), -1);
+      for order := low(TBinarySearchChoosen) to high(TBinarySearchChoosen) do begin
+        test(arrayBinarySearch(ai32, 10*j, order), j);
+        test(arrayBinarySearch(ai32, 10*j + 1, order), -1);
+      end;
 
       test(arrayBinarySearch(ai32, 10*j, bsFirst, [bsGreater, bsEqual]), j);
       test(arrayBinarySearch(ai32, 10*j, bsLast, [bsLower, bsEqual]), j);
@@ -801,6 +805,125 @@ begin
   end;
 
 
+    //another equal test
+  setlength(ai32, 0);
+  arrayAdd(ai32, [10,10,10,23,23,23,23,23]);
+
+  test(arrayBinarySearch(ai32, 3, bsFirst), -1);
+  test(arrayBinarySearch(ai32, 3, bsAny), -1);
+  test(arrayBinarySearch(ai32, 3, bsLast), -1);
+
+  test(arrayBinarySearch(ai32, 3, bsFirst, [bsLower]), -1);
+  test(arrayBinarySearch(ai32, 3, bsAny, [bsLower]), -1);
+  test(arrayBinarySearch(ai32, 3, bsLast, [bsLower]), -1);
+
+  test(arrayBinarySearch(ai32, 3, bsFirst, [bsLower, bsEqual]), -1);
+  test(arrayBinarySearch(ai32, 3, bsAny, [bsLower, bsEqual]), -1);
+  test(arrayBinarySearch(ai32, 3, bsLast, [bsLower, bsEqual]), -1);
+
+  test(arrayBinarySearch(ai32, 3, bsFirst, [bsGreater, bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 3, bsAny, [bsGreater, bsEqual]), 3); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 3, bsLast, [bsGreater, bsEqual]), 7);
+
+  test(arrayBinarySearch(ai32, 3, bsFirst, [bsGreater]), 0);
+  test(arrayBinarySearch(ai32, 3, bsAny, [bsGreater]), 3); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 3, bsLast, [bsGreater]), 7);
+
+
+  test(arrayBinarySearch(ai32, 10, bsFirst), 0);
+  test(arrayBinarySearch(ai32, 10, bsAny), 1);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 10, bsLast), 2);
+
+  test(arrayBinarySearch(ai32, 10, bsFirst, [bsLower]), -1);
+  test(arrayBinarySearch(ai32, 10, bsAny, [bsLower]), -1);
+  test(arrayBinarySearch(ai32, 10, bsLast, [bsLower]), -1);
+
+  test(arrayBinarySearch(ai32, 10, bsFirst, [bsLower, bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 10, bsAny, [bsLower, bsEqual]), 0);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 10, bsLast, [bsLower, bsEqual]), 2);
+
+  test(arrayBinarySearch(ai32, 10, bsFirst, [bsGreater, bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 10, bsAny, [bsGreater, bsEqual]), 3); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 10, bsLast, [bsGreater, bsEqual]), 7);
+
+  test(arrayBinarySearch(ai32, 10, bsFirst, [bsGreater]), 3);
+  test(arrayBinarySearch(ai32, 10, bsAny, [bsGreater]), 3); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 10, bsLast, [bsGreater]), 7);
+
+
+  test(arrayBinarySearch(ai32, 15, bsFirst), -1);
+  test(arrayBinarySearch(ai32, 15, bsAny), -1);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 15, bsLast), -1);
+
+  test(arrayBinarySearch(ai32, 15, bsFirst, [bsLower]), 0);
+  test(arrayBinarySearch(ai32, 15, bsAny, [bsLower]), 0);   //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 15, bsLast, [bsLower]), 2);
+
+  test(arrayBinarySearch(ai32, 15, bsFirst, [bsLower, bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 15, bsAny, [bsLower, bsEqual]), 0);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 15, bsLast, [bsLower, bsEqual]), 2);
+
+  test(arrayBinarySearch(ai32, 15, bsFirst, [bsGreater, bsEqual]), 3);
+  test(arrayBinarySearch(ai32, 15, bsAny, [bsGreater, bsEqual]), 3); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 15, bsLast, [bsGreater, bsEqual]), 7);
+
+  test(arrayBinarySearch(ai32, 15, bsFirst, [bsGreater]), 3);
+  test(arrayBinarySearch(ai32, 15, bsAny, [bsGreater]), 3); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 15, bsLast, [bsGreater]), 7);
+
+
+  test(arrayBinarySearch(ai32, 23, bsFirst), 3);
+  test(arrayBinarySearch(ai32, 23, bsAny), 3);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 23, bsLast), 7);
+
+  test(arrayBinarySearch(ai32, 23, bsFirst, [bsLower]), 0);
+  test(arrayBinarySearch(ai32, 23, bsAny, [bsLower]), 0);   //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 23, bsLast, [bsLower]), 2);
+
+  test(arrayBinarySearch(ai32, 23, bsFirst, [bsLower, bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 23, bsAny, [bsLower, bsEqual]), 0);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 23, bsLast, [bsLower, bsEqual]), 7);
+
+  test(arrayBinarySearch(ai32, 23, bsFirst, [bsGreater, bsEqual]), 3);
+  test(arrayBinarySearch(ai32, 23, bsAny, [bsGreater, bsEqual]), 3); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 23, bsLast, [bsGreater, bsEqual]), 7);
+
+  test(arrayBinarySearch(ai32, 23, bsFirst, [bsGreater]), -1);
+  test(arrayBinarySearch(ai32, 23, bsAny, [bsGreater]), -1); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 23, bsLast, [bsGreater]), -1);
+
+
+
+  test(arrayBinarySearch(ai32, 35, bsFirst), -1);
+  test(arrayBinarySearch(ai32, 35, bsAny), -1);
+  test(arrayBinarySearch(ai32, 35, bsLast), -1);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsLower]), 0);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsLower]), 0);   //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsLower]), 7);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsLower, bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsLower, bsEqual]), 0);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsLower, bsEqual]), 7);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsGreater, bsEqual]), -1);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsGreater, bsEqual]), -1); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsGreater, bsEqual]), -1);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsGreater]), -1);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsGreater]), -1); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsGreater]), -1);
+
+  SetLength(sa, 0);
+  arrayAdd(sa, ['abc', 'def', 'def', 'def', 'foobar', 'hallo', 'welt', 'xyz', 'xyz', 'xyz', 'xyz', 'xyz', 'xyz']);
+
+  test(arrayBinarySearch(sa, 'def'), 2); //implementation detail, not guaranteed
+  test(arrayBinarySearch(sa, 'def', bsFirst), 1);
+  test(arrayBinarySearch(sa, 'def', bsLast), 3);
+
+  test(arrayBinarySearch(sa, 'xyz'), 9); //implementation detail, not guaranteed
+  test(arrayBinarySearch(sa, 'xyz', bsFirst), 7);
+  test(arrayBinarySearch(sa, 'xyz', bsLast), high(sa));
 
 //Url resolving
 
