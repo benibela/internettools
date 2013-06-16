@@ -437,6 +437,7 @@ var i:longint;
 var ar8: array[0..100] of shortint;
     ar32: array[0..100] of longint;
     ar64: array[0..100] of int64;
+    ai32: TLongintArray;
     j: Integer;
     y,m,d: integer;
     ms: double;
@@ -715,6 +716,93 @@ begin
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
 
 
+  //========Binary search=========
+  setlength(ai32, 0);
+  arrayAdd(ai32, [00, 10,20,30,40,40,50,60,70]);
+  //basic checks
+  test(arrayBinarySearch(ai32, 30, bsFirst), 3);
+  test(arrayBinarySearch(ai32, 30, bsAny), 3);
+  test(arrayBinarySearch(ai32, 30, bsLast), 3);
+
+  test(arrayBinarySearch(ai32, 30, bsFirst, [bsLower]), 0);
+  test(arrayBinarySearch(ai32, 30, bsAny, [bsLower]), 0); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 30, bsLast, [bsLower]), 2);
+
+  test(arrayBinarySearch(ai32, 30, bsFirst, [bsLower,bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 30, bsAny, [bsLower,bsEqual]), 0);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 30, bsLast, [bsLower,bsEqual]), 3);
+
+  test(arrayBinarySearch(ai32, 30, bsFirst, [bsGreater,bsEqual]), 3);
+  test(arrayBinarySearch(ai32, 30, bsAny, [bsGreater,bsEqual]), 4); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 30, bsLast, [bsGreater,bsEqual]), 8);
+
+  test(arrayBinarySearch(ai32, 30, bsFirst, [bsGreater]), 4);
+  test(arrayBinarySearch(ai32, 30, bsAny, [bsGreater]), 4); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 30, bsLast, [bsGreater]), 8);
+
+
+  test(arrayBinarySearch(ai32, 35, bsFirst), -1);
+  test(arrayBinarySearch(ai32, 35, bsAny), -1);
+  test(arrayBinarySearch(ai32, 35, bsLast), -1);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsLower]), 0);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsLower]), 0); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsLower]), 3);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsLower,bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsLower,bsEqual]), 0);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsLower,bsEqual]), 3);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsGreater,bsEqual]), 4);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsGreater,bsEqual]), 4); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsGreater,bsEqual]), 8);
+
+  test(arrayBinarySearch(ai32, 35, bsFirst, [bsGreater]), 4);
+  test(arrayBinarySearch(ai32, 35, bsAny, [bsGreater]), 4); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 35, bsLast, [bsGreater]), 8);
+
+
+
+  test(arrayBinarySearch(ai32, 40, bsFirst), 4);
+  test(arrayBinarySearch(ai32, 40, bsAny), 4);  //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 40, bsLast), 5);
+
+  test(arrayBinarySearch(ai32, 40, bsFirst, [bsLower]), 0);
+  test(arrayBinarySearch(ai32, 40, bsAny, [bsLower]), 0); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 40, bsLast, [bsLower]), 3);
+
+  test(arrayBinarySearch(ai32, 40, bsFirst, [bsLower, bsEqual]), 0);
+  test(arrayBinarySearch(ai32, 40, bsAny, [bsLower, bsEqual]), 0); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 40, bsLast, [bsLower, bsEqual]), 5);
+
+  test(arrayBinarySearch(ai32, 40, bsFirst, [bsGreater, bsEqual]), 4);
+  test(arrayBinarySearch(ai32, 40, bsAny, [bsGreater, bsEqual]), 4); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 40, bsLast, [bsGreater, bsEqual]), 8);
+
+  test(arrayBinarySearch(ai32, 40, bsFirst, [bsGreater]), 6);
+  test(arrayBinarySearch(ai32, 40, bsAny, [bsGreater]), 6); //implementation detail, not guaranteed
+  test(arrayBinarySearch(ai32, 40, bsLast, [bsGreater]), 8);
+
+
+  //complete search
+  for i := 1 to 64 do begin
+    SetLength(ai32, i);
+    for j := 0 to high(ai32) do ai32[j] := 10 * j;
+    for j := 0 to high(ai32) do begin
+      test(arrayBinarySearch(ai32, 10*j), j);
+      test(arrayBinarySearch(ai32, 10*j + 1), -1);
+
+      test(arrayBinarySearch(ai32, 10*j, bsFirst, [bsGreater, bsEqual]), j);
+      test(arrayBinarySearch(ai32, 10*j, bsLast, [bsLower, bsEqual]), j);
+
+      test(arrayBinarySearch(ai32, 10*j, bsFirst, [bsGreater]), ifthen(j < high(ai32), j+1, -1));
+      test(arrayBinarySearch(ai32, 10*j, bsLast, [bsLower]), j - 1);
+    end;
+  end;
+
+
+
+//Url resolving
 
   test(strResolveURI('/foobar', 'http://example.org'), 'http://example.org/foobar');
   test(strResolveURI('foobar', 'http://example.org'), 'http://example.org/foobar');

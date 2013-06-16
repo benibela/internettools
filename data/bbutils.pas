@@ -747,7 +747,7 @@ TIntSet = specialize TSet <integer>;
 procedure setInsertAll(oldSet:TIntSet; insertedSet: TIntSet);
 procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //----------------------------Others-----------------------------------
-//**Compare function to compare the two values where a and b points to, ideally returning -1 for a^<b^, 0 for a^=b^, +1 for a^>b^
+//**Compare function to compare the two values to which a and b, ideally returning -1 for a^<b^, 0 for a^=b^, +1 for a^>b^
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
 //**so the function use the same call convention like a method
 type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
@@ -759,6 +759,28 @@ type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil);
 //**general stable sort function (using merge + insert sort in the moment)
 procedure stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
+
+type TBinarySearchChoosen = (bsAny, bsFirst, bsLast);
+     TBinarySearchAcceptedCondition = (bsLower, bsEqual, bsGreater);
+type TBinarySearchAcceptedConditions = set of TBinarySearchAcceptedCondition;
+//**Should return 0 if the searched element is equal to a,
+//**             -1 if the searched element is smaller than a, and
+//**             +1 if the searched element is larger than a.
+//**(that is the opposite of what you might expect, but it is logical: the data parameter has to come first to match a method signature. The data parameter is compared to a parameter (to match a standalone comparison function signature))
+type TBinarySearchFunction = function (data: TObject; a: pointer): longint;
+//** General binary search function
+//** @br @code(a) is the first element in the (increasingly sorted) array, @code(b) the last, @code(size) the size of each element
+//** @br @code(compareFunction) is a TBinarySearchFunction comparing the searched element to another element
+//** @br @code(compareFunctionData) is the data passed to the comparison function as first argument (you can think of it as searched element)
+//** @br @code(choosen) is the element that should be returned, if there are multiple matches (bsFirst, bsLast  or bsAny) .
+//** @br @code(condition) the comparison relation between the returned and searched element (E.g. for [bsGreater, bsEqual] the returned element satisfies @code(compareFunction(reference, returned) <= 0).)
+//** @br returns a pointer to the found match or nil if there is none.
+//** @br (note that you can combine, e.g. bsGreater and bsLast, which will always return the last element, unless all are lower)
+function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
+
+
+function arrayBinarySearch(a: TLongintArray; value: integer; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+
 implementation
 
 //========================array functions========================
@@ -4843,6 +4865,95 @@ begin
   if length(intArray)<=1  then exit;
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
+
+function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
+var temp: pointer;
+  l, h, m: Integer;
+  acceptedFlags, moveFlags: array[TValueSign] of boolean;
+  cmpResult: TValueSign;
+begin
+  result := nil;
+  if b < a then exit(nil);
+
+  //+1 +1 +1 0 0 0 0 -1 -1 -1
+
+
+  acceptedFlags[-1] := bsGreater in condition;
+  acceptedFlags[0]  := bsEqual in condition;
+  acceptedFlags[+1] := bsLower in condition;
+
+  l := 0;
+  h := (PtrUInt(b) - PtrUInt(a)) div size;
+  if choosen <> bsLast then begin
+    if bsLower in condition then begin
+      cmpResult := Sign(compareFunction(compareFunctionData, a));
+      if acceptedFlags[cmpResult] then result := a;
+      exit;
+    end;
+
+    moveFlags[-1] := true; //bsGreater in condition;
+    moveFlags[0]  := (bsEqual in condition);
+    moveFlags[+1] := false; //bsLower in condition;
+
+    //choose first (or any)
+    while l <= h do begin
+      m := l + (h - l) div 2;
+      temp := a + m * size;
+      cmpResult := Sign(compareFunction(compareFunctionData, temp));
+      if acceptedFlags[cmpResult] then begin
+        result := temp;
+        if (choosen = bsAny) then exit;
+      end;
+      if  moveFlags[cmpResult] then h := m - 1
+      else l := m + 1;
+    end;
+  end else {if choosen = bsLast then }begin
+    if bsGreater in condition then begin
+      cmpResult := Sign(compareFunction(compareFunctionData, b));
+      if acceptedFlags[cmpResult] then result := b;
+      exit;
+    end;
+
+    moveFlags[-1] := true;
+    moveFlags[0]  := not (bsEqual in condition);
+    moveFlags[+1] := false;
+
+    while l <= h do begin
+      m := l + (h - l) div 2;
+      temp := a + m * size;
+      cmpResult := Sign(compareFunction(compareFunctionData, temp));
+      if acceptedFlags[cmpResult] then result := temp;
+      if moveFlags[cmpResult] then h := m - 1
+      else l := m + 1;
+    end;
+  end;
+
+  {if (result <> nil) and (bsExactMatch in flags) then begin
+    if compareFunction(compareFunctionData, result) <> 0 then exit(nil);
+    if (bsLowerBound in flags) and (bsUpperBound in flags) then begin
+      //above it was checked for being lower bound
+      if (Result < b) and (compareFunction(compareFunctionData, result+size) = 0) then
+        exit(nil); //not an upper bound
+    end;
+  end;}
+end;
+
+
+function TIntegerArrayCompare(searched: TObject; current: pointer): integer;
+begin
+  result := CompareValue(Integer(pointer(searched)), PInteger(current)^);
+end;
+
+function arrayBinarySearch(a: TLongintArray; value: integer; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+var
+  element: Pointer;
+begin
+  if length(a) = 0 then exit(-1);
+  element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TIntegerArrayCompare, TObject(pointer(value)), choosen, condition);
+  if element = nil then exit(-1);
+  result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
+end;
+
 (*
 { TSet }
 
