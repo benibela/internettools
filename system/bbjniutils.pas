@@ -115,7 +115,7 @@ const javaEnvRef: cardinal = $deadbeef; //block access to CustomDrawnInt.javaEnv
 threadvar j: TJavaEnv; //this is an object to reduce the overhead caused by being a threadvar (i.e. you can write with j ...)
 
 var jvmref: PJavaVM;
-    jActivityObject: jobject;
+    jContextObject: jobject;
 
 var onLoad: function: integer;
 
@@ -548,7 +548,7 @@ end;
 {$ifdef android}
 function TJavaEnv.getAssets: jobject;
 begin
-  result := callObjectMethodChecked(jActivityObject, getmethod('android/content/Context', 'getAssets', '()Landroid/content/res/AssetManager;'));
+  result := callObjectMethodChecked(jContextObject, getmethod('android/content/Context', 'getAssets', '()Landroid/content/res/AssetManager;'));
 end;
 
 function TJavaEnv.getAssetAsString(name: string): string;
