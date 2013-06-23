@@ -74,7 +74,7 @@
     <Version Value="11"/>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="../../import/regexpr/Source;../../import"/>
+      <OtherUnitFiles Value="../../import/regexpr/source;../../internet;../../import;.."/>
     </SearchPaths>
     <Parsing>
       <SyntaxOptions>

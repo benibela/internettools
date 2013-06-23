@@ -1,4 +1,4 @@
-{**
+(***
   @abstract(This unit extends the XQuery interpreter with JSONiq)
 
   Including this unit in the uses clause will add JSONiq support to the xquery.TXQueryEngine.
@@ -13,7 +13,7 @@
      pxp:json, pxp:serialize-json
 
   @author Benito van der Zander (http://www.benibela.de)
-*}
+*)
 
 unit xquery_json;
 
