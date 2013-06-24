@@ -2936,6 +2936,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('outer-html(/)', '<table><colgroup></colgroup><tr>17</tr></table>' , '<table><colgroup><tr>17</table>');
   t('outer-html(/)', '<div><p>123</p><p>456</p><p>789</p><div>hi<p>abc</p><p>def</p></div></div>' , '<div><p>123<p>456<p>789<div>hi<p>abc<p>def</div>');
   t('outer-html(/)', '<div><p>123<em>mausi</em></p><p>foo<i><b>bar</b></i></p><p>hallo</p></div>' , '<div><p>123<em>mausi<p>foo<i><b>bar<p>hallo'); //not entirely correct. The end tags are correctly inserted, but additional em/i/b start tags are leaking out
+  t('outer-html(/)',  '<div>123456</div>', '<div>123</ br>456</div>'); //firefox turns it into a <!-- br --> comment but we cannot do that
+
+
 
   xml.repairMissingStartTags:=true;
   t('outer-html(/)', '<html><head></head><body><table></table></body></html>', '<table></table>');

@@ -1836,6 +1836,10 @@ begin
   if (FParsingModel = pmStrict) and (last = nil) then
     raise ETreeParseException.create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but none was open');
 
+  if (tagNameLen = 0) then
+    if  (tagName <> nil) then exit  //skip tags like </ br>
+    else tagName := pchar(''); //but allow (nil, 0) call to close all still open tags
+
   if last = nil then exit;
 
   if FAutoCloseTag and (not strliequal(tagName, last.value, tagNameLen)) then autoCloseLastTag();
@@ -2223,7 +2227,7 @@ begin
   else simplehtmlparser.parseML(FCurrentFile,[],@enterTag, @leaveTag, @readText, @readComment);
 
   //close root element
-  leaveTag('',0);
+  leaveTag(nil,0);
 
   if FAutoDetectHTMLEncoding  then begin
     FCurrentTree.FEncoding:=eUnknown;
