@@ -118,6 +118,7 @@ var jvmref: PJavaVM;
     jContextObject: jobject;
 
 var onLoad: function: integer;
+var onUnload: procedure;
 
 function needJ: TJavaEnv;
 
@@ -159,7 +160,7 @@ end;
 
 procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); cdecl;
 begin
-
+  if assigned(onUnload) then onUnload();
 end;
 
 function TJavaEnv.getclass(n: pchar): jclass;
