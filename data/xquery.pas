@@ -3630,9 +3630,9 @@ function TXQVariableChangeLog.debugTextRepresentation: string;
 var i:longint;
 begin
   if count = 0 then exit('');
-  result:=getName(0)+'='+get(0).toString;
+  result:=getName(0)+'='+get(0).debugAsStringWithTypeAnnotation();
   for i:=1 to high(vars) do
-    result+=LineEnding+getName(i)+'='+get(i).toString;
+    result+=LineEnding+getName(i)+'='+get(i).debugAsStringWithTypeAnnotation();
 end;
 
 function TXQVariableChangeLog.clone: TXQVariableChangeLog;
