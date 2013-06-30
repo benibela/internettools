@@ -83,6 +83,8 @@ type
   function stringToJString(s: string): jobject; //deprecated
   function jStringToStringAndDelete(s: jobject): string;
 
+  function arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
+
   procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
   procedure RethrowJavaExceptionIfThereIsOne();
 
@@ -469,6 +471,20 @@ begin
   else result := chars;
   env^^.ReleaseStringUTFChars(env, s, chars);
   env^^.DeleteLocalRef(env, s);
+end;
+
+function TJavaEnv.arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
+var
+  i: Integer;
+  temp: jobject;
+  sc: jclass;
+begin
+  sc := stringClass;
+  if sc = nil then sc := commonClasses_String;
+  result := newObjectArray(length(a), sc, nil);
+  for i := 0 to high(a) do
+    setStringArrayElement(result, i, a[i]);
+  if stringClass = nil then deleteLocalRef(sc);
 end;
 
 
