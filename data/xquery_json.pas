@@ -63,10 +63,14 @@ var v: IXQValue;
 begin
   requiredArgCount(args, 1);
   resobj := TXQValueObject.create();
-  for v in args[0] do begin
-    if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.debugAsStringWithTypeAnnotation());
-    if resobj.prototype = nil then resobj.prototype := v
-    else merge(v as TXQValueObject);
+  try
+    for v in args[0] do begin
+      if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.debugAsStringWithTypeAnnotation());
+      if resobj.prototype = nil then resobj.prototype := v
+      else merge(v as TXQValueObject);
+    end;
+  except
+    on EXQEvaluationException do begin resobj.free; raise; end
   end;
   result := resobj;
 end;

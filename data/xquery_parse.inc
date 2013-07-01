@@ -409,38 +409,42 @@ var
   end;
 begin
   result := TXQTermFlower.Create;
-  parseVarBinding;
-
-  token := nextToken();
-
-  while (token = ',') or (token = 'for') or (token = 'let') do begin
-    if token <> ',' then begin
-      requireXQuery;
-      akind := token;;
-    end;
+  try
     parseVarBinding;
+
     token := nextToken();
-  end;
 
-  if token <> 'return' then begin
-    requireXQuery;
-
-    if token = 'where' then begin
-      result.where := parse;
+    while (token = ',') or (token = 'for') or (token = 'let') do begin
+      if token <> ',' then begin
+        requireXQuery;
+        akind := token;;
+      end;
+      parseVarBinding;
       token := nextToken();
     end;
 
-    if (token = 'stable') or (token = 'order') then begin
-      if token = 'stable' then expect('order'); //always be stable
-      expect('by');
-      repeat
-        parseOrderSpecAndNextToken;
-      until token <> ',';
-      if token <> 'return' then raiseParsingError('XPST0003', 'Expected return');
-    end;
-  end;
+    if token <> 'return' then begin
+      requireXQuery;
 
-  result.returned := parse;
+      if token = 'where' then begin
+        result.where := parse;
+        token := nextToken();
+      end;
+
+      if (token = 'stable') or (token = 'order') then begin
+        if token = 'stable' then expect('order'); //always be stable
+        expect('by');
+        repeat
+          parseOrderSpecAndNextToken;
+        until token <> ',';
+        if token <> 'return' then raiseParsingError('XPST0003', 'Expected return');
+      end;
+    end;
+
+    result.returned := parse;
+  except
+    on EXQParsingException do begin result.free; raise; end;
+  end;
 end;
 
 function TXQParsingContext.parseSomeEvery(const akind: string): TXQTermSomeEvery;
@@ -833,29 +837,33 @@ begin
     if not (strsymb in ['''', '"']) then raiseParsingError('pxp:XPTS0003ext', 'Expected string start');
   end;
   mark := pos;
-  while pos^ <> #0 do begin
-    while (pos^ <> strsymb) and not (pos^ in [#0, '{', '}']) do pos+=1;
-    pushRaw(mark, pos - 1);
-    if pos^ = #0 then begin mark := pos; break; end;
-    if pos^ = (pos+1)^ then begin //escaped like {{, '', "", }}
-      pos+=1;
-      mark := pos;
-      pos+=1;
-    end else case pos^ of
-      '}': raiseParsingError('pxp:XPTS0003ext',  'Single closing } not allowed in extended strings (use }})');
-      '{': begin
+  try
+    while pos^ <> #0 do begin
+      while (pos^ <> strsymb) and not (pos^ in [#0, '{', '}']) do pos+=1;
+      pushRaw(mark, pos - 1);
+      if pos^ = #0 then begin mark := pos; break; end;
+      if pos^ = (pos+1)^ then begin //escaped like {{, '', "", }}
         pos+=1;
-        pushTerm(parsePrimaryLevel);
-        expect('}');
         mark := pos;
-      end;
-      else begin //string closed
-        expect(strsymb);
-        break;
+        pos+=1;
+      end else case pos^ of
+        '}': raiseParsingError('pxp:XPTS0003ext',  'Single closing } not allowed in extended strings (use }})');
+        '{': begin
+          pos+=1;
+          pushTerm(parsePrimaryLevel);
+          expect('}');
+          mark := pos;
+        end;
+        else begin //string closed
+          expect(strsymb);
+          break;
+        end;
       end;
     end;
+    if nullterminatedString then pushRaw(mark, pos - 1);
+  except
+    on EXQParsingException do begin result.free; raise; end;
   end;
-  if nullterminatedString then pushRaw(mark, pos - 1);
   if result = nil then result := TXQTermString.create('');
 end;
 
@@ -1174,8 +1182,9 @@ begin
           replace := ripBinOpApart(@astroot, 10000);
           if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor)  or (replace^ is TXQTermDynamicFunctionCall) then
             replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
-           else
-            raiseParsingError('XPST0003', 'Unexpected .');
+           else begin
+             raiseParsingError('XPST0003', 'Unexpected .');
+           end;
         end else
           raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word);
       end;

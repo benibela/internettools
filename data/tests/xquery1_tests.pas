@@ -1604,6 +1604,8 @@ begin
 
   m('declare option pxp:extended-strings "on"; let $a := 17 return x">{$a}<" ', '>17<');
   f('declare option pxp:extended-strings "off"; let $a := 17 return x">{$a}<" ');
+  f('declare option pxp:extended-strings "off"; for $a in (1, 2, 3, 4) where $a = $a return x">{$a}<" ');
+  f('declare option pxp:extended-strings "off"; for $a in (1, 2, 3, 4) where $a = $a order by x"{$a}" return x">{$a}<" ');
   m('declare option pxp:strict-type-checking "off"; "1" + 2 ', '3');
   //m('declare option pxp:strict-type-checking "on"; "1" + 2 ', '<fail>');
   m('declare option pxp:use-local-namespaces "on";  <r><a:b xmlns:a="xxx">!</a:b></r> / a:b ', '!');

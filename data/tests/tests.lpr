@@ -17,7 +17,7 @@ begin
   start := now;
   bbutils_tests.unitTests;
   internetaccess_tests.unittests;
-  testerrors := false; //disabled since they drive the lazarus debugger mad
+  //testerrors := true; //disabled since they drive the lazarus debugger mad
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
   extendedhtmlparser_tests.unitTests(testerrors);
