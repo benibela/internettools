@@ -748,6 +748,10 @@ begin
   t('form(<form><input name="a" value="foo" type="radio"/></form>).url', 'pseudo://test');
   t('form(<form><input name="a" value="foo" type="radio" checked="checked"/></form>).url', 'pseudo://test?a=foo');
 
+  t('form(<form><select name="s"><option value="1">a</option><option value="2">b</option></select></form>).url', 'pseudo://test?s=1');
+  t('form(<form><select name="s"><option selected="selected" value="1">a</option><option value="2">b</option></select></form>).url', 'pseudo://test?s=1');
+  t('form(<form><select name="s"><option value="1">a</option><option selected="selected" value="2">b</option></select></form>).url', 'pseudo://test?s=2');
+
   t('uri-combine(<input name="c" value="foo"/>, <input name="d" value="bar"/>)', 'c=foo&d=bar');
   t('uri-combine(<input name="c" value="foo"/>, (<input name="d" value="bar"/>, <input name="e+" value="xyz"/>))', 'c=foo&d=bar&e%2B=xyz');
 

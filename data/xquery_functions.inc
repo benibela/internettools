@@ -1062,8 +1062,8 @@ begin
     exit(true);
   end;
 
-  if cmp(typ, 'select') then begin
-    name := tempend.reverse.getAttribute('name', cmp);
+  if cmp(temp.value, 'select') then begin
+    name := temp.getAttribute('name', cmp);
     tempend := temp.reverse;
     value := '';
     first := true;
