@@ -7,14 +7,14 @@ interface
 uses
   Classes, SysUtils;
 
-procedure unitTests();
+procedure unitTests(testerrors: boolean);
 
 implementation
 
 uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser;
 
 
-procedure unitTests();
+procedure unitTests(testerrors: boolean);
 var data: array[1..285] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
@@ -728,6 +728,22 @@ var previoushtml: string;
       checklog(expected);
     end;
 
+    procedure f(const template, html: string);
+    var
+      ok: Boolean;
+    begin
+      if html<>'' then previoushtml:=html;
+      if not testerrors then exit;
+      extParser.parseTemplate(template);
+      ok := false;
+      try
+        extParser.parseHTML(previoushtml, 'unittest');
+      except
+        on e: EHTMLParseMatchingException do ok := true;
+      end;
+      if not ok then raise Exception.Create('Negative test succeeded and therefore failed');
+    end;
+
     procedure xstring(const inp,exp: string);
     begin
       if extParser.replaceEnclosedExpressions(inp) <> exp then raise Exception.Create('#0-Xstring test failed: got: '+extParser.replaceEnclosedExpressions(inp)+' expected ' + exp);
@@ -783,6 +799,36 @@ begin
   t('<r><a x="{../text()}"/></r>', '<r><a>1</a><a x>2</a></r>', '_result=2');
   t('<r><a x="{../text()}" y="{../text()}"/></r>', '<r><a>1</a><a x>2</a><a y>3</a><a x y>4</a><a x y>5</a></r>', '_result=4'#10'_result=4'#10);
   t('<r><a x="{../text()}" y="{../text()}"/></r>', '<r><a>1</a><a x>2</a><a y>3</a><a x="x" y>4</a><a x y="y">5</a></r>', '_result=4'#10'_result=4'#10);
+
+  //testing optional flag on non-html elements
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if></a>', '<a><b>1</b><c>2</c></a>', '_result=1'#10'_result=2');
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if></a>', '<a><b>1</b></a>', '');
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if></a>', '<a><c>2</c></a>', '');
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if></a>', '<a></a>', '');
+
+  f('<a><t:if><b>{.}</b><c>{.}</c></t:if></a>', '<a><c>2</c></a>');
+
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if><x>{$x}</x></a>', '<a><b>1</b><c>2</c><x>5</x></a>', '_result=1'#10'_result=2'#10'x=5');
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if><x>{$x}</x></a>', '<a><b>1</b><x>5</x></a>', 'x=5');
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if><x>{$x}</x></a>', '<a><c>2</c><x>5</x></a>', 'x=5');
+  t('<a><t:if t:optional="true"><b>{.}</b><c>{.}</c></t:if><x>{$x}</x></a>', '<a><x>5</x></a>', 'x=5');
+
+  t('<a><t:switch><x>{$x}</x><y>{$y}</y></t:switch></a>', '<a><x>5</x></a>', 'x=5');
+  t('<a><t:switch><x>{$x}</x><y>{$y}</y></t:switch></a>', '<a><y>5</y></a>', 'y=5');
+  f('<a><t:switch><x>{$x}</x><y>{$y}</y></t:switch></a>', '<a><z>5</z></a>');
+
+  t('<a><t:switch><x>{$x}</x><y>{$y}</y></t:switch>?</a>', '<a><x>5</x></a>', 'x=5');
+  t('<a><t:switch><x>{$x}</x><y>{$y}</y></t:switch>?</a>', '<a><y>5</y></a>', 'y=5');
+  t('<a><t:switch><x>{$x}</x><y>{$y}</y></t:switch>?</a>', '<a><z>5</z></a>', '');
+
+  t('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>A1A</x><x>B1B</x><x>C2C</x></a>', 'a1=A1A'#10'b1=B1B'#10'c2=C2C');
+  t('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>A1A</x><x>B2B</x><x>C1C</x></a>', 'a1=A1A'#10'b2=B2B'#10'c1=C1C');
+  t('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>A2A</x><x>B2B</x><x>C2C</x></a>', 'a2=A2A'#10'b2=B2B'#10'c2=C2C');
+
+  f('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>B2B</x><x>C2C</x></a>');
+  t('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>A2A</x><x>C2C</x></a>', 'a2=A2A'#10'c2=C2C');
+  f('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>A2A</x><x>B2B</x></a>');
+
 
   //  t('<a><b>{.}</b>{3}</a>', '<a><b>12</b><b>34</b></a>', '_result=12'#10'_result=34');
 

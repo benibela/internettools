@@ -892,22 +892,21 @@ var xpathText: TTreeNode;
     htmlStart := htmlStart.next;
   end;
 
-
-  procedure HandleMatchOpen;
+  procedure HandleOptional;
   var ok: boolean;
   begin
     //If an element is option it can either be there (preferred) or not. Therefore we simple try both cases
     //Notice that this modifies the template, and it is NOT THREAD SAFE (so don't share
     //one instance, you can of course still use instances in different threads)
-    if tefOptional in templateStart.flags then begin
-      Exclude(templateStart.flags, tefOptional);
-      ok := matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart, templateEnd);
-      Include(templateStart.flags, tefOptional);
-      if ok then templateStart := templateEnd
-      else templateStart := templateStart.templateReverse.templateNext;
-      exit;
-    end;
+    Exclude(templateStart.flags, tefOptional);
+    ok := matchTemplateTree(htmlParent, htmlStart, htmlEnd, templateStart, templateEnd);
+    Include(templateStart.flags, tefOptional);
+    if ok then templateStart := templateEnd
+    else templateStart := templateStart.templateReverse.templateNext;
+  end;
 
+  procedure HandleMatchOpen;
+  begin
     //To check if a node matches a template node we have to check all children, if they don't match
     //we have to test it with another node
     //But once a element E match we can assume that there is no better match on the same level (e.g. a
@@ -1150,7 +1149,7 @@ begin
             if htmlStart.typ = tetText then xpathText := htmlStart;
             if not switchCommandAccepted and (templateStart.templateType <> tetIgnore) and
                 (templateStart.test <> nil) then
-              if not HandleCommandPseudoIf then continue;
+            if not HandleCommandPseudoIf then continue;
             if tefSwitchChild in templateStart.flags then begin
               if switchCommandAccepted then switchCommandAccepted:=false
               else begin //try other switch children (?)
@@ -1158,6 +1157,10 @@ begin
                 else templateStart := templateStart.templateNext;
                 continue;
               end;
+            end;
+            if tefOptional in templateStart.flags then begin
+              HandleOptional;
+              continue;
             end;
             case templateStart.templateType of
               tetMatchText: HandleMatchText;
@@ -1283,7 +1286,7 @@ begin
       realLast := cur;
       cur := cur.templateNext;
     end;
-    raise EHTMLParseException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason');
+    raise EHTMLParseMatchingException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason', '');
   end;
 //TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;

@@ -151,7 +151,7 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="6">
+    <Exceptions Count="7">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -170,6 +170,9 @@
       <Item6>
         <Name Value="EXQParsingException"/>
       </Item6>
+      <Item7>
+        <Name Value="EHTMLParseMatchingException"/>
+      </Item7>
     </Exceptions>
   </Debugging>
 </CONFIG>
