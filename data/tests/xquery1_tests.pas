@@ -733,10 +733,23 @@ begin
   t('form(<form/>, {"a": "b", "c": "d"}).url', 'pseudo://test?a=b&c=d');
   t('form(<form action="http://example.org"/>, {"a": "b", "c": "d"}).url', 'http://example.org?a=b&c=d');
   t('form(<form><input name="c" value="foo"/></form>, {"a": "b", "c": "d"}).url', 'pseudo://test?c=d&a=b');
+  t('form(<form><input name="c" value="foo"/></form>, {"a": "b"}).url', 'pseudo://test?c=foo&a=b');
+  t('form(<form><input name="" value="foo"/></form>, {"a": "b"}).url', 'pseudo://test?a=b');
   t('form(<form><input name="c" value="foo"/><input name="x" value="y"/></form>, {"a": "b", "c": "d"}).url', 'pseudo://test?c=d&x=y&a=b');
   t('form(<form><input name="c" value="foo"/><input name="x" value="y"/></form>, {"a": "b$", "c%2": "d%"}).url', 'pseudo://test?c=foo&x=y&a=b%24&c%252=d%25');
   t('form(<form><input name="c%2" value="foo"/><input name="x" value="y"/></form>, {"a": "b$", "c%2": "d%"}).url', 'pseudo://test?c%252=d%25&x=y&a=b%24');
 
+  t('form(<form><input name="a" type="checkbox"/></form>).url', 'pseudo://test');
+  t('form(<form><input name="a" type="checkbox" checked="checked"/></form>).url', 'pseudo://test?a=on');
+  t('form(<form><input name="a" value="foo" type="checkbox"/></form>).url', 'pseudo://test');
+  t('form(<form><input name="a" value="foo" type="checkbox" checked="checked"/></form>).url', 'pseudo://test?a=foo');
+  t('form(<form><input name="a" type="radio"/></form>).url', 'pseudo://test');
+  t('form(<form><input name="a" type="radio" checked="checked"/></form>).url', 'pseudo://test?a=on');
+  t('form(<form><input name="a" value="foo" type="radio"/></form>).url', 'pseudo://test');
+  t('form(<form><input name="a" value="foo" type="radio" checked="checked"/></form>).url', 'pseudo://test?a=foo');
+
+  t('uri-combine(<input name="c" value="foo"/>, <input name="d" value="bar"/>)', 'c=foo&d=bar');
+  t('uri-combine(<input name="c" value="foo"/>, (<input name="d" value="bar"/>, <input name="e+" value="xyz"/>))', 'c=foo&d=bar&e%2B=xyz');
 
   //Tests based on failed XQTS tests
   t('empty(text {"some text"}/..)', 'true');

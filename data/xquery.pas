@@ -2121,7 +2121,7 @@ begin
 end;
 
 
-function urlHexEncode(s: string; const safe: TCharSet): string;
+function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
 var
   p: Integer;
   i: Integer;
@@ -5210,6 +5210,7 @@ pxp.registerFunction('join',@xqFunctionJoin,[]);
 
 pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
 pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
+pxp.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']);
 
 
 //standard functions

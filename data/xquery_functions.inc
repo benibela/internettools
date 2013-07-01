@@ -1032,54 +1032,107 @@ begin
   result := xqvalue(node.innerHTML())
 end;
 
+
+
+
+
+function nodeToFormData(temp: TTreeNode; cmp: TStringComparisonFunc; out name, value: string): boolean;
+var
+  tempend: TTreeNode;
+  typ: String;
+  first: Boolean;
+begin
+  if temp.typ <> tetOpen then exit(false);
+
+  if cmp(temp.value, 'textarea') then begin
+    name := temp.getAttribute('name', cmp);
+    value := temp.deepNodeText();
+    exit(true);
+  end;
+
+  if cmp(temp.value, 'input') and (temp['name'] <> '') then begin
+    typ := temp.getAttribute('type', cmp);
+    if (typ = '') or cmp(typ, 'hidden') or cmp(typ, 'password') or cmp(typ, 'text') then begin
+      name := temp.getAttribute('name', cmp);
+      value := temp.getAttribute('value', cmp);
+    end else if (cmp(typ, 'checkbox') or cmp(typ, 'radio')) and (temp.hasAttribute('checked', cmp))  then begin
+      name := temp.getAttribute('name', cmp);
+      value := temp.getAttribute('value', 'on', cmp);
+    end else exit(false);
+    exit(true);
+  end;
+
+  if cmp(typ, 'select') then begin
+    name := tempend.reverse.getAttribute('name', cmp);
+    tempend := temp.reverse;
+    value := '';
+    first := true;
+    while temp <> tempend do begin
+      if cmp(temp.value, 'option') and (first or temp.hasAttribute('selected', cmp)) then begin
+        value := temp.getAttribute('value', cmp);
+        first := false;
+        if temp.hasAttribute('selected', cmp) then
+          break;
+      end;
+      temp := temp.next;
+    end;
+    while temp <> tempend do
+      temp := temp.next;
+    exit(true);
+  end;
+  exit(false);
+end;
+
+procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; out names, values: TStringArray);
+  procedure addSingleValue(temp: string);
+  begin
+    arrayAdd(names, strSplitGet('=', temp));
+    arrayAdd(values, temp);
+  end;
+
+  procedure add(s: string);
+  var
+    split: TStringArray;
+    i: Integer;
+  begin
+    if s = '' then exit;
+    split := strSplit(s, '&');
+    for i:=0 to high(split) do addSingleValue(split[i]);
+  end;
+var v, temp: IXQValue;
+  tempobj: TXQValueObject;
+  i: Integer;
+  sname: string;
+  svalue: string;
+begin
+  setlength(names, 0);
+  setlength(values, 0);
+  for v in value do
+    if v is TXQValueObject then begin
+      if (v as TXQValueObject).prototype = nil then temp := v
+      else temp := v.clone;
+      tempobj := temp as TXQValueObject;
+      for i:=0 to tempobj.values.count-1 do begin
+        arrayAdd(names, urlHexEncode(tempobj.values.Names[i]));
+        arrayAdd(values, urlHexEncode(tempobj.values.Values[i].toString));
+      end;
+    end else if v is TXQValueNode then begin
+      if nodeToFormData(v.toNode, cmp, sname, svalue) then begin
+        arrayAdd(names, urlHexEncode(sname));
+        arrayAdd(values, urlHexEncode(svalue));
+      end;
+    end else add(v.toString)
+end;
+
 function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-
-//That is horrible outdated:
-{ string-join(
-    for $i in $form//* return
-      if (node-name($i) = 'input' and ($i/type = ('hidden', 'password', 'text') or ($i/@type = ('radio', 'checked')  and exists($i/@checked)) ) ) then
-        concat(encode-for-uri($i/@name), '=', encode-for-uri($i/@value))
-      else if (node-name($i) = 'select' and $i/option[exists(@selected)) then
-        concat(encode-for-uri($i/@name), '=', encode-for-uri($i/option[exists(@selected)][1]/@value))
-      else if (node-name($i) = 'select' and $i/option) then
-        concat(encode-for-uri($i/@name), '=', encode-for-uri($i/option[1]/@value))
-      else if (node-name($i) = 'textarea') then
-        concat(encode-for-uri($i/@name), '=', encode-for-uri($i))
-      else ""
-  , '&')
-}
-
-var //node: TTreeNode;
-    replaceNames, replaceValues: TStringArray;  //names are NOT url encoded, values ARE url encoded
+var replaceNames, replaceValues: TStringArray;
     cmp: TStringComparisonFunc;
-    procedure addSingleValue(temp: string);
-    begin
-      arrayAdd(replaceNames, strSplitGet('=', temp));
-      arrayAdd(replaceValues, temp);
-    end;
-
-    procedure add(s: string);
-    var
-      split: TStringArray;
-      i: Integer;
-    begin
-      if s = '' then exit;
-      split := strSplit(s, '&');
-      for i:=0 to high(split) do addSingleValue(split[i]);
-    end;
-
-    function urlEncode(const s: string): string;
-    begin
-       result := urlHexEncode(s, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']);
-    end;
 
     function encodeForm(const form: TTreeNode): IXQValue;
     var
       temp: TTreeNode;
       typ: string;
-      tempend: TTreeNode;
-      value: String;
-      first: Boolean;
+      name, value: String;
       request: string;
       used: TStringList;
       i: Integer;
@@ -1091,11 +1144,10 @@ var //node: TTreeNode;
         if request <> '' then request += '&';
         if addToUsed then begin
           replaced := arrayIndexOf(replaceNames, n);
-          if replaced >= 0 then v := replaceValues[replaced]
-          else v := urlEncode(v);
-          request += urlEncode(n) + '=' + v;
+          if replaced >= 0 then v := replaceValues[replaced];
+          request += n + '=' + v;
           used.Add(n);
-        end else request += urlEncode(n) + '=' + v;
+        end else request += n + '=' + v;
       end;
 
     begin
@@ -1104,34 +1156,10 @@ var //node: TTreeNode;
       used.CaseSensitive:=false;
       temp := form.getFirstChild();
       while (temp <> nil) and (temp <> form.reverse) do begin
-        if temp.typ = tetOpen then begin
-          if cmp(temp.value, 'textarea') then
-            addToRequest(temp.getAttribute('name', cmp), temp.deepNodeText())
-          else if cmp(temp.value, 'input') and (temp['name'] <> '') then begin
-            typ := temp.getAttribute('type', cmp);
-            if (typ = '') or cmp(typ, 'hidden') or cmp(typ, 'password') or cmp(typ, 'text') then
-              addToRequest(temp.getAttribute('name', cmp), temp.getAttribute('value', cmp))
-            else if (cmp(typ, 'checkbox') or cmp(typ, 'radio')) and (temp.hasAttribute('checked', cmp))  then
-              addToRequest(temp.getAttribute('name', cmp), temp.getAttribute('value', 'on', cmp));
-          end else if cmp(typ, 'select') then begin
-            tempend := temp.reverse;
-            value := '';
-            first := true;
-            while temp <> tempend do begin
-              if cmp(temp.value, 'option') and (first or temp.hasAttribute('selected', cmp)) then begin
-                value := temp.getAttribute('value', cmp);
-                first := false;
-                if temp.hasAttribute('selected', cmp) then
-                  break;
-              end;
-              temp := temp.next;
-            end;
-            while temp <> tempend do
-              temp := temp.next;
-            addToRequest(tempend.reverse.getAttribute('name', cmp), value);
-          end;
+        if nodeToFormData(temp, cmp, name, value) then begin
+          addToRequest(urlHexEncode(name), urlHexEncode(value));
+          temp := temp.reverse;
         end;
-
         temp := temp.next;
       end;
 
@@ -1173,22 +1201,50 @@ begin
   cmp := @context.staticContext.nodeCollation.equal;
 
   if length(args) = 2 then
-    for v in args[1] do
-      if not (v is TXQValueObject) then add(v.toString)
-      else begin
-        temp := v.clone;
-        tempobj := temp as TXQValueObject;
-        for i:=0 to tempobj.values.count-1 do begin
-          arrayAdd(replaceNames, tempobj.values.Names[i]);
-          arrayAdd(replaceValues, urlEncode(tempobj.values.Values[i].toString));
-        end;
-      end;
+    urlEncodingFromValue(args[1], cmp, replaceNames, replaceValues);
 
   result := nil;
   for v in args[0] do
     xqvalueSeqAdd(result, encodeForm(v.toNode));
   if result = nil then result := xqvalue;
 
+end;
+
+function xqFunctionUri_combine(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var names, values: array of TStringArray;
+    used: array of array of boolean;
+    rep: Integer;
+    res: String;
+    cmp: TStringComparisonFunc;
+    i: Integer;
+begin
+  requiredArgCount(args, 1, 2);
+  setlength(names, 2); setlength(values, 2);
+  cmp := @context.staticContext.nodeCollation.equal;
+  urlEncodingFromValue(args[0], cmp, names[0], values[0]);
+  urlEncodingFromValue(args[1], cmp, names[1], values[1]);
+  setlength(used, 2);
+
+  setlength(used[1], length(values[1]));
+  for i := 0 to high(used[1]) do used[1][i] := false;
+
+
+  res := '';
+  for i := 0 to high(names[0]) do begin
+    rep := arrayIndexOf(names[1], names[0][i]);
+    if rep < 0 then res += IfThen(res = '', '', '&') + names[0][i] + '=' + values[0][i]
+    else begin
+      res += IfThen(res = '', '', '&') + names[1][rep] + '=' + values[1][rep];
+      used[1][i] := true;
+    end;
+  end;
+
+  for i := 0 to high(names[1]) do begin
+    if used[1][i] then continue;
+    res += IfThen(res = '', '', '&') + names[1][i] + '=' + values[1][i];
+  end;
+
+  result := xqvalue(res);
 end;
 
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
@@ -2034,8 +2090,9 @@ end;
 function xqFunctionEncode_For_Uri(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,1);
-  result := xqvalue(urlHexEncode(args[0].toString, ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']));
+  result := xqvalue(urlHexEncode(args[0].toString));
 end;
+
 function xqFunctionIri_To_Uri(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,1);
