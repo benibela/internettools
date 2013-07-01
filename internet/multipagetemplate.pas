@@ -296,7 +296,7 @@ type
   { TTemplateActionCallAction }
 
   TTemplateActionCallAction = class(TTemplateAction)
-    action: string;
+    action, test: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
@@ -344,10 +344,41 @@ type
     function clone: TTemplateAction; override;
   end;
 
+  { TTemplateActionShort }
+
+  TTemplateActionShort = class(TTemplateAction)
+    test, query: string;
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
+
 { THtmlTemplateParserBreaker }
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
   function getVariable(name: string): IXQValue;
+end;
+
+{ TTemplateActionShort }
+
+procedure TTemplateActionShort.initFromTree(t: TTreeNode);
+begin
+  query := t.deepNodeText();
+  test := t['test'];
+end;
+
+procedure TTemplateActionShort.perform(reader: TMultipageTemplateReader);
+begin
+  if test <> '' then
+    if not parseQuery(reader, test).evaluate().toBooleanEffective then
+      exit;
+  parseQuery(reader, query).evaluate();
+end;
+
+function TTemplateActionShort.clone: TTemplateAction;
+begin
+  Result:=TTemplateActionShort.Create;
+  TTemplateActionShort(result).query:=query;
 end;
 
 procedure TTemplateActionIf.initFromTree(t: TTreeNode);
@@ -531,12 +562,16 @@ end;
 procedure TTemplateActionCallAction.initFromTree(t: TTreeNode);
 begin
   action := t['action'];
+  test := t['test']
 end;
 
 procedure TTemplateActionCallAction.perform(reader: TMultipageTemplateReader);
 var
   act: TTemplateAction;
 begin
+  if test <> '' then
+    if not parseQuery(reader, test).evaluate().toBooleanEffective then
+      exit;
   act := reader.findAction(action);
   if act = nil then raise Exception.Create('Could not find action: '+action);
   act.perform(reader);
@@ -776,6 +811,7 @@ begin
   else if SameText(t.value, 'loop') then addChild(TTemplateActionLoop)
   else if SameText(t.value, 'meta') then addChild(TTemplateActionMeta)
   else if SameText(t.value, 'if') then addChild(TTemplateActionIf)
+  else if SameText(t.value, 's') then addChild(TTemplateActionShort)
   else raise Exception.Create('Unknown template node: '+t.outerXML);
 end;
 
