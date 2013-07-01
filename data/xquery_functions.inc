@@ -1036,7 +1036,7 @@ end;
 
 
 
-function nodeToFormData(temp: TTreeNode; cmp: TStringComparisonFunc; out name, value: string): boolean;
+function nodeToFormData(temp: TTreeNode; cmp: TStringComparisonFunc; includeAllInputs: boolean; out name, value: string): boolean;
 var
   tempend: TTreeNode;
   typ: String;
@@ -1052,7 +1052,7 @@ begin
 
   if cmp(temp.value, 'input') and (temp['name'] <> '') then begin
     typ := temp.getAttribute('type', cmp);
-    if (typ = '') or cmp(typ, 'hidden') or cmp(typ, 'password') or cmp(typ, 'text') then begin
+    if includeAllInputs or ( (typ = '') or cmp(typ, 'hidden') or cmp(typ, 'password') or cmp(typ, 'text') ) then begin
       name := temp.getAttribute('name', cmp);
       value := temp.getAttribute('value', cmp);
     end else if (cmp(typ, 'checkbox') or cmp(typ, 'radio')) and (temp.hasAttribute('checked', cmp))  then begin
@@ -1117,7 +1117,7 @@ begin
         arrayAdd(values, urlHexEncode(tempobj.values.Values[i].toString));
       end;
     end else if v is TXQValueNode then begin
-      if nodeToFormData(v.toNode, cmp, sname, svalue) then begin
+      if nodeToFormData(v.toNode, cmp, true, sname, svalue) then begin
         arrayAdd(names, urlHexEncode(sname));
         arrayAdd(values, urlHexEncode(svalue));
       end;
@@ -1156,7 +1156,7 @@ var replaceNames, replaceValues: TStringArray;
       used.CaseSensitive:=false;
       temp := form.getFirstChild();
       while (temp <> nil) and (temp <> form.reverse) do begin
-        if nodeToFormData(temp, cmp, name, value) then begin
+        if nodeToFormData(temp, cmp, false, name, value) then begin
           addToRequest(urlHexEncode(name), urlHexEncode(value));
           temp := temp.reverse;
         end;
@@ -1235,7 +1235,7 @@ begin
     if rep < 0 then res += IfThen(res = '', '', '&') + names[0][i] + '=' + values[0][i]
     else begin
       res += IfThen(res = '', '', '&') + names[1][rep] + '=' + values[1][rep];
-      used[1][i] := true;
+      used[1][rep] := true;
     end;
   end;
 

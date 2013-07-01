@@ -755,6 +755,12 @@ begin
   t('uri-combine(<input name="c" value="foo"/>, <input name="d" value="bar"/>)', 'c=foo&d=bar');
   t('uri-combine(<input name="c" value="foo"/>, (<input name="d" value="bar"/>, <input name="e+" value="xyz"/>))', 'c=foo&d=bar&e%2B=xyz');
 
+
+  t('uri-combine(<input name="c" value="foo" type="submit"/>, ())', 'c=foo');
+  t('uri-combine((), <input name="c" value="foo" type="submit"/>)', 'c=foo');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>).url', 'pseudo://test');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>, <input name="c" value="foo" type="submit"/>).url', 'pseudo://test?c=foo');
+
   //Tests based on failed XQTS tests
   t('empty(text {"some text"}/..)', 'true');
   t('empty(document-uri(attribute name {"content"}))', 'true');

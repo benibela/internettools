@@ -1684,6 +1684,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('uri-combine((), "a=17&c=13")', 'a=17&c=13');
   t('uri-combine(({"x": "++"}, "a=100"), "c=13")', 'x=%2B%2B&a=100&c=13');
   t('uri-combine({"x": "++", "y&": 123}, {"x": 0, "y": 456})', 'x=0&y%26=123&y=456');
+  t('uri-combine({"x": "++", "y&": 123}, {"y": "456", "x": 0})', 'x=0&y%26=123&y=456');
 
                //Objects extension
   t('obj := xs:object()', '', '');
