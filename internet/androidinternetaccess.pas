@@ -57,8 +57,6 @@ protected
   function doTransfer(method:string; const url: TDecodedUrl; data:string): string;override;
   function GetLastHTTPHeaders: TStringList; override;
 public
-  Referer: string;
-
   constructor create;override;
   destructor destroy;override;
   function needConnection():boolean;override;
@@ -77,6 +75,7 @@ implementation
 {$IFDEF COMPILE_ANDROID_INTERNETACCESS}
 
 uses bbutils,
+     //bbdebugtools,
      bbjniutils; //if this unit is not found you need to add the ../system directory to the search paths
 
 type THttpMethod = (hmDelete, hmGet, hmHead, hmOptions, hmPost, hmPut, hmTrace);
@@ -110,12 +109,20 @@ type TClassInformation = record
     jmDefaultHttpClientGetParams: jmethodID;
     jmHttpParamsSetParameter: jmethodID;
     jcHttpHost: jclass;
-    jmHttpHostConstructor: jmethodID;
+    jmHttpHostConstructor, jmHttpHostToUri: jmethodID;
 
     jiHttpMessage: jclass;
     jiHeaderIterator: jclass;
     jiHeader: jclass;
     jiHttpParams: jclass;
+
+    jcBasicHttpContext: jclass;
+    jmBasicHttpContextInit, jmBasicHttpContextGetAttribute: jmethodID;
+    jcHttpUriRequest: jclass;
+    jmHttpUriRequestGetURI: jmethodID;
+    jmObjectToString: jmethodID;
+    jcUri: jclass;
+    jmURIIsAbsolute: jmethodID;
 end;
 
 //threadvar initialized: boolean;
@@ -137,6 +144,7 @@ function initializeClasses(): TClassInformation;
 
 var
   m: THttpMethod;
+  jcObject: jclass;
 
 begin
   //if initialized then exit(cache);
@@ -144,7 +152,7 @@ begin
      jcDefaultHttpClient := defaultHttpClientClass;
      if jcDefaultHttpClient = nil then jcDefaultHttpClient := getc('org/apache/http/impl/client/DefaultHttpClient');
      jmDefaultHttpClientConstructor := getm(jcDefaultHttpClient, '<init>', '()V');
-     jmDefaultHttpClientExecute := getm(jcDefaultHttpClient, 'execute', '(Lorg/apache/http/client/methods/HttpUriRequest;)Lorg/apache/http/HttpResponse;');
+     jmDefaultHttpClientExecute := getm(jcDefaultHttpClient, 'execute', '(Lorg/apache/http/client/methods/HttpUriRequest;Lorg/apache/http/protocol/HttpContext;)Lorg/apache/http/HttpResponse;');
      jmDefaultHttpClientGetParams := getm(jcDefaultHttpClient, 'getParams', '()Lorg/apache/http/params/HttpParams;');
 
      jiHttpParams := getc('org/apache/http/params/HttpParams');
@@ -152,6 +160,7 @@ begin
 
      jcHttpHost := getc('org/apache/http/HttpHost');
      jmHttpHostConstructor := getm(jcHttpHost, '<init>', '(Ljava/lang/String;I)V');
+     jmHttpHostToUri := getm(jcHttpHost, 'toURI', '()Ljava/lang/String;');
 
      jiHttpMessage := getc('org/apache/http/HttpMessage');
      jmHttpMessageAddHeader := getm(jiHttpMessage, 'addHeader', '(Ljava/lang/String;Ljava/lang/String;)V');
@@ -190,6 +199,20 @@ begin
        jmMethodConstructors[m] := getm(jcMethods[m], '<init>', '(Ljava/lang/String;)V');
      end;
 
+
+     jcBasicHttpContext := getc('org/apache/http/protocol/BasicHttpContext');
+     jmBasicHttpContextInit := getm(jcBasicHttpContext, '<init>', '()V');
+     jmBasicHttpContextGetAttribute := getm(jcBasicHttpContext, 'getAttribute', '(Ljava/lang/String;)Ljava/lang/Object;');
+
+     jcHttpUriRequest := getc('org/apache/http/client/methods/HttpUriRequest');
+     jmHttpUriRequestGetURI := getm(jcHttpUriRequest, 'getURI', '()Ljava/net/URI;');
+
+     jcUri := getc('java/net/URI');
+     jmURIIsAbsolute := getm(jcUri, 'isAbsolute', '()Z');
+
+     jcObject := getc('java/lang/Object');
+     jmObjectToString := getm(jcObject, 'toString', '()Ljava/lang/String;');
+     j.deleteLocalRef(jcObject);
    end;
  // initialized:=true;
   //cache:=result;
@@ -201,6 +224,10 @@ var
 begin
   with info do begin
     if jcDefaultHttpClient <> defaultHttpClientClass then j.deleteLocalRef(jcDefaultHttpClient);
+
+    j.deleteLocalRef(jcBasicHttpContext);
+    j.deleteLocalRef(jcHttpUriRequest);
+    j.deleteLocalRef(jcUri);
     j.deleteLocalRef(jiHttpParams);
     j.deleteLocalRef(jcHttpHost);
     j.deleteLocalRef(jiHttpMessage);
@@ -233,7 +260,7 @@ end;
 
 
 function TAndroidInternetAccess.doTransfer2(method: string; url: TDecodedUrl; data: string): string;
-var jRequest: jvalue;
+var jRequest: jobject;
     classInfos: TClassInformation;
 
   procedure addHeader(const n,v: string);
@@ -243,7 +270,7 @@ var jRequest: jvalue;
     with classInfos do begin
       args[0].l := j.NewStringUTF8(n);
       args[1].l := j.NewStringUTF8(v);
-      j.CallVoidMethod(jRequest.l,  jmHttpMessageAddHeader, @args[0]);;
+      j.CallVoidMethod(jRequest,  jmHttpMessageAddHeader, @args[0]);;
       j.DeleteLocalRef(args[0].l);
       j.DeleteLocalRef(args[1].l);
     end;
@@ -269,7 +296,7 @@ var jRequest: jvalue;
         j.DeleteLocalRef(temp.l);
       end;
       //httprequest.setEntity(entity)
-      j.CallVoidMethod(jRequest.l,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
+      j.CallVoidMethod(jRequest,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
 
       j.DeleteLocalRef(wrappedData);
     end;
@@ -278,18 +305,20 @@ var jRequest: jvalue;
 var
   i: Integer;
 
-  jUrl: jvalue;
   m: THttpMethod;
-  jResponse, jResult, jStatusLine, jHeaderIterator, jHeader: jobject;
+  jUrl, jResponse, jResult, jStatusLine, jHeaderIterator, jHeader, jContext, jHost, jRedirectRequest: jobject;
   resultCode: integer;
   resultString: string;
+  args: array[0..1] of jvalue;
+
+
 begin
   result:='';
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
     j.env^^.ExceptionDescribe(j.env);
     j.env^^.ExceptionClear(j.env);
-    DebugLn('Warning: Ignoring exception');
+    //log('Warning: Ignoring exception');
   end;
 
   url.prepareSelfForRequest(lastConnectedUrl);
@@ -300,19 +329,23 @@ begin
   try
     with classInfos do begin;
       //HttpGet httpget = new HttpGet(url);
-      jUrl.l := j.NewStringUTF8(pchar(url.combined));
-      jRequest.l := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
-      j.DeleteLocalRef(jUrl.l);
+      jUrl := j.NewStringUTF8(pchar(url.combined));
+      jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
+      j.DeleteLocalRef(jUrl);
 
-      if Referer <> '' then
-        addHeader('Referer', Referer);
+      if lastUrl <> '' then
+        addHeader('Referer', lastUrl);
       for i := 0 to additionalHeaders.Count - 1 do
         addHeader(additionalHeaders.Names[i], additionalHeaders.ValueFromIndex[i]);
       if (data <> '') and (m in [hmPut, hmPost]) then
         setRequestData();
 
+      jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
+
       //send
-      jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @jRequest);;
+      args[0].l := jRequest;
+      args[1].l := jContext;
+      jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @args);;
 
       j.RethrowJavaExceptionIfThereIsOne(EInternetException); //if there is an exception during execute, do NOT delete the jRespone (having it in a finally block caused sigsegv, because it is an invalid not-nil value)
 
@@ -338,6 +371,25 @@ begin
               j.DeleteLocalRef(jHeader);
             end;
             j.DeleteLocalRef(jHeaderIterator);
+
+
+
+            args[0].l := j.stringToJString('http.request');  //Better: ExecutionContext.HTTP_REQUEST
+            jRedirectRequest := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
+            j.deleteLocalRef(args[0].l);
+
+            jUrl := j.callObjectMethod(jRedirectRequest, jmHttpUriRequestGetURI);
+            lastUrl := j.callStringMethod(jUrl, jmObjectToString);
+            if not j.callBooleanMethod(jUrl, jmURIIsAbsolute) then begin
+              args[0].l := j.stringToJString('http.target_host'); //Better: ExecutionContext.HTTP_TARGET_HOST
+              jHost := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
+              j.deleteLocalRef(args[0].l);
+
+              lastUrl := j.callStringMethod(jHost, jmHttpHostToUri) + lastUrl;
+              j.deleteLocalRef(jHost);
+            end;
+            j.deleteLocalRef(jUrl);
+            j.deleteLocalRef(jRedirectRequest);
           end else
             raise EInternetException.Create('Transfer failed: '+inttostr(ResultCode)+': '+resultString+#13#10'when talking to: '+url.combined, resultCode);
             //raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
@@ -348,17 +400,18 @@ begin
         if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
           j.env^^.ExceptionDescribe(j.env);
           j.env^^.ExceptionClear(j.env);
-          DebugLn('Warning: Ignoring exception');
+          //log('Warning: Ignoring exception');
         end;
 
-        url.username:=''; url.password:=''; url.linktarget:=''; //keep it secret in referer
-        Referer:=url.combined;
         lastConnectedUrl := url;
         lastHTTPResultCode := ResultCode;
       finally
         if  jResponse <> nil then
-        j.DeleteLocalRef(jResponse);
+          j.DeleteLocalRef(jResponse);
       end;
+
+      j.deleteLocalRef(jRequest);
+      j.deleteLocalRef(jContext);
     end;
   finally
     freeClasses(classInfos);
@@ -443,8 +496,8 @@ destructor TAndroidInternetAccess.destroy;
 begin
   additionalHeaders.free;
   FLastHTTPHeaders.Free;
-  if jhttpclient <> nil then needj.DeleteGlobalRef(jhttpclient)
-  else DebugLn('Invalid jhttpclient reference (nil)');
+  if jhttpclient <> nil then needj.DeleteGlobalRef(jhttpclient);
+  //else log('Invalid jhttpclient reference (nil)');
   inherited destroy;
 end;
 

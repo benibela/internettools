@@ -383,6 +383,7 @@ begin
       
   lastRefererUrl := decoded;
   lastRefererUrl.username:=''; lastRefererUrl.password:=''; lastRefererUrl.linktarget:=''; //keep this secret
+  lastUrl := lastRefererUrl.combined;
 
   dwIndex  := 0;
   dwCodeLen := 10;

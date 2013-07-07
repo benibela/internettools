@@ -98,6 +98,7 @@ type
   public
     //out
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
+    lastUrl: String;
     property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last request
     function getLastHTTPHeader(header: string): string; //**< Reads a certain HTTP header received by the last request
     function getLastContentType: string; //**< Same as getLastHTTPHeader('Content-Type') but easier to remember and without magic string

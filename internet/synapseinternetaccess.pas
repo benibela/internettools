@@ -61,8 +61,6 @@ protected
   function doTransfer(method:string; const url: TDecodedUrl; data:string): string;override;
   function GetLastHTTPHeaders: TStringList; override;
 public
-  Referer: string;
-
   constructor create();override;
   destructor destroy;override;
   function needConnection():boolean;override;
@@ -146,8 +144,8 @@ function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; d
      WriteStrToStream(connection.Document, data);
      connection.MimeType := 'application/x-www-form-urlencoded';
    end;
-   if Referer <> '' then
-     connection.Headers.Add('Referer: '+Referer);
+   if lastUrl <> '' then
+     connection.Headers.Add('Referer: '+lastUrl);
    connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml,text/*,*/*');;
    connection.Protocol:='1.1';
    for i := 0 to additionalHeaders.Count - 1 do
@@ -199,7 +197,7 @@ begin
     raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
 
   url.username:=''; url.password:=''; url.linktarget:=''; //keep it secret in referer
-  Referer:=url.combined;
+  lastUrl:=url.combined;
   lastHTTPResultCode := connection.ResultCode;
 
   if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then

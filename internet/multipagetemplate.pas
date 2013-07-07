@@ -683,7 +683,7 @@ begin
   if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post ('+curmethod+') internet page '+cururl+#13#10'Post: '+post);
 
   if guessType(cururl) = rtFile then
-    cururl := strResolveURI(cururl, reader.lastURL);
+    cururl := strResolveURI(cururl, reader.lastUrl);
 
 
   case guessType(cururl) of
@@ -692,27 +692,30 @@ begin
         reader.internet.additionalHeaders.Add(headers[j].name + ': ' + reader.parser.replaceEnclosedExpressions(headers[j].value));
 
       page:=reader.internet.request(curmethod, cururl, post);
+      reader.lastURL:=reader.internet.lastURL;
 
       if length(headers) > 0 then reader.internet.additionalHeaders.Clear;
     end;
-    rtFile:
+    rtFile: begin
       page := strLoadFromFileUTF8(cururl);
+      reader.lastURL:=cururl;
+    end;
     rtXML: begin
       page := cururl;
       cururl:='';
+      reader.lastURL:=cururl;
     end
     else raise ETemplateReader.create('Unknown url type: '+cururl);
   end;
-  reader.lastURL:=cururl;
 
   if Assigned(reader.onLog) then reader.onLog(reader, 'downloaded: '+inttostr(length(page))+' bytes', 1);
 
   if page='' then raise EInternetException.Create(url +' konnte nicht geladen werden');
 
   if template<>'' then begin
-    if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.parser.replaceEnclosedExpressions(url), 1);
+    if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.lastURL, 1);
 
-    reader.processPage(page, cururl, reader.internet.getLastHTTPHeader('Content-Type'));
+    reader.processPage(page, reader.lastURL, reader.internet.getLastHTTPHeader('Content-Type'));
   end;
   if Assigned(reader.onLog) then reader.onLog(reader, 'page finished', 2);
 end;
