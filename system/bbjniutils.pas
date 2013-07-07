@@ -168,15 +168,12 @@ end;
 function TJavaEnv.getclass(n: pchar): jclass;
 begin
   result := env^^.FindClass(env, n);
-  if (result = nil) or (env^^.ExceptionCheck(env)<>0) then
-    raise EAndroidInterfaceException.Create('TAndroidInternetAccess: Failed to find class: '+string(n));
-
+  RethrowJavaExceptionIfThereIsOne();
 end;
 function TJavaEnv.getmethod(c: jclass; n, sig: pchar): jmethodID;
 begin
   result := env^^.GetMethodID(env, c, n, sig);
-  if (result = nil) or (env^^.ExceptionCheck(env)<>0) then
-    raise EAndroidInterfaceException.Create('TAndroidInternetAccess: Failed to find method: '+string(n)+' '+string(sig));
+  RethrowJavaExceptionIfThereIsOne();
 end;
 
 function TJavaEnv.getmethod(classname: pchar; n, sig: pchar): jmethodID;
