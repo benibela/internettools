@@ -127,9 +127,11 @@ begin
         exit;
       end;
     if contentLength=-1 then exit;
+    lastProgressLength:=0;
   end;
-  lastProgressLength:=connection.DownloadSize;
-  FOnProgress(self, connection.DownloadSize, contentLength);
+  if (Reason <> HR_ReadCount) or (value = '') then exit;
+  lastProgressLength:=lastProgressLength + StrToIntDef(value, 0);
+  FOnProgress(self, lastProgressLength, contentLength);
 end;
 
 
