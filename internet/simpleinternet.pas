@@ -203,11 +203,11 @@ begin
     end;
     tree.parseTree(data, dataFileName);
     if pxpParser = nil then pxpParser := TXQueryEngine.create;
+    pxpparser.StaticContext.baseURI:=dataFileName;
     if strBeginsWith(query, 'xquery') then pxpParser.parseXQuery1(query)
     else pxpParser.parseXPath2(query);
     pxpparser.ParentElement := tree.getLastTree;
     pxpparser.RootElement := tree.getLastTree;
-    pxpparser.StaticContext.baseURI:=dataFileName;
     result := pxpParser.evaluate();
   end;
 end;
