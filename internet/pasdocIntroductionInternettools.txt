@@ -1,6 +1,15 @@
 @shorttitle(Overview)
 @title(Internet-Tools Overview)
 
+@section(1 AnchorNameInstallation Installation)
+
+
+Since the Internet Tools and their XQuery-Engine consist of a set of simple Pascal units they do not require installation.
+
+Just set the search paths of the project, so that all necessary units are found. Important paths: data/, internet/ and import/regexpr/source.
+
+There is also a Lazarus package internettools.lpk, which can be installed in Lazarus to set these paths with project dependencies. But this is optional.
+
 @section(1 AnchorNameStarted Getting Started)
 
 If you just want to download things, you can use the function @link(simpleinternet.retrieve retrieve) of the unit simpleinternet.@br@br
