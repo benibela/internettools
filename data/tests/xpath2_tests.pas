@@ -1812,6 +1812,101 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$x(1+1+1) := 6', '6');
   t('$x.3', '6');
 
+  //. is an operator
+  t('$x .foo', 'bar');
+  t('$x .$indirect', 'bar');
+  t('$x . "foo"', 'bar');
+  t('$x . (concat("fo", "o"))', 'bar');
+  t('$x . concat("fo", "o")', 'bar'); //is this really allowed?
+  t('$x . $indirect', 'bar');
+
+  t('$x."foo"', 'bar');
+  t('$x.(concat("fo", "o"))', 'bar');
+  t('$x.$indirect', 'bar');
+
+  t('$x. "foo"', 'bar');
+  t('$x. (concat("fo", "o"))', 'bar');
+  t('$x. concat("fo", "o")', 'bar'); //is this really allowed?
+  t('$x. $indirect', 'bar');
+
+  t('$x.omg := "strange"', 'strange', '<foo>omg</foo>');
+  t('$x.foo', 'bar');
+  t('$x. (foo)', 'strange'); //beware! the strangeness of dot space
+  t('$x . (foo)', 'strange');
+  f('$x. foo');
+  f('$x . foo');
+  t('$x .foo', 'bar');
+
+  t('{"foo": 123}.foo', '123');
+  t('{"foo": 123}.$indirect', '123');
+  t('{"foo": 123}. "foo"', '123');
+  t('{"foo": 123}. (concat("foo", ""))', '123');
+  t('{"foo": 123}. $indirect', '123');
+
+  t('{"foo": 123} .foo', '123');
+  t('{"foo": 123} . "foo"', '123');
+  t('{"foo": 123} . (concat("foo", ""))', '123');
+  t('{"foo": 123} .$indirect', '123');
+  t('{"foo": 123} . $indirect', '123');
+
+  t('{"foo": {"bar": 456}}.foo.bar', '456');
+  t('{"foo": {"bar": 456}}."foo"."bar"', '456');
+  t('{"foo": {"bar": 456}}."foo". "bar"', '456');
+  t('{"foo": {"bar": 456}}."foo" ."bar"', '456');
+  t('{"foo": {"bar": 456}}."foo" . "bar"', '456');
+  t('{"foo": {"bar": 456}}. "foo"."bar"', '456');
+  t('{"foo": {"bar": 456}}. "foo". "bar"', '456');
+  t('{"foo": {"bar": 456}}. "foo" ."bar"', '456');
+  t('{"foo": {"bar": 456}}. "foo" . "bar"', '456');
+  t('{"foo": {"bar": 456}} ."foo"."bar"', '456');
+  t('{"foo": {"bar": 456}} ."foo". "bar"', '456');
+  t('{"foo": {"bar": 456}} ."foo" ."bar"', '456');
+  t('{"foo": {"bar": 456}} ."foo" . "bar"', '456');
+  t('{"foo": {"bar": 456}} . "foo"."bar"', '456');
+  t('{"foo": {"bar": 456}} . "foo". "bar"', '456');
+  t('{"foo": {"bar": 456}} . "foo" ."bar"', '456');
+  t('{"foo": {"bar": 456}} . "foo" . "bar"', '456');
+
+  t('{"foo": {"bar": 456}}.foo.bar + 1', '457');
+  t('{"foo": {"bar": 456}}."foo"."bar" + 1', '457');
+  t('{"foo": {"bar": 456}}."foo". "bar" + 1', '457');
+  t('{"foo": {"bar": 456}}."foo" ."bar" + 1', '457');
+  t('{"foo": {"bar": 456}}."foo" . "bar" + 1', '457');
+  t('{"foo": {"bar": 456}}. "foo"."bar" + 1', '457');
+  t('{"foo": {"bar": 456}}. "foo". "bar" + 1', '457');
+  t('{"foo": {"bar": 456}}. "foo" ."bar" + 1', '457');
+  t('{"foo": {"bar": 456}}. "foo" . "bar" + 1', '457');
+  t('{"foo": {"bar": 456}} ."foo"."bar" + 1', '457');
+  t('{"foo": {"bar": 456}} ."foo". "bar" + 1', '457');
+  t('{"foo": {"bar": 456}} ."foo" ."bar" + 1', '457');
+  t('{"foo": {"bar": 456}} ."foo" . "bar" + 1', '457');
+  t('{"foo": {"bar": 456}} . "foo"."bar" + 1', '457');
+  t('{"foo": {"bar": 456}} . "foo". "bar" + 1', '457');
+  t('{"foo": {"bar": 456}} . "foo" ."bar" + 1', '457');
+  t('{"foo": {"bar": 456}} . "foo" . "bar" + 1', '457');
+
+  t('1000 + {"foo": {"bar": 456}}.foo.bar + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}."foo"."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}."foo". "bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}."foo" ."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}."foo" . "bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}. "foo"."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}. "foo". "bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}. "foo" ."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}}. "foo" . "bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} ."foo"."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} ."foo". "bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} ."foo" ."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} ."foo" . "bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} . "foo"."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} . "foo". "bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} . "foo" ."bar" + 1', '1457');
+  t('1000 + {"foo": {"bar": 456}} . "foo" . "bar" + 1', '1457');
+
+  //  t('$x. bar', 'bar');
+//  t('$x.$indirect', 'bar');
+
+
   ps.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
   t('$a := 123', '123');
   t('$a.b.c := 456', '456');

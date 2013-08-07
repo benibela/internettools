@@ -68,6 +68,7 @@ type
   function parseDirectConstructor(name: string): TXQTermConstructor;
   function parseComputedConstructor(name: string): TXQTermConstructor;
   function parseExtension: TXQTerm;
+  function parseVariable: TXQTerm;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -736,6 +737,31 @@ begin
   expect('{'); result := parsePrimaryLevel; expect('}');
 end;
 
+function TXQParsingContext.parseVariable: TXQTerm;
+var
+  operatorMode: Boolean;
+  propertyAccess: Boolean;
+begin
+  result := TXQTermVariable.Create(nextTokenQName(), staticContext);
+  if (AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(TXQTermVariable(result).value, '.') then begin
+    propertyAccess := true;
+    operatorMode := strEndsWith(TXQTermVariable(result).value, '.');
+    if operatorMode then begin
+      delete(TXQTermVariable(result).value, length(TXQTermVariable(result).value), 1);
+      propertyAccess := strContains(TXQTermVariable(result).value, '.');
+    end;
+    if propertyAccess then
+      result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
+    if operatorMode then begin
+      result := TXQTermDynamicFunctionCall.create(result, parseValue());
+      if result.children[1] is TXQTermNodeMatcher then begin
+        result.free;
+        raiseParsingError('pxp:XPTS0003', 'A node matching step is not allowed directly after a property dot operator');
+      end;
+    end;
+  end;
+end;
+
 function TXQParsingContext.replaceEntities(s: string): string;
 var
   n, p: Integer;
@@ -912,10 +938,7 @@ begin
     '''', '"':  exit(parseString(word));
     '$': begin
       if word <> '$' then raiseParsingError('XPST0003', 'Invalid characters after $');
-      result := TXQTermVariable.Create(nextTokenQName(), staticContext);
-      if (AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(result).value, '.')) then
-        result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
-      exit;
+      exit(parseVariable());
     end;
     '@': exit(TXQTermReadAttribute.create(nextTokenQName(true)));
     '+', '-': begin
@@ -1141,8 +1164,31 @@ var astroot: TXQTerm;
     end;
   end;
 
+
   var word: string;
     replace: PXQTerm;
+
+  procedure parseDotOperator;
+  var prop: string;
+  begin
+    replace := ripBinOpApart(@astroot, 10000);
+    if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable)
+       or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor) or (replace^ is TXQTermDynamicFunctionCall) then begin
+         word := strCopyFrom(word, 2);
+         if word <> '' then
+           for prop in strSplit(word, '.') do begin
+             if prop = '' then raiseParsingError('XPST0003', 'Unexpected ..');
+             replace^ := TXQTermReadObjectProperty.Create(prop).push([replace^]);
+           end;
+         if (word = '') or (strEndsWith(word, '.')) then begin
+           replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseValue);
+           if replace^.children[1] is TXQTermNodeMatcher then
+             raiseParsingError('pxp:XPTS0003', 'A node matching step is not allowed directly after a property dot operator');
+         end;
+     end else begin
+       raiseParsingError('XPST0003', 'Unexpected .');
+     end;
+  end;
 begin
   astroot := parseValue();
   try
@@ -1190,14 +1236,7 @@ begin
         else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
         else if (word[1] = '.') and (AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
           expect(word);
-          replace := ripBinOpApart(@astroot, 10000);
-          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable)
-             or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor) or (replace^ is TXQTermDynamicFunctionCall) then begin
-             for word in strSplit(strCopyFrom(word, 2), '.') do
-               replace^ := TXQTermReadObjectProperty.Create(word).push([replace^])
-           end else begin
-             raiseParsingError('XPST0003', 'Unexpected .');
-           end;
+          parseDotOperator;
         end else
           raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word);
       end;
