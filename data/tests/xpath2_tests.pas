@@ -1903,6 +1903,19 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('1000 + {"foo": {"bar": 456}} . "foo" ."bar" + 1', '1457');
   t('1000 + {"foo": {"bar": 456}} . "foo" . "bar" + 1', '1457');
 
+  //multiple properties
+  t('join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" })("foo"))', 'bar bar2'); //test based on jsoniq standard
+  t('join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" })."foo")', 'bar bar2'); //test based on jsoniq standard
+  t('for $f in "foo" return join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" }).$f)', 'bar bar2'); //test based on jsoniq standard
+  t('join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" }).foo)', 'bar bar2'); //test from jsoniq standard
+
+  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" })("foo"))', 'bar'); //test based on jsoniq standard
+  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" })."foo")', 'bar'); //test based on jsoniq standard
+  t('for $f in "foo" return join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).$f)', 'bar'); //test based on jsoniq standard
+  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).foo)', 'bar'); //test from jsoniq standard
+
+  t('(17).abc', '');
+
   //  t('$x. bar', 'bar');
 //  t('$x.$indirect', 'bar');
 
@@ -1919,10 +1932,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   t('$a.b', '17');
-  f('$a.b.c');
+  t('$a.b.c', '');
 
   t('{"a.b.c": "miza"}("a.b.c")', 'miza');
-  f('{"a.b.c": "miza"}.a.b.c');
+  t('{"a.b.c": "miza"}.a.b.c', '');
 
   t('$obj := {}', '');
   t('$obj("x.y.z") := 17', '17');

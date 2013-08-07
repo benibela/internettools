@@ -108,13 +108,19 @@ end;
 
 function TXQTermReadObjectProperty.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
-  obj: IXQValue;
+  obj, v: IXQValue;
 begin
   if length(children) = 0 then raiseEvaluationError('pxp:OBJ', 'Found no term to read property from');
   if length(children) > 1 then raiseEvaluationError('pxp:OBJ', 'Can only read property from one term');
   obj:=children[0].evaluate(context);
-  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
-  result := (obj as TXQValueObject).getProperty(propname);
+
+  result := nil;
+  for v in obj do
+    if v is TXQValueObject then
+       xqvalueSeqAdd(result, v.getProperty(propname));
+  if result = nil then result := xqvalue();
+//  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
+//  result := (obj as TXQValueObject).getProperty(propname);
 end;
 
 function TXQTermReadObjectProperty.getContextDependencies: TXQContextDependencies;
