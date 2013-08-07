@@ -189,30 +189,76 @@ end;
 
 constructor TXQTermDefineVariable.create(avarname: string; anamespace: INamespace);
 begin
-  variablename := avarname;
-  namespace := anamespace;
+  variable := TXQTermVariable.create(avarname, anamespace);
 end;
 
-constructor TXQTermDefineVariable.create(varname: TXQTerm; anamespace: INamespace; value: TXQTerm);
+constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
+  function checkAssignable(t: TXQTerm): boolean;
+  begin
+    while t <> nil do begin
+      if (t is TXQTermNodeMatcher) or (t is TXQTermVariable) then
+        exit(true);
+      if (t is TXQTermReadObjectProperty) or (t is TXQTermDynamicFunctionCall) then
+        t := t.children[0]
+      else
+        exit(false);
+    end;
+    exit(false);
+  end;
 begin
-  if varname is TXQTermNodeMatcher then variablename := TXQTermNodeMatcher(varname).debugTermToString
-  else if varname is TXQTermVariable then variablename := TXQTermVariable(varname).value
-  else raiseParsingError('XPST0003', 'Invalid term to assign a variable to: '+varname.debugTermToString);
-  varname.Free;
-  namespace := anamespace;
+  if not checkAssignable(vari) then
+    raiseParsingError('XPST0003', 'Invalid term to assign a variable to: '+vari.debugTermToString);
+  variable := vari;
   if value <> nil then push(value);
 end;
 
 function TXQTermDefineVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
+var varname: string;
+    varnamespace: INamespace;
+    properties: TStringArray;
+    v: TXQTerm;
+
 begin
-  //this is never called for true XQuery variables, they are handled from the module term.
-  if not assigned(context.staticContext.sender.OnDefineVariable) then raiseEvaluationError('XPST0001', ':= can''t be used without a method assigned to the OnDefineVariable event');
   if length(children) = 0 then raiseEvaluationError('XPST0003', 'Value missing');
   if length(children) > 1 then raiseEvaluationError('XPST0003', 'Only one value can be assigned to a variable');
   result := children[0].evaluate(context);
+  properties := nil;
+
+  v := variable;
+  while true do begin
+    if v is TXQTermNodeMatcher then begin
+      raiseEvaluationError('pxp:VAR', 'node matcher term as variable name in assignment has been deprecated. (but this error should never occur, since the term type is changed during parsing time)');
+      //varname:=TXQTermNodeMatcher(v).select;
+      //break;
+    end else if v is TXQTermVariable then begin
+      varname := TXQTermVariable(v).value;
+      varnamespace := TXQTermVariable(v).namespace;
+      break;
+    end else if v is TXQTermReadObjectProperty then begin
+      arrayPrepend(properties, TXQTermReadObjectProperty(v).propname);
+      v := v.children[0];
+    end else if v is TXQTermDynamicFunctionCall then begin
+      arrayPrepend(properties, TXQTermDynamicFunctionCall(v).children[1].evaluate(context).toString);
+      v := v.children[0];
+    end
+    else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v.debugTermToString);
+  end;
+
+  if length(properties) = 0 then //test is unnessesary, as it should work with only the last branch. But being explicit looks better
+    context.staticContext.sender.VariableChangelog.add(varname, result, varnamespace)
+   else
+    context.staticContext.sender.VariableChangelog.addObjectModification(varname, result, varnamespace, properties)
+
+
+  (*exit;
+
+  variable.;
+
+  //this is never called for true XQuery variables, they are handled from the module term.
+  if not assigned(context.staticContext.sender.OnDefineVariable) then raiseEvaluationError('XPST0001', ':= can''t be used without a method assigned to the OnDefineVariable event');
 
   if namespace <> nil then context.staticContext.sender.OnDefineVariable(self, namespace.getPrefix + ':' + variablename, result)
-  else context.staticContext.sender.OnDefineVariable(self, variablename, result);
+  else context.staticContext.sender.OnDefineVariable(self, variablename, result);*)
 end;
 
 function TXQTermDefineVariable.getContextDependencies: TXQContextDependencies;
@@ -220,6 +266,12 @@ begin
   Result:=[];
   if length(children) > 0 then result := children[high(children)].getContextDependencies;
   result += [xqcdContextVariables];
+end;
+
+destructor TXQTermDefineVariable.destroy;
+begin
+  variable.Free;
+  inherited destroy;
 end;
 
 { TXQTermType }
@@ -414,7 +466,6 @@ begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
     tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-    tempContext.temporaryVariables.allowPropertyDotNotation:=context.staticContext.sender.VariableChangelog.allowPropertyDotNotation;
   end;
   try
     result:=xqvalue(evaluateSomeEvery(0));
@@ -552,7 +603,6 @@ begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
     tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-    tempContext.temporaryVariables.allowPropertyDotNotation:=context.staticContext.sender.VariableChangelog.allowPropertyDotNotation;
   end;
 
   //oldVarCount := tempContext.temporaryVariables.count;
@@ -1143,6 +1193,12 @@ begin
   if staticContext <> nil then staticContext.splitRawQName(namespace, value, xqdnkUnknown);
 end;
 
+constructor TXQTermVariable.create(const avalue: string; const anamespace: INamespace);
+begin
+  value := avalue;
+  namespace := anamespace;
+end;
+
 function TXQTermVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   result := context.getVariable(value, namespace);
@@ -1151,6 +1207,18 @@ end;
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;
 begin
   Result:=[xqcdContextVariables];
+end;
+
+class function TXQTermVariable.splitForDotNotation(v: TXQTermVariable): TXQTerm;
+var
+  name: String;
+  prop: String;
+begin
+  name := v.value;
+  v.value := strSplitGet('.', name);
+  result := v;
+  for prop in strSplit(name, '.') do
+    result := TXQTermReadObjectProperty.create(prop).push([result]);
 end;
 
 { TXQTermString }
@@ -1613,14 +1681,16 @@ end;
 function TXQTermDefineFunction.define(): TXQValueFunction;
 var
   i: Integer;
+  v: TXQTermVariable;
 begin
   result := TXQValueFunction.create();
   result.namespace := namespace;
   result.name:=funcname;
   setlength(result.parameters, parameterCount);
   for i := 0 to high(result.parameters) do begin
-    result.parameters[i].namespace:=(children[i] as TXQTermDefineVariable).namespace;
-    result.parameters[i].name:=(children[i] as TXQTermDefineVariable).variablename;
+    v := ((children[i] as TXQTermDefineVariable).variable as TXQTermVariable);
+    result.parameters[i].namespace:=v.namespace;
+    result.parameters[i].name:=v.value;
     if length((children[i] as TXQTermDefineVariable).children) > 0 then
       result.parameters[i].seqtype:=(children[i] as TXQTermDefineVariable).children[0] as TXQTermSequenceType
      else

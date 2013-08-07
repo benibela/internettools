@@ -160,19 +160,20 @@ var
     m('import module namespace test = "'+ns+'"; let $o := {"Captain": "Kirk", "First Officer": "Spock", "Engineer": "Scott" } return serialize-json(test:project($o, "XQuery Evangelist"))', '{}');
   end;
 
-var vars: TXQVariableChangeLog;
+var //vars: TXQVariableChangeLog;
   helper: THelper;
 begin
 //  time := Now;
-  vars:= TXQVariableChangeLog.create();
+  //vars:= TXQVariableChangeLog.create();
 
   count:=0;
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.ImplicitTimezone:=-5 / HoursPerDay;
-  ps.OnEvaluateVariable:=@vars.evaluateVariable;
-  ps.OnDefineVariable:=@vars.defineVariable;
+  //ps.OnEvaluateVariable:=@vars.evaluateVariable;
+  //ps.OnDefineVariable:=@vars.defineVariable;
   ps.AllowJSONLiterals:=false;
+  ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   xml := TTreeParser.Create;
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
@@ -1752,7 +1753,7 @@ begin
   xml.free;
   FreeAndNil(ps.GlobalNamespaces);
   ps.free;
-  vars.free
+  //vars.free
 end;
 
 
@@ -1776,7 +1777,7 @@ end;
 constructor THelper.create;
 begin
   func1 := TXQTermString.create('func-result');
-  func2 := TXQTermBinaryOp.create('*', TXQTermVariable.Create('a', nil), TXQTermVariable.Create('b', nil));;
+  func2 := TXQTermBinaryOp.create('*', TXQTermVariable.Create('a'), TXQTermVariable.Create('b'));;
   func3 := TTermExtension.Create;
 end;
 

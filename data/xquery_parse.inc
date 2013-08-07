@@ -26,7 +26,7 @@ type
   engine: TXQueryEngine;
 
   AllowExtendedStrings: boolean;
-  AllowPropertyDotNotation: boolean;
+  AllowPropertyDotNotation: TXQPropertyDotNotation;
   AllowJSON: boolean;
   AllowJSONLiterals: Boolean;
   parsingModel: TXQParsingModel;
@@ -897,6 +897,7 @@ begin
   result := parseSequenceLike(TXQTermJSONArray.Create, ']') as TXQTermJSONArray;
 end;
 
+
 function TXQParsingContext.parseValue: TXQTerm;
 var
   word: String;
@@ -911,7 +912,10 @@ begin
     '''', '"':  exit(parseString(word));
     '$': begin
       if word <> '$' then raiseParsingError('XPST0003', 'Invalid characters after $');
-      exit(TXQTermVariable.Create(nextTokenQName(), staticContext));
+      result := TXQTermVariable.Create(nextTokenQName(), staticContext);
+      if (AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(result).value, '.')) then
+        result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
+      exit;
     end;
     '@': exit(TXQTermReadAttribute.create(nextTokenQName(true)));
     '+', '-': begin
@@ -1172,17 +1176,26 @@ begin
         end;
         ':=': begin
           expect(':=');
-          result := TXQTermDefineVariable.Create(astroot, nil, parseSomething());
-          staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
+          result := astroot;
+          if result is TXQTermNodeMatcher then begin
+            result := TXQTermVariable.create(IfThen(TXQTermNodeMatcher(astroot).namespace = '', TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).namespace + ':' + TXQTermNodeMatcher(astroot).select), staticContext);
+            astroot.free;
+            if (AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(result).value, '.')) then
+              result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
+          end;
+          result := TXQTermDefineVariable.Create(result, parseSomething());
+          //staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
           exit;
         end;
         else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
-        else if (word[1] = '.') and AllowPropertyDotNotation then begin
+        else if (word[1] = '.') and (AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
           expect(word);
           replace := ripBinOpApart(@astroot, 10000);
-          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable) or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor)  or (replace^ is TXQTermDynamicFunctionCall) then
-            replace^ := TXQTermReadObjectProperty.Create(strCopyFrom(word, 2)).push([replace^])
-           else begin
+          if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable)
+             or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor) or (replace^ is TXQTermDynamicFunctionCall) then begin
+             for word in strSplit(strCopyFrom(word, 2), '.') do
+               replace^ := TXQTermReadObjectProperty.Create(word).push([replace^])
+           end else begin
              raiseParsingError('XPST0003', 'Unexpected .');
            end;
         end else
@@ -1309,7 +1322,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     requireModule;
     expect('$');
     vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp), nil);
-    staticContext.splitRawQName(vari.namespace, vari.variablename, xqdnkUnknown);
+    staticContext.splitRawQName((vari.variable as TXQTermVariable).namespace, (vari.variable as TXQTermVariable).value, xqdnkUnknown);
     result.push(vari);
     if tempTyp <> nil then vari.push(tempTyp);
     case nextToken() of
@@ -1334,7 +1347,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     while nextToken(true) <> ')' do begin
       expect('$');
       tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType), nil);
-      staticContext.splitRawQName(tempVar.namespace, tempVar.variablename, xqdnkUnknown);
+      staticContext.splitRawQName((tempVar.variable as TXQTermVariable).namespace, (tempVar.variable as TXQTermVariable).value, xqdnkUnknown);
       if tempType <> nil then tempVar.push(tempType);
       funcTerm.push(tempVar);
       skipWhitespaceAndComment();
@@ -1488,7 +1501,14 @@ begin
                 'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
                 'extended-strings': readBoolean(AllowExtendedStrings, temp);
                 'json': readBoolean(AllowJSON, temp);
-                'property-dot-notation': readBoolean(AllowPropertyDotNotation, temp);
+                'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
+                  case temp of
+                    'on':  AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+                    'off': AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+                    'unambiguous': AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
+                    'toggle': raiseParsingError('pxp:XPST0003', 'The "toggle" value has been removed for the property-dot-notation option.');
+                    else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/unambiguous');
+                  end;
                 'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
                 'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
                 'pure-json-objects': readBoolean(staticContext.objectsRestrictedToJSONTypes, temp);

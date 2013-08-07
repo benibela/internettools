@@ -42,7 +42,7 @@ var
 //    writeln(ps.debugtermToString(ps.FCurTerm));
     got := ps.evaluate().toString;
     if got<>s2 then
-        raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
+        raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'". Parsed query: '+ps.LastQuery.Term.debugTermToString);
   end;
 
   procedure t(a,b: string; c: string = '');
@@ -74,22 +74,23 @@ var
    end;
 
 //var  time: TDateTime;
-var vars: TXQVariableChangeLog;
-  tempb: Boolean;
+var tempb: Boolean;
 begin
 //  time := Now;
-  vars:= TXQVariableChangeLog.create();
-  vars.add('abc', 'alphabet');
-  vars.add('test', 'tset');
-  vars.add('eval', '''abc'' = ''abc''');
+  //vars:= TXQVariableChangeLog.create();
 
   ps := TXQueryEngine.Create;
   ps.AllowJSONLiterals:=false;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.StaticContext.useLocalNamespaces:=false;
   ps.ImplicitTimezone:=-5 / HoursPerDay;
-  ps.OnEvaluateVariable:=@vars.evaluateVariable;
-  ps.OnDefineVariable:=@vars.defineVariable;
+
+  ps.VariableChangelog.add('abc', 'alphabet');
+  ps.VariableChangelog.add('test', 'tset');
+  ps.VariableChangelog.add('eval', '''abc'' = ''abc''');
+
+  //ps.OnEvaluateVariable:=@vars.evaluateVariable;
+  //ps.OnDefineVariable:=@vars.defineVariable;
   xml := TTreeParser.Create;
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
@@ -1686,10 +1687,17 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('uri-combine({"x": "++", "y&": 123}, {"x": 0, "y": 456})', 'x=0&y%26=123&y=456');
   t('uri-combine({"x": "++", "y&": 123}, {"y": "456", "x": 0})', 'x=0&y%26=123&y=456');
 
+  ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+
                //Objects extension
   t('obj := xs:object()', '', '');
   t('obj.foo := "bar"', 'bar', '');
   t('$obj.foo', 'bar', '');
+  t('($obj).foo', 'bar', '');
+  t('$obj("foo")', 'bar', '');
+  t('$obj("foo") := "xyz"', 'xyz', '');
+  t('$obj.foo', 'xyz', '');
+//  t('($obj) . foo', 'bar', '');
   t('obj.foo := 123', '123', '');
   t('obj.foo := $obj.foo * 2', '246', '');
   t('obj.o := $obj', '', '');
@@ -1732,6 +1740,25 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('(object(("x", "y")), object(("u", "v")))[1].x', 'y', '');
   t('(object(("x", "y")), object(("u", "v")))[1].u', '', '');
   t('(object(("x", "y")), object(("u", "v")))[2].u', 'v', '');
+
+  t('obj := {"b": {"c": {"d": 1}}}', '');
+  t('$obj.b.c.d', '1');
+  t('x := $obj', '');
+  t('$x.b.c.d := 2', '2');
+  t('$x.b.c.d', '2');
+  t('$obj.b.c.d', '1');
+  t('x.b.c.d := 3', '3');
+  t('$x.b.c.d', '3');
+  t('$obj.b.c.d', '1');
+  t('$x.b("c").d := 4', '4');
+  t('$x.b.c.d', '4');
+  t('$x("b")("c")("d") := 5', '5');
+  t('$x.b.c.d', '5');
+  t('$x("b")("c").d := 6', '6');
+  t('$x.b.c.d', '6');
+  t('$x("b").c := {"y": 123}', '');
+  t('$x.b.c.d', '');
+  t('$x.b.c.y', '123');
 
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")).a return $i, "|")', 'x', '');
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return $i.a, "|")', 'x', '');
@@ -1776,6 +1803,35 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('[123] instance of structured-item()', 'true');
   t('123 instance of structured-item()', 'false');
   t('(/) instance of structured-item()', 'true');
+
+  t('indirect := "foo"', 'foo');
+  t('$x($indirect) := "bar"', 'bar');
+  t('$x($indirect)', 'bar');
+  t('$x("foo")', 'bar');
+  t('$x.foo', 'bar');
+  t('$x(1+1+1) := 6', '6');
+  t('$x.3', '6');
+
+  ps.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
+  t('$a := 123', '123');
+  t('$a.b.c := 456', '456');
+  t('$a', '123');
+  t('$a.b.c', '456');
+  f('$a.b');
+  t('$a := {"b": 17}', '');
+  f('$a.b');
+  t('$a("b")', '17');
+
+  ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+  t('$a.b', '17');
+  f('$a.b.c');
+
+  t('{"a.b.c": "miza"}("a.b.c")', 'miza');
+  f('{"a.b.c": "miza"}.a.b.c');
+
+  t('$obj := {}', '');
+  t('$obj("x.y.z") := 17', '17');
+  t('$obj("x.y.z")', '17');
 
   //Json tests
   t('json(''{"a": 123}'').a', '123');
@@ -2919,10 +2975,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   performUnitTest('$abc','alphabet','');
   f('$ABC');
-  vars.caseSensitive:=false;
+  ps.VariableChangelog.caseSensitive:=false;
   performUnitTest('$abc','alphabet','');
   performUnitTest('$ABC','alphabet','');
-  vars.caseSensitive:=true;
+  ps.VariableChangelog.caseSensitive:=true;
   performUnitTest('$abc','alphabet','');
   f('$ABC');
 
@@ -3028,7 +3084,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   ps.free;
   xml.Free;
-  vars.Free;
+  //vars.Free;
 end;
 
 

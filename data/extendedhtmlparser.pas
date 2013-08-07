@@ -384,7 +384,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 *)
 THtmlTemplateParser=class
   protected
-    FObjects: boolean;
+    //FObjects: boolean;
     FRepetitionRegEx: TRegExpr;
     FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
     FVeryShortNotation: boolean;
@@ -414,8 +414,8 @@ THtmlTemplateParser=class
     //FOnVariableRead: TVariableCallbackFunction;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
-    function evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
-    procedure defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
+    //function evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
+    //procedure defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
     //procedure executeTemplateCommand(status:TParsingStatus;cmd: TTemplateElement;afterReading:boolean);
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
@@ -456,7 +456,6 @@ THtmlTemplateParser=class
     property trimTextNodes: TTrimTextNodes read FTrimTextNodes write FTrimTextNodes; //**< How to trim text nodes (default ttnAfterReading). There is also pseudoxpath.XQGlobalTrimNodes which controls, how the values are returned.
     property UnnamedVariableName: string read FUnnamedVariableName write FUnnamedVariableName; //**< Default variable name. If a something is read from the document, but not assigned to a variable, it is assigned to this one. (Default: _result)
     property AllowVeryShortNotation: boolean read FVeryShortNotation write FVeryShortNotation; //**< Enables the the very short notation (e.g. {a:=text()}, <a>*) (default: true)
-    property AllowPropertyDotNotation: boolean read FObjects write FObjects; //**< If object properties can be accessed with $object.propertyname (e.g. @code( object(("a", 1, "b", 2)).a ) would become 1). When objects are enabled, variable names cannot contain points.  (default true)
     property SingleQueryModule: boolean read FSingleQueryModule write FSingleQueryModule;  //**< If all XPath/XQuery expressions in the templates are kept in the same module. Only if true, XQuery variables/functions declared are accessible in other read commands. (declarations must be preceded by @code(xquery version "1.0";) and followed by an expression, if only @code(())) Global variables, declared with a simple $x := value, are always everywhere accessible. (default true)
 
     property hasRealVariableDefinitions: boolean read GetTemplateHasRealVariableDefinitions; //**< If the currently loaded template contains := variable definitions (contrary to assign values to the default variable with {.} )  (CAN ONLY BE USED AFTER the template has been applied!)
@@ -652,12 +651,12 @@ begin
   if templateType = tetCommandShortRead then begin
     source := parser.parseQuery(deepNodeText()); //todo: use correct encoding
     term := source.Term;
-    if term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(Term, nil, TXQTermNodeMatcher.Create('.'))
+    if term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.'))
     else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
             and (source.term.children[0] is TXQTermReadAttribute) and (source.Term.children[1] is TXQTermSequence)
             and (length(source.term.children[1].children) = 1) and (source.term.children[1].children[0] is TXQTermVariable) then begin
       //replace    @foobar / ( $xyz ) by $xyz := @foobar
-      source.term := TXQTermDefineVariable.create(Term.children[1].children[0], nil, Term.children[0]);
+      source.term := TXQTermDefineVariable.create(Term.children[1].children[0],  Term.children[0]);
       //free terms
       setlength(term.children[1].children, 0);
       term.children[1].free;
@@ -761,7 +760,7 @@ begin
   end;
 end;
 
-procedure THtmlTemplateParser.defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
+{procedure THtmlTemplateParser.defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
 var
   base: string;
   varname: string;
@@ -778,7 +777,7 @@ begin
   temp := FOldVariableLog.get(base);
   if not (temp is TXQValueObject) then raise EXQEvaluationException.create('pxp:OBJECT', 'Set object property, but variable is no object');
   FVariableLog.defineVariable(sender, base, (temp as TXQValueObject).setImmutable(varname, value));
-end;
+end;}
 
 function THtmlTemplateParser.GetVariableLogCondensed: TXQVariableChangeLog;
 begin
@@ -795,7 +794,7 @@ begin
   result := FVariables;
 end;
 
-function THtmlTemplateParser.evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
+{function THtmlTemplateParser.evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
 var
   temp: TXQValue;
 begin
@@ -806,7 +805,7 @@ begin
   if temp <> nil then value := temp
   else value := xqvalue();
   result := true;
-end;
+end;}
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeNode;
   template: TTemplateElement): Boolean;
@@ -930,6 +929,8 @@ var xpathText: TTreeNode;
    attribs: tStringAttributeList;
    submatch: Integer;
    regex: String;
+   name: String;
+   props: TStringArray;
   begin
     attribs := templateStart.templateAttributes;
 
@@ -946,10 +947,14 @@ var xpathText: TTreeNode;
       regexp.free;
     end;
 
-    if templateStart.varname <> nil then
-      defineXQVariable(nil,Trim(performPXPEvaluation(templateStart.varname).toString), value)
-    else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
-      defineXQVariable(nil, FUnnamedVariableName, value);
+
+    if templateStart.varname <> nil then begin
+      name := Trim(performPXPEvaluation(templateStart.varname).toString);
+      props := strSplit(name, '.');
+      if length(props) > 0 then name := arrayDelete(props, 0);
+      FVariableLog.addObjectModification(name, value, nil, props);
+    end else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
+      FVariableLog.add(FUnnamedVariableName, value, nil);
 
     templateStart := templateStart.templateReverse;
   end;
@@ -960,7 +965,8 @@ var xpathText: TTreeNode;
   begin
     varcount:=FVariableLog.count;
     read := performPXPEvaluation(templateStart.source);
-    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then defineXQVariable(nil, FUnnamedVariableName, read);
+    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then
+      FVariableLog.add(FUnnamedVariableName, read);
     templateStart := templateStart.templateReverse;
   end;
 
@@ -1217,7 +1223,6 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
   FreeAndNil(FVariableLogCondensed);
-  FVariableLog.allowPropertyDotNotation:=FObjects;
 
   if FTemplate.getLastTree <> nil then begin
     if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
@@ -1293,7 +1298,6 @@ end;
 
 constructor THtmlTemplateParser.create;
 begin
-  FVariableLog := TXQVariableChangeLog.Create;
   FOldVariableLog := TXQVariableChangeLog.create;
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
@@ -1311,17 +1315,20 @@ begin
   FUnnamedVariableName:='_result';
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
-  FObjects:=true;
   FSingleQueryModule := true;
 
   FAttributeMatching := TStringList.Create;
   FAttributeMatching.Values['class'] := 'list-contains';
 
   FQueryEngine := TXQueryEngine.create;
-  FQueryEngine.OnDefineVariable:=@defineXQVariable;
-  FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
+  FQueryEngine.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+  //FQueryEngine.OnDefineVariable:=@defineXQVariable;
+  //FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
+
+  FVariableLog := FQueryEngine.VariableChangelog;
+  FVariableLog.parentLog := FOldVariableLog;
 end;
 
 destructor THtmlTemplateParser.destroy;
@@ -1331,7 +1338,6 @@ begin
   FRepetitionRegEx.Free;
   FreeAndNil(FVariables);
   FVariableLogCondensed.free;
-  FVariableLog.Free;
   FOldVariableLog.Free;
   FTemplate.Free;
   FHTML.Free;
@@ -1451,7 +1457,14 @@ begin
       while (i<=length(s)) and (s[i]<>';')  do inc(i);
       temp:=copy(s,f,i-f);
       tempxqvalue:=xqvalue();
-      evaluateXQVariable(self,temp,tempxqvalue);
+
+      if pos('.', temp) = 0 then tempxqvalue := FVariableLog.get(temp)
+      else begin
+        tempxqvalue := FVariableLog.get(strSplitGet('.', temp));
+        while (temp <> '') and (tempxqvalue is TXQValueObject) do
+          tempxqvalue := tempxqvalue.getProperty(strSplitGet('.', temp));
+      end;
+
       value:=tempxqvalue.toString;
       if assigned(customReplace) then customReplace(temp,value);
     //  OutputDebugString(pchar(parser.variables.Text));

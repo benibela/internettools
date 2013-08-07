@@ -89,6 +89,11 @@ type
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
   TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkAny, xqdnkElementType,  xqdnkType, xqdnkFunction);
+  //** If it is possible to access object properties with @code(.property) @br
+  //** xqpdnDisallowDotNotation: do not allow the dot operator anywhere @br
+  //** xqpdnAllowUnambiguousDotNotation: allow the dot operator when disabling it would be a syntax error. E.g. cases like @code(($obj).property), @code(func(..).property), @code({"a": ..}.property), ...  @br
+  //** xqpdnAllowFullDotNotation: allow the dot operator everywhere. Even in $obj.property  @br
+  TXQPropertyDotNotation = (xqpdnDisallowDotNotation, xqpdnAllowUnambiguousDotNotation, xqpdnAllowFullDotNotation);
 
   TTreeNodeSerialization = (tnsText, tnsXML, tnsHTML);
 
@@ -98,7 +103,7 @@ type
   TXQStaticContext = class
     sender: TXQueryEngine; //**< Engine this context belongs to
 
-    //The following values map directly to XQuery options declarable in a Prolog
+    //The following values map directly to XQuery options declarable in a prolog
     moduleNamespace: INamespace; //**< The namespace of this module or nil
     namespaces: TNamespaceList;  //**< All declared namespaces.
     moduleVariables: TXQVariableChangeLog;  //**< All declared variables.
@@ -654,6 +659,8 @@ type
     procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
     function setImmutable(const name: string; const s: string): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
 
+    function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
+
     function toBooleanEffective: boolean; override;
 
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
@@ -777,7 +784,8 @@ type
   (***
     @abstract(Event callback that is called to set the @code(value) of the variable @code(variable)).
   *)
-  TXQDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
+  //TXQDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
+
   (***
     @abstract(Event callback that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
 
@@ -995,19 +1003,21 @@ type
     namespace: INamespace;
     value: string;
     constructor create(const avalue: string; staticContext: TXQStaticContext);
+    constructor create(const avalue: string; const anamespace: INamespace = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    class function splitForDotNotation(v: TXQTermVariable): TXQTerm;
   end;
 
   { TXQTermDefineVariable }
 
   TXQTermDefineVariable = class(TXQTerm)
-    namespace: INamespace;
-    variablename: string;
+    variable: TXQTerm;
     constructor create(avarname: string; anamespace: INamespace);
-    constructor create(varname: TXQTerm; anamespace: INamespace; value: TXQTerm = nil);
+    constructor create(vari: TXQTerm; value: TXQTerm = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    destructor destroy; override;
   end;
 
   { TXQTermDefineVariable }
@@ -1468,8 +1478,8 @@ type
 
     VariableChangelog: TXQVariableChangeLog;  //**< All global variables that have been set (if a variable was overriden, it stores the old and new value)
 
-    OnEvaluateVariable: TXQEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
-    OnDefineVariable: TXQDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
+    //OnEvaluateVariable: TXQEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
+    //OnDefineVariable: TXQDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
     OnDeclareExternalVariable: TXQDeclareExternalVariableEvent; //**< Event called to import a variable that is declared as "declare variable ... external" in a XQuery expression
     OnDeclareExternalFunction: TXQDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression.
     OnImportModule: TXQImportModuleEvent;  //**< Event called to import a XQuery module that has not previously be defined
@@ -1479,6 +1489,7 @@ type
     OnParseDoc: TXQParseDocEvent; //**< Event called by fn:doc (if nil, a default xml parser is used)
 
     AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
+    AllowPropertyDotNotation: TXQPropertyDotNotation; //**< If it is possible to access (json) object properties with the @code(($obj).property) or even @code($obj.property) syntax (default is xqpdnAllowUnambiguousDotNotation, property syntax can be used, where a dot would be an invalid expression in standard xquery)
     AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
     AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
     GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
@@ -1640,9 +1651,9 @@ type
   *)
   TXQVariable = record
     namespace: INamespace;
-    name: string; //**< Name of the variable
+    name: string; //**< Name of the variable  (basename, in a.b := 123, the name is a)
     value: IXQValue;
-    fullname: string; //**< Name used to change the variable (i.e. when changing @code(obj.property), @code(name) will be @code(obj), and @code(fullname) will be @code(obj.property)  )
+    propertyChange: boolean;
   end;
 
   { TXQVariableStorage }
@@ -1662,7 +1673,7 @@ type
   TXQVariableChangeLog = class
     caseSensitive: boolean; //**< If true, variables are case-sensitive, otherwise case-insensitive
     readonly: boolean; //**< If true, modifying the variable value raises an error
-    allowPropertyDotNotation: boolean;  //**< If true, object properties are changed when variables like obj.propname are added. (more precise, a copy of the object would be made in which that property has the new value)
+    parentLog: TXQVariableChangeLog;
 
     procedure add(name: string; const value: IXQValue; const namespace: INamespace = nil); //**< Add a variable
     procedure add(const name: string; const value: string); //**< Add a variable (@code(value) is converted to a IXQValue)
@@ -1686,7 +1697,7 @@ type
     function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
 
     function hasVariable(const variable: string; value: PXQValue; const namespace: INamespace = nil): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
-    function hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace = nil): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+    //function hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace = nil): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
 
     property Values[name:string]:IXQValue read get write add; default;
     property ValuesString[name:string]:string read getString write add;
@@ -1700,7 +1711,7 @@ type
     procedure popAll(level: integer = -1); //**< Reverts all variables to the latest marked state
 
     procedure stringifyNodes;
-    class function splitName(const variable: string; out base, varname: string): boolean; static;
+    //class function splitName(const variable: string; out base, varname: string): boolean; static;
 
     function debugTextRepresentation: string; //**< Dump of the log as list of name=value pairs
 
@@ -1710,8 +1721,10 @@ type
     function condensed: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
     function collected: TXQVariableChangeLog; //**< Collects multiple assignments to single sequence assignment. (i.e. @code(a := 123, a := 456, a := 789) collected is equivalent to @code(a := (123, 456, 789))) (creates a new variable log that has to be freed)
 
-    function evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean; //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
-    procedure defineVariable(sender: TObject; const variable: string; const value: IXQValue); //**< Sets @code(variable) to the @code(value)@br This is used as callback by the XQuery-Engine
+    //function evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean; //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
+    //procedure defineVariable(sender: TObject; const variable: string; const value: IXQValue); //**< Sets @code(variable) to the @code(value)@br This is used as callback by the XQuery-Engine
+
+    procedure addObjectModification(const variable: string; value: IXQValue; const namespace: INamespace; properties: TStringArray);
   private
     shared: boolean;
     vars: array of TXQVariable;
@@ -2577,6 +2590,7 @@ var
   hasTypeDeclaration: Boolean;
   hasExpression: Boolean;
   tempValue: IXQValue;
+  name: String;
 begin
   truechildcount := length(children);
   if context.staticContext.moduleNamespace <> nil then truechildcount-=1;
@@ -2606,11 +2620,12 @@ begin
     if children[i] is TXQTermDefineVariable then begin
       tempDefVar := TXQTermDefineVariable(children[i]);
 
-      ns := tempDefVar.namespace;
+      ns := (tempDefVar.variable as TXQTermVariable).namespace;
+      name := (tempDefVar.variable as TXQTermVariable).value;
       if (ns = nil) and (context.staticContext.moduleNamespace <> nil) then
-        raiseEvaluationError('XPST0008', 'Unknown namespace prefix for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
+        raiseEvaluationError('XPST0008', 'Unknown namespace prefix for variable: '+name);
       if (context.staticContext.moduleNamespace  <> nil) and (context.staticContext.moduleNamespace  <> ns ) and (context.staticContext.moduleNamespace.getURL  <> ns.getURL ) then
-         raiseEvaluationError('XQST0048', 'Invalid namespace for variable: '+tempDefVar.namespace.getPrefix+ ':'+tempDefVar.variablename);
+         raiseEvaluationError('XQST0048', 'Invalid namespace for variable: '+ns.getPrefix+ ':'+name);
 
       hasTypeDeclaration := (length(tempDefVar.children) > 0) and (tempDefVar.children[0] is TXQTermSequenceType);
       hasExpression := (length(tempDefVar.children) > 0) and not (tempDefVar.children[high(tempDefVar.children)] is TXQTermSequenceType);
@@ -2619,14 +2634,14 @@ begin
       if hasExpression then tempValue := tempDefVar.children[high(tempDefVar.children)].evaluate(context)
       else begin
         if not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
-        context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, tempDefVar.variablename, tempValue);
-        if tempValue = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + tempDefVar.variablename+ ' given.');
+        context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, name, tempValue);
+        if tempValue = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
       end;
-      vars.add(tempDefVar.variablename, tempValue, ns);
+      vars.add(name, tempValue, ns);
 
       if hasTypeDeclaration then
         if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(tempValue, context) then
-          raiseEvaluationError('XPTY0004', 'Variable '+tempDefVar.variablename + ' with value ' +tempValue.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
+          raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +tempValue.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
     end;
 end;
 
@@ -2720,21 +2735,25 @@ begin
   temp := nil;
   value := nil;
   if temporaryVariables <> nil then begin
-    result := temporaryVariables.hasVariableOrObject(name, @temp, ns);
+    result := temporaryVariables.hasVariable(name, @temp, ns);
     value := temp;
     if result then exit;
   end;
   sc := findModuleStaticContext(ns);
   if (sc <> nil) and (sc.moduleVariables <> nil) then begin
-    result := sc.moduleVariables.hasVariableOrObject(name, @temp, ns);
+    result := sc.moduleVariables.hasVariable(name, @temp, ns);
     value := temp;
     exit;
   end;
   if name = '$' then begin result := true; value := xqvalue('$'); end //default $$; as $
   else if name = 'line-ending' then begin result := true; value := xqvalue(LineEnding); end //default $line-ending; as #13#10
   else result := false;
-  if assigned(staticContext.sender.OnEvaluateVariable) then
-    result := result or staticContext.sender.OnEvaluateVariable(staticContext.sender, name, value)
+
+  if staticContext.sender.VariableChangelog.hasVariable(name, @temp, ns) then begin
+    result := true;
+    if temp <> nil then //safety check. todo: necessary?
+      value := temp;
+  end;
 end;
 
 function TXQEvaluationContext.getVariable(const name: string; const ns: INamespace): IXQValue;
@@ -3399,43 +3418,38 @@ end;
 
 procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const namespace: INamespace = nil);
 var
- point: Integer;
  base: String;
  i: Integer;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
-  point := 0;
-  if allowPropertyDotNotation then begin
-    point := pos('.', name);
-    if point > 0 then begin
-      base := copy(name, 1, point - 1);
-      i := indexOf(base);
-      if i < 0 then raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+base+LineEnding+'(when accessing: '+name+')');
-      if not (get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+base+' is not an object, but '+get(i).toString+LineEnding+'(when accessing: '+name+')');
-    end;
-  end;
+
   SetLength(vars, length(vars)+1);
-  vars[high(vars)].fullname:=name;
-  if point = 0 then begin
-    vars[high(vars)].namespace := namespace;
-    vars[high(vars)].name:=name;
-    vars[high(vars)].value:=value;
-  end else begin
-    vars[high(vars)].namespace := namespace;
-    vars[high(vars)].name:=base;
-    vars[high(vars)].value:=(get(i) as TXQValueObject).setImmutable(strCopyFrom(name, point + 1), value);;
+  vars[high(vars)].namespace := namespace;
+  vars[high(vars)].name:=name;
+  vars[high(vars)].value:=value;
+  vars[high(vars)].propertyChange:=false;
+end;
+
+procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespace: INamespace; properties: TStringArray);
+var
+  oldObj: TXQValue;
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
+  if length(properties) = 0 then begin
+   add(variable, value, namespace);
+   exit;
   end;
-{  end else begin
-    i := getVariableIndex(name);
-    if i = -1 then begin
-      SetLength(vars, length(vars)+1);
-      vars[high(vars)].name:=name;
-      vars[high(vars)].value:=value;
-    end else begin
-      xqvalueDestroy(vars[i].value);
-      vars[i].value:=value;
-    end;
-  end;}
+
+  if not hasVariable(variable, @oldObj, namespace) then
+    raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(properties, '.')+')');
+  if not (oldObj is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object, but '+oldObj.debugAsStringWithTypeAnnotation()+LineEnding+'(when changing properites: '+strJoin(properties, '.')+')');
+
+  SetLength(vars, length(vars)+1);
+  vars[high(vars)].namespace := namespace;
+  vars[high(vars)].name:=variable;
+  vars[high(vars)].value:=(oldObj as TXQValueObject).setImmutable(properties, value);
+
+  vars[high(vars)].propertyChange:=true;
 end;
 
 procedure TXQVariableChangeLog.add(const name: string; const value: string);
@@ -3483,7 +3497,8 @@ var i:integer;
 begin
   i := indexOf(name, namespace);
   if i = -1 then
-    exit(xqvalue());
+    if parentLog <> nil then exit(parentLog.get(name, namespace))
+    else exit(xqvalue());
   result := vars[i].value;
 end;
 
@@ -3505,22 +3520,22 @@ begin
   exit(-1);
 end;
 
-function TXQVariableChangeLog.evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
+{function TXQVariableChangeLog.evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
 var
   temp: TXQValue;
 begin
   ignore(sender);
   temp := nil;
-  if not hasVariableOrObject(variable, @temp) then exit(false);
+  if not hasVariable(variable, @temp) then exit(false);
   if temp <> nil then value := temp;
   result := true;
-end;
+end;}
 
-procedure TXQVariableChangeLog.defineVariable(sender: TObject; const variable: string; const value: IXQValue);
+{procedure TXQVariableChangeLog.defineVariable(sender: TObject; const variable: string; const value: IXQValue);
 begin
   ignore(sender);
   add(variable,value);
-end;
+end;}
 
 
 function TXQVariableChangeLog.count: integer;
@@ -3531,7 +3546,7 @@ end;
 function TXQVariableChangeLog.getName(i: integer): string;
 begin
   assert(i>=0); assert(i< count);
-  result := vars[i].fullname;
+  result := vars[i].name;
 end;
 
 function TXQVariableChangeLog.get(i: integer): IXQValue; inline;
@@ -3600,7 +3615,7 @@ begin
     end
 end;
 
-class function TXQVariableChangeLog.splitName(const variable: string; out base, varname: string): boolean;
+{class function TXQVariableChangeLog.splitName(const variable: string; out base, varname: string): boolean;
 var
   i: SizeInt;
 begin
@@ -3610,12 +3625,11 @@ begin
     base := copy(variable,1,i-1);
     varname := strCopyFrom(variable,i+1);
   end;
-end;
+end;}
 
 constructor TXQVariableChangeLog.create();
 begin
   caseSensitive:=true;
-  allowPropertyDotNotation:=true;
   pushAll;
 end;
 
@@ -3700,7 +3714,7 @@ begin
   p := 0;
   SetLength(result.vars, length(vars));
   for i:=0 to high(vars) do begin
-    if length(vars[i].fullname) <> length(vars[i].name) then begin
+    if vars[i].propertyChange then begin
       found := false;
       for j:=p - 1 downto 0 do
         if result.vars[j].name = vars[i].name then begin
@@ -3712,7 +3726,7 @@ begin
           result.vars[p-1] := vars[i];                            }
           for k := j + 1 to p - 1 do result.vars[k-1] := result.vars[k];
           result.vars[p-1] := vars[i];
-          result.vars[p-1].fullname := vars[i].name;
+          result.vars[p-1].name := vars[i].name;
           break;
         end;
       if not found then raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to object without an object');
@@ -3730,7 +3744,7 @@ var temp: txqvalue;
   varname: string;
   i: Integer;
 begin
-  if allowPropertyDotNotation then begin
+  {if allowPropertyDotNotation then begin
     if splitName(variable, base, varname) then begin
       result := hasVariable(base, @temp, namespace);
       if not result then exit;
@@ -3738,14 +3752,16 @@ begin
       result := (temp as TXQValueObject).hasProperty(varname, value);
       exit;
     end;
-  end;
+  end;}
   i := indexOf(variable, namespace);
-  if i = -1 then exit(false);
+  if i = -1 then
+    if parentLog <> nil then exit(parentLog.hasVariable(variable, value, namespace))
+    else exit(false);
   if assigned(value) then value^ := vars[i].value as txqvalue;
   result := true;
 end;
 
-function TXQVariableChangeLog.hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace): boolean;
+{function TXQVariableChangeLog.hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace): boolean;
 var temp: txqvalue;
   base: string;
   varname: string;
@@ -3760,7 +3776,7 @@ begin
   if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
 
   TXQValueObject(temp).hasProperty(varname, value);
-end;
+end;}
 
                        (*
 { TXQQueryIterator }
@@ -3916,11 +3932,12 @@ begin
   self.CurrentDateTime:=now;
   ImplicitTimezone:=getNaN;
   AllowExtendedStrings:=true;
+  AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
   AllowJSON:=AllowJSONDefaultInternal;
   AllowJSONLiterals:=true;
   VariableChangelog := TXQVariableChangeLog.create();
-  OnEvaluateVariable := @VariableChangelog.evaluateVariable;
-  OnDefineVariable:= @VariableChangelog.defineVariable;
+  //OnEvaluateVariable := @VariableChangelog.evaluateVariable;
+  //OnDefineVariable:= @VariableChangelog.defineVariable;
   GlobalNamespaces := TNamespaceList.Create;
   StaticContext := TXQStaticContext.Create;
   StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensions;
@@ -4052,7 +4069,7 @@ begin
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowExtendedStrings := AllowExtendedStrings;
-  cxt.AllowPropertyDotNotation:=VariableChangelog.allowPropertyDotNotation;
+  cxt.AllowPropertyDotNotation:= allowPropertyDotNotation;
   cxt.AllowJSON:=allowJSON;
   cxt.AllowJSONLiterals:=AllowJSON and AllowJSONLiterals;
   cxt.staticContext := context;
@@ -4090,7 +4107,7 @@ begin
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.AllowExtendedStrings := true;
-  cxt.AllowPropertyDotNotation:=VariableChangelog.allowPropertyDotNotation;
+  cxt.AllowPropertyDotNotation:=allowPropertyDotNotation;
   cxt.AllowJSON:=AllowJSON;
   cxt.AllowJSONLiterals:=AllowJSON and AllowJSONLiterals;
   cxt.staticContext := context;

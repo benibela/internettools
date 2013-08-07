@@ -1484,12 +1484,14 @@ begin
 end;
 
 procedure TXQValueObject.setMutable(const name: string; const v: IXQValue);
-var point: integer;
+(*var point: integer;
   temp: String;
   old: TXQValue;
   i: Integer;
-  base: String;
+  base: String;     *)
 begin
+  values.add(name, v);
+(*
   point := pos('.', name);
   if Point = 0 then values.add(name, v)
   else begin
@@ -1503,7 +1505,7 @@ begin
     end;
     if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+temp+' to assign to '+name);
     (values.get(i) as TXQValueObject).setMutable(temp, v);
-  end;
+  end;*)
 end;
 
 function TXQValueObject.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
@@ -1522,6 +1524,23 @@ begin
   result := setImmutable(name,xqvalue(s));
 end;
 
+function TXQValueObject.setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
+var
+  i: Integer;
+  oldValue: TXQValue;
+begin
+  if startIndex = high(properties) then
+    exit(setImmutable(properties[high(properties)], v));
+
+  result := cloneLinked;
+
+  if not hasProperty(properties[startIndex], @oldValue) then
+    raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+properties[startIndex]+' not found, when assigning to '+strJoin(properties, '.'));
+  if not (oldValue is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+properties[startIndex]+' to assign to '+strJoin(properties, '.'));
+
+  result.values.add(properties[startIndex], TXQValueObject(oldValue).setImmutable(properties, v, startIndex+1) );
+end;
+
 function TXQValueObject.toBooleanEffective: boolean;
 begin
   result := true;
@@ -1532,18 +1551,6 @@ var
   i, point: Integer;
   part: String;
 begin
-  point := pos('.', name);
-  if point > 0 then begin
-    part := copy(name,1,point-1);
-    i := values.indexOf(part);
-    if i < 0 then begin
-      if prototype = nil then raise EXQEvaluationException.Create('pxp:OBJECT', 'Couldn''t find sub object:  ' + name);
-      exit((prototype as TXQValueObject).hasProperty(part, value));
-    end;
-    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object:  ' + name+ ' got '+values.get(i).toString);
-    exit((values.get(i) as TXQValueObject).hasProperty(strCopyFrom(name, point + 1), value));
-  end;
-
   i := values.indexOf(name);
   if i >= 0 then begin
     if value <> nil then value^ := values.get(i) as txqvalue;
