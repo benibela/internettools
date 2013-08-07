@@ -94,6 +94,8 @@ const __ELEMENT__DEFAULT__: T__ElementType__ = '';
 function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: T__ArrayType__; const a2: array of T__ElementType__):longint; overload;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrepend(var a: T__ArrayType__; const e: T__ElementType__);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: T__ArrayType__; const i: longint):T__ElementType__; overload;
@@ -105,6 +107,8 @@ function arrayDeleteUnordered(var a: T__ArrayType__; const i: longint):T__Elemen
 procedure arrayReserveFast(var a: T__ArrayType__; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__): longint;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrependFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint):T__ElementType__; overload;
@@ -623,6 +627,17 @@ begin
     a[i] := a2[i - result];
 end;
 
+procedure arrayPrepend(var a: T__ArrayType__; const e: T__ElementType__);
+begin
+  SetLength(a, length(a) + 1);
+  if length(a) >= 2 then
+    move(a[0], a[1], (length(a) - 1) * sizeof(a[0]));
+  {%COMPARE T__ElementType__ = string }FillChar(a[0], sizeof(a[0]), 0); {%END-COMPARE}
+  a[0] := e;
+end;
+
+
+
 function arrayDelete(var a: T__ArrayType__; const i: longint): T__ElementType__;
 begin
   if (i<0) or (i>high(a)) then exit(__ELEMENT__DEFAULT__);
@@ -665,6 +680,20 @@ begin
   len+=1;
   a[result] := e;
 end;
+
+procedure arrayPrependFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__);
+begin
+  if len >= length(a) then
+    arrayReserveFast(a, len, len+1);
+  len += 1;
+  if len >= 2 then begin
+    {%COMPARE T__ElementType__ = string }FillChar(a[len-1], sizeof(a[0]), 0); {%END-COMPARE}
+    move(a[0], a[1], (len - 1) * sizeof(a[0]));
+  end;
+  {%COMPARE T__ElementType__ = string }FillChar(a[0], sizeof(a[0]), 0); {%END-COMPARE}
+  a[0] := e;
+end;
+
 
 function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint): T__ElementType__;
 begin

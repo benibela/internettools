@@ -925,7 +925,25 @@ begin
   test(arrayBinarySearch(sa, 'xyz', bsFirst), 7);
   test(arrayBinarySearch(sa, 'xyz', bsLast), high(sa));
 
-//Url resolving
+  SetLength(sa, 0);
+  arrayPrepend(sa, 'c'); test(strJoin(sa, '|'), 'c');
+  arrayPrepend(sa, 'b'); test(strJoin(sa, '|'), 'b|c');
+  arrayPrepend(sa, 'a'); test(strJoin(sa, '|'), 'a|b|c');
+
+  SetLength(sa, 0);
+  i := 0;
+  arrayPrependFast(sa, i, 'c'); test(strJoin(sa, '|'), 'c|||'); test(i, 1); //count of ||| is an implementation detail
+  arrayPrependFast(sa, i, 'b'); test(strJoin(sa, '|'), 'b|c||'); test(i, 2);
+  arrayPrependFast(sa, i, 'a'); test(strJoin(sa, '|'), 'a|b|c|'); test(i, 3);
+
+  SetLength(sa, 0);
+  arrayAdd(sa, ['x','y','z']);
+  i := 0;
+  arrayPrependFast(sa, i, 'c'); test(strJoin(sa, '|'), 'c|y|z'); test(i, 1);
+  arrayPrependFast(sa, i, 'b'); test(strJoin(sa, '|'), 'b|c|z'); test(i, 2);
+  arrayPrependFast(sa, i, 'a'); test(strJoin(sa, '|'), 'a|b|c'); test(i, 3);
+
+  //Url resolving
 
   test(strResolveURI('/foobar', 'http://example.org'), 'http://example.org/foobar');
   test(strResolveURI('foobar', 'http://example.org'), 'http://example.org/foobar');

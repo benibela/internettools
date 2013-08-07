@@ -77,6 +77,8 @@ type
 function arrayAdd(var a: TStringArray; const e: string):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TStringArray; const a2: array of string):longint; overload;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrepend(var a: TStringArray; const e: string);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TStringArray; const i: longint):string; overload;
@@ -88,6 +90,8 @@ function arrayDeleteUnordered(var a: TStringArray; const i: longint):string; ove
 procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0.
+procedure arrayPrependFast(var a: TStringArray; var len: longint; const e: string);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
@@ -125,6 +129,8 @@ function arrayEqual(a, b: array of string; slice1a: integer = -1; slice1b: integ
 function arrayAdd(var a: TLongintArray; const e: longint):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TLongintArray; const a2: array of longint):longint; overload;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrepend(var a: TLongintArray; const e: longint);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongintArray; const i: longint):longint; overload;
@@ -136,6 +142,8 @@ function arrayDeleteUnordered(var a: TLongintArray; const i: longint):longint; o
 procedure arrayReserveFast(var a: TLongintArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint): longint;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrependFast(var a: TLongintArray; var len: longint; const e: longint);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
@@ -173,6 +181,8 @@ function arrayEqual(a, b: array of longint; slice1a: integer = -1; slice1b: inte
 function arrayAdd(var a: TLongwordArray; const e: longword):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TLongwordArray; const a2: array of longword):longint; overload;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrepend(var a: TLongwordArray; const e: longword);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongwordArray; const i: longint):longword; overload;
@@ -184,6 +194,8 @@ function arrayDeleteUnordered(var a: TLongwordArray; const i: longint):longword;
 procedure arrayReserveFast(var a: TLongwordArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword): longint;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrependFast(var a: TLongwordArray; var len: longint; const e: longword);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
@@ -221,6 +233,8 @@ function arrayEqual(a, b: array of longword; slice1a: integer = -1; slice1b: int
 function arrayAdd(var a: TInt64Array; const e: int64):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TInt64Array; const a2: array of int64):longint; overload;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrepend(var a: TInt64Array; const e: int64);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TInt64Array; const i: longint):int64; overload;
@@ -232,6 +246,8 @@ function arrayDeleteUnordered(var a: TInt64Array; const i: longint):int64; overl
 procedure arrayReserveFast(var a: TInt64Array; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): longint;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrependFast(var a: TInt64Array; var len: longint; const e: int64);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
@@ -269,6 +285,8 @@ function arrayEqual(a, b: array of int64; slice1a: integer = -1; slice1b: intege
 function arrayAdd(var a: TFloatArray; const e: float):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TFloatArray; const a2: array of float):longint; overload;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrepend(var a: TFloatArray; const e: float);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TFloatArray; const i: longint):float; overload;
@@ -280,6 +298,8 @@ function arrayDeleteUnordered(var a: TFloatArray; const i: longint):float; overl
 procedure arrayReserveFast(var a: TFloatArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): longint;
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
+procedure arrayPrependFast(var a: TFloatArray; var len: longint; const e: float);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
@@ -844,6 +864,17 @@ begin
     a[i] := a2[i - result];
 end;
 
+procedure arrayPrepend(var a: TStringArray; const e: string);
+begin
+  SetLength(a, length(a) + 1);
+  if length(a) >= 2 then
+    move(a[0], a[1], (length(a) - 1) * sizeof(a[0]));
+  FillChar(a[0], sizeof(a[0]), 0); 
+  a[0] := e;
+end;
+
+
+
 function arrayDelete(var a: TStringArray; const i: longint): string;
 begin
   if (i<0) or (i>high(a)) then exit('');
@@ -886,6 +917,20 @@ begin
   len+=1;
   a[result] := e;
 end;
+
+procedure arrayPrependFast(var a: TStringArray; var len: longint; const e: string);
+begin
+  if len >= length(a) then
+    arrayReserveFast(a, len, len+1);
+  len += 1;
+  if len >= 2 then begin
+    FillChar(a[len-1], sizeof(a[0]), 0); 
+    move(a[0], a[1], (len - 1) * sizeof(a[0]));
+  end;
+  FillChar(a[0], sizeof(a[0]), 0); 
+  a[0] := e;
+end;
+
 
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint): string;
 begin
@@ -1031,6 +1076,17 @@ begin
     a[i] := a2[i - result];
 end;
 
+procedure arrayPrepend(var a: TLongintArray; const e: longint);
+begin
+  SetLength(a, length(a) + 1);
+  if length(a) >= 2 then
+    move(a[0], a[1], (length(a) - 1) * sizeof(a[0]));
+  
+  a[0] := e;
+end;
+
+
+
 function arrayDelete(var a: TLongintArray; const i: longint): longint;
 begin
   if (i<0) or (i>high(a)) then exit(0);
@@ -1073,6 +1129,20 @@ begin
   len+=1;
   a[result] := e;
 end;
+
+procedure arrayPrependFast(var a: TLongintArray; var len: longint; const e: longint);
+begin
+  if len >= length(a) then
+    arrayReserveFast(a, len, len+1);
+  len += 1;
+  if len >= 2 then begin
+    
+    move(a[0], a[1], (len - 1) * sizeof(a[0]));
+  end;
+  
+  a[0] := e;
+end;
+
 
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint): longint;
 begin
@@ -1218,6 +1288,17 @@ begin
     a[i] := a2[i - result];
 end;
 
+procedure arrayPrepend(var a: TLongwordArray; const e: longword);
+begin
+  SetLength(a, length(a) + 1);
+  if length(a) >= 2 then
+    move(a[0], a[1], (length(a) - 1) * sizeof(a[0]));
+  
+  a[0] := e;
+end;
+
+
+
 function arrayDelete(var a: TLongwordArray; const i: longint): longword;
 begin
   if (i<0) or (i>high(a)) then exit(0);
@@ -1260,6 +1341,20 @@ begin
   len+=1;
   a[result] := e;
 end;
+
+procedure arrayPrependFast(var a: TLongwordArray; var len: longint; const e: longword);
+begin
+  if len >= length(a) then
+    arrayReserveFast(a, len, len+1);
+  len += 1;
+  if len >= 2 then begin
+    
+    move(a[0], a[1], (len - 1) * sizeof(a[0]));
+  end;
+  
+  a[0] := e;
+end;
+
 
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint): longword;
 begin
@@ -1405,6 +1500,17 @@ begin
     a[i] := a2[i - result];
 end;
 
+procedure arrayPrepend(var a: TInt64Array; const e: int64);
+begin
+  SetLength(a, length(a) + 1);
+  if length(a) >= 2 then
+    move(a[0], a[1], (length(a) - 1) * sizeof(a[0]));
+  
+  a[0] := e;
+end;
+
+
+
 function arrayDelete(var a: TInt64Array; const i: longint): int64;
 begin
   if (i<0) or (i>high(a)) then exit(0);
@@ -1447,6 +1553,20 @@ begin
   len+=1;
   a[result] := e;
 end;
+
+procedure arrayPrependFast(var a: TInt64Array; var len: longint; const e: int64);
+begin
+  if len >= length(a) then
+    arrayReserveFast(a, len, len+1);
+  len += 1;
+  if len >= 2 then begin
+    
+    move(a[0], a[1], (len - 1) * sizeof(a[0]));
+  end;
+  
+  a[0] := e;
+end;
+
 
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint): int64;
 begin
@@ -1592,6 +1712,17 @@ begin
     a[i] := a2[i - result];
 end;
 
+procedure arrayPrepend(var a: TFloatArray; const e: float);
+begin
+  SetLength(a, length(a) + 1);
+  if length(a) >= 2 then
+    move(a[0], a[1], (length(a) - 1) * sizeof(a[0]));
+  
+  a[0] := e;
+end;
+
+
+
 function arrayDelete(var a: TFloatArray; const i: longint): float;
 begin
   if (i<0) or (i>high(a)) then exit(0);
@@ -1634,6 +1765,20 @@ begin
   len+=1;
   a[result] := e;
 end;
+
+procedure arrayPrependFast(var a: TFloatArray; var len: longint; const e: float);
+begin
+  if len >= length(a) then
+    arrayReserveFast(a, len, len+1);
+  len += 1;
+  if len >= 2 then begin
+    
+    move(a[0], a[1], (len - 1) * sizeof(a[0]));
+  end;
+  
+  a[0] := e;
+end;
+
 
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint): float;
 begin
