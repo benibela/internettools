@@ -160,6 +160,25 @@ var
     m('import module namespace test = "'+ns+'"; let $o := {"Captain": "Kirk", "First Officer": "Spock", "Engineer": "Scott" } return serialize-json(test:project($o, "XQuery Evangelist"))', '{}');
   end;
 
+  procedure jsoniqlibtestsnew(ns: string);
+  begin
+    ns := 'import module namespace test = "'+ns+'"; ';
+    m(ns + 'serialize-json(test:accumulate( ( [1,2,3], {"a": 4}, {"a": 5} ) ))', '{"a": [4, 5]}');
+    m(ns + 'serialize-json(test:descendant-arrays(({"a": [1,2,[3,4,5]], "b": {"c": [7], "d": []}}, [8,9], "mua")))', '[[1, 2, [3, 4, 5]], [3, 4, 5], [7], [], [8, 9]]');
+    m(ns + 'serialize-json(test:descendant-objects(({"a": [1,2,[3,4,5]], "b": {"c": [7], "d": []}}, [8,{"x":"z"}], "mua")))', '[{"a": [1, 2, [3, 4, 5]], "b": {"c": [7], "d": []}}, {"c": [7], "d": []}, {"x": "z"}]');
+    m(ns + 'join(test:flatten((1,2,3,[4,[5,6]])))', '1 2 3 4 5 6');
+    m(ns + 'serialize-json(test:flatten((1,2,3,[4,[5,6]],{"x": [1,2,3]})))', '[1, 2, 3, 4, 5, 6, {"x": [1, 2, 3]}]');
+    m(ns + 'serialize-json(test:intersect(({"x": [1,2,3]})))', '{"x": [1, 2, 3]}');
+    m(ns + 'serialize-json(test:intersect(({"x": [1,2,3]}, {"x": 7, "y": 8})))', '{"x": [[1, 2, 3], 7]}');
+    m(ns + 'serialize-json(test:intersect(({"x": [1,2,3]}, "foobar", [18], {"x": 7, "y": 8})))', '{"x": [[1, 2, 3], 7]}');
+    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), "x"))', '{"x": [1, 2]}');
+    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '{"x": [1, 2], "y": 3}');
+    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '{"x": [1, 2], "y": 3}');
+    m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '[1, 2, 3]');
+    m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[1, 2, 3]');
+
+  end;
+
 var //vars: TXQVariableChangeLog;
   helper: THelper;
 begin
@@ -1718,6 +1737,7 @@ begin
 
   //JSON lib tests, using definitions in xquery_json
   jsoniqlibtests('http://jsoniq.org/function-library');
+  jsoniqlibtestsnew('http://jsoniq.org/function-library');
 
   //JSON lib tests, directly defind
   mr('module namespace libjn = "pseudo://libjn-test-module"; '+
@@ -1731,6 +1751,7 @@ begin
      'declare function libjn:value-intersect( $arg1 as xs:anyAtomicType* ,    $arg2 as xs:anyAtomicType* )  as xs:anyAtomicType* {distinct-values($arg1[.=$arg2])} ;'); //that's a funcx function, but needed here
 
   jsoniqlibtests('pseudo://libjn-test-module');
+
 
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2([1,2,3]), " ")', '1 2 3');
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2((1,2,3)), " ")', '1 2 3');

@@ -338,13 +338,78 @@ initialization
 
   XMLNamespace_JSONiqLibraryFunctions:=TNamespace.create('http://jsoniq.org/function-library', 'libjn');
   libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
-  libjn.registerInterpretedFunction('accumulate', '($o as object()*) as object()', 'jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
-  libjn.registerInterpretedFunction('descendant-objects', '($i as json-item()) as object()*', 'if ($i instance of object()) then ( $i, for $v in libjn:values($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else if ($i instance of array()) then ( for $v in jn:members($i) where $v instance of json-item() return libjn:descendant-objects($v) ) else () ');;
-  libjn.registerInterpretedFunction('descendant-pairs', '($o as object())', 'for $k in jn:keys($o) return ( { $k : $o($k) }, if ($o($k) instance of object()) then libjn:descendant-pairs($o($k)) else () )');
-  libjn.registerInterpretedFunction('flatten', '($a as array()) as item()* ', 'for $value in jn:members($a) return if ($value instance of array()) then libjn:flatten($value) else $value ');
-  libjn.registerInterpretedFunction('intersect', '($o as object()*)', 'jn:object( let $common-keys := jn:keys(($o[1]))[ every $object in ($o[position() >= 2]) satisfies jn:keys($object) = . ] for $key in $common-keys let $values := $o($key) return if (count($values) eq 1) then { $key : $values } else { $key : [ $values ] } )');
-  libjn.registerInterpretedFunction('project', '($o as object(), $s as xs:string*) as object()', 'jn:object( for $key in distinct-values(jn:keys($o)[.=$s]) return { $key : $o($key) } )');
-  libjn.registerInterpretedFunction('values', '($i as object()) as item()*', 'for $k in jn:keys($i) return $i($k) ');
+//new function from 1.0.1 not working libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', '{| for $key in jn:keys($seq) return { $key : $seq($key) }  |}');
+  {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', 'jn:object( let $o := for $p in $seq return if ($p instance of object()) then $p else (), $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
+  //old accumulate function: libjn.registerInterpretedFunction('accumulate', '($o as object()*) as object()', 'jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
+
+  libjn.registerInterpretedFunction('descendant-arrays', '($seq as item()*) as array()*',
+      'for $i in $seq ' +
+      'return typeswitch ($i) ' +
+      'case array() return ( ' +
+      '  $i, ' +
+      '  libjn:descendant-arrays(jn:members($i)) ' +
+      ') ' +
+      'case object() ' +
+      '    return libjn:descendant-arrays(libjn:values($i)) ' +
+      'default return () ');
+
+  libjn.registerInterpretedFunction('descendant-objects', '($seq as item()*) as object()*',
+      'for $i in $seq ' +
+      'return typeswitch ($i) ' +
+      'case object() return ( ' +
+      '  $i, ' +
+      '  libjn:descendant-objects(libjn:values($i)) ' +
+      ') ' +
+      'case array() return ' +
+      '    libjn:descendant-objects(jn:members($i)) ' +
+      'default return () ');
+  libjn.registerInterpretedFunction('descendant-pairs', '($seq as item()*)',
+      'for $i in $seq ' +
+      'return typeswitch ($i) ' +
+      'case object() return ' +
+      '  for $k in jn:keys($i) ' +
+      '  let $v := $i($k) ' +
+      '  return ( ' +
+      '    { $k : $v }, ' +
+      '    libjn:descendant-pairs($v) ' +
+      '  ) ' +
+      'case array() return ' +
+      '  libjn:descendant-pairs(jn:members($i)) ' +
+      'default return () '
+  );
+  libjn.registerInterpretedFunction('flatten', '($seq as item()*) as item()* ',
+    'for $i in $seq ' +
+    'return ' +
+    '  typeswitch ($i) ' +
+    '  case array() return libjn:flatten(jn:members($i)) ' +
+    '  default return $i '
+  );
+  libjn.registerInterpretedFunction('intersect', '($seq as item()*)',
+    '{| ' +
+    '  let $objects := $seq[. instance of object()] ' +
+    '  for $key in jn:keys(($objects)[1]) ' +
+    '  where every $object in ($objects)[position() > 1] ' +
+    '        satisfies exists(index-of(jn:keys($object), $key)) ' +
+    '  return { $key : $objects($key) } ' +
+    '|} '
+  );
+  libjn.registerInterpretedFunction('project', '($seq as item()*, $s as xs:string*) as object()',
+    '{| ' +
+    '  for $key in $s ' +
+    '  let $value := $seq($key) ' +
+    '  where exists($value) ' +
+    '  return { $key : $value } ' +
+    '|} ');
+
+  {libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
+    'for $i in $seq '+
+    'for $k in jn:keys($i) '+
+    'return $i($k)'); definition from 1.0.1. not working with atomic values}
+
+  libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
+    'for $i in $seq where $i instance of object() return '+
+    'for $k in jn:keys($i) '+
+    'return $i($k)'); //my own
 
   TXQueryEngine.registerNativeModule(libjn);
 

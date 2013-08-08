@@ -2126,7 +2126,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   ps.StaticContext.strictTypeChecking:=false;
 
   t('jn:is-null({"a": ()}("a"))', 'false');
-  f('{"a": (10,20,30,40,50)}.a(3)');
+//  f('{"a": (10,20,30,40,50)}.a(3)'); //no error since jsoniq 1.0.1
   t('{"a": (10,20,30,40,50)}.a[3]', '30');
   ps.StaticContext.objectsRestrictedToJSONTypes:=true;
   t('jn:is-null({"a": ()}("a"))', 'true');
