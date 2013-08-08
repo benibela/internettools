@@ -513,8 +513,7 @@ end;
 
 function THtmlTemplateParserBreaker.getVariable(name: string): IXQValue;
 begin
-  result := xqvalue();
-  evaluateXQVariable(self, name, result);
+  result := variableChangeLog.get(name);
 end;
 
 procedure TTemplateActionLoop.initFromTree(t: TTreeNode);
