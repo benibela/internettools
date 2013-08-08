@@ -934,7 +934,8 @@ begin
       xqvalueSeqAdd(result, (v as TXQValueJSONArray).seq[index.toInt64-1]);
     end else if v is TXQValueObject then begin
       xqvalueSeqAdd(result, v.getProperty(index.ToString));
-    end else raiseEvaluationError('XPST003', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
+    end;
+    //end else raiseEvaluationError('XPST003', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation()); no error since JSONiq 1.0.1
   end;
   //this returns a sequence of a single value instead that value, if func is a sequence with multiple values (from which only one has that property). Does it matter?
   if result = nil then result := xqvalue();
