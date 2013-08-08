@@ -33,11 +33,14 @@ begin
   bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkUndefined, pvkBoolean, pvkNull]) or (bk in [pvkUndefined, pvkBoolean, pvkNull]) then
+     (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit(xqvalue());
 
   if (ak = pvkInt) and (bk = pvkInt) then
     exit(commonIntegerClass(a,b).create(a.toInt65 + b.toInt65));
+
+  if (ak = pvkNull) or (bk = pvkNull) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) or
@@ -76,11 +79,14 @@ begin
   bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkUndefined, pvkBoolean, pvkNull]) or (bk in [pvkUndefined, pvkBoolean, pvkNull]) then
+     (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit(xqvalue);
 
   if (ak = pvkInt) and (bk = pvkInt) then
     exit(commonIntegerClass(a, b).create(a.toInt65 - b.toInt65));
+
+  if (ak = pvkNull) or (bk = pvkNull) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
@@ -159,8 +165,11 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkBoolean, pvkUndefined, pvkNull]) then
+     (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
     exit((xqvalue));
+
+  if (ak = pvkNull) or (bk = pvkNull) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
@@ -198,8 +207,11 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkBoolean, pvkUndefined, pvkNull]) then
+     (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
     exit((xqvalue));
+
+  if (ak = pvkNull) or (bk = pvkNull) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   if (ak = pvkDateTime) then begin
     if not (a is TXQValue_duration) then exit(xqvalue);
@@ -240,7 +252,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) then
+     (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
     exit(xqvalue);
 
   if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and (a.canConvertToInt65))) and
@@ -259,6 +271,9 @@ begin
     exit;
   end;
 
+  if (ak = pvkNull) or (bk = pvkNull) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+
   f := b.toDecimal;
   if IsNan(f) or (f = 0) then
     exit(commonDecimalClass(a,b).create(getNaN));
@@ -274,7 +289,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
      ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
-     (ak in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined, pvkNull]) then
+     (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
     exit(xqvalue);
 
   if (ak = pvkInt) and (bk = pvkInt) then begin
@@ -283,6 +298,9 @@ begin
     else result := xqvalue(a.toInt65 mod i);
     exit;
   end;
+
+  if (ak = pvkNull) or (bk = pvkNull) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   e := a.toDecimal;
   f := b.toDecimal;

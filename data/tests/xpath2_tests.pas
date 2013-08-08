@@ -2062,11 +2062,15 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('if (()) then "T" else "F"', 'F');
 
     t('() + 1', '');
-    t('null + 1', '');
+    f('null + 1', '');
     t('() eq 1', '');
     t('null eq 1', '');
     t('1 + ()', '');
-    t('1 + null', '');
+    f('1 + null', '');
+    f('null - 1', '');
+    f('null * 1', '');
+    f('null div 1', '');
+    f('null idiv 1', '');
 
     t('(null, 2) = (1, 3)', 'false');
     t('(1, null, 3) = (1, 3)', 'true');
