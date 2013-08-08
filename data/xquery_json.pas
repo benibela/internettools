@@ -297,6 +297,7 @@ begin
   requiredArgCount(args, 1);
   a := args[0];
   if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
+  if a.getSequenceCount = 0 then exit(xqvalue());
   if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.debugAsStringWithTypeAnnotation());
   result := xqvalue((a as TXQValueJSONArray).seq.Count);
 end;
@@ -328,7 +329,7 @@ initialization
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
   jn.registerFunction('object', @xqFunctionObject, []); //deprecated
   jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as item()', '($arg as xs:string?, $options as object()) as item()*']);
-  jn.registerFunction('size', @xqFunctionSize, ['($arg as array()) as xs:integer']);
+  jn.registerFunction('size', @xqFunctionSize, ['($arg as array()?) as xs:integer']);
 
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
   pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*'], [xqcdContextOther]);
