@@ -59,7 +59,7 @@ type
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
-  function parseJSONLikeObjectConstructor(): TXQTermJSONObjectConstructor; //**< parses an json object constructor { "name": value, .. }
+  function parseJSONLikeObjectConstructor(): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(): TXQTermJSONArray;
 
 
@@ -893,11 +893,21 @@ begin
   if result = nil then result := TXQTermString.create('');
 end;
 
-function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTermJSONObjectConstructor;
+function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTerm;
 var
   token: String;
+  jn: TXQNativeModule;
 begin
   //expect('{'); parsed by caller
+  if pos^ = '|' then begin
+    expect('|');
+    jn := TXQueryEngine.findNativeModule('http://jsoniq.org/functions');
+    if jn = nil then raiseParsingError('pxp:JSONIQ', 'The {| .. |} syntax can only be used, if the json unit is loaded.');
+    result := TXQTermNamedFunction.create(xqfkBasic, jn.findBasicFunction('object'));
+    result := parseSequenceLike(result, '|');
+    expect('}');
+    exit;
+  end;
   result := TXQTermJSONObjectConstructor.create();
   try
     skipWhitespaceAndComment();
@@ -1236,6 +1246,8 @@ begin
           //staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
           exit;
         end;
+        '|': if AllowJSON and ((pos+1)^ = '}') then exit(astroot) // {| .. |} object merging syntax
+             else pushBinaryOp(word); //| operator
         else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
         else if (word[1] = '.') and (AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
           expect(word);

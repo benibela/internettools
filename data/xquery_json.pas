@@ -60,15 +60,17 @@ var resobj: TXQValueObject;
     end;
 
 var v: IXQValue;
+  i: Integer;
 begin
-  requiredArgCount(args, 1);
+  //requiredArgCount(args, 1);
   resobj := TXQValueObject.create();
   try
-    for v in args[0] do begin
-      if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.debugAsStringWithTypeAnnotation());
-      if resobj.prototype = nil then resobj.prototype := v
-      else merge(v as TXQValueObject);
-    end;
+    for i := 0 to high(args) do
+      for v in args[i] do begin
+        if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.debugAsStringWithTypeAnnotation());
+        if resobj.prototype = nil then resobj.prototype := v
+        else merge(v as TXQValueObject);
+      end;
   except
     on EXQEvaluationException do begin resobj.free; raise; end
   end;
@@ -324,7 +326,7 @@ initialization
   jn.registerFunction('is-null', @xqFunctionIsNull, ['($arg as item()) as xs:boolean']);
   jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?'], [xqcdContextOther]);
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
-  jn.registerFunction('object', @xqFunctionObject, ['($arg as object()*) as object()']);
+  jn.registerFunction('object', @xqFunctionObject, []); //deprecated
   jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as item()', '($arg as xs:string?, $options as object()) as item()*']);
   jn.registerFunction('size', @xqFunctionSize, ['($arg as array()) as xs:integer']);
 

@@ -1935,6 +1935,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$xyz.abc := 17', '17');
   t('join($xyz())', 'mu abc');
 
+  //t('join(jn:keys(({"a": 1}, {"b": 2}, {"c": 3})))', 'a b c');
 
   ps.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
   t('$a := 123', '123');
@@ -2108,6 +2109,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('serialize-json([ 10 to 15 ])', '[10, 11, 12, 13, 14, 15]');
     t('serialize-json({            "id" : 404,     "name" : "Stanco Grease Pot",   "price" : 6.49,    "weight" : 3.8,     "uses" : ["Grease storage","Backpacking pot"] })', '{"id": 404, "name": "Stanco Grease Pot", "price": 6.49, "weight": 3.8, "uses": ["Grease storage", "Backpacking pot"]}');
     t('serialize-json({"Sunday" : 1,     "Monday" : 1 + 1,    "Tuesday" : 3 * 1,    "Wednesday" : 8 div 2,    "Thursday" : 5,   "Friday" : count(for $i in 1 to 6 return $i),           "Saturday": 10 - 3 })','{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+
+
+    t('serialize-json({|  |})', '{}');
+    t('serialize-json({| {}, {}, {} |})', '{}');
+    t('serialize-json({| {"a": 123} |})', '{"a": 123}');
+    t('serialize-json({| {"a": 123}, {}, {}, {} |})', '{"a": 123}');
+    t('serialize-json({| {"a": 123}, {"b": 4, "c": 7} |})', '{"a": 123, "b": 4, "c": 7}');
 
     ps.AllowJSONLiterals:=false;
 
