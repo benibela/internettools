@@ -265,14 +265,17 @@ function xqFunctionKeys(const args: TXQVArray): IXQValue;
 var
   i: Integer;
   v: IXQValue;
+  newKeys: IXQValue;
+  seq: TXQValueSequence;
+  res: TStringList;
 begin
   requiredArgCount(args, 1);
-  result := nil;
+  res := TStringList.Create;
   for v in args[0] do
     if v is TXQValueObject then
-      xqvalueSeqAdd(result, (v as TXQValueObject).enumerateProperties);
-  if v = nil then v := xqvalue()
-  else xqvalueSeqSqueeze(result);
+      (v as TXQValueObject).enumerateKeys(res);
+  result := xqvalue(res);
+  res.free;
 end;
 
 
@@ -403,15 +406,11 @@ initialization
     '  return { $key : $value } ' +
     '|} ');
 
-  {libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
+  libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
     'for $i in $seq '+
     'for $k in jn:keys($i) '+
-    'return $i($k)'); definition from 1.0.1. not working with atomic values}
+    'return $i($k)');
 
-  libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
-    'for $i in $seq where $i instance of object() return '+
-    'for $k in jn:keys($i) '+
-    'return $i($k)'); //my own
 
   TXQueryEngine.registerNativeModule(libjn);
 

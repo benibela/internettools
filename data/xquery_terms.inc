@@ -899,6 +899,7 @@ var
   index: IXQValue;
   ara: TXQValueJSONArray;
   i: Integer;
+  sl: TStringList;
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -913,8 +914,12 @@ begin
   if length(children) = 1 then begin
     result := nil;
     for v in func do begin
-      if v is TXQValueObject then
-        xqvalueSeqAdd(result, (v as TXQValueObject).enumerateProperties);
+      if v is TXQValueObject then begin
+        sl := TStringList.Create;
+        (v as TXQValueObject).enumerateKeys(sl);
+        xqvalueSeqAdd(result, xqvalue(sl));
+        sl.free;
+      end;
       if v is TXQValueJSONArray then begin
         ara := v as TXQValueJSONArray;;
         for i := 0 to ara.seq.Count-1 do

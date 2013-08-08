@@ -661,8 +661,7 @@ type
 
     function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
 
-    procedure enumerateProperties(seq: TXQValueSequence);
-    function enumerateProperties: IXQValue;
+    procedure enumerateKeys(sl: TStringList);
 
     function toBooleanEffective: boolean; override;
 
@@ -1628,6 +1627,7 @@ type
   function xqvalue(v: string):IXQValue; inline; //**< Creates an string IXQValue
   function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Creates an TDateTime IXQValue
   function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates an node TXQValue
+  function xqvalue(sl: TStringList): IXQValue; //**< Creates an sequence of strings (does *not* free the list)
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes a IXQValue (single element seq => single element, empty seq => undefined)
   procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add )
@@ -2392,7 +2392,7 @@ begin
   result := TXQValueString.Create(v);
 end;
 
-function xqvalue(sl: TStringList): IXQValue; inline;
+function xqvalue(sl: TStringList): IXQValue;
 var
   i: Integer;
 begin

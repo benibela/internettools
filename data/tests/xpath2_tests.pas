@@ -1841,6 +1841,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   f('$x . foo');
   t('$x .foo', 'bar');
 
+  t('serialize-json({$indirect: $x.$indirect})', '{"foo": "bar"}');
+
   t('{"foo": 123}.foo', '123');
   t('{"foo": 123}.$indirect', '123');
   t('{"foo": 123}. "foo"', '123');
@@ -1968,6 +1970,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('jn:members(json(''[1, 2, 3]''))', '1');
   t('string-join(jn:members(json(''[1, 2, 3]'')), " ")', '1 2 3');
   t('string-join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
+  t('join(jn:members(([1, 2, 3], {"a": 17}, [4,5,6], 7889, "hallo")))', '1 2 3 4 5 6');
+  t('join(jn:keys(([1, 2, 3], {"a": 17}, [4,5,6], 7889, "hallo")))', 'a');
+  t('join(jn:keys(([1, 2, 3], {"a": 17}, [4,5,6], {"a": 7, "b": 8, "c": 89}, "hallo", {"b": []})))', 'a b c');
+  t('join(jn:keys(([1, 2, 3], {"a": 17}, [4,5,6], {"a": 7, "b": 8, "c": 89}, "hallo", {"b": []})))', 'a b c');
 
   for tempb := false to true do begin
     ps.StaticContext.strictTypeChecking:=tempb;
