@@ -398,13 +398,17 @@ initialization
     '  return { $key : $objects($key) } ' +
     '|} '
   );
-  libjn.registerInterpretedFunction('project', '($seq as item()*, $s as xs:string*) as object()',
-    '{| ' +
-    '  for $key in $s ' +
-    '  let $value := $seq($key) ' +
-    '  where exists($value) ' +
-    '  return { $key : $value } ' +
-    '|} ');
+  libjn.registerInterpretedFunction('project', '($seq as item()*, $keys as xs:string*) as item()*',
+    'for $item in $seq ' +
+    'return typeswitch ($item) ' +
+    '       case $object as object() return ' +
+    '       {| ' +
+    '         for $key in jn:keys($object) ' +
+    '         where some $to-project in $keys satisfies $to-project eq $key ' +
+//    '         let $value := $object($key) ' + requires XQuery 3
+    '         return { $key : $object($key) } ' +
+    '       |} ' +
+    '       default return $item ');
 
   libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
     'for $i in $seq '+

@@ -171,9 +171,9 @@ var
     m(ns + 'serialize-json(test:intersect(({"x": [1,2,3]})))', '{"x": [1, 2, 3]}');
     m(ns + 'serialize-json(test:intersect(({"x": [1,2,3]}, {"x": 7, "y": 8})))', '{"x": [[1, 2, 3], 7]}');
     m(ns + 'serialize-json(test:intersect(({"x": [1,2,3]}, "foobar", [18], {"x": 7, "y": 8})))', '{"x": [[1, 2, 3], 7]}');
-    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), "x"))', '{"x": [1, 2]}');
-    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '{"x": [1, 2], "y": 3}');
-    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '{"x": [1, 2], "y": 3}');
+    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), "x"))', '[{"x": 1}, {"x": 2}, {}]');
+    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '[{"x": 1}, {"x": 2, "y": 3}, {}]');
+    m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[{"x": 1}, {"x": 2, "y": 3}, "foobar", [1, 2344, 2], {}]');
     m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '[1, 2, 3]');
     m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[1, 2, 3]');
 
