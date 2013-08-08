@@ -263,31 +263,33 @@ end;
 
 function xqFunctionKeys(const args: TXQVArray): IXQValue;
 var
-  a: IXQValue;
   i: Integer;
+  v: IXQValue;
 begin
   requiredArgCount(args, 1);
-  a := args[0];
-  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
-  if not (a is TXQValueObject) then raise EXQEvaluationException.create('pxp:OBJ', 'Expected object, got: '+a.debugAsStringWithTypeAnnotation());
-  result := (a as TXQValueObject).enumerateProperties();
+  result := nil;
+  for v in args[0] do
+    if v is TXQValueObject then
+      xqvalueSeqAdd(result, (v as TXQValueObject).enumerateProperties);
+  if v = nil then v := xqvalue()
+  else xqvalueSeqSqueeze(result);
 end;
 
 
 function xqFunctionMembers(const args: TXQVArray): IXQValue;
 var
-  a: IXQValue;
+  v: IXQValue;
   ara: TXQValueJSONArray;
   i: Integer;
 begin
   requiredArgCount(args, 1);
-  a := args[0];
-  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
-  if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.debugAsStringWithTypeAnnotation());
-  ara := a as TXQValueJSONArray;;
   result := xqvalue();
-  for i := 0 to ara.seq.Count-1 do
-    xqvalueSeqAdd(result, ara.seq[i]);
+  for v in args[0] do
+    if v is TXQValueJSONArray then begin
+      ara := v as TXQValueJSONArray;
+      for i := 0 to ara.seq.Count-1 do
+        xqvalueSeqAdd(result, ara.seq[i]);
+    end;
 end;
 
 function xqFunctionSize(const args: TXQVArray): IXQValue;
