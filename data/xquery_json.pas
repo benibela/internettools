@@ -398,6 +398,8 @@ initialization
     '  return { $key : $objects($key) } ' +
     '|} '
   );
+
+
   libjn.registerInterpretedFunction('project', '($seq as item()*, $keys as xs:string*) as item()*',
     'for $item in $seq ' +
     'return typeswitch ($item) ' +
@@ -406,6 +408,18 @@ initialization
     '         for $key in jn:keys($object) ' +
     '         where some $to-project in $keys satisfies $to-project eq $key ' +
 //    '         let $value := $object($key) ' + requires XQuery 3
+    '         return { $key : $object($key) } ' +
+    '       |} ' +
+    '       default return $item ');
+
+  libjn.registerInterpretedFunction('remove-keys', '($seq as item()*, $keys as xs:string*) as item()*',
+    'for $item in $seq ' +
+    'return typeswitch ($item) ' +
+    '       case $object as object() return ' +
+    '       {| ' +
+    '         for $key in jn:keys($object) ' +
+    '         where every $to-remove in $keys satisfies $to-remove ne $key ' +
+ //   '         let $value := $object($key) ' +
     '         return { $key : $object($key) } ' +
     '       |} ' +
     '       default return $item ');

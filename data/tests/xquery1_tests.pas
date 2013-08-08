@@ -174,6 +174,8 @@ var
     m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), "x"))', '[{"x": 1}, {"x": 2}, {}]');
     m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '[{"x": 1}, {"x": 2, "y": 3}, {}]');
     m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[{"x": 1}, {"x": 2, "y": 3}, "foobar", [1, 2344, 2], {}]');
+    m(ns + 'serialize-json(let $o := { "Captain" : "Kirk", "First Officer" : "Spock", "Engineer" : "Scott" } return test:remove-keys($o, ("Captain", "First Officer")))', '{"Engineer": "Scott"}');
+    m(ns + 'serialize-json(test:remove-keys(({ "a": 1}, {"b": 2}, {"a": 3, "b": 4}, 17), "a"))', '[{}, {"b": 2}, {"b": 4}, 17]');
     m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '[1, 2, 3]');
     m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[1, 2, 3]');
 
