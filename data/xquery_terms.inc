@@ -897,8 +897,10 @@ function TXQTermDynamicFunctionCall.evaluate(const context: TXQEvaluationContext
 var
   func, v: IXQValue;
   index: IXQValue;
+  ara: TXQValueJSONArray;
+  i: Integer;
 begin
-  if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
+  //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
   if func.isUndefined then exit(xqvalue());
   if (func is TXQValueSequence) and (func.getSequenceCount = 1) then func := func.getChild(0);
@@ -906,6 +908,21 @@ begin
   if func is TXQValueFunction then begin
     raiseEvaluationError('XPST0003', 'Dynamic function call is not yet implemented');
     //TODO
+  end;
+
+  if length(children) = 1 then begin
+    result := nil;
+    for v in func do begin
+      if v is TXQValueObject then
+        xqvalueSeqAdd(result, (v as TXQValueObject).enumerateProperties);
+      if v is TXQValueJSONArray then begin
+        ara := v as TXQValueJSONArray;;
+        for i := 0 to ara.seq.Count-1 do
+          xqvalueSeqAdd(result, ara.seq[i]);
+      end;
+    end;
+    if result = nil then result := xqvalue();
+    exit;
   end;
 
   if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices or object prop given');

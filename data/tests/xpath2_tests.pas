@@ -1779,10 +1779,14 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('{}.hallo', ''); //no exception on undefined properties
   t('string-join({"array": (1, 2, 3)}.array, " ")', '1 2 3');
   t('string-join(jn:members({"array": [1, 2, 3]}.array), " ")', '1 2 3');
+  t('string-join(({"array": [1, 2, 3]}.array)(), " ")', '1 2 3');
+  t('string-join({"array": [1, 2, 3]}.array(), " ")', '1 2 3');
   t('string-join({"array": (1)}.array, " ")', '1');
   t('string-join(jn:members({"array": [1]}.array), " ")', '1');
+  t('string-join(({"array": [1]}.array)(), " ")', '1');
   t('string-join({"array": ()}.array, " ")', '');
   t('string-join(jn:members({"array": []}.array), " ")', '');
+  t('string-join(({"array": []}.array)(), " ")', '');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[1].a', '10');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[2].a', '20');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[3].a', '30');
@@ -1918,6 +1922,18 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   //  t('$x. bar', 'bar');
 //  t('$x.$indirect', 'bar');
+
+  t('join(jn:keys({"a": 1, "b": 2, "c": 3}))', 'a b c');
+  t('join(({"a": 1, "b": 2, "c": 3})())', 'a b c');
+  t('join({"a": 1, "b": 2, "c": 3}())', 'a b c');
+  t('join({"a": 1}())', 'a');
+  t('join({}())', '');
+
+  t('join(([1,2,3], {"a": 17}, {}, [], {"c": 7, "d": 1})())', '1 2 3 a c d');
+  t('join(({}, [], {}, [1,2,3], {"a": 17}, {}, [], {"c": 7, "d": 1})())', '1 2 3 a c d');
+  t('xyz := {"mu": "mi"}', '');
+  t('$xyz.abc := 17', '17');
+  t('join($xyz())', 'mu abc');
 
 
   ps.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;

@@ -661,6 +661,9 @@ type
 
     function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
 
+    procedure enumerateProperties(seq: TXQValueSequence);
+    function enumerateProperties: IXQValue;
+
     function toBooleanEffective: boolean; override;
 
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)

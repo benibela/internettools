@@ -1215,9 +1215,12 @@ begin
           expect(']');
         end;
         '(': begin
-          expect('(');
+          expect('('); skipWhitespaceAndComment();
           replace := ripBinOpApart(@astroot, 10000); //TODO: check
-          replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseSomething());
+          if pos^ <> ')' then
+            replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseSomething())
+           else
+            replace^ := TXQTermDynamicFunctionCall.Create(replace^);
           expect(')');
         end;
         ':=': begin

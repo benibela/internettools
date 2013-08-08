@@ -262,23 +262,13 @@ end;
 function xqFunctionKeys(const args: TXQVArray): IXQValue;
 var
   a: IXQValue;
-  obj: TXQValueObject;
   i: Integer;
-  resseq: TXQValueSequence;
 begin
   requiredArgCount(args, 1);
   a := args[0];
   if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
   if not (a is TXQValueObject) then raise EXQEvaluationException.create('pxp:OBJ', 'Expected object, got: '+a.debugAsStringWithTypeAnnotation());
-  obj := a as TXQValueObject;
-
-  resseq := TXQValueSequence.create();
-  while obj <> nil do begin
-    for i := obj.values.count - 1 downto 0 do
-      resseq.seq.insert(0, xqvalue(obj.values.getName(i))); //TODO: optimize
-    obj := obj.prototype as TXQValueObject;
-  end;
-  result := resseq;
+  result := (a as TXQValueObject).enumerateProperties();
 end;
 
 

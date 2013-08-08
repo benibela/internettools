@@ -1541,6 +1541,28 @@ begin
   result.values.add(properties[startIndex], TXQValueObject(oldValue).setImmutable(properties, v, startIndex+1) );
 end;
 
+procedure TXQValueObject.enumerateProperties(seq: TXQValueSequence);
+var
+  obj: TXQValueObject;
+  i: Integer;
+begin
+  obj := self;
+  while obj <> nil do begin
+    for i := obj.values.count - 1 downto 0 do
+      seq.seq.insert(0, xqvalue(obj.values.getName(i))); //TODO: optimize
+    obj := obj.prototype as TXQValueObject;
+  end;
+end;
+
+function TXQValueObject.enumerateProperties: IXQValue;
+var
+  resseq: TXQValueSequence;
+begin
+  resseq := TXQValueSequence.create(values.count);
+  enumerateProperties(resseq);
+  result := resseq;
+end;
+
 function TXQValueObject.toBooleanEffective: boolean;
 begin
   result := true;
