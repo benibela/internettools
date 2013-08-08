@@ -363,7 +363,7 @@ var tempDateTime: TXQValueDateTime;
 begin
   ak := a.kind; bk := b.kind;
   result:=-2;
-  if not (ak in [pvkUndefined, pvkNull]) and not (bk in [pvkUndefined, pvkNull]) then begin
+  if not (ak in [pvkUndefined]) and not (bk in [pvkUndefined]) then begin
     if (ak = bk) and not (ak in [pvkString,pvkNode]) then begin
       case ak of
         pvkBoolean:
@@ -384,9 +384,12 @@ begin
           end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
             result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
         end;
+        pvkNull: result := 0;
       end;
       //This also implements the generic comparison type conversion rules (in those case where it would affect the result, a type error should be raised)
-    end else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then
+    end else if ak = pvkNull then exit(-1)
+    else if bk = pvkNull then exit(1)
+    else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then
       result := compareAsDecimals()
     else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
       result := CompareStr(TXQValue_Binary(a).toRawBinary, TXQValue_Binary(b).toRawBinary)
@@ -480,7 +483,7 @@ end;
 
 function xqvalueEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
-  if not (a.kind in [pvkUndefined, pvkNull]) and not (b.kind in [pvkUndefined, pvkNull]) then
+  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
     result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
     result := xqvalue();
@@ -488,7 +491,7 @@ end;
 
 function xqvalueUnequalAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
-  if not (a.kind in [pvkUndefined, pvkNull]) and not (b.kind in [pvkUndefined, pvkNull]) then
+  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
     result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
   else
     result := xqvalue;
@@ -498,7 +501,7 @@ procedure xqvalueCompareAtomic(a, b: IXQValue; var result: IXQValue; accept1: in
 var
  compres: Integer;
 begin
-  if not (a.kind in [pvkUndefined,pvkNull]) and not (b.kind in [pvkUndefined, pvkNull]) then begin
+  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then begin
     compres := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone);
     result := xqvalue((compres = accept1) or (compres = accept2) );
   end else
@@ -531,7 +534,7 @@ var
  ak, bk: TXQValueKind;
 begin
   ak := a.kind; bk := b.kind;
-  if (ak in [pvkUndefined, pvkNull]) or (bk in [pvkUndefined, pvkNull]) then
+  if (ak in [pvkUndefined]) or (bk in [pvkUndefined]) then
     result := false
   else if (ak <> pvkSequence) and (bk <> pvkSequence) then begin
     compres := xqvalueCompareAtomicBase(a,b,collation, implicitTimezone);

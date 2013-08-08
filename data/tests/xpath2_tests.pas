@@ -2062,20 +2062,30 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('if (()) then "T" else "F"', 'F');
 
     t('() + 1', '');
-    f('null + 1', '');
-    t('() eq 1', '');
-    t('null eq 1', '');
+    f('null + 1');
     t('1 + ()', '');
-    f('1 + null', '');
-    f('null - 1', '');
-    f('null * 1', '');
-    f('null div 1', '');
-    f('null idiv 1', '');
+    f('1 + null');
+    f('null - 1');
+    f('null * 1');
+    f('null div 1');
+    f('null idiv 1');
+
+    t('() eq 1', '');
+    t('null eq 1', 'false');
+    t('null ne 1', 'true');
+    t('null eq null', 'true');
+    t('null lt 1', 'true');
+    t('null gt 1', 'false');
+    t('1 lt null', 'false');
+    t('1 gt null', 'true');
 
     t('(null, 2) = (1, 3)', 'false');
     t('(1, null, 3) = (1, 3)', 'true');
     t('(null, 1, null, 3) = (1, 3, null)', 'true');
-    t('(null, null) = (1, 3, null)', 'false');
+    t('(null, null) = (1, 3, null)', 'true');
+    t('null = (1, 3)', 'false');
+    t('null = (1, null, 3)', 'true');
+    t('null != (1, 3)', 'true');
 
     t('serialize-json([ "Sunday","Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ])', '["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]');
     t('serialize-json(          [ [1, 2, 3],            [4, 5, 6],            [7, 8, 9]          ])', '[[1, 2, 3], [4, 5, 6], [7, 8, 9]]');
