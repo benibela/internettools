@@ -3232,6 +3232,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('outer-html(/)', '<html><head></head><body><table><colgroup><col></colgroup><tbody><tr>17</tr></tbody></table></body></html>' , '<table><col><tr>17</table>');
 
 
+  //XQuery/XPath 3 syntax tests which must fail in the old version
+  f('"a" || "b"');
+
 
   writeln('XPath 2: ', i, ' completed');
 

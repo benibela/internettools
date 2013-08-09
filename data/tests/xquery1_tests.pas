@@ -1770,6 +1770,9 @@ begin
   scd('abc:=//title', [xqcdContextVariables,xqcdFocusDocument,xqcdContextCollation]);
 
 
+  //XQuery/XPath 3 syntax tests which must fail in the old version
+  f('"a" || "b"');
+
   writeln('XQuery: ', count, ' completed');
 
   helper.free;

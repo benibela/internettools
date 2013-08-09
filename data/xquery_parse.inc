@@ -41,6 +41,7 @@ type
   procedure raiseInvalidModel(s: string);
 
   procedure requireXQuery(s: string = '');
+  procedure require3(s: string = '');
 
   procedure skipWhitespace();
   procedure skipComment();
@@ -98,7 +99,12 @@ end;
 
 procedure TXQParsingContext.requireXQuery(s: string);
 begin
-  if parsingModel <> xqpmXQuery1 then raiseInvalidModel('XQuery is required '+s);
+  if (parsingModel <> xqpmXQuery1) and (parsingModel <> xqpmXQuery3) then raiseInvalidModel('XQuery is required '+s);
+end;
+
+procedure TXQParsingContext.require3(s: string);
+begin
+  if (parsingModel <> xqpmXPath3) and (parsingModel <> xqpmXQuery3) then raiseInvalidModel('At least XQuery/XPath version 3.0 is required '+s);
 end;
 
 procedure TXQParsingContext.skipWhitespace;
@@ -1156,6 +1162,7 @@ var astroot: TXQTerm;
       replace: PXQTerm;
   begin
     expect(opinfo.name);
+    if opinfo.require3 then require3();
 
     res := TXQTermBinaryOp.Create(opinfo);
     replace := ripBinOpApart(@astroot, res.op.priority);

@@ -820,6 +820,7 @@ type
   *)
   TXQBinaryOp = function (const cxt: TXQEvaluationContext; const a,b: IXQValue): IXQValue;
 
+  TXQParsingModel = (xqpmXPath2, xqpmXQuery1, xqpmXPath3, xqpmXQuery3);
 
 
   { TXQParsingContext }
@@ -875,6 +876,7 @@ type
     priority: integer;
     followedBy: string;
     contextDependencies: TXQContextDependencies;
+    require3: boolean;
   end;
 
 
@@ -1255,7 +1257,6 @@ type
   type TXQParseDocEvent = procedure (sender: TXQueryEngine; data, url, contenttype: string; var node: TTreeNode) of object;
   { TXQueryEngine }
 
-  TXQParsingModel = (xqpmXPath2, xqpmXQuery1{, xqpmXPath3, xqpmXquery3});
 
 
   (***
@@ -1502,8 +1503,12 @@ type
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
     function parseXPath2(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
-    //** Parses a new XQuery expression and stores it in tokenized form.
+    //** Parses a new XQuery 1.0 expression and stores it in tokenized form.
     function parseXQuery1(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
+    //** Parses a new XPath 3.0 expression and stores it in tokenized form. Work in progress, only a small set of 3.0 statements is supported
+    function parseXPath3(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
+    //** Parses a new XQuery 3.0 expression and stores it in tokenized form. Work in progress, only a small set of 3.0 statements is supported
+    function parseXQuery3(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
     //** Parses a new CSS 3.0 Selector expression and stores it in tokenized form.
     function parseCSS3(s:string): IXQuery;
 
@@ -1516,6 +1521,10 @@ type
     function evaluateXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
     //** Evaluates an XQuery 1.0 expression with a certain tree element as current node.
     function evaluateXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
+    //** Evaluates an XPath 3.0 expression with a certain tree element as current node. Work in progress, only a small set of 3.0 statements is supported
+    function evaluateXPath3(expression: string; tree:TTreeNode = nil): IXQValue;
+    //** Evaluates an XQuery 3.0 expression with a certain tree element as current node. Work in progress, only a small set of 3.0 statements is supported
+    function evaluateXQuery3(expression: string; tree:TTreeNode = nil): IXQValue;
     //** Evaluates an CSS 3 Selector expression with a certain tree element as current node.
     function evaluateCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
 
@@ -1817,7 +1826,7 @@ type
   procedure registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   //** Registers a binary operator
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
-  procedure registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
   procedure registerType(const typ: TXQValueClass);
 
   function findBasicFunction(const name: string): TXQBasicFunctionInfo;
@@ -3902,6 +3911,18 @@ begin
   result := FLastQuery;
 end;
 
+function TXQueryEngine.parseXPath3(s: string; sharedContext: TXQStaticContext): IXQuery;
+begin
+  FLastQuery:=parseTerm(s, xqpmXPath3, sharedContext);
+  result := FLastQuery;
+end;
+
+function TXQueryEngine.parseXQuery3(s: string; sharedContext: TXQStaticContext): IXQuery;
+begin
+  FLastQuery:=parseTerm(s, xqpmXQuery3, sharedContext);
+  result := FLastQuery;
+end;
+
 function TXQueryEngine.parseCSS3(s: string): IXQuery;
 var
   sc: TXQStaticContext;
@@ -3993,6 +4014,24 @@ var
 begin
   temp := FLastQuery;
   result := parseXQuery1(expression).evaluate(tree);
+  FLastQuery := temp;
+end;
+
+function TXQueryEngine.evaluateXPath3(expression: string; tree: TTreeNode): IXQValue;
+var
+  temp: IXQuery;
+begin
+  temp := FLastQuery;
+  result := parseXPath3(expression).evaluate(tree);
+  FLastQuery := temp;
+end;
+
+function TXQueryEngine.evaluateXQuery3(expression: string; tree: TTreeNode): IXQValue;
+var
+  temp: IXQuery;
+begin
+  temp := FLastQuery;
+  result := parseXQuery3(expression).evaluate(tree);
   FLastQuery := temp;
 end;
 
@@ -5088,18 +5127,17 @@ begin
   end;
 end;
 
-procedure TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 var
-  temp: TXQOperatorInfo;
   spacepos: SizeInt;
   i: Integer;
   list: TStringList;
 begin
-  temp := TXQOperatorInfo.Create;
-  temp.name:=name;
-  temp.func:=func;
-  temp.priority:=priority;
-  temp.contextDependencies:=contextDependencies;
+  result := TXQOperatorInfo.Create;
+  result.name:=name;
+  result.func:=func;
+  result.priority:=priority;
+  result.contextDependencies:=contextDependencies;
   spacepos := pos(' ', name);
   i := binaryOpLists.IndexOf(name[1]);
   if i < 0 then begin
@@ -5108,15 +5146,15 @@ begin
     binaryOpLists.AddObject(name[1], list);
   end else list := TStringList(binaryOpLists.Objects[i]);
 
-  if spacepos = 0 then list.AddObject(name, (temp))
+  if spacepos = 0 then list.AddObject(name, (result))
   else begin
-    temp.name := copy(name, 1, spacepos-1);
-    list.AddObject(temp.name, (temp));
-    temp.followedBy := strCopyFrom(name, spacepos+1);
+    result.name := copy(name, 1, spacepos-1);
+    list.AddObject(result.name, (result));
+    result.followedBy := strCopyFrom(name, spacepos+1);
   end;
-  parseTypeChecking(temp, typeChecking);
-  for i := 0 to high(temp.versions) do
-    binaryOpFunctions.AddObject(temp.versions[i].name, TObject(temp));
+  parseTypeChecking(result, typeChecking);
+  for i := 0 to high(result.versions) do
+    binaryOpFunctions.AddObject(result.versions[i].name, TObject(result));
 end;
 
 procedure TXQNativeModule.registerType(const typ: TXQValueClass);
@@ -5424,6 +5462,8 @@ op.registerBinaryOp('+',@xqvalueAdd,70,['numeric-add($arg1 as numeric?, $arg2 as
 op.registerBinaryOp('-',@xqvalueSubtract,70,['numeric-subtract($arg1 as numeric?, $arg2 as numeric?) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date?, $arg2 as xs:date?) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time?, $arg2 as xs:time?) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time'], []);
 
 op.registerBinaryOp('to',@xqvalueTo,60,['to($firstval as xs:integer?, $lastval as xs:integer?) as xs:integer*'], []);
+
+op.registerBinaryOp('||',@xqvalueConcat,55,['($arg1 as xs:anyAtomicType?, $arg2 as xs:anyAtomicType?) as xs:string'], []).require3:=true;
 
 op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,['numeric-equal($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', 'duration-equal($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-equal($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-equal($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', 'gYear-equal($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', 'gDay-equal($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', 'QName-equal($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
 op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50, ['($arg1 as true-numeric?, $arg2 as true-numeric?) as xs:boolean', '($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', '($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', '($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', '($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', '($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', '($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', '($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', '($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', '($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);

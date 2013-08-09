@@ -312,6 +312,11 @@ begin
   else result := commonDecimalClass(a,b).create(e - trunc(e / f) * f)
 end;
 
+function xqvalueConcat(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
+begin
+  result := xqvalue(a.toString + b.toString);
+end;
+
 function xqvalueComparableTypes(const a, b: IXQValue): boolean;
   function decidedByUniqueTypeClass(const c: TXQValueClass): boolean;
   var
