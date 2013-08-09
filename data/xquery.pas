@@ -4788,6 +4788,12 @@ begin
   result := xqvalue();
 end;
 
+function xqvalueSimpleMap(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+begin
+  ignore(cxt); ignore(ta); ignore(tb);
+  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: ! called');
+  result := xqvalue();
+end;
 
 
 
@@ -5440,6 +5446,7 @@ fn.registerFunction('element-with-id', @xqFunctionId, ['($arg as xs:string*) as 
 
 op.registerBinaryOp('/',@xqvalueNodeStepChild,200, [], []);
 op.registerBinaryOp('//',@xqvalueNodeStepDescendant,200, [], []);
+op.registerBinaryOp('!',@xqvalueSimpleMap,200, [], []).require3:=true;
 
 op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], []);
 op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], []);

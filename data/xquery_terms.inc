@@ -977,14 +977,35 @@ begin
 end;
 
 function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
+  function evaluateSimpleMap: IXQValue;
+  var v: IXQValue;
+    tempContext: TXQEvaluationContext;
+    seq: IXQValue;
+  begin
+    result := nil;
+    seq := children[0].evaluate(context);
+    tempContext := context;
+    tempContext.ParentElement := nil;
+    tempContext.SeqIndex := 1;
+    tempContext.SeqLength := seq.getSequenceCount;
+    for tempContext.SeqValue in seq do begin
+      xqvalueSeqAdd(result, children[1].evaluate(tempContext));
+      tempContext.SeqIndex += 1;
+    end;
+    if result = nil then result := xqvalue();
+  end;
+
 var evilkids: TXQVArray;
 begin
   if length(children)<2 then raiseEvaluationError('XPST0003', 'Not enough subterms');
   if length(children)>2 then raiseEvaluationError('XPST0003', 'Too many subterms');
 
 
-  if (op.name = '/') or (op.name = '//') then
-    exit(TXQueryEngine.evaluateAccessList(self, context));
+  case op.name of
+    '/', '//': exit(TXQueryEngine.evaluateAccessList(self, context));
+    '!': exit(evaluateSimpleMap);
+  end;
+
 
 
   if not context.staticContext.strictTypeChecking  then

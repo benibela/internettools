@@ -3234,6 +3234,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
   //XQuery/XPath 3 syntax tests which must fail in the old version
   f('"a" || "b"');
+  f('(1,2) ! 7');
 
 
   writeln('XPath 2: ', i, ' completed');
