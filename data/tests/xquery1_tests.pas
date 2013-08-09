@@ -1772,6 +1772,7 @@ begin
 
   //XQuery/XPath 3 syntax tests which must fail in the old version
   f('"a" || "b"');
+  f('switch (10) case 10 return "a" case 20 return "b" default return "c"');
 
   writeln('XQuery: ', count, ' completed');
 

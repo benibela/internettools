@@ -2431,6 +2431,35 @@ begin
   result := args[0];
 end;
 
+function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;
+//contract: always return TXQValueBoolean
+var i:integer;
+    enum1, enum2: TXQValueEnumerator;
+begin
+  if a.getSequenceCount <> b.getSequenceCount then
+    exit(false);
+
+  enum1 := a.GetEnumerator; enum1.MoveNext;
+  enum2 := b.GetEnumerator; enum2.MoveNext;
+  for i := 0 to a.getSequenceCount - 1 do begin
+
+    if enum1.Current is TXQValue_AnyAtomicType then begin
+      if not (enum2.Current is TXQValue_AnyAtomicType)
+         or not xqvalueComparableTypes(enum1.Current, enum2.Current)
+         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.sender.ImplicitTimezone,true) then //todo:   nodes?
+        exit(false);
+    end else begin
+      if (enum2.Current is TXQValue_AnyAtomicType) or
+         (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
+            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.staticContext.nodeCollation.equal)) then
+        exit(false);
+    end;
+    enum1.MoveNext;
+    enum2.MoveNext;
+  end;
+  result := true;
+end;
+
 function xqFunctionDeep_equal(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 //contract: always return TXQValueBoolean
 var i:integer;
@@ -2438,31 +2467,10 @@ var i:integer;
     enum1, enum2: TXQValueEnumerator;
 begin
   requiredArgCount(args,2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
-  else collation := context.staticContext.collation;
-
-  if args[0].getSequenceCount <> args[1].getSequenceCount then
-    exit(xqvalueFalse);
-
-  enum1 := args[0].GetEnumerator; enum1.MoveNext;
-  enum2 := args[1].GetEnumerator; enum2.MoveNext;
-  for i := 0 to args[0].getSequenceCount - 1 do begin
-
-    if enum1.Current is TXQValue_AnyAtomicType then begin
-      if not (enum2.Current is TXQValue_AnyAtomicType)
-         or not xqvalueComparableTypes(enum1.Current, enum2.Current)
-         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.sender.ImplicitTimezone,true) then //todo:   nodes?
-        exit(xqvalueFalse);
-    end else begin
-      if (enum2.Current is TXQValue_AnyAtomicType) or
-         (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
-            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.staticContext.nodeCollation.equal)) then
-        exit(xqvalueFalse);
-    end;
-    enum1.MoveNext;
-    enum2.MoveNext;
-  end;
-  result := xqvalueTrue;
+  if length(args) = 3 then
+    result := xqvalue(xqvalueDeep_equal(context, args[0], args[1], TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)))
+  else
+    result := xqvalue(xqvalueDeep_equal(context, args[0], args[1], context.staticContext.collation));
 end;
 
 function xqFunctioncount(const args: TXQVArray): IXQValue;

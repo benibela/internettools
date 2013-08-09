@@ -1340,6 +1340,33 @@ begin
   Result:=getChildrenContextDependencies;
 end;
 
+{ TXQTermSwitch }
+
+function TXQTermSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  v: IXQValue;
+  start: integer;
+  i, j: Integer;
+  operand: IXQValue;
+begin
+  v := children[0].evaluate(context);
+  for i:=1 to high(children) - 1 do begin
+    if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
+    for j := 0 to high(children[i].children) - 1 do begin
+      operand := xqvalueAtomize(children[i].children[j].evaluate(context));
+      if operand.getSequenceCount > 1 then raiseEvaluationError('XPTY0004', 'Sequences are not allowed as case operands in a switch statement');
+      if xqvalueDeep_equal(context, v, operand, context.staticContext.collation) then
+        exit(children[i].children[high(children[i].children)].evaluate(context));
+    end;
+  end;
+  i := high(children);
+  exit(children[i].evaluate(context));
+end;
+
+function TXQTermSwitch.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=getChildrenContextDependencies;
+end;
 { TXQTermConstructor }
 
 constructor TXQTermConstructor.create(atype: TTreeNodeType; aname: txqterm = nil);

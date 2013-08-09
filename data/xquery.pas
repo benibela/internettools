@@ -1166,6 +1166,13 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
+  { TXQTermSwitch }
+
+  TXQTermSwitch = class(TXQTerm)
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
+  end;
+
   { TXQTermReadObjectProperty }
 
   TXQTermReadObjectProperty = class(TXQTerm)
@@ -1889,6 +1896,7 @@ var
   interpretedFunctionSynchronization: TRTLCriticalSection;
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+
 
 { TXQInterpretedFunctionInfo }
 
@@ -3078,6 +3086,7 @@ begin
 end;
 
 function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings
+function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean; forward; //needed for switch
 
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}

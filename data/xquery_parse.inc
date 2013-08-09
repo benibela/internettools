@@ -42,6 +42,7 @@ type
 
   procedure requireXQuery(s: string = '');
   procedure require3(s: string = '');
+  procedure requireXQuery3(s: string = '');
 
   procedure skipWhitespace();
   procedure skipComment();
@@ -66,6 +67,8 @@ type
 
   function parseFlower(akind: string): TXQTermFlower;
   function parseSomeEvery(const akind: string): TXQTermSomeEvery;
+  function parseTypeSwitch: TXQTermTypeSwitch;
+  function parseSwitch: TXQTermSwitch;
   function parseDirectConstructor(name: string): TXQTermConstructor;
   function parseComputedConstructor(name: string): TXQTermConstructor;
   function parseExtension: TXQTerm;
@@ -105,6 +108,11 @@ end;
 procedure TXQParsingContext.require3(s: string);
 begin
   if (parsingModel <> xqpmXPath3) and (parsingModel <> xqpmXQuery3) then raiseInvalidModel('At least XQuery/XPath version 3.0 is required '+s);
+end;
+
+procedure TXQParsingContext.requireXQuery3(s: string);
+begin
+  if (parsingModel <> xqpmXQuery3) then raiseInvalidModel('XQuery version 3.0 is required '+s);
 end;
 
 procedure TXQParsingContext.skipWhitespace;
@@ -480,6 +488,59 @@ begin
     result.free;
     raise;
   end;
+end;
+
+function TXQParsingContext.parseTypeSwitch: TXQTermTypeSwitch;
+var
+  word: String;
+begin
+  requireXQuery('for typeswitch statement');
+  result := TXQTermTypeSwitch.Create;
+  result.push(parsePrimaryLevel());
+  expect(')');
+
+  word := nextToken();
+  while word = 'case' do begin
+    skipWhitespaceAndComment();
+    result.push(TXQTermSequence.Create);
+    if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
+    result.children[high(result.children)].push(parseSequenceType());
+    expect('return');
+    result.children[high(result.children)].push(parse());
+    word := nextToken();
+  end;
+  if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
+  skipWhitespaceAndComment();
+  result.push(TXQTermSequence.Create);
+  if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
+  expect('return');
+  result.children[high(result.children)].push(parse());
+end;
+
+function TXQParsingContext.parseSwitch: TXQTermSwitch;
+var
+  word: String;
+begin
+  requireXQuery3('for switch statement');
+  result := TXQTermSwitch.Create;
+  result.push(parsePrimaryLevel());
+  expect(')');
+
+  word := nextToken();
+  while word = 'case' do begin
+    skipWhitespaceAndComment();
+    result.push(TXQTermSequence.Create);
+    while word = 'case' do begin
+      result.children[high(result.children)].push(parse());
+      word := nextToken();
+    end;
+    if word <> 'return' then raiseParsingError('XPST0003', 'expected return');
+    result.children[high(result.children)].push(parse());
+    word := nextToken();
+  end;
+  if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
+  expect('return');
+  result.push(parse());
 end;
 
 function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstructor;
@@ -1034,31 +1095,10 @@ begin
           exit;
         end;
 
-        if word = 'typeswitch' then begin
-          requireXQuery('for typeswitch statement');
-          result := TXQTermTypeSwitch.Create;
-          result.push(parsePrimaryLevel());
-          expect(')');
-
-          word := nextToken();
-          while word = 'case' do begin
-            skipWhitespaceAndComment();
-            result.push(TXQTermSequence.Create);
-            if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
-            result.children[high(result.children)].push(parseSequenceType());
-            expect('return');
-            result.children[high(result.children)].push(parse());
-            word := nextToken();
-          end;
-          if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
-          skipWhitespaceAndComment();
-          result.push(TXQTermSequence.Create);
-          if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
-          expect('return');
-          result.children[high(result.children)].push(parse());
-
-          exit;
-        end;
+        if word = 'typeswitch' then
+          exit(parseTypeSwitch);
+        if word = 'switch' then
+          exit(parseSwitch);
 
         if (isKindTestFunction(word)
            or (strContains(word, '::') and (isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2))))) then begin
