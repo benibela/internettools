@@ -959,7 +959,7 @@ end;
 
 constructor TXQTermBinaryOp.create(const aop: string; arg1: TXQTerm; arg2: TXQTerm);
 begin
-  op := TXQueryEngine.findOperator(aop);
+  op := TXQueryEngine.findOperator(pchar(aop));
   if arg1 <> nil then begin
     push(arg1);
     if arg2 <> nil then push(arg2);
@@ -969,6 +969,11 @@ end;
 constructor TXQTermBinaryOp.create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
 begin
   create(aop, arg1, arg2);
+end;
+
+constructor TXQTermBinaryOp.create(opinfo: TXQOperatorInfo);
+begin
+  op := opinfo;
 end;
 
 function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;

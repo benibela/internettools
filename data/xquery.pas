@@ -1104,6 +1104,7 @@ type
     op: TXQOperatorInfo;
     constructor create(const aop: string; arg1: TXQTerm = nil; arg2: TXQTerm = nil);
     constructor create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
+    constructor create(opinfo: TXQOperatorInfo);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   protected
@@ -1577,7 +1578,7 @@ type
     property LastQuery: IXQuery read FLastQuery;
   protected
     function findNamespace(const nsprefix: string): INamespace;
-    class function findOperator(const name: string): TXQOperatorInfo;
+    class function findOperator(const pos: pchar): TXQOperatorInfo;
     class function findTypeClass(const name: string): TXQValueClass;
   end;
 
@@ -1824,7 +1825,8 @@ type
   function findInterpretedFunction(const name: string): TXQInterpretedFunctionInfo;
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TStringList;
-  binaryOps, binaryOpFunctions: TStringList;
+  binaryOpLists: TStringList;
+  binaryOpFunctions: TStringList;
   types: TStringList;
   procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
 end;
@@ -4795,16 +4797,28 @@ begin
   result := TXQNativeModule(nativeModules.Objects[index]);
 end;
 
-class function TXQueryEngine.findOperator(const name: string): TXQOperatorInfo;
+class function TXQueryEngine.findOperator(const pos: pchar): TXQOperatorInfo;
 var
   i: Integer;
   j: Integer;
+  sl: TStringList;
+  bestMatch: Integer;
+  k: Integer;
 begin
-  for i := 0 to nativeModules.count - 1 do begin
-    j := TXQNativeModule(nativeModules.Objects[i]).binaryOps.IndexOf(name);
-    if j >= 0 then exit(TXQOperatorInfo(TXQNativeModule(nativeModules.Objects[i]).binaryOps.Objects[j]));
-  end;
   result := nil;
+  bestMatch := 0;
+  for i := 0 to nativeModules.count - 1 do begin
+    j := TXQNativeModule(nativeModules.Objects[i]).binaryOpLists.IndexOf(pos^);
+    if j >= 0 then begin
+      sl := TStringList(TXQNativeModule(nativeModules.Objects[i]).binaryOpLists.Objects[j]);
+      for k := 0 to sl.Count - 1 do
+        if strBeginsWith(pos, sl[k]) then
+          if length(sl[k]) > bestMatch then begin
+            bestMatch := length(sl[k]);
+            result := TXQOperatorInfo(sl.Objects[k]);
+          end;
+    end;
+  end;
 end;
 
 class function TXQueryEngine.findTypeClass(const name: string): TXQValueClass;
@@ -5002,9 +5016,9 @@ begin
   interpretedFunctions:=TStringList.Create;
   interpretedFunctions.Sorted := true;
   interpretedFunctions.OwnsObjects:=true;
-  binaryOps:=TStringList.Create;
-  binaryOps.Sorted := true;
-  binaryOps.OwnsObjects:=true;
+  binaryOpLists:=TStringList.Create;
+  binaryOpLists.Sorted := true;
+  binaryOpLists.OwnsObjects:=true;
 
   binaryOpFunctions:=TStringList.Create;
   binaryOpFunctions.Sorted := true;
@@ -5018,11 +5032,11 @@ begin
   basicFunctions.Clear;
   complexFunctions.Clear;
   interpretedFunctions.Clear;
-  binaryOps.Clear;
+  binaryOpLists.Clear;
 
   basicFunctions.free;
   complexFunctions.free;
-  binaryOps.free;
+  binaryOpLists.free;
   binaryOpFunctions.Free;
   interpretedFunctions.free;
   types.free;
@@ -5079,6 +5093,7 @@ var
   temp: TXQOperatorInfo;
   spacepos: SizeInt;
   i: Integer;
+  list: TStringList;
 begin
   temp := TXQOperatorInfo.Create;
   temp.name:=name;
@@ -5086,9 +5101,17 @@ begin
   temp.priority:=priority;
   temp.contextDependencies:=contextDependencies;
   spacepos := pos(' ', name);
-  if spacepos = 0 then binaryOps.AddObject(name, (temp))
+  i := binaryOpLists.IndexOf(name[1]);
+  if i < 0 then begin
+    list := TStringList.Create;
+    list.OwnsObjects := true;
+    binaryOpLists.AddObject(name[1], list);
+  end else list := TStringList(binaryOpLists.Objects[i]);
+
+  if spacepos = 0 then list.AddObject(name, (temp))
   else begin
-    binaryOps.AddObject(copy(name, 1, spacepos-1), (temp));
+    temp.name := copy(name, 1, spacepos-1);
+    list.AddObject(temp.name, (temp));
     temp.followedBy := strCopyFrom(name, spacepos+1);
   end;
   parseTypeChecking(temp, typeChecking);

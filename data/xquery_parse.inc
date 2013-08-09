@@ -1151,13 +1151,13 @@ var astroot: TXQTerm;
     if result = nil then raiseParsingError('XPST0003', 'Unexpected query end');
   end;
 
-  procedure pushBinaryOp(const v: string);
+  procedure pushBinaryOp(const opinfo: TXQOperatorInfo);
   var res: TXQTermBinaryOp;
       replace: PXQTerm;
   begin
-    expect(v);
+    expect(opinfo.name);
 
-    res := TXQTermBinaryOp.Create(v);
+    res := TXQTermBinaryOp.Create(opinfo);
     replace := ripBinOpApart(@astroot, res.op.priority);
 
     res.push(replace^);
@@ -1173,7 +1173,6 @@ var astroot: TXQTerm;
       if res.children[high(res.children)] = nil then raiseParsingError('XPST0003', 'Unexpected query end');
     end;
   end;
-
 
   var word: string;
     replace: PXQTerm;
@@ -1199,6 +1198,8 @@ var astroot: TXQTerm;
        raiseParsingError('XPST0003', 'Unexpected .');
      end;
   end;
+var
+  op: TXQOperatorInfo;
 begin
   astroot := parseValue();
   try
@@ -1207,17 +1208,6 @@ begin
       case word of
         '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
           exit(astroot);
-        //'=', '+', '-', '*': pushBinaryOp(word);
-        '!': pushBinaryOp('!=');
-        '<', '>': case (pos+1)^ of
-          '<', '>': pushBinaryOp(word+word);
-          '=': pushBinaryOp(word+'=');
-          else pushBinaryOp(word);
-        end;
-        '/':
-          if (pos+1)^ = '/' then
-            pushBinaryOp('//')
-          else pushBinaryOp('/');
         '[': begin
           expect('[');
           replace := ripBinOpApart(@astroot, 10000);
@@ -1247,13 +1237,16 @@ begin
           exit;
         end;
         '|': if AllowJSON and ((pos+1)^ = '}') then exit(astroot) // {| .. |} object merging syntax
-             else pushBinaryOp(word); //| operator
-        else if TXQueryEngine.findOperator(word) <> nil then pushBinaryOp(word)
-        else if (word[1] = '.') and (AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
-          expect(word);
-          parseDotOperator;
-        end else
-          raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word);
+             else pushBinaryOp(TXQueryEngine.findOperator(pos)); //| operator
+        else begin
+          op := TXQueryEngine.findOperator(pos);
+          if op <> nil then pushBinaryOp(op)
+          else if (word[1] = '.') and (AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
+            expect(word);
+            parseDotOperator;
+          end else
+            raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word);
+        end;
       end;
     end;
   except
