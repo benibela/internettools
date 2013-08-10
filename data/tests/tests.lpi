@@ -35,13 +35,16 @@
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
-    <RequiredPackages Count="2">
+    <RequiredPackages Count="3">
       <Item1>
-        <PackageName Value="internettools_utf8"/>
+        <PackageName Value="utf8tools"/>
       </Item1>
       <Item2>
-        <PackageName Value="internettools"/>
+        <PackageName Value="LCLBase"/>
       </Item2>
+      <Item3>
+        <PackageName Value="internettools"/>
+      </Item3>
     </RequiredPackages>
     <Units Count="17">
       <Unit0>
@@ -55,74 +58,74 @@
         <UnitName Value="bbutils_tests"/>
       </Unit1>
       <Unit2>
-        <Filename Value="../xquery.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="xquery"/>
-      </Unit2>
-      <Unit3>
         <Filename Value="../int65math.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="int65math"/>
-      </Unit3>
-      <Unit4>
+      </Unit2>
+      <Unit3>
         <Filename Value="../bbutils.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="bbutils"/>
-      </Unit4>
-      <Unit5>
+      </Unit3>
+      <Unit4>
         <Filename Value="../extendedhtmlparser.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="extendedhtmlparser"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="../xquery_parse.inc"/>
+        <IsPartOfProject Value="True"/>
       </Unit5>
       <Unit6>
-        <Filename Value="../xquery_parse.inc"/>
+        <Filename Value="../xquery_terms.inc"/>
         <IsPartOfProject Value="True"/>
       </Unit6>
       <Unit7>
-        <Filename Value="../xquery_terms.inc"/>
-        <IsPartOfProject Value="True"/>
-      </Unit7>
-      <Unit8>
         <Filename Value="xpath2_tests.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="xpath2_tests"/>
-      </Unit8>
-      <Unit9>
+      </Unit7>
+      <Unit8>
         <Filename Value="xquery1_tests.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="xquery1_tests"/>
+      </Unit8>
+      <Unit9>
+        <Filename Value="../xquery_types.inc"/>
+        <IsPartOfProject Value="True"/>
       </Unit9>
       <Unit10>
-        <Filename Value="../xquery_types.inc"/>
+        <Filename Value="../xquery_functions.inc"/>
         <IsPartOfProject Value="True"/>
       </Unit10>
       <Unit11>
-        <Filename Value="../xquery_functions.inc"/>
+        <Filename Value="../xquery_functions_generated_template.inc"/>
         <IsPartOfProject Value="True"/>
       </Unit11>
       <Unit12>
-        <Filename Value="../xquery_functions_generated_template.inc"/>
-        <IsPartOfProject Value="True"/>
-      </Unit12>
-      <Unit13>
         <Filename Value="../xquery_json.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="xquery_json"/>
-      </Unit13>
-      <Unit14>
+      </Unit12>
+      <Unit13>
         <Filename Value="internetaccess_tests.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="internetaccess_tests"/>
-      </Unit14>
-      <Unit15>
+      </Unit13>
+      <Unit14>
         <Filename Value="xpath3_tests.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="xpath3_tests"/>
-      </Unit15>
-      <Unit16>
+      </Unit14>
+      <Unit15>
         <Filename Value="xquery3_tests.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="xquery3_tests"/>
+      </Unit15>
+      <Unit16>
+        <Filename Value="../xqueryschema.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="xqueryschema"/>
       </Unit16>
     </Units>
   </ProjectOptions>

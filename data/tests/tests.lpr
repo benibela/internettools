@@ -4,9 +4,9 @@ program tests;
 
 uses
   heaptrc,
-  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests, int65math, extendedhtmlparser, bbutils, xquery, sysutils, xquery1_tests
+  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests, int65math, extendedhtmlparser, bbutils, sysutils, xquery1_tests
 
-  , xquery_utf8, xquery_json, internetaccess_tests, xpath3_tests, xquery3_tests
+  , xquery_utf8, xquery_json, internetaccess_tests, xpath3_tests, xquery3_tests, xqueryschema, utf8tools
 
   ;
 

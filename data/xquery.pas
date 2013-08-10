@@ -97,6 +97,8 @@ type
 
   TTreeNodeSerialization = (tnsText, tnsXML, tnsHTML);
 
+  //============================XQUERY CONTEXTS==========================
+
   { TXQStaticContext }
 
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
@@ -173,6 +175,9 @@ type
     function hasVariable(const name: string; out value: IXQValue; const ns: INamespace): boolean;
     function getVariable(const name: string; const ns: INamespace): IXQValue;
   end;
+
+
+  //============================VALUE STORAGE==========================
 
 
   TXQValueClass = class of TXQValue;
@@ -742,6 +747,14 @@ type
     function clone: IXQValue; override;
   end;
 
+
+
+
+
+
+
+  //============================XQUERY META STUFF ==========================
+
   { TXQVList }
 
   (*** @abstract(List of TXQValue-s) *)
@@ -779,30 +792,6 @@ type
     function getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass; //**< Returns the lowest type derived by datetime that all items in the list can be converted to
   end;
 
-  (***
-    @abstract(Event callback that is called to receive the value of the variable @code(variable)). Should return true, if the value was changed. (returning false will cause an unknown variable exceptiono)
-  *)
-  TXQEvaluateVariableEvent = function (sender: TObject; const variable: string; var value: IXQValue): boolean of object;
-  (***
-    @abstract(Event callback that is called to set the @code(value) of the variable @code(variable)).
-  *)
-  //TXQDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
-
-  (***
-    @abstract(Event callback that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
-
-    The return value can be created with one of the xqvalue(..) functions.
-  *)
-  TXQDeclareExternalVariableEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue) of object;
-  (***
-  @abstract(Event callback that is called to set a function @code(value) of a XQuery function declared as "declare function ... external").
-
-  The function in @code(result) has already been initialized with the parameters and result type, only the term in @code(result.body) has to be set.@br
-  You can either create an syntax tree for the function with the respective TXQTerm classes or derive a class from TXQTerm and override the evaluate function to calculate it natively.
-  *)
-  TXQDeclareExternalFunctionEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const functionName: string; var result: TXQValueFunction) of object;
-
-  TXQImportModuleEvent = procedure (sender: TObject; const namespace: string; const at: array of string) of object;
 
   (***
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
@@ -919,6 +908,13 @@ type
   end;
 
 
+
+
+
+
+
+
+  //============================XQUERY AST TERMS==========================
 
 
   //**@abstract Internally used xpath term
@@ -1213,6 +1209,12 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
+
+
+
+
+  //============================XQUERY QUERY HOLDER==========================
+
   IXQuery = interface
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -1240,6 +1242,8 @@ type
     procedure setTerm(aterm: TXQTerm);
   end;
 
+  //============================EXCEPTIONS/EVENTS==========================
+
   { EXQException }
 
   EXQException = class(Exception)
@@ -1258,10 +1262,45 @@ type
     constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
   end;
 
+  (***
+    @abstract(Event callback that is called to receive the value of the variable @code(variable)). Should return true, if the value was changed. (returning false will cause an unknown variable exceptiono)
+  *)
+  TXQEvaluateVariableEvent = function (sender: TObject; const variable: string; var value: IXQValue): boolean of object;
+  (***
+    @abstract(Event callback that is called to set the @code(value) of the variable @code(variable)).
+  *)
+  //TXQDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
+
+  (***
+    @abstract(Event callback that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
+
+    The return value can be created with one of the xqvalue(..) functions.
+  *)
+  TXQDeclareExternalVariableEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue) of object;
+  (***
+  @abstract(Event callback that is called to set a function @code(value) of a XQuery function declared as "declare function ... external").
+
+  The function in @code(result) has already been initialized with the parameters and result type, only the term in @code(result.body) has to be set.@br
+  You can either create an syntax tree for the function with the respective TXQTerm classes or derive a class from TXQTerm and override the evaluate function to calculate it natively.
+  *)
+  TXQDeclareExternalFunctionEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const functionName: string; var result: TXQValueFunction) of object;
+
+  TXQImportModuleEvent = procedure (sender: TObject; const namespace: string; const at: array of string) of object;
+
   //** Event called by the fn:trace(value,info) function.
   type TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;
   //** Event called by the fn:doc to parse a downloaded document.
   type TXQParseDocEvent = procedure (sender: TXQueryEngine; data, url, contenttype: string; var node: TTreeNode) of object;
+
+
+
+
+
+
+
+
+  //============================MAIN CLASS==========================
+
   { TXQueryEngine }
 
 
@@ -1660,6 +1699,7 @@ type
   //**Compares two values generically (=,!=,...) and returns if the compare value \in [accept1,accept2]@br
   //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
   function xqvalueCompareGenericBase(a, b: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
+
 
 
 type
