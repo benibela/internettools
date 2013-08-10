@@ -61,6 +61,8 @@ operator >(const a: Int65; const b: Int65): boolean;
 operator =(const a: Int65; const b: Int65): boolean;
 operator <(const a: Int65; const b: Int65): boolean;
 
+const MAXINT65: Int65 = (sign: false; value: MaxUIntValue );
+      MININT65: Int65 = (sign: true; value: MaxUIntValue );
 implementation
 
 function truncToInt65(const v: Extended): Int65;
