@@ -12,7 +12,7 @@ uses
 
 var
   start: TDateTime;
-  testerrors: boolean;
+  testerrors: boolean = false;
 begin
   start := now;
   bbutils_tests.unitTests;

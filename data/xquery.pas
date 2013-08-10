@@ -2222,7 +2222,6 @@ function urlHexDecode(s: string): string;
 var
   p: Integer;
   i: Integer;
-  temp: String;
 begin
   SetLength(result, length(s));
   p := 1;
@@ -2820,7 +2819,6 @@ end;
 
 function TXQEvaluationContext.getVariable(const name: string; const ns: INamespace): IXQValue;
 var
-  sc: TXQStaticContext;
   found: boolean;
 begin
   found := hasVariable(name, result, ns);
@@ -3480,9 +3478,6 @@ end;
 { TXQVariableStorage }
 
 procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const namespace: INamespace = nil);
-var
- base: String;
- i: Integer;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
 
@@ -3802,9 +3797,7 @@ begin
 end;
 
 function TXQVariableChangeLog.hasVariable(const variable: string; value: PXQValue; const namespace: INamespace): boolean;
-var temp: txqvalue;
-  base: string;
-  varname: string;
+var
   i: Integer;
 begin
   {if allowPropertyDotNotation then begin

@@ -314,6 +314,7 @@ end;
 
 function xqvalueConcat(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  ignore(cxt);
   result := xqvalue(a.toString + b.toString);
 end;
 
@@ -502,7 +503,7 @@ begin
     result := xqvalue;
 end;
 
-procedure xqvalueCompareAtomic(a, b: IXQValue; var result: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimeZone: TDateTime);
+procedure xqvalueCompareAtomic(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimeZone: TDateTime);
 var
  compres: Integer;
 begin
@@ -515,18 +516,22 @@ end;
 
 function xqvalueLessThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareAtomic(a,b,result,-1,9999,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 function xqvalueGreaterThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareAtomic(a,b,result,1,9999,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 function xqvalueLessEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareAtomic(a,b,result,-1,0,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 function xqvalueGreaterEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareAtomic(a,b,result,1,0,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
 end;
 
@@ -573,33 +578,39 @@ begin
   result := xqvalueCompareGenericBase(a as TXQValue,b as TXQValue,accept1,accept2,collation,implicitTimezone);
 end;
 
-procedure xqvalueCompareGeneric(const cxt: TXQEvaluationContext; a, b: IXQValue; var result: IXQValue; accept1: integer; accept2: integer = 9999);
+procedure xqvalueCompareGeneric(const cxt: TXQEvaluationContext; a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
 begin
   result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone));
 end;
 
 function xqvalueEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareGeneric(cxt,a,b,result,0);
 end;
 function xqvalueUnequalGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareGeneric(cxt,a,b,result,-1,1);
 end;
 function xqvalueLessThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareGeneric(cxt,a,b,result,-1);
 end;
 function xqvalueGreaterThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareGeneric(cxt,a,b,result,1);
 end;
 function xqvalueLessEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareGeneric(cxt,a,b,result,-1,0);
 end;
 function xqvalueGreaterEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  result := nil;
   xqvalueCompareGeneric(cxt,a,b,result,1,0);
 end;
 
@@ -1215,9 +1226,6 @@ var replaceNames, replaceValues: TStringArray;
     end;
 
 var v: IXQValue;
-  temp: IXQValue;
-  tempobj: TXQValueObject;
-  i: Integer;
 begin
   requiredArgCount(args, 1, 2);
 
@@ -1246,7 +1254,7 @@ var names, values: array of TStringArray;
 begin
   requiredArgCount(args, 1, 2);
   setlength(names, 2); setlength(values, 2);
-  cmp := @context.staticContext.nodeCollation.equal;
+  cmp := @context.staticContext.nodeCollation.equal; ignore(context);
   urlEncodingFromValue(args[0], cmp, names[0], values[0]);
   urlEncodingFromValue(args[1], cmp, names[1], values[1]);
   setlength(used, 2);
@@ -2461,10 +2469,6 @@ begin
 end;
 
 function xqFunctionDeep_equal(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-//contract: always return TXQValueBoolean
-var i:integer;
-    collation: TXQCollation;
-    enum1, enum2: TXQValueEnumerator;
 begin
   requiredArgCount(args,2, 3);
   if length(args) = 3 then

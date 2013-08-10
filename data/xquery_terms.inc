@@ -978,7 +978,7 @@ end;
 
 function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
   function evaluateSimpleMap: IXQValue;
-  var v: IXQValue;
+  var
     tempContext: TXQEvaluationContext;
     seq: IXQValue;
   begin
@@ -1345,7 +1345,6 @@ end;
 function TXQTermSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   v: IXQValue;
-  start: integer;
   i, j: Integer;
   operand: IXQValue;
 begin

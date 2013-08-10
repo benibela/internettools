@@ -1526,7 +1526,6 @@ end;
 
 function TXQValueObject.setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
 var
-  i: Integer;
   oldValue: TXQValue;
 begin
   if startIndex = high(properties) then
@@ -1565,8 +1564,7 @@ end;
 
 function TXQValueObject.hasProperty(const name: string; value: PXQValue): boolean;
 var
-  i, point: Integer;
-  part: String;
+  i: Integer;
 begin
   i := values.indexOf(name);
   if i >= 0 then begin
