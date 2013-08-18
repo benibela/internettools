@@ -3339,6 +3339,10 @@ begin
     t('"abc: def" castable as xs:Name', 'false');
     t('"  abc:def   " castable as xs:Name', 'true');
     t('"0:def" castable as xs:Name', 'false');
+
+    t('string-join("a b c d" cast as xs:ENTITIES, "|")', 'a|b|c|d');
+    t('string-join("a b c d" cast as xs:IDREFS, "|")', 'a|b|c|d');
+    t('string-join("a b c d" cast as xs:NMTOKENS, "|")', 'a|b|c|d');
   end;
   ps.StaticContext.strictTypeChecking:=false;
 

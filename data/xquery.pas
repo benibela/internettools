@@ -874,19 +874,26 @@ type
   protected
     procedure addConstrainingFacet(f: TXSConstrainingFacet);
   end;
-  TXSListType = class(TXSSimpleType)
-    subTypes: array of TXSType; //atomic types
-  end;
 
   { TXSUnionType }
 
   TXSUnionType = class(TXSSimpleType)
-    members: array of TXSType; //atomic types
-    constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSType);
+    members: array of TXSSimpleType; //atomic types
+    constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSSimpleType);
     function containsTransitive(t: TXSType): boolean;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): boolean; override;
     function tryCreateValueInternal(const v: String; outv: PXQValue=nil): boolean; override;
   end;
+
+  { TXSListType }
+
+  TXSListType = class(TXSSimpleType)
+    itemType: TXSSimpleType;
+    constructor Create(aname: string; aparent: TXSType; aitemType: TXSSimpleType);
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): boolean; override;
+    function tryCreateValueInternal(const v: String; outv: PXQValue=nil): boolean; override;
+  end;
+
 
 
   { TXSIntegerType }
@@ -956,8 +963,8 @@ type
     string_, anyURI, QName, base64Binary, boolean, date, time, dateTime, duration, gDay, gMonth, gMonthDay, gYear, gYearMonth, hexBinary, NOTATION: TXSSimpleType;
 
     nonPositiveInteger, negativeInteger, nonNegativeInteger, positiveInteger, long, int, short, Byte, unsignedLong, unsignedInt, unsignedShort, unsignedByte: TXSSimpleType;
-    normalizedString, token, language, NMTOKEN, NMTOKENS, Name, NCName, ID, IDREF, IDREFS, ENTITY, ENTITIES: TXSType;
-    yearMonthDuration, dayTimeDuration, dateTimeStamp: TXSType;
+    normalizedString, token, language, NMTOKEN, NMTOKENS, Name, NCName, ID, IDREF, IDREFS, ENTITY, ENTITIES: TXSSimpleType;
+    yearMonthDuration, dayTimeDuration, dateTimeStamp: TXSSimpleType;
 
     //XQuery additions
     untyped: TXSType;
