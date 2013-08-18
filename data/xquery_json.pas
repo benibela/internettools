@@ -116,7 +116,7 @@ var
 
   procedure raiseError(message: string);
   begin
-    raise EXQEvaluationException.create('jerr:JNDY002', message+' at ' + scanner.CurTokenString + ' in '+scanner.CurLine);
+    raise EXQEvaluationException.create('jerr:JNDY0021', message+' at ' + scanner.CurTokenString + ' in '+scanner.CurLine);
   end;
 
   function parse(repeatCurToken: boolean = false): IXQValue;
@@ -191,8 +191,8 @@ var
       tkNull: result := TXQValueJSONNull.create;
       tkCurlyBraceOpen: result := parseObject;
       tkSquaredBraceOpen: result := parseArray;
-      tkComma, tkColon, tkCurlyBraceClose, tkSquaredBraceClose, tkIdentifier, tkUnknown: raise EXQEvaluationException.create('jerr:JNDY002', 'JSON parsing failed at: '+scanner.CurLine);
-      else raise EXQEvaluationException.create('jerr:JNDY002', 'JSON parsing failed (unrecognized token) at: '+scanner.CurLine);
+      tkComma, tkColon, tkCurlyBraceClose, tkSquaredBraceClose, tkIdentifier, tkUnknown: raise EXQEvaluationException.create('jerr:JNDY0021', 'JSON parsing failed at: '+scanner.CurLine);
+      else raise EXQEvaluationException.create('jerr:JNDY0021', 'JSON parsing failed (unrecognized token) at: '+scanner.CurLine);
     end;
   end;
 

@@ -2245,6 +2245,12 @@ begin
   if strBeginsWith(aerrcode, 'pxp:') then begin
     delete(aerrcode, 1, 4);
     namespace := TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
+  end else if strBeginsWith(aerrcode, 'err:') then begin
+    delete(aerrcode, 1, 4);
+    namespace := TNamespace.create(XMLNamespaceURL_XQTErrors, 'err');
+  end else if strBeginsWith(aerrcode, 'jerr:') then begin
+    delete(aerrcode, 1, 5);
+    namespace := TNamespace.create('http://jsoniq.org/errors', 'jerr');
   end else if anamespace = nil then namespace := TNamespace.create(XMLNamespaceURL_XQTErrors, 'err')
   else namespace := anamespace;
   errorCode:=aerrcode;

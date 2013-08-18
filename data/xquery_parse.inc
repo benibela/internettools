@@ -828,7 +828,7 @@ begin
       result := TXQTermDynamicFunctionCall.create(result, parseValue());
       if result.children[1] is TXQTermNodeMatcher then begin
         result.free;
-        raiseParsingError('pxp:XPTS0003', 'A node matching step is not allowed directly after a property dot operator');
+        raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
       end;
     end;
   end;
@@ -932,7 +932,7 @@ begin
   else begin
     strsymb := pos^;
     pos+=1;
-    if not (strsymb in ['''', '"']) then raiseParsingError('pxp:XPTS0003ext', 'Expected string start');
+    if not (strsymb in ['''', '"']) then raiseParsingError('pxp:XPST0003', 'Expected string start');
   end;
   mark := pos;
   try
@@ -945,7 +945,7 @@ begin
         mark := pos;
         pos+=1;
       end else case pos^ of
-        '}': raiseParsingError('pxp:XPTS0003ext',  'Single closing } not allowed in extended strings (use }})');
+        '}': raiseParsingError('pxp:XPST0003',  'Single closing } not allowed in extended strings (use }})');
         '{': begin
           pos+=1;
           pushTerm(parsePrimaryLevel);
@@ -1090,7 +1090,7 @@ begin
 
 
     else if (word = 'x') and (pos^ in ['"', '''']) then begin
-      if not AllowExtendedStrings then raiseParsingError('pxp:XPTS0003ext', 'Extended string syntax was disabled');
+      if not AllowExtendedStrings then raiseParsingError('err:XPST0003', 'Extended string syntax was disabled');
       exit(parseXString());
     end else begin
       wordlookahead := nextToken(true);
@@ -1279,7 +1279,7 @@ var astroot: TXQTerm;
          if (word = '') or (strEndsWith(word, '.')) then begin
            replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseValue);
            if replace^.children[1] is TXQTermNodeMatcher then
-             raiseParsingError('pxp:XPTS0003', 'A node matching step is not allowed directly after a property dot operator');
+             raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
          end;
      end else begin
        raiseParsingError('XPST0003', 'Unexpected .');

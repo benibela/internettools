@@ -56,21 +56,22 @@ var
     end end;
   end;
 
-  procedure f(a: string; c: string = '');
+  procedure f(a, code: string; c: string = '');
    var
-     err: Boolean;
+     err: string;
    begin
      if not TestErrors then exit;
-     err := false;
+     err := '-';
      try
      performUnitTest(a,'<error>',c);
 
      except on e: EXQEvaluationException do begin
-       err := true;
+       err := e.namespace.getPrefix+':'+e.errorCode;
      end; on e: EXQParsingException do begin
-       err := true;
+       err := e.namespace.getPrefix+':'+e.errorCode;
      end end;
-     if not err then raise Exception.Create('No error => Test failed ');
+     if err = '' then raise Exception.Create('No error => Test failed ');
+     if err <> code then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
    end;
 
 //var  time: TDateTime;
@@ -118,16 +119,16 @@ begin
   t('x"{$$}"',                 '$',                             '');
   t('x">{$$}<"',               '>$<',                           '');
 
-  f('x">{$unknown}<"');
-  f('x"{$test}>{$unknown}<"');
-  f('x"{$test}{$unknown}{$abc}"');
+  f('x">{$unknown}<"', 'err:XPST0008');
+  f('x"{$test}>{$unknown}<"', 'err:XPST0008');
+  f('x"{$test}{$unknown}{$abc}"', 'err:XPST0008');
 
   // t('$abc;',                     'alphabet',                     '');
   t('$abc',                     'alphabet',                     '');
 
-  f('$ABC;');
-  f('$ABC');
-  f('x"{$ABC}"');
+  f('$ABC;', 'err:XPST0003');
+  f('$ABC', 'err:XPST0008');
+  f('x"{$ABC}"', 'err:XPST0008');
 
   t('concat(">",$abc,''<'')',  '>alphabet<',                     '');
   t('''$abc;''',                   '$abc;',                        ''); //no variable matching in '
@@ -153,8 +154,8 @@ begin
   t('x"{1+2}{3+4}{{5+6}}"', '37{5+6}');
   t('x"{{1+2}}{{3+4}}{{5+6}}"', '{1+2}{3+4}{5+6}');
   t('x"""{1+2}""{3+4}""{5+6}"""', '"3"7"11"');
-  f('x"1234+5+6}"'); //single } not allowed
-  f('x"123{4+5+6}}"');
+  f('x"1234+5+6}"', 'pxp:XPST0003'); //single } not allowed
+  f('x"123{4+5+6}}"', 'pxp:XPST0003');
   t('x"123{4+5+6}}}"', '12315}');
   t('x"123" + 100 + x"77000"', '77223');
 
@@ -164,8 +165,8 @@ begin
   t('x''{1+2}{3+4}{5+6}''', '3711');
   t('x''{{1+2}}{{3+4}}{{5+6}}''', '{1+2}{3+4}{5+6}');
   t('x''''''{1+2}''''{3+4}''''{5+6}''''''', '''3''7''11''');
-  f('x''1234+5+6}'''); //single } not allowed
-  f('x''123{4+5+6}}''');
+  f('x''1234+5+6}''', 'pxp:XPST0003'); //single } not allowed
+  f('x''123{4+5+6}}''', 'pxp:XPST0003');
   t('x''123{4+5+6}}}''', '12315}');
   t('x''123'' + 100 + x''77000''', '77223');
 
@@ -185,13 +186,13 @@ begin
   t('html/@attrib2',             'SECOND ATTRIBUTE',                 '');
   t('html/@attrib3',             'THIRD ATTRIBUTE',                  '');
   t('html/adv/text()',           '',                                 '');
-t('html/adv/table/deep-text('' '')','first col 2nd col',           ''); //additional spaces!
+  t('html/adv/table/deep-text('' '')','first col 2nd col',           ''); //additional spaces!
   t('html/adv/table/@id',        't1',                               '');
   t('html/adv/table/tr/td/text()', 'first col',                      '');
   t('html/adv/table/tr/td/comment()', 'cya',                         '');
   t('html/adv/table[@id=''t2'']/@id','t2',                           '');
   t('html/adv/table[@id=''t2'']/tr/td/@colspan','3',                 '');
-t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if this fails with OMG!! direct child also matches a direct grand child
+  t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if this fails with OMG!! direct child also matches a direct grand child
   t('html/adv/table[@id=''t2'']/tr/td/deep-text('' '')','OMG!!',     '');
   t('html/adv/table[@id=''t2'']/tr/td[@colspan!=''3'']/text()','',''); //not existing property != 3
 
@@ -578,12 +579,12 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('xs:int(xs:decimal("6.5"))', '6');
 
   //do not allow lower case
-  f('xs:int("6.5")');
+  f('xs:int("6.5")', 'err:FORG0001');
   t('"6" castable as xs:int', 'true', '');
   t('"6.5" castable as xs:int', 'false', '');
   t('xs:decimal("6.5") castable as xs:int', 'true', '');
 
-  f('xs:boolean("6.5")');
+  f('xs:boolean("6.5")', 'err:FORG0001');
   t('xs:boolean("1")', 'true');
   t('"1" castable as xs:boolean', 'true', '');
   t('"6" castable as xs:boolean', 'false', '');
@@ -591,10 +592,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('xs:decimal("6.5") castable as xs:boolean', 'true');
 
   t('xs:datetime("1900-01-01")', '1900-01-01T00:00:00', '');
-  f('xs:decimal(xs:datetime("1900-01-01"))'); // dynamic error [err:FORG0001]: "1900-01-01": value of type xs:string is not castable to type xs:dateTime |dateTime not castable as decimal
-  f('xs:decimal("")');
-  f('xs:decimal()');
-  f('xs:string()');
+  f('xs:decimal(xs:datetime("1900-01-01"))', 'err:FORG0001'); // todo dynamic error [err:FORG0001]: "1900-01-01": value of type xs:string is not castable to type xs:dateTime |dateTime not castable as decimal
+  f('xs:decimal("")', 'err:FORG0001');
+  f('xs:decimal()', 'err:XPST0017');
+  f('xs:string()', 'err:XPST0017');
 
 
   t('type-of(xs:decimal("6.5"))', 'decimal', '');
@@ -604,9 +605,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('type-of(xs:integer("6"))', 'integer', '');
   t('type-of(xs:boolean("1"))', 'boolean', '');
   t('type-of(xs:datetime("1800-01-01"))', 'dateTime', '');
-  f('xs:decimal("INF")');
-  f('xs:decimal("-INF")');
-  f('xs:decimal("NaN")');
+  f('xs:decimal("INF")', 'err:FORG0001');
+  f('xs:decimal("-INF")', 'err:FORG0001');
+  f('xs:decimal("NaN")', 'err:FORG0001');
   t('xs:double("INF")', 'INF', '');
   t('xs:double("-INF")', '-INF', '');
   t('xs:double("NaN")', 'NaN', '');
@@ -1424,7 +1425,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
                //Variable defining
   t('x := 123', '123', '');
   t('$x', '123', '');
-  f('$X'); //fail test
+  f('$X', 'err:XPST0008'); //fail test
   t('X := 456', '456', '');
   t('$x', '123', '');
   t('$X', '456', '');
@@ -1600,19 +1601,19 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
    //t('xs:NOTATION(''abc'')', 'abc', '');
    //t('type-of(xs:NOTATION(''abc''))', 'NOTATION', '');
    t('xs:unsignedByte(255)', '255', '');
-   f('xs:unsignedByte(256)');
-   f('xs:unsignedByte(257)');
+   f('xs:unsignedByte(256)', 'err:FORG0001');
+   f('xs:unsignedByte(257)', 'err:FORG0001');
    t('255 castable as xs:unsignedByte', 'true', '');
    t('256 castable as xs:unsignedByte', 'false', '');
    t('xs:byte(127)', '127');
-   f('xs:byte(128)');
+   f('xs:byte(128)', 'err:FORG0001');
    t('xs:byte(-1)', '-1', '');
    t('xs:byte(-127)', '-127', '');
    t('xs:byte(-128)', '-128', '');
-   f('xs:byte(-129)');
-   f('xs:byte(-130)');
-   f('xs:unsignedByte(-1)');
-   f('xs:unsignedByte(-2)');
+   f('xs:byte(-129)', 'err:FORG0001');
+   f('xs:byte(-130)', 'err:FORG0001');
+   f('xs:unsignedByte(-1)', 'err:FORG0001');
+   f('xs:unsignedByte(-2)', 'err:FORG0001');
    t('type-of(xs:float(4.0))','float','');
    t('type-of(xs:double(4.0))','double','');
    t('type-of(xs:decimal(4.0))','decimal','');
@@ -1918,9 +1919,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('uri-decode("%20%41+")', ' A ');
   t('uri-decode(">%4d<")', '>M<');
   t('uri-decode("%4D")', 'M');
-  f('uri-decode("%")');
-  f('uri-decode("%A")'); //invalid input, ignore it
-  f('uri-decode("%XY")');
+  f('uri-decode("%")', 'pxp:uri');
+  f('uri-decode("%A")', 'pxp:uri'); //invalid input, ignore it
+  f('uri-decode("%XY")', 'pxp:uri');
   t('uri-encode(" A ")', '%20A%20');
 
   t('uri-combine("a=1&b=2", "a=17&c=13")', 'a=17&b=2&c=13');
@@ -2084,8 +2085,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$x.foo', 'bar');
   t('$x. (foo)', 'strange'); //beware! the strangeness of dot space
   t('$x . (foo)', 'strange');
-  f('$x. foo');
-  f('$x . foo');
+  f('$x. foo', 'pxp:XPST0003');
+  f('$x . foo', 'pxp:XPST0003');
   t('$x .foo', 'bar');
 
   t('serialize-json({$indirect: $x.$indirect})', '{"foo": "bar"}');
@@ -2191,9 +2192,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('$a.b.c := 456', '456');
   t('$a', '123');
   t('$a.b.c', '456');
-  f('$a.b');
+  f('$a.b', 'err:XPST0008');
   t('$a := {"b": 17}', '');
-  f('$a.b');
+  f('$a.b', 'err:XPST0008');
   t('$a("b")', '17');
 
   ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
@@ -2232,7 +2233,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
     t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {})[1].hallo', 'world');
     t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
-    f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo');
+    f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo', 'jerr:JNDY0021');
     t('jn:parse-json(())', '');
 
     t('[4,5,6](0)', '');
@@ -2318,7 +2319,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('serialize-json([1 to 3, 4 to 6])', '[1, 2, 3, 4, 5, 6]');
     t('serialize-json([[1 to 3], [4 to 6]])', '[[1, 2, 3], [4, 5, 6]]');
 
-    f('serialize-json(jn:object(({"a": 1}, {"b": 2}, {"a": 3})))');
+    f('serialize-json(jn:object(({"a": 1}, {"b": 2}, {"a": 3})))', 'jerr:JNDY0003');
 
     //Tests based on examples in the JSONiq spec
     t('if (jn:null()) then "T" else "F"', 'F');
@@ -2333,13 +2334,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
     t('if (()) then "T" else "F"', 'F');
 
     t('() + 1', '');
-    f('null + 1');
+    f('null + 1', 'err:XPTY0004');
     t('1 + ()', '');
-    f('1 + null');
-    f('null - 1');
-    f('null * 1');
-    f('null div 1');
-    f('null idiv 1');
+    f('1 + null', 'err:XPTY0004');
+    f('null - 1', 'err:XPTY0004');
+    f('null * 1', 'err:XPTY0004');
+    f('null div 1', 'err:XPTY0004');
+    f('null idiv 1', 'err:XPTY0004');
 
     t('() eq 1', '');
     t('null eq 1', 'false');
@@ -3406,13 +3407,13 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
 
   performUnitTest('$abc','alphabet','');
-  f('$ABC');
+  f('$ABC', 'err:XPST0008');
   ps.VariableChangelog.caseSensitive:=false;
   performUnitTest('$abc','alphabet','');
   performUnitTest('$ABC','alphabet','');
   ps.VariableChangelog.caseSensitive:=true;
   performUnitTest('$abc','alphabet','');
-  f('$ABC');
+  f('$ABC', 'err:XPST0008');
 
 
   xml.parseTree('<?xml encoding="utf-8"?><html/>'); if xml.getLastTree.getEncoding <> eUTF8 then raise Exception.Create('xml encoding detection failed 1');
@@ -3512,9 +3513,9 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
 
   //XQuery/XPath 3 syntax tests which must fail in the old version
-  f('"a" || "b"');
-  f('(1,2) ! 7');
-  f('switch (10) case 10 return "a" case 20 return "b" default return "c"');
+  f('"a" || "b"', 'err:XPST0003');
+  f('(1,2) ! 7', 'err:XPST0003');
+  f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
 
 
   writeln('XPath 2: ', i, ' completed');

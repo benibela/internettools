@@ -64,23 +64,23 @@ var
     end end;
   end;
 
-  procedure f(a: string; c: string = '');
-  var
-    err: Boolean;
-  begin
-    if not TestErrors then exit;
-    err := false;
-    try
-    count+=1;
-    performUnitTest(a,'',c);
+  procedure f(a, code: string; c: string = '');
+   var
+     err: string;
+   begin
+     if not TestErrors then exit;
+     err := '-';
+     try
+     performUnitTest(a,'<error>',c);
 
-    except on e: EXQEvaluationException do begin
-      err := true;
-    end; on e: EXQParsingException do begin
-      err := true;
-    end end;
-    if not err then raise Exception.Create('No error => Test failed ');
-  end;
+     except on e: EXQEvaluationException do begin
+       err := e.namespace.getPrefix+':'+e.errorCode;
+     end; on e: EXQParsingException do begin
+       err := e.namespace.getPrefix+':'+e.errorCode;
+     end end;
+     if err = '' then raise Exception.Create('No error => Test failed ');
+     if err <> code then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
+   end;
 
 
 
@@ -619,7 +619,7 @@ begin
   m('import module namespace rename = "pseudo://test-module"; $rename:var', '123');
   m('import module namespace rename = "pseudo://test-module"; rename:func()', '456');
   m('import module namespace rename = "pseudo://test-module"; rename:internalref()', '123:456');
-  f('import module namespace rename = "pseudo://test-module"; $test:var');
+  f('import module namespace rename = "pseudo://test-module"; $test:var', 'err:XPST0008');
 
   mr('module namespace test2 = "pseudo://test-module2"; import module "pseudo://test-module"; declare function test2:sumcalc($param){ concat("SUM: ", sum($param)) } declare function test2:wrapwrap() { test:internalref() } ');
   m('import module "pseudo://test-module2"; test2:sumcalc((1,2,3))', 'SUM: 6');
@@ -658,8 +658,8 @@ begin
   m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'true');
   m('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,3) satisfies $xsy:abc mod 2 = 0', 'false');
 
-  f('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $abc mod 2 = 0');
-  f('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $abc in (1,2,3) satisfies $xsy:abc mod 2 = 0');
+  f('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $foobar:abc in (1,2,3) satisfies $abc mod 2 = 0', 'err:XPST0008');
+  f('declare namespace xsy = "abc"; declare namespace foobar = "abc"; some $abc in (1,2,3) satisfies $xsy:abc mod 2 = 0', 'err:XPST0008');
 
   m('declare default collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; "abc" eq "ABC"', 'true');
   m('declare default collation "http://www.benibela.de/2012/pxp/case-sensitive-clever"; "abc" eq "ABC"', 'false');
@@ -684,8 +684,8 @@ begin
   m('declare option pxp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first second');
   m('declare option pxp:default-node-collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'second');
   m('declare option pxp:extended-strings "on"; declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
-  f('declare option pxp:extended-strings "off"; declare variable $foobar := 123; x"var is {$foobar}."');
-  f('declare option pxp:extended-strings "on"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."');
+  f('declare option pxp:extended-strings "off"; declare variable $foobar := 123; x"var is {$foobar}."', 'err:XPST0003');
+  f('declare option pxp:extended-strings "on"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'err:XPST0003');
   m('declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
   m('xquery version "1.0"; declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
 
@@ -1592,7 +1592,7 @@ begin
   m('"1" + 2', '3');
   ps.StaticContext.strictTypeChecking:=true;
   m('string-join(("1", "2", "3"), " ")', '1 2 3');
-  f('string-join(1 to 3, " ")', '');
+  f('string-join(1 to 3, " ")', 'err:XPTY0004');
   m('"17" instance of xs:anyAtomicType', 'true');
   //f('text {"17"} castable as xs:anyAtomicType'); //would work, but that type is not castable-to
   m('number("17")', '17');
@@ -1602,25 +1602,25 @@ begin
   m('string-to-codepoints(processing-instruction XYZ {"A"})', '65');
   t('collection()', '');
   m('123 castable as xs:integer', 'true');
-  f('456 castable as xs:integer+');
+  f('456 castable as xs:integer+', 'err:XPST0003');
   m('<e/>[1]/text{string-join(., " ")}', '');
   m('count(<a>X</a> union <b>Y</b>)', '2');
-  f('"1" + 2');
+  f('"1" + 2', 'err:XPTY0004');
   m('1 + 2', '3');
   m('untypedAtomic("1") + 2', '3');
-  f('untypedAtomic("1a") + 2');
+  f('untypedAtomic("1a") + 2', 'err:XPTY0004');
   m('text {"1"} + 2', '3');
-  f('comment {"1"} + 2');
+  f('comment {"1"} + 2', 'err:XPTY0004');
   m('- 2', '-2');
-  f('- "2"');
+  f('- "2"', 'err:XPTY0004');
   m('- xs:untypedAtomic("2")', '-2');
 
   m('1 eq 2', 'false');
   m('1 eq 1.0', 'true');
-  f('"1" eq 2');
+  f('"1" eq 2', 'err:XPTY0004');
   m('true() eq true()', 'true');
   m('untypedAtomic("2") eq "2"', 'true');
-  f('untypedAtomic("2") eq 2');
+  f('untypedAtomic("2") eq 2', 'err:XPTY0004');
   m('untypedAtomic("2") = "2"', 'true');
   {f('"1" = 2');
   f('(1, 2, 3) = 2');} //TODO
@@ -1638,11 +1638,11 @@ begin
   m('() + ()', '');
   m('() - ()', '');
   m('declare function local:test(){0}; local:test()', '0');
-  f('declare function fn:test(){0}; fn:test()'     );
-  f('declare namespace fntricky = "http://www.w3.org/2005/xpath-functions"; declare function fntricky:test(){0}; fntricky:test()'     );
-  f('declare function xs:test(){0}; xs:test()'     );
-  f('declare function xml:test(){0}; xml:test()'     );
-  f('declare function xsi:test(){0}; xsi:test()'     );
+  f('declare function fn:test(){0}; fn:test()'   , 'err:XQST0045'  );
+  f('declare namespace fntricky = "http://www.w3.org/2005/xpath-functions"; declare function fntricky:test(){0}; fntricky:test()'    , 'err:XQST0045' );
+  f('declare function xs:test(){0}; xs:test()'    , 'err:XQST0045' );
+  f('declare function xml:test(){0}; xml:test()'  , 'err:XQST0045'  );
+  f('declare function xsi:test(){0}; xsi:test()'  , 'err:XQST0045' );
 
 
 
@@ -1652,9 +1652,9 @@ begin
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg3:* return local-name($i)', 'c');
 
   m('declare option pxp:extended-strings "on"; let $a := 17 return x">{$a}<" ', '>17<');
-  f('declare option pxp:extended-strings "off"; let $a := 17 return x">{$a}<" ');
-  f('declare option pxp:extended-strings "off"; for $a in (1, 2, 3, 4) where $a = $a return x">{$a}<" ');
-  f('declare option pxp:extended-strings "off"; for $a in (1, 2, 3, 4) where $a = $a order by x"{$a}" return x">{$a}<" ');
+  f('declare option pxp:extended-strings "off"; let $a := 17 return x">{$a}<" ', 'err:XPST0003');
+  f('declare option pxp:extended-strings "off"; for $a in (1, 2, 3, 4) where $a = $a return x">{$a}<" ', 'err:XPST0003');
+  f('declare option pxp:extended-strings "off"; for $a in (1, 2, 3, 4) where $a = $a order by x"{$a}" return x">{$a}<" ', 'err:XPST0003');
   m('declare option pxp:strict-type-checking "off"; "1" + 2 ', '3');
   //m('declare option pxp:strict-type-checking "on"; "1" + 2 ', '<fail>');
   m('declare option pxp:use-local-namespaces "on";  <r><a:b xmlns:a="xxx">!</a:b></r> / a:b ', '!');
@@ -1775,8 +1775,8 @@ begin
 
 
   //XQuery/XPath 3 syntax tests which must fail in the old version
-  f('"a" || "b"');
-  f('switch (10) case 10 return "a" case 20 return "b" default return "c"');
+  f('"a" || "b"', 'err:XPST0003');
+  f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
 
   writeln('XQuery: ', count, ' completed');
 
