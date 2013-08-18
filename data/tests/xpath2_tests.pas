@@ -77,6 +77,7 @@ var
 //var  time: TDateTime;
 var tempb: Boolean;
   tt: String;
+  j: Integer;
 begin
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
@@ -592,8 +593,8 @@ begin
   t('"6.5" castable as xs:boolean', 'false', '');
   t('xs:decimal("6.5") castable as xs:boolean', 'true');
 
-  t('xs:datetime("1900-01-01")', '1900-01-01T00:00:00', '');
-  f('xs:decimal(xs:datetime("1900-01-01"))', 'err:FORG0001'); // todo dynamic error [err:FORG0001]: "1900-01-01": value of type xs:string is not castable to type xs:dateTime |dateTime not castable as decimal
+  t('xs:date("1900-01-01")', '1900-01-01', '');
+  f('xs:decimal(xs:date("1900-01-01"))', 'err:FORG0001'); // todo dynamic error [err:FORG0001]: "1900-01-01": value of type xs:string is not castable to type xs:dateTime |dateTime not castable as decimal
   f('xs:decimal("")', 'err:FORG0001');
   f('xs:decimal()', 'err:XPST0017');
   f('xs:string()', 'err:XPST0017');
@@ -605,7 +606,7 @@ begin
   t('type-of(xs:int("6"))', 'int', '');
   t('type-of(xs:integer("6"))', 'integer', '');
   t('type-of(xs:boolean("1"))', 'boolean', '');
-  t('type-of(xs:datetime("1800-01-01"))', 'dateTime', '');
+  t('type-of(xs:date("1800-01-01"))', 'date', '');
   f('xs:decimal("INF")', 'err:FORG0001');
   f('xs:decimal("-INF")', 'err:FORG0001');
   f('xs:decimal("NaN")', 'err:FORG0001');
@@ -1713,6 +1714,7 @@ begin
    t('xs:datetime("2012-02-01T14:15:16") castable as time','true','');
    t('xs:datetime("1234-12-12T01:01:01") castable as time','true','');
    t('xs:datetime("6543-12-12T08:08:08") castable as date','true','');
+   t('xs:datetime("65436-12-12T08:08:08") castable as date','true','');
    t('xs:date("1650-04-12") castable as time','false','');
    t('xs:time("12:00:00") castable as date','false','');
    t('xs:time("12:12:59") castable as untypedAtomic','true','');
@@ -2454,7 +2456,7 @@ begin
                //,('QName("abc", "def")', 'abc', '')
   t('','','');
   t('xs:gMonth("--12") castable as decimal', 'false', '');
-  t('xs:dateTime("2030-12-05") castable as decimal', 'false', '');
+  t('xs:dateTime("2030-12-05T01:01:01") castable as decimal', 'false', '');
   t('(0.0 div 0e1)', 'NaN', '');
   t('type-of((0.0 div 0e0))', 'double');
   t('(0.0 div 0e0) castable as xs:integer', 'false', '');
@@ -2467,8 +2469,8 @@ begin
   t('xs:hexBinary("616263") castable as xs:boolean', 'false', '');
   t('xs:hexBinary("616263") castable as xs:decimal', 'false', '');
   t('true() castable as xs:decimal', 'true', '');
-  t('xs:dateTime("2012-12-12") castable as xs:decimal', 'false', '');
-  t('xs:dateTime("2012-12-12") castable as xs:gMonth', 'true', '');
+  t('xs:dateTime("2012-12-12T00:00:00") castable as xs:decimal', 'false', '');
+  t('xs:dateTime("2012-12-12T00:00:00") castable as xs:gMonth', 'true', '');
   t('xs:gMonth("--12") castable as xs:dateTime', 'false', '');
   t('xs:gMonthDay("--12-05") castable as xs:gMonth', 'false', '');
   t('xs:gMonth("--12") castable as xs:gMonthDay', 'false', '');
@@ -2550,7 +2552,7 @@ begin
   t('xs:float("5") mod xs:float("-INF")', '5', '');
   t('xs:gYearMonth("2005-02Z")', '2005-02Z', '');
   t('xs:gYearMonth("2005-02Z") = xs:gYearMonth("2005-02Z")', 'true', '');
-  t('seconds-from-dateTime(xs:dateTime("18:23:45.123"))', '45.123', '');
+  t('seconds-from-dateTime(xs:dateTime("2000-01-01T18:23:45.123"))', '45.123', '');
   t('xs:dateTime("-0001-12-31T24:00:00")', '0001-01-01T00:00:00', '');
   t('xs:float(1.01)', '1.01', '');
   t('fn:compare("abc", "abc")', '0', '');
@@ -3266,8 +3268,8 @@ begin
     t('(0e1 div 0  )', 'NaN');
     t('(0e1 div 0.0)', 'NaN');
 
-    for i := 0 to 1 do begin
-      if i = 0 then tt := 'xs:string' else tt := 'xs:untypedAtomic';
+    for j := 0 to 1 do begin
+      if j = 0 then tt := 'xs:string' else tt := 'xs:untypedAtomic';
       t('xs:NCName("Foobar") cast as ' + tt, 'Foobar');
       t('xs:anyURI("http://www.example.org/äöü !") cast as ' + tt, 'http://www.example.org/äöü !');
       t('xs:QName("xml:foo") cast as ' + tt, 'xml:foo');
@@ -3300,8 +3302,23 @@ begin
       t('xs:decimal(-10000000) cast as ' + tt, '-10000000');
       t('xs:double(-10000000) cast as ' + tt, '-1.0E7');
       t('xs:float(-10000000) cast as ' + tt, '-1.0E7');
+
+      t('xs:dateTime("2000-02-03T01:02:03") cast as ' + tt, '2000-02-03T01:02:03');
+      t('xs:date(xs:dateTime("2000-02-03T01:02:03")) cast as ' + tt, '2000-02-03');
+      t('xs:time(xs:dateTime("2000-02-03T01:02:03")) cast as ' + tt, '01:02:03');
     end;
 
+    t('xs:dateTime("2000-02-03T24:00:00")', '2000-02-04T00:00:00');
+    t('"2000-02-03" castable as xs:dateTime', 'false');
+    t('"24:01:00"   castable as xs:dateTime', 'false');
+    t('"2000-02-03T24:01:00"   castable as xs:dateTime', 'false');
+    t('"20000-02-03T20:01:00"  castable as xs:dateTime', 'true');
+    t('"200-02-03T20:01:00"    castable as xs:dateTime', 'false');
+    t('"2000-13-03T20:01:00"   castable as xs:dateTime', 'false');
+    t('"2000-02-03T20:70:00"   castable as xs:dateTime', 'false');
+    t('"2000-02-03T20:00:-10"  castable as xs:dateTime', 'false');
+    t('"20:00:10"              castable as xs:time', 'true');
+    t('"20:00:70"              castable as xs:time', 'false');
   end;
   ps.StaticContext.strictTypeChecking:=false;
 
