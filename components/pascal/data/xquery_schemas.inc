@@ -714,10 +714,21 @@ begin
   result.constrainingFacets[1] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueInt65.create(parent, minValue));
 end;
 
-function restrictedStringType(name: string; parent: TXSType): TXSSimpleType;
+function restrictedStringType(name: string; parent: TXSType; pattern: string = ''): TXSSimpleType;
 begin
-  result := TXSSimpleType.Create(name, parent);
+  if pattern = '' then result := TXSSimpleType.Create(name, parent)
+  else result := TXSStringType.Create(name, parent, TXSStringType(parent).subType, pattern);
 end;
+
+//todo: fix this (see http://www.w3.org/TR/REC-xml/#NT-Letter). Problem, our regex engine is not unicode compatible
+const RegExpr_XMLLetter = '[A-Za-z]';
+const RegExpr_XMLNCNameChar = '[^:'#1'-'#32']';
+const RegExpr_XMLNameChar = '(('+RegExpr_XMLNCNameChar+')|:)';
+const RegExpr_XMLNameRaw = '('+RegExpr_XMLLetter+'|[_:])('+RegExpr_XMLNameChar+')*';
+const RegExpr_XMLName = '^'+RegExpr_XMLNameRaw+'$';
+const RegExpr_XMLNCNameRaw = '('+RegExpr_XMLLetter+'|_)('+RegExpr_XMLNCNameChar+')*'; //name without :
+const RegExpr_XMLNCName = '^'+RegExpr_XMLNCNameRaw+'$'; //name without :
+const RegExpr_language = '^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$';
 
 constructor TXSSchema.Create;
 
@@ -788,12 +799,14 @@ begin
             Byte  := restrictedIntegerType('byte', Short, -128, 127);
 
   //--string like--
-  normalizedString := restrictedStringType('normalizedString', string_); normalizedString.whiteSpaceFacet:=xsfwReplace;
-    token := restrictedStringType('token', normalizedString); token.whiteSpaceFacet:=xsfwCollapse;
-      language := restrictedStringType('language', token);
-      NMTOKEN := restrictedStringType('NMTOKEN', token);
-      Name := restrictedStringType('Name', token);
-        NCName := restrictedStringType('NCName', name);
+  normalizedString := restrictedStringType('normalizedString', string_);
+  normalizedString.whiteSpaceFacet:=xsfwReplace;
+    token := restrictedStringType('token', normalizedString);
+    token.whiteSpaceFacet:=xsfwCollapse;
+      language := restrictedStringType('language', token, RegExpr_language);
+      NMTOKEN := restrictedStringType('NMTOKEN', token, '^('+RegExpr_XMLNameChar+')+$');
+      Name := restrictedStringType('Name', token, RegExpr_XMLName);
+        NCName := restrictedStringType('NCName', name, RegExpr_XMLNCName);
           ID := restrictedStringType('ID', NCName);
           IDREF := restrictedStringType('IDREF', NCName);
           ENTITY := restrictedStringType('ENTITY', NCName);
