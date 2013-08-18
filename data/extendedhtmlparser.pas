@@ -639,6 +639,12 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     end;
   end;
 
+  function isVariableName(t: TXQTerm): boolean;
+  begin
+    while ((t is TXQTermBinaryOp) and (TXQTermBinaryOp(t).op.name = '.')) or (t is TXQTermReadObjectProperty) do t := t.children[0];
+    result := t is TXQTermVariable;
+  end;
+
 var
   term: TXQTerm;
 begin
@@ -651,10 +657,10 @@ begin
   if templateType = tetCommandShortRead then begin
     source := parser.parseQuery(deepNodeText()); //todo: use correct encoding
     term := source.Term;
-    if term is TXQTermVariable then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.'))
+    if isVariableName(term) then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.'))
     else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
             and (source.term.children[0] is TXQTermReadAttribute) and (source.Term.children[1] is TXQTermSequence)
-            and (length(source.term.children[1].children) = 1) and (source.term.children[1].children[0] is TXQTermVariable) then begin
+            and (length(source.term.children[1].children) = 1) and isVariableName(source.term.children[1].children[0]) then begin
       //replace    @foobar / ( $xyz ) by $xyz := @foobar
       source.term := TXQTermDefineVariable.create(Term.children[1].children[0],  Term.children[0]);
       //free terms

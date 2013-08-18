@@ -710,7 +710,7 @@ var i:longint;
       for j:=0 to sl.count-1 do
         if (extParser.variableChangeLog.getName(j)<>sl.Names[j]) or
            ((extParser.variableChangeLog.get(j).toString)<>StringReplace(StringReplace(sl.ValueFromIndex[j], '[[#13]]', #13, [rfReplaceAll]), '[[#10]]', #10, [rfReplaceAll])  )     then begin
-             errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+extParser.variableChangeLog.debugTextRepresentation+'" expected: "'+s+'"';
+             errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+extParser.variableChangeLog.get(j).toString+'" (btw. "'+extParser.variableChangeLog.debugTextRepresentation+'") expected: "'+s+'"';
              //errormsg:= StringReplace(errormsg, #13, '#13', [rfReplaceAll]);
              //errormsg:= StringReplace(errormsg, #10, '#10', [rfReplaceAll]);
              WriteLn(errormsg);
@@ -791,6 +791,7 @@ begin
   t('<a><b>{$foobar}</b></a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'foobar=12');
   t('<a><b>{$foobar}</b>*</a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'foobar=12'#10'foobar=34');
   t('<a><b>{$foobar}</b><b>{$abc}</b><c>{$xyz}</c></a>', '<a><b>12</b><b>34</b><c>56</c></a>', 'foobar=12'#10'abc=34'#10'xyz=56');
+  t('<a><b>{$foobar:={"a": "in"}}</b><b>{$foobar.xyz}</b><b>{res:=$foobar("xyz")}</b></a>', '<a><b>12</b><b>34</b><b></b></a>', 'foobar='#10'foobar='#10'res=34');
 
   t('<a x="{6+5}"/>', '<a x="7"/>', '_result=11');
   t('<a x="{.}"/>', '<a x="7"/>', '_result=7');
