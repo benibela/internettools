@@ -322,7 +322,7 @@ end;
 
 { TXSUnionType }
 
-constructor TXSUnionType.Create(aname: string; aparent: TXSType; astorage: TXQValueClass; amembers: array of TXSType);
+constructor TXSUnionType.Create(aname: string; aparent: TXSType; astorage: TXQValueClass; amembers: array of TXSSimpleType);
 var
   i: Integer;
 begin
@@ -330,6 +330,7 @@ begin
   SetLength(members, length(amembers));
   for i := 0 to high(members) do
     members[i] := amembers[i];
+  variety := xsvUnion;
 end;
 
 function TXSUnionType.containsTransitive(t: TXSType): boolean;
@@ -361,6 +362,52 @@ begin
     if members[i].tryCreateValue(v, outv) then exit(true);
 end;
 
+
+
+{ TXSListType }
+
+constructor TXSListType.Create(aname: string; aparent: TXSType; aitemType: TXSSimpleType);
+var
+  i: Integer;
+begin
+  inherited create(aname, aparent, TXQValueSequence);
+  itemType := aitemType;
+  whiteSpaceFacet:=xsfwCollapse;
+  case aitemType.variety of
+    xsvAtomic: ; //ok
+    xsvList: raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (nested list)');
+    xsvUnion: for i := 0 to high((aitemType as TXSUnionType).members) do
+      if TXSUnionType(aitemType).members[i].variety <> xsvAtomic then
+        raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong union member type for usage in list)')
+    else raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong list type)')
+  end;
+end;
+
+function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+begin
+  Result:=false;
+end;
+
+function TXSListType.tryCreateValueInternal(const v: String; outv: PXQValue): boolean;
+var
+  l: TStringArray;
+  temp: TXQValue;
+  ptemp: PXQValue;
+  i: Integer;
+begin
+  l := strSplit(v, ' ');
+  if outv <> nil then begin
+    outv^ := TXQValueSequence.create(length(l));
+    ptemp := @temp;
+  end else ptemp := nil;
+  result := true;
+  for i := 0 to high(l) do begin
+    result := result and itemType.tryCreateValue(l[i], ptemp);
+    if outv <> nil then TXQValueSequence(outv^).addChild(temp);
+    if not result then break;
+  end;
+  if (outv <> nil) and not result then FreeAndNil(outv^);
+end;
 
 
 { TXSIntegerType }
@@ -811,7 +858,10 @@ begin
           IDREF := restrictedStringType('IDREF', NCName);
           ENTITY := restrictedStringType('ENTITY', NCName);
 
-          //NMTOKENS, IDREFS, ENTITIES: TXSType;
+
+  NMTOKENS := TXSListType.Create('NMTOKENS', anySimpleType, NMTOKEN);
+  IDREFS := TXSListType.Create('IDREFS', anySimpleType, IDREF);
+  ENTITIES := TXSListType.Create('ENTITIES', anySimpleType, ENTITY);
 
   //--time like--
   yearMonthDuration := TXSDateTimeType.Create('yearMonthDuration', duration, '[-]P[Y+"Y"][m+M]$', xqdttTime);
