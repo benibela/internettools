@@ -928,10 +928,10 @@ begin
   if extParser.variables.ValuesString['abc']<>'maus' then raise Exception.Create('invalid var');
   extParser.parseTemplate('<a><template:read source="x" var="nodes"/><template:read source="string-join($nodes,'','')" var="joined"/><template:read source="type-of($nodes[1])" var="type"/></a>');
   extParser.parseHTML('<a>yyyy<x>A1</x><x>B2</x><x>C3</x><x>D4</x>xxxx</a>');
-  checklog('nodes=A1'#13'joined=A1,B2,C3,D4'#13'type=node');
+  checklog('nodes=A1'#13'joined=A1,B2,C3,D4'#13'type=node()');
   if extParser.variables.ValuesString['nodes']<>'A1' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['joined']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
-  if extParser.variables.ValuesString['type']<>'node' then raise Exception.Create('invalid var');
+  if extParser.variables.ValuesString['type']<>'node()' then raise Exception.Create('invalid var');
   extParser.parseTemplate('<a><template:read source="$nodes" var="oldnodes"/>'+
                              '<template:read source="$joined" var="oldjoined"/>'+
                              '<template:read source="string-join($nodes,'','')" var="newjoinedold"/>'+

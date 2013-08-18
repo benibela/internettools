@@ -568,22 +568,51 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('-  9223372036854775808', '-9223372036854775808', '');
 
                 //Constructors
+  t('"6.5" castable as xs:decimal', 'true', '');
   t('xs:decimal("6.5")', '6.5', '');
   t('xs:string("6.5")', '6.5', '');
   t('xs:string("MEMLEAK5")', 'MEMLEAK5', '');
-  t('xs:int("6.5")', '6', '');
-  t('xs:boolean("6.5")', 'true', '');
-  t('xs:decimal(xs:datetime("1900-01-01"))', '2', '');
+  t('xs:boolean("true")', 'true', '');
+  t('xs:decimal(())', '');
+  t('xs:integer(xs:decimal("6.5"))', '6');
+  t('xs:int(xs:decimal("6.5"))', '6');
+
+  //do not allow lower case
+  f('xs:int("6.5")');
+  t('"6" castable as xs:int', 'true', '');
+  t('"6.5" castable as xs:int', 'false', '');
+  t('xs:decimal("6.5") castable as xs:int', 'true', '');
+
+  f('xs:boolean("6.5")');
+  t('xs:boolean("1")', 'true');
+  t('"1" castable as xs:boolean', 'true', '');
+  t('"6" castable as xs:boolean', 'false', '');
+  t('"6.5" castable as xs:boolean', 'false', '');
+  t('xs:decimal("6.5") castable as xs:boolean', 'true');
+
+  t('xs:datetime("1900-01-01")', '1900-01-01T00:00:00', '');
+  f('xs:decimal(xs:datetime("1900-01-01"))'); // dynamic error [err:FORG0001]: "1900-01-01": value of type xs:string is not castable to type xs:dateTime |dateTime not castable as decimal
+  f('xs:decimal("")');
+  f('xs:decimal()');
+  f('xs:string()');
+
+
   t('type-of(xs:decimal("6.5"))', 'decimal', '');
   t('type-of(xs:string("6.5"))', 'string', '');
   t('type-of(xs:string("MEMLEAK6"))', 'string', '');
-  t('type-of(xs:int("6.5"))', 'int', '');
-  t('type-of(xs:integer("6.5"))', 'integer', '');
-  t('type-of(xs:boolean("6.5"))', 'boolean', '');
+  t('type-of(xs:int("6"))', 'int', '');
+  t('type-of(xs:integer("6"))', 'integer', '');
+  t('type-of(xs:boolean("1"))', 'boolean', '');
   t('type-of(xs:datetime("1800-01-01"))', 'dateTime', '');
-  t('xs:decimal("INF")', 'INF', '');
-  t('xs:decimal("-INF")', '-INF', '');
-  t('xs:decimal("NaN")', 'NaN', '');
+  f('xs:decimal("INF")');
+  f('xs:decimal("-INF")');
+  f('xs:decimal("NaN")');
+  t('xs:double("INF")', 'INF', '');
+  t('xs:double("-INF")', '-INF', '');
+  t('xs:double("NaN")', 'NaN', '');
+  t('xs:float("INF")', 'INF', '');
+  t('xs:float("-INF")', '-INF', '');
+  t('xs:float("NaN")', 'NaN', '');
 
                 //Functions
                  //Numbers
@@ -616,7 +645,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('exists(@xxxxunknown)', 'false', '');
   t('exists(())', 'false', '');
   t('exists(0)', 'true', '');
-  t('type-of(())', 'undefined', '');
+  t('type-of(())', 'untyped', '');
   t('type-of(0)', 'integer', '');
   t('type-of(0.0)', 'decimal', '');
   t('type-of("a")', 'string', '');
@@ -728,10 +757,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('not("true")', 'false', '');
   t('not("falses")', 'false', '');
                 //Dates
-  t('xs:double(parse-date("2010-10-9", "yyyy-mm-d"))', '40460', '');
-  t('xs:double(parse-date("2010-10-08", "yyyy-mm-d"))', '40459', '');
-  t('xs:double(parse-date("1899-Dec-31", "yyyy-mmm-d"))', '1', '');
-  t('xs:double(parse-date("1899-Dec-29", "yyyy-mmm-d"))', '-1', '');
+  t('parse-date("2010-10-9", "yyyy-mm-d")', '2010-10-09', '');
+  t('parse-date("2010-10-08", "yyyy-mm-d")', '2010-10-08', '');
+  t('parse-date("1899-Dec-31", "yyyy-mmm-d")', '1899-12-31', '');
+  t('parse-date("1899-Dec-29", "yyyy-mmm-d")', '1899-12-29', '');
   t('year-from-datetime(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
   t('year-from-date(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
   t('year-from-datetime(parse-date(">>2012<<01:01", ">>yyyy<<mm:dd"))', '2012', '');
@@ -815,11 +844,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('avg((1,2,3,4))', '2.5', '');
   t('avg((3,4,5))', '4', '');
   t('avg(())', '', '');
-  t('avg((xs:decimal(''INF''), xs:decimal(''-INF'')))', 'NaN', '');
-  t('avg((3,4,5, xs:decimal(''NaN'')))', 'NaN', '');
+  t('avg((xs:float(''INF''), xs:double(''-INF'')))', 'NaN', '');
+  t('avg((3,4,5, xs:float(''NaN'')))', 'NaN', '');
   t('max((1,2,3))', '3', '');
   t('max((3,4,5))', '5', '');
-  t('max((1,xs:decimal("NaN"),3))', 'NaN', '');
+  t('max((1,xs:double("NaN"),3))', 'NaN', '');
   t('type-of(max((3,4,5)))', 'integer', '');
   t('max((5, 5.0e0))', '5', '');
 
@@ -833,7 +862,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('max((1,"2",3,4))', '4', '');
   t('max(("10haus", "100haus", "2haus", "099haus"))', '100haus', '');
   t('min((1,2,3))', '1', '');
-  t('min((1,xs:decimal("NaN"),3))', 'NaN', '');
+  t('min((1,xs:double("NaN"),3))', 'NaN', '');
   t('min((3,4,5))', '3', '');
   t('type-of(min((3,4,5)))', 'integer', '');
   t('min((5,5.0))', '5', '');
@@ -852,7 +881,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('sum((3,4,5))', '12', '');
   t('sum(())', '0', '');
   t('sum((),())', '', '');
-  t('sum((3,xs:decimal("NaN"),5))', 'NaN', '');
+  t('sum((3,xs:double("NaN"),5))', 'NaN', '');
 
   t('(1,2,3)[true()]', '1', '');
   t('(1,2,3)[false()]', '', '');
@@ -1520,8 +1549,225 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
                //http://www.dpawson.co.uk/xsl/rev2/exampler2.html
                //http://www.w3.org/TR/xslt20/#function-function-available?? that's xsl not xpath
 
-               {$DEFINE PXP_DERIVED_TYPES_UNITTESTS}
-               {$I ../xquery_derived_types.inc}
+
+
+
+
+   //type tests
+   t('type-of(xs:int(-2147483648))', 'int', '');
+   t('type-of(xs:int(2147483647))', 'int', '');
+   t('type-of(xs:short(-32768))', 'short', '');
+   t('type-of(xs:short(32767))', 'short', '');
+   t('type-of(xs:byte(-128))', 'byte', '');
+   t('type-of(xs:byte(127))', 'byte', '');
+   t('type-of(xs:nonPositiveInteger(0))', 'nonPositiveInteger', '');
+   t('type-of(xs:negativeInteger(-1))', 'negativeInteger', '');
+   t('type-of(xs:nonNegativeInteger(0))', 'nonNegativeInteger', '');
+   t('type-of(xs:positiveInteger(1))', 'positiveInteger', '');
+   t('type-of(xs:unsignedLong(0))', 'unsignedLong', '');
+   t('type-of(xs:unsignedInt(0))', 'unsignedInt', '');
+   t('type-of(xs:unsignedInt(4294967295))', 'unsignedInt', '');
+   t('type-of(xs:unsignedShort(0))', 'unsignedShort', '');
+   t('type-of(xs:unsignedShort(65535))', 'unsignedShort', '');
+   t('type-of(xs:unsignedByte(0))', 'unsignedByte', '');
+   t('type-of(xs:unsignedByte(255))', 'unsignedByte', '');
+   t('xs:untypedAtomic(''abc'')', 'abc', '');
+   t('type-of(xs:untypedAtomic(''abc''))', 'untypedAtomic', '');
+//   t('xs:untyped(''abc'')', 'abc', '');
+//   t('type-of(xs:untyped(''abc''))', 'untyped', '');
+   t('xs:normalizedString(''abc'')', 'abc', '');
+   t('type-of(xs:normalizedString(''abc''))', 'normalizedString', '');
+   t('xs:token(''abc'')', 'abc', '');
+   t('type-of(xs:token(''abc''))', 'token', '');
+   t('xs:language(''abc'')', 'abc', '');
+   t('type-of(xs:language(''abc''))', 'language', '');
+   t('xs:NMTOKEN(''abc'')', 'abc', '');
+   t('type-of(xs:NMTOKEN(''abc''))', 'NMTOKEN', '');
+   t('xs:Name(''abc'')', 'abc', '');
+   t('type-of(xs:Name(''abc''))', 'Name', '');
+   t('xs:NCName(''abc'')', 'abc', '');
+   t('type-of(xs:NCName(''abc''))', 'NCName', '');
+   t('xs:ID(''abc'')', 'abc', '');
+   t('type-of(xs:ID(''abc''))', 'ID', '');
+   t('xs:IDREF(''abc'')', 'abc', '');
+   t('type-of(xs:IDREF(''abc''))', 'IDREF', '');
+   t('xs:ENTITY(''abc'')', 'abc', '');
+   t('type-of(xs:ENTITY(''abc''))', 'ENTITY', '');
+   t('xs:anyURI(''abc'')', 'abc', '');
+   t('type-of(xs:anyURI(''abc''))', 'anyURI', '');
+   t('xs:QName(''abc'')', 'abc', '');
+   t('type-of(xs:QName(''abc''))', 'QName', '');
+   //t('xs:NOTATION(''abc'')', 'abc', '');
+   //t('type-of(xs:NOTATION(''abc''))', 'NOTATION', '');
+   t('xs:unsignedByte(255)', '255', '');
+   f('xs:unsignedByte(256)');
+   f('xs:unsignedByte(257)');
+   t('255 castable as xs:unsignedByte', 'true', '');
+   t('256 castable as xs:unsignedByte', 'false', '');
+   t('xs:byte(127)', '127');
+   f('xs:byte(128)');
+   t('xs:byte(-1)', '-1', '');
+   t('xs:byte(-127)', '-127', '');
+   t('xs:byte(-128)', '-128', '');
+   f('xs:byte(-129)');
+   f('xs:byte(-130)');
+   f('xs:unsignedByte(-1)');
+   f('xs:unsignedByte(-2)');
+   t('type-of(xs:float(4.0))','float','');
+   t('type-of(xs:double(4.0))','double','');
+   t('type-of(xs:decimal(4.0))','decimal','');
+   t('type-of(4.0)','decimal','');
+   t('type-of(4.0e1)','double','');
+   t('type-of(4)','integer','');
+   t('xs:byte(1)+xs:byte(2)','3','');
+   t('type-of(xs:byte(1)+xs:byte(2))','byte','');
+   t('xs:short(1)-xs:short(2)','-1','');
+   t('type-of(xs:short(1)-xs:short(2))','short','');
+   t('xs:short(4)*xs:short(2)','8','');
+   t('type-of(xs:short(4)*xs:short(2))','short','');
+   t('xs:short(1) div xs:short(2)','0.5','');
+   t('type-of(xs:short(1) div xs:short(2))','decimal','');
+   t('xs:short(1) idiv xs:short(2)','0','');
+   t('type-of(xs:short(1) idiv xs:short(2))','short','');
+   t('xs:byte(1)+xs:short(2)','3','');
+   t('type-of(xs:byte(1)+xs:short(2))','short','');
+   t('xs:byte(1)+xs:unsignedShort(2)','3','');
+   t('type-of(xs:byte(1)+xs:unsignedShort(2))','integer','');
+   t('xs:byte(1)*xs:int(2)','2','');
+   t('type-of(xs:byte(1)*xs:int(2))','int','');
+   t('xs:byte(1)+2','3','');
+   t('type-of(xs:byte(1)+2)','integer','');
+   t('xs:float(1)+2','3','');
+   t('type-of(xs:float(1)+2)','float','');
+   t('xs:double(1)+2','3','');
+   t('type-of(xs:double(1)+2)','double','');
+   t('xs:decimal(1)+2','3','');
+   t('type-of(xs:decimal(1)+2)','decimal','');
+   t('xs:float(1)*xs:double(2)','2','');
+   t('type-of(xs:float(1)*xs:double(2))','double','');
+   t('xs:float(1)*2','2','');
+   t('type-of(xs:float(1)*2)','float','');
+   t('xs:float(1)*2.0','2','');
+   t('type-of(xs:float(1)*2.0)','float','');
+   t('xs:double(1)*2','2','');
+   t('type-of(xs:double(1)*2)','double','');
+   t('max((xs:float(1),xs:double(2),xs:decimal(3)))','3','');
+   t('type-of(max((xs:float(1),xs:double(2),xs:decimal(3))))','double','');
+   t('max((xs:float(1),xs:decimal(3)))','3','');
+   t('type-of(max((xs:float(1),xs:decimal(3))))','float','');
+   t('min((xs:float(1),xs:double(2),xs:decimal(3)))','1','');
+   t('type-of(min((xs:float(1),xs:double(2),xs:decimal(3))))','double','');
+   t('sum((xs:float(1),xs:decimal(3)))','4','');
+   t('type-of(sum((xs:float(1),xs:decimal(3))))','float','');
+   t('xs:byte(1) instance of byte','true','');
+   t('xs:byte(1) instance of short','true','');
+   t('xs:byte(1) instance of integer','true','');
+   t('xs:byte(1) instance of decimal','true','');
+   t('xs:byte(1) instance of float','false','');
+   t('xs:byte(1) instance of double','false','');
+   t('xs:byte(1) instance of unsignedByte','false','');
+   t('xs:float(1) instance of float','true','');
+   t('xs:float(1) instance of double','false','');
+   t('xs:float(1) instance of decimal','false','');
+   t('xs:double(1) instance of float','false','');
+   t('xs:double(1) instance of double','true','');
+   t('xs:double(1) instance of decimal','false','');
+   t('xs:decimal(1) instance of float','false','');
+   t('xs:decimal(1) instance of double','false','');
+   t('xs:decimal(1) instance of decimal','true','');
+   t('xs:decimal(1) instance (: ... :) of decimal','true','');
+   t('xs:decimal(1) instance of (: .. :) decimal','true','');
+   t('xs:date("1800-02-03") instance of datetime','false','');
+   t('xs:time("23:59:59") instance of datetime','false','');
+   t('xs:untypedAtomic("abc") instance of string','false','');
+   t('string("def") instance of xs:untypedAtomic','false','');
+//   t('xs:untyped("abc") instance of string','false','');
+   t('string("def") instance of xs:untyped','false','');
+   t('xs:byte(1) castable as byte','true','');
+   t('xs:byte(1) castable as integer','true','');
+   t('xs:byte(1) castable as float','true','');
+   t('xs:byte(1) castable as double','true','');
+   t('xs:byte(1) castable as unsignedByte','true','');
+   t('xs:byte(-1) castable as byte','true','');
+   t('xs:byte(-1) castable as integer','true','');
+   t('xs:byte(-1) castable as float','true','');
+   t('xs:byte(-1) castable as double','true','');
+   t('xs:byte(-1) castable as unsignedByte','false','');
+   t('xs:byte(-1) castable as unsignedByte','false','');
+   t('1.0 castable as positiveInteger','true','');
+   t('1.0e5 castable as positiveInteger','true','');
+   t('1.5 castable as positiveInteger','true','');
+   t('0.5 castable as positiveInteger','false','');
+   t('-1.0 castable as positiveInteger','false','');
+   t('-1.0 castable as integer','true','');
+   t('-1.2 castable as integer','true','');
+   t('-1.2 castable as boolean','true','');
+   t('5 castable as boolean','true','');
+   t('0 castable as boolean','true','');
+   t('"false" castable as boolean','true','');
+   t('xs:date("2050-01-01") castable as datetime','true','');
+   t('xs:time("00:00:00") castable as datetime','false','');
+   t('xs:datetime("1899-12-31T04:04:04") castable as date','true','');
+   t('xs:datetime("2012-02-01T14:15:16") castable as time','true','');
+   t('xs:datetime("1234-12-12T01:01:01") castable as time','true','');
+   t('xs:datetime("6543-12-12T08:08:08") castable as date','true','');
+   t('xs:date("1650-04-12") castable as time','false','');
+   t('xs:time("12:00:00") castable as date','false','');
+   t('xs:time("12:12:59") castable as untypedAtomic','true','');
+   t('xs:date("2000-01-01") castable as untypedAtomic','true','');
+   t('0.5 castable as untypedAtomic','true','');
+//   t('0.5 castable as untyped','true',''); todo
+   t('xs:untypedAtomic("0.5") castable as float','true','');
+   t('xs:untypedAtomic("abc") castable as float','false','');
+   t('xs:untypedAtomic("abc") castable as string','true','');
+   t('xs:untypedAtomic("---15") castable as gDay','true','');
+   t('"---15" castable as gDay','true','');
+   t('"---15Z" castable as gDay','true','');
+   t('"---15+12:30" castable as gDay','true','');
+   t('"---15foobar" castable as gDay','false','');
+   t('"---5" castable as gDay','false',''); //true?
+   t('"---05" castable as gDay','true','');
+   t('"--12" castable as gMonth','true','');
+   t('"--13" castable as gMonth','false','');
+   t('"--12-10" castable as gMonth','true',''); //month in timezone -10
+   t('"--12-29" castable as gMonthDay','true','');
+   t('"--13-29" castable as gMonthDay','false','');
+   t('"2010" castable as gYear','true','');
+   t('"2010X" castable as gYear','false','');
+   t('"2010Z" castable as gYear','true',''); //2010 in UTC
+   t('"2010-12" castable as gYearMonth','true','');
+   t('"2010-13" castable as gYearMonth','false','');
+   t('"2010-12-10" castable as gYearMonth','true',''); //2010-12 in timezone -10
+   t('"2010-12+10" castable as gYearMonth','true',''); //2010 in UTC
+   t('type-of(xs:gYear("2010Z"))','gYear','');
+   t('type-of(xs:gMonth("--12-10"))','gMonth','');
+   t('xs:gMonth("--12")','--12','');
+   t('xs:gMonthDay("--12-03")','--12-03','');
+   t('xs:gDay("---30")','---30','');
+   t('xs:hexBinary("2020")','2020','');
+   t('-1.2 cast as boolean','true','');
+   t('5 cast as boolean','true','');
+   t('0 cast  as boolean','false','');
+   t('"false" cast as boolean','false','');
+   t('xs:byte(-1) cast as double','-1','');
+   t('xs:time("23:45:59") cast as untypedAtomic','23:45:59','');
+   t('xs:date("1999-12-31") cast as untypedAtomic','1999-12-31','');
+   t('0.5 cast as untypedAtomic','0.5','');
+   t('xs:untypedAtomic("0.5") cast as float','0.5','');
+   t('xs:untypedAtomic("abc") cast as string','abc','');
+   t('type-of(xs:time("00:59:00") cast as untypedAtomic)','untypedAtomic','');
+   t('type-of(xs:date("2012-12-21") cast as untypedAtomic)','untypedAtomic','');
+   t('type-of(0.5 cast as untypedAtomic)','untypedAtomic','');
+   t('type-of(xs:untypedAtomic("0.5") cast as float)','float','');
+   t('type-of(xs:untypedAtomic("abc") cast as string)','string','');
+
+
+
+
+
+
+
+
 
   t('123 instance of anyAtomicType', 'true', '');
   t('(5,4,2) instance of anyAtomicType', 'false', '');
@@ -1612,8 +1858,8 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('fn:local-name-from-QName(fn:QName("http://www.example.com/example", "person"))', 'person', '');
   t('fn:prefix-from-QName(fn:QName("http://www.example.com/example", "person"))', '', '');
   t('fn:namespace-uri-from-QName(fn:QName("http://www.example.com/example", "person"))', 'http://www.example.com/example', '');
-  t('fn:local-name-from-QName(fn:QName("person"))', 'person', '');
-  t('fn:namespace-uri-from-QName(fn:QName("person"))', '', '');
+  t('fn:local-name-from-QName(xs:QName("person"))', 'person', '');
+  t('fn:namespace-uri-from-QName(xs:QName("person"))', '', '');
   t('//x', '2', '!<abc id="a" xml:lang="en-US">1<x>2</x>3</abc>');
   t('fn:root(//x)', '123', '');
   t('fn:root()', '123', '');
@@ -1690,7 +1936,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
 
                //Objects extension
-  t('obj := xs:object()', '', '');
+  t('obj := object()', '', '');
   t('obj.foo := "bar"', 'bar', '');
   t('$obj.foo', 'bar', '');
   t('($obj).foo', 'bar', '');
@@ -1711,7 +1957,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('obj.o.p := $obj', '', '');
   t('$obj.o.p.foo', '246', '');
   t('$obj.o.p.o.foo', 'new', '');
-  t('obj.o.p.o := xs:object()', '', '');
+  t('obj.o.p.o := object()', '', '');
   t('$obj.o.p.o.foo', '', '');
   t('obj.o.p.o.foo := 99', '99', '');
   t('$obj.o.p.o.foo', '99', '');
@@ -1728,7 +1974,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   {t('$test.foo:bar', '123', '');
   t('$test.foo:bar := 456', '456', ''); //good idea to allow both??
   t('$test.foo:bar', '456', '');}
-  t('obj := xs:object(("a", "b", "c", 123))', '', '');
+  t('obj := object(("a", "b", "c", 123))', '', '');
   t('$obj.a', 'b', '');
   t('$obj.b', '', '');
   t('$obj.c', '123', '');
@@ -2201,15 +2447,16 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('if (xs:float("NaN") castable as xs:integer) then 1 else 2', '2', '');
   t('/td[if (true()) then true() else false()]', '', '');
   t('true() instance of anyAtomicType', 'true', '');
-  t('QName("abc")', 'abc', '');
+//  t('QName("abc")', 'abc', ''); todo?
                //,('QName("abc", "def")', 'abc', '')
   t('','','');
   t('xs:gMonth("--12") castable as decimal', 'false', '');
   t('xs:dateTime("2030-12-05") castable as decimal', 'false', '');
-  t('(0.0 div 0.0)', 'NaN', '');
-  t('(0.0 div 0.0) castable as xs:integer', 'false', '');
-  t('xs:float(0.0 div 0.0)', 'NaN', '');
-  t('xs:float(0.0 div 0.0) castable as xs:integer', 'false', '');
+  t('(0.0 div 0e1)', 'NaN', '');
+  t('type-of((0.0 div 0e0))', 'double');
+  t('(0.0 div 0e0) castable as xs:integer', 'false', '');
+  t('xs:float(0.0 div 0e0)', 'NaN', '');
+  t('xs:float(0.0 div 0e0) castable as xs:integer', 'false', '');
   t('xs:base64Binary("0FB7")', '0FB7', '');
   t('xs:hexBinary("07fb")', '07FB', '');
   t('xs:hexBinary(base64Binary("YWJj"))', '616263', '');
@@ -2285,7 +2532,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('type-of(max(a/b))', 'double', '');
   t('min((dayTimeDuration("PT1S"), dayTimeDuration("PT2S")))', 'PT1S', '');
   t('min(a/b)', '1', '');
-  t('min((xs:decimal("NaN"), 1))', 'NaN', '');
+  t('min((xs:double("NaN"), 1))', 'NaN', '');
   t('type-of(min(a/b))', 'double', '');
   t('avg((dayTimeDuration("PT1S"), dayTimeDuration("PT2S")))', 'PT1.5S', '');
   t('avg(a/b)', '2', '');
@@ -2325,6 +2572,10 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join((), "...") eq ""', 'true', '');
   t('tokenize("", "abc") eq ""', '', ''); //empty sequence returned by tokenize
   t('/', '12', '!<a>12</a>');
+  t('(/) castable as xs:decimal', 'true');
+  t('(/) castable as xs:float', 'true');
+  t('(/) castable as xs:double', 'true');
+  t('(/) castable as xs:integer', 'true');
   t('(/) * 3', '36', '');
   t('4 + /', '16', '');
   t('string-join(/a//b, ",")', '1,2,3,4,5,6', '!<a><b>1</b><c><b>2</b><b>3</b></c><d><b>4</b><b>5</b></d><b>6</b></a>');
@@ -2619,7 +2870,21 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('form(//form).url', 'abs://hallo?abc=cba', '!<html><form action="abs://hallo"><input name="abc" value="cba"/></form></html>');
   t('form(//form).url', 'abs://foo/bar?abcdef=on', '!<html><form action="abs://foo/bar"><input name="abcdef" type="checkbox" checked/></form></html>');
 
-  //Newer tests (the older tests as array is a usability catastrophe, no backtrace, no breakpoints, no easy adding... )
+  //Newer tests
+
+  t('QName("", "x") eq QName("","x")', 'true');
+  t('QName("", "x") = QName("","x")', 'true');
+  t('QName("xml", "x") eq QName("xml","x")', 'true');
+  t('QName("xml", "x") eq QName("xml","x")', 'true');
+  t('QName("", "x") eq QName("","y")', 'false');
+  t('QName("", "x") = QName("","y")', 'false');
+  t('QName("xml", "x") eq QName("xml","y")', 'false');
+  t('QName("xml", "x") eq QName("xml","y")', 'false');
+  t('QName("", "x") eq QName("xml","x")', 'false');
+  t('QName("", "x") = QName("xml","x")', 'false');
+  t('QName("xml", "x") eq QName("xs","x")', 'false');
+  t('QName("xml", "x") eq QName("xs","x")', 'false');
+  t('QName("", "x") ne QName("xml","x")', 'true');
 
   //test attributes as nodes
   t('', '', '!<test><a att1="v1" att2="v2" att3="v3" att4="v4" foo="bar">a node</a>TEST</test>');
@@ -2741,9 +3006,11 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(-92233720368547759 to -92233720368547757, ":")', '-92233720368547759:-92233720368547758:-92233720368547757', '');
   t('string-join(-3 to 3, ":")', '-3:-2:-1:0:1:2:3', '');
   //rounding
+  t('type-of(ceiling(1.5e20))', 'double');
   t('ceiling(1.5e20)', '1.5E20');
-  t('fn:ceiling(xs:float("-3.4028235E38"))', '-3.4028235E38');
+  t('type-of(ceiling(xs:float(1.5e20)))', 'float');
   t('fn:ceiling(xs:float("-3.4028235E38")) instance of xs:float', 'true');
+  t('fn:ceiling(xs:float("-3.4028235E38"))', '-3.4028235E38');
   t('fn:floor(xs:float("-3.4028235E38"))', '-3.4028235E38');
   t('fn:abs(xs:float("-3.4028235E38"))', '3.4028235E38');
   t('fn:abs(xs:float("-3.4028235E38"))', '3.4028235E38');
@@ -2829,6 +3096,16 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('string-join(distinct-values((1, "1", 2, 2.0)),":")', '1:1:2');
   t('deep-equal(1, current-dateTime())', 'false');
   t('deep-equal((1,2,3), ("1", "2", "3"))', 'false');
+  t('xs:yearMonthDuration("P0Y") eq xs:dayTimeDuration("P0D")', 'true');
+  t('op:duration-equal(xs:duration("P1Y"), xs:duration("P12M"))', 'true');
+  t('op:duration-equal(xs:duration("PT24H"), xs:duration("P1D"))', 'true');
+  t('op:duration-equal(xs:duration("P1Y"), xs:duration("P365D"))', 'false');
+  t('op:duration-equal(xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))', 'true');
+  t('op:duration-equal(xs:yearMonthDuration("P1Y"), xs:dayTimeDuration("P365D"))', 'false');
+  t('op:duration-equal(xs:yearMonthDuration("P2Y"), xs:yearMonthDuration("P24M"))', 'true');
+  t('op:duration-equal(xs:dayTimeDuration("P10D"), xs:dayTimeDuration("PT240H"))', 'true');
+  t('op:duration-equal(xs:duration("P2Y0M0DT0H0M0S"), xs:yearMonthDuration("P24M"))', 'true');
+  t('op:duration-equal(xs:duration("P0Y0M10D"), xs:dayTimeDuration("PT240H"))', 'true');
   t('string-join(fn:distinct-values((xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))),":")', 'P0M');
   t('index-of(./r/a, "y")', '2', '<r foo="z"><a>X</a><a>Y</a><a>Z</a></r>');
   t('index-of(./r/a, ./r/@foo)', '3');
@@ -2925,6 +3202,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('1  mod  ()' , '');
   t('1  to  ()' , '');
   t('xs:untypedAtomic("1") * 7', '7');
+  t('type-of(xs:untypedAtomic("1e6") * 7.0)', 'double');
   t('type-of(xs:untypedAtomic("1e6") * 7)', 'double');
   t('type-of(xs:untypedAtomic("1.0") * 7)', 'double');
   t('type-of(xs:untypedAtomic("1") * 7)', 'double');
@@ -3058,7 +3336,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
   t('"    www  " cast as xs:anyURI', 'www');
   t('"    www  " cast as xs:string', '    www  ');
   t('"    www  " cast as xs:normalizedString', '    www  ');
-  t('"    ww   w  " cast as xs:untyped', '    ww   w  ');
+//  t('"    ww   w  " cast as xs:untyped', '    ww   w  ');
   t('"    ww   w  " cast as xs:untypedAtomic', '    ww   w  ');
   t('"    ww'#9'w  " cast as xs:normalizedString', '    ww w  ');
   t('"    123  " cast as xs:int', '123');
