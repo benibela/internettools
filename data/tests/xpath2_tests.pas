@@ -3308,6 +3308,9 @@ begin
       t('xs:time(xs:dateTime("2000-02-03T01:02:03")) cast as ' + tt, '01:02:03');
     end;
 
+    t('"foo       bar    def" castable as xs:normalizedString', 'true');
+    t('"foo       bar    def" castable as xs:token', 'true');
+
     t('xs:dateTime("2000-02-03T24:00:00")', '2000-02-04T00:00:00');
     t('"2000-02-03" castable as xs:dateTime', 'false');
     t('"24:01:00"   castable as xs:dateTime', 'false');
@@ -3319,6 +3322,23 @@ begin
     t('"2000-02-03T20:00:-10"  castable as xs:dateTime', 'false');
     t('"20:00:10"              castable as xs:time', 'true');
     t('"20:00:70"              castable as xs:time', 'false');
+
+    for j := 0 to 3 do begin
+      case j of
+        0: tt := 'xs:NCName';
+        1: tt := 'xs:ID';
+        3: tt := 'xs:IDREF';
+        2: tt := 'xs:ENTITY';
+      end;
+      t('"   abc   " castable as ' + tt, 'true');
+      t('" -    " castable as ' + tt, 'false');
+      t('"-" castable as ' + tt, 'false');
+      t('"abc:def" castable as ' + tt, 'false');
+    end;
+    t('"abc:def" castable as xs:Name', 'true');
+    t('"abc: def" castable as xs:Name', 'false');
+    t('"  abc:def   " castable as xs:Name', 'true');
+    t('"0:def" castable as xs:Name', 'false');
   end;
   ps.StaticContext.strictTypeChecking:=false;
 
