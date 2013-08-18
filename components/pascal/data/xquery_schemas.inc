@@ -812,7 +812,7 @@ begin
 
   //sequence, node: TXSType;
   node := TXSType.Create('node()', nil, TXQValueNode, self);
-  sequence := TXSType.Create('*', nil, TXQValueSequence, self);
+  sequence := TXSType.Create('sequence*', nil, TXQValueSequence, self);
 
   typeList.Sorted := true;
   numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
