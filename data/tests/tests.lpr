@@ -4,11 +4,9 @@ program tests;
 
 uses
   heaptrc,
-  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests, int65math, extendedhtmlparser, bbutils, sysutils, xquery1_tests
+  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests, extendedhtmlparser, sysutils, xquery1_tests
 
-  , xquery_utf8, xquery_json, internetaccess_tests, xpath3_tests, xquery3_tests, xqueryschema, utf8tools
-
-  ;
+  , xquery_utf8, internetaccess_tests, xpath3_tests, xquery3_tests, utf8tools;
 
 var
   start: TDateTime;
@@ -17,7 +15,7 @@ begin
   start := now;
   bbutils_tests.unitTests;
   internetaccess_tests.unittests;
-  //testerrors := true; //disabled since they drive the lazarus debugger mad
+  testerrors := true; //disabled since they drive the lazarus debugger mad
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
   xpath3_tests.unittests(testerrors);
