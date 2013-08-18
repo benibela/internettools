@@ -737,7 +737,7 @@ begin
   //--primitive base types--
   boolean := primitiveBaseType(TXSBooleanType.create('boolean', AnyAtomicType, TXQValueBoolean));
 
-  DateTime := primitiveBaseType(TXSDateTimeType.create('dateTime', AnyAtomicType, 'y+-mm-dd[Z]$|hh:nn:ss[.z+][Z]$|y+-mm-ddThh:nn:ss[.z+][Z]$|y+-mm-dd hh:nn:ss[.z+][Z]$'));
+  DateTime := primitiveBaseType(TXSDateTimeType.create('dateTime', AnyAtomicType, 'yyyy+-mm-ddThh:nn:ss[.z+][Z]$'));
   Date := primitiveBaseType(TXSDateTimeType.create('date', AnyAtomicType, 'yyyy-mm-dd[Z]$', xqdttTime));
   time := primitiveBaseType(TXSDateTimeType.create('time', AnyAtomicType, 'hh:nn:ss[.z+][Z]$', xqdttDate));
   GDay := primitiveBaseType(TXSDateTimeType.create('gDay', AnyAtomicType, '---dd[Z]$'));
