@@ -3,11 +3,6 @@ begin
   result := pvkUndefined;
 end;
 
-class function TXQValueUndefined.classTypeName: string;
-begin
-  result := 'undefined';
-end;
-
 function TXQValueUndefined.isUndefined: boolean;
 begin
   Result:=true;
@@ -101,8 +96,14 @@ begin
   result[0] := self;
 end;
 
-constructor TXQValue.create;
+constructor TXQValue.create(atypeAnnotation: TXSType);
 begin
+  ftypeAnnotation := atypeAnnotation;
+end;
+
+constructor TXQValue.create(atypeAnnotation: TXSType; const value: IXQValue);
+begin
+  raise EXQEvaluationException.create('XQST0052', 'Cannot create an instance of the abstract base type anyType (TXQValue)');
 end;
 
 function TXQValue.kind: TXQValueKind;
@@ -112,7 +113,12 @@ end;
 
 function TXQValue.typeName: string;
 begin
-  result := classTypeName;
+  result := ftypeAnnotation.name;
+end;
+
+function TXQValue.typeAnnotation: TXSType;
+begin
+  result := ftypeAnnotation;
 end;
 
 class function TXQValue.classKind: TXQValueKind;
@@ -120,146 +126,10 @@ begin
   result := pvkUndefined;
 end;
 
-class function TXQValue.classTypeName: string;
+
+function TXQValue.instanceOf(const typ: TXSType): boolean;
 begin
-  result := 'anyType';
-end;
-
-function TXQValue.instanceOfInternal(const typ: TXQValueClass): boolean;
-begin
-  result := instanceOf(typ);
-end;
-
-function TXQValue.getClassType: TXQValueClass;
-begin
-  result := TXQValueClass(ClassType);
-end;
-
-{ TXQValue_AnyAtomicType }
-
-class function TXQValue_AnyAtomicType.classTypeName: string;
-begin
-  Result:='anyAtomicType';
-end;
-
-{ TXQValue_AnySimpleType }
-
-class function TXQValue_AnySimpleType.classTypeName: string;
-begin
-  Result:='anySimpleType';
-end;
-
-{ TXQValue_DatePart }
-
-class function TXQValue_Binary.createFromValue(const v: IXQValue): IXQValue;
-begin
-  if (v.getClassType <> self.ClassType) and (v is TXQValue_Binary) then
-    result := TXQValueStringClass(self.ClassType).Create(fromRawBinary((v as TXQValue_Binary).toRawBinary))
-   else
-    result := TXQValueStringClass(self.ClassType).Create(v.toString);
-end;
-
-
-function TXQValue_Binary.toRawBinary: string;
-begin
-  if ClassType = TXQValue_hexBinary then result := strDecodeHex(str)
-  else if ClassType = TXQValue_base64Binary then result := base64.DecodeStringBase64(str)
-  else assert(false);
-end;
-
-class function TXQValue_Binary.fromRawBinary(s: string): string;
-begin
-  if ClassType = TXQValue_hexBinary then result := strEncodeHex(s)
-  else if ClassType = TXQValue_base64Binary then result := base64.EncodeStringBase64(s)
-  else assert(false);
-end;
-
-function TXQValue_Binary.canConvertToInt65: boolean;
-begin
-  Result:=false;
-end;
-
-function TXQValue_Binary.canConvertToDecimal(pure: boolean): boolean;
-begin
-  ignore(pure);
-  Result:=false;
-end;
-
-function TXQValue_Binary.canConvertToBoolean: boolean;
-begin
-  Result:=false;
-end;
-
-class function TXQValue_Binary.classParentNonBlocked: TXQValueClass;
-begin
-  Result:=TXQValue_AnyAtomicType;
-end;
-
-class function TXQValue.createFromValue(const v: IXQValue): IXQValue;
-begin
-  ignore(v);
-  result := nil;
-  raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid constructor called');
-end;
-
-class function TXQValue.instanceOf(const testType: TXQValueClass): boolean;
-var selfType: TXQValueClass;
-begin
-  selfType := TXQValueClass(ClassType);
-  while selfType <> nil do begin
-    if selfType = testType then exit(true);
-    selfType := selfType.classParentNonBlocked;
-  end;
-  exit(false);
-end;
-
-class function TXQValue.castableFromInternal(const v: IXQValue): boolean;
-begin
-  ignore(v);
-  result := true;
-end;
-
-class function TXQValue.classParentNonBlocked: TXQValueClass;
-begin
-  if ClassType = TXQValue then exit(nil);
-  result := TXQValueClass(ClassParent);
-end;
-
-function TXQValue.canConvertToType(v: TXQValueClass): boolean;
-begin
-  if not v.castableFromInternal(self) then
-    exit(false);
-  if (ClassType = v) or (v = TXQValue_untyped) then result := true
-  //else if (v = TXQValue_untypedAtomic) or (v = TXQValue_AnyAtomicType) or (v = TXQValue_AnySimpleType) then result := getSequenceCount = 1
-  else if v.InheritsFrom(TXQValueInt65) then result := canConvertToInt65 and TXQValueInt65Class(v).canCreateFromInt65(toInt65)
-  else if v.InheritsFrom(TXQValueDecimal) then result :=  canConvertToDecimal(v = TXQValueDecimal) and TXQValueDecimalClass(v).canCreateFromDecimal(toDecimal)
-  else if v.InheritsFrom(TXQValueString) then begin
-    result := v.castableFromInternal(self);// and TXQValueStringClass(v).canCreateFromString(asString);
-   //  if (v.instanceOf(TXQValueString)) or (self is TXQValue_untypedAtomic) or  v.InheritsFrom(TXQValue_untypedAtomic) then
-   //  result := TXQValueStringClass(v).canCreateFromString(asString)
-{
-    if (self is TXQValue_untypedAtomic) or  v.InheritsFrom(TXQValue_untypedAtomic) then
-      result := TXQValueStringClass(v).canCreateFromString(asString)
-    else if v.instanceOf(TXQValueString) then begin
-      if v.InheritsFrom(TXQValue_Binary) then result := (self is TXQValue_Binary) or ((self.instanceOf(TXQValueString)) and TXQValueStringClass(v).canCreateFromString(asString))
-      else result := TXQValueStringClass(v).canCreateFromString(asString)
-    end else result := false;                                                       }
-  end
-//  else if (v = TXQValueDateTime) or (v = TXQValue_date) or (v = TXQValue_time) then
-//    result := canConvertToDateTime and TXQValueDateTimeClass(v).canCreateFromDateTime(asDateTime)
-  else if v.InheritsFrom(TXQValue_duration) then
-    result := (self is TXQValue_duration) or
-               ((self is TXQValueString) and TXQValueDateTimeClass(v).canCreateFromDateTime(toString))
-  else if v.InheritsFrom(TXQValueDateTime) then
-    result := (self.ClassType = TXQValueDateTime)
-              or ((self.ClassType = TXQValue_date) and not (v.InheritsFrom(TXQValue_time)))
-              or ( (self is TXQValueString) and TXQValueDateTimeClass(v).canCreateFromDateTime(toString))
-  else if v.InheritsFrom(TXQValueBoolean) then result := canConvertToBoolean
-  else if v.InheritsFrom(TXQValueNumericPseudoType) then
-    result := (self is TXQValueDecimal) or (self is TXQValueInt65) or ((self is TXQValue_untypedAtomic) and self.canConvertToDecimal(false))
-  else if v.InheritsFrom(TXQValueTrueNumericPseudoType) then
-    result := (self is TXQValueDecimal) or (self is TXQValueInt65)
-  else result := false;
+  result := typeAnnotation.derivedFrom(typ);
 end;
 
 function TXQValue.canConvertToInt65: boolean;
@@ -376,7 +246,19 @@ end;
 
 constructor TXQValueBoolean.create(abool: boolean);
 begin
-  inherited create;
+  inherited create(baseSchema.boolean);
+  bool := abool;
+end;
+
+constructor TXQValueBoolean.create(atypeAnnotation: TXSType; const value: IXQValue);
+begin
+  ftypeAnnotation := atypeAnnotation;
+  bool := value.toBoolean;
+end;
+
+constructor TXQValueBoolean.create(atypeAnnotation: TXSType; abool: boolean);
+begin
+  ftypeAnnotation := atypeAnnotation;
   bool := abool;
 end;
 
@@ -391,19 +273,9 @@ begin
   Result:=true;
 end;
 
-class function TXQValueBoolean.classkind: TXQValueKind;
+class function TXQValueBoolean.classKind: TXQValueKind;
 begin
   result := pvkBoolean;
-end;
-
-class function TXQValueBoolean.classtypeName: string;
-begin
-  result := 'boolean';
-end;
-
-class function TXQValueBoolean.createFromValue(const v: IXQValue): IXQValue;
-begin
-  result := TXQValueBoolean.create(v.toBoolean);
 end;
 
 function TXQValueBoolean.toBoolean: boolean;
@@ -439,15 +311,27 @@ end;
 
 { TXQValueInt65 }
 
-constructor TXQValueInt65.create;
+constructor TXQValueInt65.create(atypeAnnotation: TXSType);
 begin
-  inherited create;
+  inherited create(atypeAnnotation);
 end;
 
 constructor TXQValueInt65.create(const aint: int65);
 begin
-  inherited create;
+  inherited create(baseSchema.Integer);
   value := aint;
+end;
+
+constructor TXQValueInt65.create(atypeAnnotation: TXSType; const aint: int65);
+begin
+  ftypeAnnotation := atypeAnnotation;
+  value := aint;
+end;
+
+constructor TXQValueInt65.create(atypeAnnotation: TXSType; const avalue: IXQValue);
+begin
+  ftypeAnnotation := atypeAnnotation;
+  self.value := avalue.toInt65;
 end;
 
 class function TXQValueInt65.classKind: TXQValueKind;
@@ -455,26 +339,10 @@ begin
   Result := pvkInt;
 end;
 
-class function TXQValueInt65.classTypeName: string;
-begin
-  result := 'integer';
-end;
-
-class function TXQValueInt65.createFromValue(const v: IXQValue): IXQValue;
-begin
-  result := TXQValueInt65.create(v.toInt65);
-end;
-
 class function TXQValueInt65.canCreateFromInt65(const i: int65): boolean;
 begin
   ignore(i);
   result := true;
-end;
-
-class function TXQValueInt65.classParentNonBlocked: TXQValueClass;
-begin
-  if ClassType = TXQValueInt65 then Result := TXQValueDecimal
-  else result := TXQValueClass(ClassParent);
 end;
 
 function TXQValueInt65.canConvertToInt65: boolean;
@@ -523,7 +391,7 @@ function TXQValueInt65.clone: IXQValue;
 var
   temp: TXQValueInt65;
 begin
-  temp := TXQValueInt65Class(self.ClassType).Create();
+  temp := TXQValueInt65Class(self.ClassType).Create(typeAnnotation);
   temp.value := value;
   result := temp;
 end;
@@ -533,13 +401,20 @@ end;
 
 constructor TXQValueDecimal.create(const aflt: decimal);
 begin
-  inherited create;
+  inherited create(baseSchema.Decimal);
   value := aflt;
 end;
 
-class function TXQValueDecimal.createFromValue(const v: IXQValue): IXQValue;
+constructor TXQValueDecimal.create(atypeannotation: TXSType; const aflt: decimal);
 begin
-  result := TXQValueDecimal.create(v.toDecimal);
+  inherited create(atypeannotation);
+  value := aflt;
+end;
+
+constructor TXQValueDecimal.create(atypeAnnotation: TXSType; const avalue: IXQValue);
+begin
+  ftypeAnnotation := atypeAnnotation;
+  value := avalue.toDecimal;
 end;
 
 class function TXQValueDecimal.canCreateFromDecimal(const v: decimal): boolean;
@@ -547,14 +422,9 @@ begin
   result := (not IsNan(v)) and (not isPosInf(v)) and (not isNegInf(v));  //overriden by float/double childs
 end;
 
-class function TXQValueDecimal.classkind: TXQValueKind;
+class function TXQValueDecimal.classKind: TXQValueKind;
 begin
   Result:=pvkDecimal;
-end;
-
-class function TXQValueDecimal.classtypeName: string;
-begin
-  result := 'decimal';
 end;
 
 function TXQValueDecimal.canConvertToInt65: boolean;
@@ -576,6 +446,14 @@ begin
   result := v;
 end;
 
+class function TXQValueDecimal.isPure(const v: IXQValue): boolean;
+var
+  vd: Decimal;
+begin
+  vd := v.toDecimal;
+  result := not (IsNan(vd) or isPosInf(vd) or isNegInf(vd));
+end;
+
 function TXQValueDecimal.toBoolean: boolean;
 begin
  Result:=(not IsNan(value)) and (value <> 0);
@@ -595,11 +473,21 @@ begin
 end;
 
 function TXQValueDecimal.toString: string;
+var
+  subType: TXSDecimalSubType;
 begin
-  if isnan(value) then result:='NaN'
-  else if isPosInf(value) then result:='INF'
-  else if isNegInf(value) then result:='-INF'
-  else result := myDecimalToStr(value);
+  if isnan(value) then exit('NaN');
+  if isPosInf(value) then exit('INF');
+  if isNegInf(value) then exit('-INF');
+  subType := xsstDecimal;
+  if ftypeAnnotation is TXSDecimalType then subType := TXSDecimalType(ftypeAnnotation).subType
+  else if (ftypeAnnotation is TXSSimpleType) and (TXSSimpleType(ftypeAnnotation).primitive is TXSDecimalType) then
+    subType := TXSDecimalType(TXSSimpleType(ftypeAnnotation).primitive).subType;
+  case subType of
+    xsstDecimal: result := myDecimalToStr(value);
+    xsstFloat: result := myDecimalToStr(single(value));
+    xsstDouble: result := myDecimalToStr(double(value));
+  end;
 end;
 
 function TXQValueDecimal.toDateTime: TDateTime;
@@ -623,22 +511,28 @@ end;
 
 function TXQValueDecimal.clone: IXQValue;
 begin
-  result := TXQValueDecimalClass(self.ClassType).Create(value);
+  result := TXQValueDecimalClass(self.ClassType).Create(ftypeAnnotation, value);
 end;
 
 { TXQValueString }
 
 constructor TXQValueString.create(const astr: string);
 begin
-  inherited create;
+  inherited create(baseSchema.string_);
   str := astr;
 end;
 
-class function TXQValueString.createFromValue(const v: IXQValue): IXQValue;
+constructor TXQValueString.create(atypeAnnotation: TXSType; const astr: string);
 begin
-  result := TXQValueString.create(v.toString);
+  ftypeAnnotation := atypeAnnotation;
+  str := astr;
 end;
 
+constructor TXQValueString.create(atypeAnnotation: TXSType; const value: IXQValue);
+begin
+  ftypeAnnotation := atypeAnnotation;
+  str := value.toString;
+end;
 
 class function TXQValueString.canCreateFromString(const v: string): boolean;
 begin
@@ -646,19 +540,9 @@ begin
   result := true;
 end;
 
-class function TXQValueString.castableFromInternal(const v: IXQValue): boolean;
-begin
-  result := canCreateFromString(v.toString);
-end;
-
-class function TXQValueString.classkind: TXQValueKind;
+class function TXQValueString.classKind: TXQValueKind;
 begin
   Result:=pvkString;
-end;
-
-class function TXQValueString.classtypeName: string;
-begin
-  result := 'string';
 end;
 
 function TXQValueString.canConvertToInt65: boolean;
@@ -714,16 +598,8 @@ begin
 end;
 
 function TXQValueString.toString: string;
-var
-  temp: SizeInt;
 begin
   result := str;
-  if self is TXQValue_QName then begin
-    temp := pos(#2, result);
-    if temp = 0 then exit;
-    delete(result, 1, temp);
-    if (result <> '') and (result[1] = ':') then delete(result, 1, 1);
-  end;
 end;
 
 function TXQValueString.toDateTime: TDateTime;
@@ -731,65 +607,115 @@ begin
   result := StrToDateTimeDef(str,0);
 end;
 
-function TXQValueString.clone: IXQValue;
+function TXQValueString.toRawBinary: string;
 begin
-  result := TXQValueStringClass(self.ClassType).Create(str);
+  if instanceOf(baseSchema.hexBinary) then result := strDecodeHex(str)
+  else if instanceOf(baseSchema.base64Binary) then result := base64.DecodeStringBase64(str)
+  else assert(false);
 end;
 
+function TXQValueString.clone: IXQValue;
+begin
+  result := TXQValueString.create(ftypeAnnotation, str);
+end;
+
+
+{ TXQValueQName }
+
+constructor TXQValueQName.create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);
+begin
+  inherited create(atypeAnnotation);
+  prefix := aprefix;
+  url := aurl;
+  local := alocal;
+
+end;
+
+constructor TXQValueQName.create(atypeAnnotation: TXSType; const ns: INamespace; const alocal: string);
+begin
+  if ns = nil then create(atypeAnnotation, '', '', alocal)
+  else create(atypeAnnotation, ns.getURL, ns.getPrefix, alocal);
+end;
+
+constructor TXQValueQName.create(const aurl, aprefix, alocal: string);
+begin
+  create(baseSchema.QName, aurl, aprefix, alocal);
+end;
+
+constructor TXQValueQName.create(const aurl, aprefixedLocal: string);
+var
+  i: SizeInt;
+begin
+  i := pos(':', aprefixedLocal);
+  if i = 0 then create(aurl, '', aprefixedLocal)
+  else create(aurl, copy(aprefixedLocal, 1,i-1), strCopyFrom(aprefixedLocal,i+1));
+end;
+
+constructor TXQValueQName.create(const ns: INamespace; const alocal: string);
+begin
+  if ns = nil then create(baseSchema.QName, '', '', alocal)
+  else create(baseSchema.QName, ns.getURL, ns.getPrefix, alocal);
+end;
+
+constructor TXQValueQName.create(atypeAnnotation: TXSType; const value: IXQValue);
+begin
+  inherited create(atypeAnnotation);
+end;
+
+class function TXQValueQName.classKind: TXQValueKind;
+begin
+  Result:=pvkQName;
+end;
+
+function TXQValueQName.toString: string;
+begin
+  if prefix <> '' then result := prefix + ':' + local
+  else result := local;
+end;
+
+function TXQValueQName.clone: IXQValue;
+begin
+  Result:=TXQValueQName.create(ftypeAnnotation, url, prefix, local);
+end;
 { TXQValueDateTime }
 
-constructor TXQValueDateTime.create;
+constructor TXQValueDateTime.create(atypeAnnotation: TXSType);
 begin
+  inherited create(atypeAnnotation);
   fillchar(value, sizeof(value), 0);
   value.timezone:=nan;
 end;
 
-constructor TXQValueDateTime.create(const str: string);
+constructor TXQValueDateTime.create(atypeAnnotation: TXSDateTimeType; const str: string);
 begin
-  if not tryCreateFromString(str,  dateFormat, @value) then
-    raise EXQEvaluationException.Create('FORG0001', 'Invalid conversion from '+str+' to date format ' + dateFormat);
+  if not tryCreateFromString(str,  atypeAnnotation.fixedDateTimePattern, @value) then
+    raise EXQEvaluationException.Create('FORG0001', 'Invalid conversion from '+str+' to date format ' + atypeAnnotation.fixedDateTimePattern);
+  ftypeAnnotation := atypeAnnotation;
 end;
 
-class function TXQValueDateTime.createFromValue(const v: IXQValue): IXQValue;
-begin
-  if v is TXQValueDateTime then begin
-    result := TXQValueDateTimeClass(self.ClassType).create((v as TXQValueDateTime).value);
-  end else begin
-    result := TXQValueDateTimeClass(self.ClassType).create(v.toString);
-  end;
-end;
 
-constructor TXQValueDateTime.create(const str, format: string);
+constructor TXQValueDateTime.create(atypeAnnotation: TXSType; const str, format: string);
 begin
   if not tryCreateFromString(str, format, @value) then
     raise EXQEvaluationException.Create('FORG0001', 'Invalid conversion from '+str+' to date format ' + format);
+  ftypeAnnotation := atypeAnnotation;
 end;
 
-constructor TXQValueDateTime.create(const dt: TXQValueDateTimeData);
+constructor TXQValueDateTime.create(atypeAnnotation: TXSType; const dt: TXQValueDateTimeData);
 begin
+  ftypeAnnotation := atypeAnnotation;
   value := dt;
 end;
 
-constructor TXQValueDateTime.create(const dt: TDateTime);
+constructor TXQValueDateTime.create(atypeAnnotation: TXSType; const dt: TDateTime);
 begin
+  ftypeAnnotation := atypeAnnotation;
   setDateTime(dt);
 end;
 
-
-
-class function TXQValueDateTime.canCreateFromDateTime(const s: string): boolean;
-begin
-  result := tryCreateFromString(s, dateFormat, nil);
-end;
-
-class function TXQValueDateTime.classkind: TXQValueKind;
+class function TXQValueDateTime.classKind: TXQValueKind;
 begin
   Result:=pvkDateTime;
-end;
-
-class function TXQValueDateTime.classtypeName: string;
-begin
-  result := 'dateTime';
 end;
 
 function TXQValueDateTime.canConvertToInt65: boolean;
@@ -835,24 +761,25 @@ var
   i: Integer;
   v: TXQValueDateTimeData;
 begin
-  if self.ClassType = TXQValueDateTime then
+  if typeAnnotation = baseSchema.dateTime then
     result := bbutils.dateTimeFormat('yyyy-mm-ddThh:nn:ss[.z+][Z]', value.year, value.month, value.day, value.hour, value.min, value.sec, value.secfraction, value.timezone)
   else begin
     fac := 1;
-    if self is TXQValue_duration then begin
+    if (typeAnnotation as TXSDateTimeType).isDuration then begin
       for i:=1 to 6 do  if (value.values[i] <> high(integer)) and (value.values[i] < 0) then begin fac:= -1; break; end;
       if (fac = 1) and (value.secfraction < 0) then fac := -1;
       v := value;
       setDayTime(v, getDayTime(v));
       setMonths(v, getMonths(v), true);
     end else v := value;
-    result := bbutils.dateTimeFormat(self.dateFormat, fac * v.year, fac * v.month, fac * v.day, fac * v.hour, fac * v.min, fac * v.sec, fac * v.secfraction, v.timezone);
+    result := bbutils.dateTimeFormat((typeAnnotation as TXSDateTimeType).fixedDateTimePattern, fac * v.year, fac * v.month, fac * v.day, fac * v.hour, fac * v.min, fac * v.sec, fac * v.secfraction, v.timezone);
     if (fac < 0) and (result <> 'P') then result := '-' + result;
   end;
   if (result = 'P') then begin
-    if (self.ClassType = TXQValue_duration) then result := 'PT0S'
-    else if (self.ClassType = TXQValue_yearMonthDuration) then result := 'P0M'
-    else if (self.ClassType = TXQValue_dayTimeDuration) then result := 'PT0S';
+    if ftypeAnnotation.derivedFrom(baseSchema.yearMonthDuration) then
+      result := 'P0M'
+     else
+      result := 'PT0S';
   end;
 end;
 
@@ -900,17 +827,7 @@ end;
 
 function TXQValueDateTime.clone: IXQValue;
 begin
-  result := TXQValueDateTimeClass(self.ClassType).Create(value);
-end;
-
-class function TXQValueDateTime.dateFormat: string;
-begin
-  result := 'y+-mm-dd[Z]$|hh:nn:ss[.z+][Z]$|y+-mm-ddThh:nn:ss[.z+][Z]$|y+-mm-dd hh:nn:ss[.z+][Z]$';
-end;
-
-procedure TXQValueDateTime.truncateRange;
-begin
-
+  result := TXQValueDateTimeClass(self.ClassType).Create(typeAnnotation, value);
 end;
 
 class function TXQValueDateTime.tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): boolean;
@@ -987,7 +904,7 @@ end;
 procedure TXQValueDateTime.addDuration(const D: TXQValueDateTimeData);
 var temp: TXQValueDateTimeData;
 begin
-  if self is TXQValue_duration then begin
+  if (typeAnnotation as TXSDateTimeType).isDuration then begin
     setMonths(value, getMonths(value) + getMonths(D), true);
     setDayTime(value, getDayTime(value) + getDayTime(D));
   end else begin
@@ -1065,7 +982,7 @@ begin
   result := 12 * duration.year + duration.month;
 end;
 
-class procedure TXQValueDateTime.setDayTime(var duration: TXQValueDateTimeData; const dt: Extended);
+class procedure TXQValueDateTime.setDayTime(var duration: TXQValueDateTimeData; const dt: extended);
 var
   dti: Int64;
 begin
@@ -1084,7 +1001,7 @@ begin
   duration.sec := dti;
 end;
 
-class function TXQValueDateTime.getDayTime(const duration: TXQValueDateTimeData): Extended;
+class function TXQValueDateTime.getDayTime(const duration: TXQValueDateTimeData): extended;
 begin
   result := duration.secfraction + duration.sec + 60.0 * (duration.min + 60.0 * (duration.hour + 24.0 * extended(duration.day)));
 end;
@@ -1097,6 +1014,15 @@ end;
 function TXQValueDateTime.toMonths: integer;
 begin
   result := getMonths(value);
+end;
+
+procedure TXQValueDateTime.truncateRange;
+begin
+  case (ftypeAnnotation as TXSDateTimeType).truncation of
+    xqdttDate:      begin value.year := 1989; value.month := 12; value.day := 30; end;
+    xqdttTime:      begin value.hour := 0; value.min := 0; value.sec := 0; end;
+    xqdttYearMonth: begin value.year := 0; value.month := 0;   end;
+  end;
 end;
 
 class function TXQValueDateTime.compare(const a, b: TXQValueDateTime; implicitTimezone: TDateTime): integer;
@@ -1112,8 +1038,8 @@ var
   overlap: Integer;
 begin
   result := 0;
-  adf := lowercase(a.dateFormat);
-  bdf := lowercase(b.dateFormat);
+  adf := lowercase((a.typeAnnotation as TXSDateTimeType).fixedDateTimePattern);
+  bdf := lowercase((b.typeAnnotation as TXSDateTimeType).fixedDateTimePattern);
   av := a.value;
   bv := b.value;
   //replace unimportant values with reference date
@@ -1134,7 +1060,7 @@ begin
   bdt := dateEncode(bv.year, bv.month, bv.day) + (bv.hour * 3600 + bv.min *60 + bv.sec)/SecsPerDay;
   //add secfractions and timezone, if relevant in the formats
   adelta := 0; bdelta := 0.0;
-  if (pos('z', a.dateFormat) > 0) and (pos('z', b.dateFormat) > 0) then begin
+  if (pos('z', (a.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) and (pos('z', (b.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) then begin
     if not IsNan(av.secfraction) then adelta += av.secfraction / SecsPerDay;
     if not IsNan(bv.secfraction) then bdelta += bv.secfraction / SecsPerDay;
   end;
@@ -1145,7 +1071,7 @@ begin
   else if not IsNan(implicitTimezone) then bdelta -= implicitTimezone;
 
   adt+=adelta; bdt+=bdelta;
-  result := CompareValue(TXQ_Decimal(adt),TXQ_Decimal(bdt),0.000001/SecsPerDay);
+  result := CompareValue(Decimal(adt),Decimal(bdt),0.000001/SecsPerDay);
 end;
 
 
@@ -1153,13 +1079,13 @@ end;
 
 constructor TXQValueSequence.create(capacity: integer);
 begin
-  inherited create;
+  inherited create(baseSchema.sequence);
   seq := TXQVList.Create(capacity);
 end;
 
 constructor TXQValueSequence.create(firstChild: IXQValue);
 begin
-  inherited create;
+  inherited create(baseSchema.sequence);
   seq := TXQVList.Create;
   seq.add(firstChild);
 end;
@@ -1169,24 +1095,9 @@ begin
   Result:=pvkSequence;
 end;
 
-class function TXQValueSequence.classtypeName: string;
-begin
-  result := 'sequence';
-end;
-
 function TXQValueSequence.isUndefined: boolean;
 begin
   Result:=seq.Count=0;
-end;
-
-function TXQValueSequence.canConvertToInt65: boolean;
-begin
-  Result:=(seq.Count = 1) and (seq[0].canConvertToInt65);
-end;
-
-function TXQValueSequence.canConvertToDecimal(pure: boolean): boolean;
-begin
-  Result:=(seq.Count = 1) and (seq[0].canConvertToDecimal(pure));
 end;
 
 function TXQValueSequence.toBoolean: boolean;
@@ -1326,18 +1237,13 @@ end;
 
 constructor TXQValueNode.create(anode: TTreeNode);
 begin
-  inherited create;
+  inherited create(baseSchema.node);
   node := anode;
 end;
 
 class function TXQValueNode.classkind: TXQValueKind;
 begin
   Result:=pvkNode;
-end;
-
-class function TXQValueNode.classtypeName: string;
-begin
-  result := 'node';
 end;
 
 function TXQValueNode.canConvertToInt65: boolean;
@@ -1440,6 +1346,7 @@ end;
 
 constructor TXQValueObject.create();
 begin
+  inherited create(baseJSONiqSchema.object_);
   values:= TXQVariableChangeLog.create();
 end;
 
@@ -1454,33 +1361,9 @@ begin
   inherited Destroy;
 end;
 
-class function TXQValueObject.createFromValue(const v: IXQValue): IXQValue;
-var
-  seq: TXQVList;
-  i: Integer;
-  obj: TXQValueObject;
-begin
-  obj := TXQValueObject.create();
-  if v <> nil then begin
-    if (v.kind <> pvkSequence) or (v.getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Argument to object constructor must be a sequence with an even number of elements');
-    seq := v.toXQVList;
-    for i:=0 to (seq.Count-1) div 2 do begin
-      if not (seq[2*i].kind = pvkString) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Only string values are allowed as property names');
-      obj.setMutable(seq[2*i].toString, seq[2*i+1]);
-    end;
-    seq.free;
-  end;
-  result := obj;
-end;
-
 class function TXQValueObject.classKind: TXQValueKind;
 begin
   Result:=pvkObject;
-end;
-
-class function TXQValueObject.classTypeName: string;
-begin
-  Result:='object';
 end;
 
 procedure TXQValueObject.setMutable(const name: string; const v: IXQValue);
@@ -1649,17 +1532,13 @@ end;
 
 constructor TXQValueJSONArray.create(capacity: integer);
 begin
+  inherited create(baseJSONiqSchema.array_);
   seq := TXQVList.create(capacity);
 end;
 
 class function TXQValueJSONArray.classKind: TXQValueKind;
 begin
   Result:=pvkArray;
-end;
-
-class function TXQValueJSONArray.classTypeName: string;
-begin
-  Result:='array';
 end;
 
 function TXQValueJSONArray.isUndefined: boolean;
@@ -1725,10 +1604,9 @@ begin
 end;
 
 
-
-class function TXQValueJSONNull.classTypeName: string;
+constructor TXQValueJSONNull.create;
 begin
-  Result:='null';
+  inherited Create(baseJSONiqSchema.jsNull)
 end;
 
 class function TXQValueJSONNull.classKind: TXQValueKind;
@@ -1738,7 +1616,7 @@ end;
 
 function TXQValueJSONNull.clone: IXQValue;
 begin
-  Result:=TXQValueJSONNull.create;
+  Result:=TXQValueJSONNull.create();
 end;
 
 function TXQValueJSONNull.toString: string;
@@ -1771,11 +1649,6 @@ end;
 class function TXQValueFunction.classkind: TXQValueKind;
 begin
   Result:=pvkFunction;
-end;
-
-class function TXQValueFunction.classtypeName: string;
-begin
-  Result:='function';
 end;
 
 function TXQValueFunction.canConvertToInt65: boolean;

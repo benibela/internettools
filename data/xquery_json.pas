@@ -41,7 +41,7 @@ end;
 function xqFunctionNull(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0, 0);
-  result := TXQValueJSONNull.create;
+  result := TXQValueJSONNull.Create();
 end;
 
 
@@ -129,7 +129,7 @@ var
     begin
       if TryStrToInt65(scanner.CurTokenString, temp65) then exit(xqvalue(temp65));
       if TryStrToFloat(scanner.CurTokenString, tempFloat) then
-        if striContains(scanner.CurTokenString, 'E') then exit(TXQValue_double.create(tempFloat))
+        if striContains(scanner.CurTokenString, 'E') then exit(baseSchema.double.createValue(tempFloat))
         else exit(TXQValueDecimal.create(tempFloat));
       raiseError('Invalid number');
     end;

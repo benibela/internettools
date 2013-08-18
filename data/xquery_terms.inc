@@ -99,6 +99,7 @@ begin
 end;
 
 
+
 { TXQTermReadProperty }
 
 constructor TXQTermReadObjectProperty.create(apropname: string);
@@ -312,8 +313,8 @@ function TXQTermSequenceType.castableAsBase(v: IXQValue): boolean;
 begin
   if v.isUndefined then result := allowNone
   else if v.getSequenceCount > 1 then result := false
-  else if v is TXQValueSequence then result := (v as TXQValueSequence).seq[0].canConvertToType(atomicTypeInfo)
-  else result := v.canConvertToType(atomicTypeInfo)
+  else if v is TXQValueSequence then result := atomicTypeInfo.tryCreateValue((v as TXQValueSequence).seq[0])
+  else result := atomicTypeInfo.tryCreateValue(v);
 end;
 
 function TXQTermSequenceType.castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
@@ -323,11 +324,11 @@ var
 begin
   v := xqvalueAtomize(v);
   if not castableAsBase(v) then raiseEvaluationError('XPTY0004', 'impossible cast as');
-  if not atomicTypeInfo.InheritsFrom(TXQValue_QName) then result := atomicTypeInfo.createFromValue(v)
+  if not atomicTypeInfo.derivedFrom(baseSchema.QName) then result := atomicTypeInfo.createValue(v)
   else begin
     temp := trim(v.toString);
     context.splitRawQName(ns, temp, xqdnkAny);
-    result := qnameMake(ns, temp, TXQValueStringClass(atomicTypeInfo));
+    result := TXQValueQName.create(atomicTypeInfo, ns, temp);
   end;
 end;
 
@@ -342,14 +343,17 @@ function TXQTermSequenceType.instanceOf(ta: IXQValue; const context: TXQEvaluati
 var nodeCondition: TXQPathNodeCondition;
 
   function instanceOfSingleType(sub: IXQValue): boolean;
+  var
+    t: TXSType;
   begin
     case kind of
       //tikAny, tikNone: ; //handled before
-      tikAtomic:
-        if (atomicTypeInfo = TXQValueNumericPseudoType) or (atomicTypeInfo = TXQValueTrueNumericPseudoType) then
-          result := (sub is TXQValueInt65) or (sub is TXQValueDecimal)
-         else
-          result := sub.instanceOfInternal(atomicTypeInfo);
+      tikAtomic: begin
+        t := sub.typeAnnotation;;
+        if t.derivedFrom(atomicTypeInfo) then exit(true);
+        if atomicTypeInfo is TXSUnionType then exit(TXSUnionType(atomicTypeInfo).containsTransitive(t));
+        exit(false);
+      end;
       tikElementTest: result  := TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, sub.toNode);
     end;
   end;
@@ -644,7 +648,7 @@ begin
       FreeAndNil(sortingCache);
     end;
 
-    if finalResult = nil then result := TXQValueUndefined.create
+    if finalResult = nil then result := xqvalue()
     else result := finalResult;
     xqvalueSeqSqueeze(result);
   finally
@@ -681,6 +685,7 @@ begin
   returned.Free;
   inherited destroy;
 end;
+
 
 { TXQTermNamedFunction }
 
@@ -777,14 +782,14 @@ begin
       if length(evilkids) <> 2 then raiseEvaluationError('XPST0003', 'Need two arguments for function: op:' + funcname);
       result := TXQOperatorInfo(func).func(context, evilkids[0], evilkids[1]);
     end;
-    xqfkTypeConstructor:
-      if TXQValueClass(func).InheritsFrom(TXQValue_QName) then begin
-        temp := evilkids[0].toString;
-        context.splitRawQName(ns, temp, xqdnkAny);
-        result := qnameMake(ns, temp,  TXQValueStringClass(func));
-      end else if length(evilkids) = 0 then result := TXQValueClass(func).createFromValue(nil)
-      else if length(evilkids) = 1 then result := TXQValueClass(func).createFromValue(evilkids[0])
-      else raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
+    xqfkTypeConstructor: begin
+      if length(evilkids) <> 1 then raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
+      case evilkids[0].getSequenceCount of
+        0: result := xqvalue();
+        1: result := TXSType(func).createValue(evilkids[0])
+        else raiseEvaluationError('FORG0001', 'Need singleton value to cast as '+TXSType(func).name);
+      end;
+    end;
     xqfkUnknown, xqfkNativeInterpreted: begin
       if kind <> xqfkNativeInterpreted then begin
         vfunc := nil;
@@ -841,6 +846,7 @@ class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const na
 var
   aindex: Integer;
   module: TXQNativeModule;
+  t: TXSType;
 begin
   if (ns = nil) then exit(false);
 
@@ -873,10 +879,10 @@ begin
     exit;
   end;
 
-  aindex:=module.types.IndexOf(name);
-  if aindex >= 0 then begin
+  t:=baseSchema.findType(name);
+  if t <> nil then begin
     akind:=xqfkTypeConstructor;
-    afunc := TXQAbstractFunctionInfo(module.types.Objects[aindex]);
+    afunc := TXQAbstractFunctionInfo(t);
     exit(true)
   end;
 
@@ -944,7 +950,6 @@ begin
   end;
   //this returns a sequence of a single value instead that value, if func is a sequence with multiple values (from which only one has that property). Does it matter?
   if result = nil then result := xqvalue();
-
 end;
 
 function TXQTermDynamicFunctionCall.getContextDependencies: TXQContextDependencies;
@@ -1068,7 +1073,8 @@ end;
 function TXQTermNodeMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue
-  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.staticContext.sender.TextElement<>nil) then result := xqvalue(context.staticContext.sender.TextElement)
+  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.staticContext.sender.TextElement<>nil) then
+    result := xqvalue(context.staticContext.sender.TextElement)
   else begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
@@ -1150,9 +1156,14 @@ end;
 
 constructor TXQTermNumber.create(const avalue: string);
 begin
-  if strContains(avalue,'e') or strContains(avalue,'E') then value := TXQValue_double.create(StrToFloat(avalue,XQFormats))
+  if strContains(avalue,'e') or strContains(avalue,'E') then value := TXQValueDecimal.create(baseSchema.double, StrToFloat(avalue,XQFormats))
   else if strContains(avalue,'.') then value := xqvalue(StrToFloat(avalue,XQFormats))
   else value := xqvalue(StrToInt65(avalue));
+end;
+
+constructor TXQTermNumber.create(const avalue: IXQValue);
+begin
+  value := avalue;
 end;
 
 function TXQTermNumber.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -1173,10 +1184,10 @@ begin
   if func then begin
     if pos('::', avalue) > 0 then if strSplitGet('::', avalue) <> 'attribute' then raiseParsingError('XPST0003', 'Invalid axis for attribute test');
     if (avalue <> 'attribute') and (avalue <> 'node') then raiseParsingError('XPST0003', 'invalid attribute test: '+avalue);
-    value := '*';
+    attribName := '*';
   end else begin
     if pos(':', avalue) > 0 then namespace := strSplitGet(':', avalue);
-    value := avalue;
+    attribName := avalue;
   end;
 end;
 
@@ -1198,7 +1209,7 @@ begin
   if tempEl.typ = tetProcessingInstruction then
     exit(xqvalue);
 
-  readvalue := value;
+  readvalue := attribName;
   readnamespace := namespace;
   if length(children) > 0 then begin
     if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('XPST0003', 'Invalid subtype');
@@ -1581,14 +1592,16 @@ var
     end;
 
   var
-    tempqname: TStringArray;
+    vname: TXQValueQName;
+    prefix: String;
   begin
-    if (v is TXQValue_QName) and ((defkind = xqdnkElementType) or   strContains((v as TXQValueString).str, #2)) then begin
-      tempqname := qnameSplit((v as TXQValueString).str);
-      if (tempqname[1] = '') and (tempqname[0] = XMLNamespaceUrl_XML) then tempqname[1] := 'xml';
-      if (tempqname[1] = '') and (defkind <> xqdnkElementType) then tempqname[1] := chooseRandomPrefix;
-      tree.namespace := declareNewNamespace(tempqname[0], tempqname[1]);
-      tree.value:=tempqname[2];
+    if (v.instanceOf(baseSchema.QName))  and ((defkind = xqdnkElementType) or ((v as TXQValueQName).url <> ''))  then begin
+      vname := (v as TXQValueQName);
+      prefix := vname.prefix;
+      if (prefix = '') and (vname.url = XMLNamespaceUrl_XML) then prefix := 'xml';
+      if (prefix = '') and (defkind <> xqdnkElementType) then prefix := chooseRandomPrefix;
+      tree.namespace := declareNewNamespace(vname.url, prefix);
+      tree.value := vname.local;
     end else begin
       tree.value := v.toString;
       subcontext^.splitRawQName(tree.namespace, tree.value, defkind);
@@ -1716,7 +1729,7 @@ function TXQTermJSONObjectConstructor.evaluate(const context: TXQEvaluationConte
       exit(v);
 
     if v.getSequenceCount = 0 then
-      exit(TXQValueJSONNull.create);
+      exit(TXQValueJSONNull.create());
     if v is TXQValueSequence then
       if v.getSequenceCount > 1 then begin
         result := TXQValueJSONArray.create(v.getSequenceCount);

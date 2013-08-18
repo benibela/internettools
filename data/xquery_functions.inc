@@ -18,6 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
+
+function xqvalueD(v: Decimal; const typeRef1, typeRef2: IXQValue): IXQValue;
+begin
+  result := TXQValueDecimal.create(TXSType.commonDecimalType(typeRef1, typeRef2), v);
+end;
+
+function xqvalueI(const v: int65; const typeRef1, typeRef2: IXQValue): IXQValue;
+begin
+  result := TXQValueInt65.create(TXSType.commonIntegerType(typeRef1, typeRef2), v);
+end;
+
 //================================Operators=====================================
 //** Perform vinary operations on xqvalue and destroys them.
 //** Assumes @a <> @b
@@ -31,21 +42,21 @@ begin
   ignore(cxt);
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
      (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit(xqvalue());
 
   if (ak = pvkInt) and (bk = pvkInt) then
-    exit(commonIntegerClass(a,b).create(a.toInt65 + b.toInt65));
+    exit(TXSType.commonIntegerType(a,b).createValue(a.toInt65 + b.toInt65));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) or
-       (not (a is TXQValue_duration) and not (b is TXQValue_duration)) then exit(xqvalue());
-    if b is TXQValue_duration then begin
+       (not (a.typeAnnotation as TXSDateTimeType).isDuration and not (b.typeAnnotation as TXSDateTimeType).isDuration) then exit(xqvalue());
+    if (b.typeAnnotation as TXSDateTimeType).isDuration then begin
       result := a.clone;
       (result as TXQValueDateTime).addDuration((b as TXQValueDateTime).value);
     end else begin
@@ -55,13 +66,13 @@ begin
     exit;
   end;
   ad := a.toDecimal; bd := b.toDecimal;
-  if IsNan(ad) or IsNan(bd) then result := commonDecimalClass(a,b).create(getNaN)
+  if IsNan(ad) or IsNan(bd) then result := xqvalueD(getNaN, a, b)
   else if IsInfinite(ad) or IsInfinite(bd) then begin
-    if not (IsInfinite(ad) and IsInfinite(bd))  then result := commonDecimalClass(a,b).create(ad + bd)
-    else if isNegInf(ad) and isNegInf(bd)  then result := commonDecimalClass(a,b).create(-Infinity)
-    else if isPosInf(ad) and isPosInf(bd)  then result := commonDecimalClass(a,b).create(Infinity)
-    else result := commonDecimalClass(a,b).create(getNan);
-  end else result := commonDecimalClass(a,b).create(a.toDecimal + b.toDecimal);
+    if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueD(ad + bd, a, b)
+    else if isNegInf(ad) and isNegInf(bd)  then result := xqvalueD(-Infinity, a, b)
+    else if isPosInf(ad) and isPosInf(bd)  then result := xqvalueD(Infinity, a, b)
+    else result := xqvalued(getNan, a, b);
+  end else result := xqvalueD(a.toDecimal + b.toDecimal, a, b)
 end;
 
 function xqvalueSubtract(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -77,23 +88,23 @@ begin
 
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
      (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
     exit(xqvalue);
 
   if (ak = pvkInt) and (bk = pvkInt) then
-    exit(commonIntegerClass(a, b).create(a.toInt65 - b.toInt65));
+    exit(xqvalueI(a.toInt65 - b.toInt65, a, b));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
-    if not (b is TXQValue_duration) then begin
-      if a is TXQValue_duration then exit(xqvalue);
+    if not (b.typeAnnotation as TXSDateTimeType).isDuration then begin
+      if (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
       tempdt := a.toDateTime - b.toDateTime;
-      xqtempdt := TXQValueDateTimeClass(TXQValue_dayTimeDuration).create(abs(tempdt));
+      xqtempdt := TXQValueDateTime.create(baseSchema.dayTimeDuration, abs(tempdt));
       xqtempdt.value.year:=0;
       xqtempdt.value.month:=0;
       xqtempdt.value.day:=trunc(abs(tempdt));
@@ -101,25 +112,25 @@ begin
       exit(xqtempdt);
     end else begin
       btemp := b.clone; //need to keep reference to the clone
-      (btemp as TXQValue_duration).multiplyComponents(-1);
+      (btemp as TXQValueDateTime).multiplyComponents(-1);
       result := a.clone;
-      (result as TXQValueDateTime).addDuration((btemp as TXQValue_duration).value);
+      (result as TXQValueDateTime).addDuration((btemp as TXQValueDateTime).value);
     end;
     exit;
   end;
 
   ad := a.toDecimal; bd := b.toDecimal;
-  if IsNan(ad) or IsNan(bd) then result := commonDecimalClass(a,b).create(getNaN)
+  if IsNan(ad) or IsNan(bd) then result := xqvalueD(getNaN, a, b)
   else if IsInfinite(ad) or IsInfinite(bd) then begin
-    if not (IsInfinite(ad) and IsInfinite(bd))  then result := commonDecimalClass(a,b).create(ad - bd)
-    else if ad = bd then result := commonDecimalClass(a,b).create(getNaN)
+    if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueD(ad - bd, a, b)
+    else if ad = bd then result := xqvalueD(getNaN, a, b)
     else result := a.clone;
-  end else result := commonDecimalClass(a,b).create(a.toDecimal - b.toDecimal);
+  end else result := xqvalueD(a.toDecimal - b.toDecimal, a, b);
 end;
 
 function xqvalueTo(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var i, f,t: int65;
-    typ: TXQValueInt65Class;
+    typ: TXSType;
     len: Int65;
     resseq: TXQValueSequence;
     idx: Integer;
@@ -128,11 +139,11 @@ var i, f,t: int65;
 begin
   ignore(cxt);
   if a.isUndefined or b.isUndefined then exit(xqvalue);
-  typ := commonIntegerClass(a,b);
+  typ := TXSType.commonIntegerType(a,b);
   f := a.toInt65();
   t := b.toInt65();
   if t < f then exit(xqvalue);
-  if t = f then exit(typ.create(f));
+  if t = f then exit(typ.createValue(f));
   len := t - f + 1;
   if len > MaxInt then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
@@ -141,16 +152,16 @@ begin
   if (f  > -$3fffffff) and (t < $3fffffff) then begin
     fsmall := f;
     for idx := 0 to len - 1 do
-      resseqseq.list[idx] := typ.create(idx+fsmall);
+      resseqseq.list[idx] := typ.createValue(idx+fsmall);
   end else begin
     idx := 0;
     i := f;
     while i < t do begin
-      resseqseq.list[idx] := typ.create(i);
+      resseqseq.list[idx] := typ.createValue(i);
       i += 1;
       idx+=1;
     end;
-    resseqseq.list[idx] := typ.create(t);
+    resseqseq.list[idx] := typ.createValue(t);
   end;
   result := resseq;
 end;
@@ -163,8 +174,8 @@ var
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
      (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
     exit((xqvalue));
 
@@ -174,11 +185,11 @@ begin
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
     if bk <> pvkDateTime then begin
-      if (not (a is TXQValue_duration)) or (not b.canConvertToDecimal(false)) then exit(xqvalue);
+      if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (not baseSchema.double.tryCreateValue(b)) then exit(xqvalue);
       result := a.clone;
       (result as TXQValueDateTime).multiplyComponents(b.toDecimal);
     end else begin
-      if (not (b is TXQValue_duration)) or (not a.canConvertToDecimal(false)) then exit(xqvalue);
+      if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (not baseSchema.double.tryCreateValue(a)) then exit(xqvalue);
       result := b.clone;
       (result as TXQValueDateTime).multiplyComponents(a.toDecimal);
     end;
@@ -186,16 +197,16 @@ begin
   end;
 
   if (ak = pvkInt) and (bk = pvkInt) then
-    exit(commonIntegerClass(a,b).create(a.toInt65 * b.toInt65));
+    exit(xqvalueI(a.toInt65 * b.toInt65, a, b));
 
   ad := a.toDecimal; bd := b.toDecimal;
   if IsNan(ad) then result := a
   else if IsNan(bd) then result := b
   else if IsInfinite(ad) or IsInfinite(bd) then begin
-    if (ad = 0) or (bd = 0) then result := commonDecimalClass(a,b).create(getNaN)
-    else if (ad < 0) = (bd < 0) then result := commonDecimalClass(a,b).create(Infinity)
-    else result := commonDecimalClass(a,b).create(-Infinity);
-  end else result := commonDecimalClass(a,b).create(a.toDecimal * b.toDecimal);
+    if (ad = 0) or (bd = 0) then result := xqvalueD(getNaN, a, b)
+    else if (ad < 0) = (bd < 0) then result := xqvalueD(Infinity, a, b)
+    else result := xqvalueD(-Infinity, a, b);
+  end else result := xqvalueD(a.toDecimal * b.toDecimal, a, b);
 end;
 
 function xqvalueDivide(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -205,8 +216,8 @@ var f: decimal;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
      (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
     exit((xqvalue));
 
@@ -214,59 +225,61 @@ begin
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
 
   if (ak = pvkDateTime) then begin
-    if not (a is TXQValue_duration) then exit(xqvalue);
-    if b is TXQValue_duration then begin
-      if (a is TXQValue_dayTimeDuration) and (b is TXQValue_dayTimeDuration) then
-        exit(xqvalue(TXQ_Decimal((a as TXQValueDateTime).toDayTime() / (b as TXQValueDateTime ).toDayTime())));
-      if (a is TXQValue_yearMonthDuration) and (b is TXQValue_yearMonthDuration) then
-        exit(xqvalue(TXQ_Decimal((a as TXQValueDateTime).toMonths() / (b as TXQValueDateTime).toMonths())));
+    if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
+    if (b is TXQValueDateTime) and (a.typeAnnotation as TXSDateTimeType).isDuration then begin
+      if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then
+        exit(xqvalue(Decimal((a as TXQValueDateTime).toDayTime() / (b as TXQValueDateTime ).toDayTime())));
+      if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then
+        exit(xqvalue(Decimal((a as TXQValueDateTime).toMonths() / (b as TXQValueDateTime).toMonths())));
       exit(xqvalue);
     end;
     f:= b.toDecimal;
     result := a.clone;
-    if isPosInf(f) or isNegInf(f) then (result as TXQValue_duration).multiplyComponents(0)
-    else (result as TXQValue_duration).multiplyComponents(1 / f);
+    if isPosInf(f) or isNegInf(f) then (result as TXQValueDateTime).multiplyComponents(0)
+    else (result as TXQValueDateTime).multiplyComponents(1 / f);
     exit;
   end;
 
   f:= b.toDecimal;
   if isnan(f) or (f = 0) then begin
+    if a.instanceOf(baseSchema.decimal) and b.instanceOf(baseSchema.decimal) then
+      raise EXQEvaluationException.create('err:FOAR0001', 'Division by zero is not possible');
     f := a.toDecimal;
-    if isnan(f) or (f=0) then result := commonDecimalClass(a,b).create(getNaN)
-    else if f > 0 then result := commonDecimalClass(a,b).create(getPosInf)
-    else {if f < 0 then }result := commonDecimalClass(a,b).create(getNegInf);
+    if isnan(f) or (f=0) then result := xqvalueD(getNaN, a, b)
+    else if f > 0 then result := xqvalueD(getPosInf, a, b)
+    else {if f < 0 then }result := xqvalueD(getNegInf, a, b);
     exit();
   end;
   e := a.toDecimal;
-  if IsInfinite(e) or IsInfinite(f) then result := commonDecimalClass(a,b).create(getNaN)
-  else result := commonDecimalClass(a,b).create(a.toDecimal / f);
+  if IsInfinite(e) or IsInfinite(f) then result := xqvalueD(getNaN, a, b)
+  else result := xqvalueD(a.toDecimal / f, a, b);
 end;
 
 function xqvalueDivideInt(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var f: decimal;
  i: int65;
  ak, bk: TXQValueKind;
- cc: TXQValueInt65Class;
+ cc: TXSType;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
      (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
     exit(xqvalue);
 
-  if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and (a.canConvertToInt65))) and
-     ((bk = pvkInt) or ((bk in [pvkString,pvkNode]) and (b.canConvertToInt65))) then begin
+  if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and baseSchema.integer.tryCreateValue(a))) and
+     ((bk = pvkInt) or ((bk in [pvkString,pvkNode]) and baseSchema.integer.tryCreateValue(b))) then begin
     i := b.toInt65;
     if i = 0 then result := xqvalue()
     else begin
       i := a.toInt65 div i;
-      cc := commonIntegerClass(a,b);
-      if (cc.InheritsFrom(TXQValue_positiveInteger) and (i <= 0)) or (cc.InheritsFrom(TXQValue_negativeInteger) and (i >= 0))
-         or (cc.InheritsFrom(TXQValue_nonNegativeInteger) and (i < 0)) or (cc.InheritsFrom(TXQValue_nonPositiveInteger) and (i > 0)) then
+      cc := TXSType.commonIntegerType(a,b);
+      if (cc.derivedFrom(baseSchema.PositiveInteger) and (i <= 0)) or (cc.derivedFrom(baseSchema.NegativeInteger) and (i >= 0))
+         or (cc.derivedFrom(baseSchema.NonNegativeInteger) and (i < 0)) or (cc.derivedFrom(baseSchema.NonPositiveInteger) and (i > 0)) then
         result := TXQValueInt65.create(i)
       else
-        result := cc.create(i);
+        result := cc.createValue(i);
     end;
     exit;
   end;
@@ -276,8 +289,8 @@ begin
 
   f := b.toDecimal;
   if IsNan(f) or (f = 0) then
-    exit(commonDecimalClass(a,b).create(getNaN));
-  result := commonIntegerClass(a,b).create(trunc(a.toDecimal / f));
+    exit(xqvalueD(getNaN, a, b));
+  result := xqvalueI(trunc(a.toDecimal / f), a, b);
 end;
 
 function xqvalueMod(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -287,8 +300,8 @@ var f,e: decimal;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (a.canConvertToDecimal(false)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (b.canConvertToDecimal(false)){$ENDIF}) or
+  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
+     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
      (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
     exit(xqvalue);
 
@@ -306,10 +319,10 @@ begin
   f := b.toDecimal;
   if IsNan(e) then result := a
   else if IsNan(f) then result := b
-  else if IsInfinite(e) or (f = 0) then result := commonDecimalClass(a,b).create(getNaN)
+  else if IsInfinite(e) or (f = 0) then result := xqvalueD(getNaN, a, b)
   else if IsInfinite(f) then result := a
   else if f = 0 then result := a
-  else result := commonDecimalClass(a,b).create(e - trunc(e / f) * f)
+  else result := xqvalueD(e - trunc(e / f) * f, a, b)
 end;
 
 function xqvalueConcat(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -319,7 +332,7 @@ begin
 end;
 
 function xqvalueComparableTypes(const a, b: IXQValue): boolean;
-  function decidedByUniqueTypeClass(const c: TXQValueClass): boolean;
+{  function decidedByUniqueTypeClass(const c: TXQValueClass): boolean;
   var
     ais, bis: boolean;
   begin
@@ -328,13 +341,14 @@ function xqvalueComparableTypes(const a, b: IXQValue): boolean;
     result := ais or bis;
     if result then
       xqvalueComparableTypes := ais and bis;
-  end;
+  end;}
 
 var
   ak: TXQValueKind;
   bk: TXQValueKind;
-  ac: TXQValueClass;
-  bc: TXQValueClass;
+  ac: TXSType;
+  bc: TXSType;
+  ct: TXSType;
 begin
   ak := a.kind;
   bk := b.kind;
@@ -342,12 +356,14 @@ begin
      or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
     exit(true);
 
-  ac := a.getClassType;
-  if ac.InheritsFrom(TXQValueNode) then ac := TXQValueString;
-  bc := b.getClassType;
-  if bc.InheritsFrom(TXQValueNode) then bc := TXQValueString;
+  ac := a.typeAnnotation;
+  if ac.derivedFrom(baseSchema.node) then ac := baseSchema.string_;
+  bc := b.typeAnnotation;
+  if bc.derivedFrom(baseSchema.node) then bc := baseSchema.string_;
 
-  result := isAtomicSubType(commonNonBlockedClass(ac, bc));
+  //check if a and b are in the same branch of the type hierarchy (which is the case if their common parent is not the root of the hierarchy)
+  ct := TXSType.commonType(ac, bc);
+  result := (ct <> nil) and (ct <> baseSchema.anyAtomicType) and (ct <> baseSchema.anySimpleType) and (ct <> baseSchema.anyType);;
 end;
 
 
@@ -357,12 +373,23 @@ var ak, bk: TXQValueKind;
 
   function compareAsDecimals(): integer;
   var
-    cmpClass: TXQValueDecimalClass;
+    cmpClass: TXSType;
+    ad, bd: Decimal;
   begin
     if ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) or ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)) then
       exit(-2);
-    cmpClass := commonDecimalClass(a, b);
-    result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal));
+    cmpClass := TXSType.commonDecimalType(a, b);
+    ad := a.toDecimal;
+    bd := b.toDecimal;
+    if cmpClass.derivedFrom(baseSchema.Double) then begin
+      ad := double(ad);
+      bd := double(bd);
+    end else if cmpClass.derivedFrom(baseSchema.Float) then begin
+      ad := single(ad);
+      bd := single(bd);
+    end;
+    //result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal));
+    result := compareValue(ad, bd);
   end;
 
 var tempDateTime: TXQValueDateTime;
@@ -382,14 +409,19 @@ begin
           else result := 1;
         pvkDecimal: result := compareAsDecimals();
         pvkDateTime: begin
-          if (a is TXQValue_duration) <> (b is TXQValue_duration) then exit(-2);
-          if (a is TXQValue_duration) and (b is TXQValue_duration) then begin
-            result := compareValue(TXQValue_duration(a).toMonths(), TXQValue_duration(b).toMonths());
+          if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
+          if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
+            result := compareValue(TXQValueDateTime(a).toMonths(), TXQValueDateTime(b).toMonths());
             if result <> 0 then exit;
-            result := compareValue(TXQValue_duration(a).toDayTime(), TXQValue_duration(b).toDayTime(), 1e-6);
+            result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime(), 1e-6);
           end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
             result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
         end;
+        pvkQName:
+          if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
+             or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
+            if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
+              result := 0;
         pvkNull: result := 0;
       end;
       //This also implements the generic comparison type conversion rules (in those case where it would affect the result, a type error should be raised)
@@ -397,20 +429,20 @@ begin
     else if bk = pvkNull then exit(1)
     else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then
       result := compareAsDecimals()
-    else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
-      result := CompareStr(TXQValue_Binary(a).toRawBinary, TXQValue_Binary(b).toRawBinary)
-    else if (a is TXQValue_QName) or (b is TXQValue_QName) then begin
-      if (a is TXQValue_QName) and (b is TXQValue_QName) then begin
-        if qnameEqual(TXQValue_QName(a).str, TXQValue_QName(b).str) then exit(0)
+    else if (a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary)) and (b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary)) then
+      result := CompareStr(TXQValueString(a).toRawBinary, TXQValueString(b).toRawBinary)
+    else if (a.instanceOf(baseSchema.QName)) or (b.instanceOf(baseSchema.QName)) then begin
+      if a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName) then begin
+        if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then exit(0) //ignore prefix
         else exit(-2);
       end;
       raise EXQEvaluationException.Create('XPTY0004', 'QName compared');
     end else if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
       if ak = pvkDateTime then begin
-        tempDateTime := TXQValueDateTimeClass(a.ClassType).create(b.toString);
+        tempDateTime := TXQValueDateTime.create(a.typeAnnotation as TXSDateTimeType, b.toString);
         result := xqvalueCompareAtomicBase(a, tempDateTime, collation, implicitTimezone);
       end else if bk = pvkDateTime then begin
-        tempDateTime := TXQValueDateTimeClass(b.ClassType).create(a.toString);
+        tempDateTime := TXQValueDateTime.create(b.typeAnnotation as TXSDateTimeType, a.toString);
         result := xqvalueCompareAtomicBase(tempDateTime, b, collation, implicitTimezone);
       end;
       tempDateTime.free;
@@ -811,20 +843,22 @@ end;
 
 
 function xqFunctionError(const args: TXQVArray): IXQValue;
-var code: TStringArray;
+var
+  ename: TXQValueQName;
 begin
   if length(args) = 0 then
     raise EXQEvaluationException.create('FOER0000', 'error function called'); //that's not an error, that's what the function does...
 
-  if args[0].isUndefined then code := qnameSplit('http://www.w3.org/2005/xqt-errors'#2'err:FOER0000')
-  else if args[0] is TXQValue_QName then code := qnameSplit((args[0] as TXQValue_QName).str)
+  if result.isUndefined then result := TXQValueQName.create('http://www.w3.org/2005/xqt-errors', 'err' , 'FOER0000')
+  else if args[0].instanceOf(baseSchema.QName) then result := args[0]
   else raise EXQEvaluationException.create('XPTY0004', 'expected QName');
 
+  ename := result as TXQValueQName;
   if length(args) = 1 then
-    raise EXQEvaluationException.create(code[2], 'error function called', TNamespace.create(code[0], code[1]));
+    raise EXQEvaluationException.create(ename.local, 'error function called', TNamespace.create(ename.url, ename.prefix));
   if length(args) = 2 then
-    raise EXQEvaluationException.create(code[2], args[1].toString, TNamespace.create(code[0], code[1]));
-  raise EXQEvaluationException.create(code[2], args[1].toString+':'+LineEnding+args[2].debugAsStringWithTypeAnnotation(), TNamespace.create(code[0], code[1]));
+    raise EXQEvaluationException.create(ename.local, args[1].toString, TNamespace.create(ename.url, ename.prefix));
+  raise EXQEvaluationException.create(ename.local, args[1].toString+':'+LineEnding+args[2].debugAsStringWithTypeAnnotation(), TNamespace.create(ename.url, ename.prefix));
   result := xqvalue();
 end;
 
@@ -833,11 +867,11 @@ var x: IXQValue;
   isAlreadyAtomized: Boolean;
   seqResult: TXQValueSequence;
 begin
+  if v.getSequenceCount = 0 then exit(v);
   if v is TXQValueSequence then begin
-    if v.getSequenceCount = 0 then exit(v);
     isAlreadyAtomized := true;
     for x in v do
-      if not (x is TXQValue_AnyAtomicType) then begin
+      if not x.instanceOf(baseSchema.AnyAtomicType) then begin
         isAlreadyAtomized := false;
         break;
       end;
@@ -847,16 +881,15 @@ begin
     result := seqResult;
     exit
   end;
-  if v is TXQValueUndefined then exit(v);
-  if v is TXQValue_AnyAtomicType then exit(v);
+  if v.instanceOf(baseSchema.AnyAtomicType) then exit(v);
   if not (v is TXQValueNode) then
     raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
   case v.toNode.typ of
-    tetOpen, tetDocument: result := TXQValue_untypedAtomic.create(v.tonode.deepNodeText()); //todo: handle xsi:type="xs:integer" attribute
+    tetOpen, tetDocument: result := TXQValueString.create(baseSchema.untypedAtomic, v.tonode.deepNodeText()); //todo: handle i:type="xs:integer" attribute
     tetClose: result := xqvalue();
-    tetText: result := TXQValue_untypedAtomic.create(v.tonode.value);// xqvalue(v.tonode.value);
+    tetText: result := TXQValueString.create(baseSchema.untypedAtomic,v.tonode.value);// xqvalue(v.tonode.value);
     tetComment: result := TXQValueString.create(v.tonode.value);
-    tetAttribute: result := TXQValue_untypedAtomic.create(TTreeAttribute(v.tonode).realvalue);
+    tetAttribute: result := TXQValueString.create(baseSchema.untypedAtomic,TTreeAttribute(v.tonode).realvalue);
     tetProcessingInstruction: result := xqvalue(v.tonode.getAttribute(''));
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
   end;
@@ -873,9 +906,9 @@ end;
 function xqFunctionNumber(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
   procedure numberize(v: IXQValue);
   begin
-    if v.getClassType = TXQValue_double then result := v
-    else if v is TXQValueDateTime then result := TXQValue_double.create(getNaN)
-    else result := TXQValue_double.create(v.toDecimal);
+    if v.instanceOf(baseSchema.Double) then result := v
+//    else if v is TXQValueDateTime then result := TXQValue_double.create(getNaN)
+    else result := TXQValueDecimal.create(baseSchema.Double, double(v.toDecimal));
   end;
 begin
   requiredArgCount(args, 0, 1);
@@ -887,17 +920,18 @@ begin
   numberize(args[0]);
 end;
 
-function xqvalueBaseDecimalType(v: TXQ_Decimal; const typeref: IXQValue): IXQValue;
+function xqvalueBaseDecimalType(v: Decimal; const typeref: IXQValue): IXQValue;
 begin
   if typeref.kind <> pvkDecimal then raise EXQEvaluationException.Create('XPTY0004', 'Expected decimal numeric type');
-  result := TXQValueDecimalClass(typeref.getClassType).create(v); //this assumes there are no user defined float/double/decimal types!
+//  result := TXQValueDecimalClass(typeref.getClassType).create(v); //this assumes there are no user defined float/double/decimal types!
+  result := typeref.typeAnnotation.createValue(v);
 end;
 
 function xqFunctionAbs(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueInt65 then begin
+  if args[0].instanceOf(baseSchema.integer) then begin
     result := xqvalue(args[0].toInt65);
     (result as TXQValueInt65).value.sign:=false;
   end else result := xqvalueBaseDecimalType(abs(args[0].toDecimal), args[0]);
@@ -907,7 +941,7 @@ function xqFunctionCeiling(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueInt65 then result := xqvalue(args[0].toInt65)
+  if args[0].instanceOf(baseSchema.integer) then result := xqvalue(args[0].toInt65)
   else if frac(args[0].toDecimal) > 0 then result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal) + 1, args[0])
   else result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal), args[0]);
 end;
@@ -916,12 +950,12 @@ function xqFunctionFloor(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueInt65 then result := xqvalue(args[0].toInt65)
+  if args[0].instanceOf(baseSchema.integer) then result := xqvalue(args[0].toInt65)
   else if frac(args[0].toDecimal) < 0 then result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal) - 1, args[0])
   else result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal), args[0])
 end;
 
-function xqvalueRounded(const v: IXQValue): TXQ_Decimal;
+function xqvalueRounded(const v: IXQValue): Decimal;
 var
   f, ff: Decimal;
 begin
@@ -941,7 +975,7 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueInt65 then exit(xqvalue(args[0].toInt65));
+  if args[0].instanceOf(baseSchema.integer) then exit(xqvalue(args[0].toInt65));
   f := args[0].toDecimal;
   if IsNan(f) or IsInfinite(f) then exit(args[0]);
   result := xqvalueBaseDecimalType(xqvalueRounded(args[0]), args[0]);
@@ -1697,6 +1731,28 @@ begin
   result := args[0].getProperty(args[1].toString);
 end;
 
+function xqFunctionObject(const args: TXQVArray): IXQValue;
+var
+  seq: TXQVList;
+  i: Integer;
+  obj: TXQValueObject;
+  v: IXQValue;
+begin
+  requiredArgCount(args, 0, 1);
+  obj := TXQValueObject.create();
+  if length(args) = 1 then begin
+    v := args[0];
+    if (v.kind <> pvkSequence) or (v.getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Argument to object constructor must be a sequence with an even number of elements');
+    seq := v.toXQVList;
+    for i:=0 to (seq.Count-1) div 2 do begin
+      if not (seq[2*i].kind = pvkString) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Only string values are allowed as property names');
+      obj.setMutable(seq[2*i].toString, seq[2*i+1]);
+    end;
+    seq.free;
+  end;
+  result := obj;
+end;
+
 //Boolean functions
 function xqFunctionBoolean(const args: TXQVArray): IXQValue;
 begin
@@ -1727,17 +1783,17 @@ end;
 function xqFunctionParse_datetime(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 2);;
-  result := TXQValueDateTime.create(args[0].toString, args[1].toString);
+  result := TXQValueDateTime.create(baseSchema.dateTime, args[0].toString, args[1].toString);
 end;
 function xqFunctionParse_date(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 2);;
-  result := (TXQValueDateTimeClass(TXQValue_Date).create(args[0].toString, args[1].toString));
+  result := TXQValueDateTime.create(baseSchema.date, args[0].toString, args[1].toString);
 end;
 function xqFunctionParse_time(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 2);;
-  result := (TXQValueDateTimeClass(TXQValue_Time).create(args[0].toString, args[1].toString));
+  result := TXQValueDateTime.create(baseSchema.time, args[0].toString, args[1].toString);
 end;
 
 function xqFunctionDateTime(const args: TXQVArray): IXQValue;
@@ -1746,15 +1802,15 @@ var
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 1 then
-    exit(TXQValueDateTime.createFromValue(args[0]));
+    exit(baseSchema.DateTime.createValue(args[0]));
 
   if args[0].isUndefined or args[1].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_Date) or not (args[1] is TXQValue_Time) then
+  if not args[0].instanceOf(baseSchema.date) or not args[1].instanceOf(baseSchema.time) then
     raise EXQEvaluationException.Create('XPTY0004', 'Invalid parameters for date time constructor: '+args[0].toString+','+args[1].toString);
   //todo: error when timezones differ
   dt0 := args[0] as TXQValueDateTime;
   dt1 := args[1] as TXQValueDateTime;
-  resdt := TXQValueDateTime.create(dt0.value);
+  resdt := TXQValueDateTime.create(baseSchema.dateTime, dt0.value);
   resdt.value.hour := dt1.value.hour;
   resdt.value.min := dt1.value.min;
   resdt.value.sec := dt1.value.sec;
@@ -1774,7 +1830,7 @@ function xqFunctionYear_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
+  if not (args[0].instanceOf(baseSchema.duration)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() div 12);
 end;
 
@@ -1782,7 +1838,7 @@ function xqFunctionMonth_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
+  if not (args[0].instanceOf(baseSchema.duration)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
   result := xqvalue((args[0] as TXQValueDateTime).toMonths() mod 12);
 end;
 
@@ -1792,11 +1848,11 @@ var
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration time, got: ' + args[0].toString);
-  tempValue := (args[0] as TXQValue_duration).value;
-  TXQValue_duration.setDayTime(tempValue, (args[0] as TXQValue_duration).toDayTime());
+  if not (args[0].instanceOf(baseSchema.duration)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration time, got: ' + args[0].toString);
+  tempValue := (args[0] as TXQValueDateTime).value;
+  TXQValueDateTime.setDayTime(tempValue, (args[0] as TXQValueDateTime).toDayTime());
   if v <> 6 then result := xqvalue(tempValue.values[v])
-  else  result := xqvalue(roundto(tempValue.values[v]  + TXQ_Decimal(tempValue.secfraction), -6));
+  else  result := xqvalue(roundto(tempValue.values[v]  + Decimal(tempValue.secfraction), -6));
 end;
 
 function xqFunctionDay_From_Duration(const args: TXQVArray): IXQValue;
@@ -1828,8 +1884,8 @@ begin
   if length(args) = 2 then begin
     if args[1].isUndefined then tz := getNaN
     else begin
-      if not (args[1] is TXQValue_duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: '+args[1].toString + ', when conerting '+args[0].toString);
-      tz := (args[1] as TXQValue_duration).toDayTime() / SecsPerDay;
+      if not args[1].instanceOf(baseSchema.duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: '+args[1].toString + ', when conerting '+args[0].toString);
+      tz := (args[1] as TXQValueDateTime).toDayTime() / SecsPerDay;
     end;
   end else tz := context.staticContext.sender.implicitTimezone;
 
@@ -1837,28 +1893,28 @@ begin
   if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('XPTY0004', 'Expected datetime, got: '+args[0].toString);
 
   if (IsNan(tz) and isnan((args[0] as TXQValueDateTime).value.timezone)) then exit(args[0]);
-  resdt := TXQValueDateTimeClass(args[0].getClassType).create((args[0] as TXQValueDateTime).value);
+  result := args[0].clone;
+  resdt := Result as TXQValueDateTime;
   if isNan(tz) or isnan(resdt.value.timezone)  then
     resdt.value.timezone := tz
   else if resdt.value.timezone <> tz  then begin
     resdt.setDateTime(resdt.toDateTime + tz);
     resdt.value.timezone:=tz;
   end;
-  result := resdt;
 end;
 
 function xqFunctionImplicit_Timezone(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0);
   if isnan(context.staticContext.sender.ImplicitTimezone) then exit(xqvalue);
-  result := TXQValueDateTimeClass(TXQValue_dayTimeDuration).create();
-  (result as TXQValue_dayTimeDuration).value.sec:=round(context.staticContext.sender.ImplicitTimezone * SecsPerDay);
+  result := TXQValueDateTime.create(baseSchema.dayTimeDuration);
+  (result as TXQValueDateTime).value.sec:=round(context.staticContext.sender.ImplicitTimezone * SecsPerDay);
 end;
 
 function xqFunctionCurrent_Datetime(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0);
-  result := TXQValueDateTime.create(context.staticContext.sender.CurrentDateTime); //stable during evaluation
+  result := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.sender.CurrentDateTime); //stable during evaluation
   if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.sender.ImplicitTimezone;
 end;
 
@@ -1867,9 +1923,9 @@ var
   temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  temp := TXQValueDateTime.create(context.staticContext.sender.currentDateTime); //force auto free
-  result := TXQValue_Date.createFromValue(temp);
-  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValue_date).value.timezone := context.staticContext.sender.ImplicitTimezone;
+  temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.sender.currentDateTime); //force auto free
+  result := baseSchema.Date.createValue(temp);
+  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.sender.ImplicitTimezone;
 end;
 
 function xqFunctionCurrent_Time(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -1877,9 +1933,9 @@ var
   temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  temp := TXQValueDateTime.create(context.staticContext.sender.currentDateTime); //force auto free
-  result := TXQValue_Time.createFromValue(temp);
-  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValue_time).value.timezone := context.staticContext.sender.ImplicitTimezone;
+  temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.sender.currentDateTime); //force auto free
+  result := baseSchema.Time.createValue(temp);
+  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.sender.ImplicitTimezone;
 end;
 
 function xqFunctionTrace(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -1893,7 +1949,7 @@ end;
 function xqFunctionStatic_Base_Uri(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,0);
-  if context.staticContext.baseURI <> '' then result := TXQValue_anyURI.create(context.staticContext.baseURI)
+  if context.staticContext.baseURI <> '' then result := baseSchema.anyURI.createValue(context.staticContext.baseURI)
   else result := xqvalue();
 end;
 
@@ -1922,7 +1978,7 @@ begin
     else if last.typ in [tetOpen] then uri := strResolveURI(uri, strTrimAndNormalize(context.staticContext.baseURI, [#9,#10,#13,' ']))
     else if (uri = '') and (last.typ in [tetAttribute, tetText, tetComment, tetProcessingInstruction]) then exit(xqvalue());
   end;
-  result := TXQValue_anyURI.create('');
+  result := TXQValueString.create(baseSchema.anyURI,'');
   (result as TXQValueString).str :=  uri; // by pass validation
 end;
 
@@ -1935,7 +1991,7 @@ begin
   node := xqvalueToSingleNode(args[0]);
   if (node = nil) or not (node is TTreeDocument) then exit(xqvalue);
   if TTreeDocument(node).documentURI = '' then exit(xqvalue);
-  result := TXQValue_anyURI.create(strTrimAndNormalize(TTreeDocument(node).documentURI, [#9,#10,#13,' ']));
+  result := baseSchema.anyURI.createValue(TTreeDocument(node).documentURI);
 end;
 
 function xqFunctionRoot(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -1980,61 +2036,62 @@ function xqFunctionResolve_QName(const context: TXQEvaluationContext; const args
 
 var
   name, ns: String;
+  p: SizeInt;
 begin
   requiredArgCount(args, 2);
   if args[0].isUndefined then exit(xqvalue);
   name := args[0].toString;
   ns := '';
-  if pos(':', name) > 0 then ns := copy(name, 1, pos(':', name) - 1);
+  p := pos(':', name);
+  if p > 0 then ns := copy(name, 1, p - 1);
   if args[1].toNode = nil then exit(xqvalue);
-  ns := args[1].toNode.getNamespaceURL(ns, @context.staticContext.nodeCollation.equal);  ignore(context);
-  if ns <> '' then ns := ns + #2;
-  result := TXQValue_QName.create(ns + name);
+  result := TXQValueQName.create(args[1].toNode.getNamespaceURL(ns, @context.staticContext.nodeCollation.equal), ns, strCopyFrom(name, p+1));
+  ignore(context);
 end;
 
 function xqFunctionQName(const args: TXQVArray): IXQValue;
 begin
-  requiredArgCount(args,1,2);
-  if length(args) = 1 then
-    exit(TXQValue_QName.create(args[0].toString));
+  requiredArgCount(args,2,2);
+//  if length(args) = 1 then
+//    exit(TXQValueQName.create(baseSchema.QName, args[0].toString));
   if args[0].isUndefined or (args[0].toString = '') then begin
     if pos(':', args[1].toString) > 0 then raise EXQEvaluationException.Create('FOCA0002', 'Need namespace uri for '+args[1].toString);
-    result := TXQValue_QName.create(args[1].toString);
-  end else result := TXQValue_QName.create(args[0].toString+#2+args[1].toString)
+    result := TXQValueQName.create('', '', args[1].toString);
+  end else result := TXQValueQName.create(args[0].toString, args[1].toString)
 end;
 
 function xqFunctionPrefix_From_QName(const args: TXQVArray): IXQValue;
 var
-  splitted: TStringArray;
+  splitted: TXQValueQName;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
-  splitted := qnameSplit((args[0] as TXQValueString).str);
-  if splitted[1] = '' then exit(xqvalue);
-  result := TXQValue_NCName.create(splitted[1]);
+  if not (args[0] is TXQValueQName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
+  splitted := args[0] as TXQValueQName;
+  if splitted.prefix = '' then exit(xqvalue);
+  result := TXQValueString.create(baseSchema.NCName, splitted.prefix);
 end;
 
 function xqFunctionLocal_Name_From_QName(const args: TXQVArray): IXQValue;
 var
-  splitted: TStringArray;
+  splitted: TXQValueQName;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
-  splitted := qnameSplit((args[0] as TXQValueString).str);
-  result := TXQValue_NCName.create(splitted[2]);
+  if not (args[0] is TXQValueQName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
+  splitted := args[0] as TXQValueQName;
+  result := TXQValueString.create(baseSchema.NCName, splitted.local);
 end;
 
 function xqFunctionNamespace_URI_from_QName(const args: TXQVArray): IXQValue;
 var
-  splitted: TStringArray;
+  splitted: TXQValueQName;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValue_QName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
-  splitted := qnameSplit((args[0] as TXQValueString).str);
-  result := TXQValue_anyURI.create(splitted[0]);
+  if not (args[0] is TXQValueQName) then raise EXQEvaluationException.Create('XPTY0004', 'Expected QName, got: '+args[0].toString);
+  splitted := args[0] as TXQValueQName;
+  result := baseSchema.anyURI.createValue(splitted.url);
 end;
 
 function xqFunctionNamespace_URI_For_Prefix(const args: TXQVArray): IXQValue;
@@ -2047,7 +2104,7 @@ begin
   temp := TNamespaceList.Create;
   args[1].toNode.getAllNamespaces(temp);
   if not temp.hasNamespacePrefix(args[0].toString, tempns) then result := xqvalue
-  else result := TXQValue_anyURI.create(tempns.getURL);
+  else result := baseSchema.anyURI.createValue(tempns.getURL);
   temp.free;
 end;
 
@@ -2160,7 +2217,7 @@ begin
   raise EXQEvaluationException.Create('pxp:CONFIG', 'Using fn:doc is not allowed');
   {$endif}
 
-  if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('FODC0005', 'Invalid url: '+url);
+  //if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('FODC0005', 'Invalid url: '+url);
 
   url := context.staticContext.resolveDocURI(url);
 
@@ -2207,7 +2264,7 @@ begin
   if not strContains(url, '://') or striBeginsWith(url, 'file:/') then exit(xqvalue(FileExists(strRemoveFileURLPrefix(url))));
   result := xqvalueFalse;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
-  if TXQValue_anyURI.canCreateFromstring(url) then
+  //if TXQValue_anyURI.canCreateFromstring(url) then
     result := xqvalueTrue;
   {$endif}
 end;
@@ -2451,13 +2508,13 @@ begin
   enum2 := b.GetEnumerator; enum2.MoveNext;
   for i := 0 to a.getSequenceCount - 1 do begin
 
-    if enum1.Current is TXQValue_AnyAtomicType then begin
-      if not (enum2.Current is TXQValue_AnyAtomicType)
+    if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
+      if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
          or not xqvalueComparableTypes(enum1.Current, enum2.Current)
          or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.sender.ImplicitTimezone,true) then //todo:   nodes?
         exit(false);
     end else begin
-      if (enum2.Current is TXQValue_AnyAtomicType) or
+      if (enum2.Current.instanceOf(baseSchema.anyAtomicType)) or
          (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
             and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.staticContext.nodeCollation.equal)) then
         exit(false);
@@ -2490,7 +2547,7 @@ var x: IXQValue;
 begin
   found := false;
   for x in v do begin
-    if (x is TXQValue_untypedAtomic) or (x is TXQValueNode) or (x is TXQValue_untyped) then begin
+    if (x.instanceOf(baseSchema.untypedAtomic)) or (x is TXQValueNode) or (x.instanceOf(baseSchema.untyped)) then begin
       found := true;
       break;
     end;
@@ -2500,8 +2557,8 @@ begin
   result := TXQValueSequence.create(v.getSequenceCount);
   resseq := (result as TXQValueSequence).seq;;
   for x in v do
-    if (x is TXQValue_untypedAtomic) or (x is TXQValueNode) or (x is TXQValue_untyped) then
-      resseq.add(TXQValue_double.create(x.toDecimal))
+    if (x.instanceOf(baseSchema.untypedAtomic)) or (x is TXQValueNode) or (x.instanceOf(baseSchema.untyped)) then
+      resseq.add(baseSchema.double.createValue(x.toDecimal))
      else
       resseq.add(x);
 end;
@@ -2525,10 +2582,10 @@ begin
   ak := args[0].kind;
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
-    if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0] is TXQValue_duration) and not (args[0] is TXQValue_untypedAtomic) then
+    if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0].instanceOf(baseSchema.duration)) and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
       raise EXQEvaluationException.Create('XPTY0004', 'Wrong type for sum');
     if ak = pvkSequence then result := args[0].getChild(1);
-    if (result is TXQValue_untypedAtomic) or (result is TXQValueNode) then result := TXQValue_double.create(result.toDecimal);
+    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
     exit();
   end;
 
@@ -2537,21 +2594,21 @@ begin
   case seq.getPromotedType of
     pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Wrong type for sum');
     pvkDateTime: begin
-      result := seq.getPromotedDateTimeType(true).create;
+      result := TXQValueDateTime.create(seq.getPromotedDateTimeType(true));
       for i:=0 to seq.Count-1 do
-        (result as TXQValue_duration).addDuration((seq.items[i] as TXQValue_duration).value);
+        (result as TXQValueDateTime).addDuration((seq.items[i] as TXQValueDateTime).value);
     end;
     pvkInt: begin
       tempi := 0;
       for i:=0 to seq.count-1 do
         tempi += seq[i].toInt65;
-      result := seq.getPromotedIntegerType.create(tempi);
+      result := seq.getPromotedIntegerType.createValue(tempi);
     end;
     pvkDecimal: begin
       tempf := 0;
       for i:=0 to seq.count-1 do
         tempf += seq[i].toDecimal;
-      result := seq.getPromotedDecimalType.create(tempf);
+      result := seq.getPromotedDecimalType.createValue(tempf);
     end;
   end;
 end;
@@ -2569,7 +2626,7 @@ begin
   if i = 1 then begin
     result := args[0];
     xqvalueSeqSqueeze(result);
-    if (result is TXQValue_untypedAtomic) or (result is TXQValueNode) then result := TXQValue_double.create(result.toDecimal);
+    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
     exit;
   end;
 
@@ -2579,17 +2636,17 @@ begin
     pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Invalid types for average');
     pvkDateTime: begin
       result := xqFunctionSum(args);
-      (result as TXQValue_duration).multiplyComponents(1.0 / i);
+      (result as TXQValueDateTime).multiplyComponents(1.0 / i);
     end;
     pvkInt, pvkDecimal: begin
       tempf:=0;
       for i:=0 to seq.Count-1 do begin
         tempf2 := seq[i].toDecimal;;
         if (isnan(tempf2)) or (isPosInf(tempf2) and isNegInf(tempf)) or (isNegInf(tempf2) and isPosInf(tempf))  then
-          exit(seq.getPromotedDecimalType.create(getNaN));
+          exit(seq.getPromotedDecimalType.createValue(getNaN));
         tempf += tempf2;
       end;
-      result := seq.getPromotedDecimalType.create(tempf / seq.Count);
+      result := seq.getPromotedDecimalType.createValue(tempf / seq.Count);
     end;
   end;
 end;
@@ -2613,7 +2670,7 @@ begin
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
     if result is TXQValueSequence then result := args[0].getChild(1);
-    if (result is TXQValue_untypedAtomic) or (result is TXQValueNode) then result := TXQValue_double.create(result.toDecimal);
+    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
     exit();
   end;
 
@@ -2647,7 +2704,7 @@ begin
       for i:=1 to seq.count-1 do
         if (seq[i].toInt65 < tempi) = asmin then
           tempi:= seq[i].toInt65;
-      result := seq.getPromotedIntegerType.create(tempi);
+      result := seq.getPromotedIntegerType.createValue(tempi);
     end;
     pvkDecimal: begin
       tempf := seq[0].toDecimal;
@@ -2661,7 +2718,7 @@ begin
           if (tempf2 < tempf) = asmin then
             tempf := tempf2
         end;
-      result := seq.getPromotedDecimalType.create(tempf);
+      result := seq.getPromotedDecimalType.createValue(tempf);
     end;
     pvkString: begin
       temps := seq[0].toString;
@@ -2701,7 +2758,7 @@ begin
   requiredArgCount(args,1);
   node := args[0].toNode;
   if (node <> nil) and (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) then
-    result := qnameMake(node.namespace, node.value, TXQValue_QName)
+    result := TXQValueQName.create(node.namespace, node.value)
    else
     result := xqvalue();
 end;
@@ -2745,8 +2802,8 @@ var
   node: TTreeNode;
 begin
   node := simpleNode(context, args);
-  if (node = nil) or not (node.typ in [tetOpen, tetAttribute]) then result := TXQValue_anyURI.create('')
-  else result := TXQValue_anyURI.create(node.getNamespaceURL());
+  if (node = nil) or not (node.typ in [tetOpen, tetAttribute]) then result := baseSchema.anyURI.createValue('')
+  else result := baseSchema.anyURI.createValue(node.getNamespaceURL());
 end;
 
 function xqFunctionPosition(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

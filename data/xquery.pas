@@ -54,6 +54,9 @@ type
   TXQueryEngine=class;
   TXQValue = class;
   PXQValue = ^TXQValue;
+  TXSType = class;
+  TXSDateTimeType = class;
+  TXSSchema = class;
   TXQVList=class;
   IXQValue=interface;
   TXQVArray = array of IXQValue;
@@ -82,7 +85,7 @@ type
 
 
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
 
   //**Type used for XQuery decimal types
   Decimal = Extended;
@@ -225,13 +228,13 @@ type
   IXQValue = interface
     function kind: TXQValueKind; //**< Primary type of a value
     function typeName: string;    //**< XPath type name
-    function getClassType: TXQValueClass;  //**< Returns the class underlying the interface
+    function typeAnnotation: TXSType;  //**< Returns the class underlying the interface
+    //function schema: TXSSchema;
 
-    function canConvertToInt65: boolean;  //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
+{    function canConvertToInt65: boolean;  //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
     function canConvertToDecimal(pure: boolean): boolean;  //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
     function canConvertToBoolean: boolean;  //**< Checks if the value can be converted to an boolean.
-    function canConvertToType(v: TXQValueClass): boolean;  //**< Checks if the value can be converted to a certain type. This method contains (indirectly) all XPath casting rules (i.e. it directly maps to "self castable as v")!
-
+}
     function isUndefined: boolean;  //**< Returns true, iff the value is undefined or an empty sequence
 
     function toBoolean: boolean;  //**< Returns the value as boolean; dynamically converted, if necessary
@@ -256,7 +259,7 @@ type
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
     function GetEnumerator: TXQValueEnumerator; //**< Returns an enumerator for @code(for var in value). For a sequence the enumerator runs over all values contained in the sequence, for other values it will do one iteration over the value of that value. The iterated values have the IXQValue interface type
 
-    function instanceOfInternal(const typ: TXQValueClass): boolean; //**< If the XPath expression "self instance of typ" should return true
+    function instanceOf(const typ: TXSType): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
   end;
 
 
@@ -269,18 +272,18 @@ type
   See IXQValue for an actual description
   *)
   TXQValue = class(TInterfacedObject, IXQValue)
-    constructor create; virtual;
+    ftypeAnnotation: TXSType;
+    constructor create(atypeAnnotation: TXSType); virtual;
+    constructor create(atypeAnnotation: TXSType; const value: IXQValue); virtual;
 
     function kind: TXQValueKind;  //**< Primary type of a value (actually just wraps classKind. Since you can't define class functions in the interface, but we need to do calculations with types itself)
     function typeName: string;      //**< XPath type name (actually just wraps classTypeName. Since you can't define class functions in the interface, but we need to do calculations with types itself)
-    function getClassType: TXQValueClass; //**< Returns the actual class type of the value. (just wraps classType, but can be called through the interface)
-
-    class function createFromValue(const v: IXQValue): IXQValue; virtual; //**< Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
+    function typeAnnotation: TXSType; inline; //**< Returns the class underlying the interface
+    //function schema: TXSSchema;
 
     function canConvertToInt65: boolean;    virtual; //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
     function canConvertToDecimal(pure: boolean): boolean;  virtual; //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
     function canConvertToBoolean: boolean;  virtual; //**< Checks if the value can be converted to an boolean.
-    function canConvertToType(v: TXQValueClass): boolean; virtual; //**< Checks if the value can be converted to a certain type. This method contains (indirectly) all XPath casting rules (i.e. it directly maps to "self castable as v")!
 
     function isUndefined: boolean; virtual;  //**< Returns true, iff the value is undefined or an empty sequence
 
@@ -307,37 +310,17 @@ type
 
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
-    class function classTypeName: string; virtual;   //**< XPath type name
-    function instanceOfInternal(const typ: TXQValueClass): boolean;  //**< If the XPath expression "self instance of typ" should return true
-    class function instanceOf(const testType: TXQValueClass): boolean; virtual; //**< If the XPath expression "self instance of typ" should return true
-    class function castableFromInternal(const v: IXQValue): boolean; virtual; //**< If the XPath expression "v castable as self" should return true (only handles special cases here, most is handled in canConvertToType)
-    class function classParentNonBlocked: TXQValueClass; virtual; //**< This returns the class of the parent type of the current type in the scheme type hierarchy. (which is often the same as fpc's classParent, but also often skips a parent or even jumps to an unrelated class. It is then used to implement instanceOf )
+    function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
+//    class function classParentNonBlocked: TXQValueClass; virtual; //**< This returns the class of the parent type of the current type in the scheme type hierarchy. (which is often the same as fpc's classParent, but also often skips a parent or even jumps to an unrelated class. It is then used to implement instanceOf )
 
   private
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (private because it wraps the object instance in a IXQValue. which may free it, if there is not another interface variable pointing to it )
-  end;
-
-  { TXQValue_AnySimpleType }
-
-  //**Useless type in the XPath type hierarchy
-  TXQValue_AnySimpleType = class(TXQValue)
-  protected
-    class function classTypeName: string; override;
-  end;
-
-  { TXQValue_AnyAtomicType }
-
-  //**Useless type in the XPath type hierarchy
-  TXQValue_AnyAtomicType = class(TXQValue_AnySimpleType)
-  protected
-    class function classTypeName: string; override;
   end;
 
   { TXQValueUndefined }
   //**undefined/empty sequence
   TXQValueUndefined = class(TXQValue)
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
     function isUndefined: boolean; override;
     function toArray: TXQVArray; override;
     function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
@@ -354,17 +337,17 @@ type
   { TXQValueBoolean }
 
   //** boolean value
-  TXQValueBoolean = class (TXQValue_AnyAtomicType)
+  TXQValueBoolean = class (TXQValue)
     bool: boolean;   //**< plain boolean value
 
-    constructor create(abool: boolean = false); reintroduce; virtual;
+    constructor create(abool: boolean = false); reintroduce;
+    constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
+    constructor create(atypeAnnotation: TXSType; abool: boolean = false); reintroduce;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
-    class function createFromValue(const v: IXQValue): IXQValue; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -379,17 +362,16 @@ type
 
   { TXQValueInt65 }
   //** integer value (should have unlimited range, but is actually a signed 65 bit)
-  TXQValueInt65 = class (TXQValue_AnyAtomicType)
+  TXQValueInt65 = class (TXQValue)
     value:  int65;
 
-    constructor create(); reintroduce; virtual;
+    constructor create(atypeAnnotation: TXSType); reintroduce; virtual;
     constructor create(const aint: int65); reintroduce; virtual;
+    constructor create(atypeAnnotation: TXSType; const aint: int65);
+    constructor create(atypeAnnotation: TXSType; const avalue: IXQValue); override;
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
-    class function createFromValue(const v: IXQValue): IXQValue; override;
     class function canCreateFromInt65(const i: int65): boolean; virtual;
-    class function classParentNonBlocked: TXQValueClass; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
@@ -409,19 +391,21 @@ type
   { TXQValueDecimal }
 
   //decimal value (should be a unlimited real number \mathbb{R}, but is extended )
-  TXQValueDecimal = class (TXQValue_AnyAtomicType)
+  TXQValueDecimal = class (TXQValue)
     value:  decimal;   //*< plain decimal value
 
     constructor create(const aflt: decimal = 0); reintroduce; virtual;
-    class function createFromValue(const v: IXQValue): IXQValue; override;
+    constructor create(atypeannotation: TXSType; const aflt: decimal = 0); reintroduce; virtual;
+    constructor create(atypeAnnotation: TXSType; const avalue: IXQValue); override;
+
     class function canCreateFromDecimal(const v:decimal): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
     class function truncateRange(const v: decimal): Decimal; virtual;
+    class function isPure(const v: IXQValue): boolean; static;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
@@ -438,15 +422,16 @@ type
   { TXQValueString }
 
   //**< string value
-  TXQValueString = class (TXQValue_AnyAtomicType)
+  TXQValueString = class (TXQValue)
     str:  string;
 
     constructor create(const astr: string = ''); reintroduce; virtual;
-    class function createFromValue(const v: IXQValue): IXQValue; override;
+    constructor create(atypeAnnotation: TXSType; const astr: string);
+    constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
+
     class function canCreateFromString(const v: string): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
@@ -459,12 +444,31 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
+    function toRawBinary: string;
+
     function clone: IXQValue; override;
-
-    class function castableFromInternal(const v: IXQValue): boolean; override;
   end;
-  TXQValueStringClass = class of TXQValueString;
 
+    //**< string value
+
+    { TXQValueQName }
+
+    TXQValueQName = class (TXQValue)
+      prefix, url, local: string;
+
+      constructor create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);
+      constructor create(atypeAnnotation: TXSType; const ns: INamespace; const alocal: string);
+      constructor create(const aurl, aprefix, alocal: string);
+      constructor create(const aurl, aprefixedLocal: string);
+      constructor create(const ns: INamespace; const alocal: string);
+      constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
+
+      class function classKind: TXQValueKind; override;
+
+      function toString: string; override; //**< Converts the TXQValue dynamically to string
+
+      function clone: IXQValue; override;
+    end;
 
   { TXQValueDateTime }
 
@@ -480,19 +484,16 @@ type
   PXQValueDateTimeData=^TXQValueDateTimeData;
 
   //**< Datetime value
-  TXQValueDateTime = class (TXQValue_AnyAtomicType)
+  TXQValueDateTime = class (TXQValue)
     value: TXQValueDateTimeData;
 
-    constructor create(); reintroduce; virtual;
-    constructor create(const str: string); reintroduce; virtual; //**< Create from XPath standard representation (@see dateFormat)
-    constructor create(const str, format: string); reintroduce; virtual; //**< Create from a date/time with a certain format (see bbutils.dateParseParts)
-    constructor create(const dt: TXQValueDateTimeData); reintroduce; virtual; //**< Create from a splitted ordinary datetime
-    constructor create(const dt: TDateTime); reintroduce; virtual; //**< Create from an ordinary datetime
-    class function createFromValue(const v: IXQValue): IXQValue; override;
-    class function canCreateFromDateTime(const s: string): boolean; virtual;
+    constructor create(atypeAnnotation: TXSType); reintroduce; virtual;
+    constructor create(atypeAnnotation: TXSDateTimeType; const str: string); reintroduce; virtual; //**< Create from XPath standard representation (@see dateFormat)
+    constructor create(atypeAnnotation: TXSType; const str, format: string); reintroduce; virtual; //**< Create from a date/time with a certain format (see bbutils.dateParseParts)
+    constructor create(atypeAnnotation: TXSType; const dt: TXQValueDateTimeData); reintroduce; virtual; //**< Create from a splitted ordinary datetime
+    constructor create(atypeAnnotation: TXSType; const dt: TDateTime); reintroduce; virtual; //**< Create from an ordinary datetime
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
@@ -510,8 +511,6 @@ type
 
     function clone: IXQValue; override;
   protected
-    class function dateFormat: string; virtual; //**< Returns the format used by this type (override by derived types)
-    procedure truncateRange; virtual; //**< Removes all components from value, that are not supported by this type (overriden by derived types)
     class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): boolean; static;
 
     procedure multiplyComponents(fac: Decimal); //Multiply all components of value with fac
@@ -527,6 +526,8 @@ type
     function toDayTime(): extended; inline; //seconds in the duration
     function toMonths(): integer; inline;
 
+    procedure truncateRange();
+
     class function compare(const a,b: TXQValueDateTime; implicitTimezone: TDateTime): integer; static;
 //    class procedure subtract(S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
   end;
@@ -535,19 +536,15 @@ type
   { TXQValueSequence }
 
   //**< Type for a sequence containg an arbitrary number (>= 0) of other IXQValue
-  TXQValueSequence = class (TXQValue_AnySimpleType)
+  TXQValueSequence = class (TXQValue)
     seq: TXQVList;    //**< pointer to a list of the contained sequence values.
 
     constructor create(capacity: integer = 0);
     constructor create(firstChild: IXQValue);
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function isUndefined: boolean; override;
-
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toBooleanEffective: boolean; override;
@@ -591,7 +588,6 @@ type
     constructor create(anode: TTreeNode = nil); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
@@ -651,9 +647,7 @@ type
     constructor createTakingVariableLog(log: TXQVariableChangeLog);
     destructor Destroy; override;
 
-    class function createFromValue(const v: IXQValue): IXQValue; override;
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
@@ -686,7 +680,6 @@ type
     constructor create(capacity: integer = 0); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function isUndefined: boolean; override;
 
@@ -708,8 +701,8 @@ type
 
   { TXQValueJSONNull }
 
-  TXQValueJSONNull = class(TXQValue_AnyAtomicType)
-    class function classTypeName: string; override;
+  TXQValueJSONNull = class(TXQValue)
+    constructor create;
     class function classKind: TXQValueKind; override;
     function clone: IXQValue; override;
 
@@ -738,7 +731,6 @@ type
     constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
-    class function classTypeName: string; override;
 
     function canConvertToInt65: boolean; override;
     function canConvertToDecimal(pure: boolean): boolean; override;
@@ -747,6 +739,255 @@ type
     function clone: IXQValue; override;
   end;
 
+
+
+
+
+  //================================XML Schema=======================
+
+  type
+  TXSSimpleType = class;
+  { TXSSchema }
+
+  TXSAnnotation = class
+
+  end;
+
+  {
+  facets:
+             annotations fixed value                                                 implementation
+  length         +         +    >= 0                                                  ordinal
+  min/max-length +         +    >= 0                                                  ordinal
+  pattern        +         -    set of regex (OR on same level, AND on parent)         string+object cache
+  enumeration    +         -    set of values of base type                             xqvalue
+  whiteSpace     +         +    enum                                                  ordinal
+  maxInclusive   +         +    value of base type                                     xqvalue
+  maxExclusive   +         +    value of base type                                     xqvalue
+  minExclusive   +         +    value of base type                                     xqvalue
+  minInclusive   +         +    value of base type                                     xqvalue
+  totalDigits    +         +    > 0                                                   ordinal
+  fractionDigits +         +    >= 0                                                  ordinal
+  assertions     +              XPATH 2 EXPRESSION                                      string+object cache
+  explicitTimezone +       +    boolean                                               ordinal
+  }
+
+  TXSConstrainingFacetKind = (xsfLength, xsfMinLength, xsfMaxLength, xsfPattern, xsfEnumeration, {xsfWhiteSpace,}
+           xsfMaxInclusive, xsfMinInclusive, xsfTotalDigits, xsfFractionDigits, xsfAssertions, xsfExplicitTimezone);
+
+  { TXSConstrainingFacet }
+
+  TXSConstrainingFacet = class
+    kind: TXSConstrainingFacetKind;
+    annotations: array of TXSAnnotation;
+    fixed: boolean; //ignored for pattern/enumeration/assertion
+    constructor create(akind: TXSConstrainingFacetKind; afixed: boolean);
+  end;
+
+  TXSConstrainingFacetWhitespace = (xsfwAbsent, xsfwPreserve, xsfwReplace, xsfwCollapse);
+  TXSConstrainingFacetExplicitTimeZone = (xsfetRequired, xsfetProhibited, xsfetOptional);
+
+  { TXSConstrainingFacetOrdinal }
+
+  TXSConstrainingFacetOrdinal = class(TXSConstrainingFacet)
+    value: integer;
+    constructor create(akind: TXSConstrainingFacetKind; avalue: integer; afixed: boolean = true);
+  end;
+
+  { TXSConstrainingFacetValue }
+
+  TXSConstrainingFacetValue = class(TXSConstrainingFacet)
+    value: IXQValue;
+    constructor create(akind: TXSConstrainingFacetKind; const avalue: IXQValue; afixed: boolean = false);
+  end;
+
+  TXSConstrainingFacetObject = class(TXSConstrainingFacet)
+    value: string;
+    cache: TObject;
+  end;
+
+  TXSStorage = (xssBoolean, xssInt65, xssExtended, xssString);
+
+  { TXSType }
+
+  TXSType = class
+    name: string;
+    schema: TXSSchema;
+    base: TXSType;
+    storage: TXQValueClass;
+
+    whiteSpaceFacet: TXSConstrainingFacetWhitespace;
+    whiteSpaceFixed: boolean;
+
+    constructor Create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
+
+    //function isAtomic: boolean; virtual;
+    function derivedFrom(t: TXSType): boolean;
+    function derivedFrom(t: array of TXSType): boolean;
+
+    class function commonType(a, b: TXSType): TXSType; static;
+    class function commonType(const a, b: IXQValue): TXSType; static;
+
+    function getIntegerType: TXSType; virtual;
+    class function commonIntegerType(const a,b: TXSType): TXSType; static;
+    class function commonIntegerType(const a,b: IXQValue): TXSType; inline; static;
+    function getDecimalType: TXSType; virtual;
+    class function commonDecimalType(a,b: TXSType; const failureType: TXSType): TXSType; //static;
+    class function commonDecimalType(const a,b: IXQValue): TXSType; static;
+
+    //** Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
+    function createValue(const v: IXQValue): IXQValue; inline;
+    function createValue(const v: Int65): IXQValue; inline;
+    function createValue(const v: Decimal): IXQValue; inline;
+    function createValue(const v: String): IXQValue; inline;
+  protected
+    function tryCreateValue(const v: IXQValue; outv: PXQValue = nil): boolean;
+    function tryCreateValue(v: string; outv: PXQValue = nil): boolean;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; virtual;
+    function tryCreateValueInternal(const v: String; outv: PXQValue = nil): boolean; virtual;
+    function tryCreateValue(const v: Int65; outv: PXQValue = nil): boolean; virtual;
+    function tryCreateValue(const v: Decimal; outv: PXQValue = nil): boolean; virtual;
+  end;
+
+  //TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+
+
+  { TXSSimpleType }
+
+  TXSSimpleType = class(TXSType)
+    //annotations: array of TXSAnnotation;
+    final: (xsfRestriction, xsfExtension, xsfList, xsfUnion);
+    //context:
+    constrainingFacets: array of TXSConstrainingFacet;
+    //fundamentalFacets: array of TXSFacet;
+    {fundamentalFacets: record
+      ordered: (foFalse, foPartial, foTotal);
+      bounded: boolean;
+      cardinality: (fcFinite, fcCountableInfinite);
+      numeric: boolean;
+    end;}
+    variety: (xsvAbsent, xsvAtomic, xsvList, xsvUnion);
+    primitive: TXSType;
+    //items
+    //members
+    constructor Create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
+    destructor Destroy; override;
+  protected
+    procedure addConstrainingFacet(f: TXSConstrainingFacet);
+  end;
+  TXSListType = class(TXSSimpleType)
+    subTypes: array of TXSType; //atomic types
+  end;
+
+  { TXSUnionType }
+
+  TXSUnionType = class(TXSSimpleType)
+    members: array of TXSType; //atomic types
+    constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSType);
+    function containsTransitive(t: TXSType): boolean;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): boolean; override;
+    function tryCreateValueInternal(const v: String; outv: PXQValue=nil): boolean; override;
+  end;
+
+
+  { TXSIntegerType }
+
+  TXSIntegerType = class(TXSSimpleType)
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    function constraintsSatisfied(const v: int65): boolean;
+  end;
+
+  { TXSDecimalType }
+  TXSDecimalSubType = (xsstDecimal, xsstFloat, xsstDouble);
+  TXSDecimalType = class(TXSSimpleType)
+    subType: TXSDecimalSubType;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    constructor create(const aname: string; aparent: TXSType; asubtype: TXSDecimalSubType);
+  end;
+
+  { TXSBooleanType }
+
+  TXSBooleanType = class(TXSSimpleType)
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+  end;
+
+  { TXSStringType }
+
+  TXSStringSubType = (xsstString, xsstHexBinary, xsstBase64Binary, xsstUrl);
+  TXSStringType = class(TXSSimpleType)
+    lexicalSpaceRegex: TRegExpr;
+    subType: TXSStringSubType;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    constructor create(const aname: string; aparent: TXSType; asubtype: TXSStringSubType; pattern: string = '');
+    destructor Destroy; override;
+  end;
+
+  { TXSQNameType }
+
+  TXSQNameType = class(TXSSimpleType)
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+  end;
+
+  { TXSDateTimeType }
+  TXQDateTimeTruncation = (xqdttNone, xqdttTime, xqdttDate, xqdttYearMonth);
+  TXSDateTimeType = class(TXSSimpleType)
+    fixedDateTimePattern: string;
+    isDuration: boolean;
+    truncation: TXQDateTimeTruncation;
+    function truncated(const value: TXQValueDateTimeData): TXQValueDateTimeData;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    constructor Create(aname: string; aparent: TXSType; apattern: string; atruncation: TXQDateTimeTruncation = xqdttNone );
+  end;
+
+  { TXSBaseSchema }
+
+  TXSSchema = class
+    //engine: TXQueryEngine;
+    url: string;
+    anyType, anySimpleType, anyAtomicType: TXSSimpleType;
+    decimal, integer, double, float: TXSSimpleType;
+
+
+    string_, anyURI, QName, base64Binary, boolean, date, time, dateTime, duration, gDay, gMonth, gMonthDay, gYear, gYearMonth, hexBinary, NOTATION: TXSSimpleType;
+
+    nonPositiveInteger, negativeInteger, nonNegativeInteger, positiveInteger, long, int, short, Byte, unsignedLong, unsignedInt, unsignedShort, unsignedByte: TXSSimpleType;
+    normalizedString, token, language, NMTOKEN, NMTOKENS, Name, NCName, ID, IDREF, IDREFS, ENTITY, ENTITIES: TXSType;
+    yearMonthDuration, dayTimeDuration, dateTimeStamp: TXSType;
+
+    //XQuery additions
+    untyped: TXSType;
+    untypedAtomic: TXSSimpleType;
+    node: TXSType;
+
+    sequence: TXSType;
+    numericPseudoType, trueNumericPseudoType: TXSUnionType;
+
+    constructor Create;
+    destructor Destroy; override;
+    function findType(const typeName: string): TXSType;
+  private
+    typeList: TStringList;
+  end;
+
+  { TJSSchema }
+
+  { TJSONiqOverrideSchema }
+
+  TJSONiqOverrideSchema = class(TXSSchema)
+    structuredItem: TXSType;
+    constructor create;
+  end;
+
+  TJSONiqAdditionSchema = class(TXSSchema)
+    jsonItem, array_, object_: TXSType;
+    jsNull: TXSSimpleType;
+    constructor create;
+  end;
 
 
 
@@ -787,9 +1028,9 @@ type
     property Count: integer read fcount write setCount;
 
     function getPromotedType(): TXQValueKind; //**< Returns the lowest type that all items in the list can be converted to
-    function getPromotedIntegerType: TXQValueInt65Class; //**< Returns the lowest type derived by integer that all items in the list can be converted to
-    function getPromotedDecimalType: TXQValueDecimalClass; //**< Returns the lowest type derived by decimal that all items in the list can be converted to
-    function getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass; //**< Returns the lowest type derived by datetime that all items in the list can be converted to
+    function getPromotedIntegerType: TXSType; //**< Returns the lowest type derived by integer that all items in the list can be converted to
+    function getPromotedDecimalType: TXSType; //**< Returns the lowest type derived by decimal that all items in the list can be converted to
+    function getPromotedDateTimeType(needDuration: boolean): TXSType; //**< Returns the lowest type with datetime storage that all items in the list can be converted to
   end;
 
 
@@ -917,6 +1158,12 @@ type
   //============================XQUERY AST TERMS==========================
 
 
+  {TXQTerm_VisitAction = (xqtvaNothing, xqtvaDeleteWithChildren, xqtvaDeleteLonely);
+  TXQTerm_Visitor = class
+    function visit(var term: TXQTerm): TXQTerm_VisitAction; virtual; abstract;
+    function leave(var term: TXQTerm): TXQTerm_VisitAction; virtual; abstract;
+  end;}
+
   //**@abstract Internally used xpath term
 
   { TXQTerm }
@@ -936,6 +1183,8 @@ type
     function getChildrenContextDependencies: TXQContextDependencies; virtual;
     function toQueryCommand: TXQPathMatchingStep; virtual;
     procedure addToQueryList(var path: TXQPathMatching); virtual;
+
+//    procedure visit(visitor: TXQTerm_Visitor); virtual;
   end;
 
   { TXQTermString }
@@ -952,6 +1201,7 @@ type
   TXQTermNumber = class(TXQTerm)
     value: IXQValue;
     constructor create(const avalue: string);
+    constructor create(const avalue: IXQValue);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -981,7 +1231,7 @@ type
     name: string;
     allowNone, allowMultiple: boolean;
     kind: TXQTypeInformationKind;
-    atomicTypeInfo: TXQValueClass; //only for tikAtomic
+    atomicTypeInfo: TXSType; //only for tikAtomic
     nodeMatching: TXQPathMatchingStep; //only for tikElementTest
 
     constructor create();
@@ -1061,7 +1311,7 @@ type
   { TXQTermReadAttribute }
 
   TXQTermReadAttribute = class(TXQTerm)
-    value, namespace: string;
+    attribName, namespace: string;
     constructor create(avalue: string; func: boolean = false);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
@@ -1136,6 +1386,9 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     destructor destroy; override;
+
+  protected
+//    procedure visit(visitor: TXQTerm_Visitor); override;
   end;
 
 
@@ -1190,6 +1443,9 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function isNamespaceConstructor: boolean;
     destructor destroy; override;
+
+  protected
+//    procedure visit(visitor: TXQTerm_Visitor); override;
   end;
 
   { TXQTermConstructor }
@@ -1517,6 +1773,8 @@ type
   *)
   TXQueryEngine=class
   public
+    Schemas: TList;
+
     RootElement: TTreeNode; //**< Root element
     ParentElement: TTreeNode; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
     TextElement: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
@@ -1634,7 +1892,7 @@ type
   protected
     function findNamespace(const nsprefix: string): INamespace;
     class function findOperator(const pos: pchar): TXQOperatorInfo;
-    class function findTypeClass(const name: string): TXQValueClass;
+    function findType(const namespace, name: string): TXSType;
   end;
 
   { TXQQueryIterator }
@@ -1668,9 +1926,6 @@ type
   //============================================================================
   //                                   Variant
   //============================================================================
-  //Note to memory management: All functions below (except xqvalueClone) destroy
-  //the passed const-xqvalue, so you don't have to care about it afterwards
-
   //Returns a IXQValue containing the passed value
   function xqvalue():IXQValue; inline; //**< Creates an undefined/empty-sequence IXQValue
   function xqvalue(const v: Boolean):IXQValue; inline; //**< Creates an boolean IXQValue
@@ -1835,23 +2090,6 @@ type
 TXQValue_DatePart = class (TXQValueDateTime)
 end;
 
-{ TXQValue_Binary }
-
-//**(Abstract) Class containing binary data
-TXQValue_Binary = class (TXQValueString)
-  class function createFromValue(const v: IXQValue): IXQValue; override;
-  function toRawBinary: string; virtual;
-  class function fromRawBinary(s: string): string; virtual;
-  function canConvertToInt65: boolean; override;
-  function canConvertToDecimal(pure: boolean): boolean; override;
-  function canConvertToBoolean: boolean; override;
-  class function classParentNonBlocked: TXQValueClass; override;
-end;
-
-
-  {$DEFINE PXP_DERIVED_TYPES_INTERFACE}
-  {$I xquery_derived_types.inc}
-
 type
 
 { TXQNativeModule }
@@ -1874,7 +2112,6 @@ type
   //** Registers a binary operator
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
-  procedure registerType(const typ: TXQValueClass);
 
   function findBasicFunction(const name: string): TXQBasicFunctionInfo;
   function findComplexFunction(const name: string): TXQComplexFunctionInfo;
@@ -1883,7 +2120,6 @@ protected
   basicFunctions, complexFunctions, interpretedFunctions: TStringList;
   binaryOpLists: TStringList;
   binaryOpFunctions: TStringList;
-  types: TStringList;
   procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
 end;
 
@@ -1905,6 +2141,8 @@ procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from,
 
 var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are known in all XPath/XQuery expressions, even if they are not declared there
     AllowJSONDefaultInternal: boolean = false; //**< Default setting for JSON (internally used).
+    baseSchema: TJSONiqOverrideSchema;
+    baseJSONiqSchema: TJSONiqAdditionSchema;
 implementation
 uses base64, strutils;
 
@@ -2016,33 +2254,6 @@ begin
   inherited create(temp + amessage);
 end;
 
-
-type
-
-  { TXQValueNumericPseudoType }
-
-  TXQValueNumericPseudoType = class(TXQValue)
-    class function classTypeName: string; override;
-  end;
-
-  class function TXQValueNumericPseudoType.classTypeName: string;
-  begin
-    result := 'numeric';
-  end;
-
-type
-  //equal to numeric, but does not match untypedAtomic
-  TXQValueTrueNumericPseudoType = class(TXQValue)
-    class function classTypeName: string; override;
-  end;
-
-
-  class function TXQValueTrueNumericPseudoType.classTypeName: string;
-  begin
-    result := 'true-numeric';
-  end;
-
-
 var collations: TStringList;
     nativeModules: TStringList;
 
@@ -2112,9 +2323,9 @@ end;
 {$I restoreRangeOverflowChecks.inc}
 
 
-function compareValue(a, b: TXQ_Decimal;const EPSILON: extended = 1e-17): integer;
+function compareValue(a, b: Decimal;const EPSILON: extended = 1e-17): integer;
 var
-  t: TXQ_Decimal;
+  t: Decimal;
 begin
   if IsNan(a) or IsNan(b) then exit(-2);
   if isPosInf(a) or isPosInf(b) then
@@ -2150,6 +2361,8 @@ begin
     else if striEqual(s, '-INF') then result:=getNegInf
     else {if strliEqual(string(v.varstr), 'NaN') then }result:=getNaN;
 end;
+
+
 {$ifdef FPC_HAS_TYPE_EXTENDED}
 function myDecimalToStr(const v:extended): string;
 begin
@@ -2253,230 +2466,6 @@ end;
 
 function xqvalueAtomize(const v: IXQValue): IXQValue; forward;
 
-function commonClass(a,b: TXQValueClass): TXQValueClass; overload;
-var ta: TClass;
-begin
-  if a = b then exit(a);
-  if (a = TXQValue) or (b = TXQValue) then exit(TXQValue);
-//  if a.InheritsFrom(b) then exit(b);
-  if b.InheritsFrom(a) then exit(a);
-  ta := a;
-  while ta <> nil do begin
-    ta := ta.ClassParent;
-    if b.InheritsFrom(ta) then exit(TXQValueClass(ta));
-  end;
-  exit(TXQValue);
-end;
-
-
-function commonClass(const a,b: IXQValue): TXQValueClass; overload; inline;
-begin
-  result := commonClass(a.getClassType, b.getClassType);
-end;
-
-function commonNonBlockedClass(a,b: TXQValueClass): TXQValueClass;
-var ta: TXQValueClass;
-begin
-  if a = b then exit(a);
-  if a.instanceOf(b) then exit(b);
-  if b.instanceOf(a) then exit(a);
-  ta := a;
-  while ta <> nil do begin
-    ta := ta.classParentNonBlocked;
-    if b.instanceOf(ta) then exit(ta);
-  end;
-  exit(TXQValue);
-end;
-
-function isAtomicSubType(temp: TXQValueClass): boolean;
-begin
-  result := (temp <> nil) and (temp <> TXQValue_AnyAtomicType) and (temp <> TXQValue) and (temp <> TXQValue_AnySimpleType) ;
-end;
-
-function getIntegerClass(a: IXQValue): TXQValueInt65Class; inline;
-begin
-  if a is TXQValueInt65 then result := TXQValueInt65Class(a.getClassType)
-  else result := TXQValueInt65;
-end;
-
-function getDecimalClass(a: IXQValue): TXQValueDecimalClass; inline;
-begin
-  if a is TXQValueDecimal then result := TXQValueDecimalClass(a.getClassType)
-  else result := TXQValueDecimal;
-end;
-
-function commonIntegerClass(a,b: TXQValueClass): TXQValueInt65Class;
-var temp: TClass;
-  aInteger, bInteger: Boolean;
-begin
-  aInteger := a.InheritsFrom(TXQValueInt65);
-  bInteger := b.InheritsFrom(TXQValueInt65);
-  if (not aInteger) and (not bInteger) then exit(TXQValueInt65);
-  if (not aInteger) or (not bInteger) then begin
-    if aInteger then exit(TXQValueInt65Class(a));
-    if bInteger then exit(TXQValueInt65Class(b));
-  end;
-  temp := commonClass(a,b);
-  if temp = TXQValue then exit(TXQValueInt65);
-  result := TXQValueInt65Class(temp);
-end;
-
-function commonIntegerClass(a,b: IXQValue): TXQValueInt65Class; inline;
-begin
-  result := commonIntegerClass(a.getClassType, b.getClassType);
-end;
-
-function commonDecimalClass(a,b: TXQValueClass; failureClass: TXQValueDecimalClass): TXQValueDecimalClass;
-   //checks if one of the values has the given type. if yes, it sets its caller result to the least common ancestor, derived from that type
-  function becomesType(typ: TXQValueDecimalClass): boolean;
-  var amatch, bmatch: boolean;
-  begin
-    amatch:=a.InheritsFrom(typ);
-    bmatch:=b.InheritsFrom(typ);
-    if not amatch and not bmatch then exit(false);
-    result := true;
-    if not amatch or not bmatch then commonDecimalClass := typ
-    else if a = b then commonDecimalClass := TXQValueDecimalClass(a)
-    else commonDecimalClass := TXQValueDecimalClass(commonClass(a, b)); //check for possible user defined types both derived from typ
-  end;
-
-begin
-  //Decimal conversion is complicated.
-  //Official type promotion after: http://www.w3.org/TR/xpath20/#promotion:
-  //  float~ -> double
-  //  decimal~ -> float,  decimal~ -> double
-  // also sub type substitution:
-  //  integer -> decimal
-  //That's the opposite of my type hierarchy (float -> decimal, double -> decimal), so handle all cases separately
-
-  if a = b then
-    if a.InheritsFrom(TXQValueDecimal) then exit(TXQValueDecimalClass(a))
-    else if a.InheritsFrom(TXQValueInt65) then exit(TXQValueDecimal)
-    else exit(failureClass);
-
-  if not a.InheritsFrom(TXQValueDecimal) and not a.InheritsFrom(TXQValueInt65) then
-    a := failureClass;
-  if not b.InheritsFrom(TXQValueDecimal) and not b.InheritsFrom(TXQValueInt65) then
-    b := failureClass;
-
-  if becomesType(TXQValue_double) then
-    exit; //all values can be converted to double, but double can not be converted to anything
-
-  //(decimal, float, integer) bases remaining
-
-  if becomesType(TXQValue_float) then
-    exit(); //all of them can be converted to float
-
-  //(decimal, integer) remaining
-
-  result := failureClass;
-  becomesType(TXQValueDecimal)
-end;
-
-function commonDecimalClass(a,b: IXQValue): TXQValueDecimalClass; inline;
-begin
-  result := commonDecimalClass(a.getClassType, b.getClassType, TXQValue_Double);
-end;
-
-var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
-
-function xqvalue: IXQValue;
-begin
-  result := commonValuesUndefined;
-  //result := TXQValueUndefined.Create;
-end;
-
-function xqvalue(const v: Boolean): IXQValue;
-begin
-  case v of
-    true:  result := commonValuesTrue;
-    false: result := commonValuesFalse;
-    else result := nil;
-  end;
-
-  //result := TXQValueBoolean.Create(v);
-end;
-
-function xqvalueTrue: IXQValue;
-begin
-  result := commonValuesTrue;
-end;
-
-function xqvalueFalse: IXQValue;
-begin
-  result := commonValuesFalse;
-end;
-
-function xqvalue(const v: int65): IXQValue;
-begin
-  {case v.value of
-    0: result := commonValues[cvk0];
-    1: if v.sign then result := commonValues[cvkM1] else  result := commonValues[cvk1];
-    else result := TXQValueInt65.Create(v);
-  end;                                }
-  result := TXQValueInt65.Create(v);
-end;
-
-function xqvalue(v: Integer): IXQValue;
-begin
-  {case v of
-    0: result := commonValues[cvk0];
-    1: result := commonValues[cvk1];
-    else result := TXQValueInt65.Create(v);
-  end;}
-  result := xqvalue(int65(v));
-end;
-
-function xqvalue(const v: Int64): IXQValue;
-begin
-  {case v of
-    0: result := commonValues[cvk0];
-    1: result := commonValues[cvk1];
-    else result := TXQValueInt65.Create(v);
-  end;}
-  result := xqvalue(int65(v));
-end;
-
-function xqvalue(v: decimal): IXQValue;
-begin
-  result := TXQValueDecimal.Create(v);
-end;
-
-function xqvalue(v: string): IXQValue; inline;
-begin
-  {if v = '' then
-    result := commonValues[cvkEmptyString]
-   else}
-  result := TXQValueString.Create(v);
-end;
-
-function xqvalue(sl: TStringList): IXQValue;
-var
-  i: Integer;
-begin
-  if sl.Count = 0 then exit(xqvalue());
-  if sl.Count = 1 then exit(xqvalue(sl[0]));
-  result := xqvalue();
-  for i:=0 to sl.Count - 1 do
-    xqvalueSeqAdd(result, xqvalue(sl[i]));
-end;
-
-{function xqvalue(v: TDateTime): IXQValue;
-begin
-  result := TXQValueDateTime.Create(v);
-end;}
-
-function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
-begin
-  result := nil;
-  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
-end;
-
-function xqvalue(v: TTreeNode): IXQValue;
-begin
-  if v = nil then exit(xqvalue());
-  result := TXQValueNode.Create(v);
-end;
 
 
 { TXQValueObjectPropertyEnumerator }
@@ -2886,6 +2875,107 @@ begin
     TXQTermModule(fterm).initializeStaticContext(context);
 end;
 
+var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
+
+function xqvalue: IXQValue;
+begin
+  result := commonValuesUndefined;
+  //result := TXQValueUndefined.Create;
+end;
+
+function xqvalue(const v: Boolean): IXQValue;
+begin
+  case v of
+    true:  result := commonValuesTrue;
+    false: result := commonValuesFalse;
+    else result := nil;
+  end;
+
+  //result := TXQValueBoolean.Create(v);
+end;
+
+function xqvalueTrue: IXQValue;
+begin
+  result := commonValuesTrue;
+end;
+
+function xqvalueFalse: IXQValue;
+begin
+  result := commonValuesFalse;
+end;
+
+function xqvalue(const v: int65): IXQValue;
+begin
+  {case v.value of
+    0: result := commonValues[cvk0];
+    1: if v.sign then result := commonValues[cvkM1] else  result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;                                }
+  result := TXQValueInt65.Create(v);
+end;
+
+function xqvalue(v: Integer): IXQValue;
+begin
+  {case v of
+    0: result := commonValues[cvk0];
+    1: result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;}
+  result := xqvalue(int65(v));
+end;
+
+function xqvalue(const v: Int64): IXQValue;
+begin
+  {case v of
+    0: result := commonValues[cvk0];
+    1: result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;}
+  result := xqvalue(int65(v));
+end;
+
+function xqvalue(v: decimal): IXQValue;
+begin
+  result := TXQValueDecimal.Create(v);
+end;
+
+function xqvalue(v: string): IXQValue; inline;
+begin
+  {if v = '' then
+    result := commonValues[cvkEmptyString]
+   else}
+  result := TXQValueString.Create(v);
+end;
+
+function xqvalue(sl: TStringList): IXQValue;
+var
+  i: Integer;
+begin
+  if sl.Count = 0 then exit(xqvalue());
+  if sl.Count = 1 then exit(xqvalue(sl[0]));
+  result := xqvalue();
+  for i:=0 to sl.Count - 1 do
+    xqvalueSeqAdd(result, xqvalue(sl[i]));
+end;
+
+{function xqvalue(v: TDateTime): IXQValue;
+begin
+  result := TXQValueDateTime.Create(v);
+end;}
+
+function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
+begin
+  result := nil;
+  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
+end;
+
+function xqvalue(v: TTreeNode): IXQValue;
+begin
+  if v = nil then exit(xqvalue());
+  result := TXQValueNode.Create(v);
+end;
+
+
 procedure xqvalueSeqSqueeze(var v: IXQValue);
 var
   seq: TXQValueSequence;
@@ -2990,6 +3080,7 @@ begin
   end else raise EXQEvaluationException.Create('XPST0003', 'Children not allowed for element test "'+select+'"');
 end;
 
+{
 function qnameSplit(s: string): TStringArray;
 begin
   //splits URL #2 PREFIX : NAME  to  (URL, PREFIX, NAME)
@@ -2999,15 +3090,15 @@ begin
   result[2] := s;
 end;
 
-function qnameMake(const uri, prefix, local: string; c: TXQValueStringClass): TXQValue_QName;overload;
+function qnameMake(const uri, prefix, local: string; c: TXSType): TXQValueString;overload;
 begin
-  result := TXQValue_QName(c.create(uri + #2 + prefix + ':' + local));
+  result := TXQValueString.create(c, uri + #2 + prefix + ':' + local);
 end;
 
-function qnameMake(const ns: INamespace; const local: string; c: TXQValueStringClass): TXQValue_QName; overload;
+function qnameMake(const ns: INamespace; const local: string; c: TXSType): TXQValueString; overload;
 begin
   if ns <> nil then result := qnameMake(ns.getURL, ns.getPrefix, local, c)
-  else result := TXQValue_QName(c.create(local))
+  else result := TXQValueString.create(c, local)
 end;
 
 function qnameEqual(a,b: string): boolean;
@@ -3019,6 +3110,7 @@ begin
   bt := qnameSplit(b);
   result := (at[0] = bt[0]) and (at[2] = bt[2]); //ignore prefix
 end;
+}
 
 function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
 function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
@@ -3031,14 +3123,20 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
   ): IXQValue;
 
   function conversionSingle(const w: IXQValue): IXQValue;
+  var
+    t: TXSType;
   begin
     result := w;
-    if result is TXQValueNode then result := xqvalueAtomize(result);
+    t := result.typeAnnotation;
+    if t.derivedFrom(baseSchema.node) then begin
+      result := xqvalueAtomize(result);
+      t := result.typeAnnotation;
+    end;
     if typ.instanceOf(result, context) then exit;
-    if (result is TXQValue_untypedAtomic)
-       or (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) and ((w is TXQValue_float) or (w is TXQValue_double)))
-       or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
-       or (w.instanceOfInternal(TXQValue_anyURI) and (typ.atomicTypeInfo.instanceOf(TXQValueString))) then
+    if t.derivedFrom(baseSchema.UntypedAtomic)
+       or (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (t.derivedFrom(baseSchema.Float) or t.derivedFrom(baseSchema.Double)))
+       or ((t.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
+       or (t.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
          exit(typ.castAs(result, context));
     raise EXQEvaluationException.Create('XPTY0004', 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
   end;
@@ -3064,15 +3162,17 @@ class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: T
   ): boolean;
   function checkSingle(const wpre: IXQValue): boolean;
   var w: IXQValue;
+    st: TXSType;
   begin
-    if wpre is TXQValueNode then w := xqvalueAtomize(wpre)
+    if wpre.typeAnnotation.derivedFrom(baseSchema.node) then w := xqvalueAtomize(wpre)
     else w := wpre;
     if typ.instanceOf(w, context) then exit(true);
     if (w.kind = pvkNull) and (typ.allowNone) then exit(true);
-    if (w is TXQValue_untypedAtomic)
-       or (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) and ((w is TXQValue_float) or (w is TXQValue_double)))
-       or ((w.instanceOfInternal(TXQValueDecimal) and (typ.atomicTypeInfo.InheritsFrom(TXQValue_double) or typ.atomicTypeInfo.InheritsFrom(TXQValue_float) )) )
-       or (w.instanceOfInternal(TXQValue_anyURI) and (typ.atomicTypeInfo.instanceOf(TXQValueString)))      then
+    st := w.typeAnnotation;
+    if (st.derivedFrom(baseSchema.UntypedAtomic) and (typ.atomicTypeInfo <> baseSchema.trueNumericPseudoType))
+       or (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
+       or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
+       or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
          exit(typ.castableAs(w));
     result := false;
   end;
@@ -3129,12 +3229,9 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}
 {$I xquery_types.inc}
+{$I xquery_schemas.inc}
 {$I xquery_functions.inc}
 {$I xquery_functions_generated.inc}
-
-{$DEFINE PXP_DERIVED_TYPES_IMPLEMENTATION}
-{$I xquery_derived_types.inc}
-
 
 
 function sequenceFilterConditionSatisfied(evaluatedCondition: IXQValue; const index: integer): boolean;
@@ -3437,41 +3534,41 @@ begin
     result := commonTyp(result, items[i].kind);
 end;
 
-function TXQVList.getPromotedIntegerType: TXQValueInt65Class;
+function TXQVList.getPromotedIntegerType: TXSType;
 var
   i: Integer;
 begin
-  if count = 0 then exit(TXQValueInt65);
-  if count = 1 then exit(getIntegerClass(items[0]));
-  result := commonIntegerClass(items[0], items[1]);
+  if count = 0 then exit(baseSchema.integer);
+  if count = 1 then exit(items[0].typeAnnotation);
+  result := TXSType.commonIntegerType(items[0], items[1]);
   for i:=2 to count - 1 do
-    result := commonIntegerClass(result, items[i].getClassType);
+    result := TXSType.commonIntegerType(result, items[i].typeAnnotation);
 end;
 
-function TXQVList.getPromotedDecimalType: TXQValueDecimalClass;
+function TXQVList.getPromotedDecimalType: TXSType;
 var
   i: Integer;
 begin
-  if count = 0 then exit(TXQValueDecimal);
-  if count = 1 then exit(getDecimalClass(items[0]));
-  result := commonDecimalClass(items[0], items[1]);
+  if count = 0 then exit(baseSchema.decimal);
+  if count = 1 then exit(items[0].typeAnnotation.getDecimalType);
+  result := TXSType.commonDecimalType(items[0], items[1]);
   for i:=2 to count - 1 do
-    result := commonDecimalClass(result, items[i].getClassType, TXQValue_Double);
+    result := TXSType.commonDecimalType(result, items[i].typeAnnotation, baseSchema.double);
 end;
 
-function TXQVList.getPromotedDateTimeType(needDuration: boolean): TXQValueDateTimeClass;
+function TXQVList.getPromotedDateTimeType(needDuration: boolean): TXSType;
 var
   i: Integer;
 begin
   if count = 0 then
-    if needDuration then exit(TXQValue_duration)
-    else exit(TXQValueDateTime);
-  result := TXQValueDateTimeClass(items[0].getClassType);
+    if needDuration then exit(baseSchema.duration)
+    else exit(baseSchema.dateTime);
+  result := items[0].typeAnnotation;
   for i:=1 to count - 1 do begin
-    if result <> items[i].getClassType then raise EXQEvaluationException.Create('FORG0006', 'Mixed date/time/duration types');
+    if result <> items[i].typeAnnotation then raise EXQEvaluationException.Create('FORG0006', 'Mixed date/time/duration types');
     //result := TXQValueDateTimeClass(commonClass(result, TXQValueClass(items[i])));
   end;
-  if (needDuration) and (not result.InheritsFrom(TXQValue_duration)) then raise EXQEvaluationException.Create('FORG0006', 'Expected duration type, got: '+result.ClassName);
+  if (needDuration) and (not result.derivedFrom(baseSchema.duration)) then raise EXQEvaluationException.Create('FORG0006', 'Expected duration type, got: '+result.name);
 end;
 
 
@@ -4908,16 +5005,23 @@ begin
   end;
 end;
 
-class function TXQueryEngine.findTypeClass(const name: string): TXQValueClass;
+function TXQueryEngine.findType(const namespace, name: string): TXSType;
 var
   i: Integer;
   j: Integer;
 begin
-  for i := 0 to nativeModules.count - 1 do begin
+  if (self <> nil) and (Schemas <> nil) then
+    for i := 0 to Schemas.count - 1 do
+      if TXSSchema(Schemas[i]).url = namespace then
+        exit(TXSSchema(Schemas[i]).findType(name));
+  if namespace = baseSchema.url then
+    exit(baseSchema.findType(name));
+  raise EXQEvaluationException.create('XPST0008', 'unknown type {'+namespace+'}:'+name);
+  {for i := 0 to nativeModules.count - 1 do begin
     j := TXQNativeModule(nativeModules.Objects[i]).types.IndexOf(name);
     if j >= 0 then exit(TXQValueClass(TXQNativeModule(nativeModules.Objects[i]).types.Objects[j]));
   end;
-  result := nil;
+  result := nil;}
 end;
 
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean;
@@ -4938,8 +5042,8 @@ begin
   if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(xqvalue(node))) then begin
     if nodeCondition.requiredType.isSingleType() then
       case node.typ of
-        tetOpen: exit(TXQValue_untyped.instanceOf(nodeCondition.requiredType.atomicTypeInfo));
-        else exit(TXQValue_untypedAtomic.instanceOf(nodeCondition.requiredType.atomicTypeInfo));
+        tetOpen: exit(nodeCondition.requiredType.atomicTypeInfo.derivedFrom(baseSchema.untyped));
+        else exit(nodeCondition.requiredType.atomicTypeInfo.derivedFrom(baseSchema.untypedAtomic));
       end;
     exit(false);
   end;
@@ -5109,8 +5213,6 @@ begin
 
   binaryOpFunctions:=TStringList.Create;
   binaryOpFunctions.Sorted := true;
-  types:=TStringList.Create;
-  types.Sorted := true;
   parent := aparentModule;
 end;
 
@@ -5126,7 +5228,6 @@ begin
   binaryOpLists.free;
   binaryOpFunctions.Free;
   interpretedFunctions.free;
-  types.free;
   inherited Destroy;
 end;
 
@@ -5203,11 +5304,6 @@ begin
   parseTypeChecking(result, typeChecking);
   for i := 0 to high(result.versions) do
     binaryOpFunctions.AddObject(result.versions[i].name, TObject(result));
-end;
-
-procedure TXQNativeModule.registerType(const typ: TXQValueClass);
-begin
-  types.AddObject(typ.classTypeName, TObject(typ));
 end;
 
 function TXQNativeModule.findBasicFunction(const name: string): TXQBasicFunctionInfo;
@@ -5297,23 +5393,9 @@ op := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators);
 TXQueryEngine.registerNativeModule(op);
 
 //Constructors (xs: namespace, not fn:)
-xs.registerType(TXQValueBoolean);
-xs.registerType(TXQValueInt65);
-xs.registerType(TXQValueDecimal);
-xs.registerType(TXQValueString);
-xs.registerType(TXQValueDateTime);
-xs.registerType(TXQValueObject);
-xs.registerType(TXQValueJSONArray); //that should be in another namespace, but that cannot be really handled yet
-xs.registerType(TXQValueJSONNull); //that should be in another namespace, but that cannot be really handled yet
-xs.registerType(TXQValue_AnyAtomicType);
-xs.registerType(TXQValue_AnySimpleType);
-xs.registerType(TXQValue);
-xs.registerType(TXQValueNumericPseudoType);
-xs.registerType(TXQValueTrueNumericPseudoType);
-
-{$DEFINE PXP_DERIVED_TYPES_REGISTRATION}
-{$I xquery_derived_types.inc}
-
+baseSchema := TJSONiqOverrideSchema.create;
+baseSchema.url:=XMLNamespace_XMLSchema.getURL;
+baseJSONiqSchema := TJSONiqAdditionSchema.create();
 
 
 //my functions
@@ -5335,7 +5417,9 @@ pxp.registerFunction('get',@xqFunctionGet, ['($name as xs:string)','($name as xs
 pxp.registerFunction('is-nth',@xqFunctionIs_Nth, []);
 pxp.registerFunction('type-of',@xqFunctionType_of, []);
 pxp.registerFunction('get-property',@xqFunctionGet_Property, []);
+pxp.registerFunction('object',@xqFunctionObject,[]); //deprecated
 pxp.registerFunction('join',@xqFunctionJoin,[]);
+
 
 pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
 pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
@@ -5543,7 +5627,7 @@ TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpat
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
 
-commonValuesUndefined := TXQValueUndefined.create;
+commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped);
 commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
 
@@ -5559,8 +5643,8 @@ collations.Free;
 nativeModules.free;
 globalTypeParsingContext.staticContext.Free;
 globalTypeParsingContext.free;
+baseSchema.free;
+baseJSONiqSchema.free;
 GlobalStaticNamespaces.Free;
-{$DEFINE PXP_DERIVED_TYPES_FINALIZATION}
-{$I xquery_derived_types.inc}
 end.
 

@@ -310,18 +310,18 @@ begin
     end else if AllowJSON and ((word = 'array') or (word = 'object') or (word = 'json-item') or (word = 'structured-item')) then begin
       expect('('); expect(')');
       case word of
-        'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := TXQValueJSONIQItem; end;
-        'structured-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := TXQValueJSONIQStructuredItem; end;
-        'array', 'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := TXQueryEngine.findTypeClass(word); end;
+        'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
+        'structured-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseSchema.structuredItem; end;
+        'array': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_; end;
+        'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
         else raiseParsingError('XPST0003', 'WTF??');
       end;
     end else begin;
       staticContext.splitRawQName(namespace, word, xqdnkType);
       if (namespace = nil) then raiseParsingError('XPST0008', 'No schemas loaded for type '+word);
-      if namespace.getURL <> XMLNamespaceURL_XMLSchema then raiseParsingError('XQST0009', 'Invalid schema loaded: '+namespace.getURL+' by '+word);
       result.kind:=tikAtomic;
-      result.atomicTypeInfo := TXQueryEngine.findTypeClass(word);
-      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: '+word);
+      result.atomicTypeInfo := engine.findType(namespace.getURL, word);
+      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: {'+namespace.getURL+'}:'+word);
     end;
 
 
@@ -650,6 +650,7 @@ var
   attribute: TXQTermConstructor;
   lastWasCData: Boolean;
   i: Integer;
+  oldDefaultElementTypeNamespace: INamespace;
 begin
   name := nextTokenMaybeQName();
   if name = '!' then exit(parseCommentConstructor)
@@ -684,10 +685,14 @@ begin
     exit;
   end;
 
+  oldDefaultElementTypeNamespace := staticContext.defaultElementTypeNamespace;
   if Result.implicitNamespaces <> nil then begin
     if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
-    for i := 0 to result.implicitNamespaces.Count - 1 do
+    for i := 0 to result.implicitNamespaces.Count - 1 do begin
       staticContext.namespaces.add(Result.implicitNamespaces.namespaces[i]);
+      if Result.implicitNamespaces.namespaces[i].getPrefix = '' then
+        staticContext.defaultElementTypeNamespace := Result.implicitNamespaces.namespaces[i];
+    end;
   end;
 
   lastWasCData := false;
@@ -703,7 +708,7 @@ begin
           pos += 1;
           if nextTokenQName() <> name then raiseParsingError('XPST0003', 'Expected matching closing tag');
           expect('>');
-
+          staticContext.defaultElementTypeNamespace := oldDefaultElementTypeNamespace;
           if Result.implicitNamespaces <> nil then
             for i := 0 to result.implicitNamespaces.Count - 1 do
               staticContext.namespaces.Delete(staticContext.namespaces.Count-1);
@@ -1000,6 +1005,23 @@ begin
   result := parseSequenceLike(TXQTermJSONArray.Create, ']') as TXQTermJSONArray;
 end;
 
+function staticallyCastQNameAndNotation(term: TXQTerm; typ: TXSType; staticContext: TXQStaticContext): txqterm;
+var
+  name: String;
+  namespace: INamespace;
+begin
+  result := term;
+  if typ.derivedFrom([baseSchema.QName, baseSchema.NOTATION])
+     and (typ <> baseSchema.NOTATION)
+     and (term.children[0] is TXQTermString) then begin
+       name := TXQTermString(term.children[0]).value;
+       staticContext.splitRawQName(namespace, name, xqdnkElementType);
+       result := TXQTermNumber.create(TXQValueQName.create(typ, namespace, name));
+       term.free;
+     end;
+end;
+
+
 
 function TXQParsingContext.parseValue: TXQTerm;
 var
@@ -1007,6 +1029,7 @@ var
   wordlookahead: String;
   temp: PChar;
   constr: Boolean;
+  namespace: INamespace;
 begin
   result := nil;
   word:=nextToken();
@@ -1026,7 +1049,7 @@ begin
         expect(wordlookahead);
         exit(TXQTermNumber.Create('-' + wordlookahead));
       end else
-        exit(TXQTermBinaryOp.create(word, TXQTermNumber.create('0'), parseValue()));
+        exit(TXQTermBinaryOp.create(word, TXQTermNumber.create( '0'), parseValue()));
     end;
 
     '(': begin
@@ -1119,7 +1142,11 @@ begin
         end else begin
           result := TXQTermNamedFunction.createIfExists(word, staticContext);
           if result = nil then raiseParsingError('XPST0003', 'unknown function: '+word);
-          exit(parseSequenceLike(result));
+          result := parseSequenceLike(result);
+
+          if (TXQTermNamedFunction(result).kind = xqfkTypeConstructor) and (length(result.children) = 1) then
+            result := staticallyCastQNameAndNotation(result, TXSType(TXQTermNamedFunction(result).func), staticContext);
+          exit;
         end;
       end;
 
@@ -1173,6 +1200,7 @@ begin
   end;
 end;
 
+
 type PXQTerm = ^TXQTerm;
 
 //searchs the term to split
@@ -1197,9 +1225,25 @@ var astroot: TXQTerm;
     if result = nil then raiseParsingError('XPST0003', 'Unexpected query end');
   end;
 
+
   procedure pushBinaryOp(const opinfo: TXQOperatorInfo);
   var res: TXQTermBinaryOp;
       replace: PXQTerm;
+    procedure handleCastStrangeness;
+    var st: TXQTermSequenceType;
+        name: String;
+        namespace: INamespace;
+    begin
+      expect(res.op.followedBy);
+      st := parseSequenceType();
+      res.push(st); //assume we read instance of/cast/castable/treat as
+      if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) then begin
+        if not (st.isSingleType()) then
+          raiseParsingError('XPST0003', 'Need single typ for cast');
+        replace^ := staticallyCastQNameAndNotation(res, st.atomicTypeInfo, staticContext);
+      end;
+    end;
+
   begin
     expect(opinfo.name);
     if opinfo.require3 then require3();
@@ -1210,12 +1254,8 @@ var astroot: TXQTerm;
     res.push(replace^);
     replace^ := res;
 
-    if res.op.followedBy <> '' then begin
-      expect(res.op.followedBy);
-      res.push(parseSequenceType()); //assume we read instance of/cast/castable/treat as
-      if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) and (not (res.children[high(res.children)] as TXQTermSequenceType).isSingleType()) then
-        raiseParsingError('XPST0003', 'Need single typ for cast');
-    end else begin
+    if res.op.followedBy <> '' then handleCastStrangeness
+    else begin
       res.push(parseValue());
       if res.children[high(res.children)] = nil then raiseParsingError('XPST0003', 'Unexpected query end');
     end;
@@ -1302,6 +1342,41 @@ begin
   end;
   result := astroot;
 end;
+
+
+{type
+
+
+TParseFinalizer = class(TXQTerm_Visitor)
+  sc: TXQStaticContext;
+  function visit(var term: TXQTerm): TXQTerm_VisitAction; override;
+end;
+ function TParseFinalizer.visit(var term: TXQTerm): TXQTerm_VisitAction;
+var
+  bop: TXQTermBinaryOp;
+  name: String;
+  namespace: INamespace;
+  nf: TXQTermNamedFunction;
+begin
+  if term is TXQTermBinaryOp then begin
+    bop := TXQTermBinaryOp(term);
+    if ((bop.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs))
+       and (term.children[0] is TXQTermString)
+       and ((term.children[1] as TXQTermSequenceType).atomicTypeInfo.derivedFrom([baseSchema.QName, baseSchema.NOTATION])) then begin
+       name := TXQTermString(term.children[0]).value;
+       sc.splitRawQName(namespace, name, xqdnkElementType);
+       term := TXQTermNumber.create(TXQValueQName.create((term.children[1] as TXQTermSequenceType).atomicTypeInfo, ns, name));
+       exit(xqtvaDeleteWithChildren);
+    end;
+  end else if term is TXQTermNamedFunction then begin
+    nf := TXQTermNamedFunction(term);
+    if (nf.kind = xqfkTypeConstructor)
+       and (TXSType(nf.func).derivedFrom([baseSchema.QName, baseSchema.NOTATION]))
+       and (length(nf.children) = 0) then begin
+
+    end;
+  end;
+end;        }
 
 function TXQParsingContext.parsePrimaryLevel: TXQTerm;
 begin
@@ -1635,8 +1710,10 @@ begin
     resultquery.initializeStaticContext(staticContext.sender.getEvaluationContext(staticContext));
   end;
 
-  if AllowJSONLiterals and (result <> nil) then
-    postprocessJSONLiterals(result);
+  if result <> nil then begin
+    if AllowJSONLiterals then
+      postprocessJSONLiterals(result);
+  end;
 end;
 
 procedure TXQParsingContext.postProcessJSONLiterals(var t: TXQTerm);
@@ -1665,7 +1742,7 @@ begin
     postProcessJSONLiterals(TXQTermFlower(t).returned);
     if TXQTermFlower(t).where <> nil then postProcessJSONLiterals(TXQTermFlower(t).where);
   end else if t is TXQTermDefineVariable then begin
-    for i := 1 to high(t.children) do postProcessJSONLiterals(t.children[i]);
+    for i := 0 to high(t.children) do postProcessJSONLiterals(t.children[i]);
   end else if t <> nil then
     for i := 0 to high(t.children) do postProcessJSONLiterals(t.children[i]);
 end;
