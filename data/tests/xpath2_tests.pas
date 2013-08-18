@@ -1937,6 +1937,7 @@ t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if thi
 
                //Objects extension
   t('obj := object()', '', '');
+  t('type-of($obj)', 'object()');
   t('obj.foo := "bar"', 'bar', '');
   t('$obj.foo', 'bar', '');
   t('($obj).foo', 'bar', '');

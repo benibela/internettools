@@ -945,6 +945,21 @@ begin
   if extParser.variables.ValuesString['newjoinednew']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['newtype']<>'string' then raise Exception.Create('invalid var');
 
+  extParser.parseTemplate('<a>{obj := {"a": .} }</a>');
+  extParser.parseHTML('<a>1x</a>');
+  cmp(extParser.variables.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x}');
+  extParser.parseTemplate('<a>{$obj.b := .}</a>');
+  extParser.parseHTML('<a>2y</a>');
+  cmp(extParser.variables.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y}');
+  extParser.parseTemplate('<a>{$obj.c := concat($obj.b, .)}</a>');
+  extParser.parseHTML('<a>3z</a>');
+  cmp(extParser.variables.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y, c: string: 2y3z}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y, c: string: 2y3z}');
+
+
+
   //test, if the testing here works
   q('1+2', '3');
   q('"abc"', 'abc');

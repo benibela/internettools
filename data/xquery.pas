@@ -3863,6 +3863,7 @@ var
   found: Boolean;
   i,j: Integer;
   k: Integer;
+  temp: TXQValue;
 begin
   result := TXQVariableChangeLog.create();
   result.shared:=true;
@@ -3882,10 +3883,14 @@ begin
           for k := j + 1 to p - 1 do result.vars[k-1] := result.vars[k];
           result.vars[p-1] := vars[i];
           result.vars[p-1].name := vars[i].name;
+          result.vars[p-1].propertyChange:=false;
           break;
         end;
-      if not found then raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to object without an object');
-      continue;
+      if found then continue;
+      if not parentLog.hasVariable(vars[i].name, @temp, vars[i].namespace) then
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+vars[i].name+', but no variable of that name exists');
+      if not (temp is TXQValueObject) then
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+vars[i].name+', but '+vars[i].name+'='+temp.debugAsStringWithTypeAnnotation()+' is not an object ');
     end;
     result.vars[p] := vars[i];
     p+=1;
