@@ -76,6 +76,7 @@ var
 
 //var  time: TDateTime;
 var tempb: Boolean;
+  tt: String;
 begin
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
@@ -3039,12 +3040,12 @@ begin
   t('fn:round-half-to-even(10.3, -999999999999)', '0');
   t('fn:round-half-to-even(10.3, 999999999999)', '10.3');
   t('fn:round-half-to-even(10, -2)', '0');
-  t('fn:round-half-to-even(xs:float("3.4028235E38"), -38)', '3E38');
-  t('fn:round-half-to-even(xs:float("-3.4028235E38"), -38)', '-3E38');
-  t('fn:round-half-to-even(xs:double("3.4028235E38"), -38)', '3E38');
-  t('fn:round-half-to-even(xs:double("-3.4028235E38"), -38)', '-3E38');
-  t('fn:round-half-to-even(xs:double("3.5E38"), -38)', '4E38');
-  t('fn:round-half-to-even(xs:double("-3.5E38"), -38)', '-4E38');
+  t('fn:round-half-to-even(xs:float("3.4028235E38"), -38)', '3.0E38');
+  t('fn:round-half-to-even(xs:float("-3.4028235E38"), -38)', '-3.0E38');
+  t('fn:round-half-to-even(xs:double("3.4028235E38"), -38)', '3.0E38');
+  t('fn:round-half-to-even(xs:double("-3.4028235E38"), -38)', '-3.0E38');
+  t('fn:round-half-to-even(xs:double("3.5E38"), -38)', '4.0E38');
+  t('fn:round-half-to-even(xs:double("-3.5E38"), -38)', '-4.0E38');
   t('fn:round-half-to-even(10.344, 2)', '10.34');
   t('fn:round-half-to-even(10.345, 2)', '10.34');
   t('fn:round-half-to-even(10.346, 2)', '10.35');
@@ -3252,6 +3253,58 @@ begin
   t('/a >> ()',  '');
   t('() >> /a ', '');
 
+  for tempb := false to true do begin
+    ps.StaticContext.strictTypeChecking:=tempb;
+
+    f('(0.0 div 0.0)', 'err:FOAR0001');
+    f('(0   div 0  )', 'err:FOAR0001');
+    f('(0.0 div   0)', 'err:FOAR0001');
+    f('(  0 div 0.0)', 'err:FOAR0001');
+
+    t('(  0 div 0e1)', 'NaN');
+    t('(0.0 div 0e1)', 'NaN');
+    t('(0e1 div 0  )', 'NaN');
+    t('(0e1 div 0.0)', 'NaN');
+
+    for i := 0 to 1 do begin
+      if i = 0 then tt := 'xs:string' else tt := 'xs:untypedAtomic';
+      t('xs:NCName("Foobar") cast as ' + tt, 'Foobar');
+      t('xs:anyURI("http://www.example.org/äöü !") cast as ' + tt, 'http://www.example.org/äöü !');
+      t('xs:QName("xml:foo") cast as ' + tt, 'xml:foo');
+      t('xs:integer(123) cast as ' + tt, '123');
+      t('xs:decimal(0.00001) cast as ' + tt, '0.00001');
+      t('xs:double(0.00001) cast as ' + tt, '0.00001');
+      t('xs:float(0.00001) cast as ' + tt, '0.00001');
+      t('xs:decimal(0.000001) cast as ' + tt, '0.000001');
+      t('xs:double(0.000001) cast as ' + tt, '0.000001');
+      t('xs:float(0.000001) cast as ' + tt, '0.000001');
+      t('xs:decimal(0.0000001) cast as ' + tt, '0.0000001');
+      t('xs:double(0.0000001) cast as ' + tt, '1.0E-7');
+      t('xs:float(0.0000001) cast as ' + tt, '1.0E-7');
+      t('xs:decimal(1000000) cast as ' + tt, '1000000');
+      t('xs:double(1000000) cast as ' + tt, '1000000');
+      t('xs:float(1000000) cast as ' + tt, '1000000');
+      t('xs:decimal(10000000) cast as ' + tt, '10000000');
+      t('xs:double(10000000) cast as ' + tt, '1.0E7');
+      t('xs:float(10000000) cast as ' + tt, '1.0E7');
+
+      t('xs:decimal(-0.000001) cast as ' + tt, '-0.000001');
+      t('xs:double(-0.000001) cast as ' + tt, '-0.000001');
+      t('xs:float(-0.000001) cast as ' + tt, '-0.000001');
+      t('xs:decimal(-0.0000001) cast as ' + tt, '-0.0000001');
+      t('xs:double(-0.0000001) cast as ' + tt, '-1.0E-7');
+      t('xs:float(-0.0000001) cast as ' + tt, '-1.0E-7');
+      t('xs:decimal(-1000000) cast as ' + tt, '-1000000');
+      t('xs:double(-1000000) cast as ' + tt, '-1000000');
+      t('xs:float(-1000000) cast as ' + tt, '-1000000');
+      t('xs:decimal(-10000000) cast as ' + tt, '-10000000');
+      t('xs:double(-10000000) cast as ' + tt, '-1.0E7');
+      t('xs:float(-10000000) cast as ' + tt, '-1.0E7');
+    end;
+
+  end;
+  ps.StaticContext.strictTypeChecking:=false;
+
   t('element', 'E1aT1E1bD1aA1D1bC1PI1E1c', '!<element>E1a<text>T1</text>E1b<document>D1a<attribute>A1</attribute>D1b<comment>C1</comment><processing-instruction>PI1</processing-instruction></document>E1c</element>');
   t('string-join(for $a in element return $a / text(), ":")', 'E1a:E1b:E1c');
   t('string-join(for $a in element return $a / text, ":")', 'T1');
@@ -3368,8 +3421,9 @@ begin
   t('/ | / ', 'hallo', '!<a>hallo</a>');
   t('/ + 17', '140', '!<a>123</a>');
 
-  t('xs:float(1e7)', '10000000');
-  t('xs:double(1e18)', '1000000000000000000');
+  t('xs:float(1e7)', '1.0E7');
+  t('xs:double(1e18)', '1.0E18');
+  t('xs:decimal(1e18)', '1000000000000000000');
 
 
   if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode') <> nil then begin

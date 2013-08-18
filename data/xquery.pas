@@ -2369,27 +2369,63 @@ begin
 end;
 
 
+function killTrailingZeros(const s: string): string;
+var
+  p: SizeInt;
+  l: Integer;
+  sp: SizeInt;
+
+  E: SizeInt;
+  d: SizeInt;
+begin
+  //change: y.xxxx0*(E...)? => y.xxxx(E...)?
+  //        y.0* => y
+  //        y.0*(E..) => y.0E..
+
+  result := s;
+
+  D := pos('.', result);
+  if D <= 0 then exit;
+  E := pos('E', result);
+  if E <= 0 then E := length(result) + 1
+  else if D > E then exit; // format: integer E ..
+  p := E;
+  while (Result[p-1] = '0') do p-=1;
+  if Result[p - 1] = '.' then
+    if E = length(result) + 1 then p -= 1  //delete .
+    else p += 1;                           //keep   .0
+  delete(result, p, E - p);
+
+  if (p < length(result)) and (Result[p+1] = '+') then delete(result, p+1, 1); //also remove + after E
+end;
+
 {$ifdef FPC_HAS_TYPE_EXTENDED}
 function myDecimalToStr(const v:extended): string;
 begin
-  if frac(v) = 0 then begin
-    if  (v >= -9200000000000000000) and (v <= 9200000000000000000) then result := IntToStr(trunc(v))
-    else result := FloatToStrF(V, ffFixed, 16, 0, FormatSettings)
-  end else result := FloatToStrF(V, ffGeneral, 16, 0, FormatSettings);
+  if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then result := IntToStr(trunc(v))
+  else begin
+    str(v:0:18, result);
+    result := killTrailingZeros(Result);
+  end;
 end;
 {$endif FPC_HAS_TYPE_EXTENDED}
+
 {$ifdef FPC_HAS_TYPE_SINGLE}
 function myDecimalToStr(const v:single): string;
 begin
-  if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
-  result := FloatToStrF(V, ffGeneral, 8, 0, FormatSettings);
+  //if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
+  if ((v >= single(0.000001)) and (v <= 1000000)) or ((v >= -1000000) and (v <= single(-0.000001)))  then str(v:0:7, result)
+  else result := FloatToStrF(V, ffExponent, 8, 0, FormatSettings);
+  result := killTrailingZeros(result);
 end;
 {$endif FPC_HAS_TYPE_SINGLE}
 {$ifdef FPC_HAS_TYPE_DOUBLE}
 function myDecimalToStr(const v:double): string;
 begin
-  if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
-  result := FloatToStrF(V, ffGeneral, 16, 0, FormatSettings);
+  //if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
+  if ((v >= double(0.000001)) and (v <= 1000000)) or ((v >= -1000000) and (v <= double(-0.000001)))  then str(v:0:16, result)
+  else result := FloatToStrF(V, ffExponent, 16, 0, FormatSettings);
+  result := killTrailingZeros(result);
 end;
 {$endif FPC_HAS_TYPE_DOUBLE}
 
