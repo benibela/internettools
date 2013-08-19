@@ -339,7 +339,7 @@ begin
 
   CATALOG_TEMPLATE :=
     '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case ' + IfThen(onlyxpath, ' is-XPath2="true" ', '')+'>{('+
-    'test:=xs:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name, test.isXPath2 := @*:is-XPath2,' +
+    'test:=pxp:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name, test.isXPath2 := @*:is-XPath2,' +
     'test.outputfile:=*:output-file,test.outputcomparator:=*:output-file/@*:compare, test.error:=*:expected-error)}' +
    '<module>{test.modul:=($test.modul, object(("namespace", @*:namespace, "file", text())))}</module>*'+
     '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-query>{inputQuery:=.}</input-query>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
@@ -361,7 +361,7 @@ begin
   pxp.AllowExtendedStrings := false;
   pxp.AllowJSON:=false;
   pxp.AllowJSONLiterals:=false;
-  pxp.VariableChangelog.allowPropertyDotNotation:=false;
+  pxp.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
   pxp.StaticContext.collation := pxp.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   pxp.StaticContext.stripBoundarySpace:=true;
   pxp.StaticContext.strictTypeChecking:=true;
@@ -459,12 +459,15 @@ begin
 
 
         totalLocal += 1;
-        if (error <> '') or (striEqual(outputcomparator, 'Inspect')) then begin
+        if (error <> '') or (striEqual(outputcomparator, 'Inspect'))  then begin
           skippedErrorsLocal+=1;
           continue;
         end;
         query := strLoadFromFile('Queries/XQuery/'+path+'/'+queryname+'.xq');
-        output :=strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile);
+        if not striEqual(outputcomparator, 'Ignore') then begin
+          if outputfile = '' then raise Exception.Create('No output file for query '+ParamStr(CAT)+':' + queryname);
+          output :=strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile);
+        end;
         try
           if isxpath2 then begin
             query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
