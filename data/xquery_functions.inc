@@ -904,20 +904,22 @@ end;
 //Number functions
 
 function xqFunctionNumber(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-  procedure numberize(v: IXQValue);
+  function numberize(const v: IXQValue): IXQValue;
+  var
+    temp: TXQValue;
   begin
-    if v.instanceOf(baseSchema.Double) then result := v
-//    else if v is TXQValueDateTime then result := TXQValue_double.create(getNaN)
-    else result := TXQValueDecimal.create(baseSchema.Double, double(v.toDecimal));
+    if v.instanceOf(baseSchema.Double) then exit(v);
+    if baseSchema.double.tryCreateValue(v,  @temp) then exit(temp)
+    else exit(baseSchema.double.createValue(getNaN));
   end;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
-    if context.SeqValue <> nil then numberize(context.SeqValue.clone)
+    if context.SeqValue <> nil then result := numberize(context.SeqValue.clone)
     else result := xqvalue(StrToFloatDef(treeElementAsString(context.ParentElement),0,XQFormats));
     exit;
   end;
-  numberize(args[0]);
+  result := numberize(args[0]);
 end;
 
 function xqvalueBaseDecimalType(v: Decimal; const typeref: IXQValue): IXQValue;

@@ -642,6 +642,9 @@ begin
   t('number(true())', '1', '');
   t('number()', '7800', '<a>78<b>0</b>0</a>');
   t('number(())', 'NaN', '');
+  t('number(xs:anyURI("abc"))', 'NaN', '');
+  t('number(xs:duration("PT1S"))', 'NaN', '');
+  t('number(xs:date("1900-02-02"))', 'NaN', '');
                  //Types
   t('exists(false())', 'true', '');
   t('exists("")', 'true', '');
