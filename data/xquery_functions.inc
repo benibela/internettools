@@ -1317,6 +1317,24 @@ begin
   result := xqvalue(res);
 end;
 
+function xqFunctionForm_combine(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var temp: TXQVArray;
+  propName: String;
+begin
+  requiredArgCount(args, 2);
+  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.create('pxp:FORM', 'Expected object {"url", "method", "post"}, got: '+args[0].debugAsStringWithTypeAnnotation());
+
+  if args[0].getProperty('method').toString = 'POST' then propName := 'post'
+  else propName := 'url';
+
+  SetLength(temp, 2);
+  temp[0] := args[0].getProperty(propName);
+  temp[1] := args[1];
+
+
+  result := (args[0] as TXQValueObject).setImmutable(propName, xqFunctionUri_combine(context, temp));
+end;
+
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
 var temp: string;
  v: IXQValue;

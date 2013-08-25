@@ -5399,7 +5399,7 @@ begin
   SetLength(info.versions, length(typeChecking));
   for i:= 0 to high(typeChecking) do
     with globalTypeParsingContext  do begin
-      AllowJSON:=AllowJSONDefaultInternal; //todo: improve json modularization?
+      //AllowJSON:=AllowJSONDefaultInternal; //todo: improve json modularization?
       str:=typeChecking[i];
       pos:=@globalTypeParsingContext.str[1];
       skipWhitespaceAndComment();
@@ -5427,6 +5427,7 @@ collations.OwnsObjects:=true;
 nativeModules := TStringList.Create;
 globalTypeParsingContext := TXQParsingContext.Create;
 globalTypeParsingContext.staticContext := TXQStaticContext.Create;
+globalTypeParsingContext.AllowJSON:=true;
 //namespaces
 GlobalStaticNamespaces:=TNamespaceList.Create;
 XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
@@ -5478,7 +5479,7 @@ pxp.registerFunction('join',@xqFunctionJoin,[]);
 pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
 pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
 pxp.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']);
-
+pxp.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']);
 
 //standard functions
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
