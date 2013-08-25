@@ -391,7 +391,7 @@ function intSqrt(const i: T__INT__NUMBER__): T__INT__NUMBER__;
 function gcd(a,b: integer): integer; //**< Calculates the greatest common denominator
 function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
 function gcd(a,b: int64): int64; //**< Calculates the greatest common denominator
-function lcm(a,b: int64): int64; //**< Checks if two numbers are coprime
+function lcm(a,b: int64): int64; //**< Calculates the least common multiple (just a*b div gcd(a,b), so it can easily overflow)
 function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
 {%REPEAT T__INT__NUMBER__, [longint, int64]}
 function modPow(i, e, m: T__INT__NUMBER__): T__INT__NUMBER__; //**< Calculates i^e mod m in O(log(e)) and never exceeding m

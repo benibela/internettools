@@ -90,7 +90,7 @@ function arrayDeleteUnordered(var a: TStringArray; const i: longint):string; ove
 procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
 //**returns i with a[i]=e
 function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint;
-//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0.
+//**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
 procedure arrayPrependFast(var a: TStringArray; var len: longint; const e: string);
 //**Removes element at position i from a@br
 //**Returns e=a[i]
@@ -605,7 +605,7 @@ function intSqrt(const i: int64): int64;
 function gcd(a,b: integer): integer; //**< Calculates the greatest common denominator
 function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
 function gcd(a,b: int64): int64; //**< Calculates the greatest common denominator
-function lcm(a,b: int64): int64; //**< Checks if two numbers are coprime
+function lcm(a,b: int64): int64; //**< Calculates the least common multiple (just a*b div gcd(a,b), so it can easily overflow)
 function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
 
 function modPow(i, e, m: longint): longint; //**< Calculates i^e mod m in O(log(e)) and never exceeding m
