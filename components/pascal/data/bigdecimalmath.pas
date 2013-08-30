@@ -52,7 +52,7 @@ Invalid digit count
 {$ENDIF}
 
 type
-  //** Big float type. @br
+  //** Big Decimal type. @br
   //** Consisting of an bcd integer times a decimal exponent ([integer digits] * 10 ^ (DIGITS_PER_ELEMENT * exponent)) @br
   //** It can be used like a normal floating point number. E.g: @longCode(#
   //**   var bf: BigDecimal;
@@ -81,10 +81,17 @@ function StrToBigDecimal(const s: string): BigDecimal; inline;
 function BigDecimalToStr(const v: BigDecimal): string;
 
 
-operator :=(const a: BigDecimal): Integer;
+function BigDecimalToInteger(const a: BigDecimal): Integer;
+
+function BigDecimalToInt64(const a: BigDecimal): Int64;
+
+function BigDecimalToExtended(const a: BigDecimal): Extended;
+
+
+//operator :=(const a: BigDecimal): Integer;
 operator :=(const a: Integer): BigDecimal;
 
-operator :=(const a: BigDecimal): Int64;
+//operator :=(const a: BigDecimal): Int64;
 operator :=(const a: Int64): BigDecimal;
 
 //operator :=(const a: BigDecimal): Extended; auto conversion of bigdecimal to extended is possible, but it confuses fpc overload resolution. Then e.g. power calls either math or bigdecimalbc depending on the unit order in the uses clause
@@ -120,7 +127,7 @@ type TBigDecimalDivisionFlags = set of (bfdfFillIntegerPart, bfdfAddHiddenDigit)
 procedure divideModNoAlias(out quotient, remainder: BigDecimal; const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bfdfFillIntegerPart, bfdfAddHiddenDigit]);
 function divide(const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bfdfFillIntegerPart, bfdfAddHiddenDigit]): BigDecimal;
 
-//** Compares the big floats. Returns -1, 0 or 1
+//** Compares the big decimals. Returns -1, 0 or 1
 function compareBigDecimals(const a, b: BigDecimal): integer;
 
 operator <(const a: BigDecimal; const b: BigDecimal): boolean;
@@ -142,6 +149,8 @@ function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
 
 //** Sets the bigdecimal to 0
 procedure setZero(out r: BigDecimal);
+//** Sets the bigdecimal to 1
+procedure setOne(out r: BigDecimal);
 //** Returns true iff the bigdecimal is zero
 function isZero(const v: BigDecimal): boolean; overload;
 //** Returns true iff v has no fractional digits
@@ -437,7 +446,8 @@ begin
 end;
 
 
-operator:=(const a: BigDecimal): Integer;
+
+function BigDecimalToInteger(const a: BigDecimal): Integer;
 var
   i: Integer;
 begin
@@ -449,6 +459,37 @@ begin
       result := result * ELEMENT_OVERFLOW;
   if a.signed then result := -result;
 end;
+
+
+
+function BigDecimalToInt64(const a: BigDecimal): Int64;
+var
+  i: Integer;
+begin
+  result := 0;
+  for i := max(0, - a.exponent) to high(a.digits) do
+    result := result * ELEMENT_OVERFLOW + a.digits[i];
+  if a.exponent > 0 then
+    for i := 1 to a.exponent do
+      result := result * ELEMENT_OVERFLOW;
+  if a.signed then result := -result;
+end;
+
+
+
+function BigDecimalToExtended(const a: BigDecimal): Extended;
+var
+  i: Integer;
+begin
+  result := 0;
+  for i := high(a.digits) downto 0 do
+    result := result * ELEMENT_OVERFLOW + a.digits[i];
+  result *= math.intpower(ELEMENT_OVERFLOW, a.exponent);
+  if a.signed then result := -result;
+end;
+
+
+
 
 operator:=(const a: Integer): BigDecimal;
 var len: integer;
@@ -475,18 +516,7 @@ begin
 end;
 
 
-operator:=(const a: BigDecimal): Int64;
-var
-  i: Integer;
-begin
-  result := 0;
-  for i := max(0, - a.exponent) to high(a.digits) do
-    result := result * ELEMENT_OVERFLOW + a.digits[i];
-  if a.exponent > 0 then
-    for i := 1 to a.exponent do
-      result := result * ELEMENT_OVERFLOW;
-  if a.signed then result := -result;
-end;
+
 
 operator:=(const a: Int64): BigDecimal;
 var len: integer;
@@ -515,15 +545,7 @@ end;
 
 
 
-{operator :=(const a: BigDecimal): Extended;
-var
-  i: Integer;
-begin
-  result := math.intpower(ELEMENT_OVERFLOW, a.exponent);
-  for i := 0 to high(a.digits) do
-    result := result * ELEMENT_OVERFLOW + a.digits[i];
-  if a.signed then result := -result;
-end;}
+
 
 operator:=(const a: Extended): BigDecimal;
 begin
@@ -685,7 +707,6 @@ begin
 end;
 
 
-
 function isZero(const v: BigDecimal): boolean;
 var
   i: Integer;
@@ -700,6 +721,15 @@ procedure setZero(out r: BigDecimal);
 begin
   r.signed:=false;
   setlength(r.digits, 0);
+  r.exponent:=0;
+  r.lastDigitHidden:=false;
+end;
+
+procedure setOne(out r: BigDecimal);
+begin
+  r.signed:=false;
+  setlength(r.digits, 1);
+  r.digits[0] := 1;
   r.exponent:=0;
   r.lastDigitHidden:=false;
 end;
@@ -994,6 +1024,7 @@ begin
   end;
   r.signed   := a.signed <> b.signed;
   r.exponent := a.exponent + b.exponent;
+  r.lastDigitHidden := a.lastDigitHidden or b.lastDigitHidden;
   SetLength(r.digits, length(a.digits) + length(b.digits) - 1);
   if length(r.digits) = 0 then exit;
   FillChar(r.digits[0], sizeof(r.digits[0]) * length(r.digits), 0);

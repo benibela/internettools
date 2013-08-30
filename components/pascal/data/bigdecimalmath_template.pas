@@ -81,7 +81,12 @@ function StrToBigDecimal(const s: string): BigDecimal; inline;
 function BigDecimalToStr(const v: BigDecimal): string;
 
 {%REPEAT T_NativeInt_, [Integer, Int64]}
-operator :=(const a: BigDecimal): T_NativeInt_;
+function BigDecimalToT_NativeInt_(const a: BigDecimal): T_NativeInt_;
+{%END-REPEAT}
+function BigDecimalToExtended(const a: BigDecimal): Extended;
+
+{%REPEAT T_NativeInt_, [Integer, Int64]}
+//operator :=(const a: BigDecimal): T_NativeInt_;
 operator :=(const a: T_NativeInt_): BigDecimal;
 {%END-REPEAT}
 //operator :=(const a: BigDecimal): Extended; auto conversion of bigdecimal to extended is possible, but it confuses fpc overload resolution. Then e.g. power calls either math or bigdecimalbc depending on the unit order in the uses clause
@@ -135,6 +140,8 @@ function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
 
 //** Sets the bigdecimal to 0
 procedure setZero(out r: BigDecimal);
+//** Sets the bigdecimal to 1
+procedure setOne(out r: BigDecimal);
 //** Returns true iff the bigdecimal is zero
 function isZero(const v: BigDecimal): boolean; overload;
 //** Returns true iff v has no fractional digits
@@ -430,7 +437,8 @@ begin
 end;
 
 {%REPEAT T_NativeInt_, [Integer, Int64]}
-operator:=(const a: BigDecimal): T_NativeInt_;
+
+function BigDecimalToT_NativeInt_(const a: BigDecimal): T_NativeInt_;
 var
   i: Integer;
 begin
@@ -442,6 +450,22 @@ begin
       result := result * ELEMENT_OVERFLOW;
   if a.signed then result := -result;
 end;
+
+{%END-REPEAT}
+
+function BigDecimalToExtended(const a: BigDecimal): Extended;
+var
+  i: Integer;
+begin
+  result := 0;
+  for i := high(a.digits) downto 0 do
+    result := result * ELEMENT_OVERFLOW + a.digits[i];
+  result *= math.intpower(ELEMENT_OVERFLOW, a.exponent);
+  if a.signed then result := -result;
+end;
+
+{%REPEAT T_NativeInt_, [Integer, Int64]}
+
 
 operator:=(const a: T_NativeInt_): BigDecimal;
 var len: integer;
@@ -470,15 +494,7 @@ end;
 {%END-REPEAT}
 
 
-{operator :=(const a: BigDecimal): Extended;
-var
-  i: Integer;
-begin
-  result := math.intpower(ELEMENT_OVERFLOW, a.exponent);
-  for i := 0 to high(a.digits) do
-    result := result * ELEMENT_OVERFLOW + a.digits[i];
-  if a.signed then result := -result;
-end;}
+
 
 operator:=(const a: Extended): BigDecimal;
 begin
@@ -640,7 +656,6 @@ begin
 end;
 
 
-
 function isZero(const v: BigDecimal): boolean;
 var
   i: Integer;
@@ -655,6 +670,15 @@ procedure setZero(out r: BigDecimal);
 begin
   r.signed:=false;
   setlength(r.digits, 0);
+  r.exponent:=0;
+  r.lastDigitHidden:=false;
+end;
+
+procedure setOne(out r: BigDecimal);
+begin
+  r.signed:=false;
+  setlength(r.digits, 1);
+  r.digits[0] := 1;
   r.exponent:=0;
   r.lastDigitHidden:=false;
 end;
@@ -917,6 +941,7 @@ begin
   end;
   r.signed   := a.signed <> b.signed;
   r.exponent := a.exponent + b.exponent;
+  r.lastDigitHidden := a.lastDigitHidden or b.lastDigitHidden;
   SetLength(r.digits, length(a.digits) + length(b.digits) - 1);
   if length(r.digits) = 0 then exit;
   FillChar(r.digits[0], sizeof(r.digits[0]) * length(r.digits), 0);
