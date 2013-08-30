@@ -117,6 +117,7 @@ begin
   test((blarge.exponent = 0) and not (blarge.signed));// and (length(b1.digits) = 1) and (b1.digits[0] = 1));
   test(BigDecimalToStr(blarge), '123456789');
   test(blarge = 123456789); test(blarge = 123456789.0);
+  test(BigDecimalToExtended(blarge) = 123456789.0); test(BigDecimalToInt64(blarge) = 123456789); test(BigDecimalToInteger(blarge) = 123456789);
 
   blarge += 1;
   test(blarge = 123456790); test(blarge = 123456790.0);
@@ -317,6 +318,7 @@ begin
     ds := FloatToStr(d);
     dbf := StrToBigDecimal(ds);
     test(BigDecimalToStr(dbf), ds);
+    test(SameValue(BigDecimalToExtended(dbf), d, 1e-9),  FloatToStr(BigDecimalToExtended(dbf))+ ' <> ' + ds);
 
 
     d := Random(100000000) / powersOf10[random(6)];
