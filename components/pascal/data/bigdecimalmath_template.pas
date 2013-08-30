@@ -114,11 +114,13 @@ operator mod(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 operator **(const a: BigDecimal; const b: int64): BigDecimal;
 
 
-type TBigDecimalDivisionFlags = set of (bfdfFillIntegerPart, bfdfAddHiddenDigit);
+type TBigDecimalDivisionFlags = set of (bfdfFillIntegerPart, bfdfAddHiddenDigit, bfdfKillFractions);
 //** Universal division/modulo function. Calculates the quotient and remainder of a / b. @br
 //** @param maximalAdditionalFractionDigits How many digits should be added to the quotient, if the result cannot be represented with the current precision
 //** @param flags Division options: bfdfFillIntegerPart:  Calculate at least all digits of the integer part of the quotient, independent of the precision of the input @br
-//+*                                bfdfAddHiddenDigit: Calculates an additional digit for rounding, which will not be displayed by BigDecimalToStr
+//**                                bfdfKillFractions:    Do not calculate the fractional part of the quotient (remember that a bigdecimal is a scaled integer. So bfdfFillIntegerPart ensures that the result has not less digits than an integer division (necessary in case of an exponent > 0) and bfdfKillFractions that the result has not more digits than an integer division (in case of an exponent < 0) )  @br
+//**                                bfdfAddHiddenDigit: Calculates an additional digit for rounding, which will not be displayed by BigDecimalToStr@br
+//** Only tested with the [bfdfFillIntegerPart, bfdfAddHiddenDigit] and [bfdfFillIntegerPart, bfdfKillFractions] flags
 procedure divideModNoAlias(out quotient, remainder: BigDecimal; const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bfdfFillIntegerPart, bfdfAddHiddenDigit]);
 function divide(const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bfdfFillIntegerPart, bfdfAddHiddenDigit]): BigDecimal;
 
@@ -443,12 +445,12 @@ var
   i: Integer;
 begin
   result := 0;
-  for i := max(0, - a.exponent) to high(a.digits) do
-    result := result * ELEMENT_OVERFLOW + a.digits[i];
+  for i := high(a.digits)  downto max(0, - a.exponent) do
+    result := result * ELEMENT_OVERFLOW - a.digits[i]; //create negative value (as it has a larger range by 1)
   if a.exponent > 0 then
     for i := 1 to a.exponent do
       result := result * ELEMENT_OVERFLOW;
-  if a.signed then result := -result;
+  if not a.signed then result := -result;
 end;
 
 {%END-REPEAT}
@@ -1036,6 +1038,7 @@ var
   j: Integer;
   guess: Integer;
   maximalAdditionalFractionBins: Integer;
+  last: Integer;
 begin
   if maximalAdditionalFractionDigits = 0 then
     case compareAbsolute(a, b) of
@@ -1052,6 +1055,7 @@ begin
   remainder.signed := false;
   quotient.exponent := a.exponent - b.exponent;
   remainder.exponent := b.exponent;
+  remainder.lastDigitHidden:=false;
   temp.exponent := b.exponent;
 
   if (bfdfFillIntegerPart in flags) then maximalAdditionalFractionDigits += (max(0, a.exponent - b.exponent)) * DIGITS_PER_ELEMENT;
@@ -1060,32 +1064,50 @@ begin
   SetLength(temp.digits, length(b.digits) + 1);
   SetLength(quotient.digits, max(0, length(a.digits) - bhigh - min(0, b.exponent)));
   SetLength(remainder.digits, length(b.digits) + 1);
-  for i := high(a.digits) downto 0 do begin
+  last := 0;
+  if bfdfKillFractions in flags then last := max(0, -quotient.exponent);
+  for i := high(a.digits) downto last do begin
     for j := high(remainder.digits) downto 1 do remainder.digits[j] := remainder.digits[j-1];
     remainder.digits[0] := a.digits[i];
     guess := greatestMultiple(remainder, b); // remainder.digits[bhigh+1] * BigDecimalBinSquared(DIGITS_PER_ELEMENT) + remainder.digits[bhigh]) div b.digits[bhigh];
     if guess > 0 then
       subAbsoluteScaledNoAlias(remainder, b, 0, guess);
-    if i <= high(quotient.digits) then quotient.digits[i] := guess;
+    if (i <= high(quotient.digits)) then
+      quotient.digits[i] := guess;
   end;
 
-  if (maximalAdditionalFractionDigits > 0) and not isZero(remainder) then begin
-    maximalAdditionalFractionBins := ((maximalAdditionalFractionDigits + DIGITS_PER_ELEMENT - 1) div DIGITS_PER_ELEMENT) ;
-    quotient.exponent -= maximalAdditionalFractionBins;
-    SetLength(quotient.digits, length(quotient.digits) + maximalAdditionalFractionBins);
-    for i := high(quotient.digits) downto maximalAdditionalFractionBins do
-      quotient.digits[i] := quotient.digits[i-maximalAdditionalFractionBins];
-    for i := maximalAdditionalFractionBins - 1 downto 0 do begin
-      for j := high(remainder.digits) downto 1 do remainder.digits[j] := remainder.digits[j-1];
-      remainder.digits[0] := 0;
-      guess := greatestMultiple(remainder, b);
-      if guess > 0 then subAbsoluteScaledNoAlias(remainder, b, 0, guess);
-      quotient.digits[i] := guess;
-    end;
-    if (maximalAdditionalFractionBins * DIGITS_PER_ELEMENT > maximalAdditionalFractionDigits) and (quotient.exponent < 0) then
-      quotient.digits[0] -= quotient.digits[0] mod powersOf10[DIGITS_PER_ELEMENT * maximalAdditionalFractionBins - maximalAdditionalFractionDigits];
-    if not isZero(remainder) and (bfdfAddHiddenDigit in flags) then
-      quotient.lastDigitHidden:=true;
+  if (bfdfKillFractions in flags) and (quotient.exponent < 0) then begin
+    SetLength(remainder.digits, length(remainder.digits) + last);
+    for i := high(remainder.digits) downto last do
+      remainder.digits[i] := remainder.digits[i - last];
+    for i := 0 to last - 1 do
+      remainder.digits[i] := a.digits[i];
+    remainder.exponent -= last;
+  end;
+
+  if not isZero(remainder) then begin
+    if (maximalAdditionalFractionDigits > 0) then begin
+      maximalAdditionalFractionBins := ((maximalAdditionalFractionDigits + DIGITS_PER_ELEMENT - 1) div DIGITS_PER_ELEMENT) ;
+      quotient.exponent -= maximalAdditionalFractionBins;
+      SetLength(quotient.digits, length(quotient.digits) + maximalAdditionalFractionBins);
+      for i := high(quotient.digits) downto maximalAdditionalFractionBins do
+        quotient.digits[i] := quotient.digits[i-maximalAdditionalFractionBins];
+      for i := maximalAdditionalFractionBins - 1 downto 0 do begin
+        for j := high(remainder.digits) downto 1 do remainder.digits[j] := remainder.digits[j-1];
+        remainder.digits[0] := 0;
+        guess := greatestMultiple(remainder, b);
+        if guess > 0 then subAbsoluteScaledNoAlias(remainder, b, 0, guess);
+        quotient.digits[i] := guess;
+      end;
+      if (maximalAdditionalFractionBins * DIGITS_PER_ELEMENT > maximalAdditionalFractionDigits) and (quotient.exponent < 0) then
+        quotient.digits[0] -= quotient.digits[0] mod powersOf10[DIGITS_PER_ELEMENT * maximalAdditionalFractionBins - maximalAdditionalFractionDigits];
+      if not isZero(remainder) then begin
+        if (bfdfAddHiddenDigit in flags) then
+          quotient.lastDigitHidden:=true;
+        remainder.signed:=a.signed <> b.signed;
+      end;
+    end else
+      remainder.signed:=a.signed <> b.signed;
   end;
 end;
 
@@ -1107,14 +1129,14 @@ operator div(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 var
   temp: BigDecimal;
 begin
-  divideModNoAlias(result, temp, a, b, 0, [bfdfFillIntegerPart]);
+  divideModNoAlias(result, temp, a, b, 0, [bfdfFillIntegerPart, bfdfKillFractions]);
 end;
 
 operator mod(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 var
   temp: BigDecimal;
 begin
-  divideModNoAlias(temp, result, a, b, 0, [bfdfFillIntegerPart]);
+  divideModNoAlias(temp, result, a, b, 0, [bfdfFillIntegerPart, bfdfKillFractions]);
 end;
 
 operator**(const a: BigDecimal; const b: int64): BigDecimal;
