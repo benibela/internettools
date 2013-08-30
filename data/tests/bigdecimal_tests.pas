@@ -276,7 +276,21 @@ begin
     test(BigDecimalToStr(tempbf), '0.02434666256024372176');
   end;
   test(StrToBigDecimal('247.6905') / StrToBigDecimal('83103111'), '0.0000029805201877460399767705447272605');
+  test(BigDecimalToStr(StrToBigDecimal('3.0') div StrToBigDecimal('2')), '1');
+  test(BigDecimalToStr(StrToBigDecimal('3.0') div StrToBigDecimal('2.0')), '1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') div StrToBigDecimal('2')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') div StrToBigDecimal('2.0')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') div StrToBigDecimal('2.000000000000000000000000000000000000000000')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0000000000000000000000000000000000000000000') div StrToBigDecimal('2.0')), '-1');
 
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') mod StrToBigDecimal('2.0')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.5') mod StrToBigDecimal('2.0')), '-1.5');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') mod StrToBigDecimal('2')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.5') mod StrToBigDecimal('2')), '-1.5');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0E1') mod StrToBigDecimal('2')), '0');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0E20') mod StrToBigDecimal('7')), '-6');
+  test(BigDecimalToStr(StrToBigDecimal('3.0E20') mod StrToBigDecimal('7')), '6');
+  test(BigDecimalToStr(StrToBigDecimal('3.1E1') mod StrToBigDecimal('6')), '1');
 
   test(isInteger(StrToBigDecimal('1e10')) = true );
   test(isInteger(StrToBigDecimal('1e-10')) = false );
@@ -299,6 +313,14 @@ begin
   test(isInt64(StrToBigDecimal('-9223372036854775807')) = true);
   test(isInt64(StrToBigDecimal('-9223372036854775808')) = True);
   test(isInt64(StrToBigDecimal('-9223372036854775809')) = false);
+
+  setZero(bf);
+  SetLength(bf.digits, 3);
+  bf.digits[0] := 1;
+  test(BigDecimalToStr(bf), '1');
+  test(FloatToStr(BigDecimalToExtended(bf)), '1');
+  test(BigDecimalToInt64(bf), 1);
+  test(BigDecimalToInteger(bf), 1);
 
   //fuzzing
   for i := 1 to 10000 do begin
