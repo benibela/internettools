@@ -432,14 +432,11 @@ var ak, bk: TXQValueKind;
     ad := a.toFloat;
     bd := b.toFloat;
     if cmpClass.derivedFrom(baseSchema.Double) then begin
-      ad := double(ad);
-      bd := double(bd);
+      result := compareValue(double(ad), double(bd));
     end else if cmpClass.derivedFrom(baseSchema.Float) then begin
-      ad := single(ad);
-      bd := single(bd);
+      result := compareValue(Single(ad), Single(bd));
     end;
     //result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal));
-    result := compareValue(ad, bd);
   end;
 
 var tempDateTime: TXQValueDateTime;

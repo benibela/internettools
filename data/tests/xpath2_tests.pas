@@ -2610,6 +2610,8 @@ begin
   t('"" / number()', 'NaN', '');
   t('number()', '123', '<x>123</x>');
   t('number()', 'NaN', '<x>foo</x>');
+  t('fn:number(xs:float("-3.4028235E38")) eq xs:float("-3.4028235E38")', 'true');
+  t('fn:number(xs:float("-3.4028235E38")) eq -3.4028234663852885E38', 'true');
   t('not(double("NaN"))', 'true', '');
   t('not(double("INF"))', 'false', '');
   t('not(double("-INF"))', 'false', '');
