@@ -996,22 +996,25 @@ begin
     end;
   end;
 
-  SetLength(result.digits, max(1, length(v.digits) - highskip - max(0, result.exponent - v.exponent)));
+  SetLength(result.digits, max(0, length(v.digits) - highskip - max(0, result.exponent - v.exponent)));
   for i := 0 to high(result.digits) do
     result.digits[i] := v.digits[i - v.exponent + result.exponent];
-  if toDigitInBin <> 0 then
-    Result.digits[0] -= Result.digits[0] mod powersOf10[toDigitInBin];
+  if length(result.digits) > 0 then begin
+    if toDigitInBin <> 0 then
+      Result.digits[0] -= Result.digits[0] mod powersOf10[toDigitInBin];
 
-  if increment then begin
-    Result.digits[0] += powersOf10[toDigitInBin];
-    for i := 0 to high(result.digits) do
-      if Result.digits[i] >= ELEMENT_OVERFLOW then begin
-        result.digits[i] -= ELEMENT_OVERFLOW;
-        result.digits[i+1] += 1;
-      end else break;
+    if increment then begin
+      Result.digits[0] += powersOf10[toDigitInBin];
+      for i := 0 to high(result.digits) do
+        if Result.digits[i] >= ELEMENT_OVERFLOW then begin
+          result.digits[i] -= ELEMENT_OVERFLOW;
+          result.digits[i+1] += 1;
+        end else break;
+    end;
   end;
   result.signed := v.signed and not isZero(v);
 end;
+
 
 
 operator+(const a: BigDecimal; const b: BigDecimal): BigDecimal;
