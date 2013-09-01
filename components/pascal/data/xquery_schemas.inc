@@ -651,6 +651,7 @@ end;
 
 function TXSQNameType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
 begin
+  ignore(v); ignore(outv);
   result := false;
 end;
 
