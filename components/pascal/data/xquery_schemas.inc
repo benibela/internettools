@@ -465,17 +465,28 @@ begin
   end;
   if not result then exit;
   if (outv = nil) and (length(constrainingFacets) = 0) then exit;
-  if not sispure then begin
-    if outv <> nil then
-      case subType of
-        xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
-        xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
+  case subType of
+    xsstInteger, xsstDecimal: begin
+      if not sispure then exit(false);
+      i := v.toDecimal;
+      if (subType = xsstInteger) and (not isInteger(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
+      if not constraintsSatisfied(i) then exit(false);
+    end;
+    xsstFloat, xsstDouble: begin
+      if not sispure then begin
+        if outv <> nil then
+          case subType of
+            xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
+            xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
+          end;
+        exit;
       end;
-    exit;
+      if length(constrainingFacets) > 0 then begin
+        i := v.toDecimal;
+        if not constraintsSatisfied(i) then exit(false);
+      end;
+    end;
   end;
-  i := v.toDecimal;
-  if (subType = xsstInteger) and (not isInteger(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
-  if not constraintsSatisfied(i) then exit(false);
   if outv <> nil then
     case subType of
       xsstInteger: begin
@@ -486,8 +497,8 @@ begin
       xsstDecimal:
         if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
         else outv^ := TXQValueDecimal.create(self, i);
-      xsstFloat:   outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(i)));
-      xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(i)));
+      xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
+      xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
     end;
 end;
 
