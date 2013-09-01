@@ -160,6 +160,17 @@ begin
   test(BigDecimalToStr(StrToBigDecimal('-.1')), '-0.1');
   test(BigDecimalToStr(StrToBigDecimal('.123E1')), '1.23');
   test(BigDecimalToStr(StrToBigDecimal('-.1E1')), '-1');
+  test(TryStrToBigDecimal('.', nil) = false);
+  test(TryStrToBigDecimal('e', nil) = false);
+  test(TryStrToBigDecimal('a', nil) = false);
+  test(TryStrToBigDecimal('', nil) = false);
+  test(TryStrToBigDecimal('.e', nil) = false);
+  test(TryStrToBigDecimal('-e', nil) = false);
+  test(TryStrToBigDecimal('-.', nil) = false);
+  test(TryStrToBigDecimal('-.E1', nil) = false);
+  test(TryStrToBigDecimal('e1', nil) = false);
+  test(TryStrToBigDecimal('.e2', nil) = false);
+  test(TryStrToBigDecimal('18', nil) = TRUE);
 
   for i := 0 to high(powersOf10) do begin
     test(BigDecimalToStr(StrToBigDecimal(IntToStr(powersOf10[i]))), IntToStr(powersOf10[i]));
