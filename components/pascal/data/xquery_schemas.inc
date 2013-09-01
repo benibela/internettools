@@ -83,21 +83,21 @@ begin
   else result := schema.integer;
 end;
 
-class function TXSType.commonIntegerType(const a, b: TXSType): TXSType;
+class function TXSType.commonIntegerType(const a, b: TXSType): TXSNumericType;
 var aInteger, bInteger: Boolean;
 begin
   aInteger := a.derivedFrom(a.schema.Integer);
   bInteger := b.derivedFrom(b.schema.Integer);
   if (not aInteger) and (not bInteger) then exit(a.schema.Integer);
   if (not aInteger) or (not bInteger) then begin
-    if aInteger then exit(a);
-    if bInteger then exit(b);
+    if aInteger then exit(TXSNumericType(a));
+    if bInteger then exit(TXSNumericType(b));
   end;
-  Result := commonType(a,b);
+  Result := TXSNumericType(commonType(a,b));
   if Result = a.schema.AnyType then exit(a.schema.Integer);
 end;
 
-class function TXSType.commonIntegerType(const a, b: IXQValue): TXSType;
+class function TXSType.commonIntegerType(const a, b: IXQValue): TXSNumericType;
 begin
   result := commonIntegerType(a.typeAnnotation, b.typeAnnotation);
 end;
@@ -164,6 +164,17 @@ begin
   at := a.typeAnnotation;
   bt := b.typeAnnotation;
   result := commonDecimalType(at, bt, at.schema.Double);
+end;
+
+class function TXSType.commonNumericType(a, b: TXSType): TXSNumericType;
+begin
+  if a.derivedFrom(baseSchema.integer) and b.derivedFrom(baseSchema.integer) then exit(commonIntegerType(a,b))
+  else exit(commonDecimalType(a,b,baseSchema.double) as TXSNumericType);
+end;
+
+class function TXSType.commonNumericType(const a, b: IXQValue): TXSNumericType;
+begin
+  result := commonNumericType(a.typeAnnotation, b.typeAnnotation)
 end;
 
 
@@ -237,17 +248,24 @@ begin
   result := temp;
 end;
 
-function TXSType.createValue(const v: Int65): IXQValue;
+function TXSType.createValue(const v: Int64): IXQValue;
 var temp: TXQValue;
 begin
-  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native integer '+Int65ToStr(v)+' to '+name);
+  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native integer '+IntToStr(v)+' to '+name);
   result := temp;
 end;
 
-function TXSType.createValue(const v: Decimal): IXQValue;
+function TXSType.createValue(const v: xqfloat): IXQValue;
 var temp: TXQValue;
 begin
   if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native number '+FloatToStr(v)+' to '+name);
+  result := temp;
+end;
+
+function TXSType.createValue(const v: BigDecimal): IXQValue;
+var temp: TXQValue;
+begin
+  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native number '+BigDecimalToStr(v)+' to '+name);
   result := temp;
 end;
 
@@ -308,12 +326,17 @@ begin
   if result and (outv <> nil) then (outv^ as TXQValue).ftypeAnnotation := self;
 end;
 
-function TXSType.tryCreateValue(const v: Int65; outv: PXQValue): boolean;
+function TXSType.tryCreateValue(const v: Int64; outv: PXQValue): boolean;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
 
-function TXSType.tryCreateValue(const v: Decimal; outv: PXQValue): boolean;
+function TXSType.tryCreateValue(const v: xqfloat; outv: PXQValue): boolean;
+begin
+  result := tryCreateValue(xqvalue(v), outv);
+end;
+
+function TXSType.tryCreateValue(const v: BigDecimal; outv: PXQValue): boolean;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
@@ -411,34 +434,105 @@ end;
 
 
 { TXSIntegerType }
-function TXSIntegerType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+
+function TXSNumericType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
 var
-  i: Int65;
+  st: TXSType;
+  sispure: Boolean;
+  i: BigDecimal;
 begin
-  if v.typeAnnotation.derivedFrom([schema.decimal, schema.boolean]) then begin
+  st := v.typeAnnotation;
+  result := false;
+  if st.derivedFrom(self) then begin
     result := true;
-  end else if v.typeAnnotation.derivedFrom([schema.float, schema.double]) then begin
-    result := TXQValueDecimal.isPure(v);
-  end else result := false;
-
-  if result then begin
-    if (outv = nil) and (length(constrainingFacets) = 0) then exit;
-    i := v.toInt65;
-    if not constraintsSatisfied(i) then exit(false);
-    if outv <> nil then outv^ := TXQValueInt65.create(self, i);
+    if outv <> nil then
+      case subType of
+        xsstInteger, xsstDecimal:
+          if v is TXQValueInt64 then outv^ := TXQValueInt64.create(self, v.toInt64)
+          else outv^ := TXQValueDecimal.create(self, v.toDecimal);
+        xsstFloat, xsstDouble: outv^ := TXQValueFloat.create(self, v.toFloat);
+      end;
+    exit;
+  end else if st.derivedFrom([schema.decimal, schema.boolean]) then begin
+    result := true;
+    sispure := true;
+  end else begin
+    sispure := TXQValueFloat.isPure(v);
+    case subType of
+      xsstInteger, xsstDecimal: result := st.derivedFrom([schema.float, schema.double]) and sispure;
+      xsstDouble, xsstFloat :  result := st.derivedFrom([schema.float, schema.double]);
+    end;
   end;
+  if not result then exit;
+  if (outv = nil) and (length(constrainingFacets) = 0) then exit;
+  if not sispure then begin
+    if outv <> nil then
+      case subType of
+        xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
+        xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
+      end;
+    exit;
+  end;
+  i := v.toDecimal;
+  if (subType = xsstInteger) and (not isInteger(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
+  if not constraintsSatisfied(i) then exit(false);
+  if outv <> nil then
+    case subType of
+      xsstInteger: begin
+        if not isInteger(i) then i := round(i, 0, bfrmTrunc);
+        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+        else outv^ := TXQValueDecimal.create(self, i);
+      end;
+      xsstDecimal:
+        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+        else outv^ := TXQValueDecimal.create(self, i);
+      xsstFloat:   outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(i)));
+      xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(i)));
+    end;
 end;
 
-function TXSIntegerType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
+function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
 var
-  i: Int65;
+  pure: Boolean;
+  temp: BigDecimal;
 begin
-  Result := TryStrToInt65(v, i);
-  result := result and constraintsSatisfied(i);
-  if result and (outv <> nil) then outv^ := TXQValueInt65.create(self, i);
+  pure := subType in  [xsstInteger, xsstDecimal];
+  if ((v = 'NaN') or (v = 'INF') or (v = '-INF')) then begin
+    if pure then exit(false);
+    if outv <> nil then
+      case v of
+        'NaN':  outv^ := TXQValueFloat.create(self, getNaN);
+        'INF':  outv^ := TXQValueFloat.create(self, getPosInf);
+        '-INF':  outv^ := TXQValueFloat.create(self, getNegInf);
+      end;
+    exit(true);
+  end;
+  if pure and striContains(v, 'e') then exit(false);
+  if (subType = xsstInteger) and (strContains(v, '.')) then exit(false);
+  result := TryStrToBigDecimal(v, @temp);
+  result := result and constraintsSatisfied(temp);
+  if outv <> nil then
+    case subType of
+      xsstInteger, xsstDecimal:
+        if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
+        else outv^ := TXQValueDecimal.create(self, temp);
+      xsstFloat:  outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(temp)));
+      xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(temp)));
+    end;
 end;
 
-function TXSIntegerType.constraintsSatisfied(const v: int65): boolean;
+constructor TXSNumericType.create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
+begin
+  inherited create(aname, aparent, TXQValueDecimal);
+  subType:=asubtype;
+end;
+
+constructor TXSNumericType.create(const aname: string; aparent: TXSNumericType);
+begin
+  create(aname, aparent, aparent.subType)
+end;
+
+function TXSNumericType.constraintsSatisfied(const v: BigDecimal): boolean;
 var
   i: Integer;
 begin
@@ -448,58 +542,9 @@ begin
       {fractionDigits = 0 (fixed)
       whiteSpace = collapse (fixed)
       pattern = [\-+]?[0-9]+}
-      xsfMaxInclusive: if (v > TXSConstrainingFacetValue(constrainingFacets[i]).value.toInt65) then exit(false);
-      xsfMinInclusive: if (v < TXSConstrainingFacetValue(constrainingFacets[i]).value.toInt65) then exit(false);
+      xsfMaxInclusive: if (v > TXSConstrainingFacetValue(constrainingFacets[i]).value.toDecimal) then exit(false);
+      xsfMinInclusive: if (v < TXSConstrainingFacetValue(constrainingFacets[i]).value.toDecimal) then exit(false);
     end;
-end;
-
-{ TXSDecimalType }
-
-function TXSDecimalType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
-var
-  st: TXSType;
-begin
-  st := v.typeAnnotation;
-  result := false;
-  if st.derivedFrom([schema.decimal, schema.boolean, self]) then result := true
-  else case subType of
-    xsstDecimal: result := st.derivedFrom([schema.float, schema.double]) and TXQValueDecimal.isPure(v);
-    xsstDouble, xsstFloat :  result := st.derivedFrom([schema.float, schema.double]);
-  end;
-  if result and (outv <> nil) then begin
-    case subType of
-      xsstDecimal: outv^ := TXQValueDecimal.create(self, v.toDecimal);
-      xsstFloat:   outv^ := TXQValueDecimal.create(self, single(v.toDecimal));
-      xsstDouble:  outv^ := TXQValueDecimal.create(self, double(v.toDecimal));
-    end;
-  end;
-end;
-
-function TXSDecimalType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
-var
-  temp: Extended;
-  pure: Boolean;
-begin
-  pure := subType = xsstDecimal;
-  if ((v = 'NaN') or (v = 'INF') or (v = '-INF')) then begin
-    if pure then exit(false);
-    if outv <> nil then
-      case v of
-        'NaN':  outv^ := TXQValueDecimal.create(self, getNaN);
-        'INF':  outv^ := TXQValueDecimal.create(self, getPosInf);
-        '-INF':  outv^ := TXQValueDecimal.create(self, getNegInf);
-      end;
-    exit(true);
-  end;
-  if pure and striContains(v, 'e') then exit(false);
-  result := TryStrToFloat(v, temp, XQFormats);
-  if result and (outv <> nil) then outv^ := TXQValueDecimal.create(self, temp);
-end;
-
-constructor TXSDecimalType.create(const aname: string; aparent: TXSType; asubtype: TXSDecimalSubType);
-begin
-  inherited create(aname, aparent, TXQValueDecimal);
-  subType:=asubtype;
 end;
 
 
@@ -744,6 +789,7 @@ end;
 function primitiveBaseType(t: TXSSimpleType): TXSSimpleType;
 begin
   result := t;
+  result.primitive := t;
   if t.name = 'string' then begin
     result.whiteSpaceFixed := false;
     result.whiteSpaceFacet := xsfwPreserve;
@@ -753,12 +799,12 @@ begin
   end;
 end;
 
-function restrictedIntegerType(name: string; parent: TXSType; const minValue, maxValue: int65): TXSSimpleType;
+function restrictedIntegerType(name: string; parent: TXSType; const minValue, maxValue: BigDecimal): TXSNumericType;
 begin
-  result := TXSIntegerType.Create(name, parent);
+  result := TXSNumericType.Create(name, parent, xsstInteger);
   SetLength(Result.constrainingFacets, 2);
-  result.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, TXQValueInt65.create(parent, maxValue));
-  result.constrainingFacets[1] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueInt65.create(parent, minValue));
+  result.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, TXQValueDecimal.create(parent, maxValue));
+  result.constrainingFacets[1] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueDecimal.create(parent, minValue));
 end;
 
 function restrictedStringType(name: string; parent: TXSType; pattern: string = ''): TXSSimpleType;
@@ -806,9 +852,9 @@ begin
   Duration := primitiveBaseType(TXSDateTimeType.create('duration', AnyAtomicType, '[-]P[Y+"Y"][m+M][d+D][T[h+H][n+M][s+[.z+]S]]$'));
 
 
-  Decimal := primitiveBaseType(TXSDecimalType.create('decimal', AnyAtomicType, xsstDecimal));
-  Double := primitiveBaseType(TXSDecimalType.create('double', AnyAtomicType, xsstDouble));
-  Float := primitiveBaseType(TXSDecimalType.create('float', AnyAtomicType, xsstFloat));
+  Decimal := TXSNumericType(primitiveBaseType(TXSNumericType.create('decimal', AnyAtomicType, xsstDecimal)));
+  Double := TXSNumericType(primitiveBaseType(TXSNumericType.create('double', AnyAtomicType, xsstDouble)));
+  Float := TXSNumericType(primitiveBaseType(TXSNumericType.create('float', AnyAtomicType, xsstFloat)));
 
   AnyURI := primitiveBaseType(TXSStringType.create('anyURI', AnyAtomicType, xsstUrl));
   anyURI.whiteSpaceFacet:=xsfwCollapse; anyURI.whiteSpaceFixed := true;
@@ -824,17 +870,26 @@ begin
 
   //--numbers--
   //abstract
-  Integer := TXSIntegerType.Create('integer', Decimal);
-    Integer.storage := TXQValueInt65;
+  Integer := TXSNumericType.Create('integer', Decimal, xsstInteger);
+    Integer.storage := TXQValueDecimal;
 
-      NonPositiveInteger := restrictedIntegerType('nonPositiveInteger', Integer, MININT65, 0);
-        NegativeInteger := restrictedIntegerType('negativeInteger', NonPositiveInteger, MININT65, -1);
+      NonPositiveInteger := TXSNumericType.Create('nonPositiveInteger', integer);
+      SetLength(NonPositiveInteger.constrainingFacets, 1);
+      nonPositiveInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, TXQValueDecimal.create(integer, 0));
+        NegativeInteger := TXSNumericType.Create('negativeInteger', nonPositiveInteger);
+        SetLength(negativeInteger.constrainingFacets, 1);
+        negativeInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, TXQValueDecimal.create(integer, -1));
 
-      NonNegativeInteger := restrictedIntegerType('nonNegativeInteger', Integer, 0, MAXINT65);
-        PositiveInteger := restrictedIntegerType('positiveInteger', NonNegativeInteger, 1, MAXINT65);
+
+      nonNegativeInteger := TXSNumericType.Create('nonNegativeInteger', integer);
+      SetLength(nonNegativeInteger.constrainingFacets, 1);
+      nonNegativeInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueDecimal.create(integer, 0));
+        positiveInteger := TXSNumericType.Create('positiveInteger', nonNegativeInteger);
+        SetLength(positiveInteger.constrainingFacets, 1);
+        positiveInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueDecimal.create(integer, 1));
 
   //specialized positive
-        UnsignedLong := restrictedIntegerType('unsignedLong', NonNegativeInteger, 0, MAXINT65);
+        UnsignedLong := restrictedIntegerType('unsignedLong', NonNegativeInteger, 0, StrToBigDecimal('18446744073709551615'));
           UnsignedInt  := restrictedIntegerType('unsignedInt', UnsignedLong, 0, 4294967295);
             UnsignedShort  := restrictedIntegerType('unsignedShort', UnsignedInt, 0, 65535);
               UnsignedByte  := restrictedIntegerType('unsignedByte', UnsignedShort, 0, 255);
