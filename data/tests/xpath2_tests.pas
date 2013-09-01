@@ -914,6 +914,7 @@ begin
   t('sum(())', '0', '');
   t('sum((),())', '', '');
   t('sum((3,xs:double("NaN"),5))', 'NaN', '');
+  t('sum((xs:unsignedByte(200), xs:unsignedByte(200)))', '400', '');
 
   t('(1,2,3)[true()]', '1', '');
   t('(1,2,3)[false()]', '', '');
@@ -1652,21 +1653,22 @@ begin
    t('type-of(4.0e1)','double','');
    t('type-of(4)','integer','');
    t('xs:byte(1)+xs:byte(2)','3','');
-   t('type-of(xs:byte(1)+xs:byte(2))','byte','');
+   t('type-of(xs:byte(1)+xs:byte(2))','integer','');
    t('xs:short(1)-xs:short(2)','-1','');
-   t('type-of(xs:short(1)-xs:short(2))','short','');
+   t('type-of(xs:short(1)-xs:short(2))','integer','');
    t('xs:short(4)*xs:short(2)','8','');
-   t('type-of(xs:short(4)*xs:short(2))','short','');
+   t('type-of(xs:short(4)*xs:short(2))','integer','');
    t('xs:short(1) div xs:short(2)','0.5','');
    t('type-of(xs:short(1) div xs:short(2))','decimal','');
+   t('type-of(xs:short(1) div xs:short(1))','decimal','');
    t('xs:short(1) idiv xs:short(2)','0','');
    t('type-of(xs:short(1) idiv xs:short(2))','integer','');
    t('xs:byte(1)+xs:short(2)','3','');
-   t('type-of(xs:byte(1)+xs:short(2))','short','');
+   t('type-of(xs:byte(1)+xs:short(2))','integer','');
    t('xs:byte(1)+xs:unsignedShort(2)','3','');
    t('type-of(xs:byte(1)+xs:unsignedShort(2))','integer','');
    t('xs:byte(1)*xs:int(2)','2','');
-   t('type-of(xs:byte(1)*xs:int(2))','int','');
+   t('type-of(xs:byte(1)*xs:int(2))','integer','');
    t('xs:byte(1)+2','3','');
    t('type-of(xs:byte(1)+2)','integer','');
    t('xs:float(1)+2','3','');
@@ -3494,7 +3496,7 @@ begin
   t('type-of(xs:untypedAtomic("0") + xs:decimal(0))', 'double');
   t('string-join(for $x in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
                 '$y in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x + $y), " ")',
-                'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
+                'integer decimal float double double decimal integer float double double float float float double double double double double double double double double double double double'); //XQTS test
   t('string-join(for $x in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
     '$y in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x mod $y), " ")',
     'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
@@ -3512,15 +3514,15 @@ begin
   t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:positiveInteger', 'false');
   t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:integer', 'true');
 
-  {t('xs:byte("200") * xs:byte(200)', '40000');
-  t('(xs:byte("200") * xs:byte(200)) instance of xs:integer', 'true');
-  t('(xs:byte("200") * xs:byte(200)) instance of xs:byte', 'false');
-  t('xs:byte("200") + xs:byte(200)', '400');
-  t('(xs:byte("200") + xs:byte(200)) instance of xs:integer', 'true');
-  t('(xs:byte("200") + xs:byte(200)) instance of xs:byte', 'false');
-  t('xs:byte("200") - xs:byte(201)', '-1');
-  t('(xs:byte("200") - xs:byte(201)) instance of xs:integer', 'true');
-  t('(xs:byte("200") - xs:byte(201)) instance of xs:byte', 'false');}
+  t('xs:unsignedByte("200") * xs:unsignedByte(200)', '40000');
+  t('(xs:unsignedByte("200") * xs:unsignedByte(200)) instance of xs:integer', 'true');
+  t('(xs:unsignedByte("200") * xs:unsignedByte(200)) instance of xs:unsignedByte', 'false');
+  t('xs:unsignedByte("200") + xs:unsignedByte(200)', '400');
+  t('(xs:unsignedByte("200") + xs:unsignedByte(200)) instance of xs:integer', 'true');
+  t('(xs:unsignedByte("200") + xs:unsignedByte(200)) instance of xs:unsignedByte', 'false');
+  t('xs:unsignedByte("200") - xs:unsignedByte(201)', '-1');
+  t('(xs:unsignedByte("200") - xs:unsignedByte(201)) instance of xs:integer', 'true');
+  t('(xs:unsignedByte("200") - xs:unsignedByte(201)) instance of xs:unsignedByte', 'false');
 
   t('/ = "hallo" ', 'true', '!<a>hallo</a>');
   t('/ = "hxallo" ', 'false', '!<a>hallo</a>');

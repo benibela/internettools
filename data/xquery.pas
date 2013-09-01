@@ -411,8 +411,8 @@ type
   TXQValueDecimal = class (TXQValue)
     value:  BigDecimal;   //*< plain BigDecimal value
 
-    constructor create(const aflt: BigDecimal = 0); reintroduce; virtual;
-    constructor create(atypeannotation: TXSType; const aflt: BigDecimal = 0); reintroduce; virtual;
+    constructor create(const v: BigDecimal = 0); reintroduce; virtual;
+    constructor create(atypeannotation: TXSType; const v: BigDecimal = 0); reintroduce; virtual;
     constructor create(atypeAnnotation: TXSType; const avalue: IXQValue); override;
 
     class function classKind: TXQValueKind; override;

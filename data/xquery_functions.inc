@@ -19,14 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 
-function xqvalueD(const v: BigDecimal; const typeRef1, typeRef2: IXQValue): IXQValue;
-var
-  t: TXSType;
-begin
-  t := TXSType.commonDecimalType(typeRef1, typeRef2);
-  if isInt64(v) then result := TXQValueInt64.create(t, BigDecimalToInt64(v))
-  else result := TXQValueDecimal.create(t, v);
-end;
 
 function xqvalueF(const v: xqfloat; const typeRef1, typeRef2: IXQValue): IXQValue;
 var
@@ -34,15 +26,6 @@ var
 begin
   t := TXSType.commonDecimalType(typeRef1, typeRef2);
   result := TXQValueFloat.create(t, v)
-end;
-
-function xqvalueI(const v: BigDecimal; const typeRef1, typeRef2: IXQValue): IXQValue;
-var
-  t: TXSType;
-begin
-  t := TXSType.commonIntegerType(typeRef1, typeRef2);
-  if isInt64(v) then result := TXQValueInt64.create(t, BigDecimalToInt64(v))
-  else result := TXQValueDecimal.create(t, v);
 end;
 
 const Int64Halved = high(int64) div 2;
@@ -68,11 +51,11 @@ begin
     bi := b.toInt64;
     if ((ai >= 0) and ((bi <= 0) or ((ai <= Int64Halved)  and (bi <=  Int64Halved )))) or
        ((ai < 0)  and ((bi >= 0) or ((ai >= -Int64Halved) and (bi >= -Int64Halved )))) then
-      exit(TXSType.commonIntegerType(a,b).createValue(ai + bi));
+      exit(xqvalue(ai + bi));
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
-    exit(TXSType.commonNumericType(a,b).createValue(a.toDecimal + b.toDecimal));
+    exit(xqvalue(a.toDecimal + b.toDecimal));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
@@ -120,11 +103,11 @@ begin
     bi := b.toInt64;
     if ((ai >= 0) and ((bi >= 0) or ((ai <= Int64Halved)  and (bi >= -Int64Halved )))) or
        ((ai < 0)  and ((bi <= 0) or ((ai >= -Int64Halved) and (bi <= Int64Halved )))) then
-      exit(TXSType.commonIntegerType(a,b).createValue(ai - bi));
+      exit(xqvalue(ai - bi));
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
-    exit(TXSType.commonNumericType(a,b).createValue(a.toDecimal - b.toDecimal));
+    exit(xqvalue(a.toDecimal - b.toDecimal));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
@@ -156,7 +139,7 @@ begin
     if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueF(ad - bd, a, b)
     else if ad = bd then result := xqvalueF(getNaN, a, b)
     else result := a.clone;
-  end else result := xqvalueD(a.toDecimal - b.toDecimal, a, b);
+  end else result := xqvalueF(ad - bd, a, b);
 end;
 
 function xqvalueTo(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -212,11 +195,11 @@ begin
     if ((ai >= low(integer)) and (ai <= high(integer)) and (bi >= low(integer)) and (bi <= high(integer))) or
        ((ai >= -$7f) and (ai <= $7f) and (bi >= $00ffffffffffffff) and (bi <= $00ffffffffffffff)) or
        ((ai >= $00ffffffffffffff) and (ai <= $00ffffffffffffff) and (bi >= -$7f) and (bi <= $7f)) then
-      exit(TXSType.commonIntegerType(a,b).createValue(ai * bi));
+      exit(xqvalue(ai * bi));
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
-    exit(TXSType.commonNumericType(a,b).createValue(a.toDecimal * b.toDecimal));
+    exit(xqvalue(a.toDecimal * b.toDecimal));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
@@ -365,11 +348,8 @@ begin
   ak := a.kind; bk := b.kind;
 
   if (ak = pvkInt64) and (bk = pvkInt64) then begin
-    t := TXSType.commonIntegerType(a, b);
     i := a.toInt64 mod b.toInt64;
-    if (t <> baseSchema.integer) then
-      if (not t.derivedFrom(baseSchema.integer)) or ((t as TXSNumericType).constraintsSatisfied(i)) then t := baseSchema.integer;
-    exit(t.createValue(i));
+    exit(xqvalue(i));
   end;
 
   if (ak = pvkNull) or (bk = pvkNull) then

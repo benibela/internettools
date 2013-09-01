@@ -467,16 +467,17 @@ end;
 
 { TXQValueDecimal }
 
-constructor TXQValueDecimal.create(const aflt: BigDecimal);
+constructor TXQValueDecimal.create(const v: BigDecimal);
 begin
-  inherited create(baseSchema.Decimal);
-  value := aflt;
+  if isInteger(v) then inherited create(baseSchema.integer)
+  else inherited create(baseSchema.decimal);
+  value := v;
 end;
 
-constructor TXQValueDecimal.create(atypeannotation: TXSType; const aflt: BigDecimal);
+constructor TXQValueDecimal.create(atypeannotation: TXSType; const v: BigDecimal);
 begin
   inherited create(atypeannotation);
-  value := aflt;
+  value := v;
 end;
 
 constructor TXQValueDecimal.create(atypeAnnotation: TXSType; const avalue: IXQValue);
