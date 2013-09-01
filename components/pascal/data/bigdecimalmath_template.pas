@@ -197,7 +197,7 @@ begin
   if res = nil then exit;
   if exp = 0 then intend := length(s)
   else intend := exp - 1;
-  if intend = dot then intend -= 1;
+  if intend = dot then begin intend -= 1; dot := 0; end;
   with res^ do begin
     signed := s[1] = '-';
     lastDigitHidden := false;
