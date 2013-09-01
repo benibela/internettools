@@ -93,6 +93,7 @@ var
   bf: BigDecimal;
   dbf: BigDecimal;
   ds: String;
+  b0: BigDecimal;
 begin
 
   test(TryStrToBigDecimal('1', @b1));
@@ -140,7 +141,7 @@ begin
   test(BigDecimalToStr(StrToBigDecimal('0.00000000000000000000000001')), '0.00000000000000000000000001');
   test(BigDecimalToStr(StrToBigDecimal('000000.00000000000000000000000001')), '0.00000000000000000000000001');
   test(BigDecimalToStr(StrToBigDecimal('0000000000.0000000000000000000000000')), '0');
-  test(BigDecimalToStr(StrToBigDecimal('-0')), '-0');
+  test(BigDecimalToStr(StrToBigDecimal('-0')), '0');
   test(BigDecimalToStr(StrToBigDecimal('1E-1')), '0.1');
   test(BigDecimalToStr(StrToBigDecimal('1E-10')), '0.0000000001');
   test(BigDecimalToStr(StrToBigDecimal('1234567890E-10')), '0.123456789');
@@ -469,6 +470,26 @@ begin
   test(BigDecimalToStr(lcm(StrToBigDecimal('120'), StrToBigDecimal('27'))), '1080');
   test(BigDecimalToStr(gcd(StrToBigDecimal('120'), StrToBigDecimal('-120'))), '120');
   test(BigDecimalToStr(gcd(StrToBigDecimal('120'), StrToBigDecimal('-20'))), '-20'); //random sign depending on recursion deep
+
+
+  //comparisons involving 0/-0
+  test(compareBigDecimals(StrToBigDecimal('-0'), StrToBigDecimal('0')), 0);
+  setZero(b0);
+  test(compareBigDecimals(b0, b1), -1);
+  test(compareBigDecimals(b0, bs1), 1);
+  test(compareBigDecimals(b1, b0), 1);
+  test(compareBigDecimals(bs1, b0), -1);
+  test(compareBigDecimals(b1, b1), 0);
+  test(compareBigDecimals(bs1, bs1), 0);
+  test(compareBigDecimals(b0, b0), 0);
+  b0.signed:=true;
+  test(compareBigDecimals(b0, b1), -1);
+  test(compareBigDecimals(b0, bs1), 1);
+  test(compareBigDecimals(b1, b0), 1);
+  test(compareBigDecimals(bs1, b0), -1);
+  test(compareBigDecimals(b1, b1), 0);
+  test(compareBigDecimals(bs1, bs1), 0);
+  test(compareBigDecimals(b0, b0), 0);
 end;
 
 
