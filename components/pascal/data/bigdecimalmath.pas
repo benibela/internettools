@@ -142,7 +142,7 @@ operator >(const a: BigDecimal; const b: BigDecimal): boolean;
 procedure normalize(var x: BigDecimal);
 
 
-type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmRoundHalfToEven);
+type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmRoundHalfUp, bfrmRoundHalfToEven);
 //** Universal rounding function @br
 //** Rounds v to the precision of a certain digit, subject to a certain rounding mode. @br
 //** Positive toDigit will round to an integer with toDigit trailing zeros, negative toDigit will round to a decimal with -toDigit numbers after the decimal point
@@ -972,6 +972,17 @@ begin
     bfrmCeil:  increment := not v.signed; //3; -2
     bfrmFloor: increment := v.signed; //2, -3
     bfrmRound: increment := getDigit(v, toDigit - 1) >= 5; // 3; -3
+    bfrmRoundHalfUp: begin //2; 2
+      lastDigit := getDigit(v, toDigit - 1);
+      if lastDigit < 5 then increment := false
+      else if lastDigit > 5 then increment := true
+      else if lowskip + v.exponent <> result.exponent - ifthen(toDigitInBin = 0, 1, 0) then
+        increment := lowskip + v.exponent < result.exponent - ifthen(toDigitInBin = 0, 1, 0) //if the bins following the bin containing toDigit are not skipped, they are not zero, and the number is > 0.5xx
+      else if not v.signed then increment := true //round positive (absolute) up
+      else if toDigitInBin = 1 then increment := false //if the rounded-to digit is the 2nd last in its bin (so 5 is last), incrementing depends on the next block which was checked above
+      else if toDigitInBin = 0 then increment := v.digits[result.exponent - v.exponent - 1] > ELEMENT_OVERFLOW div 2 //if the rounded-to digit is the last in its bin, it depends on the next block after removing its first digit (e.g. 50000 => no increment, 5000x000 => increment)
+      else increment := v.digits[result.exponent - v.exponent] mod powersOf10[toDigitInBin - 1] > 0; //otherwise it depends on the digits in the same after the removing the rounded-to digit and next digits
+    end;
     bfrmRoundHalfToEven: begin //2; 2
       lastDigit := getDigit(v, toDigit - 1);
       if lastDigit < 5 then increment := false
