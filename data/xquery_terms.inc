@@ -514,12 +514,12 @@ var meta: PFlowerSortingData;
     if emptyLeast then begin
       if v.isUndefined and not w.isUndefined then
         exit(true);
-      if ((v is TXQValueDecimal) and IsNan(v.toDecimal)) and not w.isUndefined and not ((w is TXQValueDecimal) and IsNan(w.toDecimal)) then
+      if ((v is TXQValueFloat) and IsNan(v.toFloat)) and not w.isUndefined and not ((w is TXQValueFloat) and IsNan(w.toFloat)) then
         exit(true);
     end else begin
       if w.isUndefined and not v.isUndefined then
         exit(true);
-      if ((w is TXQValueDecimal) and IsNan(w.toDecimal)) and not v.isUndefined and not ((v is TXQValueDecimal) and IsNan(v.toDecimal)) then
+      if ((w is TXQValueFloat) and IsNan(w.toFloat)) and not v.isUndefined and not ((v is TXQValueFloat) and IsNan(v.toFloat)) then
         exit(true);
     end;
 
@@ -762,7 +762,6 @@ var
   vfunc: TXQValueFunction;
   sc: TXQStaticContext;
   ns: INamespace;
-  temp: String;
 begin
   evaluateChildren(context, evilkids);
 
@@ -1156,9 +1155,9 @@ end;
 
 constructor TXQTermNumber.create(const avalue: string);
 begin
-  if strContains(avalue,'e') or strContains(avalue,'E') then value := TXQValueDecimal.create(baseSchema.double, StrToFloat(avalue,XQFormats))
-  else if strContains(avalue,'.') then value := xqvalue(StrToFloat(avalue,XQFormats))
-  else value := xqvalue(StrToInt65(avalue));
+  if strContains(avalue,'e') or strContains(avalue,'E') then value := baseSchema.double.createValue(avalue)
+  else if strContains(avalue,'.') then value := baseSchema.decimal.createValue(avalue)
+  else value := baseSchema.integer.createValue(avalue);
 end;
 
 constructor TXQTermNumber.create(const avalue: IXQValue);

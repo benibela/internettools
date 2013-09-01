@@ -39,7 +39,7 @@ uses
    Classes, SysUtils,
    dregexpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page dead, I create a mirror on benibela.de) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr)
              //ATTENTION: You must use my version of it, OR set NSUBEXP = 90, otherwise it will crash with an "TRegExpr(comp): ParseReg Unmatched ()" error everytime you use the anyURI type
-   simplehtmltreeparser, math, int65math, bbutils,
+   simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif};
 
 
@@ -69,6 +69,8 @@ type
   IXQuery = interface;
   TXQNativeModule = class;
 
+  float = record end;
+  xqfloat = double;
 
   { TXQValueEnumerator }
   //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
@@ -85,10 +87,7 @@ type
 
 
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
-
-  //**Type used for XQuery decimal types
-  Decimal = Extended;
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
   TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkAny, xqdnkElementType,  xqdnkType, xqdnkFunction);
@@ -231,17 +230,13 @@ type
     function typeAnnotation: TXSType;  //**< Returns the class underlying the interface
     //function schema: TXSSchema;
 
-{    function canConvertToInt65: boolean;  //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
-    function canConvertToDecimal(pure: boolean): boolean;  //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
-    function canConvertToBoolean: boolean;  //**< Checks if the value can be converted to an boolean.
-}
     function isUndefined: boolean;  //**< Returns true, iff the value is undefined or an empty sequence
 
     function toBoolean: boolean;  //**< Returns the value as boolean; dynamically converted, if necessary
     function toBooleanEffective: boolean;  //**< Returns the effective boolean value, as defined in XPath. (the main difference to toBoolean is that toBooleanEffective returns true for the string "false", while toBoolean returns false)
     function toInt64: int64;  //**< Returns the value as int64; dynamically converted, if necessary
-    function toInt65: int65;  //**< Returns the value as int65; dynamically converted, if necessary
-    function toDecimal: decimal;  //**< Returns the value as decimal; dynamically converted, if necessary
+    function toFloat: xqfloat;  //**< Returns the value as float (extended if available); dynamically converted, if necessary
+    function toDecimal: BigDecimal;  //**< Returns the value as bigdecimal; dynamically converted, if necessary
     function toString: string;  //**< Returns the value as string; dynamically converted, if necessary
     function toDateTime: TDateTime;  //**< Returns the value as datetime; dynamically converted, if necessary
     function toNode: TTreeNode;  //**< Returns the value as node; dynamically converted, if necessary
@@ -281,17 +276,13 @@ type
     function typeAnnotation: TXSType; inline; //**< Returns the class underlying the interface
     //function schema: TXSSchema;
 
-    function canConvertToInt65: boolean;    virtual; //**< Checks if the value can be converted to an integer. (Depends on the actual value, not just on the type, since '10' can be converted but 'abc' not)
-    function canConvertToDecimal(pure: boolean): boolean;  virtual; //**< Checks if the value can be converted to an decimal. (Depends on the actual value, not just on the type, since '10.0' can be converted but 'abc' not)
-    function canConvertToBoolean: boolean;  virtual; //**< Checks if the value can be converted to an boolean.
-
     function isUndefined: boolean; virtual;  //**< Returns true, iff the value is undefined or an empty sequence
 
     function toBoolean: boolean; virtual; //**< Returns the value as boolean; dynamically converted, if necessary
     function toBooleanEffective: boolean; virtual; //**< Returns the value effective boolean value
     function toInt64: int64; virtual; //**< Returns the value as int64; dynamically converted, if necessary
-    function toInt65: int65; virtual; //**< Returns the value as int65; dynamically converted, if necessary
-    function toDecimal: decimal; virtual; //**< Returns the value as decimal; dynamically converted, if necessary
+    function toFloat: xqfloat; virtual; //**< Returns the value as int64; dynamically converted, if necessary
+    function toDecimal: BigDecimal; virtual; //**< Returns the value as BigDecimal; dynamically converted, if necessary
     function toString: string; override; //**< Returns the value as string; dynamically converted, if necessary
     function toDateTime: TDateTime; virtual; //**< Returns the value as datetime; dynamically converted, if necessary
     function toNode: TTreeNode; virtual; //**< Returns the value as node; dynamically converted, if necessary
@@ -344,14 +335,12 @@ type
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
     constructor create(atypeAnnotation: TXSType; abool: boolean = false); reintroduce;
 
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
-
     class function classKind: TXQValueKind; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
-    function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
+    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to float
+    function toInt64: int64; override; //**< Converts the TXQValue dynamically to int64
+    function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
 
     function clone: IXQValue; override;
@@ -362,23 +351,23 @@ type
 
   { TXQValueInt65 }
   //** integer value (should have unlimited range, but is actually a signed 65 bit)
-  TXQValueInt65 = class (TXQValue)
-    value:  int65;
+
+  { TXQValueInt64 }
+
+  TXQValueInt64 = class (TXQValue)
+    value:  int64;
 
     constructor create(atypeAnnotation: TXSType); reintroduce; virtual;
-    constructor create(const aint: int65); reintroduce; virtual;
-    constructor create(atypeAnnotation: TXSType; const aint: int65);
+    constructor create(const aint: int64); reintroduce; virtual;
+    constructor create(atypeAnnotation: TXSType; const aint: int64);
     constructor create(atypeAnnotation: TXSType; const avalue: IXQValue); override;
 
     class function classKind: TXQValueKind; override;
-    class function canCreateFromInt65(const i: int65): boolean; virtual;
-
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
-    function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
+    function toInt64: int64; override; //**< Converts the TXQValue dynamically to integer
+    function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
+    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to float
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
@@ -386,30 +375,51 @@ type
 
     function clone: IXQValue; override;
   end;
-  TXQValueInt65Class = class of TXQValueInt65;
+  TXQValueInt64Class = class of TXQValueInt64;
 
-  { TXQValueDecimal }
+  { TXQValueFloat }
 
-  //decimal value (should be a unlimited real number \mathbb{R}, but is extended )
-  TXQValueDecimal = class (TXQValue)
-    value:  decimal;   //*< plain decimal value
+  //bigdecimal value (unlimited real number \mathbb{R})
+  TXQValueFloat = class (TXQValue)
+    value:  double;   //*< plain decimal value
 
-    constructor create(const aflt: decimal = 0); reintroduce; virtual;
-    constructor create(atypeannotation: TXSType; const aflt: decimal = 0); reintroduce; virtual;
+    constructor create(const aflt: xqfloat = 0); reintroduce; virtual;
+    constructor create(atypeannotation: TXSType; const aflt: xqfloat = 0); reintroduce; virtual;
     constructor create(atypeAnnotation: TXSType; const avalue: IXQValue); override;
-
-    class function canCreateFromDecimal(const v:decimal): boolean; virtual;
 
     class function classKind: TXQValueKind; override;
 
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
-    class function truncateRange(const v: decimal): Decimal; virtual;
+    //class function truncateRange(const v: BigDecimal): BigDecimal; virtual;
     class function isPure(const v: IXQValue): boolean; static;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
-    function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
+    function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
+    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to float
+    function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
+    function toString: string; override; //**< Converts the TXQValue dynamically to string
+    function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+
+    function clone: IXQValue; override;
+  end;
+  TXQValueFloatClass = class of TXQValueFloat;
+
+  { TXQValueDecimal }
+
+  //bigdecimal value (unlimited real number \mathbb{R})
+  TXQValueDecimal = class (TXQValue)
+    value:  BigDecimal;   //*< plain BigDecimal value
+
+    constructor create(const aflt: BigDecimal = 0); reintroduce; virtual;
+    constructor create(atypeannotation: TXSType; const aflt: BigDecimal = 0); reintroduce; virtual;
+    constructor create(atypeAnnotation: TXSType; const avalue: IXQValue); override;
+
+    class function classKind: TXQValueKind; override;
+
+    function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
+    function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
+    function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
@@ -433,14 +443,7 @@ type
 
     class function classKind: TXQValueKind; override;
 
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
-    function canConvertToBoolean: boolean; override;
-
-    function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toBooleanEffective: boolean; override;
-    function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
@@ -495,14 +498,10 @@ type
 
     class function classKind: TXQValueKind; override;
 
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
-    function canConvertToBoolean: boolean; override;
-
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toBooleanEffective: boolean; override;
-    function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
+    function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
+    function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
@@ -513,7 +512,7 @@ type
   protected
     class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): boolean; static;
 
-    procedure multiplyComponents(fac: Decimal); //Multiply all components of value with fac
+    procedure multiplyComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure addDuration(const D: TXQValueDateTimeData); //Adds a duration to the current datetime/duration
     class procedure addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
 
@@ -548,8 +547,8 @@ type
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toBooleanEffective: boolean; override;
-    function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
+    function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
+    function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
@@ -589,13 +588,8 @@ type
 
     class function classKind: TXQValueKind; override;
 
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
-
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toBooleanEffective: boolean; override;
-    function toInt65: int65; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: decimal; override; //**< Converts the TXQValue dynamically to decimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
@@ -732,9 +726,6 @@ type
 
     class function classKind: TXQValueKind; override;
 
-    function canConvertToInt65: boolean; override;
-    function canConvertToDecimal(pure: boolean): boolean; override;
-
     function directClone: TXQValue;
     function clone: IXQValue; override;
   end;
@@ -805,10 +796,10 @@ type
     cache: TObject;
   end;
 
-  TXSStorage = (xssBoolean, xssInt65, xssExtended, xssString);
 
   { TXSType }
 
+  TXSNumericType = class;
   TXSType = class
     name: string;
     schema: TXSSchema;
@@ -828,24 +819,29 @@ type
     class function commonType(const a, b: IXQValue): TXSType; static;
 
     function getIntegerType: TXSType; virtual;
-    class function commonIntegerType(const a,b: TXSType): TXSType; static;
-    class function commonIntegerType(const a,b: IXQValue): TXSType; inline; static;
+    class function commonIntegerType(const a,b: TXSType): TXSNumericType; static;
+    class function commonIntegerType(const a,b: IXQValue): TXSNumericType; inline; static;
     function getDecimalType: TXSType; virtual;
     class function commonDecimalType(a,b: TXSType; const failureType: TXSType): TXSType; //static;
     class function commonDecimalType(const a,b: IXQValue): TXSType; static;
 
+    class function commonNumericType(a, b: TXSType): TXSNumericType;
+    class function commonNumericType(const a, b: IXQValue): TXSNumericType;
+
     //** Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
     function createValue(const v: IXQValue): IXQValue; inline;
-    function createValue(const v: Int65): IXQValue; inline;
-    function createValue(const v: Decimal): IXQValue; inline;
+    function createValue(const v: Int64): IXQValue; inline;
+    function createValue(const v: xqfloat): IXQValue; inline;
+    function createValue(const v: BigDecimal): IXQValue; inline;
     function createValue(const v: String): IXQValue; inline;
   protected
     function tryCreateValue(const v: IXQValue; outv: PXQValue = nil): boolean;
     function tryCreateValue(v: string; outv: PXQValue = nil): boolean;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; virtual;
     function tryCreateValueInternal(const v: String; outv: PXQValue = nil): boolean; virtual;
-    function tryCreateValue(const v: Int65; outv: PXQValue = nil): boolean; virtual;
-    function tryCreateValue(const v: Decimal; outv: PXQValue = nil): boolean; virtual;
+    function tryCreateValue(const v: Int64; outv: PXQValue = nil): boolean; virtual;
+    function tryCreateValue(const v: xqfloat; outv: PXQValue = nil): boolean; virtual;
+    function tryCreateValue(const v: BigDecimal; outv: PXQValue = nil): boolean; virtual;
   end;
 
   //TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
@@ -894,23 +890,18 @@ type
     function tryCreateValueInternal(const v: String; outv: PXQValue=nil): boolean; override;
   end;
 
-
-
-  { TXSIntegerType }
-
-  TXSIntegerType = class(TXSSimpleType)
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
-    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
-    function constraintsSatisfied(const v: int65): boolean;
-  end;
-
   { TXSDecimalType }
-  TXSDecimalSubType = (xsstDecimal, xsstFloat, xsstDouble);
-  TXSDecimalType = class(TXSSimpleType)
-    subType: TXSDecimalSubType;
+  TXSNumericSubType = (xsstInteger, xsstDecimal, xsstFloat, xsstDouble);
+
+  { TXSNumericType }
+
+  TXSNumericType = class(TXSSimpleType)
+    subType: TXSNumericSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
-    constructor create(const aname: string; aparent: TXSType; asubtype: TXSDecimalSubType);
+    function constraintsSatisfied(const v: BigDecimal): boolean;
+    constructor create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
+    constructor create(const aname: string; aparent: TXSNumericType);
   end;
 
   { TXSBooleanType }
@@ -957,12 +948,12 @@ type
     //engine: TXQueryEngine;
     url: string;
     anyType, anySimpleType, anyAtomicType: TXSSimpleType;
-    decimal, integer, double, float: TXSSimpleType;
+    decimal, integer, double, float: TXSNumericType;
 
 
     string_, anyURI, QName, base64Binary, boolean, date, time, dateTime, duration, gDay, gMonth, gMonthDay, gYear, gYearMonth, hexBinary, NOTATION: TXSSimpleType;
 
-    nonPositiveInteger, negativeInteger, nonNegativeInteger, positiveInteger, long, int, short, Byte, unsignedLong, unsignedInt, unsignedShort, unsignedByte: TXSSimpleType;
+    nonPositiveInteger, negativeInteger, nonNegativeInteger, positiveInteger, long, int, short, Byte, unsignedLong, unsignedInt, unsignedShort, unsignedByte: TXSNumericType;
     normalizedString, token, language, NMTOKEN, NMTOKENS, Name, NCName, ID, IDREF, IDREFS, ENTITY, ENTITIES: TXSSimpleType;
     yearMonthDuration, dayTimeDuration, dateTimeStamp: TXSSimpleType;
 
@@ -1938,10 +1929,10 @@ type
   function xqvalue(const v: Boolean):IXQValue; inline; //**< Creates an boolean IXQValue
   function xqvalueTrue:IXQValue; inline; //**< Creates an boolean IXQValue
   function xqvalueFalse:IXQValue; inline; //**< Creates an boolean IXQValue
-  function xqvalue(const v: int65):IXQValue; inline; //**< Creates an integer IXQValue
-  function xqvalue(v: Integer):IXQValue; inline; //**< Creates an integer IXQValue
   function xqvalue(const v: Int64):IXQValue; inline; //**< Creates an integer IXQValue
-  function xqvalue(v: decimal):IXQValue; inline; //**< Creates an decimal IXQValue
+  function xqvalue(v: Integer):IXQValue; inline; //**< Creates an integer IXQValue
+  function xqvalue(v: xqfloat):IXQValue; inline; //**< Creates an BigDecimal IXQValue
+  function xqvalue(const v: BigDecimal):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   function xqvalue(v: string):IXQValue; inline; //**< Creates an string IXQValue
   function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Creates an TDateTime IXQValue
   function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates an node TXQValue
@@ -1949,7 +1940,7 @@ type
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes a IXQValue (single element seq => single element, empty seq => undefined)
   procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add )
-  function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
+  //function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
 
   //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b (doesn't free them); -2 for unknown
   function xqvalueCompareAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
@@ -2001,7 +1992,8 @@ type
     procedure add(const name: string; const value: string); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: string; const namespace: INamespace); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: integer; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
-    procedure add(const name: string; const value: decimal; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: xqfloat; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(const name: string; const value: bigdecimal; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: boolean; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: TDateTime; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: TTreeNode; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
@@ -2080,7 +2072,6 @@ private
   fequal, fcontains, fstartsWith, fendsWith: TXQCollationBoolFunction;
 end;
 
-  //{$DEFINE STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY}
   //var curUnitTest: integer;
 
 //**If XQGlobalTrimNodes is true, the result of every node->string conversion is trimmed. This trimming occurs after and not during the conversion.@br
@@ -2183,6 +2174,8 @@ var
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 
 
+
+
 { TXQInterpretedFunctionInfo }
 
 procedure TXQInterpretedFunctionInfo.initialize();
@@ -2280,50 +2273,51 @@ var   XMLNamespace_XPathFunctions, XMLNamespace_XMLSchema, XMLNamespace_XMLSchem
 procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: string); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: boolean); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: int65); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: Int64); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: IXQValue); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: Decimal); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: xqfloat); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: bigDecimal); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
 
 {$I disableRangeOverflowChecks.inc}
 
 
-function getNaN: decimal;
+function getNaN: xqfloat;
 begin
   result := NaN;
 end;
-function getPosInf: decimal;
+function getPosInf: xqfloat;
 begin
   result := Infinity;
 end;
-function getNegInf: decimal;
+function getNegInf: xqfloat;
 begin
   result := -Infinity;
 end;
-function isPosInf(const f: decimal): boolean;
+function isPosInf(const f: xqfloat): boolean;
 begin
   result := f = Infinity;
 end;
-function isNegInf(const f: decimal): boolean;
+function isNegInf(const f: xqfloat): boolean;
 begin
   result := f = -Infinity;
 end;
 
-function xqround(const f: Decimal): int65;
-var tempf: decimal;
+function xqround(const f: xqfloat): Int64;
+var tempf: xqfloat;
 begin
   tempf := f + 0.5;
-  result := truncToInt65(tempf);
+  result := trunc(tempf);
   if frac(tempf) < 0 then result -= 1;
 end;
 
-function xqtruncdecimal(const f: Decimal): Decimal;
+{function xqtruncdecimal(const f: Decimal): Decimal;
 begin
   result := f - frac(f);
-end;
+end;}
 
 procedure xqswap(var a, b: IXQValue); inline;
 var
@@ -2336,9 +2330,9 @@ end;
 {$I restoreRangeOverflowChecks.inc}
 
 
-function compareValue(a, b: Decimal;const EPSILON: extended = 1e-17): integer;
+function compareValue(a, b: xqfloat;const EPSILON: extended = 1e-17): integer;
 var
-  t: Decimal;
+  t: xqfloat;
 begin
   if IsNan(a) or IsNan(b) then exit(-2);
   if isPosInf(a) or isPosInf(b) then
@@ -2356,17 +2350,8 @@ begin
 end;
 
 
-function myStrToInt(s:string):int65;
-var tempf:decimal;
-begin
-  s := trim(s);
-  if not TryStrToInt65(s, result) then
-    if TryStrToFloat(s, tempf, XQFormats) then result:=trunc(tempf)
-    else result:=0;
-end;
 
-
-function myStrToDecimal(s:string): decimal;
+function myStrToFloat(s:string): xqfloat;
 begin
   s := trim(s);
   if not TryStrToFloat(s, result, XQFormats) then
@@ -2379,8 +2364,6 @@ end;
 function killTrailingZeros(const s: string): string;
 var
   p: SizeInt;
-  l: Integer;
-  sp: SizeInt;
 
   E: SizeInt;
   d: SizeInt;
@@ -2953,14 +2936,14 @@ begin
   result := commonValuesFalse;
 end;
 
-function xqvalue(const v: int65): IXQValue;
+function xqvalue(const v: Int64): IXQValue;
 begin
   {case v.value of
     0: result := commonValues[cvk0];
     1: if v.sign then result := commonValues[cvkM1] else  result := commonValues[cvk1];
     else result := TXQValueInt65.Create(v);
   end;                                }
-  result := TXQValueInt65.Create(v);
+  result := TXQValueInt64.Create(v);
 end;
 
 function xqvalue(v: Integer): IXQValue;
@@ -2970,20 +2953,16 @@ begin
     1: result := commonValues[cvk1];
     else result := TXQValueInt65.Create(v);
   end;}
-  result := xqvalue(int65(v));
+  result := xqvalue(int64(v));
 end;
 
-function xqvalue(const v: Int64): IXQValue;
+
+function xqvalue(v: xqfloat): IXQValue;
 begin
-  {case v of
-    0: result := commonValues[cvk0];
-    1: result := commonValues[cvk1];
-    else result := TXQValueInt65.Create(v);
-  end;}
-  result := xqvalue(int65(v));
+  result := TXQValueFloat.Create(v);
 end;
 
-function xqvalue(v: decimal): IXQValue;
+function xqvalue(const v: bigdecimal): IXQValue;
 begin
   result := TXQValueDecimal.Create(v);
 end;
@@ -3055,29 +3034,6 @@ begin
   end;
 end;
 
-function commonTyp(const a, b: TXQValueKind): TXQValueKind;
-begin
-  //Conversion rules:
-  //  undefined, sequence unconvertible
-  //         int    -->      decimal     -->        string
-  //         /|\              /|\                   /||\
-  //          |                |                     ||
-  //       boolean          datetime                node
-
-  if (a in [pvkUndefined, pvkSequence, pvkNull]) or (b in [pvkUndefined,pvkSequence,pvkNull]) then exit(pvkUndefined);
-  //leafes
-  if (a = pvkDateTime) and (b = pvkDateTime) then exit(pvkDateTime);
-  if (a = pvkBoolean) and (b = pvkBoolean) then exit(pvkBoolean);
-
-  if (a in [pvkBoolean,pvkInt]) and (b in [pvkBoolean,pvkInt]) then exit(pvkInt);
-  if (a in [pvkDateTime,pvkDecimal]) and (b in [pvkDateTime,pvkDecimal]) then exit(pvkDecimal);
-
-  if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then exit(pvkString);
-  if (a = pvkDecimal) or (b = pvkDecimal) then exit(pvkDecimal);
-  if (a = pvkInt) or (b = pvkInt) then exit(pvkInt);
-
-  result := pvkUndefined;
-end;
 
 function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
 begin
@@ -3287,8 +3243,9 @@ function sequenceFilterConditionSatisfied(evaluatedCondition: IXQValue; const in
 begin
   case evaluatedCondition.kind of
     pvkUndefined: result := false;
-    pvkInt: result := evaluatedCondition.toInt65 = index;
-    pvkDecimal: result := (evaluatedCondition.toDecimal = index);
+    pvkInt64: result := evaluatedCondition.toInt64 = index;
+    pvkBigDecimal: result := evaluatedCondition.toDecimal = index;
+    pvkFloat: result := (evaluatedCondition.toFloat = index);
     pvkDateTime: raise EXQEvaluationException.create('FORG0006', 'Sequence filter returned invalid value');
     else {pvkBoolean, pvkString,pvkSequence,pvkNode,pvkArray,pvkObject,pvkNull:} result := evaluatedCondition.toBooleanEffective;
   end;
@@ -3573,7 +3530,32 @@ begin
     xqswap(list[i], list[h-i]);
 end;
 
-function TXQVList.getPromotedType(): TXQValueKind;
+function TXQVList.getPromotedType: TXQValueKind;
+function commonTyp(const a, b: TXQValueKind): TXQValueKind;
+begin
+  //Conversion rules:
+  //  undefined, sequence unconvertible
+  //         int    -->      decimal     -->        string
+  //         /|\              /|\                   /||\
+  //          |                |                     ||
+  //       boolean          datetime                node
+
+  if (a in [pvkUndefined, pvkSequence, pvkNull]) or (b in [pvkUndefined,pvkSequence,pvkNull]) then exit(pvkUndefined);
+  //leafes
+  if (a = pvkDateTime) and (b = pvkDateTime) then exit(pvkDateTime);
+  if (a = pvkBoolean) and (b = pvkBoolean) then exit(pvkBoolean);
+
+  if (a in [pvkBoolean,pvkInt64]) and (b in [pvkBoolean,pvkInt64]) then exit(pvkInt64);
+  if (a in [pvkBoolean,pvkInt64,pvkBigDecimal]) and (b in [pvkBoolean,pvkInt64,pvkBigDecimal]) then exit(pvkBigDecimal);
+  if (a in [pvkDateTime,pvkFloat]) and (b in [pvkDateTime,pvkFloat]) then exit(pvkFloat);
+
+  if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then exit(pvkString);
+  if (a = pvkFloat) or (b = pvkFloat) then exit(pvkFloat);
+  if (a = pvkBigDecimal) or (b = pvkBigDecimal) then exit(pvkBigDecimal);
+  if (a = pvkInt64) or (b = pvkInt64) then exit(pvkInt64);
+
+  result := pvkUndefined;
+end;
 var
   i: Integer;
 begin
@@ -3623,6 +3605,7 @@ end;
 
 { TXQVariableStorage }
 
+
 procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const namespace: INamespace = nil);
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
@@ -3671,7 +3654,12 @@ begin
   add(name, xqvalue(value), namespace);
 end;
 
-procedure TXQVariableChangeLog.add(const name: string; const value: decimal; const namespace: INamespace = nil);
+procedure TXQVariableChangeLog.add(const name: string; const value: xqfloat; const namespace: INamespace = nil);
+begin
+  add(name, xqvalue(value), namespace);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: bigdecimal; const namespace: INamespace);
 begin
   add(name, xqvalue(value), namespace);
 end;
@@ -4779,12 +4767,13 @@ begin
   if [xqcdFocusDocument, xqcdFocusOther] * filter.getContextDependencies = [] then begin
     value := filter.evaluate(context);
     //optimization for a single number
-    if value.kind in [pvkDecimal, pvkInt] then begin
-      if frac(value.toDecimal) <> 0 then begin
+    if value.kind in [pvkBigDecimal, pvkInt64, pvkFloat] then begin
+      if ((value.kind = pvkFloat) and (frac(value.toFloat) <> 0)) or
+         ((value.kind = pvkBigDecimal) and (not isInteger(value.toDecimal) )) then begin
         result := xqvalue();
-        exit;
+        exit();
       end;
-      i := value.toInt65;
+      i := value.toInt64;
       if result is TXQValueSequence then begin
         if (i < 1) or (i > result.getSequenceCount) then result := xqvalue()
         else result := (result as TXQValueSequence).seq[i - 1];
@@ -5062,7 +5051,6 @@ end;
 function TXQueryEngine.findType(const namespace, name: string): TXSType;
 var
   i: Integer;
-  j: Integer;
 begin
   if (self <> nil) and (Schemas <> nil) then
     for i := 0 to Schemas.count - 1 do

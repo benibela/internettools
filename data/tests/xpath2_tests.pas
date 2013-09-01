@@ -623,16 +623,39 @@ begin
   t('abs(-10.5)', '10.5', '');
   t('fn:abs(-10.5)', '10.5', '');
   t('abs(10.5) = 10.5', 'true', '');
+  t('ceiling(10)', '10', '');
+  t('ceiling(-10)', '-10', '');
   t('ceiling(10.5)', '11', '');
   t('ceiling(-10.5)', '-10', '');
+  t('ceiling(10.6)', '11', '');
+  t('ceiling(-10.6)', '-10', '');
+  t('ceiling(10.4)', '11', '');
+  t('ceiling(-10.4)', '-10', '');
+  t('ceiling(10.4E0)', '11', '');
+  t('ceiling(-10.4E0)', '-10', '');
+  t('floor(10)', '10', '');
+  t('floor(-10)', '-10', '');
+  t('floor(0)', '0', '');
+  t('floor(10.4)', '10', '');
+  t('floor(-10.4)', '-11', '');
   t('floor(10.5)', '10', '');
   t('floor(-10.5)', '-11', '');
+  t('floor(10.6)', '10', '');
+  t('floor(-10.6)', '-11', '');
+  t('floor(10.5E0)', '10', '');
+  t('floor(-10.5E0)', '-11', '');
   t('round(2.5)', '3', '');
   t('round(2.4999)', '2', '');
   t('round(-2.5)', '-2', '');
+  t('round(2.5E0)', '3', '');
+  t('round(2.4999E0)', '2', '');
+  t('round(-2.5E0)', '-2', '');
   t('round-half-to-even(0.5)', '0', '');
   t('round-half-to-even(1.5)', '2', '');
   t('round-half-to-even(2.5)', '2', '');
+  t('round-half-to-even(0.5E0)', '0', '');
+  t('round-half-to-even(1.5E0)', '2', '');
+  t('round-half-to-even(2.5E0)', '2', '');
   t('round-half-to-even(3.567812E+3, 2)', '3567.81', '');
   t('round-half-to-even(4.7564E-3, 2)', '0', '');
   t('round-half-to-even(35612.25, -2)', '35600', '');
@@ -659,7 +682,8 @@ begin
   t('type-of(parse-date("2010-10-10","yyyy-mm-dd"))', 'date', '');
   t('type-of(parse-time("2010-10-10","yyyy-mm-dd"))', 'time', '');
   t('type-of(eval("0"))', 'integer', '');
-  t('type-of(eval("0 + 9.0"))', 'decimal', '');
+  t('(eval("0 + 9.0")) instance of xs:decimal', 'true', '');
+  //t('type-of(eval("0 + 9.0"))', 'decimal', ''); todo?
 
   //Stringfunctions
   t('string()', 'mausxyzx', '<a>maus<b>xyz</b>x</a>');
@@ -691,6 +715,8 @@ begin
   t('substring("metadata", 4, 3)', 'ada', '');
   t('substring("12345", 1.5, 2.6)', '234', '');
   t('substring("12345", 0, 3)', '12', '');
+  t('substring("12345", 0, xs:decimal(3))', '12', '');
+  t('substring("12345", xs:decimal(0), xs:decimal(3))', '12', '');
   t('substring("12345", 5, -3)', '', '');
   t('substring("12345", -3, 5)', '1', '');
   t('substring("12345", 0 div 0e0, 3)', '', '');
@@ -872,7 +898,7 @@ begin
   t('min((3,4,5))', '3', '');
   t('type-of(min((3,4,5)))', 'integer', '');
   t('min((5,5.0))', '5', '');
-  t('type-of(min((5,5.0)))', 'decimal', '');
+  t('type-of(min((5,5.0)))', 'integer', '');
   t('min((3,4,"Zero"))', '3', ''); //don't follow
   t('min((current-date(), parse-date("3001-01-01","yyyy-mm-dd"))) = current-date()', 'true', '');
   t('min((current-date(), parse-date("1901-01-01","yyyy-mm-dd"))) = current-date()', 'false', '');
@@ -1634,7 +1660,7 @@ begin
    t('xs:short(1) div xs:short(2)','0.5','');
    t('type-of(xs:short(1) div xs:short(2))','decimal','');
    t('xs:short(1) idiv xs:short(2)','0','');
-   t('type-of(xs:short(1) idiv xs:short(2))','short','');
+   t('type-of(xs:short(1) idiv xs:short(2))','integer','');
    t('xs:byte(1)+xs:short(2)','3','');
    t('type-of(xs:byte(1)+xs:short(2))','short','');
    t('xs:byte(1)+xs:unsignedShort(2)','3','');
@@ -1648,7 +1674,7 @@ begin
    t('xs:double(1)+2','3','');
    t('type-of(xs:double(1)+2)','double','');
    t('xs:decimal(1)+2','3','');
-   t('type-of(xs:decimal(1)+2)','decimal','');
+   t('type-of(xs:decimal(1)+2)','integer',''); //?
    t('xs:float(1)*xs:double(2)','2','');
    t('type-of(xs:float(1)*xs:double(2))','double','');
    t('xs:float(1)*2','2','');
@@ -2576,6 +2602,8 @@ begin
   t('abs(negativeInteger(-3))', '3', '');
   t('type-of(number(-3))', 'double', '');
   t('not(double("NaN"))', 'true', '');
+  t('not(double("INF"))', 'false', '');
+  t('not(double("-INF"))', 'false', '');
   t('subsequence((1,2), 4)', '', '');
   t('string-join((), "...") eq ""', 'true', '');
   t('tokenize("", "abc") eq ""', '', ''); //empty sequence returned by tokenize
@@ -3024,22 +3052,31 @@ begin
   t('fn:abs(xs:float("-3.4028235E38"))', '3.4028235E38');
   t('fn:round(xs:float("-3.4028235E38"))', '-3.4028235E38');
   t('fn:round-half-to-even(xs:float("-3.4028235E38"))', '-3.4028235E38');
-  t('fn:round-half-to-even(10, 0)', '10');
-  t('fn:round-half-to-even(10, -1)', '10');
-  t('fn:round-half-to-even(14, -1)', '10');
-  t('fn:round-half-to-even(15, -1)', '20');
-  t('fn:round-half-to-even(24, -1)', '20');
-  t('fn:round-half-to-even(25, -1)', '20');
-  t('fn:round-half-to-even(26, -1)', '30');
-  t('fn:round-half-to-even(124, -1)', '120');
-  t('fn:round-half-to-even(125, -1)', '120');
-  t('fn:round-half-to-even(126, -1)', '130');
-  t('fn:round-half-to-even(-124, -1)', '-120');
-  t('fn:round-half-to-even(-125, -1)', '-120');
-  t('fn:round-half-to-even(-126, -1)', '-130');
-  t('fn:round-half-to-even(126, 1)', '126');
-  t('fn:round-half-to-even(-126, 1)', '-126');
-  t('fn:round-half-to-even(10, -2)', '0');
+  for j := 1 to 4 do begin
+    case j of
+      1: tt := 'integer';
+      2: tt := 'decimal';
+      3: tt := 'double';
+      4: tt := 'byte';
+    end;
+    t('fn:round-half-to-even(xs:'+tt+'(10), 0)', '10');
+    t('fn:round-half-to-even(xs:'+tt+'(10), -1)', '10');
+    t('fn:round-half-to-even(xs:'+tt+'(14), -1)', '10');
+    t('fn:round-half-to-even(xs:'+tt+'(15), -1)', '20');
+    t('fn:round-half-to-even(xs:'+tt+'(24), -1)', '20');
+    t('fn:round-half-to-even(xs:'+tt+'(25), -1)', '20');
+    t('fn:round-half-to-even(xs:'+tt+'(26), -1)', '30');
+    t('fn:round-half-to-even(xs:'+tt+'(124), -1)', '120');
+    t('fn:round-half-to-even(xs:'+tt+'(125), -1)', '120');
+    t('fn:round-half-to-even(xs:'+tt+'(126), -1)', '130');
+    t('fn:round-half-to-even(xs:'+tt+'(-124), -1)', '-120');
+    t('fn:round-half-to-even(xs:'+tt+'(-125), -1)', '-120');
+    t('fn:round-half-to-even(xs:'+tt+'(-126), -1)', '-130');
+    t('fn:round-half-to-even(xs:'+tt+'(126), 1)', '126');
+    t('fn:round-half-to-even(xs:'+tt+'(-126), 1)', '-126');
+    t('fn:round-half-to-even(xs:'+tt+'(10), -2)', '0');
+  end;
+
   t('fn:round-half-to-even(10.3, -5000)', '0');
   t('fn:round-half-to-even(10.3, 5000)', '10.3');
   t('fn:round-half-to-even(10.3, -999999999999)', '0');
@@ -3265,6 +3302,10 @@ begin
     f('(0   div 0  )', 'err:FOAR0001');
     f('(0.0 div   0)', 'err:FOAR0001');
     f('(  0 div 0.0)', 'err:FOAR0001');
+    f('(0.0 idiv 0.0)', 'err:FOAR0001');
+    f('(0   idiv 0  )', 'err:FOAR0001');
+    f('(0.0 idiv   0)', 'err:FOAR0001');
+    f('(  0 idiv 0.0)', 'err:FOAR0001');
 
     t('(  0 div 0e1)', 'NaN');
     t('(0.0 div 0e1)', 'NaN');
@@ -3451,8 +3492,13 @@ begin
   t('type-of(xs:untypedAtomic("0") + xs:float(0))', 'double');
   t('xs:untypedAtomic("0") + xs:decimal(0)', '0');
   t('type-of(xs:untypedAtomic("0") + xs:decimal(0))', 'double');
-  t('string-join(for $x in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)), $y in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x + $y), " ")', 'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
-  t('string-join(for $x in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)), $y in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x mod $y), " ")', 'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
+  t('string-join(for $x in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
+                '$y in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x + $y), " ")',
+                'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
+  t('string-join(for $x in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
+    '$y in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x mod $y), " ")',
+    'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
+
   t('(xs:untypedAtomic("3") - 1.1) instance of xs:double', 'true');
   t('(xs:positiveInteger("1") idiv xs:nonPositiveInteger("-999999999999999999")) instance of xs:integer', 'true');
   t('(xs:positiveInteger("1") idiv xs:nonPositiveInteger("-999999999999999999")) instance of xs:positiveInteger', 'false');
@@ -3465,6 +3511,16 @@ begin
   t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:negativeInteger', 'false');
   t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:positiveInteger', 'false');
   t('(xs:negativeInteger("-4") idiv xs:negativeInteger("-2")) instance of xs:integer', 'true');
+
+  {t('xs:byte("200") * xs:byte(200)', '40000');
+  t('(xs:byte("200") * xs:byte(200)) instance of xs:integer', 'true');
+  t('(xs:byte("200") * xs:byte(200)) instance of xs:byte', 'false');
+  t('xs:byte("200") + xs:byte(200)', '400');
+  t('(xs:byte("200") + xs:byte(200)) instance of xs:integer', 'true');
+  t('(xs:byte("200") + xs:byte(200)) instance of xs:byte', 'false');
+  t('xs:byte("200") - xs:byte(201)', '-1');
+  t('(xs:byte("200") - xs:byte(201)) instance of xs:integer', 'true');
+  t('(xs:byte("200") - xs:byte(201)) instance of xs:byte', 'false');}
 
   t('/ = "hallo" ', 'true', '!<a>hallo</a>');
   t('/ = "hxallo" ', 'false', '!<a>hallo</a>');

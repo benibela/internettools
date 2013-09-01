@@ -22,12 +22,12 @@ unit xquery_json;
 interface
 
 uses
-  Classes, SysUtils, xquery;
+  Classes, SysUtils, bigdecimalmath, xquery;
 
 
 implementation
 
-uses jsonscanner, simplehtmltreeparser, int65math, bbutils;
+uses jsonscanner, simplehtmltreeparser, bbutils;
 
 
 function xqFunctionIsNull(const args: TXQVArray): IXQValue;
@@ -124,10 +124,15 @@ var
 
     function parseNumber: Ixqvalue;
     var
-      temp65: Int65;
+      temp64: Int64;
       tempFloat: Extended;
+      tempd: BigDecimal;
     begin
-      if TryStrToInt65(scanner.CurTokenString, temp65) then exit(xqvalue(temp65));
+      if TryStrToInt64(scanner.CurTokenString, temp64) then exit(xqvalue(temp64));
+      if TryStrToBigDecimal(scanner.CurTokenString, @tempd) then
+        if striContains(scanner.CurTokenString, 'E')  then exit(baseSchema.double.createValue(tempd))
+        else if strContains(scanner.CurTokenString, '.')  then exit(baseSchema.decimal.createValue(tempd))
+        else exit(baseSchema.integer.createValue(tempd));
       if TryStrToFloat(scanner.CurTokenString, tempFloat) then
         if striContains(scanner.CurTokenString, 'E') then exit(baseSchema.double.createValue(tempFloat))
         else exit(TXQValueDecimal.create(tempFloat));

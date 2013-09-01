@@ -1029,7 +1029,6 @@ var
   wordlookahead: String;
   temp: PChar;
   constr: Boolean;
-  namespace: INamespace;
 begin
   result := nil;
   word:=nextToken();
@@ -1230,9 +1229,8 @@ var astroot: TXQTerm;
   var res: TXQTermBinaryOp;
       replace: PXQTerm;
     procedure handleCastStrangeness;
-    var st: TXQTermSequenceType;
-        name: String;
-        namespace: INamespace;
+    var
+      st: TXQTermSequenceType;
     begin
       expect(res.op.followedBy);
       st := parseSequenceType();

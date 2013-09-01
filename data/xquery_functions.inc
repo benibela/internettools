@@ -19,15 +19,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 
-function xqvalueD(v: Decimal; const typeRef1, typeRef2: IXQValue): IXQValue;
+function xqvalueD(const v: BigDecimal; const typeRef1, typeRef2: IXQValue): IXQValue;
+var
+  t: TXSType;
 begin
-  result := TXQValueDecimal.create(TXSType.commonDecimalType(typeRef1, typeRef2), v);
+  t := TXSType.commonDecimalType(typeRef1, typeRef2);
+  if isInt64(v) then result := TXQValueInt64.create(t, BigDecimalToInt64(v))
+  else result := TXQValueDecimal.create(t, v);
 end;
 
-function xqvalueI(const v: int65; const typeRef1, typeRef2: IXQValue): IXQValue;
+function xqvalueF(const v: xqfloat; const typeRef1, typeRef2: IXQValue): IXQValue;
+var
+  t: TXSType;
 begin
-  result := TXQValueInt65.create(TXSType.commonIntegerType(typeRef1, typeRef2), v);
+  t := TXSType.commonDecimalType(typeRef1, typeRef2);
+  result := TXQValueFloat.create(t, v)
 end;
+
+function xqvalueI(const v: BigDecimal; const typeRef1, typeRef2: IXQValue): IXQValue;
+var
+  t: TXSType;
+begin
+  t := TXSType.commonIntegerType(typeRef1, typeRef2);
+  if isInt64(v) then result := TXQValueInt64.create(t, BigDecimalToInt64(v))
+  else result := TXQValueDecimal.create(t, v);
+end;
+
+const Int64Halved = high(int64) div 2;
+const NonNumericKind = [pvkUndefined, pvkBoolean, pvkQName, pvkObject, pvkArray, pvkNull, pvkFunction];
 
 //================================Operators=====================================
 //** Perform vinary operations on xqvalue and destroys them.
@@ -36,22 +55,28 @@ function xqvalueAdd(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQV
 var
   ak: TXQValueKind;
   bk: TXQValueKind;
-  ad: Decimal;
-  bd: Decimal;
+  af, bf: xqfloat;
+  ai: Int64;
+  bi: Int64;
 begin
   ignore(cxt);
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
-     (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
-    exit(xqvalue());
 
-  if (ak = pvkInt) and (bk = pvkInt) then
-    exit(TXSType.commonIntegerType(a,b).createValue(a.toInt65 + b.toInt65));
+  if (ak = pvkInt64) and (bk = pvkInt64) then begin
+    ai := a.toInt64;
+    bi := b.toInt64;
+    if ((ai >= 0) and ((bi <= 0) or ((ai <= Int64Halved)  and (bi <=  Int64Halved )))) or
+       ((ai < 0)  and ((bi >= 0) or ((ai >= -Int64Halved) and (bi >= -Int64Halved )))) then
+      exit(TXSType.commonIntegerType(a,b).createValue(ai + bi));
+  end;
+
+  if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
+    exit(TXSType.commonNumericType(a,b).createValue(a.toDecimal + b.toDecimal));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) or
@@ -65,39 +90,45 @@ begin
     end;
     exit;
   end;
-  ad := a.toDecimal; bd := b.toDecimal;
-  if IsNan(ad) or IsNan(bd) then result := xqvalueD(getNaN, a, b)
-  else if IsInfinite(ad) or IsInfinite(bd) then begin
-    if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueD(ad + bd, a, b)
-    else if isNegInf(ad) and isNegInf(bd)  then result := xqvalueD(-Infinity, a, b)
-    else if isPosInf(ad) and isPosInf(bd)  then result := xqvalueD(Infinity, a, b)
-    else result := xqvalued(getNan, a, b);
-  end else result := xqvalueD(a.toDecimal + b.toDecimal, a, b)
+
+  af := a.toFloat; bf := b.toFloat;
+  if IsInfinite(af) or IsInfinite(bf) then begin
+    if not (IsInfinite(af) and IsInfinite(bf))  then result := xqvalueF(af + bf, a, b)
+    else if isNegInf(af) and isNegInf(bf)  then result := xqvalueF(-Infinity, a, b)
+    else if isPosInf(af) and isPosInf(bf)  then result := xqvalueF(Infinity, a, b)
+    else result := xqvalueF(getNan, a, b);
+  end else result := xqvalueF(af + bf, a, b)
 end;
 
 function xqvalueSubtract(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var
   ak, bk: TXQValueKind;
   tempdt: TDateTime;
-  ad: Decimal;
-  bd: Decimal;
+  ad, bd: xqfloat;
   xqtempdt: TXQValueDateTime;
   btemp: IXQValue;
+  ai: Int64;
+  bi: Int64;
 begin
   ignore(cxt);
 
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
-     (ak in [pvkUndefined, pvkBoolean]) or (bk in [pvkUndefined, pvkBoolean]) then
-    exit(xqvalue);
 
-  if (ak = pvkInt) and (bk = pvkInt) then
-    exit(xqvalueI(a.toInt65 - b.toInt65, a, b));
+  if (ak = pvkInt64) and (bk = pvkInt64) then begin
+    ai := a.toInt64;
+    bi := b.toInt64;
+    if ((ai >= 0) and ((bi >= 0) or ((ai <= Int64Halved)  and (bi >= -Int64Halved )))) or
+       ((ai < 0)  and ((bi <= 0) or ((ai >= -Int64Halved) and (bi <= Int64Halved )))) then
+      exit(TXSType.commonIntegerType(a,b).createValue(ai - bi));
+  end;
+
+  if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
+    exit(TXSType.commonNumericType(a,b).createValue(a.toDecimal - b.toDecimal));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
@@ -119,19 +150,19 @@ begin
     exit;
   end;
 
-  ad := a.toDecimal; bd := b.toDecimal;
-  if IsNan(ad) or IsNan(bd) then result := xqvalueD(getNaN, a, b)
+  ad := a.toFloat; bd := b.toFloat;
+  if IsNan(ad) or IsNan(bd) then result := xqvalueF(getNaN, a, b)
   else if IsInfinite(ad) or IsInfinite(bd) then begin
-    if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueD(ad - bd, a, b)
-    else if ad = bd then result := xqvalueD(getNaN, a, b)
+    if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueF(ad - bd, a, b)
+    else if ad = bd then result := xqvalueF(getNaN, a, b)
     else result := a.clone;
   end else result := xqvalueD(a.toDecimal - b.toDecimal, a, b);
 end;
 
 function xqvalueTo(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
-var i, f,t: int65;
+var i, f,t: BigDecimal;
     typ: TXSType;
-    len: Int65;
+    len: BigDecimal;
     resseq: TXQValueSequence;
     idx: Integer;
     resseqseq: TXQVList;
@@ -140,18 +171,18 @@ begin
   ignore(cxt);
   if a.isUndefined or b.isUndefined then exit(xqvalue);
   typ := TXSType.commonIntegerType(a,b);
-  f := a.toInt65();
-  t := b.toInt65();
+  f := a.toDecimal();
+  t := b.toDecimal();
   if t < f then exit(xqvalue);
   if t = f then exit(typ.createValue(f));
   len := t - f + 1;
   if len > MaxInt then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
   resseqseq := resseq.seq;
-  resseqseq.setCount(len);
+  resseqseq.setCount(BigDecimalToInteger(len));
   if (f  > -$3fffffff) and (t < $3fffffff) then begin
-    fsmall := f;
-    for idx := 0 to len - 1 do
+    fsmall := BigDecimalToInteger(f);
+    for idx := 0 to BigDecimalToInteger(len) - 1 do
       resseqseq.list[idx] := typ.createValue(idx+fsmall);
   end else begin
     idx := 0;
@@ -169,161 +200,202 @@ end;
 function xqvalueMultiply(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var
   ak, bk: TXQValueKind;
-  ad: Decimal;
-  bd: Decimal;
+  ad, bd: xqfloat;
+  ai, bi: Int64;
 begin
   ignore(cxt);
-  ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
-     (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
-    exit((xqvalue));
+  ak := a.kind;
+  bk := b.kind;
+  if (ak = pvkInt64) and (bk = pvkInt64) then begin
+    ai := a.toInt64;
+    bi := b.toInt64;
+    if ((ai >= low(integer)) and (ai <= high(integer)) and (bi >= low(integer)) and (bi <= high(integer))) or
+       ((ai >= -$7f) and (ai <= $7f) and (bi >= $00ffffffffffffff) and (bi <= $00ffffffffffffff)) or
+       ((ai >= $00ffffffffffffff) and (ai <= $00ffffffffffffff) and (bi >= -$7f) and (bi <= $7f)) then
+      exit(TXSType.commonIntegerType(a,b).createValue(ai * bi));
+  end;
+
+  if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
+    exit(TXSType.commonNumericType(a,b).createValue(a.toDecimal * b.toDecimal));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
     if bk <> pvkDateTime then begin
       if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (not baseSchema.double.tryCreateValue(b)) then exit(xqvalue);
       result := a.clone;
-      (result as TXQValueDateTime).multiplyComponents(b.toDecimal);
+      (result as TXQValueDateTime).multiplyComponents(b.toFloat);
     end else begin
       if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (not baseSchema.double.tryCreateValue(a)) then exit(xqvalue);
       result := b.clone;
-      (result as TXQValueDateTime).multiplyComponents(a.toDecimal);
+      (result as TXQValueDateTime).multiplyComponents(a.toFloat);
     end;
     exit;
   end;
 
-  if (ak = pvkInt) and (bk = pvkInt) then
-    exit(xqvalueI(a.toInt65 * b.toInt65, a, b));
-
-  ad := a.toDecimal; bd := b.toDecimal;
+  ad := a.toFloat; bd := b.toFloat;
   if IsNan(ad) then result := a
   else if IsNan(bd) then result := b
   else if IsInfinite(ad) or IsInfinite(bd) then begin
-    if (ad = 0) or (bd = 0) then result := xqvalueD(getNaN, a, b)
-    else if (ad < 0) = (bd < 0) then result := xqvalueD(Infinity, a, b)
-    else result := xqvalueD(-Infinity, a, b);
-  end else result := xqvalueD(a.toDecimal * b.toDecimal, a, b);
+    if (ad = 0) or (bd = 0) then result := XQValueF(getNaN, a, b)
+    else if (ad < 0) = (bd < 0) then result := XQValueF(Infinity, a, b)
+    else result := XQValueF(-Infinity, a, b);
+  end else result := XQValueF(ad * bd, a, b);
+end;
+
+procedure raiseDivisionBy0NotAllowed;
+begin
+  raise EXQEvaluationException.create('err:FOAR0001', 'Division by zero is not possible');
 end;
 
 function xqvalueDivide(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
-var f: decimal;
+var e, f: xqfloat;
   ak, bk: TXQValueKind;
-  e: Decimal;
+  ai, bi, ri: Int64;
+  t: TXSNumericType;
+  bd: BigDecimal;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
-     (ak in [pvkBoolean, pvkUndefined]) or (bk in [pvkBoolean, pvkUndefined]) then
-    exit((xqvalue));
+
+  if (ak = pvkInt64) and (bk = pvkInt64) then begin
+    t := baseSchema.integer;//  TXSType.commonNumericType(a,b);
+    if t.derivedFrom(baseSchema.integer) then t := baseSchema.decimal;
+    ai := a.toInt64;
+    bi := b.toInt64;
+    if bi <> 0 then begin
+      ri := ai div bi;
+      ai := ai - ri * bi;
+      if ai = 0 then exit(TXQValueInt64.create(t, ri))
+      else exit(t.createValue(ri + (BigDecimal(ai) / bi)));
+    end else raiseDivisionBy0NotAllowed;
+  end;
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
   if (ak = pvkDateTime) then begin
     if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
     if (b is TXQValueDateTime) and (a.typeAnnotation as TXSDateTimeType).isDuration then begin
       if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then
-        exit(xqvalue(Decimal((a as TXQValueDateTime).toDayTime() / (b as TXQValueDateTime ).toDayTime())));
+        exit(baseSchema.decimal.createValue((a as TXQValueDateTime).toDayTime() / (b as TXQValueDateTime ).toDayTime()));
       if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then
-        exit(xqvalue(Decimal((a as TXQValueDateTime).toMonths() / (b as TXQValueDateTime).toMonths())));
+        exit(baseSchema.decimal.createValue(((a as TXQValueDateTime).toMonths() / (b as TXQValueDateTime).toMonths())));
       exit(xqvalue);
     end;
-    f:= b.toDecimal;
+    f:= b.toFloat;
     result := a.clone;
     if isPosInf(f) or isNegInf(f) then (result as TXQValueDateTime).multiplyComponents(0)
     else (result as TXQValueDateTime).multiplyComponents(1 / f);
     exit;
   end;
 
-  f:= b.toDecimal;
+  t := TXSType.commonNumericType(a, b);
+  if t.derivedFrom(baseSchema.decimal) then begin
+    bd := b.toDecimal;
+    if isZero(bd) then raiseDivisionBy0NotAllowed;
+    exit(t.createValue(a.toDecimal / bd));
+  end;
+
+  f:= b.toFloat;
   if isnan(f) or (f = 0) then begin
     if a.instanceOf(baseSchema.decimal) and b.instanceOf(baseSchema.decimal) then
-      raise EXQEvaluationException.create('err:FOAR0001', 'Division by zero is not possible');
-    f := a.toDecimal;
-    if isnan(f) or (f=0) then result := xqvalueD(getNaN, a, b)
-    else if f > 0 then result := xqvalueD(getPosInf, a, b)
-    else {if f < 0 then }result := xqvalueD(getNegInf, a, b);
+      raiseDivisionBy0NotAllowed;
+    f := a.toFloat;
+    if isnan(f) or (f=0) then result := xqvalueF(getNaN, a, b)
+    else if f > 0 then result := xqvalueF(getPosInf, a, b)
+    else {if f < 0 then }result := xqvalueF(getNegInf, a, b);
     exit();
   end;
-  e := a.toDecimal;
-  if IsInfinite(e) or IsInfinite(f) then result := xqvalueD(getNaN, a, b)
-  else result := xqvalueD(a.toDecimal / f, a, b);
+  e := a.toFloat;
+  if IsInfinite(e) or IsInfinite(f) then result := t.createValue(getNaN)
+  else result := t.createValue(e / f);
 end;
 
 function xqvalueDivideInt(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
-var f: decimal;
- i: int65;
+var
+ i: int64;
  ak, bk: TXQValueKind;
- cc: TXSType;
+ t: TXSNumericType;
+ tempd: BigDecimal;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
-     (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
-    exit(xqvalue);
 
-  if ((ak = pvkInt) or ((ak in [pvkString,pvkNode]) and baseSchema.integer.tryCreateValue(a))) and
-     ((bk = pvkInt) or ((bk in [pvkString,pvkNode]) and baseSchema.integer.tryCreateValue(b))) then begin
-    i := b.toInt65;
-    if i = 0 then result := xqvalue()
-    else begin
-      i := a.toInt65 div i;
-      cc := TXSType.commonIntegerType(a,b);
-      if (cc.derivedFrom(baseSchema.PositiveInteger) and (i <= 0)) or (cc.derivedFrom(baseSchema.NegativeInteger) and (i >= 0))
-         or (cc.derivedFrom(baseSchema.NonNegativeInteger) and (i < 0)) or (cc.derivedFrom(baseSchema.NonPositiveInteger) and (i > 0)) then
-        result := TXQValueInt65.create(i)
-      else
-        result := cc.createValue(i);
-    end;
-    exit;
+  if (ak = pvkInt64) and (bk = pvkInt64) then begin
+    t := baseSchema.integer;// TXSType.commonIntegerType(a, b);
+    i := b.toInt64;
+    if i = 0 then raiseDivisionBy0NotAllowed;
+    i := a.toInt64 div i;
+    //if (t <> baseSchema.integer) then
+    //  if (not t.derivedFrom(baseSchema.integer)) or (not t.constraintsSatisfied(i)) then t := baseSchema.integer;
+    exit(t.createValue(i));
   end;
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
-  f := b.toDecimal;
-  if IsNan(f) or (f = 0) then
-    exit(xqvalueD(getNaN, a, b));
-  result := xqvalueI(trunc(a.toDecimal / f), a, b);
+
+  if (a is TXQValueFloat) and (isNan(a.toFloat) or IsInfinite(a.toFloat)) then raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.debugAsStringWithTypeAnnotation()+' for integer division');
+  if (b is TXQValueFloat) then begin
+    if (IsNan(b.toFloat)) then raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+b.debugAsStringWithTypeAnnotation()+' for integer division');
+    if IsInfinite(b.toFloat) then exit(t.createValue(0));
+  end;
+
+  t := TXSType.commonIntegerType(a, b);
+  tempd := b.toDecimal;
+  if isZero(tempd) then raiseDivisionBy0NotAllowed;
+  result := t.createValue(a.toDecimal div tempd);
 end;
 
 function xqvalueMod(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
-var f,e: decimal;
- i: int65;
+var
+ i: int64;
  ak, bk: TXQValueKind;
+ t: TXSType;
+ ad: BigDecimal;
+ bd: BigDecimal;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
-  if ((ak in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(a)){$ENDIF}) or
-     ((bk in [pvkString,pvkNode]) {$IFNDEF STRICT_XPATH_COMPATIBILITY_NUMERIC_ADDITION_ONLY} and not (baseSchema.double.tryCreateValue(b)){$ENDIF}) or
-     (ak in [pvkDateTime, pvkBoolean, pvkUndefined]) or (bk in [pvkDateTime, pvkBoolean, pvkUndefined]) then
-    exit(xqvalue);
 
-  if (ak = pvkInt) and (bk = pvkInt) then begin
-    i := b.toInt65;
-    if i = 0 then result := a
-    else result := xqvalue(a.toInt65 mod i);
-    exit;
+  if (ak = pvkInt64) and (bk = pvkInt64) then begin
+    t := TXSType.commonIntegerType(a, b);
+    i := a.toInt64 mod b.toInt64;
+    if (t <> baseSchema.integer) then
+      if (not t.derivedFrom(baseSchema.integer)) or ((t as TXSNumericType).constraintsSatisfied(i)) then t := baseSchema.integer;
+    exit(t.createValue(i));
   end;
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
-  e := a.toDecimal;
-  f := b.toDecimal;
-  if IsNan(e) then result := a
-  else if IsNan(f) then result := b
-  else if IsInfinite(e) or (f = 0) then result := xqvalueD(getNaN, a, b)
-  else if IsInfinite(f) then result := a
-  else if f = 0 then result := a
-  else result := xqvalueD(e - trunc(e / f) * f, a, b)
+
+  if (a is TXQValueFloat) then begin
+    if isNan(a.toFloat) then exit(a);
+    if IsInfinite(a.toFloat) then exit(XQValueF(getNaN, a, b));
+  end;
+  if (b is TXQValueFloat) then begin
+    if (IsNan(b.toFloat)) then exit(b);
+    if IsInfinite(b.toFloat) then exit(a);
+  end;
+
+  ad := a.toDecimal;
+  if isZero(ad) then exit(a);
+  bd := b.toDecimal;
+  if isZero(bd) then  exit(XQValueF(getNaN, a, b));
+
+  t := TXSType.commonDecimalType(a, b);
+  result := t.createValue(ad mod bd);
 end;
+
+
 
 function xqvalueConcat(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
@@ -331,6 +403,7 @@ begin
   result := xqvalue(a.toString + b.toString);
 end;
 
+//Returns if the eq operator is defined for the types of a and b
 function xqvalueComparableTypes(const a, b: IXQValue): boolean;
 {  function decidedByUniqueTypeClass(const c: TXQValueClass): boolean;
   var
@@ -352,7 +425,7 @@ var
 begin
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkInt, pvkDecimal]) and (bk in [pvkInt, pvkDecimal]))
+  if ((ak in [pvkInt64, pvkFloat, pvkBigDecimal]) and (bk in [pvkInt64, pvkFloat, pvkBigDecimal]))
      or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
     exit(true);
 
@@ -371,16 +444,16 @@ end;
 function xqvalueCompareAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
 var ak, bk: TXQValueKind;
 
-  function compareAsDecimals(): integer;
+  function compareAsFloats(): integer;
   var
     cmpClass: TXSType;
-    ad, bd: Decimal;
+    ad, bd: xqfloat;
   begin
-    if ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) or ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)) then
+    if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
       exit(-2);
     cmpClass := TXSType.commonDecimalType(a, b);
-    ad := a.toDecimal;
-    bd := b.toDecimal;
+    ad := a.toFloat;
+    bd := b.toFloat;
     if cmpClass.derivedFrom(baseSchema.Double) then begin
       ad := double(ad);
       bd := double(bd);
@@ -403,11 +476,12 @@ begin
           if TXQValueBoolean(a).bool = TXQValueBoolean(b).bool then result := 0
           else if TXQValueBoolean(a).bool then result := 1
           else result := -1;
-        pvkInt:
-          if TXQValueInt65(a).value = TXQValueInt65(b).value then result := 0
-          else if TXQValueInt65(a).value < TXQValueInt65(b).value then result := -1
+        pvkInt64:
+          if TXQValueInt64(a).value = TXQValueInt64(b).value then result := 0
+          else if TXQValueInt64(a).value < TXQValueInt64(b).value then result := -1
           else result := 1;
-        pvkDecimal: result := compareAsDecimals();
+        pvkBigDecimal: result := compareBigDecimals(a.toDecimal, b.toDecimal);
+        pvkFloat: result := compareAsFloats();
         pvkDateTime: begin
           if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
           if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
@@ -427,8 +501,10 @@ begin
       //This also implements the generic comparison type conversion rules (in those case where it would affect the result, a type error should be raised)
     end else if ak = pvkNull then exit(-1)
     else if bk = pvkNull then exit(1)
-    else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then
-      result := compareAsDecimals()
+    else if (ak = pvkFloat) or (bk = pvkFloat) then
+      result := compareAsFloats()
+    else if (ak in [pvkInt64, pvkBigDecimal]) or (bk in [pvkInt64, pvkBigDecimal]) then
+      result := compareBigDecimals(a.toDecimal, b.toDecimal)
     else if (a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary)) and (b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary)) then
       result := CompareStr(TXQValueString(a).toRawBinary, TXQValueString(b).toRawBinary)
     else if (a.instanceOf(baseSchema.QName)) or (b.instanceOf(baseSchema.QName)) then begin
@@ -468,8 +544,8 @@ var
 begin
   result:=false;
   ak := a.kind; bk := b.kind;
-  if ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) or ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)) then
-    exit(acceptNAN and ((ak = pvkDecimal) and IsNan(TXQValueDecimal(a).value)) and ((bk = pvkDecimal) and IsNan(TXQValueDecimal(b).value)));
+  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
+    exit(acceptNAN and ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)));
   result := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone)=0;
 end;
 
@@ -849,7 +925,8 @@ begin
   if length(args) = 0 then
     raise EXQEvaluationException.create('FOER0000', 'error function called'); //that's not an error, that's what the function does...
 
-  if result.isUndefined then result := TXQValueQName.create('http://www.w3.org/2005/xqt-errors', 'err' , 'FOER0000')
+
+  if args[0].isUndefined then result := TXQValueQName.create('http://www.w3.org/2005/xqt-errors', 'err' , 'FOER0000')
   else if args[0].instanceOf(baseSchema.QName) then result := args[0]
   else raise EXQEvaluationException.create('XPTY0004', 'expected QName');
 
@@ -916,97 +993,131 @@ begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
     if context.SeqValue <> nil then result := numberize(context.SeqValue.clone)
-    else result := xqvalue(StrToFloatDef(treeElementAsString(context.ParentElement),0,XQFormats));
+    else result := xqvalue(xqfloat(StrToFloatDef(treeElementAsString(context.ParentElement),0,XQFormats)));
     exit;
   end;
   result := numberize(args[0]);
 end;
 
-function xqvalueBaseDecimalType(v: Decimal; const typeref: IXQValue): IXQValue;
+function getBaseType(const x: IXQValue): TXSType;
 begin
-  if typeref.kind <> pvkDecimal then raise EXQEvaluationException.Create('XPTY0004', 'Expected decimal numeric type');
-//  result := TXQValueDecimalClass(typeref.getClassType).create(v); //this assumes there are no user defined float/double/decimal types!
-  result := typeref.typeAnnotation.createValue(v);
+  result := x.typeAnnotation;
+  if not (result is TXSNumericType) then exit;
+  case TXSNumericType(result).subType of
+    xsstInteger: result := baseSchema.integer;
+    xsstDecimal, xsstFloat, xsstDouble: result := TXSNumericType(result).primitive;
+  end;
 end;
 
 function xqFunctionAbs(const args: TXQVArray): IXQValue;
+var
+  baseType: TXSType;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0].instanceOf(baseSchema.integer) then begin
-    result := xqvalue(args[0].toInt65);
-    (result as TXQValueInt65).value.sign:=false;
-  end else result := xqvalueBaseDecimalType(abs(args[0].toDecimal), args[0]);
+  baseType := getBaseType(args[0]);
+  case args[0].kind of
+    pvkInt64:      result := baseType.createValue(abs(args[0].toInt64));
+    pvkBigDecimal: result := baseType.createValue(abs(args[0].toDecimal));
+    pvkFloat:      result := baseType.createValue(abs(args[0].toFloat));
+    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:abs: ' + args[0].debugAsStringWithTypeAnnotation());
+  end;
 end;
 
 function xqFunctionCeiling(const args: TXQVArray): IXQValue;
+var
+  baseType: TXSType;
+  v: xqfloat;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0].instanceOf(baseSchema.integer) then result := xqvalue(args[0].toInt65)
-  else if frac(args[0].toDecimal) > 0 then result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal) + 1, args[0])
-  else result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal), args[0]);
+  baseType := getBaseType(args[0]);
+  case args[0].kind of
+    pvkInt64:      result := baseType.createValue(args[0].toInt64);
+    pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmCeil));
+    pvkFloat: begin
+      v := args[0].toFloat;
+      if frac(v) > 0 then result := baseType.createValue(v - frac(v) + 1)
+      else result := baseType.createValue(v - frac(v));
+    end
+    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:ceiling: ' + args[0].debugAsStringWithTypeAnnotation());
+  end;
 end;
 
 function xqFunctionFloor(const args: TXQVArray): IXQValue;
+var
+  baseType: TXSType;
+  v: xqfloat;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0].instanceOf(baseSchema.integer) then result := xqvalue(args[0].toInt65)
-  else if frac(args[0].toDecimal) < 0 then result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal) - 1, args[0])
-  else result := xqvalueBaseDecimalType(xqtruncdecimal(args[0].toDecimal), args[0])
+
+  baseType := getBaseType(args[0]);
+  case args[0].kind of
+    pvkInt64:      result := baseType.createValue(args[0].toInt64);
+    pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmFloor));
+    pvkFloat: begin
+      v := args[0].toFloat;
+      if frac(v) < 0 then result := baseType.createValue(v - frac(v) - 1)
+      else result := baseType.createValue(v - frac(v));
+    end
+    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:floor: ' + args[0].debugAsStringWithTypeAnnotation());
+  end;
 end;
 
-function xqvalueRounded(const v: IXQValue): Decimal;
+function xqfloatRounded(f: xqfloat): xqfloat;
 var
-  f, ff: Decimal;
+  ff: xqfloat;
 begin
-  if v is TXQValueInt65 then exit(v.toDecimal);
-  f := v.toDecimal;
+  if IsNan(f) or IsInfinite(f) then exit((f));
   ff := frac(f);
-  if ff = 0 then exit(f);
+  if ff = 0 then exit((f));
   f := f + 0.5;
   ff := frac(f);
-  if ff >= 0 then result := f - ff
-  else result := f - ff - 1;
+  if ff >= 0 then result := (f - ff)
+  else result := (f - ff - 1);
 end;
 
 function xqFunctionRound(const args: TXQVArray): IXQValue;
 var
-  f: Decimal;
+  baseType: TXSType;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0].instanceOf(baseSchema.integer) then exit(xqvalue(args[0].toInt65));
-  f := args[0].toDecimal;
-  if IsNan(f) or IsInfinite(f) then exit(args[0]);
-  result := xqvalueBaseDecimalType(xqvalueRounded(args[0]), args[0]);
+  baseType := getBaseType(args[0]);
+  case args[0].kind of
+    pvkInt64:      result := baseType.createValue(args[0].toInt64);
+    pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmRoundHalfUp));
+    pvkFloat:      result := baseType.createValue(xqfloatRounded(args[0].toFloat));
+    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:rounded: ' + args[0].debugAsStringWithTypeAnnotation());
+  end;
 end;
 
 function xqFunctionRound_Half_To_Even(const args: TXQVArray): IXQValue;
   //reimplement rounding to avoid precision lose due to int64/65 <-> extended conversions
-  function intRoundHalfToEven(const i: int65; prec: integer): Int65;
-  var rpower: int65;
-    switchPoint: Int65;
-    modu: UInt64;
+  function intRoundHalfToEven(const i: int64; prec: integer): Int64;
+  var rpower: int64;
+    switchPoint: Int64;
+    modu: Int64;
   begin
     rpower := 1;
     if prec >= 9 then begin rpower *= powersOf10[9]; prec -= 9; end;
     rpower *= powersOf10[prec];
 
     result := i div rpower;
-    modu := i.value mod rpower.value;
+    modu := abs(i - result * rpower);
 
     switchPoint := rpower div 2;
-    if modu > switchPoint.value then result.value += 1
-    else if (modu = switchPoint) and (result.value and 1 = 1) then
-      if result.sign then result.value -= 1
-      else result.value += 1;
+    if modu > switchPoint then begin
+      if result >= 0 then result += 1
+      else result -= 1;
+    end else if (modu = switchPoint) and (result and 1 = 1) then
+      result += 1;
     result := result * rpower;
   end;
 
-  function decimalRoundHalfToEven(const d: Decimal): Decimal;
-  var f: decimal;
+  function floatRoundHalfToEven(const d: xqfloat): xqfloat;
+  var f: xqfloat;
   begin
     f := frac(d);
     if f = 0 then exit(d)
@@ -1018,32 +1129,46 @@ function xqFunctionRound_Half_To_Even(const args: TXQVArray): IXQValue;
   end;
 
 var
-  f, p: Decimal;
-  prec: Int65;
+  f, p: xqfloat;
+  prec: Int64;
+  baseType: TXSType;
 
 begin
   requiredArgCount(args, 1, 2);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueInt65 then begin
-    if length(args) = 1 then exit(xqvalue(args[0].toInt65))
-    else if (args[1].toInt65 > 0) or (args[1].toInt65 = 0) then exit(xqvalue(args[0].toInt65))
-    else if args[1].toInt65 >= -17 then exit(xqvalue(intRoundHalfToEven(args[0].toInt65, - args[1].toInt64)));
+  baseType := getBaseType(args[0]);
+  case args[0].kind of
+    pvkInt64:
+      if length(args) = 1 then exit(baseType.createValue(args[0].toInt64))
+      else if (args[1].toInt64 > 0) or (args[1].toInt64 = 0) then exit(baseType.createValue(args[0].toInt64))
+      else if args[1].toInt64 >= -17 then exit(baseType.createValue(intRoundHalfToEven(args[0].toInt64, - args[1].toInt64)))
+      else exit(baseType.createValue(0));
+    pvkBigDecimal:
+     if length(args) = 1 then exit(baseType.createValue(round(args[0].toDecimal, 0, bfrmRoundHalfToEven)))
+     else begin
+       prec := - args[1].toInt64;
+       if prec > high(integer) then prec := high(integer) else if prec < low(integer) then prec := low(integer);
+       exit(baseType.createValue(round(args[0].toDecimal, prec, bfrmRoundHalfToEven)));
+     end;
+    pvkFloat: begin
+      f := args[0].toFloat;
+      if IsNan(f) or IsInfinite(f) then exit(baseType.createValue(f));
+
+      if length(args) = 1 then
+        result := baseType.createValue(floatRoundHalfToEven(f))
+      else begin
+        prec := - args[1].toInt64;
+        if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
+        else if prec > 4933 then result := baseType.createValue(0)
+        else begin
+          p := power(10, prec);
+          result := baseType.createValue(floatRoundHalfToEven(f /  p) * p)
+        end;
+      end;
+    end
+    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:round-half-to-even: ' + args[0].debugAsStringWithTypeAnnotation());
   end;
 
-  f := args[0].toDecimal;
-  if IsNan(f) or IsInfinite(f) then exit(args[0]);
-
-  if length(args) = 1 then
-    result := xqvalueBaseDecimalType(decimalRoundHalfToEven(f), args[0])
-  else begin
-    prec := - args[1].toInt65;
-    if prec < -4933 {approximately extended range} then result := xqvalueBaseDecimalType(f, args[0])
-    else if prec > 4933 then result := xqvalueBaseDecimalType(0, args[0])
-    else begin
-      p := power(10, prec);
-      result := xqvalueBaseDecimalType(decimalRoundHalfToEven(f /  p) * p, args[0])
-    end;
-  end;
 end;
 
 //String functions
@@ -1369,25 +1494,36 @@ end;
 procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
 begin
-  if (args[1].kind = pvkDecimal) then
-    if IsNan(args[1].toDecimal) or isPosInf(args[1].toDecimal) then begin
-      len := 0;
-      exit;
-    end else if isNegInf(args[1].toDecimal) then begin
-      from := 1;
-      if length(args) <= 2 then len := maxLen
-      else len := 0;
-      exit;
+  case args[1].kind of
+    pvkInt64: from := args[1].toInt64;
+    pvkFloat: begin
+      if IsNan(args[1].toFloat) or isPosInf(args[1].toFloat) then begin
+        len := 0;
+        exit;
+      end else if isNegInf(args[1].toFloat) then begin
+        from := 1;
+        if length(args) <= 2 then len := maxLen
+        else len := 0;
+        exit;
+      end;
+      from := round(xqfloatRounded(args[1].toFloat));
     end;
+    {pvkBigDecimal:}else from := BigDecimalToInteger(round(args[1].toDecimal));
+  end;
 
-  from := round(xqvalueRounded(args[1]));
+
   if length(args) = 3 then begin
-    if args[2].kind <> pvkDecimal then unti :=from + args[2].toInt64
-    else if IsNan(args[2].toDecimal) or isNegInf(args[2].toDecimal) then begin //Since -INF + INF returns NaN, no characters are selected.
-       len := 0;
-       exit();
-    end else if isPosInf(args[2].toDecimal) then unti := maxLen+1
-    else unti := from + round(xqvalueRounded(args[2]));
+    case args[2].kind of
+      pvkInt64: unti := from + args[2].toInt64;
+      pvkFloat: begin
+        if IsNan(args[2].toFloat) or isNegInf(args[2].toFloat) then begin //Since -INF + INF returns NaN, no characters are selected.
+           len := 0;
+           exit();
+        end else if isPosInf(args[2].toFloat) then unti := maxLen+1
+        else unti := from + round(xqfloatRounded(args[2].toFloat));
+      end;
+      else unti := from + BigDecimalToInteger(round(args[2].toDecimal));
+    end;
   end else unti := maxLen + 1;
 
   if from < 1 then from := 1;
@@ -1724,12 +1860,12 @@ end;
 
 function xqFunctionIs_Nth(const args: TXQVArray): IXQValue;
 var
-  i,a,b,n: int65;
+  i,a,b,n: int64;
 begin
   requiredArgCount(args, 3);
-  i := args[0].toInt65;
-  a := args[1].toInt65;
-  b := args[2].toInt65;
+  i := args[0].toInt64;
+  a := args[1].toInt64;
+  b := args[2].toInt64;
   if a = 0 then result := xqvalue(i = b)
   else begin
     // i = a n + b => i - b = a n
@@ -1872,7 +2008,7 @@ begin
   tempValue := (args[0] as TXQValueDateTime).value;
   TXQValueDateTime.setDayTime(tempValue, (args[0] as TXQValueDateTime).toDayTime());
   if v <> 6 then result := xqvalue(tempValue.values[v])
-  else  result := xqvalue(roundto(tempValue.values[v]  + Decimal(tempValue.secfraction), -6));
+  else  result := xqvalue(roundto(tempValue.values[v]  + xqfloat(tempValue.secfraction), -6));
 end;
 
 function xqFunctionDay_From_Duration(const args: TXQVArray): IXQValue;
@@ -2407,7 +2543,7 @@ var
  resseq: TXQValueSequence;
 begin
   requiredArgCount(args,3);
-  index := args[1].toInt65;
+  index := args[1].toInt64;
 
   resseq := TXQValueSequence.create(args[0].getSequenceCount+args[2].getSequenceCount);
 
@@ -2428,7 +2564,7 @@ var
  oldseq, resseq: TXQValueSequence;
 begin
   requiredArgCount(args,2);
-  i := args[1].toInt65-1;
+  i := args[1].toInt64 -1;
   if (args[0].kind <> pvkSequence) then begin
     if i <> 0 then exit(args[0]);
     exit(xqvalue);
@@ -2585,12 +2721,16 @@ end;
 
 function xqFunctionSum(const args: TXQVArray): IXQValue;
 var
- tempf: decimal;
- tempi: Int65;
+ tempf: xqfloat;
+ tempd: BigDecimal;
+ tempi: Int64;
  seq: TXQVList;
  i: Integer;
  ak: TXQValueKind;
  temp: IXQValue;
+ baseKind: TXQValueKind;
+ absMax: Int64;
+ baseType: TXSNumericType;
 begin
   requiredArgCount(args,1,2);
 
@@ -2611,32 +2751,57 @@ begin
 
   temp := castUntypedToDouble(args[0]);
   seq := (temp as TXQValueSequence).seq;
-  case seq.getPromotedType of
+  baseKind := seq.getPromotedType;
+  case baseKind of
     pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Wrong type for sum');
     pvkDateTime: begin
       result := TXQValueDateTime.create(seq.getPromotedDateTimeType(true));
       for i:=0 to seq.Count-1 do
         (result as TXQValueDateTime).addDuration((seq.items[i] as TXQValueDateTime).value);
     end;
-    pvkInt: begin
-      tempi := 0;
-      for i:=0 to seq.count-1 do
-        tempi += seq[i].toInt65;
-      result := seq.getPromotedIntegerType.createValue(tempi);
+    pvkInt64, pvkBigDecimal: begin
+      if baseKind = pvkInt64 then begin
+        absMax := $7FFFFFFFFFFFFFFF div seq.Count;
+        for i := 0 to seq.Count - 1 do
+          if not (seq[i] is TXQValueInt64) or (abs((seq[i] as TXQValueInt64).value) > absMax ) then begin
+            baseKind := pvkBigDecimal; //sum would not fit in int64
+            break;
+          end;
+      end;
+      baseType := baseSchema.integer;
+      for i := 0 to seq.Count - 1 do if not seq[i].instanceOf(baseSchema.integer) then begin
+        baseType := baseSchema.decimal;
+        break;
+      end;
+      case baseKind of
+        pvkInt64: begin;
+          tempi := 0;
+          for i:=0 to seq.count-1 do
+            tempi += seq[i].toInt64;
+          result := baseType.createValue(tempi);
+        end;
+        pvkBigDecimal: begin
+          tempd := 0;
+          for i:=0 to seq.count-1 do
+            tempd += seq[i].toDecimal;
+          result := baseType.createValue(tempd);
+        end;
+      end;
     end;
-    pvkDecimal: begin
+    pvkFloat: begin
       tempf := 0;
       for i:=0 to seq.count-1 do
-        tempf += seq[i].toDecimal;
+        tempf += seq[i].toFloat;
       result := seq.getPromotedDecimalType.createValue(tempf);
     end;
   end;
 end;
 
 function xqFunctionavg(const args: TXQVArray): IXQValue;
-var tempf: decimal;
+var tempf: xqfloat;
+    tempf2: xqfloat;
+    tempd: BigDecimal;
  i: Integer;
- tempf2: decimal;
  seq: TXQVList;
  temp: IXQValue;
 begin
@@ -2658,10 +2823,16 @@ begin
       result := xqFunctionSum(args);
       (result as TXQValueDateTime).multiplyComponents(1.0 / i);
     end;
-    pvkInt, pvkDecimal: begin
+    pvkInt64, pvkBigDecimal: begin
+      tempd:=0;
+      for i:=0 to seq.Count-1 do
+        tempd := tempd + seq[i].toDecimal;
+      result := seq.getPromotedDecimalType.createValue(tempd / seq.Count);
+    end;
+    pvkFloat: begin
       tempf:=0;
       for i:=0 to seq.Count-1 do begin
-        tempf2 := seq[i].toDecimal;;
+        tempf2 := seq[i].toFloat;;
         if (isnan(tempf2)) or (isPosInf(tempf2) and isNegInf(tempf)) or (isNegInf(tempf2) and isPosInf(tempf))  then
           exit(seq.getPromotedDecimalType.createValue(getNaN));
         tempf += tempf2;
@@ -2672,16 +2843,17 @@ begin
 end;
 
 function xqFunctionminmax(const context: TXQEvaluationContext; const args: TXQVArray; const asmin: boolean): IXQValue;
-var tempf: decimal;
- tempi: int65;
+var tempf: xqfloat;
+ tempi: int64;
  temps: string;
  tempb: boolean;
  seq: TXQVList;
- i: Integer;
- tempf2: decimal;
+ i, besti: Integer;
  temps2: String;
  collation: TXQCollation;
  temp: IXQValue;
+ tempf2: xqfloat;
+ tempd: BigDecimal;
 begin
   requiredArgCount(args,1, 3);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
@@ -2719,26 +2891,40 @@ begin
       end;
       result := xqvalue(tempb);
     end;
-    pvkInt: begin
-      tempi := seq[0].toInt65;
+    pvkInt64: begin
+      tempi := seq[0].toInt64;
+      besti := 0;
       for i:=1 to seq.count-1 do
-        if (seq[i].toInt65 < tempi) = asmin then
-          tempi:= seq[i].toInt65;
-      result := seq.getPromotedIntegerType.createValue(tempi);
+        if (seq[i].toInt64 < tempi) = asmin then begin
+          tempi:= seq[i].toInt64;
+          besti := i;
+        end;
+      result := seq[besti];
     end;
-    pvkDecimal: begin
-      tempf := seq[0].toDecimal;
+    pvkBigDecimal: begin
+      tempd := seq[0].toDecimal;
+      besti := 0;
+      for i := 1 to seq.Count-1 do
+        if (seq[i].toDecimal < tempd) = asmin then begin
+          tempd := seq[i].toDecimal;
+          besti := i;
+        end;
+      result := seq[besti];
+    end;
+    pvkFloat: begin
+      besti := 0;
+      tempf := seq[0].toFloat;
       if not isnan(tempf) then
         for i:=1 to seq.count-1 do begin
-          tempf2 := seq[i].toDecimal;
-          if isnan(tempf2) then begin
-            tempf := getNaN;
-            break;
-          end;
-          if (tempf2 < tempf) = asmin then
+          tempf2 := seq[i].toFloat;
+          if isnan(tempf2) then
+            exit(seq.getPromotedDecimalType.createValue(seq[i]));
+          if (tempf2 < tempf) = asmin then begin
+            besti := i;
             tempf := tempf2
+          end;
         end;
-      result := seq.getPromotedDecimalType.createValue(tempf);
+      result := seq.getPromotedDecimalType.createValue(seq[besti]);
     end;
     pvkString: begin
       temps := seq[0].toString;

@@ -61,18 +61,30 @@ begin
 end;
 
 function TXQValue.toInt64: int64;
+  function myStrToInt(const s:string):int64;
+  var tempf:xqfloat;
+  begin
+    if not TryStrToInt64(s, result) then
+      if TryStrToFloat(s, tempf, XQFormats) then result:=trunc(tempf)
+      else result:=0;
+  end;
+var
+  temp: String;
 begin
-  result := toInt65;
+  temp := trim(toString);
+  if temp = '' then exit(0);
+  result := myStrToInt(temp);
 end;
 
-function TXQValue.toInt65: int65;
+function TXQValue.toFloat: xqfloat;
 begin
-  result:=0;
+  result:=myStrToFloat(toString);
 end;
 
-function TXQValue.toDecimal: decimal;
+function TXQValue.toDecimal: BigDecimal;
 begin
-  result:=getNaN;
+  if not tryStrToBigDecimal(toString, @result) then
+    setZero(result);
 end;
 
 function TXQValue.toString: string;
@@ -103,6 +115,7 @@ end;
 
 constructor TXQValue.create(atypeAnnotation: TXSType; const value: IXQValue);
 begin
+  ignore(atypeAnnotation); ignore(value);
   raise EXQEvaluationException.create('XQST0052', 'Cannot create an instance of the abstract base type anyType (TXQValue)');
 end;
 
@@ -130,22 +143,6 @@ end;
 function TXQValue.instanceOf(const typ: TXSType): boolean;
 begin
   result := typeAnnotation.derivedFrom(typ);
-end;
-
-function TXQValue.canConvertToInt65: boolean;
-begin
-  result := false;
-end;
-
-function TXQValue.canConvertToDecimal(pure: boolean): boolean;
-begin
-  ignore(pure);
-  result := false;
-end;
-
-function TXQValue.canConvertToBoolean: boolean;
-begin
-  result := true;
 end;
 
 function TXQValue.isUndefined: boolean;
@@ -262,17 +259,6 @@ begin
   bool := abool;
 end;
 
-function TXQValueBoolean.canConvertToInt65: boolean;
-begin
-  Result:=true;
-end;
-
-function TXQValueBoolean.canConvertToDecimal(pure: boolean): boolean;
-begin
-  ignore(pure);
-  Result:=true;
-end;
-
 class function TXQValueBoolean.classKind: TXQValueKind;
 begin
   result := pvkBoolean;
@@ -283,14 +269,19 @@ begin
   result := bool;
 end;
 
-function TXQValueBoolean.toInt65: int65;
+function TXQValueBoolean.toInt64: int64;
 begin
   if bool then result:=1 else result:=0;
 end;
 
-function TXQValueBoolean.toDecimal: decimal;
+function TXQValueBoolean.toFloat: xqfloat;
 begin
   if bool then result:=1 else result:=0;
+end;
+
+function TXQValueBoolean.toDecimal: bigdecimal;
+begin
+  if bool then setOne(result) else setZero(result);
 end;
 
 function TXQValueBoolean.toString: string;
@@ -311,101 +302,178 @@ end;
 
 { TXQValueInt65 }
 
-constructor TXQValueInt65.create(atypeAnnotation: TXSType);
+constructor TXQValueInt64.create(atypeAnnotation: TXSType);
 begin
   inherited create(atypeAnnotation);
 end;
 
-constructor TXQValueInt65.create(const aint: int65);
+constructor TXQValueInt64.create(const aint: int64);
 begin
   inherited create(baseSchema.Integer);
   value := aint;
 end;
 
-constructor TXQValueInt65.create(atypeAnnotation: TXSType; const aint: int65);
+constructor TXQValueInt64.create(atypeAnnotation: TXSType; const aint: int64);
 begin
   ftypeAnnotation := atypeAnnotation;
   value := aint;
 end;
 
-constructor TXQValueInt65.create(atypeAnnotation: TXSType; const avalue: IXQValue);
+constructor TXQValueInt64.create(atypeAnnotation: TXSType; const avalue: IXQValue);
 begin
   ftypeAnnotation := atypeAnnotation;
-  self.value := avalue.toInt65;
+  self.value := avalue.toInt64;
 end;
 
-class function TXQValueInt65.classKind: TXQValueKind;
+class function TXQValueInt64.classKind: TXQValueKind;
 begin
-  Result := pvkInt;
+  Result := pvkInt64;
 end;
 
-class function TXQValueInt65.canCreateFromInt65(const i: int65): boolean;
-begin
-  ignore(i);
-  result := true;
-end;
-
-function TXQValueInt65.canConvertToInt65: boolean;
-begin
-  result := true;
-end;
-
-function TXQValueInt65.canConvertToDecimal(pure: boolean): boolean;
-begin
-  ignore(pure);
-  result := true;
-end;
-
-function TXQValueInt65.toBoolean: boolean;
+function TXQValueInt64.toBoolean: boolean;
 begin
   result:=value<>0;
 end;
 
-function TXQValueInt65.toInt65: int65;
+function TXQValueInt64.toInt64: int64;
 begin
   result:=value;
 end;
 
-function TXQValueInt65.toDecimal: decimal;
+function TXQValueInt64.toDecimal: bigdecimal;
 begin
   result:=value;
 end;
 
-function TXQValueInt65.toString: string;
+function TXQValueInt64.toFloat: xqfloat;
 begin
-  result:=int65tostr(value);
+  Result:=value;
 end;
 
-function TXQValueInt65.toDateTime: TDateTime;
+function TXQValueInt64.toString: string;
+begin
+  result:=inttostr(value);
+end;
+
+function TXQValueInt64.toDateTime: TDateTime;
 begin
   result:=extended(value);
 end;
 
-function TXQValueInt65.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueInt64.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
   ignore(nodeFormat);
-  Result:=Int65ToStr(value);
+  Result:=IntToStr(value);
 end;
 
-function TXQValueInt65.clone: IXQValue;
+function TXQValueInt64.clone: IXQValue;
 var
-  temp: TXQValueInt65;
+  temp: TXQValueInt64;
 begin
-  temp := TXQValueInt65Class(self.ClassType).Create(typeAnnotation);
+  temp := TXQValueInt64Class(self.ClassType).Create(typeAnnotation);
   temp.value := value;
   result := temp;
 end;
 
 
+{ TXQValueFloat }
+
+constructor TXQValueFloat.create(const aflt: xqfloat);
+begin
+  create(baseSchema.double, aflt);
+end;
+
+constructor TXQValueFloat.create(atypeannotation: TXSType; const aflt: xqfloat);
+begin
+  inherited create(atypeannotation);
+  value := aflt;
+end;
+
+constructor TXQValueFloat.create(atypeAnnotation: TXSType; const avalue: IXQValue);
+begin
+  inherited create(atypeannotation);
+  value := avalue.toFloat;
+end;
+
+class function TXQValueFloat.classKind: TXQValueKind;
+begin
+  Result:=pvkFloat;
+end;
+
+{class function TXQValueFloat.truncateRange(const v: BigDecimal): BigDecimal;
+begin
+  case (typeAnnotation as TXSNumericType).subType of
+    xsstDouble: avalue := double(avalue);
+    xsstFloat: avalue := single(avalue);
+  end;
+end;}
+
+class function TXQValueFloat.isPure(const v: IXQValue): boolean;
+var
+  f: xqfloat;
+begin
+  if v.kind <> pvkFloat then exit(true);
+  f := v.toFloat;
+  result := not IsNan(f) and not IsInfinite(f);
+end;
+
+function TXQValueFloat.toBoolean: boolean;
+begin
+  Result:=not IsNan(value) and (value <> 0);
+end;
+
+function TXQValueFloat.toInt64: Int64;
+begin
+  Result:=trunc(value);
+end;
+
+function TXQValueFloat.toFloat: xqfloat;
+begin
+  Result:=value;
+end;
+
+function TXQValueFloat.toDecimal: BigDecimal;
+begin
+  Result:=value;
+end;
+
+function TXQValueFloat.toString: string;
+begin
+  if IsNan(value) then exit('NaN');
+  if IsInfinite(value) then
+    if isPosInf(value) then exit('INF')
+    else exit('-INF');
+  case (typeAnnotation as TXSNumericType).subType of
+    xsstDouble: result := myDecimalToStr(double(value));
+    xsstFloat: result := myDecimalToStr(single(value));
+  end;
+end;
+
+function TXQValueFloat.toDateTime: TDateTime;
+begin
+  Result:=nan;
+end;
+
+function TXQValueFloat.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+begin
+  ignore(nodeFormat);
+  Result:=toString;
+end;
+
+function TXQValueFloat.clone: IXQValue;
+begin
+  Result:=TXQValueFloat.create(typeAnnotation, value);
+end;
+
 { TXQValueDecimal }
 
-constructor TXQValueDecimal.create(const aflt: decimal);
+constructor TXQValueDecimal.create(const aflt: BigDecimal);
 begin
   inherited create(baseSchema.Decimal);
   value := aflt;
 end;
 
-constructor TXQValueDecimal.create(atypeannotation: TXSType; const aflt: decimal);
+constructor TXQValueDecimal.create(atypeannotation: TXSType; const aflt: BigDecimal);
 begin
   inherited create(atypeannotation);
   value := aflt;
@@ -417,96 +485,41 @@ begin
   value := avalue.toDecimal;
 end;
 
-class function TXQValueDecimal.canCreateFromDecimal(const v: decimal): boolean;
-begin
-  result := (not IsNan(v)) and (not isPosInf(v)) and (not isNegInf(v));  //overriden by float/double childs
-end;
-
 class function TXQValueDecimal.classKind: TXQValueKind;
 begin
-  Result:=pvkDecimal;
+  Result:=pvkBigDecimal;
 end;
 
-function TXQValueDecimal.canConvertToInt65: boolean;
-begin
-  if IsNan(value) then result := false
-  else if isPosInf(value) then result:=false
-  else if isNegInf(value) then result:=false
-  else result:=true;
-end;
-
-function TXQValueDecimal.canConvertToDecimal(pure: boolean): boolean;
-begin
-  if pure then result := canConvertToInt65
-  else Result:=true;
-end;
-
-class function TXQValueDecimal.truncateRange(const v: decimal): Decimal;
-begin
-  result := v;
-end;
-
-class function TXQValueDecimal.isPure(const v: IXQValue): boolean;
-var
-  vd: Decimal;
-begin
-  vd := v.toDecimal;
-  result := not (IsNan(vd) or isPosInf(vd) or isNegInf(vd));
-end;
 
 function TXQValueDecimal.toBoolean: boolean;
 begin
- Result:=(not IsNan(value)) and (value <> 0);
+ Result:=(value <> 0);
 end;
 
-function TXQValueDecimal.toInt65: int65;
+function TXQValueDecimal.toInt64: Int64;
 begin
-  if IsNan(value) then result := 0
-  else if isPosInf(value) then result:=high(Int64)
-  else if value = -Infinity then result:=low(Int64)
-  else result := truncToInt65(value);
+  result := BigDecimalToInt64(value);
 end;
 
-function TXQValueDecimal.toDecimal: decimal;
+function TXQValueDecimal.toDecimal: bigdecimal;
 begin
  Result:=value;
 end;
 
 function TXQValueDecimal.toString: string;
-var
-  subType: TXSDecimalSubType;
 begin
-  if isnan(value) then exit('NaN');
-  if isPosInf(value) then exit('INF');
-  if isNegInf(value) then exit('-INF');
-  subType := xsstDecimal;
-  if ftypeAnnotation is TXSDecimalType then subType := TXSDecimalType(ftypeAnnotation).subType
-  else if (ftypeAnnotation is TXSSimpleType) and (TXSSimpleType(ftypeAnnotation).primitive is TXSDecimalType) then
-    subType := TXSDecimalType(TXSSimpleType(ftypeAnnotation).primitive).subType;
-  case subType of
-    xsstDecimal: result := myDecimalToStr(value);
-    xsstFloat: result := myDecimalToStr(single(value));
-    xsstDouble: result := myDecimalToStr(double(value));
-  end;
+  result := BigDecimalToStr(value);
 end;
 
 function TXQValueDecimal.toDateTime: TDateTime;
 begin
- Result:=value;
+ Result:= getNaN;
 end;
 
 function TXQValueDecimal.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 begin
   ignore(nodeFormat);
-  if isnan(value) then result:='"NaN"'
-  else if isPosInf(value) then result:='"INF"'
-  else if isNegInf(value) then result:='"-INF"'
-  else begin
-    result := myDecimalToStr(value);
-    {if ((self is TXQValue_double) or (self is TXQValue_float)) and not striContains(result, 'E') then result += 'E0'
-    else if not striContains(result, 'E')  and not striContains(result, '.') then
-      result += '.0';}
-  end;
+  result := toString;
 end;
 
 function TXQValueDecimal.clone: IXQValue;
@@ -545,57 +558,11 @@ begin
   Result:=pvkString;
 end;
 
-function TXQValueString.canConvertToInt65: boolean;
-var
-  temp: int64;
-  tempstr: string;
-begin
-  tempstr:=trim(str);
-  if (tempstr = 'NaN') or (tempstr = 'INF') or (tempstr = '-INF') then exit(false);
-  result := TryStrToInt64(tempstr,temp);
-end;
-
-function TXQValueString.canConvertToDecimal(pure: boolean): boolean;
-var
-  temp: Extended;
-  tempstr: String;
-begin
-  tempstr := trim(str);
-  if (tempstr = 'NaN') or (tempstr = 'INF') or (tempstr = '-INF') then exit(not pure);
-  if pure and striContains(tempstr, 'e') then exit(false);
-  result := TryStrToFloat(tempstr, temp, XQFormats);
-end;
-
-function TXQValueString.canConvertToBoolean: boolean;
-var
-  tempstr: String;
-begin
-  tempstr := trim(str);
-  Result:=(tempstr = '0') or (tempstr = '1') or (tempstr = 'true') or (tempstr = 'false') or (str = '');
-end;
-
-function TXQValueString.toBoolean: boolean;
-var
- temp: String;
-begin
-  temp := lowercase(trim(str));
-  result:=(temp<>'0') and (temp<>'false') and (temp<>'');
-end;
-
 function TXQValueString.toBooleanEffective: boolean;
 begin
   result := length(str) > 0
 end;
 
-function TXQValueString.toInt65: int65;
-begin
-  result := myStrToInt(str);
-end;
-
-function TXQValueString.toDecimal: decimal;
-begin
-  result := myStrToDecimal(str);
-end;
 
 function TXQValueString.toString: string;
 begin
@@ -660,6 +627,11 @@ end;
 constructor TXQValueQName.create(atypeAnnotation: TXSType; const value: IXQValue);
 begin
   inherited create(atypeAnnotation);
+  if value is TXQValueQName then begin
+    prefix := (value as TXQValueQName).prefix;
+    url := (value as TXQValueQName).url;
+    local := (value as TXQValueQName).local;
+  end else raise EXQEvaluationException.create('XPTY0004', 'Cannnot cast '+value.debugAsStringWithTypeAnnotation()+' to xs:QName');
 end;
 
 class function TXQValueQName.classKind: TXQValueKind;
@@ -718,22 +690,6 @@ begin
   Result:=pvkDateTime;
 end;
 
-function TXQValueDateTime.canConvertToInt65: boolean;
-begin
-  Result:=false;
-end;
-
-function TXQValueDateTime.canConvertToDecimal(pure: boolean): boolean;
-begin
-  ignore(pure);
-  Result:=false;
-end;
-
-function TXQValueDateTime.canConvertToBoolean: boolean;
-begin
-  result := false;
-end;
-
 function TXQValueDateTime.toBoolean: boolean;
 begin
  Result:=toDateTime <> 0;
@@ -745,12 +701,12 @@ begin
   Result := false;
 end;
 
-function TXQValueDateTime.toInt65: int65;
+function TXQValueDateTime.toInt64: int64;
 begin
  Result:=trunc(toDateTime);
 end;
 
-function TXQValueDateTime.toDecimal: decimal;
+function TXQValueDateTime.toDecimal: bigdecimal;
 begin
  Result:=toDateTime;
 end;
@@ -896,7 +852,7 @@ begin
 end;
 
 
-procedure TXQValueDateTime.multiplyComponents(fac: Decimal);
+procedure TXQValueDateTime.multiplyComponents(fac: xqfloat);
 begin
   setMonths(value, integer(xqround(getMonths(value) * fac)), true);
   setDayTime(value, getDayTime(value) * fac);
@@ -1073,7 +1029,7 @@ begin
   else if not IsNan(implicitTimezone) then bdelta -= implicitTimezone;
 
   adt+=adelta; bdt+=bdelta;
-  result := CompareValue(Decimal(adt),Decimal(bdt),0.000001/SecsPerDay);
+  result := CompareValue(xqfloat(adt),xqfloat(bdt),0.000001/SecsPerDay);
 end;
 
 
@@ -1113,13 +1069,13 @@ begin
   result := (getSequenceCount > 0) and ( (seq[0] is TXQValueNode) or (seq[0] is TXQValueObject) or (seq[0] is TXQValueJSONArray));
 end;
 
-function TXQValueSequence.toInt65: int65;
+function TXQValueSequence.toInt64: int64;
 begin
-  if seq.Count >= 1 then result := seq[0].toInt65
+  if seq.Count >= 1 then result := seq[0].toInt64
   else result := 0;
 end;
 
-function TXQValueSequence.toDecimal: decimal;
+function TXQValueSequence.toDecimal: bigdecimal;
 begin
   if seq.Count >= 1 then result := seq[0].toDecimal
   else result := 0;
@@ -1248,27 +1204,6 @@ begin
   Result:=pvkNode;
 end;
 
-function TXQValueNode.canConvertToInt65: boolean;
-var
-  temp: int64;
-  str: String;
-begin
-  str := toString;
-  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(false);
-  result := TryStrToInt64(str,temp);
-end;
-
-function TXQValueNode.canConvertToDecimal(pure: boolean): boolean;
-var
-  temp: Extended;
-  str: string;
-begin
-  str := toString;
-  if (str = 'NaN') or (str = 'INF') or (str = '-INF') then exit(not pure);
-  if pure and striContains(str, 'e') then exit(false);
-  Result:=TryStrToFloat(toString, temp, XQFormats);
-end;
-
 function TXQValueNode.toBoolean: boolean;
 begin
  Result:=node <> nil;
@@ -1277,16 +1212,6 @@ end;
 function TXQValueNode.toBooleanEffective: boolean;
 begin
   Result:=true;
-end;
-
-function TXQValueNode.toInt65: int65;
-begin
-  result := myStrToInt(toString);
-end;
-
-function TXQValueNode.toDecimal: decimal;
-begin
-  result := myStrToDecimal(toString);
 end;
 
 function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
@@ -1651,17 +1576,6 @@ end;
 class function TXQValueFunction.classkind: TXQValueKind;
 begin
   Result:=pvkFunction;
-end;
-
-function TXQValueFunction.canConvertToInt65: boolean;
-begin
-  Result:=false;
-end;
-
-function TXQValueFunction.canConvertToDecimal(pure: boolean): boolean;
-begin
-  ignore(pure);
-  Result:=false;
 end;
 
 function TXQValueFunction.directClone: TXQValue;

@@ -45,7 +45,7 @@ begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
   if not (args[0] is TXQValueDateTime) or (args[0].instanceOf(baseSchema.duration)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected date time, got: ' + args[0].toString);
-  result := xqvalue(RoundTo(decimal((args[0] as TXQValueDateTime).value.sec + (args[0] as TXQValueDateTime).value.secfraction), -6));
+  result := xqvalue(RoundTo(xqfloat((args[0] as TXQValueDateTime).value.sec + (args[0] as TXQValueDateTime).value.secfraction), -6));
 end;
 
 function xqFunctionTimezone_From_Datetime(const args: TXQVArray): IXQValue;
