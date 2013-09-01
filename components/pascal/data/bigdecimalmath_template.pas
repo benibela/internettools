@@ -231,6 +231,7 @@ begin
       digits[p] := digits[p] * 10;
       i += 1;
     end;
+    if signed and isZero(res^) then setZero(res^);
   end;
 end;
 
@@ -736,10 +737,20 @@ begin
 end;
 
 function compareBigDecimals(const a, b: BigDecimal): integer;
+var
+  ai, bi: Integer;
 begin
-  if a.signed <> b.signed then
-    if a.signed then exit(-1)
+  if a.signed <> b.signed then begin
+    if isZero(a) then begin
+      if isZero(b) then exit(0);
+      if b.signed then exit(1)  // 0 > - 1
+      else exit(-1);            // 0 < 1
+    end else if isZero(b) then begin
+      if a.signed then exit(-1) // -1 < 0
+      else exit(1);             //  1 > 0
+    end else if a.signed then exit(-1) // -1 < 1
     else exit(1);
+  end;
   result := compareAbsolute(a,b);
   if a.signed then result := - Result;
 end;
