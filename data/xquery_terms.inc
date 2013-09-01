@@ -785,8 +785,8 @@ begin
       if length(evilkids) <> 1 then raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
       case evilkids[0].getSequenceCount of
         0: result := xqvalue();
-        1: result := TXSType(func).createValue(evilkids[0])
-        else raiseEvaluationError('FORG0001', 'Need singleton value to cast as '+TXSType(func).name);
+        1: result := TXSType(TObject(func)).createValue(evilkids[0])
+        else raiseEvaluationError('FORG0001', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
       end;
     end;
     xqfkUnknown, xqfkNativeInterpreted: begin
@@ -881,7 +881,7 @@ begin
   t:=baseSchema.findType(name);
   if t <> nil then begin
     akind:=xqfkTypeConstructor;
-    afunc := TXQAbstractFunctionInfo(t);
+    afunc := TXQAbstractFunctionInfo(TObject(t));
     exit(true)
   end;
 

@@ -268,10 +268,7 @@ end;
 
 function xqFunctionKeys(const args: TXQVArray): IXQValue;
 var
-  i: Integer;
   v: IXQValue;
-  newKeys: IXQValue;
-  seq: TXQValueSequence;
   res: TStringList;
 begin
   requiredArgCount(args, 1);

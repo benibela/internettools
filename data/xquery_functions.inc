@@ -303,20 +303,18 @@ function xqvalueDivideInt(const cxt: TXQEvaluationContext; const a, b: IXQValue)
 var
  i: int64;
  ak, bk: TXQValueKind;
- t: TXSNumericType;
  tempd: BigDecimal;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
 
   if (ak = pvkInt64) and (bk = pvkInt64) then begin
-    t := baseSchema.integer;// TXSType.commonIntegerType(a, b);
     i := b.toInt64;
     if i = 0 then raiseDivisionBy0NotAllowed;
     i := a.toInt64 div i;
     //if (t <> baseSchema.integer) then
     //  if (not t.derivedFrom(baseSchema.integer)) or (not t.constraintsSatisfied(i)) then t := baseSchema.integer;
-    exit(t.createValue(i));
+    exit(baseSchema.integer.createValue(i));
   end;
 
   if (ak = pvkNull) or (bk = pvkNull) then
@@ -327,13 +325,12 @@ begin
   if (a is TXQValueFloat) and (isNan(a.toFloat) or IsInfinite(a.toFloat)) then raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.debugAsStringWithTypeAnnotation()+' for integer division');
   if (b is TXQValueFloat) then begin
     if (IsNan(b.toFloat)) then raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+b.debugAsStringWithTypeAnnotation()+' for integer division');
-    if IsInfinite(b.toFloat) then exit(t.createValue(0));
+    if IsInfinite(b.toFloat) then exit(baseSchema.integer.createValue(0));
   end;
 
-  t := TXSType.commonIntegerType(a, b);
   tempd := b.toDecimal;
   if isZero(tempd) then raiseDivisionBy0NotAllowed;
-  result := t.createValue(a.toDecimal div tempd);
+  result := baseSchema.integer.createValue(a.toDecimal div tempd);
 end;
 
 function xqvalueMod(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -972,8 +969,9 @@ function xqFunctionNumber(const context: TXQEvaluationContext; const args: TXQVA
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
-    if context.SeqValue <> nil then result := numberize(context.SeqValue.clone)
-    else result := xqvalue(xqfloat(StrToFloatDef(treeElementAsString(context.ParentElement),0,XQFormats)));
+    if context.SeqValue <> nil then result := numberize(context.SeqValue)
+    else if context.ParentElement <> nil then result := numberize(xqvalue(context.ParentElement))
+    else result := xqvalue();
     exit;
   end;
   result := numberize(args[0]);

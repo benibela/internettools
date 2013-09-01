@@ -696,7 +696,7 @@ type
   { TXQValueJSONNull }
 
   TXQValueJSONNull = class(TXQValue)
-    constructor create;
+    constructor create; reintroduce;
     class function classKind: TXQValueKind; override;
     function clone: IXQValue; override;
 
@@ -2276,6 +2276,7 @@ procedure ignore(const intentionallyUnusedParameter: boolean); inline; begin end
 procedure ignore(const intentionallyUnusedParameter: Int64); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: IXQValue); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: pointer); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: xqfloat); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: bigDecimal); inline; begin end;

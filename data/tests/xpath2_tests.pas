@@ -421,6 +421,7 @@ begin
   t('-3<3', 'true', '');
   t('3.7<4', 'true', '');
   t('4.00<4', 'false', '');
+  t('4.=4', 'true', '');
   t('"maus" <  "maushaus"', 'true', '');
   t('"maus" <  "hausmaus"', 'false', '');
   t('"123" <  "1234"', 'true', '');
@@ -668,6 +669,8 @@ begin
   t('number(xs:anyURI("abc"))', 'NaN', '');
   t('number(xs:duration("PT1S"))', 'NaN', '');
   t('number(xs:date("1900-02-02"))', 'NaN', '');
+  t('number("")', 'NaN', '');
+  t('number(xs:untypedAtomic(""))', 'NaN', '');
                  //Types
   t('exists(false())', 'true', '');
   t('exists("")', 'true', '');
@@ -2601,8 +2604,12 @@ begin
   t('fn:resolve-uri("././c", "http://www.example.com/")' ,'http://www.example.com/c', '');
   t('fn:tokenize("abc", "def")', 'abc', '');
   t('pxp:type-of(abs(xs:byte(1)))', 'integer', ''); //standard, abs: If the type of $arg is a type derived from one of the numeric types, the result is an instance of the base numeric type.
+  t('abs(int("0"))', '0', '');
   t('abs(negativeInteger(-3))', '3', '');
   t('type-of(number(-3))', 'double', '');
+  t('"" / number()', 'NaN', '');
+  t('number()', '123', '<x>123</x>');
+  t('number()', 'NaN', '<x>foo</x>');
   t('not(double("NaN"))', 'true', '');
   t('not(double("INF"))', 'false', '');
   t('not(double("-INF"))', 'false', '');
@@ -2663,6 +2670,9 @@ begin
   t('xs:dayTimeDuration(xs:yearMonthDuration("-P543Y456M"))', 'PT0S', '');
   t('deep-equal(xs:float("NaN"),xs:double("NaN"))', 'true', '');
   t('count(distinct-values((xs:float("NaN"),xs:double("NaN"))))', '1', '');
+  t('xs:float("3") idiv xs:float("INF")', '0');
+  t('xs:float("3") idiv xs:float("INF") eq xs:float(0)', 'true');
+
   //             ,('count(distinct-values((xs:float("INF"),xs:double("INF"))))', '1', '')
 
     //           ,('xs:date(1999-05-17) cast as xs:dateTime', '1999-05-31T00:00:00', '')

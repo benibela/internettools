@@ -1144,7 +1144,7 @@ begin
           result := parseSequenceLike(result);
 
           if (TXQTermNamedFunction(result).kind = xqfkTypeConstructor) and (length(result.children) = 1) then
-            result := staticallyCastQNameAndNotation(result, TXSType(TXQTermNamedFunction(result).func), staticContext);
+            result := staticallyCastQNameAndNotation(result, TXSType(TObject(TXQTermNamedFunction(result).func)), staticContext);
           exit;
         end;
       end;
