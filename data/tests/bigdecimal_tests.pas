@@ -94,6 +94,7 @@ var
   dbf: BigDecimal;
   ds: String;
   b0: BigDecimal;
+  ddd: Double;
 begin
 
   test(TryStrToBigDecimal('1', @b1));
@@ -171,6 +172,11 @@ begin
   test(TryStrToBigDecimal('e1', nil) = false);
   test(TryStrToBigDecimal('.e2', nil) = false);
   test(TryStrToBigDecimal('18', nil) = TRUE);
+  test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528'))) = double(StrToFloat('-3.40282346638528')));
+   e := BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38'));
+  ddd := double(e);
+  test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38'))) = double(StrToFloat('-3.40282346638528E38')));
+  test(single(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38')))) = single(double(StrToFloat('-3.40282346638528E38'))));
 
   for i := 0 to high(powersOf10) do begin
     test(BigDecimalToStr(StrToBigDecimal(IntToStr(powersOf10[i]))), IntToStr(powersOf10[i]));
