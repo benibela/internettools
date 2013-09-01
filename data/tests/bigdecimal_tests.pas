@@ -133,6 +133,7 @@ begin
 
   test(BigDecimalToStr(StrToBigDecimal('1.2')), '1.2');
   test(BigDecimalToStr(StrToBigDecimal('1.0')), '1');
+  test(BigDecimalToStr(StrToBigDecimal('1.')), '1');
   test(BigDecimalToStr(StrToBigDecimal('1.234567890234567890234567890')), '1.23456789023456789023456789');
   test(BigDecimalToStr(StrToBigDecimal('1.234567890')), '1.23456789');
   test(BigDecimalToStr(StrToBigDecimal('1.23456789000000000000000000')), '1.23456789');
@@ -142,6 +143,10 @@ begin
   test(BigDecimalToStr(StrToBigDecimal('000000.00000000000000000000000001')), '0.00000000000000000000000001');
   test(BigDecimalToStr(StrToBigDecimal('0000000000.0000000000000000000000000')), '0');
   test(BigDecimalToStr(StrToBigDecimal('-0')), '0');
+  test(BigDecimalToStr(StrToBigDecimal('-0.')), '0');
+  test(BigDecimalToStr(StrToBigDecimal('.0')), '0');
+  test(BigDecimalToStr(StrToBigDecimal('-.0')), '0');
+  test(BigDecimalToStr(StrToBigDecimal('1.E-1')), '0.1');
   test(BigDecimalToStr(StrToBigDecimal('1E-1')), '0.1');
   test(BigDecimalToStr(StrToBigDecimal('1E-10')), '0.0000000001');
   test(BigDecimalToStr(StrToBigDecimal('1234567890E-10')), '0.123456789');
@@ -151,6 +156,10 @@ begin
   test(BigDecimalToStr(StrToBigDecimal('-10.6832')), '-10.6832');
   test(BigDecimalToStr(StrToBigDecimal('-10.683215')), '-10.683215');
   test(BigDecimalToStr(StrToBigDecimal('-10.6832154')), '-10.6832154');
+  test(BigDecimalToStr(StrToBigDecimal('.123')), '0.123');
+  test(BigDecimalToStr(StrToBigDecimal('-.1')), '-0.1');
+  test(BigDecimalToStr(StrToBigDecimal('.123E1')), '1.23');
+  test(BigDecimalToStr(StrToBigDecimal('-.1E1')), '-1');
 
   for i := 0 to high(powersOf10) do begin
     test(BigDecimalToStr(StrToBigDecimal(IntToStr(powersOf10[i]))), IntToStr(powersOf10[i]));
