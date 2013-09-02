@@ -1,3 +1,13 @@
+//todo: fix this (see http://www.w3.org/TR/REC-xml/#NT-Letter). Problem, our regex engine is not unicode compatible
+const RegExpr_XMLLetter = '[A-Za-z]';
+const RegExpr_XMLNCNameChar = '[^:'#1'-'#32']';
+const RegExpr_XMLNameChar = '(('+RegExpr_XMLNCNameChar+')|:)';
+const RegExpr_XMLNameRaw = '('+RegExpr_XMLLetter+'|[_:])('+RegExpr_XMLNameChar+')*';
+const RegExpr_XMLName = '^'+RegExpr_XMLNameRaw+'$';
+const RegExpr_XMLNCNameRaw = '('+RegExpr_XMLLetter+'|_)('+RegExpr_XMLNCNameChar+')*'; //name without :
+const RegExpr_XMLNCName = '^'+RegExpr_XMLNCNameRaw+'$'; //name without :
+const RegExpr_language = '^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$';
+const RegExpr_XMLQName = '^(('+RegExpr_XMLNCNameRaw+')|('+RegExpr_XMLNCNameRaw+':'+RegExpr_XMLNCNameRaw+'))$'; //name without :
 
 
 { TXSType }
@@ -646,6 +656,18 @@ end;
 
 { TXSQNameType }
 
+constructor TXSQNameType.create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
+begin
+  inherited create(aname, aparent, astorage, aschema);
+  qnameRegex := TRegExpr.Create(RegExpr_XMLQName);
+end;
+
+destructor TXSQNameType.Destroy;
+begin
+  qnameRegex.Free;
+  inherited Destroy;
+end;
+
 function TXSQNameType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
 var
   st: TXSType;
@@ -820,20 +842,18 @@ begin
 end;
 
 function restrictedStringType(name: string; parent: TXSType; pattern: string = ''): TXSSimpleType;
+var
+  tempParent: TXSType;
 begin
   if pattern = '' then result := TXSSimpleType.Create(name, parent)
-  else result := TXSStringType.Create(name, parent, TXSStringType(parent).subType, pattern);
+  else begin
+    tempParent := parent;
+    while (tempParent <> nil) and not (tempParent is TXSStringType) do
+      tempParent := tempParent.base;
+    result := TXSStringType.Create(name, parent, (tempParent as TXSStringType).subType, pattern);
+  end;
 end;
 
-//todo: fix this (see http://www.w3.org/TR/REC-xml/#NT-Letter). Problem, our regex engine is not unicode compatible
-const RegExpr_XMLLetter = '[A-Za-z]';
-const RegExpr_XMLNCNameChar = '[^:'#1'-'#32']';
-const RegExpr_XMLNameChar = '(('+RegExpr_XMLNCNameChar+')|:)';
-const RegExpr_XMLNameRaw = '('+RegExpr_XMLLetter+'|[_:])('+RegExpr_XMLNameChar+')*';
-const RegExpr_XMLName = '^'+RegExpr_XMLNameRaw+'$';
-const RegExpr_XMLNCNameRaw = '('+RegExpr_XMLLetter+'|_)('+RegExpr_XMLNCNameChar+')*'; //name without :
-const RegExpr_XMLNCName = '^'+RegExpr_XMLNCNameRaw+'$'; //name without :
-const RegExpr_language = '^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$';
 
 constructor TXSSchema.Create;
 
@@ -876,8 +896,8 @@ begin
   hexBinary.whiteSpaceFacet:=xsfwCollapse; hexBinary.whiteSpaceFixed := true;
   String_ := primitiveBaseType(TXSStringType.create('string', AnyAtomicType, xsstString));
 
-  QName := primitiveBaseType(TXSSimpleType.create('QName', AnyAtomicType, TXQValueQName));
-  NOTATION := primitiveBaseType(TXSSimpleType.create('NOTATION', AnyAtomicType, TXQValueQName));
+  QName := primitiveBaseType(TXSQNameType.create('QName', AnyAtomicType, TXQValueQName)) as TXSQNameType;
+  NOTATION := primitiveBaseType(TXSQNameType.create('NOTATION', AnyAtomicType, TXQValueQName)) as TXSQNameType;
 
 
   //--numbers--
@@ -907,7 +927,7 @@ begin
               UnsignedByte  := restrictedIntegerType('unsignedByte', UnsignedShort, 0, 255);
 
   //specialized
-      Long := restrictedIntegerType('long', Integer, low(int64) + 1, high(int64));
+      Long := restrictedIntegerType('long', Integer, -9223372036854775808, 9223372036854775807);
         Int  := restrictedIntegerType('int', Long, -2147483648, 2147483647);
           Short  := restrictedIntegerType('short', Int, -32768, 32767);
             Byte  := restrictedIntegerType('byte', Short, -128, 127);
