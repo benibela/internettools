@@ -267,9 +267,9 @@ end;
 var CATALOG_TEMPLATE: string;
 
 var htp: THtmlTemplateParser;
-    desc, queryname, outputfile, error, path: string;
+    desc, queryname, error, path: string;
     i: Integer;
-    query, output: String;
+    query: String;
     skippedErrorsLocal, totalLocal, correctLocal, wrongLocal, exceptionLocal: Integer;
     pxp: TXQueryEngine;
     myoutput: string;
@@ -285,10 +285,11 @@ var htp: THtmlTemplateParser;
     currentTree: TTreeNode = nil;
     logCorrect: Boolean;
     timing: TDateTime;
-    mypxpoutput: IXQValue;
+    mypxpoutput, xqoutput: IXQValue;
+    output: string;
     extendedvars: TXQVariableChangeLog;
     varlog: TXQVariableChangeLog;
-    outputcomparator: String;
+
     onlyxpath: Boolean;
     isxpath2: Boolean;
     extvars: TVariableProvider;
@@ -327,6 +328,8 @@ end;
 
 var t: IXQValue;
   url: String;
+  testfailed: Boolean;
+  outputcomparator: String;
 begin
   {$ifdef win32}defaultInternetAccessClass := TW32InternetAccess.create{$else}defaultInternetAccessClass:=TSynapseInternetAccess{$endif};
 
@@ -340,7 +343,7 @@ begin
   CATALOG_TEMPLATE :=
     '<test-group><GroupInfo>{gi:=.}</GroupInfo><test-case ' + IfThen(onlyxpath, ' is-XPath2="true" ', '')+'>{('+
     'test:=pxp:object(), test.path:=@*:FilePath,test.desc:=*:description,test.queryname:=*:query/@*:name, test.isXPath2 := @*:is-XPath2,' +
-    'test.outputfile:=*:output-file,test.outputcomparator:=*:output-file/@*:compare, test.error:=*:expected-error)}' +
+    'test.output:=*:output-file/{"file": ., "compare": @*:compare},test.error:=*:expected-error)}' +
    '<module>{test.modul:=($test.modul, object(("namespace", @*:namespace, "file", text())))}</module>*'+
     '<input-file>{input:=.}</input-file>*<contextItem>{input:=.}</contextItem>*<input-query>{inputQuery:=.}</input-query>*<input-URI>{input:=.}</input-URI>*{test.complete:="yes"}</test-case>*</test-group>';
 
@@ -355,6 +358,7 @@ begin
   buffer3 := TStringList.Create;
   htp := THtmlTemplateParser.create;
   htp.parseTemplate(CATALOG_TEMPLATE);
+  htp.QueryEngine.AllowJSON:=true;
   pxp := TXQueryEngine.create;
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
   pxp.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
@@ -445,9 +449,9 @@ begin
 
       end else if varlog.getName(i) = 'test' then begin
         desc := varlog.get(i).getProperty('desc').toString;
+//        if varlog.get(i).getProperty('outputfile').getSequenceCount <> varlog.get(i).getProperty('outputcomparator') then
+//          raise Exception.Create('Invalid catalogue (missing @COMPARE)');
         queryname := varlog.get(i).getProperty('queryname').toString;
-        outputfile := varlog.get(i).getProperty('outputfile').toString;
-        outputcomparator := varlog.get(i).getProperty('outputcomparator').toString;
         error := varlog.get(i).getProperty('error').toString;
         path := varlog.get(i).getProperty('path').toString;
         isxpath2 := varlog.get(i).getProperty('isXPath2').toString = 'true';
@@ -459,15 +463,11 @@ begin
 
 
         totalLocal += 1;
-        if (error <> '') or (striEqual(outputcomparator, 'Inspect'))  then begin
+        if (error <> '')   then begin
           skippedErrorsLocal+=1;
           continue;
         end;
         query := strLoadFromFile('Queries/XQuery/'+path+'/'+queryname+'.xq');
-        if not striEqual(outputcomparator, 'Ignore') then begin
-          if outputfile = '' then raise Exception.Create('No output file for query '+ParamStr(CAT)+':' + queryname);
-          output :=strLoadFromFile('ExpectedTestResults/'+path+'/'+outputfile);
-        end;
         try
           if isxpath2 then begin
             query := StringReplace(query, 'declare variable $'+inputfilevar+' external;', '', [rfReplaceAll]);
@@ -497,80 +497,96 @@ begin
           mypxpoutput := pxp.evaluate();
           timing := now - timing;
           myoutput := mytostring(mypxpoutput);
-          if strEqual('Ignore', outputcomparator)
-             or (myoutput = output)
-             or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
-             or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
-             or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18')))
-             or ((myoutput = '-1.79769313486232E308') and (output = '-1.7976931348623157E308'))
-             or ((myoutput = '1.79769313486232E308') and (output = '1.7976931348623157E308'))
-             or ((myoutput = '-0.830993497117024') and (output = '-0.830993497117024305'))
-             or ((myoutput = '-1.20337885130186') and (output = '-1.203378851301859738'))
-             or ((myoutput = '-0.617375191608515') and (output = '-0.61737519160851484'))
-             or ((myoutput = '-1.619760582531007') and (output = '-1.619760582531006901'))
-             or ((myoutput = '0.511478470287702') and (output = '0.51147847028770199'))
-             or ((myoutput = '1.955116506541339') and (output = '1.95511650654133906'))
-             or ((myoutput = '0.297014075999097') and (output = '0.297014075999096793'))
-             or ((myoutput = '1E-18') and (output = '0.000000000000000001'))
-             or ((myoutput = '3.366843799022646') and (output = '3.366843799022646172'))
-             or ((myoutput = '2E-17') and (output = '0.00000000000000002'))
-             or ((myoutput = '0.47568843727187') and (output = '0.47568843727187049'))
-             or ((myoutput = '2.102216328265447') and (output = '2.102216328265447024'))
-             or ((myoutput = '-1.000030518509476') and (output = '-1.000030518509475997'))
-             or ((myoutput = '3.40282346638529E38') and (output = '3.4028234663852885E38'))
-             or ((myoutput = '9.22337203685478E16') and (output = '9.223372036854776E16'))
-             or ((myoutput = '-9.22337203685478E16') and (output = '-9.223372036854776E16'))
-             or ((myoutput = '1.30747108607675E17') and (output = '1.3074710860767466E17'))
-             or ((myoutput = '-4.7568843727187E17') and (output = '-4.7568843727187049E17'))
-             or ((myoutput = '6553503.2') and (output = '6.5535032E6'))
-             or ((myoutput = '-6553503.2') and (output = '-6.5535032E6'))
-             or ((myoutput = '-1.79769313486232E3080') and (output = '-1.7976931348623157E3080'))
-             or ((myoutput = '0-1.79769313486232E308') and (output = '0-1.7976931348623157E308'))
-             or ((myoutput = '-1.79769313486232E308-1.79769313486232E308') and (output = '-1.7976931348623157E308-1.7976931348623157E308'))
-             or ((myoutput = '1.79769313486232E308-1.79769313486232E308') and (output = '1.7976931348623157E308-1.7976931348623157E308'))
-             or ((myoutput = '-1.79769313486232E3081.79769313486232E308') and (output = '-1.7976931348623157E3081.7976931348623157E308'))
-             or ((myoutput = '12678967.543233') and (output = '1.2678967543233E7'))
-             or ((myoutput = '1E-5') and (output = '0.00001'))
-             or ((myoutput = '-8.450325144148785E16') and (output = '-84503251441487847.5'))
-             or ((myoutput = '-7.378442186359352E17') and (output = '-737844218635935244.5'))
-             or ((myoutput = '5E17') and (output = '499999999999999999.5'))
-             or ((myoutput = '-5E17') and (output = '-499999999999999999.5'))
-             or ((myoutput = '1.519422729957323E17') and (output = '151942272995732263.5'))
-             or ((myoutput = '130747108607674656') and (output = '1.3074710860767466E17'))
-             or ((myoutput = '-475688437271870464') and (output = '-4.7568843727187049E17'))
-
-
-
-             or ((striEqual('text', outputcomparator)
-                  and (frac(StrToFloatDef(myoutput, 0.1)) = 0) and (frac(StrToFloatDef(output, 0.1)) = 0)
-                  and (     (StrToFloatDef(myoutput, -10.1) = StrToInt64Def(output, 7))
-                         or (StrToFloatDef(output, -10.1)   = StrToInt64Def(myoutput, 7)))
-                ))
-             or ((striEqual('xml', outputcomparator) or striEqual('fragment', outputcomparator)) and (trim(myoutput) = trim(output)))
-             or ((striEqual('xml', outputcomparator) and xmlEqual(myoutput, output)))
-             or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
-             or ((striEqual('text', outputcomparator) and strEqual(myoutput, strDecodeHTMLEntities(output, eUTF8)) or strEqual(myoutput, strNormalizeLineEndings(output))  ))
-             then begin
-            correctLocal += 1;
-            if logCorrect
-               or strEqual('Ignore', outputcomparator)
-               or ((myoutput <> output) and (
-                  not striEqual('xml', outputcomparator)
-                  or ( ((myoutput + #10) <> strNormalizeLineEndings(output)) and ((myoutput) <> strNormalizeLineEndings(output))) ) ) then begin
-              logGroupStart;
-              if myoutput = output then
-                mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)
-              else if not strEqual('Ignore', outputcomparator) then
-                mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)
-              else begin
-                output:='IGNORED OUTPUT (counted as correct)' ;
-                mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
-              end
+          testfailed := true;
+          for xqoutput in varlog.get(i).getProperty('output') do begin
+            outputcomparator := xqoutput.getProperty('compare').toString;
+            if striEqual(outputcomparator, 'Inspect') then begin
+              testfailed := false;
+              skippedErrorsLocal += 1;
+              break;
             end;
-            if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)   then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
+            if not striEqual(outputcomparator, 'Ignore') then begin
+              if xqoutput.getProperty('file').toString = '' then raise Exception.Create('No output file for query '+ParamStr(CAT)+':' + queryname);
+              output :=strLoadFromFile('ExpectedTestResults/'+path+'/'+xqoutput.getProperty('file').toString);
+            end;
 
+            if strEqual('Ignore', outputcomparator)
+               or (myoutput = output)
+               or (((myoutput = '0') or (myoutput = '-0')) and ((output = '0') or (output = '-0')))
+               or (((myoutput = '-1.0E18') or (myoutput = '-1E18')) and ((output = '-1.0E18') or (output = '-1E18')))
+               or (((myoutput = '1.0E18') or (myoutput = '1E18')) and ((output = '1.0E18') or (output = '1E18')))
+               or ((myoutput = '-1.79769313486232E308') and (output = '-1.7976931348623157E308'))
+               or ((myoutput = '1.79769313486232E308') and (output = '1.7976931348623157E308'))
+               or ((myoutput = '-0.830993497117024') and (output = '-0.830993497117024305'))
+               or ((myoutput = '-1.20337885130186') and (output = '-1.203378851301859738'))
+               or ((myoutput = '-0.617375191608515') and (output = '-0.61737519160851484'))
+               or ((myoutput = '-1.619760582531007') and (output = '-1.619760582531006901'))
+               or ((myoutput = '0.511478470287702') and (output = '0.51147847028770199'))
+               or ((myoutput = '1.955116506541339') and (output = '1.95511650654133906'))
+               or ((myoutput = '0.297014075999097') and (output = '0.297014075999096793'))
+               or ((myoutput = '1E-18') and (output = '0.000000000000000001'))
+               or ((myoutput = '3.366843799022646') and (output = '3.366843799022646172'))
+               or ((myoutput = '2E-17') and (output = '0.00000000000000002'))
+               or ((myoutput = '0.47568843727187') and (output = '0.47568843727187049'))
+               or ((myoutput = '2.102216328265447') and (output = '2.102216328265447024'))
+               or ((myoutput = '-1.000030518509476') and (output = '-1.000030518509475997'))
+               or ((myoutput = '3.40282346638529E38') and (output = '3.4028234663852885E38'))
+               or ((myoutput = '9.22337203685478E16') and (output = '9.223372036854776E16'))
+               or ((myoutput = '-9.22337203685478E16') and (output = '-9.223372036854776E16'))
+               or ((myoutput = '1.30747108607675E17') and (output = '1.3074710860767466E17'))
+               or ((myoutput = '-4.7568843727187E17') and (output = '-4.7568843727187049E17'))
+               or ((myoutput = '6553503.2') and (output = '6.5535032E6'))
+               or ((myoutput = '-6553503.2') and (output = '-6.5535032E6'))
+               or ((myoutput = '-1.79769313486232E3080') and (output = '-1.7976931348623157E3080'))
+               or ((myoutput = '0-1.79769313486232E308') and (output = '0-1.7976931348623157E308'))
+               or ((myoutput = '-1.79769313486232E308-1.79769313486232E308') and (output = '-1.7976931348623157E308-1.7976931348623157E308'))
+               or ((myoutput = '1.79769313486232E308-1.79769313486232E308') and (output = '1.7976931348623157E308-1.7976931348623157E308'))
+               or ((myoutput = '-1.79769313486232E3081.79769313486232E308') and (output = '-1.7976931348623157E3081.7976931348623157E308'))
+               or ((myoutput = '12678967.543233') and (output = '1.2678967543233E7'))
+               or ((myoutput = '1E-5') and (output = '0.00001'))
+               or ((myoutput = '-8.450325144148785E16') and (output = '-84503251441487847.5'))
+               or ((myoutput = '-7.378442186359352E17') and (output = '-737844218635935244.5'))
+               or ((myoutput = '5E17') and (output = '499999999999999999.5'))
+               or ((myoutput = '-5E17') and (output = '-499999999999999999.5'))
+               or ((myoutput = '1.519422729957323E17') and (output = '151942272995732263.5'))
+               or ((myoutput = '130747108607674656') and (output = '1.3074710860767466E17'))
+               or ((myoutput = '-475688437271870464') and (output = '-4.7568843727187049E17'))
+
+
+
+               or ((striEqual('text', outputcomparator)
+                    and (frac(StrToFloatDef(myoutput, 0.1)) = 0) and (frac(StrToFloatDef(output, 0.1)) = 0)
+                    and (     (StrToFloatDef(myoutput, -10.1) = StrToInt64Def(output, 7))
+                           or (StrToFloatDef(output, -10.1)   = StrToInt64Def(myoutput, 7)))
+                  ))
+               or ((striEqual('xml', outputcomparator) or striEqual('fragment', outputcomparator)) and (trim(myoutput) = trim(output)))
+               or ((striEqual('xml', outputcomparator) and xmlEqual(myoutput, output)))
+               or ((striEqual('fragment', outputcomparator) and xmlEqual('<root>'+myoutput+'</root>', '<root>'+output+'</root>')))
+               or ((striEqual('text', outputcomparator) and strEqual(myoutput, strDecodeHTMLEntities(output, eUTF8)) or strEqual(myoutput, strNormalizeLineEndings(output))  ))
+               then begin
+              correctLocal += 1;
+              testfailed:=false;
+              if logCorrect
+                 or strEqual('Ignore', outputcomparator)
+                 or ((myoutput <> output) and (
+                    not striEqual('xml', outputcomparator)
+                    or ( ((myoutput + #10) <> strNormalizeLineEndings(output)) and ((myoutput) <> strNormalizeLineEndings(output))) ) ) then begin
+                logGroupStart;
+                if myoutput = output then
+                  mylogger.LOG_RESULT(0, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)
+                else if not strEqual('Ignore', outputcomparator) then
+                  mylogger.LOG_RESULT(2, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing)
+                else begin
+                  output:='IGNORED OUTPUT (counted as correct)' ;
+                  mylogger.LOG_RESULT(1, desc, queryname, query, inputfile, 'Queries/XQuery/'+path+'/'+queryname+'.xq', myoutput, output, timing);
+                end
+              end;
+              break;
+              if (mylogger <> TPlainLogger) and (timing * MSecsPerDay > 2)   then writeln(stderr, '    ', queryname, ' time: ', timing * MSecsPerDay : 6 : 6);
+            end;
+          end;
             //writeln('PASS: ', copy(desc,1,30),queryname,' : got '  , myoutput);
-          end else begin
+          if testfailed then begin
             wrongLocal+=1;
 
             logGroupStart;
