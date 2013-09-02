@@ -2337,7 +2337,7 @@ end;
 
 function compareValue(a, b: xqfloat;const EPSILON: extended = 1e-17): integer;
 var
-  t: xqfloat;
+  t: extended;
 begin
   if IsNan(a) or IsNan(b) then exit(-2);
   if isPosInf(a) or isPosInf(b) then
@@ -2348,7 +2348,8 @@ begin
     if isNegInf(a) and isNegInf(b) then exit(0)
     else if isNegInf(b) then exit(1)
     else exit(-1);
-  t := a - b;
+  if a = b then exit(0);
+  t := extended(a) - extended(b); //do not want overflow
   if t < -EPSILON then exit(-1);
   if t > EPSILON then exit(1);
   exit(0);

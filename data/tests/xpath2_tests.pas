@@ -2504,9 +2504,18 @@ begin
   t('xs:gMonth("--12") castable as decimal', 'false', '');
   t('xs:dateTime("2030-12-05T01:01:01") castable as decimal', 'false', '');
   t('(0.0 div 0e1)', 'NaN', '');
+  t('(0.0 div /x)', 'NaN', '<x>0</x>');
+  t('(0.0 div /x)', '0', '<x>1</x>');
   t('type-of((0.0 div 0e0))', 'double');
   t('(0.0 div 0e0) castable as xs:integer', 'false', '');
-  t('xs:float(0.0 div 0e0)', 'NaN', '');
+  t('(1.0 div 0e1)', 'INF', '');
+  t('(-1.0 div 0e1)', '-INF', '');
+  t('(xs:double("INF") div xs:double("INF"))', 'NaN', '');
+  t('(xs:double("INF") div xs:untypedAtomic("INF"))', 'NaN', '');
+  t('(xs:untypedAtomic("INF") div xs:float("-INF"))', 'NaN', '');
+  t('(xs:untypedAtomic("   INF     ") div xs:float("   -INF  "))', 'NaN', '');
+  t('(3 idiv xs:untypedAtomic("2"))', '1', '');
+  t('(3 idiv xs:untypedAtomic(" 2 "))', '1', '');
   t('xs:float(0.0 div 0e0) castable as xs:integer', 'false', '');
   t('xs:base64Binary("0FB7")', '0FB7', '');
   t('xs:hexBinary("07fb")', '07FB', '');
@@ -2624,6 +2633,7 @@ begin
   t('number()', 'NaN', '<x>foo</x>');
   t('fn:number(xs:float("-3.4028235E38")) eq xs:float("-3.4028235E38")', 'true');
   t('fn:number(xs:float("-3.4028235E38")) eq -3.4028234663852885E38', 'true');
+  t('xs:double("-1.7976931348623157E308") eq xs:double("1.7976931348623157E308")');
   t('not(double("NaN"))', 'true', '');
   t('not(double("INF"))', 'false', '');
   t('not(double("-INF"))', 'false', '');
@@ -2686,6 +2696,7 @@ begin
   t('count(distinct-values((xs:float("NaN"),xs:double("NaN"))))', '1', '');
   t('xs:float("3") idiv xs:float("INF")', '0');
   t('xs:float("3") idiv xs:float("INF") eq xs:float(0)', 'true');
+  t('xs:untypedAtomic("NaN") eq xs:double("NaN")', 'false'); //todo should be error
 
   //             ,('count(distinct-values((xs:float("INF"),xs:double("INF"))))', '1', '')
 

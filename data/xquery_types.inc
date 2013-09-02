@@ -83,7 +83,7 @@ end;
 
 function TXQValue.toDecimal: BigDecimal;
 begin
-  if not tryStrToBigDecimal(toString, @result) then
+  if not tryStrToBigDecimal(trim(toString), @result) then
     setZero(result);
 end;
 
