@@ -926,6 +926,9 @@ type
   { TXSQNameType }
 
   TXSQNameType = class(TXSSimpleType)
+    qnameRegex: TRegExpr;
+    constructor create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
+    destructor Destroy; override;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
   end;
@@ -951,7 +954,8 @@ type
     decimal, integer, double, float: TXSNumericType;
 
 
-    string_, anyURI, QName, base64Binary, boolean, date, time, dateTime, duration, gDay, gMonth, gMonthDay, gYear, gYearMonth, hexBinary, NOTATION: TXSSimpleType;
+    string_, anyURI, base64Binary, boolean, date, time, dateTime, duration, gDay, gMonth, gMonthDay, gYear, gYearMonth, hexBinary: TXSSimpleType;
+    QName, NOTATION: TXSQNameType;
 
     nonPositiveInteger, negativeInteger, nonNegativeInteger, positiveInteger, long, int, short, Byte, unsignedLong, unsignedInt, unsignedShort, unsignedByte: TXSNumericType;
     normalizedString, token, language, NMTOKEN, NMTOKENS, Name, NCName, ID, IDREF, IDREFS, ENTITY, ENTITIES: TXSSimpleType;

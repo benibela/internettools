@@ -2689,7 +2689,7 @@ begin
   resseq := (result as TXQValueSequence).seq;;
   for x in v do
     if (x.instanceOf(baseSchema.untypedAtomic)) or (x is TXQValueNode) or (x.instanceOf(baseSchema.untyped)) then
-      resseq.add(baseSchema.double.createValue(x.toDecimal))
+      resseq.add(baseSchema.double.createValue(x))
      else
       resseq.add(x);
 end;

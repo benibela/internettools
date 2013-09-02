@@ -913,10 +913,20 @@ begin
   t('min((1,"2",3,4))', '1', '');
   t('min(("10haus", "100haus", "2haus", "099haus"))', '2haus', '');
   t('min(("a", "b", "c"))', 'a', '');
+  t('min((1,xs:double("NaN"),3))', 'NaN', '');
+  t('max((1,xs:double("NaN"),3))', 'NaN', '');
+  t('xs:double(xs:untypedAtomic("NaN"))', 'NaN');
+  t('min((1,xs:untypedAtomic("NaN"),3))', 'NaN', '');
+  t('max((1,xs:untypedAtomic("NaN"),3))', 'NaN', '');
+  t('xs:untypedAtomic("foobar2") castable as xs:double', 'false');
+  f('min((3,xs:untypedAtomic("foobar"),5))', 'err:FORG0001');
+  f('max((3,xs:untypedAtomic("foobar"),5))', 'err:FORG0001');
   t('sum((3,4,5))', '12', '');
   t('sum(())', '0', '');
   t('sum((),())', '', '');
   t('sum((3,xs:double("NaN"),5))', 'NaN', '');
+  t('sum((3,xs:untypedAtomic("NaN"),5))', 'NaN', '');
+  f('sum((3,xs:untypedAtomic("foobar"),5))', 'err:FORG0001');
   t('sum((xs:unsignedByte(200), xs:unsignedByte(200)))', '400', '');
 
   t('(1,2,3)[true()]', '1', '');
@@ -1712,6 +1722,8 @@ begin
    t('xs:decimal(1) instance of float','false','');
    t('xs:decimal(1) instance of double','false','');
    t('xs:decimal(1) instance of decimal','true','');
+   t('xs:decimal(1) instance of integer','false','');
+   t('4.0 instance of integer','false','');
    t('xs:decimal(1) instance (: ... :) of decimal','true','');
    t('xs:decimal(1) instance of (: .. :) decimal','true','');
    t('xs:date("1800-02-03") instance of datetime','false','');
@@ -2978,6 +2990,12 @@ begin
   t('max((-9223372036854775807, 9223372036854775807))', '9223372036854775807', '');
   t('min((-18446744073709551615, 18446744073709551615))', '-18446744073709551615', '');
   t('max((-18446744073709551615, 18446744073709551615))', '18446744073709551615', '');
+  t('xs:long("9223372036854775807")', '9223372036854775807');
+  t('xs:long("-9223372036854775808")', '-9223372036854775808');
+  t('"9223372036854775807" castable as xs:long', 'true');
+  t('"-9223372036854775808" castable as xs:long', 'true');
+  t('"9223372036854775808" castable as xs:long', 'false');
+  t('"-9223372036854775809" castable as xs:long', 'false');
 
   t('string-join(//b, ",")', 'A,B,C', '!<a take="1"><b id="1">A</b><b id="2">B</b><b id="3">C</b></a>');
   t('string-join(//b[@id=/a/@take], ",")', 'B', '!<a take="2"><b id="1">A</b><b id="2">B</b><b id="3">C</b></a>');
@@ -3374,6 +3392,14 @@ begin
 
     t('"foo       bar    def" castable as xs:normalizedString', 'true');
     t('"foo       bar    def" castable as xs:token', 'true');
+    t('QName("", "lname")  castable as xs:QName', 'true');
+    t('QName("", "lname")  cast as xs:QName', 'lname');
+    t('"ABC" castable as xs:QName', 'true');
+    t('"foo bar" castable as xs:QName', 'false');
+    t('"ABC:::+as-::" castable as xs:QName', 'false');
+    t('true() castable as xs:QName', 'false');
+    t('true() castable as xs:NCName', 'true');
+    t('false() castable as xs:NCName', 'true');
 
     t('xs:dateTime("2000-02-03T24:00:00")', '2000-02-04T00:00:00');
     t('"2000-02-03" castable as xs:dateTime', 'false');

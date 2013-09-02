@@ -1005,20 +1005,26 @@ begin
   result := parseSequenceLike(TXQTermJSONArray.Create, ']') as TXQTermJSONArray;
 end;
 
-function staticallyCastQNameAndNotation(term: TXQTerm; typ: TXSType; staticContext: TXQStaticContext): txqterm;
+function staticallyCastQNameAndNotation(term: TXQTerm; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false): txqterm;
 var
   name: String;
   namespace: INamespace;
+  castAllowed: Boolean;
 begin
   result := term;
-  if typ.derivedFrom([baseSchema.QName, baseSchema.NOTATION])
-     and (typ <> baseSchema.NOTATION)
-     and (term.children[0] is TXQTermString) then begin
-       name := TXQTermString(term.children[0]).value;
-       staticContext.splitRawQName(namespace, name, xqdnkElementType);
-       result := TXQTermNumber.create(TXQValueQName.create(typ, namespace, name));
-       term.free;
-     end;
+  if typ.derivedFrom([baseSchema.QName, baseSchema.NOTATION]) then begin
+    castAllowed := (typ <> baseSchema.NOTATION)
+                   and (term.children[0] is TXQTermString)
+                   and (baseSchema.QName.qnameRegex.Exec(TXQTermString(term.children[0]).value));
+    if not castAllowed then exit;
+    if not castable then begin
+      name := TXQTermString(term.children[0]).value;
+      staticContext.splitRawQName(namespace, name, xqdnkElementType);
+      result := TXQTermNumber.create(TXQValueQName.create(typ, namespace, name));
+    end else
+      result := TXQTermNumber.create(xqvalue(castAllowed));
+    term.free;
+  end;
 end;
 
 
@@ -1238,7 +1244,7 @@ var astroot: TXQTerm;
       if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) then begin
         if not (st.isSingleType()) then
           raiseParsingError('XPST0003', 'Need single typ for cast');
-        replace^ := staticallyCastQNameAndNotation(res, st.atomicTypeInfo, staticContext);
+        replace^ := staticallyCastQNameAndNotation(res, st.atomicTypeInfo, staticContext, res.op.func = @xqvalueCastableAs);
       end;
     end;
 
