@@ -3409,9 +3409,19 @@ begin
     t('"ABC" castable as xs:QName', 'true');
     t('"foo bar" castable as xs:QName', 'false');
     t('"ABC:::+as-::" castable as xs:QName', 'false');
+    t('"    foo   " castable as xs:QName', 'true');
+    t('"    foo   " cast as xs:QName', 'foo');
     t('true() castable as xs:QName', 'false');
     t('true() castable as xs:NCName', 'true');
     t('false() castable as xs:NCName', 'true');
+
+    t('"" castable as xs:base64Binary', 'true');
+    t('"" cast as xs:base64Binary', '');
+    t('"       " castable as xs:base64Binary', 'true');
+    t('"       " cast as xs:base64Binary', '');
+    t('xs:base64Binary("") eq xs:base64Binary("")', 'true');
+    t('xs:string(xs:base64Binary(""))', '');
+    t('xs:string(xs:base64Binary("a a a a"))', 'aaaa');
 
     t('xs:dateTime("2000-02-03T24:00:00")', '2000-02-04T00:00:00');
     t('"2000-02-03" castable as xs:dateTime', 'false');

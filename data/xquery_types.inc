@@ -568,6 +568,9 @@ end;
 function TXQValueString.toString: string;
 begin
   result := str;
+  //if ((typeAnnotation as TXSSimpleType).primitive as TXSStringType).subType in [xsstBase64Binary, xsstHexBinary] then
+  if instanceOf(baseSchema.base64Binary) then
+    result := StringReplace(result, ' ', '', [rfReplaceAll]);
 end;
 
 function TXQValueString.toDateTime: TDateTime;
@@ -578,8 +581,10 @@ end;
 function TXQValueString.toRawBinary: string;
 begin
   if instanceOf(baseSchema.hexBinary) then result := strDecodeHex(str)
-  else if instanceOf(baseSchema.base64Binary) then result := base64.DecodeStringBase64(str)
-  else assert(false);
+  else if instanceOf(baseSchema.base64Binary) then begin
+    if str = '' then exit('');
+    result := base64.DecodeStringBase64(str)
+  end else assert(false);
 end;
 
 function TXQValueString.clone: IXQValue;

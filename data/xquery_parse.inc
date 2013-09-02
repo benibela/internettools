@@ -1015,10 +1015,10 @@ begin
   if typ.derivedFrom([baseSchema.QName, baseSchema.NOTATION]) then begin
     castAllowed := (typ <> baseSchema.NOTATION)
                    and (term.children[0] is TXQTermString)
-                   and (baseSchema.QName.qnameRegex.Exec(TXQTermString(term.children[0]).value));
+                   and (baseSchema.QName.qnameRegex.Exec(trim(TXQTermString(term.children[0]).value)));
     if not castAllowed then exit;
     if not castable then begin
-      name := TXQTermString(term.children[0]).value;
+      name := trim(TXQTermString(term.children[0]).value);
       staticContext.splitRawQName(namespace, name, xqdnkElementType);
       result := TXQTermNumber.create(TXQValueQName.create(typ, namespace, name));
     end else
