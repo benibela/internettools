@@ -1689,7 +1689,7 @@ begin
    t('xs:double(1)+2','3','');
    t('type-of(xs:double(1)+2)','double','');
    t('xs:decimal(1)+2','3','');
-   t('type-of(xs:decimal(1)+2)','integer',''); //?
+   t('type-of(xs:decimal(1)+2)','decimal','');
    t('xs:float(1)*xs:double(2)','2','');
    t('type-of(xs:float(1)*xs:double(2))','double','');
    t('xs:float(1)*2','2','');
@@ -2633,7 +2633,8 @@ begin
   t('number()', 'NaN', '<x>foo</x>');
   t('fn:number(xs:float("-3.4028235E38")) eq xs:float("-3.4028235E38")', 'true');
   t('fn:number(xs:float("-3.4028235E38")) eq -3.4028234663852885E38', 'true');
-  t('xs:double("-1.7976931348623157E308") eq xs:double("1.7976931348623157E308")');
+  t('xs:double("-1.7976931348623157E308") eq xs:double("1.7976931348623157E308")', 'false');
+  t('xs:double("-1.7976931348623157E308") eq xs:double("-1.7976931348623157E308")', 'true');
   t('not(double("NaN"))', 'true', '');
   t('not(double("INF"))', 'false', '');
   t('not(double("-INF"))', 'false', '');
@@ -3543,11 +3544,11 @@ begin
   t('type-of(xs:untypedAtomic("0") + xs:float(0))', 'double');
   t('xs:untypedAtomic("0") + xs:decimal(0)', '0');
   t('type-of(xs:untypedAtomic("0") + xs:decimal(0))', 'double');
-  t('string-join(for $x in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
-                '$y in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x + $y), " ")',
-                'integer decimal float double double decimal integer float double double float float float double double double double double double double double double double double double'); //XQTS test
-  t('string-join(for $x in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
-    '$y in (1, xs:decimal(2.5), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x mod $y), " ")',
+  t('string-join(for $x in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
+                '$y in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x + $y), " ")',
+                'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
+  t('string-join(for $x in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)), ' +
+    '$y in (1, xs:decimal(2), xs:float(3), xs:double(4), xs:untypedAtomic(5)) return type-of($x mod $y), " ")',
     'integer decimal float double double decimal decimal float double double float float float double double double double double double double double double double double double'); //XQTS test
 
   t('(xs:untypedAtomic("3") - 1.1) instance of xs:double', 'true');

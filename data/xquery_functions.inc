@@ -28,6 +28,15 @@ begin
   result := TXQValueFloat.create(t, v)
 end;
 
+function xqvalueI(const v: int64; const typeRef1, typeRef2: IXQValue): IXQValue;
+var
+  t: TXSType;
+begin
+  if (typeRef1.typeAnnotation as TXSNumericType).subType = xsstDecimal then exit(baseSchema.decimal.createValue(v));
+  if (typeRef2.typeAnnotation as TXSNumericType).subType = xsstDecimal then exit(baseSchema.decimal.createValue(v));
+  exit(baseSchema.integer.createValue(v));
+end;
+
 const Int64Halved = high(int64) div 2;
 const NonNumericKind = [pvkUndefined, pvkBoolean, pvkQName, pvkObject, pvkArray, pvkNull, pvkFunction];
 
@@ -51,7 +60,7 @@ begin
     bi := b.toInt64;
     if ((ai >= 0) and ((bi <= 0) or ((ai <= Int64Halved)  and (bi <=  Int64Halved )))) or
        ((ai < 0)  and ((bi >= 0) or ((ai >= -Int64Halved) and (bi >= -Int64Halved )))) then
-      exit(xqvalue(ai + bi));
+      exit(xqvalueI(ai + bi, a, b));
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
@@ -103,7 +112,7 @@ begin
     bi := b.toInt64;
     if ((ai >= 0) and ((bi >= 0) or ((ai <= Int64Halved)  and (bi >= -Int64Halved )))) or
        ((ai < 0)  and ((bi <= 0) or ((ai >= -Int64Halved) and (bi <= Int64Halved )))) then
-      exit(xqvalue(ai - bi));
+      exit(xqvalueI(ai - bi, a, b));
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
@@ -195,7 +204,7 @@ begin
     if ((ai >= low(integer)) and (ai <= high(integer)) and (bi >= low(integer)) and (bi <= high(integer))) or
        ((ai >= -$7f) and (ai <= $7f) and (bi >= $00ffffffffffffff) and (bi <= $00ffffffffffffff)) or
        ((ai >= $00ffffffffffffff) and (ai <= $00ffffffffffffff) and (bi >= -$7f) and (bi <= $7f)) then
-      exit(xqvalue(ai * bi));
+      exit(xqvalueI(ai * bi, a, b));
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
@@ -346,7 +355,7 @@ begin
 
   if (ak = pvkInt64) and (bk = pvkInt64) then begin
     i := a.toInt64 mod b.toInt64;
-    exit(xqvalue(i));
+    exit(xqvalueI(i, a, b));
   end;
 
   if (ak = pvkNull) or (bk = pvkNull) then
