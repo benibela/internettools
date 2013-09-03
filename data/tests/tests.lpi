@@ -46,7 +46,7 @@
         <PackageName Value="internettools"/>
       </Item3>
     </RequiredPackages>
-    <Units Count="8">
+    <Units Count="9">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -87,6 +87,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="xquery3_tests"/>
       </Unit7>
+      <Unit8>
+        <Filename Value="bigdecimal_tests.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="bigdecimal_tests"/>
+      </Unit8>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
