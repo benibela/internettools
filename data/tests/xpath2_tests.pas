@@ -3470,8 +3470,9 @@ begin
   t('string-join(for $a in element return $a / document / processing-instruction, ":")', 'PI1');
   t('string-join(for $a in element return $a / document / (comment | processing-instruction), ":")', 'C1:PI1');
 
-  t('if (1,2,3) then 5 else 6', '6');
+  f('if (1,2,3) then 5 else 6', 'err:FORG0006');
   t('if (/a,2,3) then 5 else 6',  '5', '!<a>..</a>');
+  t('if ({},2,3) then 5 else 6', '5');
 
 
   t('string-join(css("b|foobar"), ",")', 'hallo', '<xyz:foobar xmlns:xyz="test://b">hallo</xyz:foobar>');
@@ -3732,6 +3733,29 @@ begin
   t('outer-html(/)', '<html><head></head><body><table><td>1</td><td>2</td><td>3</td></table></body></html>', '<table><td>1<td>2<td>3</table>');
   t('outer-html(/)', '<html><head></head><body><table><tbody><tr><td>1</td></tr></tbody></table></body></html>', '<table><tr><td>1</td></tr></table>');
   t('outer-html(/)', '<html><head></head><body><table><colgroup><col></colgroup><tbody><tr>17</tr></tbody></table></body></html>' , '<table><col><tr>17</table>');
+
+
+  //error tests
+  t('() and true()', 'false');
+  t('(/) and true()', 'true');
+  t('(/, 2) and true()', 'true');
+  t('(xs:string("")) and true()', 'false');
+  t('(xs:untypedAtomic("")) and true()', 'false');
+  t('(xs:anyURI("")) and true()', 'false');
+  t('(xs:normalizedString("")) and true()', 'false');
+  t('(xs:string("a")) and true()', 'true');
+  t('(xs:untypedAtomic("s")) and true()', 'true');
+  t('(xs:anyURI("d")) and true()', 'true');
+  t('(xs:NCName("e")) and true()', 'true');
+  t('([]) and true()', 'true');
+  t('({}) and true()', 'true');
+  t('([], 1) and true()', 'true');
+  t('({}, 2) and true()', 'true');
+  t('(jn:null()) and true()', 'false');
+  f('(xs:string("a"), 1) and true()', 'err:FORG0006');
+  f('(xs:string("a"), 1) and true()', 'err:FORG0006');
+  f('(0, xs:string("a")) and true()', 'err:FORG0006');
+  f('(jn:null(), 8) and true()', 'err:FORG0006');
 
 
   //XQuery/XPath 3 syntax tests which must fail in the old version

@@ -469,6 +469,7 @@ type
       class function classKind: TXQValueKind; override;
 
       function toString: string; override; //**< Converts the TXQValue dynamically to string
+      function toBooleanEffective: boolean; override;
 
       function clone: IXQValue; override;
     end;
@@ -725,6 +726,8 @@ type
     constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
+
+    function toBooleanEffective: boolean; override;
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
