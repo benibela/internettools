@@ -3340,7 +3340,7 @@ begin
              if p^ in ['0'..'9'] then entity := entity + ord(p^) - ord('0') 
              else if p^ in ['A'..'F'] then entity := entity + ord(p^) - ord('A') + 10
              else if p^ in ['a'..'f'] then entity := entity + ord(p^) - ord('a') + 10
-             else raise exception.create('???');
+             else raise exception.create('Invalid symbol in hex entity: '+copy(string(p), 1, 10));
              inc(p);
            end;
            entityStr := strGetUnicodeCharacter(entity, encoding);
