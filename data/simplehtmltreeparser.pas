@@ -18,7 +18,8 @@ type
 
 
 //**The type of a tree element. <Open>, text, or </close>
-TTreeNodeType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument);
+TTreeNodeType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument,
+                 tetInternalDoNotUseCDATAText); //tetInternalDoNotUseCDATAText is only used temporarily during parsing to mark elements in which entities should not be replaced.
 TTreeNodeTypes = set of TTreeNodeType;
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
@@ -161,7 +162,7 @@ TTreeNode = class
 //otherwise use the functions
   //procedure deleteNext(); //**<delete the next node (you have to delete the reverse tag manually)
   procedure deleteAll(); //**<deletes the tree
-  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean; trimText: boolean; skipHTMLCData: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
+  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
   //Complex search functions.
@@ -324,7 +325,7 @@ protected
 
   function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
   function leaveTag(tagName: pchar; tagNameLen: longint):TParsingResult;
-  function readText(text: pchar; textLen: longint):TParsingResult;
+  function readText(text: pchar; textLen: longint; tf: TTextFlags):TParsingResult;
   function readComment(text: pchar; textLen: longint):TParsingResult;
 
 private
@@ -739,7 +740,7 @@ procedure TTreeDocument.setEncoding(new: TEncoding; convertFromOldToNew: Boolean
 begin
   if self = nil then exit;
   if (FEncoding = eUnknown) or not convertFromOldToNew then FEncoding:= new;
-  if convertFromOldToNew or convertEntities then changeEncoding(FEncoding, new, convertEntities, FCreator.FTrimText, FCreator.parsingModel = pmHTML);
+  if convertFromOldToNew or convertEntities then changeEncoding(FEncoding, new, convertEntities, FCreator.FTrimText);
   FEncoding := new;
 end;
 
@@ -767,7 +768,7 @@ begin
   Free;
 end;
 
-procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean; skipHTMLCData: boolean);
+procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
   function change(s: string): string;
   begin
     result := strChangeEncoding(s, from, toe);
@@ -785,6 +786,10 @@ begin
   while tree <> nil do begin
     case tree.typ of
       tetText, tetProcessingInstruction: tree.value := change(tree.value);
+      tetInternalDoNotUseCDATAText: begin
+        tree.value:=strNormalizeLineEndings(strChangeEncoding(tree.value, from, toe));
+        tree.typ := tetText;
+      end;
       tetComment: tree.value:=strChangeEncoding(tree.value, from, toe);
       tetDocument, tetOpen, tetClose: begin
         tree.value := change(tree.value);
@@ -793,10 +798,6 @@ begin
             attrib.value := change(attrib.value);
             attrib.realvalue := change(attrib.realvalue);
           end;
-        if skipHTMLCData and htmlElementIsCDATA(pchar(tree.value), length(tree.value)) then begin
-          tree := tree.next;
-          while (tree <> nil) and (tree.typ = tetText) do tree := tree.next;
-        end;
       end;
       else raise ETreeParseException.Create('Unkown tree element: '+tree.outerXML());
     end;
@@ -1967,10 +1968,11 @@ begin
   end;
 end;
 
-function TTreeParser.readText(text: pchar; textLen: longint): TParsingResult;
+function TTreeParser.readText(text: pchar; textLen: longint; tf: TTextFlags): TParsingResult;
 var
   tempLen: LongInt;
   temp: PChar;
+  typ: TTreeNodeType;
 begin
   result:=prContinue;
 
@@ -2004,7 +2006,9 @@ begin
   end;
 
 
-  newTreeNode(tetText, text, textLen).initialized;
+  typ := tetText;
+  if tfCDATA in tf then typ := tetInternalDoNotUseCDATAText;
+  newTreeNode(typ, text, textLen).initialized;
 end;
 
 function TTreeParser.readComment(text: pchar; textLen: longint): TParsingResult;
@@ -2248,7 +2252,7 @@ begin
       el := FCurrentTree.next;
       while el <> nil do begin
         case el.typ of
-          tetText: if isInvalidUTF8(el.value) then begin
+          tetText, tetInternalDoNotUseCDATAText: if isInvalidUTF8(el.value) then begin
             FCurrentTree.FEncoding:=eWindows1252;
             break;
           end;
@@ -2272,7 +2276,14 @@ begin
   FCurrentNamespaces.clear;
   FCurrentNamespaceDefinitions.Clear;
   if FTargetEncoding <> eUnknown then
-    FCurrentTree.setEncoding(FTargetEncoding, true, true);
+    FCurrentTree.setEncoding(FTargetEncoding, true, true)
+   else begin
+     el := FCurrentTree.next;
+     while el <> nil do begin
+       if el.typ = tetInternalDoNotUseCDATAText then el.typ := tetText;
+       el := el.next;
+     end;
+   end;
 //  if FRootElement = nil then
 //    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
 end;

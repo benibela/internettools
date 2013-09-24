@@ -61,7 +61,7 @@ type
 
 THTMLEventHandler=class
 protected
-  function convToStr(p:pchar;l:longint):string;
+  function convToStr(p:pchar;l:longint; flags: TTextFlags = []):string;
 public
   alreadyReadSomething: boolean;
   enterTag: TEnterTagEvent;
@@ -71,14 +71,15 @@ public
   fileEncoding,outputEncoding: TEncoding;
   function enterTagEvent (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
   function leaveTagEvent(tagName: pchar; tagNameLen: longint):TParsingResult;
-  function textEvent(text: pchar; textLen: longint):TParsingResult;
+  function textEvent(text: pchar; textLen: longint; flags: TTextFlags):TParsingResult;
 end;
 
 { THTMLEventHandler }
 
-function THTMLEventHandler.convToStr(p: pchar; l: longint): string;
+function THTMLEventHandler.convToStr(p: pchar; l: longint; flags: TTextFlags = []): string;
 begin
-  result:=strDecodeHTMLEntities(p,l,fileEncoding);
+  if not (tfCDATA in flags) then
+    result:=strDecodeHTMLEntities(p,l,fileEncoding);
   result:=strChangeEncoding(result,fileEncoding,outputEncoding);
 end;
 
@@ -112,11 +113,11 @@ begin
   result:=leaveTag(convToStr(tagName,tagNameLen));
 end;
 
-function THTMLEventHandler.textEvent(text: pchar; textLen: longint): TParsingResult;
+function THTMLEventHandler.textEvent(text: pchar; textLen: longint; flags: TTextFlags): TParsingResult;
 begin
   result:=prContinue;
   if not assigned(textRead) then exit();
-  result:=textRead(convToStr(text,textLen));
+  result:=textRead(convToStr(text,textLen,flags));
 end;
 
 procedure parseXML(xml:string; enterTag: TEnterTagEvent; leaveTag: TLeaveTagEvent;

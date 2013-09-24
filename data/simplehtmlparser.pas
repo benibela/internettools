@@ -42,7 +42,9 @@ type
   TParsingResult = (prContinue, prStop);
   TEnterTagEvent=function (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult of object;
   TLeaveTagEvent=function (tagName: pchar; tagNameLen: longint):TParsingResult of object;
-  TTextEvent=function (text: pchar; textLen: longint):TParsingResult of object;
+  TCommentEvent=function (comment: pchar; commentLen: longint):TParsingResult of object;
+  TTextFlags = set of (tfCDATA);
+  TTextEvent=function (text: pchar; textLen: longint; textFlags: TTextFlags):TParsingResult of object;
 
   function pcharStartEqual(p1,p2:pchar;l1,l2: longint):boolean;
 
@@ -55,7 +57,7 @@ type
   //**@bold(Notice:) You can pass nil for every callback function and if one of them returns prStop, the parsing is aborted.
   procedure parseHTML(const html:string;
                       enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                      textEvent: TTextEvent; commentEvent: TTextEvent = nil);
+                      textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
 
   //**This parses html/xml data
   //**@param html Input
@@ -67,7 +69,7 @@ type
   //**@bold(Notice:) You can pass nil for every callback function and if one of them returns prStop, the parsing is aborted.
   procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent; commentEvent: TTextEvent = nil);
+                    textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
 
 
   function existPropertyWithValue(propertyName,propertyValue: string; properties:THTMLProperties):boolean;
@@ -90,7 +92,7 @@ end;
 
 procedure parseHTML(const html:string;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent; commentEvent: TTextEvent = nil);
+                    textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
 begin
   parseML(html, [poRespectHTMLCDATAElements], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
 end;
@@ -99,7 +101,7 @@ end;
 
 procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent; commentEvent: TTextEvent = nil);
+                    textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
 var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
     valueStart:char;
     tempLen:longint;
@@ -114,7 +116,7 @@ begin
     case pos^ of
       '<': begin //Start or end of a tag
         if (marker<>pos)and(assigned(textEvent)) then
-          if textEvent(marker,pos-marker) = prStop then
+          if textEvent(marker,pos-marker, []) = prStop then
             exit;
 
         inc(pos);
@@ -132,7 +134,7 @@ begin
                while (pos <= htmlEnd) and ((pos^ <> ']') or ((pos+1)^ <> ']') or ((pos+2)^ <> '>')) do
                  pos+=1;
                if (marker<>pos) and (Assigned(textEvent)) then
-                 if textEvent(marker,pos-marker) = prStop then exit;   //TODO: fix: here we lost the "don't parse"-information, and it will replace entities
+                 if textEvent(marker,pos-marker, [tfCDATA]) = prStop then exit;
                pos += 3;
              end else begin
               marker := pos;
@@ -233,7 +235,7 @@ begin
                       or not strliEqual(cdataTagStartMarker, pos+2, tempLen) ) do //check for  </script    (or whatever opened that implicit cdata thing)
                 inc(pos);
               if Assigned(textEvent) then
-                if textEvent(marker, pos-marker) = prStop then
+                if textEvent(marker, pos-marker, [tfCDATA]) = prStop then
                   exit;
               marker:=pos;
             end;
@@ -244,7 +246,7 @@ begin
     end;
   end;
   if (marker<>pos)and(assigned(textEvent)) then
-    textEvent(marker,pos-marker);
+    textEvent(marker,pos-marker, []);
 end;
 
 function existPropertyWithValue(propertyName,propertyValue: string; properties:THTMLProperties):boolean;
@@ -276,7 +278,7 @@ type TTempSearchClassText=class
   lastLink: boolean;
   searchedText:string;
   function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
-  function readText(text: pchar; textLen: longint):TParsingResult;
+  function readText(text: pchar; textLen: longint; tf: TTextFlags):TParsingResult;
 end;
 
 
@@ -295,7 +297,7 @@ begin
     lastLink:=false ;
   end else lastLink:=false;
 end;
-function TTempSearchClassText.readText(text: pchar; textLen: longint):TParsingResult;
+function TTempSearchClassText.readText(text: pchar; textLen: longint; tf: TTextFlags):TParsingResult;
 begin
   if lastLink and strlequal(text,@searchedText[1],textLen,length(searchedText)) then begin
     setlength(self.result,lastLinkURL.valueLen);
