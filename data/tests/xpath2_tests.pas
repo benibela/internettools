@@ -3473,7 +3473,8 @@ begin
   f('if (1,2,3) then 5 else 6', 'err:FORG0006');
   t('if (/a,2,3) then 5 else 6',  '5', '!<a>..</a>');
   t('if ({},2,3) then 5 else 6', '5');
-
+  f('/processing-instruction(a b)', 'err:XPST0003');
+  f('/processing-instruction(a,b)', 'err:XPST0003');//should be 0004?
 
   t('string-join(css("b|foobar"), ",")', 'hallo', '<xyz:foobar xmlns:xyz="test://b">hallo</xyz:foobar>');
   t('string-join(css("a|foobar"), ",")', '');

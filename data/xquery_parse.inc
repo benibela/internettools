@@ -1138,7 +1138,11 @@ begin
             skipWhitespaceAndComment();
             if pos^ <> ')' then begin
               result.push(parseValue());   skipWhitespaceAndComment();
-              if pos^ = ',' then begin expect(','); result.push(parseSequenceType()); end;
+              if pos^ = ',' then begin
+                if (word <> 'element') and (word <> 'attribute') then raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
+                expect(',');
+                result.push(parseSequenceType());
+              end;
             end;
             expect(')');
             exit;
