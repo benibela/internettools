@@ -75,7 +75,8 @@ begin
   if not CheckBoxEntities.Checked then htmlparser.OutputEncoding:=eUnknown;
   try
     htmlparser.AllowVeryShortNotation:=CheckBoxShortnotatin.Checked;
-    htmlparser.AllowPropertyDotNotation:=CheckBoxObjects.Checked;
+    if CheckBoxObjects.Checked then htmlparser.QueryEngine.AllowPropertyDotNotation := xqpdnAllowFullDotNotation
+    else htmlparser.QueryEngine.AllowPropertyDotNotation := xqpdnDisallowDotNotation;
     htmlparser.QueryEngine.AllowJSON:=CheckBoxJSON.Checked;
     htmlparser.parseTemplate(memo1.Lines.Text);
     htmlparser.trimTextNodes:=TTrimTextNodes(trimming.ItemIndex);
@@ -112,17 +113,14 @@ end;
 procedure TForm1.Button3Click(Sender: TObject);
 var ppath: TXQueryEngine;
     tp: TTreeParser;
-    vars: TXQVariableChangeLog;
     temp: IXQValue;
 begin
   ppath := TXQueryEngine.Create;
-  vars := TXQVariableChangeLog.create();
   tp := TTreeParser.Create;
   try
-    ppath.OnEvaluateVariable:=@vars.evaluateVariable;
-    ppath.OnDefineVariable:=@vars.defineVariable;
     ppath.AllowExtendedStrings:=CheckBoxVarsInStrs.Checked;
-    vars.allowPropertyDotNotation:=CheckBoxObjects.Checked;
+    if CheckBoxObjects.Checked then ppath.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation
+    else ppath.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
     ppath.AllowJSON:=CheckBoxJSON.Checked;
 
     if (sender as tbutton).tag = 1 then ppath.parseXQuery1(memo1.lines.Text)
@@ -137,7 +135,6 @@ begin
   finally
     tp.Free;
     ppath.Free;
-    vars.Free;
   end;
 end;
 
