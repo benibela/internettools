@@ -170,16 +170,12 @@ implementation
 
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
 
-function TryStrToBigDecimal(const s: string; res: PBigDecimal): boolean;
-var dot, exp, i: integer;
-  intstart: Integer;
-  intend: Integer;
-  trueexponent: integer;
-  p: Integer;
-  j: Integer;
-  totalintlength: Integer;
+function TryStrDecodeDecimal(const s: string; out intstart, intend, dot, exp: integer): boolean;
+var
+  i: Integer;
 begin
-  if s = '' then exit(false);
+  result := false;
+  if s = '' then exit();
   dot := 0;
   exp := 0;
   if s[1] in ['+', '-'] then intstart := 2
@@ -190,8 +186,8 @@ begin
       '0'..'9': ;
       '.': if (dot <> 0) or (exp <> 0) then exit(false) else dot := i;
       'e', 'E': if exp <> 0 then exit(false) else exp := i;
-      '+', '-': if i <> exp + 1 then exit(false);
-      else exit(false);
+      '+', '-': if i <> exp + 1 then exit();
+      else exit();
     end;
   if exp = 1 then exit;
   if exp = 0 then intend := length(s)
@@ -199,12 +195,34 @@ begin
   if intend = dot then begin intend -= 1; dot := 0; end;
   if intend < intstart then exit;
   result := true;
+end;
+
+function TryStrToBigDecimal(const s: string; res: PBigDecimal): boolean;
+var dot, exp, i: integer;
+  intstart: Integer;
+  intend: Integer;
+  trueexponent: integer;
+  p: Integer;
+  j: Integer;
+  totalintlength: Integer;
+begin
+  result := TryStrDecodeDecimal(s, intstart, intend, dot, exp);
+  if exp = 0 then trueexponent := 0
+  else begin
+    if (length(s) - exp <= 9) and (res = nil) then exit;
+    if not TryStrToInt(copy(s, exp + 1, length(s)), trueexponent) then begin
+      //exponent to big
+      for i := 1 to exp - 1 do
+        if not (s[i] in ['0', '.', '-']) then exit(false);
+      if res <> nil then setZero(res^); //but if all digigts are 0, the exponent can be ignored
+      exit;
+    end;
+  end;
+  if not result then exit;
   if res = nil then exit;
   with res^ do begin
     signed := s[1] = '-';
     lastDigitHidden := false;
-    if exp = 0 then trueexponent := 0
-    else trueexponent := StrToInt(copy(s, exp + 1, length(s)));
     if dot <> 0 then trueexponent -= intend - dot;
     if trueexponent >= 0 then exponent := trueexponent div DIGITS_PER_ELEMENT
     else exponent := (trueexponent - (DIGITS_PER_ELEMENT - 1)) div DIGITS_PER_ELEMENT;
