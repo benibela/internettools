@@ -29,8 +29,6 @@ begin
 end;
 
 function xqvalueI(const v: int64; const typeRef1, typeRef2: IXQValue): IXQValue;
-var
-  t: TXSType;
 begin
   if (typeRef1.typeAnnotation as TXSNumericType).subType = xsstDecimal then exit(baseSchema.decimal.createValue(v));
   if (typeRef2.typeAnnotation as TXSNumericType).subType = xsstDecimal then exit(baseSchema.decimal.createValue(v));
@@ -249,6 +247,8 @@ var e, f: xqfloat;
   ai, bi, ri: Int64;
   t: TXSNumericType;
   bd: BigDecimal;
+  ex: Extended;
+  i: Integer;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
@@ -273,15 +273,22 @@ begin
   if (ak = pvkDateTime) then begin
     if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
     if (b is TXQValueDateTime) and (a.typeAnnotation as TXSDateTimeType).isDuration then begin
-      if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then
-        exit(baseSchema.decimal.createValue((a as TXQValueDateTime).toDayTime() / (b as TXQValueDateTime ).toDayTime()));
-      if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then
-        exit(baseSchema.decimal.createValue(((a as TXQValueDateTime).toMonths() / (b as TXQValueDateTime).toMonths())));
+      if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then begin
+        ex := (b as TXQValueDateTime ).toDayTime();
+        if ex = 0 then raiseDivisionBy0NotAllowed;
+        exit(baseSchema.decimal.createValue((a as TXQValueDateTime).toDayTime() / ex));
+      end;
+      if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then begin
+        i := (b as TXQValueDateTime).toMonths();
+        if i = 0 then raiseDivisionBy0NotAllowed;
+        exit(baseSchema.decimal.createValue(((a as TXQValueDateTime).toMonths() / i)));
+      end;
       exit(xqvalue);
     end;
     f:= b.toFloat;
     result := a.clone;
     if isPosInf(f) or isNegInf(f) then (result as TXQValueDateTime).multiplyComponents(0)
+    else if f = 0 then raiseDivisionBy0NotAllowed
     else (result as TXQValueDateTime).multiplyComponents(1 / f);
     exit;
   end;
@@ -354,7 +361,9 @@ begin
   ak := a.kind; bk := b.kind;
 
   if (ak = pvkInt64) and (bk = pvkInt64) then begin
-    i := a.toInt64 mod b.toInt64;
+    i := b.toInt64;
+    if i = 0 then raiseDivisionBy0NotAllowed;
+    i := a.toInt64 mod i;
     exit(xqvalueI(i, a, b));
   end;
 
@@ -1021,6 +1030,7 @@ begin
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmCeil));
     pvkFloat: begin
       v := args[0].toFloat;
+      if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
       if frac(v) > 0 then result := baseType.createValue(v - frac(v) + 1)
       else result := baseType.createValue(v - frac(v));
     end
@@ -1042,6 +1052,7 @@ begin
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmFloor));
     pvkFloat: begin
       v := args[0].toFloat;
+      if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
       if frac(v) < 0 then result := baseType.createValue(v - frac(v) - 1)
       else result := baseType.createValue(v - frac(v));
     end
@@ -1735,10 +1746,14 @@ begin
   //TODO: cache regex
   regEx:=TRegExpr.Create(args[1].toString);
   try
+  try
     regEx.ModifierS := false;
     if length(args) >= 4 then
       regEx.ModifierStr:=args[3].toString;
     result := xqvalue(regEx.Replace(args[0].toString, args[2].toString, true));
+  except
+    on e: ERegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+  end;
   finally
     regEx.free;
   end;
@@ -1753,10 +1768,14 @@ begin
   //TODO: cache regex
   regEx:=TRegExpr.Create(args[1].toString);
   try
+  try
     regEx.ModifierS := false;
     if length(args) >= 3 then
       regEx.ModifierStr:=args[2].toString;
     result := xqvalue(regEx.Exec(args[0].toString));
+  except
+    on e: ERegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+  end;
   finally
     regEx.free;
   end;
@@ -1779,6 +1798,7 @@ begin
   regEx:=TRegExpr.Create(pattern);
   sl := TStringList.Create;
   try
+  try
     regEx.ModifierS := false;
     if length(args) >= 3 then
       regEx.ModifierStr:=args[2].toString;
@@ -1792,6 +1812,9 @@ begin
     end else sl.add(regex.InputString);
     if sl.Count = 0 then exit(xqvalue)
     else result := xqvalue(sl);
+  except
+    on e: ERegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+  end;
   finally
     regEx.free;
     sl.free;
@@ -3054,6 +3077,8 @@ begin
   try
     if length(args) = 2 then node := xqvalueToSingleNode(args[1])
     else node := xqvalueContextNode(context);
+
+    if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
 
     node := node.getRootElement();
 

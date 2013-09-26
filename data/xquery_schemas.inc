@@ -481,6 +481,18 @@ begin
       i := v.toDecimal;
       if (subType = xsstInteger) and (not isInteger(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
       if not constraintsSatisfied(i) then exit(false);
+
+      if outv <> nil then
+        case subType of
+          xsstInteger: begin
+            if not isInteger(i) then i := round(i, 0, bfrmTrunc);
+            if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+            else outv^ := TXQValueDecimal.create(self, i);
+          end;
+          xsstDecimal:
+            if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+            else outv^ := TXQValueDecimal.create(self, i);
+        end;
     end;
     xsstFloat, xsstDouble: begin
       if not sispure then begin
@@ -495,27 +507,20 @@ begin
         i := v.toDecimal;
         if not constraintsSatisfied(i) then exit(false);
       end;
+      case subType of
+        xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
+        xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
+      end;
     end;
   end;
-  if outv <> nil then
-    case subType of
-      xsstInteger: begin
-        if not isInteger(i) then i := round(i, 0, bfrmTrunc);
-        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
-        else outv^ := TXQValueDecimal.create(self, i);
-      end;
-      xsstDecimal:
-        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
-        else outv^ := TXQValueDecimal.create(self, i);
-      xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
-      xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
-    end;
 end;
 
 function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
 var
   pure: Boolean;
   temp: BigDecimal;
+{  tempintstart, tempintend, tempdot, tempexp: integer;
+  tempe: Extended;}
 begin
   pure := subType in  [xsstInteger, xsstDecimal];
   if ((v = 'NaN') or (v = 'INF') or (v = '-INF')) then begin
@@ -530,16 +535,25 @@ begin
   end;
   if pure and striContains(v, 'e') then exit(false);
   if (subType = xsstInteger) and (strContains(v, '.')) then exit(false);
+
   result := TryStrToBigDecimal(v, @temp);
   result := result and constraintsSatisfied(temp);
-  if outv <> nil then
+  if result and (outv <> nil) then
     case subType of
       xsstInteger, xsstDecimal:
         if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
         else outv^ := TXQValueDecimal.create(self, temp);
       xsstFloat:  outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(temp)));
       xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(temp)));
-    end;
+    end
+    {result := TryStrDecodeDecimal(v, tempintstart, tempintend, tempdot, tempexp);
+    if not result then exit;
+    if length(constrainingFacets) > 0 then
+      if not constraintsSatisfied(StrToBigDecimal(v)) then exit(false);
+    if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v)
+    else if v[tempexp+1] = '-' then tempe := 0
+    else if v[1]= '-' then tempe := getNegInf
+    else tempe := getPosInf;}
 end;
 
 constructor TXSNumericType.create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);

@@ -901,7 +901,7 @@ type
   TXSNumericType = class(TXSSimpleType)
     subType: TXSNumericSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
-    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue): boolean; override;
     function constraintsSatisfied(const v: BigDecimal): boolean;
     constructor create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
     constructor create(const aname: string; aparent: TXSNumericType);
@@ -1029,6 +1029,7 @@ type
     property items[i: integer]: IXQValue read get write put; default;
 
     procedure revert; //**< Reverts the list
+    procedure sort(cmp: TPointerCompareFunction; data: TObject = nil); //**< Sorts the list
 
     property Count: integer read fcount write setCount;
 
@@ -1820,6 +1821,8 @@ type
     function parseXQuery3(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
     //** Parses a new CSS 3.0 Selector expression and stores it in tokenized form.
     function parseCSS3(s:string): IXQuery;
+    //** Parses a new expression and stores it in tokenized form.
+    function parseQuery(s:string; model: TXQParsingModel; sharedContext: TXQStaticContext = nil): IXQuery;
 
     function evaluate(tree:TTreeNode = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as TXQValue
 
@@ -1891,6 +1894,7 @@ type
 
   public
     class procedure registerNativeModule(const module: TXQNativeModule);
+    class function collationsInternal: TStringList;
 
     //** Last parsed query
     property LastQuery: IXQuery read FLastQuery;
@@ -2135,6 +2139,8 @@ procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer =
 //**Calculates starting position / length from a range definition (checks for things like NaN, INF, ...) (internally used)
 procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 
+function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;  //needed for switch, tests
+
   const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
   const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
         XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
@@ -2148,6 +2154,7 @@ var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are k
     AllowJSONDefaultInternal: boolean = false; //**< Default setting for JSON (internally used).
     baseSchema: TJSONiqOverrideSchema;
     baseJSONiqSchema: TJSONiqAdditionSchema;
+
 implementation
 uses base64, strutils;
 
@@ -3238,7 +3245,6 @@ begin
 end;
 
 function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings
-function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean; forward; //needed for switch
 
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}
@@ -3537,6 +3543,12 @@ begin
   h :=count-1;
   for i:=0 to count div 2 - 1 do //carefully here. xqswap(a,a) causes a memory leak
     xqswap(list[i], list[h-i]);
+end;
+
+procedure TXQVList.sort(cmp: TPointerCompareFunction; data: TObject);
+begin
+  if count <= 1 then exit;
+  stableSort(@list[0], @list[count-1], sizeof(list[0]), cmp, data);
 end;
 
 function TXQVList.getPromotedType: TXQValueKind;
@@ -4120,6 +4132,12 @@ begin
   sc := StaticContext.clone();
   if sc.nodeCollation = nil then sc.nodeCollation := sc.collation;
   FLastQuery := TXQuery.Create(sc, parseCSSTerm(s));
+  result := FLastQuery;
+end;
+
+function TXQueryEngine.parseQuery(s: string; model: TXQParsingModel; sharedContext: TXQStaticContext): IXQuery;
+begin
+  FLastQuery:=parseTerm(s, model, sharedContext);
   result := FLastQuery;
 end;
 
@@ -4931,7 +4949,8 @@ begin
       if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
       else if context.staticContext.sender.ParentElement <> nil then result := xqvalue(context.staticContext.sender.ParentElement)
-      else raise EXQEvaluationException.Create('XPTY0020', 'No context');
+      else if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'Context item is undefined')
+      else raise EXQEvaluationException.Create('XPTY0020', 'Context item is not a node');
       result := expandSequence(result,query, context);
     end;
   end;
@@ -4963,6 +4982,11 @@ end;
 class procedure TXQueryEngine.registerNativeModule(const module: TXQNativeModule);
 begin
   nativeModules.AddObject(module.namespace.getURL, module);
+end;
+
+class function TXQueryEngine.collationsInternal: TStringList;
+begin
+  result := collations;
 end;
 
 function xqvalueNodeStepChild(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;

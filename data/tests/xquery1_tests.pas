@@ -69,10 +69,8 @@ var
      err: string;
    begin
      if not TestErrors then exit;
-     err := '-';
      try
-     performUnitTest(a,'<error>',c);
-
+       err := '- no error - : ' + performUnitTest(a,'<error>',c);
      except on e: EXQEvaluationException do begin
        err := e.namespace.getPrefix+':'+e.errorCode;
      end; on e: EXQParsingException do begin
@@ -1778,7 +1776,13 @@ begin
   scd('x"{1+2+3}{$var}"', [xqcdContextVariables]);
   scd('abc:=//title', [xqcdContextVariables,xqcdFocusDocument,xqcdContextCollation]);
 
-
+  //error tests
+  //ps.ParentElement := nil;
+  //ps.RootElement := nil;
+  //f('declare variable $x := .; $x + 1', 'err:XPDY0002'); can't test as f resets the ps.Parentelement field
+  f('unknown-function(1,2,3)', 'err:XPST0017');
+  //todo f('5 /  6', 'err:XPTY0020');
+  //todo f('5 / . / 6', 'err:XPTY0020');
   //XQuery/XPath 3 syntax tests which must fail in the old version
   f('"a" || "b"', 'err:XPST0003');
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');

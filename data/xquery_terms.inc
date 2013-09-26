@@ -1201,10 +1201,13 @@ var
   i: Integer;
   attrib: TTreeAttribute;
 begin
-  if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then
-    tempEl := context.SeqValue.toNode
-   else
-    tempEl:=context.ParentElement;
+  tempEl := nil;
+  if context.SeqValue <> nil then begin
+    if context.SeqValue is TXQValueNode then tempEl := context.SeqValue.toNode
+  end else if context.ParentElement <> nil then tempEl := context.ParentElement
+  else raise EXQEvaluationException.create('XPDY0002', 'Need context item to read attributes');
+  if tempEl = nil then
+    raise EXQEvaluationException.create('XPTY0020', 'Need node as context item to read attributes');
   if tempEl.typ = tetProcessingInstruction then
     exit(xqvalue);
 

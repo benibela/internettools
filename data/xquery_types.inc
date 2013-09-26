@@ -752,7 +752,9 @@ end;
 
 function TXQValueDateTime.toDateTime: TDateTime;
 begin
- result := dateEncode(value.year, value.month, value.day) + (value.hour * 3600 + value.min *60 + value.sec)/SecsPerDay;
+ if not dateEncodeTry(value.year, value.month, value.day, result) then
+   raise EXQEvaluationException.Create('FORG0006', 'Invalid date: '+IntToStr(value.year)+'-'+IntToStr(value.month)+'-'+IntToStr(value.day)+ ' (probably tried to use duration as datetime)');
+ result += (value.hour * 3600 + value.min *60 + value.sec)/SecsPerDay;
  if not isNan(value.secfraction) then result += value.secfraction / SecsPerDay;
  if not isnan(value.timezone) then result -= value.timezone;
 end;
