@@ -2677,9 +2677,11 @@ begin
          or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.sender.ImplicitTimezone,true) then //todo:   nodes?
         exit(false);
     end else begin
+      if context.staticContext.nodeCollation <> nil then
+        collation := context.staticContext.nodeCollation; //?? do not want to use string collation for nodes?
       if (enum2.Current.instanceOf(baseSchema.anyAtomicType)) or
          (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
-            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @context.staticContext.nodeCollation.equal)) then
+            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
         exit(false);
     end;
     enum1.MoveNext;

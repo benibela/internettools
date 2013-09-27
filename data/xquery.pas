@@ -2140,6 +2140,7 @@ procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer =
 procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;  //needed for switch, tests
+function xqvalueComparableTypes(const a, b: IXQValue): boolean; //internally used, needed for xqts
 
   const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
   const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
