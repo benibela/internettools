@@ -6,7 +6,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, xquery, simplehtmltreeparser, bbutils, math, rcmdline
+  Classes, sysutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline
   { you can add units after this };
 type
 
@@ -61,17 +61,25 @@ TTestSet = class
   dependencies, links, environments {descriptions}: TList;
   testCases: TList;
   constructor create(e: TTreeNode);
+  class function load(e: TTreeNode): TTestSet;
   procedure run;
 end;
 
 { TTestCase }
 
 TTestCaseResult = (tcrPass, tcrFail, tcrWrongError, tcrNA, tcrDisputed, tcrTooBig, tcrNotRun);
+TTestCaseResultValue = record
+  value: IXQValue;
+  error: string;
+  result: TTestCaseResult;
+end;
+
 TTestCase = class
   environments, modules, dependencies, tests, results: TList;
   name, coversName: string;
+  expected: string;
   constructor create(e: TTreeNode);
-  function run: TTestCaseResult;
+  function run: TTestCaseResultValue;
 end;
 
 { TModule }
@@ -93,12 +101,14 @@ TResult = class
   assertions: TList;
   constructor create(e: TTreeNode);
   function check(errorCode: string=''): TTestCaseResult;
+  function expectError: boolean;
 end;
 
 { TAssertion }
 
 TAssertion = class
   function check(errorCode: string): TTestCaseResult; virtual; abstract;
+  function expectError: boolean; virtual; abstract;
 end;
 
 { TAssertionList }
@@ -108,6 +118,7 @@ TAssertionList = class(TAssertion)
   list: TList;
   constructor create();
   function check(errorCode: string): TTestCaseResult; override;
+  function expectError: boolean; override;
 end;
 TAssertionAssertKind = (aakAssert, aakEq, aakCount, aakDeepEq, aakPermutation, aakXml, aakSerializationMatches, aakSerializationError, aakEmpty, aakType, aakTrue, aakFalse, aakStringValue, aakError);
 
@@ -120,6 +131,7 @@ TAssertionAssert = class(TAssertion)
   flags: string;
   constructor create(akind: TAssertionAssertKind; avalue: string);
   function check(errorCode: string): TTestCaseResult; override;
+  function expectError: boolean; override;
 end;
 
 
@@ -132,6 +144,8 @@ var xq: TXQueryEngine;
   config: record
     version: TXQParsingModel;
     featureNamespaceAxis, featureHigherOrderFunctions: boolean;
+    skipNegative: boolean;
+    forceTestSet: string;
   end;
 
 { TResult }
@@ -222,6 +236,18 @@ begin
   end;
 end;
 
+function TAssertionList.expectError: boolean;
+var
+  i: Integer;
+begin
+  result := TAssertion(list[0]).expectError;
+  if not result then exit;
+  for i := 1 to list.Count - 1 do begin
+    result := TAssertion(list[i]).expectError;
+    if not result then exit;
+  end;
+end;
+
 { TModule }
 
 constructor TModule.create(e: TTreeNode);
@@ -246,7 +272,67 @@ end;
 type PIXQValue = ^IXQValue;
 function comparison(data: TObject; a, b: PIXQValue): integer;
 begin
+  if not xqvalueComparableTypes(a^, b^) then
+    exit(strCompareClever(a^.typeName, b^.typeName));
   result := xqvalueCompareAtomicBase(a^, b^, TXQCollation(TXQueryEngine.collationsInternal.Objects[0]), 0.0/0.0);
+end;
+
+
+function attribcmp(List: TStringList; Index1, Index2: Integer): integer;
+var
+  a,b: TTreeAttribute;
+begin
+  a := TAttributeList(list).Items[index1];
+  b := TAttributeList(list).Items[index2];
+  result := CompareStr(a.value, b.value);
+  if result = 0 then result := CompareStr(a.realvalue, b.realvalue);
+end;
+
+procedure sorttree(t: TTreeNode);
+begin
+  while t <> nil do begin
+    if t.attributes <> nil then begin
+      t.attributes.CustomSort(@attribcmp);
+    end;
+    t := t.next;
+  end;
+end;
+
+function xmlEqual(a, b: string): boolean;
+var tree1, tree2: TTreeNode;
+begin
+  try
+
+  except on e: ETreeParseException do result := false;
+  end;
+end;
+
+function xmlEqual(const a: IXQValue; fragment: string): boolean;
+var compareTree: TTreeParser;
+    x: IXQValue;
+    fragment1: String;
+    tree1: TTreeDocument;
+    tree2: TTreeDocument;
+begin
+  compareTree := TTreeParser.Create;
+  fragment1 := '<WRAP>';
+  for x in a do
+    case x.kind of
+      pvkNode: fragment1 := fragment1 + x.toNode.outerXML();
+      else fragment1 += x.toString;
+    end;
+  fragment1 += '</WRAP>';
+
+  compareTree.clearTrees;
+  tree1 := compareTree.parseTree(fragment1);
+  //tree1.changeEncoding(eUTF8,eUTF8,true,false);
+  sorttree(tree1);
+  tree2 := compareTree.parseTree('<WRAP>'+fragment+'</WRAP>');
+  //tree2.changeEncoding(eUTF8,eUTF8,true,false);
+  sorttree(tree2);
+  result := tree1.outerXML() = tree2.outerXML();
+
+  compareTree.free;
 end;
 
 function TAssertionAssert.check(errorCode: string): TTestCaseResult;
@@ -271,6 +357,18 @@ function TAssertionAssert.check(errorCode: string): TTestCaseResult;
     result := v;
   end;
 
+  function parseXMLFragment: IXQValue;
+  var
+    n: TTreeNode;
+  begin
+    n := tree.parseTree(value).getFirstChild();
+    result := xqvalue(n);
+    while n.getNextSibling() <> nil do begin
+      n := n.getNextSibling();
+      xqvalueSeqAdd(result, xqvalue(n));
+    end;
+  end;
+
 const OK: array[boolean] of TTestCaseResult = (tcrFail, tcrPass);
 var
   str: String;
@@ -284,7 +382,8 @@ begin
     aakAssert: result := OK[xq.evaluateXPath2(value).toBoolean];
     aakEq: result := OK[xqvalueCompareAtomicBase(res, xq.parseQuery(value, config.version).evaluate(),  TXQCollation(TXQueryEngine.collationsInternal.Objects[0]), 0.0/0.0) = 0];
     aakCount: result := OK[res.getSequenceCount = StrToInt(value)];
-    aakDeepEq, aakXml: result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
+    aakDeepEq: result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
+    aakXml: result := OK[xmlEqual(res, value)];
     //aakXml: result := OK[xqfunctionDeep_Equal res.getSequenceCount = StrToInt(value)];
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
     aakSerializationMatches: raise exception.Create('assert serialization-matches not supported ');
@@ -309,6 +408,11 @@ begin
   end;
 end;
 
+function TAssertionAssert.expectError: boolean;
+begin
+  result := kind in [aakError, aakSerializationError];
+end;
+
 constructor TResult.create(e: TTreeNode);
 begin
   assertions := TList.Create;
@@ -320,6 +424,13 @@ begin
   if assertions.Count <> 1 then
     raise Exception.Create('Invalid assertion count in result');
   result := TAssertion(assertions[0]).check(errorCode);
+end;
+
+function TResult.expectError: boolean;
+begin
+  if assertions.Count <> 1 then
+    raise Exception.Create('Invalid assertion count in result');
+  result := TAssertion(assertions[0]).expectError;
 end;
 
 constructor TTest.create(e: TTreeNode);
@@ -354,35 +465,48 @@ begin
       'module': modules.add(TModule.create(f));
       'dependency': dependencies.add(TDependency.Create(f));
       'test': tests.add(TTest.Create(f));
-      'result': results.add(TResult.Create(f));
+      'result': begin
+        results.add(TResult.Create(f));
+        expected += f.innerXML();
+      end
       else raise Exception.Create('Unknown type: '+v.xmlSerialize(tnsXML))    ;
     end;
   end;
 end;
 
 function loadEnvironment(env: TEnvironment): TTreeNode; forward;
-function TTestCase.run: TTestCaseResult;
+function TTestCase.run: TTestCaseResultValue;
 var
   i: Integer;
   contexttree: TTreeNode;
 begin
-  writeln(name);
+  result.value := nil;
+  if config.skipNegative and TResult(results[0]).expectError then begin
+    result.result:=tcrNotRun;
+    exit();
+  end;
   for i := 0 to dependencies.Count - 1 do
-    if not TDependency(dependencies[i]).isSatisfied then
-      exit(tcrNA);
+    if not TDependency(dependencies[i]).isSatisfied then begin
+      result.result:=tcrNA;
+      exit();
+    end;
   contexttree := nil;
   for i := 0 to environments.count - 1 do
     contexttree := loadEnvironment(TEnvironment(environments[i]));
   if tests.Count <> 1 then raise Exception.Create('invalid test count');
   try
-    xq.VariableChangelog.add('result', xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree));
+    result.value := xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree);
+    xq.VariableChangelog.add('result', result.value);
     //todo:. modules,
     if Results.Count <> 1 then raise Exception.Create('invalid result count');
-    result := TResult(results[0]).check;
   except
-    on e: EXQException do
-    result := TResult(results[0]).check(e.errorCode);
+    on e: EXQException do begin
+      result.error := e.errorCode +': '+e.Message;
+      result.result := TResult(results[0]).check(e.errorCode);
+    end;
   end;
+  if result.error = '' then
+    result.result := TResult(results[0]).check;    ;
 end;
 
 { TDependency }
@@ -516,23 +640,63 @@ begin
   end;
 end;
 
+class function TTestSet.load(e: TTreeNode): TTestSet;
+begin
+  if (config.forceTestSet <> '') and (e['name'] <> config.forceTestSet) then exit(nil);
+  result := TTestSet.create(e);
+end;
+
+type TResultSet = array[TTestCaseResult] of integer;
+var totalResults: TResultSet = (0, 0, 0, 0, 0, 0, 0);
+
+procedure printResults(const r: TResultSet);
+begin
+  writeln('  Passed: ', r[tcrPass], ' Failed: ', r[tcrFail], ' Wrong error: ', r[tcrWrongError], ' N/A: ', r[tcrNA], ' Other: ', r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun] );
+end;
+
 procedure TTestSet.run;
 var
   i: Integer;
+  tc: TTestCase;
+  localResults: TResultSet;
+  res: TTestCaseResult;
+  resultValue: TTestCaseResultValue;
+  function got: string;
+  begin
+    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation()
+    else result := resultValue.error;
+  end;
+
 begin
+  fillchar(localResults, sizeof(localResults), 0);
   writeln('Running: '+name);
   for i := 0 to dependencies.Count - 1 do
     if not TDependency(dependencies[i]).isSatisfied then exit;
-  for i := 0 to testCases.Count - 1 do
-    case TTestCase(testCases[i]).run of
-      tcrPass: ; //todo
-      tcrFail: ;
-      tcrWrongError: ;
-      tcrNA: ;
-      tcrDisputed: ;
-      tcrTooBig: ;
-      tcrNotRun: ;
+  for i := 0 to testCases.Count - 1 do begin
+    tc := TTestCase(testCases[i]);
+    write(tc.name,': ');//,TTest(tc.tests[0]).test);
+    resultValue := tc.run;
+    res := resultValue.result;
+    case res of
+      tcrPass: writeln('passed'); //todo
+      tcrFail: begin
+        writeln('FAILED');
+        writeln('      got: '+got+ ' expected: '+tc.expected);
+      end;
+      tcrWrongError: begin
+        writeln('wrong error');
+        writeln('      got: '+got+ ' expected: '+tc.expected);
+      end;
+      tcrNA: writeln('na');
+      tcrDisputed: writeln('disputed');
+      tcrTooBig: writeln('too big') ;
+      tcrNotRun: writeln('not run');
     end;
+    totalResults[res]+=1;
+    localResults[res]+=1;
+  end;
+  write('Results of ', name);
+  printResults(localResults);
 end;
 
 { TSource }
@@ -674,13 +838,17 @@ end;
 procedure loadCatalog(fn: string);
 var e: TTreeNode;
     v: IXQValue;
+    ts: TTestSet;
 begin
   for v in xq.parseXPath2('/catalog/*').evaluate(tree.parseTreeFromFile(fn)) do begin
     e :=  v.toNode;
     case e.value of
       'environment': //environments.AddObject(e['name'], TEnvironment.load(e));
                      TEnvironment.load(e);
-      'test-set': testsets.add(TTestSet.Create(tree.parseTreeFromFile(e['file']).findChild(tetOpen, 'test-set')));
+      'test-set': begin
+        ts := TTestSet.load(tree.parseTreeFromFile(e['file']).findChild(tetOpen, 'test-set'));
+        if ts <> nil then testsets.add(ts);
+      end;
       'version', 'test-suite': ;
       else raise exception.Create('Unknown element in catalog: '+e.value+' :' + v.xmlSerialize(tnsXML));
     end;
@@ -688,14 +856,29 @@ begin
 end;
 
 var i: integer;
+  clr: TCommandLineReader;
 begin
   testsets := TList.Create;
   environments := TStringList.Create;
 
-  config.version := xqpmXPath2;
+  clr := TCommandLineReader.create;
+  clr.declareString('mode', 'Query mode (xquery1, xquery3, xpath2, xpath3)', 'xquery1');
+  clr.declareFlag('skip-negative', 'Ignore tests expecting only an error');
+  clr.declareString('test-set', 'Only runs a certain test set');
+
+  case clr.readString('mode') of
+    'xquery1': config.version := xqpmXQuery1;
+    'xquery3': config.version := xqpmXQuery3;
+    'xpath2': config.version := xqpmXPath2;
+    'xpath3': config.version := xqpmXPath3;
+  end;
+  config.skipNegative := clr.readFlag('skip-negative');
+  config.forceTestSet := clr.readString('test-set');
+
 
   TDependency.init;
 
+  TXQueryEngine.collationsInternal.Clear;
   TXQueryEngine.collationsInternal.OwnsObjects:=false;
   xqtsCollations := TStringList.Create;
   xqtsCollations.OwnsObjects:=true;
@@ -705,8 +888,21 @@ begin
 
 
   tree := TTreeParser.Create;
+  tree.readComments:=true;
+  tree.readProcessingInstructions:=true;
+  tree.trimText:=false;
+  tree.repairMissingStartTags:=false;
   tree.parsingModel := pmStrict;
   xq :=  TXQueryEngine.create;
+  xq.ImplicitTimezone:=-5 / HoursPerDay;
+  xq.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
+  xq.AllowExtendedStrings := false;
+  xq.AllowJSON:=false;
+  xq.AllowJSONLiterals:=false;
+  xq.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+  xq.StaticContext.collation := xq.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
+  xq.StaticContext.stripBoundarySpace:=true;
+  xq.StaticContext.strictTypeChecking:=true;
 
   Writeln(stderr, 'Loading catalogue...');
   loadCatalog('catalog.xml');
@@ -720,6 +916,6 @@ begin
   for cat in  cmd.readNamelessFiles() do begin
 
   end;}
-
+  printResults(totalResults)
 end.
 
