@@ -9,7 +9,7 @@ interface
 uses
   Classes, SysUtils, math;
 
-{$DEFINE USE_9_DIGITS}
+{$DEFINE USE_3_DIGITS}
 
 {$IF defined(USE_1_DIGIT) or defined(USE_1_DIGITS)}
 const DIGITS_PER_ELEMENT = 1;
@@ -119,15 +119,23 @@ operator mod(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 operator **(const a: BigDecimal; const b: int64): BigDecimal;
 
 
-type TBigDecimalDivisionFlags = set of (bfdfFillIntegerPart, bfdfAddHiddenDigit, bfdfKillFractions);
+type TBigDecimalDivisionFlags = set of (bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit, bddfFillIntegerPart, bddfNoFractionalPart);
 //** Universal division/modulo function. Calculates the quotient and remainder of a / b. @br
 //** @param maximalAdditionalFractionDigits How many digits should be added to the quotient, if the result cannot be represented with the current precision
-//** @param flags Division options: bfdfFillIntegerPart:  Calculate at least all digits of the integer part of the quotient, independent of the precision of the input @br
-//**                                bfdfKillFractions:    Do not calculate the fractional part of the quotient (remember that a bigdecimal is a scaled integer. So bfdfFillIntegerPart ensures that the result has not less digits than an integer division (necessary in case of an exponent > 0) and bfdfKillFractions that the result has not more digits than an integer division (in case of an exponent < 0) )  @br
-//**                                bfdfAddHiddenDigit: Calculates an additional digit for rounding, which will not be displayed by BigDecimalToStr@br
-//** Only tested with the [bfdfFillIntegerPart, bfdfAddHiddenDigit] and [bfdfFillIntegerPart, bfdfKillFractions] flags
-procedure divideModNoAlias(out quotient, remainder: BigDecimal; const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bfdfFillIntegerPart, bfdfAddHiddenDigit]);
-function divide(const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bfdfFillIntegerPart, bfdfAddHiddenDigit]): BigDecimal;
+//** @param flags Division options:
+//**  bddfKeepDividentPrecision: calculates as least as many non-zero digit of the quotient as the divident (1st arg) has @br
+//**  bddfKeepDivisorPrecision: calculates as least as many non-zero digit of the quotient as the divisor (2nd arg) has @br
+//**  bddfAddHiddenDigit: Calculates an additional digit for rounding, which will not be displayed by BigDecimalToStr@br
+//**  bddfFillIntegerPart: Calculate at least all digits of the integer part of the quotient, independent of the precision of the input @br
+//**  bddfNoFractionalPart: Do not calculate the fractional part of the quotient (remember that a bigdecimal is a scaled integer. So bfdfFillIntegerPart ensures that the result has not less digits than an integer division (necessary in case of an exponent > 0) and bfdfKillFractions that the result has not more digits than an integer division (in case of an exponent < 0) )  @br
+//** not all flag combinations were tested
+procedure divideModNoAlias(out quotient, remainder: BigDecimal; const a, b: BigDecimal; targetPrecision: integer = 18; flags: TBigDecimalDivisionFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit]);
+function divide(const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit]): BigDecimal;
+
+//** Calculates a decimal shift: @code(v := v * 10^shift)
+procedure shift10(var v: BigDecimal; shift: integer);
+//** Calculates a decimal shift: @code(result := v * 10^shift)
+function shifted10(const v: BigDecimal; shift: integer): BigDecimal;
 
 //** Compares the big decimals. Returns -1, 0 or 1
 function compareBigDecimals(const a, b: BigDecimal): integer;
@@ -140,7 +148,8 @@ operator >(const a: BigDecimal; const b: BigDecimal): boolean;
 
 //** Removes leading (pre .) and trailing (post .) zeros
 procedure normalize(var x: BigDecimal);
-
+//** How many non-zero digits the number contains
+function precision(const v: BigDecimal): integer;
 
 type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmRoundHalfUp, bfrmRoundHalfToEven);
 //** Universal rounding function @br
@@ -174,10 +183,18 @@ function gcd(const a,b: BigDecimal): BigDecimal; overload;
 //**< Calculates the least common multiple
 function lcm(const a,b: BigDecimal): BigDecimal; overload;
 
+//** Calculates 2 ** exp, with exp being an integer (faster for negative numbers)
+function fastpower2to(const exp: Int64): BigDecimal;
+//** Calculates 5 ** exp, with exp being an integer (faster for negative numbers)
+function fastpower5to(const exp: Int64): BigDecimal;
 
 implementation
 
+const divisionDefaultPrecision = 18;
+      divisionDefaultFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit, bddfFillIntegerPart];
+
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
+
 
 function TryStrDecodeDecimal(const s: string; out intstart, intend, dot, exp: integer): boolean;
 var
@@ -288,6 +305,19 @@ begin
     else if i >= 10000000 then exit(8)
     else if i >= 1000000 then exit(7)
     else exit(6);
+  end;
+end;
+
+function trailingZeros(i: integer): integer;
+var j: integer;
+begin
+  if i = 0 then exit(DIGITS_PER_ELEMENT);
+  j := i div 10;
+  result := 0;
+  while (i <> 0) and (i - 10 * j {= i mod 10} = 0) do begin
+    result += 1;
+    i := j {= i div 10};
+    j := i div 10;
   end;
 end;
 
@@ -427,7 +457,7 @@ begin
       //(each += corresponds to a for loop below)
       reslen := lowBinLength ;
       reslen += (min(high(displaydigits), dotBinPos) - lowskip) * DIGITS_PER_ELEMENT;
-      reslen += max(0, dotBinPos - high(digits) ) * DIGITS_PER_ELEMENT;
+      reslen += max(0, dotBinPos - high(displaydigits) ) * DIGITS_PER_ELEMENT;
       reslen += max(0, firstHigh - max(-exponent, 0)) * DIGITS_PER_ELEMENT;
       if reslen <> 0 then
         reslen += 1; //dot
@@ -447,7 +477,7 @@ begin
       intToStrFixedLength(lowBin, p,  lowBinLength); //last bin (with trimmed trailing zeros)
       for i := lowskip + 1 to min(high(displaydigits), dotBinPos) do //other bins
         intToStrFixedLength(displaydigits[i], p,  DIGITS_PER_ELEMENT);
-      for i := high(digits)+1 to dotBinPos do begin //additional zeros given by exponent (after .)
+      for i := high(displaydigits)+1 to dotBinPos do begin //additional zeros given by exponent (after .)
         p -= DIGITS_PER_ELEMENT;
         FillChar((p + 1)^, DIGITS_PER_ELEMENT, '0');
       end;
@@ -808,6 +838,54 @@ begin
   end;
 end;
 
+procedure shift10(var v: BigDecimal; shift: integer);
+var
+  expshift, i: Integer;
+  temp: BigDecimalBin;
+begin
+  if length(v.digits) = 0 then exit;
+
+  with v do begin
+    expshift := shift div DIGITS_PER_ELEMENT;
+    exponent += expshift;
+
+    shift := shift - expshift * DIGITS_PER_ELEMENT;
+    if shift = 0 then exit;
+    if shift < 0 then begin
+      if (digits[0] = 0 ) then begin
+        //high  | ...       |  0
+        //  xxx | yyy | zzz |
+        //=>  x | xxy | yyz | zz
+        shift := - shift;
+        for i := 0 to high(digits) - 1 do begin
+          temp := digits[i+1] div powersOf10[shift];
+          digits[i] += (digits[i+1] - temp * powersOf10[shift]) * powersOf10[DIGITS_PER_ELEMENT - shift];
+          digits[i+1] := temp;
+        end;
+        exit;
+      end else  begin
+        shift := DIGITS_PER_ELEMENT + shift; //resizing adds a bin in front so everything is shifted left, then right
+        v.exponent -= 1;
+      end;
+    end;
+    if digits[high(digits)] <> 0 then
+      SetLength(digits, length(digits) + 1);
+    for i := high(digits) - 1 downto 0 do begin
+      temp := digits[i] div powersOf10[DIGITS_PER_ELEMENT - shift];
+      digits[i+1] += temp;
+      digits[i] := (digits[i] - temp * powersOf10[DIGITS_PER_ELEMENT - shift]) * powersOf10[shift];
+    end;
+  end;
+end;
+
+function shifted10(const v: BigDecimal; shift: integer): BigDecimal;
+begin
+  result := v;
+  //if shift mod DIGITS_PER_ELEMENT <> 0 then
+    SetLength(Result.digits, length(result.digits));
+  shift10(result, shift);
+end;
+
 function compareBigDecimals(const a, b: BigDecimal): integer;
 var
   ai, bi: Integer;
@@ -881,7 +959,24 @@ begin
     for i := lowskip to high(x.digits) - highskip do
       x.digits[i - lowskip] := x.digits[i] ;
   SetLength(x.digits, length(x.digits) - lowskip - highskip);
-  x.lastDigitHidden := x.lastDigitHidden and (lowskip = 0);
+end;
+
+function precision(const v: BigDecimal): integer;
+var
+  realhigh: integer;
+  reallow: Integer;
+begin
+  realhigh := high(v.digits);
+  while (realhigh >= 0) and (v.digits[realhigh] = 0) do dec(realhigh);
+  if realhigh < 0 then exit;
+
+  reallow := 0;
+  while (reallow <= realhigh) and (v.digits[reallow] = 0) do inc(reallow);
+
+
+  if realhigh = reallow then exit(digitsInBin(v.digits[realhigh]) - trailingZeros(v.digits[reallow]));
+
+  result := digitsInBin(v.digits[realhigh]) + (realhigh - reallow) * DIGITS_PER_ELEMENT - trailingZeros(v.digits[reallow])
 end;
 
 function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
@@ -923,6 +1018,39 @@ begin
   if exp.signed then raise EInvalidArgument.Create('Non-integer exponent must be positive');
   result := bigdecimalbcd.exp(exp * ln(v));
 end;}
+
+function fastpower2to(const exp: Int64): BigDecimal;
+begin
+  if exp >= DIGITS_PER_ELEMENT * 3 then exit(power(BigDecimal(2), exp)); //I cannot think of any faster way than the standard logalgorithm
+  if exp >= 0 then begin
+    setlength(result.digits, 1);
+    result.digits[0] := 1 shl exp;
+    result.exponent:=0;
+    result.signed:=false;
+    result.lastDigitHidden:=false;
+  end else begin
+    //2^-i = 5^i / 10^i
+    result := fastpower5to(-exp);
+    shift10(result, exp);
+  end;
+end;
+
+function fastpower5to(const exp: Int64): BigDecimal;
+const powersOf5: array[0..3] of integer = (1, 5, 25, 125);
+begin
+  if exp > min(3, DIGITS_PER_ELEMENT) then exit(power(BigDecimal(5), exp)); //I cannot think of any faster way than the standard logalgorithm
+  if exp >= 0 then begin
+    setlength(result.digits, 1);
+    result.digits[0] := powersOf5[exp];
+    result.exponent:=0;
+    result.signed:=false;
+    result.lastDigitHidden:=false;
+  end else begin
+    //5^-i = 2^i / 10^i
+    result := fastpower2to(-exp);
+    shift10(result, exp);
+  end;
+end;
 
 function sqrt(const v: BigDecimal; precision: integer = 9): BigDecimal;
 var
@@ -1090,7 +1218,7 @@ end;
 
 
 procedure divideModNoAlias(out quotient, remainder: BigDecimal; const a, b: BigDecimal;
-                           maximalAdditionalFractionDigits: integer; flags: TBigDecimalDivisionFlags);
+                           targetPrecision: integer; flags: TBigDecimalDivisionFlags);
  { procedure bitShiftIntRight(var x: BigDecimal);
   var
     i: Integer;
@@ -1143,7 +1271,7 @@ var temp: BigDecimal;
     end;
     //result := max_k {k | x <= y * k }
     result := 0;
-    l := 0;
+    l := 0; // better something like: remainder.digits[bhigh+1] * BigDecimalBinSquared(DIGITS_PER_ELEMENT) + remainder.digits[bhigh]) div b.digits[bhigh];
     h := ELEMENT_OVERFLOW - 1;
     while l <= h do begin
       m := l + (h - l) div 2;
@@ -1160,6 +1288,17 @@ var temp: BigDecimal;
     end;
   end;
 
+  function getNextResultBin(const curBin: BigDecimalBin): BigDecimalBin; inline;
+  var
+    j: Integer;
+  begin
+    for j := high(remainder.digits) downto 1 do remainder.digits[j] := remainder.digits[j-1];
+    remainder.digits[0] := curBin;
+    result := greatestMultiple(remainder, b);
+    if result > 0 then
+      subAbsoluteScaledNoAlias(remainder, b, 0, result);
+  end;
+
 var
   bhighskip, blowskip: integer;
   bhigh: Integer;
@@ -1168,8 +1307,15 @@ var
   guess: Integer;
   maximalAdditionalFractionBins: Integer;
   last: Integer;
+  ahigh, aprecision, bprecision: Integer;
+
+  abin, rbin: integer;
+  bin: BigDecimalBin;
+  foundNonZeroBin: boolean;
+  len: Integer;
+
 begin
-  if maximalAdditionalFractionDigits = 0 then
+  if bddfNoFractionalPart in flags then
     case compareAbsolute(a, b) of
       -1: begin
         setZero(quotient);
@@ -1180,64 +1326,69 @@ begin
   skipZeros(b, bhighskip, blowskip);
   bhigh := high(b.digits) - bhighskip;
   quotient.signed := a.signed <> b.signed;
-  quotient.lastDigitHidden:=a.lastDigitHidden;
+  quotient.lastDigitHidden:=a.lastDigitHidden or (bddfAddHiddenDigit in flags);
   remainder.signed := false;
-  quotient.exponent := a.exponent - b.exponent;
   remainder.exponent := b.exponent;
   remainder.lastDigitHidden:=false;
   temp.exponent := b.exponent;
 
-  if (bfdfFillIntegerPart in flags) then maximalAdditionalFractionDigits += (max(0, a.exponent - b.exponent)) * DIGITS_PER_ELEMENT;
-  if bfdfAddHiddenDigit in flags then maximalAdditionalFractionDigits += 1;
 
-  SetLength(temp.digits, length(b.digits) + 1);
-  SetLength(quotient.digits, max(0, length(a.digits) - bhigh - min(0, b.exponent)));
+  if bddfKeepDividentPrecision in flags then targetPrecision := max(targetPrecision, precision(a));
+  if bddfKeepDivisorPrecision in flags then  targetPrecision := max(targetPrecision, precision(b));
+  //if bddfFillIntegerPart in flags then targetPrecision := max(targetPrecision, (length(a.digits) + a.exponent) * DIGITS_PER_ELEMENT ); //(a.exponent - b.exponent) * DIGITS_PER_ELEMENT);
+  if bddfAddHiddenDigit in flags then targetPrecision += 1;
+
   SetLength(remainder.digits, length(b.digits) + 1);
-  last := 0;
-  if bfdfKillFractions in flags then last := max(0, -quotient.exponent);
-  for i := high(a.digits) downto last do begin
-    for j := high(remainder.digits) downto 1 do remainder.digits[j] := remainder.digits[j-1];
-    remainder.digits[0] := a.digits[i];
-    guess := greatestMultiple(remainder, b); // remainder.digits[bhigh+1] * BigDecimalBinSquared(DIGITS_PER_ELEMENT) + remainder.digits[bhigh]) div b.digits[bhigh];
-    if guess > 0 then
-      subAbsoluteScaledNoAlias(remainder, b, 0, guess);
-    if (i <= high(quotient.digits)) then
-      quotient.digits[i] := guess;
+  SetLength(temp.digits, length(b.digits) + 1);
+  len := (targetPrecision + DIGITS_PER_ELEMENT - 1 ) div DIGITS_PER_ELEMENT + {bad splitting: } 1;
+  quotient.exponent :=  a.exponent - b.exponent + high(a.digits) - (len - 1);
+  if (bddfFillIntegerPart in flags) and (quotient.exponent > 0) then begin
+    targetPrecision += DIGITS_PER_ELEMENT * quotient.exponent;
+    len := (targetPrecision + DIGITS_PER_ELEMENT - 1 ) div DIGITS_PER_ELEMENT + {bad splitting: } 1;
+    quotient.exponent :=  a.exponent - b.exponent + high(a.digits) - (len - 1);
   end;
 
-  if (bfdfKillFractions in flags) and (quotient.exponent < 0) then begin
-    SetLength(remainder.digits, length(remainder.digits) + last);
-    for i := high(remainder.digits) downto last do
-      remainder.digits[i] := remainder.digits[i - last];
-    for i := 0 to last - 1 do
+  SetLength(quotient.digits,  len);
+
+
+  foundNonZeroBin := false;
+  abin := high(a.digits);
+  rbin := high(quotient.digits);
+  while ((targetPrecision > 0) or ((bddfFillIntegerPart in flags) and (rbin >= max(0, -quotient.exponent)) ))
+        and (not (bddfNoFractionalPart in flags) or (rbin >= max(0, -quotient.exponent))) do begin
+    if abin < 0 then bin := getNextResultBin(0)
+    else begin
+      bin := getNextResultBin(a.digits[abin]);
+      abin -= 1;
+    end;
+    if foundNonZeroBin or (bin > 0) then begin
+      if not foundNonZeroBin then begin
+        foundNonZeroBin := true;
+        targetPrecision -= digitsInBin(bin);
+      end else targetPrecision -= DIGITS_PER_ELEMENT;
+      quotient.digits[rbin] := bin;
+      rbin -= 1;
+    end else quotient.exponent -= 1;
+  end;
+
+  if (targetPrecision < 0) and (not (bddfFillIntegerPart in flags) or (rbin + 1 < max(0, -quotient.exponent))) then
+    quotient.digits[rbin+1] -= quotient.digits[rbin+1] mod powersOf10[-targetPrecision];
+
+  if quotient.lastDigitHidden and  (bin div powersOf10[-targetPrecision] mod 10 = 0) then
+    quotient.lastDigitHidden := false;
+
+  if abin >= 0 then begin
+    SetLength(remainder.digits, length(remainder.digits) + abin + 1);
+    for i := high(remainder.digits) downto abin + 1 do
+      remainder.digits[i] := remainder.digits[i - abin - 1];
+    for i := 0 to abin do
       remainder.digits[i] := a.digits[i];
-    remainder.exponent -= last;
+    remainder.exponent -= abin + 1;
   end;
 
-  if not isZero(remainder) then begin
-    if (maximalAdditionalFractionDigits > 0) then begin
-      maximalAdditionalFractionBins := ((maximalAdditionalFractionDigits + DIGITS_PER_ELEMENT - 1) div DIGITS_PER_ELEMENT) ;
-      quotient.exponent -= maximalAdditionalFractionBins;
-      SetLength(quotient.digits, length(quotient.digits) + maximalAdditionalFractionBins);
-      for i := high(quotient.digits) downto maximalAdditionalFractionBins do
-        quotient.digits[i] := quotient.digits[i-maximalAdditionalFractionBins];
-      for i := maximalAdditionalFractionBins - 1 downto 0 do begin
-        for j := high(remainder.digits) downto 1 do remainder.digits[j] := remainder.digits[j-1];
-        remainder.digits[0] := 0;
-        guess := greatestMultiple(remainder, b);
-        if guess > 0 then subAbsoluteScaledNoAlias(remainder, b, 0, guess);
-        quotient.digits[i] := guess;
-      end;
-      if (maximalAdditionalFractionBins * DIGITS_PER_ELEMENT > maximalAdditionalFractionDigits) and (quotient.exponent < 0) then
-        quotient.digits[0] -= quotient.digits[0] mod powersOf10[DIGITS_PER_ELEMENT * maximalAdditionalFractionBins - maximalAdditionalFractionDigits];
-      if not isZero(remainder) then begin
-        if (bfdfAddHiddenDigit in flags) then
-          quotient.lastDigitHidden:=true;
-        remainder.signed:=a.signed <> b.signed;
-      end;
-    end else
-      remainder.signed:=a.signed <> b.signed;
-  end;
+  if (a.signed <> b.signed) and not isZero(remainder) then
+    remainder.signed := a.signed <> b.signed;
+
 end;
 
 function divide(const a, b: BigDecimal; maximalAdditionalFractionDigits: integer; flags: TBigDecimalDivisionFlags): BigDecimal;
@@ -1251,21 +1402,21 @@ operator/(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 var
   temp: BigDecimal;
 begin
-  divideModNoAlias(result, temp, a, b, 18, [bfdfFillIntegerPart, bfdfAddHiddenDigit]);
+  divideModNoAlias(result, temp, a, b, divisionDefaultPrecision, divisionDefaultFlags);
 end;
 
 operator div(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 var
   temp: BigDecimal;
 begin
-  divideModNoAlias(result, temp, a, b, 0, [bfdfFillIntegerPart, bfdfKillFractions]);
+  divideModNoAlias(result, temp, a, b, 0, [bddfFillIntegerPart, bddfNoFractionalPart]);
 end;
 
 operator mod(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 var
   temp: BigDecimal;
 begin
-  divideModNoAlias(temp, result, a, b, 0, [bfdfFillIntegerPart, bfdfKillFractions]);
+  divideModNoAlias(temp, result, a, b, 0, [bddfFillIntegerPart, bddfNoFractionalPart]);
 end;
 
 operator**(const a: BigDecimal; const b: int64): BigDecimal;
