@@ -85,7 +85,10 @@ function BigDecimalToT_NativeInt_(const a: BigDecimal): T_NativeInt_;
 {%END-REPEAT}
 function BigDecimalToExtended(const a: BigDecimal): Extended;
 
-function FloatToBigDecimal(const v: double; exact: boolean = false): BigDecimal;
+
+{%REPEAT T_NativeFloat_, [Double, Single, Extended]}
+function FloatToBigDecimal(const v: T_NativeFloat_; exact: boolean = false): BigDecimal; overload;
+{%END-REPEAT}
 
 {%REPEAT T_NativeInt_, [Integer, Int64, QWord]}
 //operator :=(const a: BigDecimal): T_NativeInt_;
@@ -587,18 +590,51 @@ begin
   end;
 end;
 
-function FloatToBigDecimal(const v: double; exact: boolean): BigDecimal;
-var vasi64: QWord;
+procedure splitFloat(const v: single; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
+begin
+  sign := (PDWord(@v)^ shr 31) <> 0;
+  exponent := (PDWord(@v)^ shr 23) and $FF;
+  mantissa  := PDWord(@v)^ and DWord($7FFFFF);
+end;
+
+procedure splitFloat(const v: double; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
+begin
+  sign := (PQWord(@v)^ shr 63) <> 0;
+  exponent := (PQWord(@v)^ shr 52) and $7FF;
+  mantissa  := PQWord(@v)^ and QWord($000FFFFFFFFFFFFF);
+end;
+
+type TExtendedSplit = packed record
+    mantissa: QWord;
+    prefix: SmallInt;
+  end;
+  PExtendedSplit = ^TExtendedSplit;
+procedure splitFloat(const v: extended; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
+begin
+  sign := (PExtendedSplit(@v)^.prefix shr 15) <> 0;
+  exponent := PExtendedSplit(@v)^.prefix and $7FFF;
+  mantissa := PExtendedSplit(@v)^.mantissa;
+end;
+
+{$PUSH}
+{$R-} //QWord arithmetic is buggy in 2.6.2
+
+//http://en.wikipedia.org/wiki/Extended_precision
+//http://en.wikipedia.org/wiki/IEEE_754-1985#Single_precision
+{%REPEAT (T_NativeFloat_, _EXPONENT_MAX_, _EXPONENT_BIAS_, _MANTISSA_BIT_LENGTH_),
+         [(Double, $7FF, 1023, 52),
+         (Single, $FF, 127, 23),
+         (Extended, $7FFF, 16383, 63)]}
+function FloatToBigDecimal(const v: T_NativeFloat_; exact: boolean): BigDecimal;
+const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (_MANTISSA_BIT_LENGTH_);
+var
   exponent: Integer;
   mantissa: QWord;
   bdexphalf: BigDecimal;
   bdmin, bdexact, bdmax: BigDecimal;
+  signed: boolean;
 begin
-  vasi64 := PQWord(@v)^;
-
-  exponent := (vasi64 shr 52) and $7FF;
-  mantissa  := vasi64 and QWord($000FFFFFFFFFFFFF);
-
+  splitFloat(v, signed, exponent, mantissa);
   case exponent of
     0: begin
       if mantissa = 0 then begin
@@ -606,33 +642,41 @@ begin
         exit;
       end else begin
         //subnormal
-        exponent := 1 - 1023;
+        exponent := 1 - _EXPONENT_BIAS_;
+        mantissa := mantissa and not _MANTISSA_IMPLICIT_BIT_; //only needed for unnormal/pseudo values of extended
       end;
     end;
-    $7ff: begin
-      raise EConvertError.Create('Cannot convert non numeric double to BigDecimal');
+    _EXPONENT_MAX_: begin
+      raise EConvertError.Create('Cannot convert non numeric T_NativeFloat_ to BigDecimal');
     end;
     else begin
-      exponent:= exponent - 1023;
-      mantissa := mantissa or $0010000000000000;
+      exponent:= exponent - _EXPONENT_BIAS_;
+      mantissa := mantissa or _MANTISSA_IMPLICIT_BIT_;
     end;
   end;
 
-  exponent -= 52;
+
+  exponent -= _MANTISSA_BIT_LENGTH_;
   if exact then begin
     result :=  mantissa * fastpower2to(exponent);
-    result.signed := (vasi64 shr 63) <> 0;
+    result.signed := signed;
     exit;
   end;
 
   bdexphalf := fastpower2to(exponent - 1);
-  bdmin := (mantissa * 2 - 1) * bdexphalf;
+  bdexact := mantissa * bdexphalf;
+  bdexact := bdexact + bdexact;
+  bdmin := bdexact - bdexphalf;
+  bdmax := bdexact + bdexphalf;
+{  bdmin := (mantissa * 2 - 1) * bdexphalf;
   bdexact := bdmin + bdexphalf;
-  bdmax :=  bdexact + bdexphalf;
+  bdmax :=  bdexact + bdexphalf;}
   result := prettiest(bdmin, bdexact, bdmax);
-  result.signed := (vasi64 shr 63) <> 0;
+  result.signed := signed;
 end;
+{%END-REPEAT}
 
+{$POP}
 
 {%REPEAT T_NativeInt_, [Integer, Int64, QWord]}
 

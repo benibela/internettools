@@ -9,7 +9,7 @@ interface
 uses
   Classes, SysUtils, math;
 
-{$DEFINE USE_8_DIGITS}
+{$DEFINE USE_9_DIGITS}
 
 {$IF defined(USE_1_DIGIT) or defined(USE_1_DIGITS)}
 const DIGITS_PER_ELEMENT = 1;
@@ -87,7 +87,14 @@ function BigDecimalToInt64(const a: BigDecimal): Int64;
 
 function BigDecimalToExtended(const a: BigDecimal): Extended;
 
-function FloatToBigDecimal(const v: double; exact: boolean = false): BigDecimal;
+
+
+function FloatToBigDecimal(const v: Double; exact: boolean = false): BigDecimal; overload;
+
+function FloatToBigDecimal(const v: Single; exact: boolean = false): BigDecimal; overload;
+
+function FloatToBigDecimal(const v: Extended; exact: boolean = false): BigDecimal; overload;
+
 
 
 //operator :=(const a: BigDecimal): Integer;
@@ -614,18 +621,48 @@ begin
   end;
 end;
 
-function FloatToBigDecimal(const v: double; exact: boolean): BigDecimal;
-var vasi64: QWord;
+procedure splitFloat(const v: single; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
+begin
+  sign := (PDWord(@v)^ shr 31) <> 0;
+  exponent := (PDWord(@v)^ shr 23) and $FF;
+  mantissa  := PDWord(@v)^ and DWord($7FFFFF);
+end;
+
+procedure splitFloat(const v: double; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
+begin
+  sign := (PQWord(@v)^ shr 63) <> 0;
+  exponent := (PQWord(@v)^ shr 52) and $7FF;
+  mantissa  := PQWord(@v)^ and QWord($000FFFFFFFFFFFFF);
+end;
+
+type TExtendedSplit = packed record
+    mantissa: QWord;
+    prefix: SmallInt;
+  end;
+  PExtendedSplit = ^TExtendedSplit;
+procedure splitFloat(const v: extended; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
+begin
+  sign := (PExtendedSplit(@v)^.prefix shr 15) <> 0;
+  exponent := PExtendedSplit(@v)^.prefix and $7FFF;
+  mantissa := PExtendedSplit(@v)^.mantissa;
+end;
+
+{$PUSH}
+{$R-} //QWord arithmetic is buggy in 2.6.2
+
+//http://en.wikipedia.org/wiki/Extended_precision
+//http://en.wikipedia.org/wiki/IEEE_754-1985#Single_precision
+
+function FloatToBigDecimal(const v: Double; exact: boolean): BigDecimal;
+const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (52);
+var
   exponent: Integer;
   mantissa: QWord;
   bdexphalf: BigDecimal;
   bdmin, bdexact, bdmax: BigDecimal;
+  signed: boolean;
 begin
-  vasi64 := PQWord(@v)^;
-
-  exponent := (vasi64 shr 52) and $7FF;
-  mantissa  := vasi64 and QWord($000FFFFFFFFFFFFF);
-
+  splitFloat(v, signed, exponent, mantissa);
   case exponent of
     0: begin
       if mantissa = 0 then begin
@@ -634,32 +671,140 @@ begin
       end else begin
         //subnormal
         exponent := 1 - 1023;
+        mantissa := mantissa and not _MANTISSA_IMPLICIT_BIT_; //only needed for unnormal/pseudo values of extended
       end;
     end;
-    $7ff: begin
-      raise EConvertError.Create('Cannot convert non numeric double to BigDecimal');
+    $7FF: begin
+      raise EConvertError.Create('Cannot convert non numeric Double to BigDecimal');
     end;
     else begin
       exponent:= exponent - 1023;
-      mantissa := mantissa or $0010000000000000;
+      mantissa := mantissa or _MANTISSA_IMPLICIT_BIT_;
     end;
   end;
+
 
   exponent -= 52;
   if exact then begin
     result :=  mantissa * fastpower2to(exponent);
-    result.signed := (vasi64 shr 63) <> 0;
+    result.signed := signed;
     exit;
   end;
 
   bdexphalf := fastpower2to(exponent - 1);
-  bdmin := (mantissa * 2 - 1) * bdexphalf;
+  bdexact := mantissa * bdexphalf;
+  bdexact := bdexact + bdexact;
+  bdmin := bdexact - bdexphalf;
+  bdmax := bdexact + bdexphalf;
+{  bdmin := (mantissa * 2 - 1) * bdexphalf;
   bdexact := bdmin + bdexphalf;
-  bdmax :=  bdexact + bdexphalf;
+  bdmax :=  bdexact + bdexphalf;}
   result := prettiest(bdmin, bdexact, bdmax);
-  result.signed := (vasi64 shr 63) <> 0;
+  result.signed := signed;
 end;
 
+function FloatToBigDecimal(const v: Single; exact: boolean): BigDecimal;
+const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (23);
+var
+  exponent: Integer;
+  mantissa: QWord;
+  bdexphalf: BigDecimal;
+  bdmin, bdexact, bdmax: BigDecimal;
+  signed: boolean;
+begin
+  splitFloat(v, signed, exponent, mantissa);
+  case exponent of
+    0: begin
+      if mantissa = 0 then begin
+        setZero(result);
+        exit;
+      end else begin
+        //subnormal
+        exponent := 1 - 127;
+        mantissa := mantissa and not _MANTISSA_IMPLICIT_BIT_; //only needed for unnormal/pseudo values of extended
+      end;
+    end;
+    $FF: begin
+      raise EConvertError.Create('Cannot convert non numeric Single to BigDecimal');
+    end;
+    else begin
+      exponent:= exponent - 127;
+      mantissa := mantissa or _MANTISSA_IMPLICIT_BIT_;
+    end;
+  end;
+
+
+  exponent -= 23;
+  if exact then begin
+    result :=  mantissa * fastpower2to(exponent);
+    result.signed := signed;
+    exit;
+  end;
+
+  bdexphalf := fastpower2to(exponent - 1);
+  bdexact := mantissa * bdexphalf;
+  bdexact := bdexact + bdexact;
+  bdmin := bdexact - bdexphalf;
+  bdmax := bdexact + bdexphalf;
+{  bdmin := (mantissa * 2 - 1) * bdexphalf;
+  bdexact := bdmin + bdexphalf;
+  bdmax :=  bdexact + bdexphalf;}
+  result := prettiest(bdmin, bdexact, bdmax);
+  result.signed := signed;
+end;
+
+function FloatToBigDecimal(const v: Extended; exact: boolean): BigDecimal;
+const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (63);
+var
+  exponent: Integer;
+  mantissa: QWord;
+  bdexphalf: BigDecimal;
+  bdmin, bdexact, bdmax: BigDecimal;
+  signed: boolean;
+begin
+  splitFloat(v, signed, exponent, mantissa);
+  case exponent of
+    0: begin
+      if mantissa = 0 then begin
+        setZero(result);
+        exit;
+      end else begin
+        //subnormal
+        exponent := 1 - 16383;
+        mantissa := mantissa and not _MANTISSA_IMPLICIT_BIT_; //only needed for unnormal/pseudo values of extended
+      end;
+    end;
+    $7FFF: begin
+      raise EConvertError.Create('Cannot convert non numeric Extended to BigDecimal');
+    end;
+    else begin
+      exponent:= exponent - 16383;
+      mantissa := mantissa or _MANTISSA_IMPLICIT_BIT_;
+    end;
+  end;
+
+
+  exponent -= 63;
+  if exact then begin
+    result :=  mantissa * fastpower2to(exponent);
+    result.signed := signed;
+    exit;
+  end;
+
+  bdexphalf := fastpower2to(exponent - 1);
+  bdexact := mantissa * bdexphalf;
+  bdexact := bdexact + bdexact;
+  bdmin := bdexact - bdexphalf;
+  bdmax := bdexact + bdexphalf;
+{  bdmin := (mantissa * 2 - 1) * bdexphalf;
+  bdexact := bdmin + bdexphalf;
+  bdmax :=  bdexact + bdexphalf;}
+  result := prettiest(bdmin, bdexact, bdmax);
+  result.signed := signed;
+end;
+
+
+{$POP}
 
 
 
