@@ -527,19 +527,21 @@ var
   midigit, madigit: Integer;
   needNextBin: Boolean;
   i, j: Integer;
-  bin: BigDecimalBin;
+  bin, micurbin: BigDecimalBin;
 begin
   result := exact;
-  if (length(mi.digits) <> length(ma.digits)) or (mi.exponent <> ma.exponent) then
+  if (length(mi.digits) > length(ma.digits)) or (length(mi.digits) + 1 < length(ma.digits)) or (mi.exponent <> ma.exponent) then
     exit();
 
-  for i := high(mi.digits) downto 0 do
-    if mi.digits[i] <> ma.digits[i] then begin
+  i := high(ma.digits);
+  if i <= high(mi.digits) then micurbin := mi.digits[i] else micurbin := 0;
+  while i >= 0 do begin
+    if micurbin <> ma.digits[i] then begin
       for digit := 1 to DIGITS_PER_ELEMENT do begin
-        mitemp := mi.digits[i] div powersOf10[digit];
+        mitemp := micurbin div powersOf10[digit];
         matemp := ma.digits[i] div powersOf10[digit];
         if mitemp = matemp then begin
-          midigit := (mi.digits[i] div powersOf10[digit-1]) mod 10;
+          midigit := (micurbin div powersOf10[digit-1]) mod 10;
           madigit := (ma.digits[i] div powersOf10[digit-1]) mod 10;
           needNextBin := false;
           if midigit + 1 < madigit then begin
@@ -568,18 +570,21 @@ begin
           end;
 
           result := exact;
-          if needNextBin then setlength(result.digits, length(mi.digits) - i + 1)
-          else setlength(result.digits, length(mi.digits) - i);
-          for j := high(mi.digits) downto i + 1 do
-            Result.digits[j - high(mi.digits) + high(result.digits)] := mi.digits[j];
-          Result.digits[i - high(mi.digits) + high(result.digits)] := bin;
+          if needNextBin then setlength(result.digits, length(ma.digits) - i + 1)
+          else setlength(result.digits, length(ma.digits) - i);
+          for j := high(ma.digits) downto i + 1 do
+            Result.digits[j - high(ma.digits) + high(result.digits)] := ma.digits[j];
+          Result.digits[i - high(ma.digits) + high(result.digits)] := bin;
           if needNextBin then
             result.digits[0] := 5 * powersOf10[DIGITS_PER_ELEMENT-1];
-          result.exponent := mi.exponent + high(mi.digits) - high(result.digits);
+          result.exponent := ma.exponent + high(ma.digits) - high(result.digits);
           exit;
         end;
       end;
     end;
+    dec(i);
+    micurbin := mi.digits[i]
+  end;
 end;
 
 function FloatToBigDecimal(const v: double; exact: boolean): BigDecimal;
