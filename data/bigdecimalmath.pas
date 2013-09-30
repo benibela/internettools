@@ -9,7 +9,7 @@ interface
 uses
   Classes, SysUtils, math;
 
-{$DEFINE USE_3_DIGITS}
+{$DEFINE USE_9_DIGITS}
 
 {$IF defined(USE_1_DIGIT) or defined(USE_1_DIGITS)}
 const DIGITS_PER_ELEMENT = 1;
@@ -87,12 +87,17 @@ function BigDecimalToInt64(const a: BigDecimal): Int64;
 
 function BigDecimalToExtended(const a: BigDecimal): Extended;
 
+function FloatToBigDecimal(const v: double; exact: boolean = false): BigDecimal;
+
 
 //operator :=(const a: BigDecimal): Integer;
 operator :=(const a: Integer): BigDecimal;
 
 //operator :=(const a: BigDecimal): Int64;
 operator :=(const a: Int64): BigDecimal;
+
+//operator :=(const a: BigDecimal): QWord;
+operator :=(const a: QWord): BigDecimal;
 
 //operator :=(const a: BigDecimal): Extended; auto conversion of bigdecimal to extended is possible, but it confuses fpc overload resolution. Then e.g. power calls either math or bigdecimalbc depending on the unit order in the uses clause
 operator :=(const a: Extended): BigDecimal;
@@ -542,6 +547,115 @@ begin
   if a.signed then result := -result;
 end;
 
+function prettiest(const mi, exact, ma: BigDecimal): BigDecimal;
+var
+  mitemp, matemp: Integer;
+  digit: Integer;
+  midigit, madigit: Integer;
+  needNextBin: Boolean;
+  i, j: Integer;
+  bin: BigDecimalBin;
+begin
+  result := exact;
+  if (length(mi.digits) <> length(ma.digits)) or (mi.exponent <> ma.exponent) then
+    exit();
+
+  for i := high(mi.digits) downto 0 do
+    if mi.digits[i] <> ma.digits[i] then begin
+      for digit := 1 to DIGITS_PER_ELEMENT do begin
+        mitemp := mi.digits[i] div powersOf10[digit];
+        matemp := ma.digits[i] div powersOf10[digit];
+        if mitemp = matemp then begin
+          midigit := (mi.digits[i] div powersOf10[digit-1]) mod 10;
+          madigit := (ma.digits[i] div powersOf10[digit-1]) mod 10;
+          needNextBin := false;
+          if midigit + 1 < madigit then begin
+            //easy case
+            //e.g. xxx8xxxxxx
+            //     xxx3xxxxxx  => xxx50000000000
+            bin := (mitemp * 10 + (midigit + madigit) shr 1 ) * powersOf10[digit-1];
+          end else begin
+            //e.g. xxx800000000001
+            //     xxx700000000000  => xxx80000000000
+            //but
+            //e.g. xxx800000000000
+            //     xxx700000000000  => xxx75000000000
+            if (i = 0) and (digit = 1) then exit();
+            bin := (mitemp * 10 + madigit ) * powersOf10[digit-1];
+            needNextBin := (ma.digits[i] mod powersOf10[digit - 1] = 0);
+            for j := i - 1 downto 0 do
+              if ma.digits[j] <> 0 then begin
+                needNextBin := false;
+                break;
+              end;
+            if needNextBin and (digit <> 1) then begin
+              needNextBin := false;
+              bin := bin - powersOf10[digit-1] + 5 * powersOf10[digit+1];
+            end;
+          end;
+
+          result := exact;
+          if needNextBin then setlength(result.digits, length(mi.digits) - i + 1)
+          else setlength(result.digits, length(mi.digits) - i);
+          for j := high(mi.digits) downto i + 1 do
+            Result.digits[j - high(mi.digits) + high(result.digits)] := mi.digits[j];
+          Result.digits[i - high(mi.digits) + high(result.digits)] := bin;
+          if needNextBin then
+            result.digits[0] := 5 * powersOf10[DIGITS_PER_ELEMENT-1];
+          result.exponent := mi.exponent + high(mi.digits) - high(result.digits);
+          exit;
+        end;
+      end;
+    end;
+end;
+
+function FloatToBigDecimal(const v: double; exact: boolean): BigDecimal;
+var vasi64: QWord;
+  exponent: Integer;
+  mantissa: QWord;
+  bdexphalf: BigDecimal;
+  bdmin, bdexact, bdmax: BigDecimal;
+begin
+  vasi64 := PQWord(@v)^;
+
+  exponent := (vasi64 shr 52) and $7FF;
+  mantissa  := vasi64 and QWord($000FFFFFFFFFFFFF);
+
+  case exponent of
+    0: begin
+      if mantissa = 0 then begin
+        setZero(result);
+        exit;
+      end else begin
+        //subnormal
+        exponent := 1 - 1023;
+      end;
+    end;
+    $7ff: begin
+      raise EConvertError.Create('Cannot convert non numeric double to BigDecimal');
+    end;
+    else begin
+      exponent:= exponent - 1023;
+      mantissa := mantissa or $0010000000000000;
+    end;
+  end;
+
+  exponent -= 52;
+  if exact then begin
+    result :=  mantissa * fastpower2to(exponent);
+    result.signed := (vasi64 shr 63) <> 0;
+    exit;
+  end;
+
+  bdexphalf := fastpower2to(exponent - 1);
+  bdmin := (mantissa * 2 - 1) * bdexphalf;
+  bdexact := bdmin + bdexphalf;
+  bdmax :=  bdexact + bdexphalf;
+  result := prettiest(bdmin, bdexact, bdmax);
+  result.signed := (vasi64 shr 63) <> 0;
+end;
+
+
 
 
 
@@ -549,6 +663,7 @@ operator:=(const a: Integer): BigDecimal;
 var len: integer;
     temp: Integer;
     i: Integer;
+    signed: Boolean;
 begin
   temp := a ;
   len := 0;
@@ -557,16 +672,23 @@ begin
     len += 1;
   end;
   SetLength(result.digits, max(len, 1));
+  
   if a <> low(Integer) then temp := abs(a)
   else temp := high(Integer);
+  
+  
   for i := 0 to high(result.digits) do begin
     result.digits[i] := temp mod ELEMENT_OVERFLOW;
     temp := temp div ELEMENT_OVERFLOW;
   end;
-  result.signed:=a < 0;
   result.exponent:=0;
   result.lastDigitHidden:=false;
+  signed := false;
+  
+  signed:=a < 0;
   if a = low(Integer) then result.digits[0] += 1;
+  
+  result.signed:=signed;
 end;
 
 
@@ -576,6 +698,7 @@ operator:=(const a: Int64): BigDecimal;
 var len: integer;
     temp: Int64;
     i: Integer;
+    signed: Boolean;
 begin
   temp := a ;
   len := 0;
@@ -584,16 +707,54 @@ begin
     len += 1;
   end;
   SetLength(result.digits, max(len, 1));
+  
   if a <> low(Int64) then temp := abs(a)
   else temp := high(Int64);
+  
+  
   for i := 0 to high(result.digits) do begin
     result.digits[i] := temp mod ELEMENT_OVERFLOW;
     temp := temp div ELEMENT_OVERFLOW;
   end;
-  result.signed:=a < 0;
   result.exponent:=0;
   result.lastDigitHidden:=false;
+  signed := false;
+  
+  signed:=a < 0;
   if a = low(Int64) then result.digits[0] += 1;
+  
+  result.signed:=signed;
+end;
+
+
+
+
+operator:=(const a: QWord): BigDecimal;
+var len: integer;
+    temp: QWord;
+    i: Integer;
+    signed: Boolean;
+begin
+  temp := a ;
+  len := 0;
+  while temp <> 0 do begin
+    temp := temp div ELEMENT_OVERFLOW;
+    len += 1;
+  end;
+  SetLength(result.digits, max(len, 1));
+  
+  
+  temp := a;
+  
+  for i := 0 to high(result.digits) do begin
+    result.digits[i] := temp mod ELEMENT_OVERFLOW;
+    temp := temp div ELEMENT_OVERFLOW;
+  end;
+  result.exponent:=0;
+  result.lastDigitHidden:=false;
+  signed := false;
+  
+  result.signed:=signed;
 end;
 
 
