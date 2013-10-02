@@ -76,6 +76,7 @@ function TryStrToBigDecimal(const s: string; res: PBigDecimal): boolean;
 //** Supports standard decimal notation, like -123.456 or 1E-2    (@code(-?[0-9]+(.[0-9]+)?([eE][-+]?[0-9]+)))
 //** Raises an exception on invalid input.
 function StrToBigDecimal(const s: string): BigDecimal; inline;
+//type TBigDecimalFormat = (bdfExact, bdfExponent); format: TBigDecimalFormat = bdfExact
 //** Converts a bigdecimal to a decimal string @br
 //** The result will be fixed width format [0-9]+(.[0-9]+)?, even if the input had an exponent
 function BigDecimalToStr(const v: BigDecimal): string;
@@ -383,29 +384,43 @@ var
   lowskip: integer;
   lowBinLength: Integer;
   lowBin: BigDecimalBin;
-  displaydigits: array of BigDecimalBin;
+  displayed: PBigDecimal;
   dotBinPos: Integer;
 
  procedure setLowBin;
  begin
-   while (displaydigits[lowskip] = 0) and (lowskip  <= dotBinPos) do lowskip += 1;
+   while (displayed^.digits[lowskip] = 0) and (lowskip  <= dotBinPos) do lowskip += 1;
    lowBinLength := DIGITS_PER_ELEMENT;
-   lowBin := displaydigits[lowskip];
+   lowBin := displayed^.digits[lowskip];
    while (lowBin mod 10 = 0) and (lowBinLength > 0) do begin
      lowBin := lowBin div 10;
      lowBinLength -= 1;
    end;
  end;
 
+var
+  skip: Integer;  //leading trimmed zeros
+  firstHigh: integer;
+
+ procedure init;
+ begin
+   with displayed^ do begin
+     dotBinPos := -exponent - 1; //first bin after the decimal point (every bin i <= dotBinPos belongs to the fractional part)
+     skipZeros(v, skip, lowskip);
+     firstHigh:=high(digits) - skip;
+     if length(digits) = skip + lowskip then exit();
+   end;
+   setLowBin;
+ end;
+
  var
   p: PAnsiChar;
   i: Integer;
-  skip: Integer;  //leading trimmed zeros
   reslen: integer;
   highBin: BigDecimalBin;
   highBinLength: Integer;
   additionalCarry: Boolean;
-  firstHigh: integer;
+  tempdecimal: BigDecimal;
 begin
   //print all numbers bin starting at the lexical last one (bin nr. 0)
   // trim trailing 0 after .
@@ -425,56 +440,38 @@ begin
   //                  5   4   3   2   1   0
   //     -exponent (8)
 
+  displayed := @v;
+  init;
   with v do begin
-    dotBinPos := -exponent - 1; //first bin after the decimal point (every bin i <= dotBinPos belongs to the fractional part)
-    displaydigits := digits;
-    skipZeros(v, skip, lowskip);
     if length(digits) = skip + lowskip then exit('0');
-    firstHigh:=high(digits) - skip;
-    setLowBin;
     //remove last hidden digit, and increment the number by one if the  hidden digit is >= 5
     if (lastDigitHidden) and (lowskip <= dotBinPos)   then begin
-      additionalCarry := (lowBin mod 10 >= 5);
-      lowBin := lowBin div 10;
-      lowBinLength -= 1;
-      if additionalCarry then begin
-        lowBin += 1;
-        additionalCarry := lowBin >= powersOf10[lowBinLength];
-      end;
-      if additionalCarry then begin
-        SetLength(displaydigits, length(digits) + 1 - skip);
-        lowBin := 0;
-        displaydigits[lowskip] := 0;
-        displaydigits[lowskip + 1] += 1;
-        for i := lowskip + 1 to high(displaydigits) do begin
-          if displaydigits[i] < ELEMENT_OVERFLOW then break
-          else begin
-            displaydigits[i] -= ELEMENT_OVERFLOW;
-            if i + 1 > high(displaydigits) then begin
-              SetLength(displaydigits, length(displaydigits) + 1);
-              displaydigits[high(displaydigits)] := 0;
-            end;
-            displaydigits[i+1] += 1;
-          end;
-        end;
-        setLowBin;
-        firstHigh:=high(displaydigits) ;
-        while (firstHigh > max(0,dotBinPos)) and (displaydigits[firstHigh] = 0) do firstHigh -= 1;
+      additionalCarry := (lowBin mod 10 >= 5) ;
+      if additionalCarry and (lowBin div 10 + 1 >= powersOf10[lowBinLength-1]) then begin
+        tempdecimal := round(v, (exponent + lowskip + 1) * DIGITS_PER_ELEMENT - (lowBinLength - 1));
+        displayed := @tempdecimal;
+        init;
+        if length(digits) = skip + lowskip then exit('0');
+      end else begin
+        lowBin := lowBin div 10;
+        lowBinLength -= 1;
+        if additionalCarry then lowBin+=1;
       end;
     end;
-
+  end;
+  with displayed^ do begin
     //calculate the length of the result
     if dotBinPos < lowskip then reslen := (firstHigh + exponent) * DIGITS_PER_ELEMENT //integer number
     else begin
       //(each += corresponds to a for loop below)
       reslen := lowBinLength ;
-      reslen += (min(high(displaydigits), dotBinPos) - lowskip) * DIGITS_PER_ELEMENT;
-      reslen += max(0, dotBinPos - high(displaydigits) ) * DIGITS_PER_ELEMENT;
+      reslen += (min(high(digits), dotBinPos) - lowskip) * DIGITS_PER_ELEMENT;
+      reslen += max(0, dotBinPos - high(digits) ) * DIGITS_PER_ELEMENT;
       reslen += max(0, firstHigh - max(-exponent, 0)) * DIGITS_PER_ELEMENT;
       if reslen <> 0 then
         reslen += 1; //dot
     end;
-    if firstHigh > dotBinPos then highBin := displaydigits[firstHigh]
+    if firstHigh > dotBinPos then highBin := digits[firstHigh]
     else highBin := 0;
     highBinLength := digitsInBin(highBin);
     reslen += highBinLength;
@@ -487,9 +484,9 @@ begin
     if dotBinPos >= lowskip then begin
       //fractional part
       intToStrFixedLength(lowBin, p,  lowBinLength); //last bin (with trimmed trailing zeros)
-      for i := lowskip + 1 to min(high(displaydigits), dotBinPos) do //other bins
-        intToStrFixedLength(displaydigits[i], p,  DIGITS_PER_ELEMENT);
-      for i := high(displaydigits)+1 to dotBinPos do begin //additional zeros given by exponent (after .)
+      for i := lowskip + 1 to min(high(digits), dotBinPos) do //other bins
+        intToStrFixedLength(digits[i], p,  DIGITS_PER_ELEMENT);
+      for i := high(digits)+1 to dotBinPos do begin //additional zeros given by exponent (after .)
         p -= DIGITS_PER_ELEMENT;
         FillChar((p + 1)^, DIGITS_PER_ELEMENT, '0');
       end;
@@ -501,7 +498,7 @@ begin
       FillChar(p^, DIGITS_PER_ELEMENT + 1, '0');
     end;
     for i := max(-exponent, 0) to firstHigh - 1 do //other bins
-      intToStrFixedLength(displaydigits[i], p,  DIGITS_PER_ELEMENT);
+      intToStrFixedLength(digits[i], p,  DIGITS_PER_ELEMENT);
     intToStrFixedLength(highBin, p, highBinLength); //first bin (with trimmed leading zeros)
     if signed then begin p^ := '-'; dec(p); end;
 
@@ -1426,6 +1423,7 @@ var
   lastDigit: BigDecimalBin;
   toDigitInBin: Integer;
   i: Integer;
+  additionalBin: Integer;
 begin
   skipZeros(v, highskip, lowskip);
 
@@ -1467,8 +1465,10 @@ begin
     end;
   end;
 
-  SetLength(result.digits, max(0, length(v.digits) - highskip - max(0, result.exponent - v.exponent)));
-  for i := 0 to high(result.digits) do
+  if v.digits[high(v.digits) - highskip] = ELEMENT_OVERFLOW-1 then additionalBin := 1
+  else additionalBin :=  0;
+  SetLength(result.digits, additionalBin + max(0, length(v.digits) - highskip - max(0, result.exponent - v.exponent)));
+  for i := 0 to high(result.digits) - additionalBin do
     result.digits[i] := v.digits[i - v.exponent + result.exponent];
   if length(result.digits) > 0 then begin
     if toDigitInBin <> 0 then
