@@ -145,7 +145,7 @@ var xq: TXQueryEngine;
     version: TXQParsingModel;
     featureNamespaceAxis, featureHigherOrderFunctions: boolean;
     skipNegative: boolean;
-    forceTestSet: string;
+    forceTestSet, forceTestCase: string;
   end;
 
 { TResult }
@@ -481,6 +481,10 @@ var
   contexttree: TTreeNode;
 begin
   result.value := nil;
+  if (config.forceTestCase <> '') and (config.forceTestCase <> name) then begin
+    result.result:= tcrNA;
+    exit();
+  end;
   if config.skipNegative and TResult(results[0]).expectError then begin
     result.result:=tcrNotRun;
     exit();
@@ -503,6 +507,10 @@ begin
     on e: EXQException do begin
       result.error := e.errorCode +': '+e.Message;
       result.result := TResult(results[0]).check(e.errorCode);
+    end;
+    on e: ETreeParseException do begin
+      result.error := 'XML-PARSING-FAILED: '+e.Message;
+      result.result := tcrFail;
     end;
   end;
   if result.error = '' then
@@ -705,7 +713,7 @@ constructor TSource.create(e: TTreeNode);
 begin
   role := e['role'];
   filename := strResolveURI(e['file'], e.getDocument().baseURI);
-  url := e['url'];
+  url := e['uri'];
   if (role <> '.') and (role <> '' {part of collection}) then
     if not (role[1] = '$') then raise Exception.Create('Invalid source role:  '+e.outerXML())
     else role := strCopyFrom(role, 2);
@@ -721,8 +729,24 @@ begin
 end;
 
 function TSource.tree: TTreeNode;
+var
+  idx: Integer;
 begin
-  if ftree = nil then ftree := htmlparserExampleXQTS3.tree.parseTreeFromFile(filename);
+  if ftree = nil then begin
+    if xq.ExternalDocumentsCacheInternal = nil then xq.ExternalDocumentsCacheInternal := TStringList.Create;
+    if url <> '' then begin
+      idx := xq.ExternalDocumentsCacheInternal.IndexOf(url);
+      if idx >= 0 then exit(TTreeNode(xq.ExternalDocumentsCacheInternal.Objects[idx]));
+    end;
+    try
+      ftree := htmlparserExampleXQTS3.tree.parseTreeFromFile(filename);
+    except
+      on e: ETreeParseException do ftree := nil;
+    end;
+    if url <> '' then
+      xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
+
+  end;
   result := ftree
 end;
 
@@ -745,19 +769,22 @@ begin
     end;
 
     staticBaseUri := xq.parseXPath2('static-base-uri/@uri').evaluate(e).toString;
+    if staticBaseUri = '' then staticBaseUri := e.getDocument().baseURI;
 
     collations := TStringList.Create;
     for v in xq.parseXPath2('collation').evaluate(e) do begin
       collations.AddObject(v.toNode['uri'], xqtsCollations.Objects[xqtsCollations.IndexOf(v.toNode['uri'])]);
       if v.toNode['default'] = 'true' then defaultCollation:=v.toNode['uri'];
     end;
+    if (collations.Count > 0) and (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
+      collations.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
 
     u := xq.parseXPath2('param').evaluate(e);
     SetLength(params, u.getSequenceCount);
-    for i := 0 to u.getSequenceCount - 1 do begin
-      n := u.getChild(i).toNode;
+    for i := 0 to u.getSequenceCount -1  do begin
+      n := u.getChild(i+1).toNode;
       params[i].name := n['name'];
-      if n.hasAttribute('select') then params[i].value := xq.parseXPath2(n['select']).evaluate()
+      if n.hasAttribute('select') then params[i].value := xq.parseXQuery3(n['select']).evaluate()
       else params[i].value := xqvalue();
       if n.hasAttribute('as') then if 'xs:'+params[i].value.typeAnnotation.name <> n['as'] then raise Exception.Create('Type mismatch in environment definition');
       if n.hasAttribute('source') then raise exception.Create('Unsupported environment param attribute');
@@ -827,7 +854,7 @@ begin
   for i := 0 to env.sources.Count-1 do
     if TSource(env.sources[i]).role = '.' then result := TSource(env.sources[i]).tree
     else if TSource(env.sources[i]).role <> '' then xq.VariableChangelog.add(TSource(env.sources[i]).role, TSource(env.sources[i]).tree)
-    else ; //ignore, the query should load it itself
+    else TSource(env.sources[i]).tree; //the query should load it itself, but we need to load it in the cache, because the url does not actually exist
 
   for i := 0 to high(env.params) do
     xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
@@ -865,6 +892,7 @@ begin
   clr.declareString('mode', 'Query mode (xquery1, xquery3, xpath2, xpath3)', 'xquery1');
   clr.declareFlag('skip-negative', 'Ignore tests expecting only an error');
   clr.declareString('test-set', 'Only runs a certain test set');
+  clr.declareString('test-case', 'Only runs a certain test case');
 
   case clr.readString('mode') of
     'xquery1': config.version := xqpmXQuery1;
@@ -874,6 +902,7 @@ begin
   end;
   config.skipNegative := clr.readFlag('skip-negative');
   config.forceTestSet := clr.readString('test-set');
+  config.forceTestCase := clr.readString('test-case');
 
 
   TDependency.init;
@@ -891,6 +920,7 @@ begin
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
+  XQGlobalTrimNodes:=false;
   tree.repairMissingStartTags:=false;
   tree.parsingModel := pmStrict;
   xq :=  TXQueryEngine.create;
