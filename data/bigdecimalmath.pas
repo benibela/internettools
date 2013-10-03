@@ -355,6 +355,7 @@ end;
 function BigDecimalToStr(const v: BigDecimal; format: TBigDecimalFormat = bdfExact): string;
 const BigDecimalDecimalSeparator = '.';
       BigDecimalExponent = 'E';
+      BigDecimalZeroResult = '0'; //return value on zero input. Might depend on format some day (e.g. 0.0, 0.0E0)
 
   procedure intToStrFixedLength(t: integer; var p: pchar; len: integer = DIGITS_PER_ELEMENT); inline;
   var
@@ -406,13 +407,6 @@ var
    setLowBin;
  end;
 
- function formatZero: string;
- begin
-   case format of
-     bdfExact: result := '0';
-     bdfExponent: result := '0'+BigDecimalDecimalSeparator+'0'+BigDecimalExponent+'0';
-   end;
- end;
 
  var
   p: PAnsiChar;
@@ -446,7 +440,7 @@ begin
   displayed := @v;
   init;
   with v do begin
-    if length(digits) = skip + lowskip then exit(formatZero);
+    if length(digits) = skip + lowskip then exit(BigDecimalZeroResult);
     //remove last hidden digit, and increment the number by one if the  hidden digit is >= 5
     if (lastDigitHidden)   then begin
       additionalCarry := (lowBin mod 10 >= 5) ;
@@ -454,7 +448,7 @@ begin
         tempdecimal := round(v, (exponent + lowskip + 1) * DIGITS_PER_ELEMENT - (lowBinLength - 1));
         displayed := @tempdecimal;
         init;
-        if length(digits) = skip + lowskip then exit(formatZero);
+        if length(digits) = skip + lowskip then exit(BigDecimalZeroResult);
       end else if (lowskip <= dotBinPos) then begin
         lowBin := lowBin div 10;
         lowBinLength -= 1;
@@ -518,7 +512,7 @@ begin
       end;
       bdfExponent: begin
         while (firstHigh >= 0) and (digits[firstHigh] = 0) do dec(firstHigh);
-        if firstHigh < 0 then exit(formatZero);
+        if firstHigh < 0 then exit(BigDecimalZeroResult);
 
         highBin := digits[firstHigh];
         highBinLength := digitsInBin(highBin);
