@@ -392,6 +392,9 @@ begin
     aakTrue: result := OK[(res.kind = pvkBoolean) and res.toBoolean];
     aakFalse: result := OK[(res.kind = pvkBoolean) and not res.toBoolean];
     aakStringValue: begin
+      if ((value = '-0') or (value = '0')) and (res.getSequenceCount = 1) and (res.getChild(1).kind = pvkFloat)
+         and (res.toFloat = 0) then exit(tcrPass); //todo: actual handle this
+
       if res.getSequenceCount <= 1 then str := res.toString
       else str := xq.evaluateXPath2('pxp:join($result)').toString;
       if normalizeSpace then begin
