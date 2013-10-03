@@ -2389,6 +2389,8 @@ begin
   //        y.0* => y
   //        y.0*(E..) => y.0E..
 
+  //also E+?00*... => E...
+
   result := s;
 
   D := pos('.', result);
@@ -2404,6 +2406,7 @@ begin
   delete(result, p, E - p);
 
   if (p < length(result)) and (Result[p+1] = '+') then delete(result, p+1, 1); //also remove + after E
+  while (p < length(result)) and (Result[p+1] = '0') do delete(result, p+1, 1); //also remove 0 after E
 end;
 
 {$ifdef FPC_HAS_TYPE_EXTENDED}
@@ -2427,12 +2430,40 @@ begin
 end;
 {$endif FPC_HAS_TYPE_SINGLE}
 {$ifdef FPC_HAS_TYPE_DOUBLE}
+{function scientify(const s: string): string;
+var
+  dot: SizeInt;
+  exp: String;
+  signlen: Integer;
+begin
+  result := s;
+  if pos('E', s) > 0 then exit();
+  dot := pos('.', Result);
+  signlen := 0;
+  if result[1] = '-' then signlen := 1;
+  case dot of
+    0: begin
+      exp := IntToStr(length(s) - 1 - signlen);
+      result := copy(result, 1, 1 + signlen) + '.' + copy(result, 2 + signlen, length(result) - 1 - signlen);
+    end;
+    1: exit;
+    else begin
+      exp := IntToStr(length(s) - 1 - signlen - 1 - (length(s) - dot));
+      result := copy(result, 1, 1 + signlen) + '.' + copy(result, 2 + signlen, dot - 2 - signlen)  + copy(result, dot + 1, length(result) - dot);
+    end;
+  end;
+  result += 'E' + exp;
+end;}
+
 function myDecimalToStr(const v:double): string;
 begin
   //if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
-  if ((v >= double(0.000001)) and (v < 1000000)) or ((v > -1000000) and (v <= double(-0.000001)))  then str(v:0:16, result)
-  else result := FloatToStrF(V, ffExponent, 16, 0, FormatSettings);
-  result := killTrailingZeros(result);
+  if ((v >= double(0.000001)) and (v < 1000000)) or ((v > -1000000) and (v <= double(-0.000001)))  then begin
+    str(v:0:16, result);
+    result := killTrailingZeros(result);
+  end
+  else result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExponent);
+
 end;
 {$endif FPC_HAS_TYPE_DOUBLE}
 
