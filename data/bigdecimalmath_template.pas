@@ -88,8 +88,11 @@ function BigDecimalToT_NativeInt_(const a: BigDecimal): T_NativeInt_;
 function BigDecimalToExtended(const a: BigDecimal): Extended;
 
 
+type TBigDecimalFloatFormat = (bdffExact, bdffShortest);
 {%REPEAT T_NativeFloat_, [Double, Single, Extended]}
-function FloatToBigDecimal(const v: T_NativeFloat_; exact: boolean = false): BigDecimal; overload;
+{$ifdef FPC_HAS_TYPE_T_NativeFloat_}
+function FloatToBigDecimal(const v: T_NativeFloat_; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal; overload;
+{$endif FPC_HAS_TYPE_T_NativeFloat_}
 {%END-REPEAT}
 
 {%REPEAT T_NativeInt_, [Integer, Int64, QWord]}
@@ -678,7 +681,8 @@ end;
          [(Double, $7FF, 1023, 52),
          (Single, $FF, 127, 23),
          (Extended, $7FFF, 16383, 63)]}
-function FloatToBigDecimal(const v: T_NativeFloat_; exact: boolean): BigDecimal;
+{$ifdef FPC_HAS_TYPE_T_NativeFloat_}
+function FloatToBigDecimal(const v: T_NativeFloat_; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal;
 const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (_MANTISSA_BIT_LENGTH_);
 var
   exponent: Integer;
@@ -710,7 +714,7 @@ begin
 
 
   exponent -= _MANTISSA_BIT_LENGTH_;
-  if exact then begin
+  if format = bdffExact then begin
     result :=  mantissa * fastpower2to(exponent);
     result.signed := signed;
     exit;
@@ -727,6 +731,7 @@ begin
   result := prettiest(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
+{$endif FPC_HAS_TYPE_T_NativeFloat_}
 {%END-REPEAT}
 
 {$POP}

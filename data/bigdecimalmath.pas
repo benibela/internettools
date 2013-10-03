@@ -90,12 +90,19 @@ function BigDecimalToInt64(const a: BigDecimal): Int64;
 function BigDecimalToExtended(const a: BigDecimal): Extended;
 
 
+type TBigDecimalFloatFormat = (bdffExact, bdffShortest);
 
-function FloatToBigDecimal(const v: Double; exact: boolean = false): BigDecimal; overload;
+{$ifdef FPC_HAS_TYPE_Double}
+function FloatToBigDecimal(const v: Double; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal; overload;
+{$endif FPC_HAS_TYPE_Double}
 
-function FloatToBigDecimal(const v: Single; exact: boolean = false): BigDecimal; overload;
+{$ifdef FPC_HAS_TYPE_Single}
+function FloatToBigDecimal(const v: Single; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal; overload;
+{$endif FPC_HAS_TYPE_Single}
 
-function FloatToBigDecimal(const v: Extended; exact: boolean = false): BigDecimal; overload;
+{$ifdef FPC_HAS_TYPE_Extended}
+function FloatToBigDecimal(const v: Extended; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal; overload;
+{$endif FPC_HAS_TYPE_Extended}
 
 
 
@@ -706,7 +713,8 @@ end;
 //http://en.wikipedia.org/wiki/Extended_precision
 //http://en.wikipedia.org/wiki/IEEE_754-1985#Single_precision
 
-function FloatToBigDecimal(const v: Double; exact: boolean): BigDecimal;
+{$ifdef FPC_HAS_TYPE_Double}
+function FloatToBigDecimal(const v: Double; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal;
 const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (52);
 var
   exponent: Integer;
@@ -738,7 +746,7 @@ begin
 
 
   exponent -= 52;
-  if exact then begin
+  if format = bdffExact then begin
     result :=  mantissa * fastpower2to(exponent);
     result.signed := signed;
     exit;
@@ -755,8 +763,10 @@ begin
   result := prettiest(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
+{$endif FPC_HAS_TYPE_Double}
 
-function FloatToBigDecimal(const v: Single; exact: boolean): BigDecimal;
+{$ifdef FPC_HAS_TYPE_Single}
+function FloatToBigDecimal(const v: Single; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal;
 const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (23);
 var
   exponent: Integer;
@@ -788,7 +798,7 @@ begin
 
 
   exponent -= 23;
-  if exact then begin
+  if format = bdffExact then begin
     result :=  mantissa * fastpower2to(exponent);
     result.signed := signed;
     exit;
@@ -805,8 +815,10 @@ begin
   result := prettiest(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
+{$endif FPC_HAS_TYPE_Single}
 
-function FloatToBigDecimal(const v: Extended; exact: boolean): BigDecimal;
+{$ifdef FPC_HAS_TYPE_Extended}
+function FloatToBigDecimal(const v: Extended; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal;
 const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (63);
 var
   exponent: Integer;
@@ -838,7 +850,7 @@ begin
 
 
   exponent -= 63;
-  if exact then begin
+  if format = bdffExact then begin
     result :=  mantissa * fastpower2to(exponent);
     result.signed := signed;
     exit;
@@ -855,6 +867,7 @@ begin
   result := prettiest(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
+{$endif FPC_HAS_TYPE_Extended}
 
 
 {$POP}
