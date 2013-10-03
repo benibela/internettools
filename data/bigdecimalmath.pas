@@ -1345,7 +1345,7 @@ var
 begin
   realhigh := high(v.digits);
   while (realhigh >= 0) and (v.digits[realhigh] = 0) do dec(realhigh);
-  if realhigh < 0 then exit;
+  if realhigh < 0 then exit(0);
 
   reallow := 0;
   while (reallow <= realhigh) and (v.digits[reallow] = 0) do inc(reallow);
@@ -1704,6 +1704,11 @@ begin
         exit;
       end;
     end;
+  if isZero(a) then begin
+    setZero(quotient);
+    setZero(remainder);
+    exit;
+  end;
   skipZeros(b, bhighskip, blowskip);
   bhigh := high(b.digits) - bhighskip;
   quotient.signed := a.signed <> b.signed;
