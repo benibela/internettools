@@ -334,6 +334,8 @@ begin
   test(BigDecimalToStr(bd),  '22308033411.24063094344083');
   test(BigDecimalToStr(bd, bdfExponent),  '2.230803341124063094344083E10');
 
+  test(precision(StrToBigDecimal('0E-10')), 0);
+  test(precision(StrToBigDecimal('0')), 0);
   test(precision(StrToBigDecimal('1')), 1);
   test(precision(StrToBigDecimal('12')), 2);
   test(precision(StrToBigDecimal('123')), 3);
@@ -439,6 +441,7 @@ begin
   bd := StrToBigDecimal('-1876') / StrToBigDecimal('13242148.0');
   test(BigDecimalToStr(bd),  '-0.000141668859160915586');
   test(BigDecimalToStr(bd, bdfExponent),  '-1.41668859160915586E-4');
+  test(BigDecimalToStr(StrToBigDecimal('0') / 7), '0');
 
   test(equalUpToPrecision(StrToBigDecimal('0.11'), StrToBigDecimal('0.111')), 'eutp1');
   test(not equalUpToPrecision(StrToBigDecimal('0.11'), StrToBigDecimal('0.121')), 'eutp2');
@@ -448,6 +451,7 @@ begin
 
   test(BigDecimalToStr(StrToBigDecimal('1.23E3') div 7), '175');
   test(BigDecimalToStr(StrToBigDecimal('-1.23E3') div 7), '-175');
+  test(BigDecimalToStr(StrToBigDecimal('0') div 7), '0');
 
   bf := 12.34;
   test(BigDecimalToStr(bf), '12.34');
@@ -490,6 +494,8 @@ begin
   test(BigDecimalToStr(StrToBigDecimal('-3.0E20') mod StrToBigDecimal('7')), '-6');
   test(BigDecimalToStr(StrToBigDecimal('3.0E20') mod StrToBigDecimal('7')), '6');
   test(BigDecimalToStr(StrToBigDecimal('3.1E1') mod StrToBigDecimal('6')), '1');
+
+  test(BigDecimalToStr(StrToBigDecimal('0') mod 7), '0');
 
   test(isInteger(StrToBigDecimal('1e10')) = true );
   test(isInteger(StrToBigDecimal('1e-10')) = false );

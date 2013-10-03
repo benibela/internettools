@@ -31,7 +31,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--skip-negative  --mode xpath2 --test-set prod-Predicate"/>
+        <CommandLineParams Value="--skip-negative  --mode xpath2"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
     </RunParams>
