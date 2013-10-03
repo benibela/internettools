@@ -1895,6 +1895,7 @@ type
   public
     class procedure registerNativeModule(const module: TXQNativeModule);
     class function collationsInternal: TStringList;
+    property ExternalDocumentsCacheInternal: TStringList read FExternalDocuments write FExternalDocuments;
 
     //** Last parsed query
     property LastQuery: IXQuery read FLastQuery;
