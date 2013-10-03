@@ -418,7 +418,7 @@ end;
 
 function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
 begin
-  Result:=false;
+  Result:=false; //todo
 end;
 
 function TXSListType.tryCreateValueInternal(const v: String; outv: PXQValue): boolean;

@@ -654,6 +654,7 @@ end;
 function TXQValueQName.toBooleanEffective: boolean;
 begin
   raise EXQEvaluationException.Create('FORG0006', 'A QName cannot be used a boolean');
+  result := false;
 end;
 
 function TXQValueQName.clone: IXQValue;
@@ -1079,9 +1080,14 @@ end;
 
 function TXQValueSequence.toBooleanEffective: boolean;
 begin
-  if getSequenceCount = 0 then exit(false);
-  if (seq[0] is TXQValueNode) or (seq[0] is TXQValueObject) or (seq[0] is TXQValueJSONArray) then exit(true);
-  raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used a boolean');
+  case getSequenceCount of
+    0: exit(false);
+    1: exit(seq[0].toBooleanEffective);
+    else begin
+      if (seq[0] is TXQValueNode) or (seq[0] is TXQValueObject) or (seq[0] is TXQValueJSONArray) then exit(true);
+      raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used a boolean');
+    end;
+  end;
 end;
 
 function TXQValueSequence.toInt64: int64;
@@ -1596,6 +1602,7 @@ end;
 function TXQValueFunction.toBooleanEffective: boolean;
 begin
   raise EXQEvaluationException.Create('FORG0006', 'A datetime cannot be used a boolean');
+  result := false;
 end;
 
 function TXQValueFunction.directClone: TXQValue;
