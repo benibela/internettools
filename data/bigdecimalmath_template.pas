@@ -443,6 +443,10 @@ begin
         lowBin := lowBin div 10;
         lowBinLength -= 1;
         if additionalCarry then lowBin+=1;
+        if lowBinLength = 0 then begin
+          lowskip += 1;
+          setLowBin;
+        end;
       end else begin
         lowBin := lowBin - lowBin mod 10;
         if additionalCarry then lowBin+=10;
@@ -1458,6 +1462,7 @@ var
   bin: BigDecimalBin;
   foundNonZeroBin: boolean;
   len: Integer;
+  rdotbin: Integer;
 
 begin
   if bddfNoFractionalPart in flags then
@@ -1495,25 +1500,40 @@ begin
 
   SetLength(quotient.digits,  len);
 
+  rdotbin := max(0, -quotient.exponent);
+  if (bddfFillIntegerPart in flags) and (targetPrecision <= 0) then targetPrecision := 1;
 
   foundNonZeroBin := false;
   abin := high(a.digits);
   rbin := high(quotient.digits);
-  while ((targetPrecision > 0) or ((bddfFillIntegerPart in flags) and (rbin >= max(0, -quotient.exponent)) ))
-        and (not (bddfNoFractionalPart in flags) or (rbin >= max(0, -quotient.exponent))) do begin
-    if abin < 0 then bin := getNextResultBin(0)
-    else begin
-      bin := getNextResultBin(a.digits[abin]);
-      abin -= 1;
+  while (targetPrecision > 0)  do begin
+    while (targetPrecision > 0) do begin
+      if abin < 0 then bin := getNextResultBin(0)
+      else begin
+        bin := getNextResultBin(a.digits[abin]);
+        abin -= 1;
+      end;
+      if foundNonZeroBin or (bin > 0) then begin
+        if not foundNonZeroBin then begin
+          foundNonZeroBin := true;
+          targetPrecision -= digitsInBin(bin);
+        end else targetPrecision -= DIGITS_PER_ELEMENT;
+        quotient.digits[rbin] := bin;
+        rbin -= 1;
+        if (bddfNoFractionalPart in flags) and (rbin <  rdotbin) then break;
+      end else begin
+        quotient.exponent -= 1;
+        rdotbin := max(0, -quotient.exponent);
+      end;
     end;
-    if foundNonZeroBin or (bin > 0) then begin
-      if not foundNonZeroBin then begin
-        foundNonZeroBin := true;
-        targetPrecision -= digitsInBin(bin);
-      end else targetPrecision -= DIGITS_PER_ELEMENT;
-      quotient.digits[rbin] := bin;
-      rbin -= 1;
-    end else quotient.exponent -= 1;
+    if (bddfNoFractionalPart in flags) and (rbin <  rdotbin) then break;
+    if (bddfFillIntegerPart in flags) then
+      if (rbin >= rdotbin) then begin
+        if foundNonZeroBin then targetPrecision += DIGITS_PER_ELEMENT
+        else targetPrecision += 1;
+      end else if (bddfAddHiddenDigit in flags) and (rbin = rdotbin - 1) then
+        if isZero(remainder) then Exclude(flags, bddfAddHiddenDigit)
+        else targetPrecision := 1;
   end;
 
   if (targetPrecision < 0) and (not (bddfFillIntegerPart in flags) or (rbin + 1 < max(0, -quotient.exponent))) then
