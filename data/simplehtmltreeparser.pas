@@ -412,7 +412,7 @@ function arrayContainsI(const a: TStringArray; const s: string): boolean;
 var
   i: Integer;
 begin
-  for i:=0 to high(a) do if strEqual(a[i], s) then exit(true);
+  for i:=0 to high(a) do if striEqual(a[i], s) then exit(true);
   exit(false);
 end;
 
