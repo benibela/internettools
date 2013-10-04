@@ -443,6 +443,7 @@ type
 
     class function classKind: TXQValueKind; override;
 
+    function toBoolean: boolean; override;
     function toBooleanEffective: boolean; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime

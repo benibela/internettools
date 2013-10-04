@@ -559,6 +559,11 @@ begin
   Result:=pvkString;
 end;
 
+function TXQValueString.toBoolean: boolean;
+begin
+  Result:= (str <> '') and (str <> '0') and (str <> 'false');
+end;
+
 function TXQValueString.toBooleanEffective: boolean;
 begin
   result := length(str) > 0
