@@ -96,7 +96,7 @@ TTemplateElement=class(TTreeNode)
   match: TTreeNode; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
-  test, condition, valuepxp, source, min, max, varname: IXQuery;
+  test, condition, valuepxp, source, min, max, varname, ignoreSelfTest: IXQuery;
   textRegexs: array of TRegExpr;
 
   function templateReverse: TTemplateElement; inline;
@@ -162,7 +162,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   and the things between the loop-tags is repeated as long as possible. You can also use the short notation by adding a star like @code(<tr>..</tr>* ).@br
 
 
-  Using the template from Pascal:
+  Using the templates from Pascal:
 
 
   @orderedList(
@@ -172,7 +172,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   @item(Read the result of variable yourVariableName through parser.variables.values['yourVariableName'])
   )
 
-  If you used loops, only the last value of the variable is avaible in the variables property, the previous values can
+  If you used loops, only the last value of the variable is available in the variables property, the previous values can
   be enumerated through variableChangelog.
 
   @bold(Template examples)
@@ -331,15 +331,23 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @code(default-text-case-sensitive): specifies if text nodes are matched case sensitive.
     )
     )@br
-        Each of these commands can also have a property @code(test="{xpath condition}"), and the tag is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))). @br
+    These template attributes can be used on any template element:
+    @unorderedList(
+      @item(@code(template:test="xpath condition") @br
+        The element (and its children) is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))).
+      )
+      @item(@code(template:ignore-self-test="xpath condition") @br
+        The element (and NOT its children) is ignored if the condition does not evaluate to true.
+      )
+    )
     @br
-    There are two special attributes allowed for html or matching tags in the template file:
+    On html/matching tags also these matching modifying attributes can be used:
     @unorderedList(
       @item(@code(template:optional="true") @br if this is set the file is read successesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
                                                But it is fine to use optional tags that have an non-optional parent tag within the loop. )
       @item(@code(template:condition="xpath") @br if this is given, a tag is only accepted as matching, iff the given xpath-expression returns true (powerful, but slow) @br
-                                                      (condition is not the same as test: if test evaluates to false, the template tag is ignored; if condition evaluates to false, the html tag )
+                                                      (condition is not the same as test: if test evaluates to false, the template tag is ignored; if condition evaluates to false, the html tag is not found)
       )
     )
 
@@ -679,6 +687,7 @@ begin
   valuepxp := cachePXP('value');
   min := cachePXP('min');
   max := cachePXP('max');
+  ignoreSelfTest := cachePXP('ignore-self-test');
 
   if (templateType = tetMatchText) then begin
     //[regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [case-sensitive=".."] [list-contains=".."]
@@ -999,6 +1008,8 @@ var xpathText: TTreeNode;
      result := satisfied;
   end;
 
+
+
   procedure SkipFollowingElses;
   begin
     templateStart := templateStart.templateNext;
@@ -1159,9 +1170,13 @@ begin
         (templateStart <> nil) and (templateStart <> templateEnd) and
         ((htmlStart <> htmlEnd.next)) do begin
             if htmlStart.typ = tetText then xpathText := htmlStart;
+            if (templateStart.ignoreSelfTest <> nil) and performPXPEvaluation(templateStart.ignoreSelfTest).toBooleanEffective then begin
+              templateStart := templateStart.templateNext;
+              continue;
+            end;
             if not switchCommandAccepted and (templateStart.templateType <> tetIgnore) and
                 (templateStart.test <> nil) then
-            if not HandleCommandPseudoIf then continue;
+              if not HandleCommandPseudoIf then continue;
             if tefSwitchChild in templateStart.flags then begin
               if switchCommandAccepted then switchCommandAccepted:=false
               else begin //try other switch children (?)
@@ -1178,7 +1193,9 @@ begin
               tetMatchText: HandleMatchText;
               tetHTMLText: raise ETemplateParseException.Create('Assertion fail: Template text has been converted to text-match');
               tetHTMLOpen: HandleMatchOpen;
-              tetHTMLClose:  raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
+              tetHTMLClose:
+                if templateStart.templateReverse.ignoreSelfTest <> nil then templateStart := templateStart.templateNext //there is no way to get the value of the query now, is there?
+                else raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
 
               tetCommandRead: HandleCommandRead;
               tetCommandShortRead: HandleCommandShortRead;

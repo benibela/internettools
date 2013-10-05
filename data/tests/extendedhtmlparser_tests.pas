@@ -830,6 +830,10 @@ begin
   t('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>A2A</x><x>C2C</x></a>', 'a2=A2A'#10'c2=C2C');
   f('<a>    <t:switch><x>A1A<t:s>a1:=.</t:s></x><x>A2A<t:s>a2:=.</t:s></x></t:switch>      <t:switch><x>B1B<t:s>b1:=.</t:s></x><x>B2B<t:s>b2:=.</t:s></x></t:switch>?  <t:switch><x>C1C<t:s>c1:=.</t:s></x><x>C2C<t:s>c2:=.</t:s></x></t:switch>  </a>', '<a><x>A2A</x><x>B2B</x></a>');
 
+  t('<a><b t:ignore-self-test="true()">{.}</b></a>', '<a><c>foobar</c></a>', '_result=foobar');
+  t('<a><b t:ignore-self-test="true()"><c>{.}</c></b></a>', '<a><c>foobar</c><b>1</b></a>', '_result=foobar');
+  t('<a><t:if ignore-self-test="true()" test="false()"><b>{.}</b></t:if></a>', '<a><c>foobar</c><b>1</b></a>', '_result=1');
+  t('<a><t:if test="false()"><b>{.}</b></t:if></a>', '<a><c>foobar</c><b>1</b></a>', '');
 
   //  t('<a><b>{.}</b>{3}</a>', '<a><b>12</b><b>34</b></a>', '_result=12'#10'_result=34');
 
