@@ -1626,7 +1626,7 @@ type
           )
     @item(JSON-objects: JSON/JSONiq objects are supported. (option: json)
           @br Arrays can be created with @code(  [a,b,c] )
-          @br Like a sequence they store a list of values, and can be nested with each other and within sequences.
+          @br Like a sequence they store a list of values, but they can be nested with each other and within sequences.
           @br
           @br Object can be created with @code({"foobar": 123, "hallo": "world!", ...})
           @br They stores a set of values as associative map.

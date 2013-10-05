@@ -135,7 +135,8 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   You can use it by calling the methods @code(parseTemplate) and @code(parseHTML). @code(parseTemplate) loads a certain template
   and @code(parseHTML) matches the template to a html/xml file.@br
   A template file is just like a html file with special commands. The parser than matches every text and tag
-  of the template to text/tag in the html file, while ignoring every additional data in latter file. If no match is possible an exception is raised.@br
+  of the template to text/tag in the html file, while ignoring every additional data in latter file.
+  If no match is possible an exception is raised.@br
   The template can extract certain values from the html file into variables, and you can access these variables with the property @link(variables) and variableChangeLog.
   Former only contains the final value of the variables, latter records every assignment during the matching of the template.@br@br
 
@@ -178,92 +179,299 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
   @bold(Template examples)
 
   @definitionList(
-  @itemLabel(@italic(Example, how to read the first <b>-tag):)
+
+  @itemLabel(@italic(Example, how to read first <b>-tag):)
   @item(
-    Template: @code(<b><template:read var="test" source="text()"></b>)@br
     Html-File: @code(<b>Hello World!</b>)@br
+    Template: @code(<b>{.}</b>)@br
 
-  This will set the variable @code(test) to @code("Hello World!"))
-
-
-  @itemLabel(@italic(Example, how to read the first <b>-tag using the short template notation):)
-  @item(
-    Template: @code(<b><t:s>test:=.</t:s></b>)@br
-    Html-File: @code(<b>Hello World!</b>)@br
-
-  This will also set the variable @code(test) to @code("Hello World!" )
+  This will set the default variable @code(_result) to @code("Hello World!" )
   )
 
-  @itemLabel(@italic(Example, how to read the first <b>-tag using the very short template notation):)
+  @itemLabel(@italic(Example, how to read the first <b>-tag in a explicit named variable):)
   @item(
-    Template: @code(<b>{test:=.}</b>)@br
     Html-File: @code(<b>Hello World!</b>)@br
+    Template: @code(<b>{$test}</b>)@br
 
-  This will also set the variable @code(test) to @code("Hello World!" )
+  This will set the variable @code(test) to @code("Hello World!"). @br
+  Some alternative forms are @code(<b>{$test := .}</b>), @code(<b><t:s>test := .</t:s></b>), @code(<b><template:s>test := text()</template:s></b>) or @code(<b><t:read var="test" source="text()"></b>).
   )
 
   @itemLabel(@italic(Example, how to read all <b>-tags:))
   @item(
-    Template: @code(<template:loop><b><t:s>test:=.</t:s></b></template:loop>)@br
-    Html-File: @code(<b>Hello World!</b>)@br
+    Html-File: @code(<b>Hello </b><b>World!</b>)@br
+    Template: @code(<b>{.}</b>* )@br
 
-  This will also set the variable @code(test) to @code("Hello World!" )
+  This will change the value of the variable @code(_result) twice, to @code("Hello " ) and @code("World!"). Both values are available in the variable changelog.@br
+  Some alternative forms are: @code(<t:loop><b>{.}</b></t:loop>), @code(<template:loop><b>{.}</b></template:loop>), @code(<template:loop><b>{_result := text()}</b></template:loop>), ...
   )
 
-  @itemLabel(@italic(Example, how to read the first field of a every row of a table):)
+  @itemLabel(@italic(Example, how to read the first field of every row of a table):)
   @item(
-    Template: @code(<table> <template:loop> <tr> <td> <template:read var="readField()" source="text()"> </td> </tr> </template:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
+    Template: @code(<table> <template:loop> <tr> <td> {$field} </td> </tr> </template:loop> </table>)@br
 
-    This will read row after row, and will write each first field to the change log of the variable @code(readField()) .
+    This will read row after row, and will write each first field to the change log of the variable @code(field).
   )
 
-  @itemLabel(@italic(Example, how to read the several field of a every row of a table):)
+  @itemLabel(@italic(Example, how to read several fields of every row of a table):)
   @item(
-    Template: @code(<table> <template:loop> <tr> <td> <template:read var="readField1()" source="text()"> </td> <td> <template:read var="readField2()" source="text()"> </td> <td> <template:read var="readField3()" source="text()"> </td> ... </tr> </template:loop> </table>)@br
     Html-File: @code(<table> <tr> <td> a </td> <td> b </td> <td> c </td> </tr> ... </tr> </table>)@br
+    Template: @code(<table> <template:loop> <tr> <td> {$field1} </td> <td> {$field2} </td> <td> {$field3} </td> ... </tr> </template:loop> </table>)@br
 
-    This will read @code(readField1()=a, readField2()=b, readField3()=c)...@br
-    Of you can use your own names instead of @code(readFieldX()) and they are independent of the html file. So such templates can convert several pages with different structures, to the same internal data layout of your application.
+    This will read @code($field1=a, $field2=b, $field3=c)...@br
+    If you now want to process multiple pages which have a similar, but slightly different table/data layount, you can create
+    a template for each of them, and the Pascal side of the application is independent of the source pages.
+    Then it is even possible for the user of the application to add new pages.
   )
 
-  @itemLabel(@italic(Example, how to read all rows of every table CSV like):)
+  @itemLabel(@italic(Example, how to read all elements between two elements):)
   @item(
-  Template: @code(<template:loop> <tr>  <template:read var="readAnotherRow()" source="deep-text(',')"> </tr> </template:loop> )@br
-  Html-File: @code(... <tr> <td> a </td> <td> b </td> <td> c </td> </tr> <tr> <td> foo </td> <td> bar </td> </tr> ...)@br
+    Html-File:
+@preformatted(
+  <h1>Start</h1>
+    <b>Text 1</b>
+    <b>Text 2</b>
+  <h1>End</h1>)@br
+    Template: @preformatted(
+  <h1>Start</h1>
+    <b>{.}</b>*
+  <h1>End</h1>
+)@br
 
-  This will read all rows, and write lines like @code(a,b,c) and @code(foo,bar) to the changelog.)
+   This will read all b elements between the two headers.
+
+  )
 
   @itemLabel(@italic(Example, how to read the first list item starting with an unary prime number):)
   @item(
-  Template: @code(<li template:condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')"><template:read var="prime" source="text()"/></li>)@br
   Html-File: @code(... <li>1111: this is 4</li><li>1:1 is no prime</li><li>1111111: here is 7</li><li>11111111: 8</li> ...)@br
+  Template: @code(<li template:condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')">{$prime}</li>)@br
 
   This will return "1111111: here is 7", because 1111111 is the first prime in that list.)
 
-  @itemLabel(@italic(Example, how to extract all elements of a html form):)
-  @item(
-  Template: @preformatted(<form>
-  <template:switch>
-    <input t:condition="(@type = ('checkbox', 'radio') and exists(@checked)) or (@type = ('hidden', 'password', 'text'))">{post:=concat(@name,'=',@value)}</input>
-    <select>{temp:=@name}<option t:condition="exists(@selected)">{post:=concat($temp,'=',@value)}</option>?</select>
-    <textarea>{post:=concat(@name,'=',text())}</textarea>
-  </template:switch>*
-</form>)
 
-  Html-File: any form @br
-
-
-  This example will extract from each relevant element in the form the name and value pair which is sent to the webserver.
-  It is very general, and will work with all forms, independent of things like nesting deep.
-  Therefore it is a little bit ugly; but if you create a template for a specific page, you usually know which elements you will find there, so the template becomes much simpler in practical cases.
-
-
-  ))
+  )
 
   See the unit tests in tests/extendedhtmlparser_tests.pas for more examples.
 
 
+
+  @bold(Why not XPath/CSS-Selectors?)@br
+
+  You might wonder, why you should use templates, if you already know XPath or CSS Selectors.
+
+  The answer is that, although XPath/CSS works fine for single values, it is not
+  powerful enough to read multiple values or data from multiple sources, because:
+
+  @unorderedList(
+    @item(XPath/CSS expressions are not able to return multiple values.
+
+          Each expression can only return a single node set, so if you need to read m different values from n different pages,
+           you need O(m * n) expressions, while you only need O(n) templates.
+       @br For example, if you need to read a table listing objects and 2 values for each of them, like in this table:
+       @br   @code(<table><tr><td>name</td><td>value 1</td><td>value 2</td></tr></table>)
+       @br you can use this template:
+       @br   @code(<table><tr><td>{$name}</td><td>{$value1}</td><td>{$value2}</td></tr>*</table>)
+       @br and get three arrays with the needed values.
+       @br With XPath you would need three expressions: @br
+           @code( names := ... //table/tr/td[1] ...;   @br
+                  values1 := ... //table/tr/td[2] ...; @br
+                  values2 := ... //table/tr/td[3] ...;
+            )
+
+           Or CSS: @br
+            @code( names := ... table tr td:nth-child(1) ...;    @br
+                   values1 := ... table tr td:nth-child(2) ...;  @br
+                   values2 := ... table tr td:nth-child(3) ...;
+             )
+
+          )
+
+
+    @item( XPath is not suited to process html.
+
+           XPath was made to process xml not html, so there are some important functions missing.
+      @br  One of the most common actions of web scraping is to select (e.g. div) elements based on their classes.
+           Novices think this can be written as @code(//div[@class = "foobar"]), but this is wrong, because the class attribute can list multiple classes.
+           And the correct XPath expression @code(//div[contains(concat(" ", @class, " "), " foobar ")]) is very ugly.
+      @br  Templates know the semantic meaning of attributes, so you can just use @code(<div class="foobar"></div>).
+      @br  Normal XPath is also case-sensitive, while html is case-insensitive, so if the expression works at all, depends on the parser changing the case of all tags.
+
+           You might see this as a reason to use CSS selectors, but:
+          )
+
+    @item(CSS Selectors are not able to process the data
+
+          CSS only selects the elements and cannot change their values.
+      @br E.g. if you need to parse numbers from two pages, one of them using the Amercian format 123,456.00 and the other one the
+          European format 123.456,00, you cannot use CSS selectors to parse them both without changing something in the host language.
+      @br With  templates you can use  @code({.}) and @code({translate(., ".,", ",.")}) and are done.
+          )
+
+
+    @item(Templates can be written much faster.
+
+           Because you do not need to write them at all and instead just copy them from the input page.
+       @br E.g. in the example above to create a template for the webpage @code(<table><tr><td>name</td><td>value 1</td><td>value 2</td></tr></table>)
+           you just need to insert some @code({}* ) and get the complete template @code(<table><tr><td>{$name}</td><td>{$value1}</td><td>{$value2}</td></tr>*</table>).
+       @br To get the XPath-expressions @code(/table/tr/td[1,2,3]) you actually need to look at the structure of the page.
+
+           Of course the table example is trivial, only on more complex examples you can see how powerful the templates actually are:
+
+           Let us assume the data is not nicely packed in a table, but contained in a formatted text, like:
+
+           @code(
+             <b>name a</b>: value-a1, value-a2<br>        @br
+             <b>name b</b>: value-b1, value-b2<br>
+             ...
+           )
+
+           The template is a little bit more complex, since you need to split the values:
+
+           @code(<t:loop><b>{$name}</b>: <t:s>value1 := extract(text(), ":(.+),", 1), value2 := extract(text(), ":(.+),(.+)", 2)</t:s><br/></t:loop>)
+
+       @br However, if you want to solve this task with XPath 1.0 or CSS, you will discover that it is impossible.
+           CSS can not select the text nodes at all, and XPath 1 cannot split them.
+       @br The best you can manage is to select the values with XPath and then split them in the host language, but then you cannot parse multiple different sources by swapping the expressions.
+       @br And although XPath 2 or 3 can split the values, it becomes rather ugly:
+
+       @code( names := //b,                                                                 @br
+              values1 := //b/substring-after(following-sibling::text()[1], ":")             @br
+              values2 := //b/substring-after(following-sibling::text()[1], ",")
+            )
+
+       Another example is if you just need the data from a part of the page, e.g. between two headers like here.
+
+@preformatted(
+  not needed
+  ...
+  <h1>Header 1</h1>
+
+    <b>name a</b>: value-a1, value-a2<br>
+    <b>name b</b>: value-b1, value-b2<br>
+
+  <h1>Header 2</h1>
+  ...
+  not needed
+)
+
+       The template change is trivial, you just add both headers to the template:
+
+          @code(<h1>Header 1</h1>                                                                                                                             @br
+                <t:loop><b>{$name}</b>: <t:s>value1 := extract(text(), ":(.+),", 1), value2 := extract(text(), ":(.+),(.+)", 2)</t:s><br></t:loop>            @br
+                <h1>Header 2</h1>)
+
+       How to do it in XPath? (in XPath 2, it is of course still impossible with XPath 1)
+
+
+       Well, it gets just crazy:
+
+
+        @code( names := //h1[. = "Header 1"]/following-sibling::b[following-sibling::h1[1] = "Header 2"],                                                              @br
+               values1 := //h1[. = "Header 1"]/following-sibling::b[following-sibling::h1[1] = "Header 2"]/substring-after(following-sibling::text()[1], ":")          @br
+               values2 := //h1[. = "Header 1"]/following-sibling::b[following-sibling::h1[1] = "Header 2"]/substring-after(following-sibling::text()[1], ",")
+             )
+
+          )
+
+    @item(Multiple XPath/CSS expressions are not adaptable to changes
+
+             If the page layout changes, you need to rewrite all the expressions.
+             With templates, you just need to apply the local change.
+
+             E.g. if you want to get multiple data from the last div on this page:
+
+@preformatted(<div id="foobar">
+   ...
+   <div class="abc">...</div>
+   <div>
+     <b> .. data 1 .. </b>
+     <i> .. data 2 .. </i>
+   </div>
+</div>
+)
+
+             The template would be
+
+@preformatted(<div id="foobar">
+   <div class="abc"/>
+   <div>
+     <b>{$data1}</b>
+     <i>{$data2}</i>
+   </div>
+</div>
+             )
+
+             If you do it with XPath, you have two expressions:
+
+             @code(
+                     data1 := ... //div[@id="foobar"]/div[@class = "abc"]/following-sibling::div/b ...          @br
+                     data2 := ... //div[@id="foobar"]/div[@class = "abc"]/following-sibling::div/i ...
+             )
+
+             Now, if the page layout is changed to e.g.
+
+@preformatted(<div id="foobar">
+   ...
+   <div class="def">...</div>
+   <div>
+     ...
+   </div>
+</div>
+)
+
+             You get a diff
+
+             @code(
+               - <div class="abc">...</div>             @br
+               + <div class="abc">...</div>
+             )
+
+             Which can basically be applied directly to the template and leads to:
+
+@code(<div id="foobar">
+   <div class="def"/>
+   <div>
+     <b>{$data1}</b>
+     <i>{$data2}</i>
+   </div>
+</div>
+)
+
+             But using XPath expressions, you need to change multiple expressions and you have to look at
+             each expression to find the correct div class to change:
+
+             @code(
+                     data1 := ... //div[@id="foobar"]/div[@class = "def"]/following-sibling::div/b ...          @br
+                     data2 := ... //div[@id="foobar"]/div[@class = "def"]/following-sibling::div/i ...
+             )
+             .
+       )
+
+       @item(Metapher: XPath/CSS are like string functions, templates are like regular expressions
+
+       If you write XPath/CSS expressions you give an explicit list of instructions, i.e. you write @code(/foo) to get all foo-children,
+       you write @code([bar]) to filter all elements that have a bar child, you write @code(..) to get the parent, you write
+       @code([position() <= 10]) to take the first ten elements...
+
+       This is exactly the same concept, as if you write e.g. @code(copy(s, pos(s, 'foo'), 10) ) to find the 'foo' substring and
+       then take the next 10 characters.
+
+       But you would never do that nowadays, if you can use a regular expression like @code('foo(.{1})').
+
+       Such a regular expression now implicitely selects the characters after foo, just like a template @code(<foo/>{text()})
+       selects the text after a foo-element.
+
+       )
+
+  )
+
+  That said, it is obviously also possible to use XPath or CSS with the templates:
+
+  @code(<html>{//your/xpath/expression}</html>) or @code(<html>{css("your.css#expression")}</html>)
+
+  In fact there exists no other modern XPath/CSS interpreter for FreePascal.
 
 
   @bold(Template reference)
@@ -277,7 +485,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
    @unorderedList(
       @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
         @br The @link(xquery.TXQueryEngine XPath-expression) in source is evaluated and stored in variable of var.
-        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the xq-function filter instead of the regex/submatch attributes, because former is more elegant)
+        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the xq-function extract instead of the regex/submatch attributes, because former is more elegant)
         )
       @item(@code(<template:s>var:=source</template:s>)
         @br Short form of @code(template:read). The expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several variables like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the expression syntax, so you can use much more complex expressions.)
