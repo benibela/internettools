@@ -92,6 +92,11 @@ begin
   result := '';
 end;
 
+function TXQValue.toJoinedString(const sep: string): string;
+begin
+  result := toString;
+end;
+
 function TXQValue.toDateTime: TDateTime;
 begin
   result := 0;
@@ -1067,7 +1072,7 @@ begin
   seq.add(firstChild);
 end;
 
-class function TXQValueSequence.classkind: TXQValueKind;
+class function TXQValueSequence.classKind: TXQValueKind;
 begin
   Result:=pvkSequence;
 end;
@@ -1095,13 +1100,13 @@ begin
   end;
 end;
 
-function TXQValueSequence.toInt64: int64;
+function TXQValueSequence.toInt64: Int64;
 begin
   if seq.Count >= 1 then result := seq[0].toInt64
   else result := 0;
 end;
 
-function TXQValueSequence.toDecimal: bigdecimal;
+function TXQValueSequence.toDecimal: BigDecimal;
 begin
   if seq.Count >= 1 then result := seq[0].toDecimal
   else result := 0;
@@ -1111,6 +1116,15 @@ function TXQValueSequence.toString: string;
 begin
   if seq.Count >= 1 then result := seq[0].toString
   else result := '';
+end;
+
+function TXQValueSequence.toJoinedString(const sep: string): string;
+var i: integer;
+begin
+  if seq.count = 0 then exit('');
+  result := seq[0].toString;
+  for i := 1 to seq.count - 1 do
+    Result := Result + sep + seq[i].toString;
 end;
 
 function TXQValueSequence.toDateTime: TDateTime;

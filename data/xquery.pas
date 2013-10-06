@@ -238,6 +238,7 @@ type
     function toFloat: xqfloat;  //**< Returns the value as float (extended if available); dynamically converted, if necessary
     function toDecimal: BigDecimal;  //**< Returns the value as bigdecimal; dynamically converted, if necessary
     function toString: string;  //**< Returns the value as string; dynamically converted, if necessary
+    function toJoinedString(const sep: string=' '): string;  //**< Returns the value as joined string (string-join($self, $sep)); dynamically converted, if necessary
     function toDateTime: TDateTime;  //**< Returns the value as datetime; dynamically converted, if necessary
     function toNode: TTreeNode;  //**< Returns the value as node; dynamically converted, if necessary
     function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer interface to each element of the sequence
@@ -284,6 +285,7 @@ type
     function toFloat: xqfloat; virtual; //**< Returns the value as int64; dynamically converted, if necessary
     function toDecimal: BigDecimal; virtual; //**< Returns the value as BigDecimal; dynamically converted, if necessary
     function toString: string; override; //**< Returns the value as string; dynamically converted, if necessary
+    function toJoinedString(const sep: string = ' '): string; virtual; //**< Returns the value as joined string (string-join($self, $sep)); dynamically converted, if necessary
     function toDateTime: TDateTime; virtual; //**< Returns the value as datetime; dynamically converted, if necessary
     function toNode: TTreeNode; virtual; //**< Returns the value as node; dynamically converted, if necessary
     function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer to each element of the sequence
@@ -552,6 +554,7 @@ type
     function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
+    function toJoinedString(const sep: string=' '): string; override;
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
 
