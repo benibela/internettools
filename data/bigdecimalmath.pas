@@ -681,20 +681,25 @@ begin
   end;
 end;
 
+{$ifdef FPC_HAS_TYPE_Single}
 procedure splitFloat(const v: single; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
 begin
   sign := (PDWord(@v)^ shr 31) <> 0;
   exponent := (PDWord(@v)^ shr 23) and $FF;
   mantissa  := PDWord(@v)^ and DWord($7FFFFF);
 end;
+{$endif}
 
+{$ifdef FPC_HAS_TYPE_Double}
 procedure splitFloat(const v: double; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
 begin
   sign := (PQWord(@v)^ shr 63) <> 0;
   exponent := (PQWord(@v)^ shr 52) and $7FF;
   mantissa  := PQWord(@v)^ and QWord($000FFFFFFFFFFFFF);
 end;
+{$endif}
 
+{$ifdef FPC_HAS_TYPE_Extended}
 type TExtendedSplit = packed record
     mantissa: QWord;
     prefix: SmallInt;
@@ -706,6 +711,7 @@ begin
   exponent := PExtendedSplit(@v)^.prefix and $7FFF;
   mantissa := PExtendedSplit(@v)^.mantissa;
 end;
+{$endif}
 
 {$PUSH}
 {$R-} //QWord arithmetic is buggy in 2.6.2
