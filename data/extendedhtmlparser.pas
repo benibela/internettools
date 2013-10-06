@@ -449,6 +449,18 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
              .
        )
 
+       @item(XPath/CSS cannot handle errors
+
+            XPath/CSS do not provide any information in case the query fails.
+
+            E.g. if you use @code(//table[@id="foobar"]/tr) to get all rows of a table, and it returns 0 rows,
+            you do not know, if the table was actually empty, or if the page layout changed and the table does not
+            exist anymore, or if you use a new html parser, which inserts (correctly) a tbody element between the table and tr.
+
+            But if you use a template @code(<table id="foobar"><tr>{.}*</tr></table>) and it returns anything,
+            it is guaranteed that the table exists, since it raises an exception in case it is missing.
+       )
+
        @item(Metapher: XPath/CSS are like string functions, templates are like regular expressions
 
        If you write XPath/CSS expressions you give an explicit list of instructions, i.e. you write @code(/foo) to get all foo-children,
@@ -464,6 +476,7 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
        selects the text after a foo-element.
 
        )
+
 
   )
 
