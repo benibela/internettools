@@ -2316,7 +2316,10 @@ var rel, base: string;
 begin
   requiredArgCount(args, 1,2);
   if length(args) = 2 then base := args[1].toString
-  else base := context.staticContext.baseURI;
+  else begin
+    base := context.staticContext.baseURI;
+    if not strIsAbsoluteURI(base) then base := 'file://' + GetCurrentDir + DirectorySeparator + base;
+  end;
   if args[0].isUndefined then exit(xqvalue);
   rel := args[0].toString;
   if strIsAbsoluteURI(rel) then exit(xqvalue(rel));
