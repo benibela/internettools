@@ -69,10 +69,14 @@ type
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
   //**@abstract(Abstract base class for connections)
-  //**There are two child classes TW32InternetAccess and TSynapseInternetAccess which
-  //**you should assign once to defaultInternetAccessClass and then use this class
-  //**variable@br
-  //**If a transfer fails it will raise a EInternetException
+  //**This class defines the interface methods for http requests, like get, post or request.@br
+  //**If a method fails, it will raise a EInternetException@br@br
+  //**Since this is an abstract class, you cannot use it directly, but need one of the implementing child classes
+  //**TW32InternetAccess, TSynapseInternetAccess, TAndroidInternetAccess or TMockInternetAccess. @br
+  //**The recommended usage is to assign one of the child classes to defaultInternetAccessClass and
+  //**then create an actual internet access class with @code(defaultInternetAccessClass.create()). @br
+  //**Then it is trivial to swap between different implementations on different platforms, and the depending units
+  //**(e.g. simpleinternet or xquery) will use the implementation you have choosen.
   TInternetAccess=class
   private
     FOnTransferEnd: TTransferEndEvent;

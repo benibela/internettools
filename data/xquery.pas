@@ -192,9 +192,7 @@ type
   You can read its value with the methods toBoolean, toInt64, toDecimal, toString, toDateTime, toNode, toArray,
   which convert the returned value to the requested type.
 
-  The @code(kind) property and the @code(is) operator can be used to check for the actually contained type.
-  E.g. for an string @code(kind) returns @code(pvkString) and @code(is TXQValueString) returns true (latter might be changed in later versions). @code(kind)
-  returns a basic type, so e.g. float and double values both return pvkDecimal.
+
 
   Since IXQValue is an interface, it can be used without worrying much about memory management. @br
   So if you have an IXQValue @code(value), you can read it like @code(value.toString) or @code(value.toBoolean).
@@ -206,23 +204,19 @@ type
   You can declare user defined types by deriving TXQValue (not IXQValue, there is a bunch of staff depending on the class) and
   calling TXQueryEngine.registerType with the new type.
 
-  @br@br@br@br@br@bold(Internal types / data model)@br
-  Each xq value has a certain type. These types are almost the same as those in the xpath/xquery data model, but not quite.@br
-  There a seven primary types: boolean, int65, decimal, string, datetime, sequence, node and function.@br
-  By restricting their values to a sub range, secondary types are created, and for each type a native fpc class exists, as follow: @br
-    decimal -> (float, double)@br
-    integer -> (long -> (int -> (short -> byte)), nonPositiveInteger -> negativeInteger, nonNegativeInteger -> (positiveInteger, unsignedLong -> (unsignedInt -> (unsignedShort -> unsignedByte))))@br@br
+  Each value is a tuple of the value of a Pascal type (e.g. string, int65 double, bigdecimal), and a xml schema type annotation.
 
-   (Notation: a -> (b, c) means "b" and "c" were created by restricting the range of type "a"; a -> (b -> c) means "c" is a restricted "b" which is a restricted "a". "a ~~> c" means that "c" is a (indirectly) restricted "a" and "a ~~> c" holds in both previous examples)@br
-   E.g.  A "unsignedInt" is a "unsignedLong", a "nonNegativeInteger" and a "integer", but not a "positiveInteger".@br@br
 
-   If an operator is applied to two values of type "a" and type "b", which are both restricted types, the result is the most general subtype "c". I.e. the type "c", such that "c ~~> a" and "c ~~> b" holds.@br
-   (so. xs:byte(3) + 1 has type integer, since 1 has type integer; and if a ~~> b, b is converted to a, backward to the arrow)
-   However, in XPath decimal/float/double are distinct types, so all functions/operators behave as if the primary type was double, not how the values are actually stored in the class inheritance tree.
-   I.e. double -> (float -> (decimal -> integer))@br
+  There are different ways to check which type an IXQValue has:
+  @unorderedList(
+    @item(The method code(typeAnnotation) returns the logical type of the value, i.e. the type seen by a XQuery expression. @br
+          This is an object in a  @noLink(schema) describing the type (e.g. name "xs:string", ranges), and does not necessary
+          correspond to the type used to store the value. )
+    @item(A derivation check @code(is TXQValue...). This checks if the value is stored in a certain implementation class (e.g. TXQValueString))
+    @item(The method @code(kind) returns the kind of the value, an enum corresponding to each of the implementation classes, e.g. pvkString)
+  )
 
-   All integer calculations are done on an int65 type, i.e. a 65 bit integer, consisting of a sign flag and a unsigned 64 integer. This is necessary since the XPath datamodel demands distinct signed and unsigned 64 types,
-   and I need a common type to avoid writing every function twice.
+
   *)
   IXQValue = interface
     function kind: TXQValueKind; //**< Primary type of a value
@@ -381,7 +375,7 @@ type
 
   { TXQValueFloat }
 
-  //bigdecimal value (unlimited real number \mathbb{R})
+  //**Double float value
   TXQValueFloat = class (TXQValue)
     value:  double;   //*< plain decimal value
 
@@ -409,7 +403,7 @@ type
 
   { TXQValueDecimal }
 
-  //bigdecimal value (unlimited real number \mathbb{R})
+  //**BigDecimal value (unlimited real number \mathbb{R})
   TXQValueDecimal = class (TXQValue)
     value:  BigDecimal;   //*< plain BigDecimal value
 
