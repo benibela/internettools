@@ -6,7 +6,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline
+  Classes, sysutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess
   { you can add units after this };
 type
 
@@ -43,6 +43,7 @@ type
   refed: TEnvironment;
   sources: TList;
   class function load(e: TTreeNode): TEnvironment;
+  function getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
 end;
 
 { TDependency }
@@ -653,8 +654,9 @@ end;
 
 class function TTestSet.load(e: TTreeNode): TTestSet;
 begin
-  if (config.forceTestSet <> '') and (e['name'] <> config.forceTestSet) then exit(nil);
-  result := TTestSet.create(e);
+  result := nil;
+  if (config.forceTestSet = '') or (striEqual(e['name'], config.forceTestSet) or striContains(e.getDocument().baseURI, config.forceTestSet)) then
+    result := TTestSet.create(e);
 end;
 
 type TResultSet = array[TTestCaseResult] of integer;
@@ -734,20 +736,31 @@ end;
 function TSource.tree: TTreeNode;
 var
   idx: Integer;
+  doc: TTreeDocument;
 begin
   if ftree = nil then begin
     if xq.ExternalDocumentsCacheInternal = nil then xq.ExternalDocumentsCacheInternal := TStringList.Create;
+    idx := xq.ExternalDocumentsCacheInternal.IndexOf('file://'+filename);
+    if idx >= 0 then begin
+      ftree := TTreeNode(xq.ExternalDocumentsCacheInternal.Objects[idx]);
+      exit(ftree);
+    end;
     if url <> '' then begin
       idx := xq.ExternalDocumentsCacheInternal.IndexOf(url);
-      if idx >= 0 then exit(TTreeNode(xq.ExternalDocumentsCacheInternal.Objects[idx]));
+      if idx >= 0 then begin
+        ftree := TTreeNode(xq.ExternalDocumentsCacheInternal.Objects[idx]);
+        exit(ftree);
+      end;
     end;
     try
       ftree := htmlparserExampleXQTS3.tree.parseTreeFromFile(filename);
     except
       on e: ETreeParseException do ftree := nil;
     end;
-    if url <> '' then
-      xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
+    if url <> '' then xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
+    doc := ftree.getDocument(); //doc = ftree
+    if not strContains(doc.documentURI, '://') then doc.documentURI := 'file://' + doc.documentURI;
+    if doc.documentURI <> '' then xq.ExternalDocumentsCacheInternal.AddObject(doc.documentURI, ftree);
 
   end;
   result := ftree
@@ -819,6 +832,19 @@ begin
   end;
 end;
 
+function TEnvironment.getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
+var
+  i, j: Integer;
+begin
+  value := xqvalue();
+  if collections = nil then exit;
+  for i := 0 to collections.count - 1 do
+    if collections[i] = variable then begin
+      for j := 0 to tlist(collections.Objects[i]).Count - 1 do
+        xqvalueSeqAdd(value, xqvalue(TSource(tlist(collections.Objects[i])[j]).tree));
+    end;
+end;
+
 
 function loadEnvironment(env: TEnvironment): TTreeNode;
 var
@@ -858,6 +884,8 @@ begin
     if TSource(env.sources[i]).role = '.' then result := TSource(env.sources[i]).tree
     else if TSource(env.sources[i]).role <> '' then xq.VariableChangelog.add(TSource(env.sources[i]).role, TSource(env.sources[i]).tree)
     else TSource(env.sources[i]).tree; //the query should load it itself, but we need to load it in the cache, because the url does not actually exist
+
+  xq.OnCollection:=@env.getCollection;
 
   for i := 0 to high(env.params) do
     xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
@@ -936,6 +964,9 @@ begin
   xq.StaticContext.collation := xq.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
+  defaultInternetAccessClass := TMockInternetAccess;
+
+
 
   Writeln(stderr, 'Loading catalogue...');
   loadCatalog('catalog.xml');
