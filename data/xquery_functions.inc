@@ -2425,7 +2425,7 @@ var url: string;
 begin
   requiredArgCount(args, 0, 1);
   if (length(args) = 0) or (args[0].isUndefined) then url := ''
-  else url := args[0].toString;
+  else url := strResolveURI(args[0].toString, context.staticContext.baseURI);
   result := xqvalue();
   if assigned(context.staticContext.sender.OnCollection) then context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
 end;
