@@ -16,7 +16,7 @@
         <CompilerPath Value="$(CompPath)"/>
       </Other>
     </CompilerOptions>
-    <Files Count="22">
+    <Files Count="23">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -105,6 +105,10 @@
         <Filename Value="data/xquery_json.pas"/>
         <UnitName Value="xquery_json"/>
       </Item22>
+      <Item23>
+        <Filename Value="internet/mockinternetaccess.pas"/>
+        <UnitName Value="mockinternetaccess"/>
+      </Item23>
     </Files>
     <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="1">
