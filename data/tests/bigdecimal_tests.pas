@@ -469,6 +469,7 @@ begin
   test(BigDecimalToStr(9 - StrToBigDecimal( '9.57784763022100591716')), '-0.57784763022100591716');
 
 
+
   //failed fuzzy tests
   if DIGITS_PER_ELEMENT = 5 then begin
     SetLength(tempbf.digits, 5); tempbf.digits[0] := BigDecimalBin(10000); tempbf.digits[1] := BigDecimalBin(72175); tempbf.digits[2] := BigDecimalBin(60243); tempbf.digits[3] := BigDecimalBin(66625); tempbf.digits[4] := BigDecimalBin(2434);
@@ -499,6 +500,8 @@ begin
 
   test(isInteger(StrToBigDecimal('1e10')) = true );
   test(isInteger(StrToBigDecimal('1e-10')) = false );
+  test(isInteger(StrToBigDecimal('1e100000')) = true );
+  test(isInteger(StrToBigDecimal('1e-100000')) = false );
   test(isInteger(StrToBigDecimal('1234')) = true );
   test(isInteger(StrToBigDecimal('0.1234')) = false );
 
