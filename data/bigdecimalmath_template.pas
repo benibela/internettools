@@ -976,7 +976,7 @@ var
   i: Integer;
 begin
   if v.exponent >= 0 then exit(true);
-  for i := 0 to -v.exponent - 1 do
+  for i := 0 to min(-v.exponent - 1, high(v.digits)) do
     if v.digits[i] <> 0 then exit(false);
   result := true;
 end;
