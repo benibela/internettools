@@ -3747,6 +3747,8 @@ begin
   t('outer-html(/)', '<html><script>&auml;</script></html>', '<html><script><![CDATA[&auml;]]></script></html>');
   t('outer-xml(/)', '<html><script>&amp;auml;</script></html>', '<html><script><![CDATA[&auml;]]></script></html>');
 
+  t('outer-xml(/)', '<foo xmlns:abc="123" abc:def="456"/>', '<foo abc:def="456" xmlns:abc="123"/>');
+
   xml.parsingModel:=pmHTML;
 
 //  t('outer-html(/)', '', '<html><body><div class="content"><html><body><table width="99%"><tbody><tr><td>12345</td><td>&#160;&#160;>  S.L.<br/>></td><td>Entliehen/Bereitgestellt: 5</td><td>Geb&#252;ühren: 2,00&#160;&#8364;</ €</td></tr></tbody></table><br/>><table><tbody><tr><td colspan="9">Ausweis g&#252;ültig bis: 05.05.2013</td><td></td></tr><tr></tr><tr></tr></tbody></table><br/>></div></body></html><!-- Your output data goes in here --><font color="black"><br></font>');

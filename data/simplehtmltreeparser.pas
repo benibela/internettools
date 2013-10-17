@@ -1810,7 +1810,9 @@ begin
            pushNamespace(attrib.realvalue, attrib.value);
            attrib.namespace := XMLNamespace_XMLNS;
          end;
-      end else if pos(':', attrib.value) > 0 then
+      end;
+    for attrib in new.attributes do
+      if pos(':', attrib.value) > 0 then
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
   end;
   if (pos(':', new.value) > 0) then
