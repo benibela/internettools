@@ -1595,6 +1595,8 @@ begin
       (staticContext.moduleNamespace as TNamespace).url := parseStringLiteral;
       expect(';');
       token := nextToken(true);
+      if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
+      staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, resultquery); //every module import itself so it can lazy initialize its variables
       if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then
         staticContext.sender.FModules.Add(IXQuery(resultquery));
     end;

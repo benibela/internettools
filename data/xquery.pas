@@ -110,7 +110,7 @@ type
     //The following values map directly to XQuery options declarable in a prolog
     moduleNamespace: INamespace; //**< The namespace of this module or nil
     namespaces: TNamespaceList;  //**< All declared namespaces.
-    moduleVariables: TXQVariableChangeLog;  //**< All declared variables.
+    moduleVariables: TXQVariableChangeLog;  //**< All declared and imported variables.
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
@@ -169,6 +169,7 @@ type
     function compareAtomicBase(const a,b: IXQValue): integer; //**< Compares two values (depending on the context properties like collations)
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
+    function findModule(const namespace: INamespace): TXQuery;
     function findModuleStaticContext(const namespace: INamespace): TXQStaticContext;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
@@ -1465,6 +1466,9 @@ type
 
   TXQTermModule = class(TXQTerm)
     procedure initializeStaticContext(const context: TXQEvaluationContext); //will change context.staticContext^, just const so it is not copied
+    procedure initializeVariables(var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext);
+    function getVariableValue(declaration: TXQTermDefineVariable; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
+    function getVariableValue(const name: string; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -2715,11 +2719,7 @@ var
   functionCount: Integer;
   vars: TXQVariableChangeLog;
   truechildcount: Integer;
-  ns: INamespace;
-  hasTypeDeclaration: Boolean;
-  hasExpression: Boolean;
-  tempValue: IXQValue;
-  name: String;
+
 begin
   truechildcount := length(children);
   if context.staticContext.moduleNamespace <> nil then truechildcount-=1;
@@ -2743,8 +2743,25 @@ begin
       functionCount+=1;
     end;
 
-  if context.staticContext.moduleVariables = nil then context.staticContext.moduleVariables := TXQVariableChangeLog.create();
-  vars := context.staticContext.moduleVariables;
+end;
+
+procedure TXQTermModule.initializeVariables(var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext);
+var
+  targetStaticContext: TXQStaticContext;
+  vars: TXQVariableChangeLog;
+  i: Integer;
+  tempDefVar: TXQTermDefineVariable;
+  ns: INamespace;
+  name: String;
+  hasTypeDeclaration: Boolean;
+  hasExpression: Boolean;
+  tempValue: IXQValue;
+begin
+  targetStaticContext := context.staticContext;
+  context.staticContext := ownStaticContext;
+
+  if targetStaticContext.moduleVariables = nil then targetStaticContext.moduleVariables := TXQVariableChangeLog.create();
+  vars := targetStaticContext.moduleVariables;
   for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineVariable then begin
       tempDefVar := TXQTermDefineVariable(children[i]);
@@ -2759,18 +2776,59 @@ begin
       hasTypeDeclaration := (length(tempDefVar.children) > 0) and (tempDefVar.children[0] is TXQTermSequenceType);
       hasExpression := (length(tempDefVar.children) > 0) and not (tempDefVar.children[high(tempDefVar.children)] is TXQTermSequenceType);
 
-      tempValue := nil;
-      if hasExpression then tempValue := tempDefVar.children[high(tempDefVar.children)].evaluate(context)
-      else begin
-        if not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
-        context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, name, tempValue);
-        if tempValue = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
-      end;
+      tempValue := getVariableValue(tempDefVar, context, ownStaticContext);
       vars.add(name, tempValue, ns);
 
       if hasTypeDeclaration then
         if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(tempValue, context) then
           raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +tempValue.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
+    end;
+
+
+  context.staticContext := targetStaticContext;
+end;
+
+function TXQTermModule.getVariableValue(declaration: TXQTermDefineVariable; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
+var
+  tempcontext: TXQEvaluationContext;
+  hasExpression: Boolean;
+  name: String;
+  ns: INamespace;
+begin
+  if context.staticContext <> ownStaticContext then begin
+    tempcontext := context;
+    tempcontext.staticContext := ownStaticContext;
+    exit(getVariableValue(declaration, tempcontext, ownStaticContext));
+  end;
+  hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
+
+  result := nil;
+  if hasExpression then result := declaration.children[high(declaration.children)].evaluate(context)
+  else begin
+    if not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
+    name := (declaration.variable as TXQTermVariable).value;
+    ns := (declaration.variable as TXQTermVariable).namespace;
+    context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, name, result);
+    if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
+  end;
+end;
+
+function TXQTermModule.getVariableValue(const name: string; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
+var
+  tempDefVar: TXQTermDefineVariable;
+  tname: String;
+  ns: INamespace;
+  i: Integer;
+begin
+  for i:=0 to high(children) - 1 do
+    if children[i] is TXQTermDefineVariable then begin
+      tempDefVar := TXQTermDefineVariable(children[i]);
+      tname := (tempDefVar.variable as TXQTermVariable).value;
+      if tname <> name then continue;
+      ns := (tempDefVar.variable as TXQTermVariable).namespace;
+      if (ownStaticContext.moduleNamespace  <> nil) and (ownStaticContext.moduleNamespace  <> ns ) and (ownStaticContext.moduleNamespace.getURL  <> ns.getURL ) then
+        raiseEvaluationError('XQST0048', 'Invalid namespace for variable: '+ns.getPrefix+ ':'+name);
+      exit(getVariableValue(tempDefVar, context, ownStaticContext));
     end;
 end;
 
@@ -2819,7 +2877,7 @@ begin
   result := temp.getURL;
 end;
 
-function TXQEvaluationContext.findModuleStaticContext(const namespace: INamespace): TXQStaticContext;
+function TXQEvaluationContext.findModule(const namespace: INamespace): TXQuery;
 var
   i: Integer;
   nsurl: String;
@@ -2830,9 +2888,18 @@ begin
     nsurl := namespace.getURL;
     for i := 0 to staticContext.importedModules.count - 1 do
       if TXQuery(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace.getURL = nsurl then
-        exit(TXQuery(staticContext.importedModules.Objects[i]).staticContext);
+        exit(TXQuery(staticContext.importedModules.Objects[i]));
   end;
-  result := staticContext;
+  result := nil;
+end;
+
+function TXQEvaluationContext.findModuleStaticContext(const namespace: INamespace): TXQStaticContext;
+var
+  module: TXQuery;
+begin
+  module := findModule(namespace);
+  if module = nil then exit(staticContext);
+  exit(module.staticContext);
 end;
 
 procedure TXQEvaluationContext.splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind
@@ -2859,7 +2926,7 @@ end;
 function TXQEvaluationContext.hasVariable(const name: string; out value: IXQValue; const ns: INamespace): boolean;
 var
   temp: TXQValue;
-  sc: TXQStaticContext;
+  module: TXQuery;
 begin
   temp := nil;
   value := nil;
@@ -2868,11 +2935,23 @@ begin
     value := temp;
     if result then exit;
   end;
-  sc := findModuleStaticContext(ns);
-  if (sc <> nil) and (sc.moduleVariables <> nil) then begin
-    result := sc.moduleVariables.hasVariable(name, @temp, ns);
+  if (staticContext.moduleVariables <> nil) then begin
+    result := staticContext.moduleVariables.hasVariable(name, @temp, ns);
     value := temp;
     exit;
+  end;
+  module := findModule(ns);
+  if (module <> nil) then begin
+    if (module.staticContext.moduleVariables <> nil) then begin
+      result := module.staticContext.moduleVariables.hasVariable(name, @temp, ns);
+      value := temp;
+      exit;
+    end;
+    if module.fterm is TXQTermModule then begin
+      value := TXQTermModule(module.fTerm).getVariableValue(name, self, module.staticContext);
+      result := value <> nil;
+      exit;
+    end;
   end;
   if name = '$' then begin result := true; value := xqvalue('$'); end //default $$; as $
   else if name = 'line-ending' then begin result := true; value := xqvalue(LineEnding); end //default $line-ending; as #13#10
@@ -2914,17 +2993,26 @@ begin
     context.ParentElement := tree;
     context.RootElement := tree;
   end;
-  initializeStaticContext(context);
-  result := fterm.evaluate(context);
+  //initializeStaticContext(context);
+  //result := fterm.evaluate(context);
+  result := evaluate(context);
 end;
 
 function TXQuery.evaluate(const context: TXQEvaluationContext): IXQValue;
 var tempcontext: TXQEvaluationContext;
+  i: Integer;
 begin
   if fterm = nil then exit(xqvalue());
   tempcontext:=context;
   tempcontext.staticContext:=staticContext;
   initializeStaticContext(tempcontext);
+  //reevaluate module variables ()
+//  if (staticContext.moduleVariables <> nil) and (staticContext.moduleVariables.count > 0) then
+//    staticContext.moduleVariables.clear;
+  if staticContext.importedModules <> nil then
+    for i := 0 to staticContext.importedModules.Count - 1 do
+      ((staticContext.importedModules.Objects[i] as TXQuery).fterm as TXQTermModule).initializeVariables(tempcontext, (staticContext.importedModules.Objects[i] as TXQuery).staticContext);
+  if fterm is TXQTermModule then TXQTermModule(fterm).initializeVariables(tempcontext, staticContext);
   result := fterm.evaluate(tempcontext);
 end;
 
@@ -2953,6 +3041,7 @@ begin
   if fterm is TXQTermModule then
     TXQTermModule(fterm).initializeStaticContext(context);
 end;
+
 
 var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
 

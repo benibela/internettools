@@ -628,6 +628,10 @@ begin
   m('import module "pseudo://test-module2"; declare namespace indirect = "pseudo://test-module2"; indirect:wrapwrap()', '123:456');
   m('import module "pseudo://test-module2"; declare namespace indirect = "pseudo://test-module2"; concat(test2:wrapwrap(), indirect:sumcalc((90,1)))', '123:456SUM: 91');
 
+  mr('module namespace test3 = "pseudo://test-module2b"; import module "pseudo://test-module"; declare variable $test3:varwrap := $test:var * 10 + 4;');
+  m('import module "pseudo://test-module2b"; $test3:varwrap', '1234');
+
+
   m('declare function local:test(){15}; local:test()', '15');
   m('declare namespace xyz = "foobar"; declare function xyz:test(){-6}; xyz:test()', '-6');
   m('declare namespace xyz = "foobar"; declare namespace alias = "foobar"; declare function xyz:test(){"assaa"}; alias:test()', 'assaa');
