@@ -1,0 +1,864 @@
+unit bigdecimal_tests;
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  Classes, SysUtils, math, bigdecimalmath, strutils;
+
+procedure unittests;
+
+implementation
+
+function strDup(rep: string; const count: integer): string;
+var
+  i: Integer;
+begin
+  result := '';
+  for i:=1 to count do
+    result := result + rep;
+end;
+
+procedure test(condition: boolean; name: string='(unnamed test failed)');
+begin
+  if not condition then writeln('test: '+name);
+end;
+procedure test(a, b: string; name: string = '(unnamed test failed)');
+begin
+  if a <> b then
+    writeln ('test: '+name+': '+a+' <> '+b);
+end;
+procedure test(a, b: integer; name: string = '(unnamed test failed)');
+begin
+  if a <> b then raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
+end;
+
+function equalUpToPrecision(bf, bf2: BigDecimal): boolean;
+var
+  i: Integer;
+  a: LongInt;
+  b: LongInt;
+  j: Integer;
+  lastDigitA, lastDigitB: Integer;
+begin
+  normalize(bf);
+  normalize(bf2);
+  result := true;
+  for i := high(bf.digits) downto max(0, - bf.exponent + bf2.exponent) do begin
+    a := bf.digits[i];
+    j := i + bf.exponent - bf2.exponent;
+    if j > high(bf2.digits) then continue;
+    b := bf2.digits[j];
+  if a <> b then begin
+      lastDigitA := 0; if i > 0 then lastDigitA := bf.digits[i-1] div (ELEMENT_OVERFLOW div 10);
+      lastDigitB := 0; if j > 0 then lastDigitB := bf2.digits[j-1] div (ELEMENT_OVERFLOW div 10);
+      while ((a mod 10 = 0) or (b mod 10 = 0)) and ((a <> 0) or (b <> 0)) do begin
+        lastDigitA := a mod 10;
+        lastDigitB := b mod 10;
+        a := a div 10;
+        b := b div 10;
+      end;
+      if (a = b + 1) and (i = 0) and (((j >= 0) and (lastDigitB >= 4)) or ((j = 0) and (lastDigitA = 0)) )  then continue; //should check for >= 5, but the floating points are incorrectly rounded
+      if (b = a + 1) and (j = 0) and (((i >= 0) and (lastDigitA >= 4)) or ((i = 0) and (lastDigitB = 0)) ) then continue;
+      if a <> b then
+        exit(false);
+    end;
+  end;
+end;
+
+procedure test(bf: BigDecimal; const s: string; const name: string='');
+begin
+  test(equalUpToPrecision(bf, StrToBigDecimal(s)), name + ': ' + BigDecimalToStr(bf) + '<>' + s);
+end;
+
+const powersOf10: array[0..16] of Int64 = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,
+                                           10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000);
+procedure unittests;
+var
+  b1: BigDecimal;
+  bs1: BigDecimal;
+  blarge: BigDecimal;
+  bverylarge: BigDecimal;
+  i: Integer;
+  b10: BigDecimal;
+  j: Integer;
+  t: int64;
+  u: Int64;
+  d, e: Extended;
+  resdiv, resmod: BigDecimal;
+  tempbf: BigDecimal;
+  temp: ansistring;
+  r: TBigDecimalRoundingMode;
+  bf, bd: BigDecimal;
+  dbf: BigDecimal;
+  ds: String;
+  b0: BigDecimal;
+  ddd: Double;
+  bd5: BigDecimal;
+  bd2: BigDecimal;
+  s1, s2: single;
+begin
+
+  test(TryStrToBigDecimal('1', @b1));
+  test((b1.exponent = 0) and not (b1.signed) and (length(b1.digits) = 1) and (b1.digits[0] = 1));
+  test(BigDecimalToStr(b1), '1');
+  test(BigDecimalToStr(b1, bdfExponent), '1.0E0');
+  test(b1 = 1); test(b1 = 1.0);
+  test(b1 > 0); test(b1 >= 0); test(b1 >= 1);
+  test(b1 <= 2); test(b1 <= 2); test(b1 <= 2);
+
+  test(TryStrToBigDecimal('-1', @bs1));
+  test((bs1.exponent = 0) and (bs1.signed) and (length(bs1.digits) = 1) and (bs1.digits[0] = 1));
+  test(BigDecimalToStr(bs1), '-1');
+  test(BigDecimalToStr(bs1, bdfExponent), '-1.0E0');
+  test(bs1 = -1); test(bs1 = -1.0);
+  test(bs1 < 0); test(bs1 <= 0); test(bs1 <= -1);
+  test(bs1 > -2); test(bs1 >= -2); test(bs1 >= -1);
+
+  test(TryStrToBigDecimal('10', @b10));
+  test((b1.exponent = 0) and not (b10.signed));// and (length(b10.digits) = 1) and (b1.digits[0] = 1));
+  test(BigDecimalToStr(b10), '10');
+  test(BigDecimalToStr(b10, bdfExponent), '1.0E1');
+
+  test(TryStrToBigDecimal('123456789', @blarge));
+  test((blarge.exponent = 0) and not (blarge.signed));// and (length(b1.digits) = 1) and (b1.digits[0] = 1));
+  test(BigDecimalToStr(blarge), '123456789');
+  test(BigDecimalToStr(blarge, bdfExponent), '1.23456789E8');
+  test(blarge = 123456789); test(blarge = 123456789.0);
+  test(BigDecimalToExtended(blarge) = 123456789.0); test(BigDecimalToInt64(blarge) = 123456789); test(BigDecimalToInteger(blarge) = 123456789);
+
+  blarge += 1;
+  test(blarge = 123456790); test(blarge = 123456790.0);
+
+  blarge := blarge * 1000 - 17;
+  test(blarge = 123456789983); test(blarge = 123456789983.0);
+
+  blarge += 0.42;
+  test(blarge = 123456789983.42);
+
+
+
+  bd := StrToBigDecimal('1.2'); test(BigDecimalToStr(bd), '1.2');  test(BigDecimalToStr(bd, bdfExponent), '1.2E0');
+  bd := StrToBigDecimal('1.0'); test(BigDecimalToStr(bd), '1'); test(BigDecimalToStr(bd, bdfExponent), '1.0E0');
+  bd := StrToBigDecimal('1.000'); test(BigDecimalToStr(bd), '1'); test(BigDecimalToStr(bd, bdfExponent), '1.0E0');
+  bd := StrToBigDecimal('1.'); test(BigDecimalToStr(bd), '1'); test(BigDecimalToStr(bd, bdfExponent), '1.0E0');
+  bd := StrToBigDecimal('1.234567890234567890234567890'); test(BigDecimalToStr(bd), '1.23456789023456789023456789'); test(BigDecimalToStr(bd, bdfExponent), '1.23456789023456789023456789E0');
+  bd := StrToBigDecimal('1.234567890'); test(BigDecimalToStr(bd), '1.23456789'); test(BigDecimalToStr(bd, bdfExponent), '1.23456789E0');
+  bd := StrToBigDecimal('1.23456789000000000000000000'); test(BigDecimalToStr(bd), '1.23456789'); test(BigDecimalToStr(bd, bdfExponent), '1.23456789E0');
+  bd := StrToBigDecimal('121121232343.234567890234567890234567890'); test(BigDecimalToStr(bd), '121121232343.23456789023456789023456789');
+  test(BigDecimalToStr(bd, bdfExponent), '1.2112123234323456789023456789023456789E11');
+  bd := StrToBigDecimal('0.1'); test(BigDecimalToStr(bd), '0.1');
+  test(BigDecimalToStr(bd, bdfExponent), '1.0E-1');
+  bd := StrToBigDecimal('0.00000000000000000000000001'); test(BigDecimalToStr(bd), '0.00000000000000000000000001'); test(BigDecimalToStr(bd, bdfExponent), '1.0E-26');
+  bd := StrToBigDecimal('000000.00000000000000000000000001'); test(BigDecimalToStr(bd), '0.00000000000000000000000001'); test(BigDecimalToStr(bd, bdfExponent), '1.0E-26');
+  bd := StrToBigDecimal('0000000000.0000000000000000000000000'); test(BigDecimalToStr(bd), '0'); test(BigDecimalToStr(bd, bdfExponent), '0');
+  bd := StrToBigDecimal('-0'); test(BigDecimalToStr(bd), '0'); test(BigDecimalToStr(bd, bdfExponent), '0');
+  bd := StrToBigDecimal('-0.'); test(BigDecimalToStr(bd), '0'); test(BigDecimalToStr(bd, bdfExponent), '0');
+  bd := StrToBigDecimal('.0'); test(BigDecimalToStr(bd), '0'); test(BigDecimalToStr(bd, bdfExponent), '0');
+  bd := StrToBigDecimal('-.0'); test(BigDecimalToStr(bd), '0'); test(BigDecimalToStr(bd, bdfExponent), '0');
+  bd := StrToBigDecimal('1.E-1'); test(BigDecimalToStr(bd), '0.1'); test(BigDecimalToStr(bd, bdfExponent), '1.0E-1');
+  bd := StrToBigDecimal('1E-1'); test(BigDecimalToStr(bd), '0.1'); test(BigDecimalToStr(bd, bdfExponent), '1.0E-1');
+  bd := StrToBigDecimal('1E-10'); test(BigDecimalToStr(bd), '0.0000000001'); test(BigDecimalToStr(bd, bdfExponent), '1.0E-10');
+  bd := StrToBigDecimal('1234567890E-10'); test(BigDecimalToStr(bd), '0.123456789'); test(BigDecimalToStr(bd, bdfExponent), '1.23456789E-1');
+  bd := StrToBigDecimal('123456789.0E-10'); test(BigDecimalToStr(bd), '0.0123456789'); test(BigDecimalToStr(bd, bdfExponent), '1.23456789E-2');
+  bd := StrToBigDecimal('1234567.890E-10'); test(BigDecimalToStr(bd), '0.000123456789'); test(BigDecimalToStr(bd, bdfExponent), '1.23456789E-4');
+  bd := StrToBigDecimal('1234567.89000000000000000000000007E-10'); test(BigDecimalToStr(bd), '0.000123456789000000000000000000000007'); test(BigDecimalToStr(bd, bdfExponent), '1.23456789000000000000000000000007E-4');
+  bd := StrToBigDecimal('-10.6832'); test(BigDecimalToStr(bd), '-10.6832'); test(BigDecimalToStr(bd, bdfExponent), '-1.06832E1');
+  bd := StrToBigDecimal('-10.683215'); test(BigDecimalToStr(bd), '-10.683215');test(BigDecimalToStr(bd, bdfExponent), '-1.0683215E1');
+  bd := StrToBigDecimal('-10.6832154'); test(BigDecimalToStr(bd), '-10.6832154'); test(BigDecimalToStr(bd, bdfExponent), '-1.06832154E1');
+  bd := StrToBigDecimal('.123'); test(BigDecimalToStr(bd), '0.123'); test(BigDecimalToStr(bd, bdfExponent), '1.23E-1');
+  bd := StrToBigDecimal('-.1'); test(BigDecimalToStr(bd), '-0.1'); test(BigDecimalToStr(bd, bdfExponent), '-1.0E-1');
+  bd := StrToBigDecimal('.123E1'); test(BigDecimalToStr(bd), '1.23'); test(BigDecimalToStr(bd, bdfExponent), '1.23E0');
+  bd := StrToBigDecimal('-.1E1'); test(BigDecimalToStr(bd), '-1'); test(BigDecimalToStr(bd, bdfExponent), '-1.0E0');
+  test(TryStrToBigDecimal('.', nil) = false);
+  test(TryStrToBigDecimal('e', nil) = false);
+  test(TryStrToBigDecimal('a', nil) = false);
+  test(TryStrToBigDecimal('', nil) = false);
+  test(TryStrToBigDecimal('.e', nil) = false);
+  test(TryStrToBigDecimal('-e', nil) = false);
+  test(TryStrToBigDecimal('-.', nil) = false);
+  test(TryStrToBigDecimal('-.E1', nil) = false);
+  test(TryStrToBigDecimal('e1', nil) = false);
+  test(TryStrToBigDecimal('.e2', nil) = false);
+  test(TryStrToBigDecimal('18', nil) = TRUE);
+  test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528'))) = double(StrToFloat('-3.40282346638528')));
+   e := BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38'));
+  ddd := double(e);
+  test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38'))) = double(StrToFloat('-3.40282346638528E38')));
+  test(single(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38')))) = single(double(StrToFloat('-3.40282346638528E38'))));
+
+  for i := 0 to high(powersOf10) do begin
+    bd := StrToBigDecimal(IntToStr(powersOf10[i]));
+    test(BigDecimalToStr(bd), IntToStr(powersOf10[i]));
+    test(BigDecimalToStr(bd, bdfExponent), '1.0E'+IntToStr(i));
+    bd := StrToBigDecimal('1E'+inttostr(i))                    ;
+    test(BigDecimalToStr(bd), IntToStr(powersOf10[i]), '1E'+inttostr(i));
+    test(BigDecimalToStr(bd, bdfExponent), '1.0E'+inttostr(i), '1E'+inttostr(i));
+    test(BigDecimalToStr(StrToBigDecimal('1e'+inttostr(i))), IntToStr(powersOf10[i]), '1E'+inttostr(i));
+    test(BigDecimalToStr(StrToBigDecimal('1E+'+inttostr(i))), IntToStr(powersOf10[i]), '1E'+inttostr(i));
+    test(BigDecimalToStr(StrToBigDecimal('1e+'+inttostr(i))), IntToStr(powersOf10[i]), '1E'+inttostr(i));
+    bd := StrToBigDecimal(IntToStr(powersOf10[i])+ '.0');
+    test(BigDecimalToStr(bd, bdfExponent), '1.0E'+IntToStr(i));
+    test(BigDecimalToStr(bd), IntToStr(powersOf10[i]), IntToStr(powersOf10[i])+'.0');
+    for j := 0 to high(powersOf10) do begin
+      test(BigDecimalToStr(StrToBigDecimal(IntToStr(powersOf10[i] + powersOf10[j]))), IntToStr(powersOf10[i] + powersOf10[j]));
+    end;
+  end;
+  for i := 0 to 9 do
+    for j := 0 to 9 do begin
+      bd := StrToBigDecimal(IntToStr(powersOf10[i]) + 'E' + inttostr(j));
+      test(BigDecimalToStr(bd), IntToStr(powersOf10[i]*powersOf10[j]), IntToStr(powersOf10[i]) + 'E' + inttostr(j));
+      test(BigDecimalToStr(bd, bdfExponent), '1.0E'+IntToStr(i+j));
+    end;
+  for i := 1 to 40 do begin
+    bd := StrToBigDecimal('1E-'+IntToStr(i));
+    test(BigDecimalToStr(bd), '0.'+strDup('0', i-1)+'1');
+    test(BigDecimalToStr(bd, bdfExponent), '1.0E'+IntToStr(-i));
+    bd := StrToBigDecimal('0.1E-'+IntToStr(i));
+    test(BigDecimalToStr(bd), '0.'+strDup('0', i)+'1');
+    test(BigDecimalToStr(bd, bdfExponent), '1.0E'+IntToStr(-i-1));
+    bd := StrToBigDecimal('0.10000000E-'+IntToStr(i));
+    test(BigDecimalToStr(bd), '0.'+strDup('0', i)+'1');
+    test(BigDecimalToStr(bd, bdfExponent), '1.0E'+IntToStr(-i-1));
+  end;
+
+
+  test(TryStrToBigDecimal('123456789011122233344455566677788899901234567900', @bverylarge));
+  test((bverylarge.exponent = 0) and not (bverylarge.signed));// and (length(b1.digits) = 1) and (b1.digits[0] = 1));
+  test(BigDecimalToStr(bverylarge), '123456789011122233344455566677788899901234567900');
+  test(BigDecimalToStr(bverylarge, bdfExponent), '1.234567890111222333444555666777888999012345679E47');
+
+
+  test(BigDecimalToStr(-StrToBigDecimal('123')), '-123');
+  test(BigDecimalToStr(-StrToBigDecimal('123'), bdfExponent), '-1.23E2');
+  test(BigDecimalToStr(StrToBigDecimal('123') + StrToBigDecimal('456')), '579');
+  test(BigDecimalToStr(StrToBigDecimal('123') + StrToBigDecimal('456'), bdfExponent), '5.79E2');
+  bd := StrToBigDecimal('123456789012345678901234567890') + StrToBigDecimal('9123456789113129124012412442141');
+  test(BigDecimalToStr(bd), '9246913578125474802913647010031');
+  test(BigDecimalToStr(bd, bdfExponent), '9.246913578125474802913647010031E30');
+  bd := StrToBigDecimal('123456789012345678901234567890') + StrToBigDecimal('1');
+  test(BigDecimalToStr(bd), '123456789012345678901234567891');
+  test(BigDecimalToStr(bd, bdfExponent), '1.23456789012345678901234567891E29');
+  bd := StrToBigDecimal('1') + StrToBigDecimal('9123456789113129124012412442141');
+  test(BigDecimalToStr(bd), '9123456789113129124012412442142');
+  test(BigDecimalToStr(bd, bdfExponent), '9.123456789113129124012412442142E30');
+  bd := StrToBigDecimal('123') + StrToBigDecimal('0.456');
+  test(BigDecimalToStr(bd), '123.456');
+  test(BigDecimalToStr(bd, bdfExponent), '1.23456E2');
+  bd := StrToBigDecimal('123456789012345678901234567890') + StrToBigDecimal('0.9123456789113129124012412442141');
+  test(BigDecimalToStr(bd), '123456789012345678901234567890.9123456789113129124012412442141');
+  test(BigDecimalToStr(bd, bdfExponent), '1.234567890123456789012345678909123456789113129124012412442141E29');
+  bd := StrToBigDecimal('0.5') + StrToBigDecimal('0.5');
+  test(BigDecimalToStr(bd), '1');
+  test(BigDecimalToStr(bd, bdfExponent), '1.0E0');
+  bd := StrToBigDecimal('99999999999999') + StrToBigDecimal('1');
+  test(BigDecimalToStr(bd), '100000000000000');
+  test(BigDecimalToStr(bd, bdfExponent), '1.0E14');
+  bd := StrToBigDecimal('123') + StrToBigDecimal('123123123123.456789789');
+  test(BigDecimalToStr(bd), '123123123246.456789789');
+  test(BigDecimalToStr(bd, bdfExponent), '1.23123123246456789789E11');
+  bd := StrToBigDecimal('123123123123.456789789') + StrToBigDecimal('123');
+  test(BigDecimalToStr(bd), '123123123246.456789789');
+  test(BigDecimalToStr(bd, bdfExponent), '1.23123123246456789789E11');
+
+  bd := StrToBigDecimal('0.5') - StrToBigDecimal('0.5');
+  test(BigDecimalToStr(bd), '0');
+  test(BigDecimalToStr(bd, bdfExponent), '0');
+  bd := StrToBigDecimal('100000000000000') - StrToBigDecimal('1');
+  test(BigDecimalToStr(bd), '99999999999999');
+  test(BigDecimalToStr(bd, bdfExponent), '9.9999999999999E13');
+  bd := StrToBigDecimal('100000000000000') - StrToBigDecimal('0.001');
+  test(BigDecimalToStr(bd), '99999999999999.999');
+  test(BigDecimalToStr(bd, bdfExponent), '9.9999999999999999E13');
+  bd := StrToBigDecimal('100000000000000') - StrToBigDecimal('0.000000000000001');
+  test(BigDecimalToStr(bd), '99999999999999.999999999999999');
+  test(BigDecimalToStr(bd, bdfExponent), '9.9999999999999999999999999999E13');
+  bd := StrToBigDecimal('0.000000000000001') - StrToBigDecimal('100000000000000');
+  test(BigDecimalToStr(bd), '-99999999999999.999999999999999');
+  test(BigDecimalToStr(bd, bdfExponent), '-9.9999999999999999999999999999E13');
+  bd := StrToBigDecimal('17000') - StrToBigDecimal('17001');
+  test(BigDecimalToStr(bd), '-1');
+  test(BigDecimalToStr(bd, bdfExponent), '-1.0E0');
+  bd := StrToBigDecimal('100') - StrToBigDecimal('90000.7');
+  test(BigDecimalToStr(bd), '-89900.7');
+  test(BigDecimalToStr(bd, bdfExponent), '-8.99007E4');
+  bd := StrToBigDecimal('100') - StrToBigDecimal('900000000000000000.00000000000000007');
+  test(BigDecimalToStr(bd), '-899999999999999900.00000000000000007');
+  test(BigDecimalToStr(bd, bdfExponent), '-8.9999999999999990000000000000000007E17');
+  bd := StrToBigDecimal('900000000000000000.00000000000000007') - StrToBigDecimal('100') ;
+  test(BigDecimalToStr(bd), '899999999999999900.00000000000000007');
+  test(BigDecimalToStr(bd, bdfExponent), '8.9999999999999990000000000000000007E17');
+  bd := StrToBigDecimal('100') - StrToBigDecimal('90000000000000000000000000000000007E-17');
+  test(BigDecimalToStr(bd), '-899999999999999900.00000000000000007');
+  test(BigDecimalToStr(bd, bdfExponent), '-8.9999999999999990000000000000000007E17');
+  bd := StrToBigDecimal('100') - StrToBigDecimal('90000000000000000000000000000000007E-35');
+  test(BigDecimalToStr(bd), '99.09999999999999999999999999999999993');
+  test(BigDecimalToStr(bd, bdfExponent), '9.909999999999999999999999999999999993E1');
+
+  bd := StrToBigDecimal('-12345678901234567890') + StrToBigDecimal('12345678901234567890');
+  test(BigDecimalToStr(bd), '0');
+  test(BigDecimalToStr(bd, bdfExponent), '0');
+  bd := StrToBigDecimal('12345678901234567890') + StrToBigDecimal('-12345678901234567890');
+  test(BigDecimalToStr(bd), '0');
+  test(BigDecimalToStr(bd, bdfExponent), '0');
+
+
+
+
+  bd := StrToBigDecimal('12345') * StrToBigDecimal('0');
+  test(BigDecimalToStr(bd),  '0');
+  test(BigDecimalToStr(bd, bdfExponent),  '0');
+  bd := StrToBigDecimal('0') * StrToBigDecimal('12345');
+  test(BigDecimalToStr(bd),  '0');
+  test(BigDecimalToStr(bd, bdfExponent),  '0');
+  bd := StrToBigDecimal('-12345') * StrToBigDecimal('0');
+  test(BigDecimalToStr(bd),  '0');
+  test(BigDecimalToStr(bd, bdfExponent),  '0');
+  bd := StrToBigDecimal('0') * StrToBigDecimal('-12345');
+  test(BigDecimalToStr(bd),  '0');
+  test(BigDecimalToStr(bd, bdfExponent),  '0');
+  bd := StrToBigDecimal('12345') * StrToBigDecimal('12345');
+  test(BigDecimalToStr(bd),  '152399025');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.52399025E8');
+  bd := StrToBigDecimal('1234567890') * StrToBigDecimal('1234567890');
+  test(BigDecimalToStr(bd),  '1524157875019052100');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.5241578750190521E18');
+  bd := StrToBigDecimal('999999999999999') * StrToBigDecimal('999999999999999');
+  test(BigDecimalToStr(bd),  '999999999999998000000000000001');
+  test(BigDecimalToStr(bd, bdfExponent),  '9.99999999999998000000000000001E29');
+  bd := StrToBigDecimal('9.99999999999999') * StrToBigDecimal('9.99999999999999');
+  test(BigDecimalToStr(bd),  '99.9999999999998000000000000001');
+  test(BigDecimalToStr(bd, bdfExponent),  '9.99999999999998000000000000001E1');
+  bd := StrToBigDecimal('92482252232323423') * StrToBigDecimal('2.4121421E-7');
+  test(BigDecimalToStr(bd),  '22308033411.24063094344083');
+  test(BigDecimalToStr(bd, bdfExponent),  '2.230803341124063094344083E10');
+
+  test(precision(StrToBigDecimal('0E-10')), 0);
+  test(precision(StrToBigDecimal('0')), 0);
+  test(precision(StrToBigDecimal('1')), 1);
+  test(precision(StrToBigDecimal('12')), 2);
+  test(precision(StrToBigDecimal('123')), 3);
+  test(precision(StrToBigDecimal('1234')), 4);
+  test(precision(StrToBigDecimal('123412341234')), 12);
+  test(precision(StrToBigDecimal('0.123412341234')), 12);
+  test(precision(StrToBigDecimal('123412341234123412341234123412341234')), 36);
+  test(precision(StrToBigDecimal('1234123412341234123412341234123412345')), 37);
+  test(precision(StrToBigDecimal('0.01')), 1);
+  test(precision(StrToBigDecimal('0.001')), 1);
+  test(precision(StrToBigDecimal('0.0001')), 1);
+  test(precision(StrToBigDecimal('0.00001')), 1);
+  test(precision(StrToBigDecimal('0.101')), 3);
+  test(precision(StrToBigDecimal('0.0101')), 3);
+  test(precision(StrToBigDecimal('0.00101')), 3);
+  test(precision(StrToBigDecimal('0.000101')), 3);
+
+  bd := StrToBigDecimal('123') div StrToBigDecimal('1');
+  test(BigDecimalToStr(bd),  '123');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.23E2');
+  bd := StrToBigDecimal('123') div StrToBigDecimal('10');
+  test(BigDecimalToStr(bd),  '12');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.2E1');
+  bd := StrToBigDecimal('123') div StrToBigDecimal('123');
+  test(BigDecimalToStr(bd),  '1');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.0E0');
+  bd := StrToBigDecimal('123') div StrToBigDecimal('001');
+  test(BigDecimalToStr(bd),  '123');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.23E2');
+  bd := StrToBigDecimal('123') div StrToBigDecimal('0000000000000000000000001');
+  test(BigDecimalToStr(bd),  '123');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.23E2');
+  bd := StrToBigDecimal('123456789') div  StrToBigDecimal('123');
+  test(BigDecimalToStr(bd),  '1003713');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.003713E6');
+  bd := StrToBigDecimal('98765') div  StrToBigDecimal('123');
+  test(BigDecimalToStr(bd),  '802');
+  test(BigDecimalToStr(bd, bdfExponent),  '8.02E2');
+  bd := StrToBigDecimal('92482252232323423') div StrToBigDecimal('123');
+  test(BigDecimalToStr(bd),  '751888229531084');
+  test(BigDecimalToStr(bd, bdfExponent),  '7.51888229531084E14');
+  bd := StrToBigDecimal('123') div  StrToBigDecimal('0.1');
+  test(BigDecimalToStr(bd),  '1230');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.23E3');
+  bd := StrToBigDecimal('123') div  StrToBigDecimal('0.0000001');
+  test(BigDecimalToStr(bd),  '1230000000');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.23E9');
+  bd := StrToBigDecimal('1000000000000000000000') div  StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '333333333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333333E20');
+  bd := StrToBigDecimal('1E21') div  StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '333333333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333333E20');
+  bd := StrToBigDecimal('12345678901234567890') div StrToBigDecimal('999888777999888777');
+  test(BigDecimalToStr(bd),  '12');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.2E1');
+
+  bd := StrToBigDecimal('1') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '0.333333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333E-1');
+  bd := StrToBigDecimal('10') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '3.33333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333E0');
+  bd := StrToBigDecimal('100') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '33.3333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333E1');
+  bd := StrToBigDecimal('1E21') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '333333333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333333E20');
+  bd := StrToBigDecimal('1E25') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),               '3333333333333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.333333333333333333333333E24');
+  bd := StrToBigDecimal('1') / StrToBigDecimal('2');
+  test(BigDecimalToStr(bd),  '0.5');
+  test(BigDecimalToStr(bd, bdfExponent),  '5.0E-1');
+  bd := StrToBigDecimal('334634') / StrToBigDecimal('6734745323');
+  test(BigDecimalToStr(bd),  '0.0000496876992300188275');
+  test(BigDecimalToStr(bd, bdfExponent),  '4.96876992300188275E-5');
+  bd := StrToBigDecimal('1') / StrToBigDecimal('2') + StrToBigDecimal('1') / StrToBigDecimal('2');
+  test(BigDecimalToStr(bd),  '1');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.0E0');
+  bd := StrToBigDecimal('1') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '0.333333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333E-1');
+  bd := StrToBigDecimal('1') / StrToBigDecimal('3') + StrToBigDecimal('1') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '0.666666666666666667');
+  test(BigDecimalToStr(bd, bdfExponent),  '6.66666666666666667E-1');
+  bd := StrToBigDecimal('1') / StrToBigDecimal('3') + StrToBigDecimal('1') / StrToBigDecimal('3') + StrToBigDecimal('1') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),  '1');
+  test(BigDecimalToStr(bd, bdfExponent),  '1.0E0');
+  bd := StrToBigDecimal('0.333333333333333333') + StrToBigDecimal('0.333333333333333333') + StrToBigDecimal('0.333333333333333333');
+  test(BigDecimalToStr(bd),  '0.999999999999999999');
+  test(BigDecimalToStr(bd, bdfExponent),  '9.99999999999999999E-1');
+  bd := StrToBigDecimal('1') / StrToBigDecimal('171');
+  test(BigDecimalToStr(bd),  '0.00584795321637426901');
+  test(BigDecimalToStr(bd, bdfExponent),  '5.84795321637426901E-3');
+  bd := StrToBigDecimal('1E20') / StrToBigDecimal('171E20');
+  test(BigDecimalToStr(bd),  '0.00584795321637426901');
+  test(BigDecimalToStr(bd, bdfExponent),  '5.84795321637426901E-3');
+  bd := StrToBigDecimal('1E-20') / StrToBigDecimal('171E-20');
+  test(BigDecimalToStr(bd),  '0.00584795321637426901');
+  test(BigDecimalToStr(bd, bdfExponent),  '5.84795321637426901E-3');
+  bd := StrToBigDecimal('-1876') / StrToBigDecimal('13242148.0');
+  test(BigDecimalToStr(bd),  '-0.000141668859160915586');
+  test(BigDecimalToStr(bd, bdfExponent),  '-1.41668859160915586E-4');
+  test(BigDecimalToStr(StrToBigDecimal('0') / 7), '0');
+
+  test(equalUpToPrecision(StrToBigDecimal('0.11'), StrToBigDecimal('0.111')), 'eutp1');
+  test(not equalUpToPrecision(StrToBigDecimal('0.11'), StrToBigDecimal('0.121')), 'eutp2');
+  test(equalUpToPrecision(StrToBigDecimal('0.11'), StrToBigDecimal('11.1E-2')), 'eutp3');
+  test(not equalUpToPrecision(StrToBigDecimal('0.11'), StrToBigDecimal('12.1E-2')), 'eutp4');
+  test(equalUpToPrecision(StrToBigDecimal('3.736901128118292746'), StrToBigDecimal('3.73690112811829')), 'eutp5');
+
+  test(BigDecimalToStr(StrToBigDecimal('1.23E3') div 7), '175');
+  test(BigDecimalToStr(StrToBigDecimal('-1.23E3') div 7), '-175');
+  test(BigDecimalToStr(StrToBigDecimal('0') div 7), '0');
+
+  bf := 12.34;
+  test(BigDecimalToStr(bf), '12.34');
+  bf := bf * 1000 - 42;
+  test(BigDecimalToStr(bf), '12298');
+  test(BigDecimalToStr(bf / 7), '1756.85714285714286');
+  bf += -1;
+  test(BigDecimalToStr(bf), '12297');
+  test(BigDecimalToStr(bf * (-1)), '-12297');
+
+  test(BigDecimalToStr(bf - 9223372036854775807), '-9223372036854763510');
+  test(BigDecimalToStr(bf + (-9223372036854775808)), '-9223372036854763511');
+
+  test(9 < StrToBigDecimal( '9.57784763022100591716'));
+  test(BigDecimalToStr(9 - StrToBigDecimal( '9.57784763022100591716')), '-0.57784763022100591716');
+
+
+
+  //failed fuzzy tests
+  if DIGITS_PER_ELEMENT = 5 then begin
+    SetLength(tempbf.digits, 5); tempbf.digits[0] := BigDecimalBin(10000); tempbf.digits[1] := BigDecimalBin(72175); tempbf.digits[2] := BigDecimalBin(60243); tempbf.digits[3] := BigDecimalBin(66625); tempbf.digits[4] := BigDecimalBin(2434);
+    tempbf.exponent:=-5; tempbf.signed:=false; tempbf.lastDigitHidden:=true;
+    test(BigDecimalToStr(tempbf), '0.02434666256024372175');
+    tempbf.digits[0] := BigDecimalBin(80000);
+    test(BigDecimalToStr(tempbf), '0.02434666256024372176');
+  end;
+  test(StrToBigDecimal('247.6905') / StrToBigDecimal('83103111'), '0.0000029805201877460399767705447272605');
+  test(BigDecimalToStr(StrToBigDecimal('3.0') div StrToBigDecimal('2')), '1');
+  test(BigDecimalToStr(StrToBigDecimal('3.0') div StrToBigDecimal('2.0')), '1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') div StrToBigDecimal('2')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') div StrToBigDecimal('2.0')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') div StrToBigDecimal('2.000000000000000000000000000000000000000000')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0000000000000000000000000000000000000000000') div StrToBigDecimal('2.0')), '-1');
+
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') mod StrToBigDecimal('2.0')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.5') mod StrToBigDecimal('2.0')), '-1.5');
+
+  test(BigDecimalToStr(StrToBigDecimal('-3.0') mod StrToBigDecimal('2')), '-1');
+  test(BigDecimalToStr(StrToBigDecimal('-3.5') mod StrToBigDecimal('2')), '-1.5');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0E1') mod StrToBigDecimal('2')), '0');
+  test(BigDecimalToStr(StrToBigDecimal('-3.0E20') mod StrToBigDecimal('7')), '-6');
+  test(BigDecimalToStr(StrToBigDecimal('3.0E20') mod StrToBigDecimal('7')), '6');
+  test(BigDecimalToStr(StrToBigDecimal('3.1E1') mod StrToBigDecimal('6')), '1');
+
+  test(BigDecimalToStr(StrToBigDecimal('0') mod 7), '0');
+
+  test(isInteger(StrToBigDecimal('1e10')) = true );
+  test(isInteger(StrToBigDecimal('1e-10')) = false );
+  test(isInteger(StrToBigDecimal('1e100000')) = true );
+  test(isInteger(StrToBigDecimal('1e-100000')) = false );
+  test(isInteger(StrToBigDecimal('1234')) = true );
+  test(isInteger(StrToBigDecimal('0.1234')) = false );
+
+  test(IsZero(StrToBigDecimal('0')));
+  test(IsZero(StrToBigDecimal('0.0')));
+  test(IsZero(StrToBigDecimal('0e10')));
+  test(IsZero(StrToBigDecimal('-0')));
+  test(IsZero(StrToBigDecimal('1') - 1));
+  test(IsZero(StrToBigDecimal('1'))  = false);
+
+  test(BigDecimalToStr(abs(StrToBigDecimal('1'))), '1');
+  test(BigDecimalToStr(abs(StrToBigDecimal('0'))), '0');
+  test(BigDecimalToStr(abs(StrToBigDecimal('-1'))), '1');
+
+  test(isInt64(StrToBigDecimal('9223372036854775807')) = true);
+  test(isInt64(StrToBigDecimal('9223372036854775808')) = false);
+  test(isInt64(StrToBigDecimal('-9223372036854775807')) = true);
+  test(isInt64(StrToBigDecimal('-9223372036854775808')) = True);
+  test(isInt64(StrToBigDecimal('-9223372036854775809')) = false);
+
+  setZero(bf);
+  SetLength(bf.digits, 3);
+  bf.digits[0] := 1;
+  test(BigDecimalToStr(bf), '1');
+  test(FloatToStr(BigDecimalToExtended(bf)), '1');
+  test(BigDecimalToInt64(bf), 1);
+  test(BigDecimalToInteger(bf), 1);
+
+  //fuzzing
+  for i := 1 to 10000 do begin
+    t := Random(9223372036854775807);
+    test(BigDecimalToStr(StrToBigDecimal(inttostr(t))), inttostr(t));
+    u := Random(9223372036854775807);
+    test(BigDecimalToStr(StrToBigDecimal(inttostr(t div 2)) + StrToBigDecimal(inttostr(u div 2)) ), inttostr(t div 2+u div 2));
+
+    test(BigDecimalToStr(StrToBigDecimal(inttostr(t )) - StrToBigDecimal(inttostr(u )) ), inttostr(t  - u));
+    divideModNoAlias(resdiv, resmod, StrToBigDecimal(inttostr(t )), StrToBigDecimal(inttostr(u)), 0, [bddfFillIntegerPart,bddfNoFractionalPart]);
+    test(BigDecimalToStr(resdiv), inttostr(t  div u), inttostr(t)+ ' div '+inttostr(u));
+    test(BigDecimalToStr(resmod), inttostr(t  mod u));
+
+
+    d := Random(100000000) / powersOf10[random(10)];
+    if random(2) = 0 then d := - d;
+    ds := FloatToStr(d);
+    dbf := StrToBigDecimal(ds);
+    test(BigDecimalToStr(dbf), ds);
+    test(SameValue(BigDecimalToExtended(dbf), d, 1e-9),  FloatToStr(BigDecimalToExtended(dbf))+ ' <> ' + ds);
+
+
+    d := Random(100000000) / powersOf10[random(6)];
+    e := Random(100000000) / powersOf10[random(6)];
+    if random(2) = 0 then d := - e;
+    if random(2) = 0 then d := - e;
+    test(BigDecimalToStr(StrToBigDecimal(FloatToStr(d)) + StrToBigDecimal(FloatToStr(e)) ), FloatToStr(d+e), FloatToStr(d)+ ' + ' + FloatToStr(e));
+    test(StrToBigDecimal(FloatToStr(d)) - StrToBigDecimal(FloatToStr(e)) , FloatToStr(d-e), FloatToStr(d)+ ' - ' + FloatToStr(e));
+    try
+    test(StrToBigDecimal(FloatToStr(d)) / StrToBigDecimal(FloatToStr(e)) , FloatToStr(d/e), FloatToStr(d)+ ' / ' + FloatToStr(e));
+
+    except
+      writeln(FloatToStr(d)+ ' / ' + FloatToStr(e));
+    end;
+
+    d := Random(1000000) / powersOf10[random(7)];
+    e := Random(1000000) / powersOf10[random(7)];
+    if random(2) = 0 then d := - d;
+    if random(2) = 0 then e := - e;
+    test(BigDecimalToStr(StrToBigDecimal(FloatToStr(d)) * StrToBigDecimal(FloatToStr(e)) ), FloatToStr(d*e), FloatToStr(d)+ ' * ' + FloatToStr(e));
+
+  end;
+
+  test(BigDecimalToStr(round(StrToBigDecimal('1.1'))), '1');
+  test(BigDecimalToStr(round(StrToBigDecimal('1.1'), -100)), '1.1');
+  test(BigDecimalToStr(round(StrToBigDecimal('1.1'), -1)), '1.1');
+  test(BigDecimalToStr(round(StrToBigDecimal('1.5'))), '2');
+  test(BigDecimalToStr(round(StrToBigDecimal('11E-1'))), '1');
+  test(BigDecimalToStr(round(StrToBigDecimal('15E-1'))), '2');
+  test(BigDecimalToStr(round(StrToBigDecimal('1.5'), 0, bfrmRoundHalfToEven)), '2');
+  test(BigDecimalToStr(round(StrToBigDecimal('2.5'), 0, bfrmRoundHalfToEven)), '2');
+  test(BigDecimalToStr(round(StrToBigDecimal('3.5'), 0, bfrmRoundHalfToEven)), '4');
+  test(BigDecimalToStr(round(StrToBigDecimal('-1.5'), 0, bfrmRoundHalfToEven)), '-2');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.5'), 0, bfrmRoundHalfToEven)), '-2');
+  test(BigDecimalToStr(round(StrToBigDecimal('-3.5'), 0, bfrmRoundHalfToEven)), '-4');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.51'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.501'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.5001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.50001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.500001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.5000001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.50000001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.500000001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.5000000001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.50000000001'), 0, bfrmRoundHalfToEven)), '-3');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.5E10'), 10, bfrmRoundHalfToEven)), '-20000000000');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.51E10'), 10, bfrmRoundHalfToEven)), '-30000000000');
+  test(BigDecimalToStr(round(StrToBigDecimal('-2.501E10'), 10, bfrmRoundHalfToEven)), '-30000000000');
+  for i := 0 to 1000 do begin
+    j := ifthen(i = 0, 0, Random(2000000000) - 1000000000);
+    temp := IntToStr(j);
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'))), temp);
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -1)), temp + '.4');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -2)), temp + '.38');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -3)), temp + '.382');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -4)), temp + '.3824');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -5)), temp + '.38238');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -6)), temp + '.382383');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -7)), temp + '.3823829');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -8)), temp + '.38238294');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -9)), temp + '.382382942');
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -10)), temp + '.3823829422');
+
+
+    test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), 0, bfrmTrunc)), temp);
+    if j >= 0 then test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), 0, bfrmCeil)), inttostr(strtoint(temp) + 1))
+    else test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), 0, bfrmCeil)), temp);
+    if j >= 0 then test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), 0, bfrmFloor)), temp)
+    else test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), 0, bfrmFloor)), inttostr(j - 1));
+    for r := bfrmTrunc to bfrmFloor do begin
+      if (r <> bfrmTrunc) and ((j >= 0) = (r = bfrmCeil)) then begin
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -1, r)), temp + '.4');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -2, r)), temp + '.39');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -3, r)), temp + '.383');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -4, r)), temp + '.3824');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -5, r)), temp + '.38239');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -6, r)), temp + '.382383');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -7, r)), temp + '.382383');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -8, r)), temp + '.38238295');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -9, r)), temp + '.382382943');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -10, r)), temp + '.3823829422');
+      end else begin
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -1, r)), temp + '.3');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -2, r)), temp + '.38');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -3, r)), temp + '.382');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -4, r)), temp + '.3823');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -5, r)), temp + '.38238');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -6, r)), temp + '.382382');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -7, r)), temp + '.3823829');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -8, r)), temp + '.38238294');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -9, r)), temp + '.382382942');
+        test(BigDecimalToStr(round(StrToBigDecimal(temp + '.3823829422'), -10, r)), temp + '.3823829422');
+      end;
+    end;
+  end;
+
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('9'))), '3');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('121'))), '11');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8'))), '2.828427125');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'))), '282842.712474619');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 1)), '282842.7');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 2)), '282842.71');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 3)), '282842.712');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 4)), '282842.7125');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 5)), '282842.71247');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 6)), '282842.712475');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 7)), '282842.7124746');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 0)), '282843');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E10'), 1)), '282842.7');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('0'), 1)), '0');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('1.21'))), '1.1');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('0.0121'))), '0.11');
+  test(BigDecimalToStr(sqrt(StrToBigDecimal('8E-10'))), '0.000028284');
+
+  test(BigDecimalToStr(power(StrToBigDecimal('1'), 1)), '1');
+  test(BigDecimalToStr(power(StrToBigDecimal('1'), 0)), '1');
+  test(BigDecimalToStr(power(StrToBigDecimal('1'), -1)), '1');
+  test(BigDecimalToStr(power(StrToBigDecimal('10'), 0)), '1');
+  test(BigDecimalToStr(power(StrToBigDecimal('10'), 1)), '10');
+  test(BigDecimalToStr(power(StrToBigDecimal('10'), -1)), '0.1');
+  test(BigDecimalToStr(power(StrToBigDecimal('12'), 10)), '61917364224');
+  test(BigDecimalToStr(power(StrToBigDecimal('12'), -10)), '0.0000000000161505582889845721');
+  test(BigDecimalToStr(power(StrToBigDecimal('2141412441242'), 3)), '9819762058390878821648425132804344488');
+
+  test(BigDecimalToStr(gcd(StrToBigDecimal('120'), StrToBigDecimal('27'))), '3');
+  test(BigDecimalToStr(lcm(StrToBigDecimal('120'), StrToBigDecimal('27'))), '1080');
+  test(BigDecimalToStr(gcd(StrToBigDecimal('120'), StrToBigDecimal('-120'))), '120');
+  test(BigDecimalToStr(gcd(StrToBigDecimal('120'), StrToBigDecimal('-20'))), '-20'); //random sign depending on recursion deep
+
+
+  //comparisons involving 0/-0
+  test(compareBigDecimals(StrToBigDecimal('-0'), StrToBigDecimal('0')), 0);
+  setZero(b0);
+  test(compareBigDecimals(b0, b1), -1);
+  test(compareBigDecimals(b0, bs1), 1);
+  test(compareBigDecimals(b1, b0), 1);
+  test(compareBigDecimals(bs1, b0), -1);
+  test(compareBigDecimals(b1, b1), 0);
+  test(compareBigDecimals(bs1, bs1), 0);
+  test(compareBigDecimals(b0, b0), 0);
+  b0.signed:=true;
+  test(compareBigDecimals(b0, b1), -1);
+  test(compareBigDecimals(b0, bs1), 1);
+  test(compareBigDecimals(b1, b0), 1);
+  test(compareBigDecimals(bs1, b0), -1);
+  test(compareBigDecimals(b1, b1), 0);
+  test(compareBigDecimals(bs1, bs1), 0);
+  test(compareBigDecimals(b0, b0), 0);
+
+
+
+
+  bf := StrToBigDecimal('1');
+  test(BigDecimalToStr(shifted10(bf, -3)), '0.001');
+  test(BigDecimalToStr(shifted10(bf, -2)), '0.01');
+  test(BigDecimalToStr(shifted10(bf, -1)), '0.1');
+  test(BigDecimalToStr(shifted10(bf, 0)), '1');
+  test(BigDecimalToStr(shifted10(bf, 1)), '10');
+  test(BigDecimalToStr(shifted10(bf, 2)), '100');
+  test(BigDecimalToStr(shifted10(bf, 3)), '1000');
+
+  bf := StrToBigDecimal('12');
+  test(BigDecimalToStr(shifted10(bf, -4)), '0.0012');
+  test(BigDecimalToStr(shifted10(bf, -3)), '0.012');
+  test(BigDecimalToStr(shifted10(bf, -2)), '0.12');
+  test(BigDecimalToStr(shifted10(bf, -1)), '1.2');
+  test(BigDecimalToStr(shifted10(bf, 0)), '12');
+  test(BigDecimalToStr(shifted10(bf, 1)), '120');
+  test(BigDecimalToStr(shifted10(bf, 2)), '1200');
+  test(BigDecimalToStr(shifted10(bf, 3)), '12000');
+
+  bf := StrToBigDecimal('123');
+  test(BigDecimalToStr(shifted10(bf, -4)), '0.0123');
+  test(BigDecimalToStr(shifted10(bf, -3)), '0.123');
+  test(BigDecimalToStr(shifted10(bf, -2)), '1.23');
+  test(BigDecimalToStr(shifted10(bf, -1)), '12.3');
+  test(BigDecimalToStr(shifted10(bf, 0)), '123');
+  test(BigDecimalToStr(shifted10(bf, 1)), '1230');
+  test(BigDecimalToStr(shifted10(bf, 2)), '12300');
+  test(BigDecimalToStr(shifted10(bf, 3)), '123000');
+
+  bf := StrToBigDecimal('1234567890112233445566778899');
+//  temp := '1234567890112233445566778899';
+//  for i := 0 to 100 do begin
+  test(BigDecimalToStr(shifted10(bf, 0)), '1234567890112233445566778899');
+  test(BigDecimalToStr(shifted10(bf, 1)), '12345678901122334455667788990');
+  test(BigDecimalToStr(shifted10(bf, 2)), '123456789011223344556677889900');
+  test(BigDecimalToStr(shifted10(bf, 3)), '1234567890112233445566778899000');
+  test(BigDecimalToStr(shifted10(bf, 4)), '12345678901122334455667788990000');
+  temp := '12345678901122334455667788990000';
+  for i := 5  to 40 do begin
+    temp:= temp + '0';
+    test(BigDecimalToStr(shifted10(bf, i)), temp);
+  end;
+  test(BigDecimalToStr(shifted10(bf, -1)), '123456789011223344556677889.9');
+  test(BigDecimalToStr(shifted10(bf, -2)), '12345678901122334455667788.99');
+  test(BigDecimalToStr(shifted10(bf, -3)), '1234567890112233445566778.899');
+  temp := '1234567890112233445566778899';
+  for i := 4 to length(temp) - 1 do
+    test(BigDecimalToStr(shifted10(bf, -i)), copy(temp, 1, length(temp) - i) + '.' + copy(temp, length(temp) - i + 1, length(temp)));
+  test(BigDecimalToStr(shifted10(bf, -length(temp))), '0.1234567890112233445566778899');
+  test(BigDecimalToStr(shifted10(bf, -length(temp)-1)), '0.01234567890112233445566778899');
+  temp := '1234567890112233445566778899';
+  for i := 0 to 30 do begin
+    test(BigDecimalToStr(shifted10(bf, -length('1234567890112233445566778899')-i)), '0.'+temp);
+    temp := '0' + temp;
+  end;
+
+
+  test(BigDecimalToStr(fastpower2to(3)), '8');
+  test(BigDecimalToStr(fastpower2to(2)), '4');
+  test(BigDecimalToStr(fastpower2to(1)), '2');
+  test(BigDecimalToStr(fastpower2to(0)), '1');
+  test(BigDecimalToStr(fastpower2to(-1)), '0.5');
+  test(BigDecimalToStr(fastpower2to(-2)), '0.25');
+  test(BigDecimalToStr(fastpower2to(-3)), '0.125');
+  bd2 := StrToBigDecimal('2');
+  for i := -60 to -1 do begin
+    bf := fastpower2to(i); dbf := power(bd2, -i); divideModNoAlias(resdiv, resmod, 1, dbf, 50);
+    test(BigDecimalToStr(bf), BigDecimalToStr(resdiv), '2^'+inttostr(i));
+  end;
+  for i := 0 to 60 do begin
+    bf := fastpower2to(i); dbf := power(bd2, i);
+    test(BigDecimalToStr(bf), BigDecimalToStr(dbf), '2^'+inttostr(i));
+  end;
+
+  test(BigDecimalToStr(fastpower5to(3)), '125');
+  test(BigDecimalToStr(fastpower5to(2)), '25');
+  test(BigDecimalToStr(fastpower5to(1)), '5');
+  test(BigDecimalToStr(fastpower5to(0)), '1');
+  test(BigDecimalToStr(fastpower5to(-1)), '0.2');
+  test(BigDecimalToStr(fastpower5to(-2)), '0.04');
+  test(BigDecimalToStr(fastpower5to(-3)), '0.008');
+  bd5 := StrToBigDecimal('5');
+
+  test(BigDecimalToStr(FloatToBigDecimal(single(3.14159), bdffExact)), '3.141590118408203125');
+  test(BigDecimalToStr(FloatToBigDecimal(single(0.81), bdffExact)), '0.810000002384185791015625');
+  test(BigDecimalToStr(FloatToBigDecimal(single(144115188075855877), bdffExact)), '144115188075855872');
+  test(BigDecimalToStr(FloatToBigDecimal(single(1 / 3.0), bdffExact)), '0.3333333432674407958984375');
+  test(BigDecimalToStr(FloatToBigDecimal(single(1E-20), bdffExact)), '0.000000000000000000009999999682655225388967887463487205224055287544615566730499267578125');
+  test(BigDecimalToStr(FloatToBigDecimal(single(92233720368547758), bdffExact)), '92233718306963456');
+  test(BigDecimalToStr(FloatToBigDecimal(single(3.4028235E38), bdffExact)), '340282346638528859811704183484516925440');
+
+
+
+  test(BigDecimalToStr(FloatToBigDecimal(single(3.14159), bdffShortest)), '3.14159');
+  test(BigDecimalToStr(FloatToBigDecimal(single(0.81), bdffShortest)), '0.81');
+  test(BigDecimalToStr(FloatToBigDecimal(single(144115188075855877), bdffShortest)), '144115180000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(single(1 / 3.0), bdffShortest)), '0.33333333');
+  test(BigDecimalToStr(FloatToBigDecimal(single(1E-20), bdffShortest)), '0.00000000000000000001');
+  test(BigDecimalToStr(FloatToBigDecimal(single(92233720368547758), bdffShortest)), '92233720000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(single(3.4028235E38), bdffShortest)), '340282340000000000000000000000000000000');
+
+
+  test(BigDecimalToStr(FloatToBigDecimal(double(3.14159), bdffExact)), '3.14158999999999988261834005243144929409027099609375');
+  test(BigDecimalToStr(FloatToBigDecimal(double(0.81), bdffExact)), '0.810000000000000053290705182007513940334320068359375');
+  test(BigDecimalToStr(FloatToBigDecimal(double(144115188075855877), bdffExact)), '144115188075855872');
+  test(BigDecimalToStr(FloatToBigDecimal(double(1.2648080533535911530920161097426467149E-321), bdffExact)), '0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012648080533535911530920161097426467132545530946926713969294993472017292986117344047751675810857881404922792056203410373911722411785112058787808634777876016080033298257671971955912852919496933941854431197083059167506510080163517674331263600315199318970193142147584811913866190697631707279133978282459051181265588212743951998257798952742206856430219687536668863491320575988273458928872458664021107833782985446777005572079494108455683450970278232883696103086354195178760530500722568539445331025756396500207253422233871389455794712967880556229934922874636755263310787522373754559119577032201560242430806136366010054957017921691011069776652521219714656928609708162446943717718013423781913449380366598750951114861484914086986464099027216434478759765625');
+  test(BigDecimalToStr(FloatToBigDecimal(double(6.9533558078350043221569772416637627063E-310), bdffExact)), '0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006953355807835004322156977241663762700685049938944786970479148177772513858793494362044634871914096939262710436659486909391101356754854562840175038704305371316033681229787507282748781710758073862724754890771695324169401172658770783177056746714751534937401848873901564487214906619702733749315274230468592036188911265784110624551820221308265979806049390600362440893018912476354225357351219214986561279972777786259352004722073332229355198367457853216786756397892599317142701096475383839492631390146285648793473365821255280791387843825504523192558022394220437982140889739852818447379133684052280335541010419021840572422086996396644039918681165183311421690910528423144176461152194995869735283378076928784139454364776611328125');
+
+  test(BigDecimalToStr(FloatToBigDecimal(double(3.14159))), '3.14159');
+  test(BigDecimalToStr(FloatToBigDecimal(double(0.81))), '0.81');
+  test(BigDecimalToStr(FloatToBigDecimal(double(144115188075855877))), '144115188075855860');
+
+  test(BigDecimalToStr(FloatToBigDecimal(double(1E-20))), '0.00000000000000000001');
+  test(BigDecimalToStr(FloatToBigDecimal(double(1 / 3.0))), '0.3333333333333333');
+  test(BigDecimalToStr(FloatToBigDecimal(double(-1.7976931348623158e+30))), '-1797693134862315700000000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(double(1.7976931348623158e+30))), '1797693134862315700000000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(double(-1.7976931348623158e+305))), '-179769313486231600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(double(1.7976931348623158e+305))), '179769313486231600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(double(92233720368547758.0))), '92233720368547760');
+  test(BigDecimalToStr(FloatToBigDecimal(double(1.2648080533535911530920161097426467149E-321), bdffShortest)), '0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001264');
+  test(BigDecimalToStr(FloatToBigDecimal(double(6.9533558078350043221569772416637627063E-310), bdffShortest)), '0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006953355807835');
+
+
+
+  test(BigDecimalToStr(FloatToBigDecimal(extended(3.14159), bdffExact)), '3.14158999999999999992901511536302905369666405022144317626953125');
+  test(BigDecimalToStr(FloatToBigDecimal(extended(1e-20), bdffExact)), '0.0000000000000000000100000000000000000003416395822511968001989078435098753026666395786361922481955133434894378297030925750732421875');
+  test(BigDecimalToStr(FloatToBigDecimal(extended(1 / extended(3)), bdffExact)), '0.33333333333333333334236835143737920361672877334058284759521484375');
+  {                                                                                    x
+                                                                                       17976931348623158000898375387403278600983725288639302445743167524649073914191140070361647584553841456009035760565890162657136728358485450314659867153779807762260453043884434493827571365147117530414184544472432401975579188236758013633708052855736338033982255613543976216669653360425759600586180412951232512
+                                                                                       8988465674311579000449187693701639300491862644319651222871583762324536957095570035180823792276920728004517880282945081328568364179242725157329933576889903881130226521942217246913785682573558765207092272236216200987789594118379006816854026427868169016991127806771988108334826680212879800293090206475616256
+                                                                                       17976931348623157999708761860621052150745275290119381997638159363321558346946522582908895058825517957172901108968965082185297749326331071874296198957343883196027788579002518793201194692789149631260035416604994212479387831610876863868853853890234033963456576461265049750260017276062444470327168133899485184
+
+
+                                                                                       17976931348623157999708761860621052150745275290119381997638159363321558346946522582908895058825517957172901108968965082185297749326331071874296198957343883196027788579002518793201194692789149631260035416604994212479387831610876863868853853890234033963456576461265049750260017276062444470327168133899485184
+                                                                                       17976931348623158000898375387403278600983725288639302445743167524649073914191140070361647584553841456009035760565890162657136728358485450314659867153779807762260453043884434493827571365147117530414184544472432401975579188236758013633708052855736338033982255613543976216669653360425759600586180412951232512    }
+  e := 1.7976931348623157e+305; //00e04f8d976e1283f543;
+  temp := '05dd4f8d976e1283f543'; //fpc's literal to extended conversion is broken, use the value from gcc
+  for i := 0 to 9 do
+    pchar(@e)[i] := chr(StrToInt('$'+copy(temp, i*2+1, 2)));
+
+
+  test(BigDecimalToStr(FloatToBigDecimal(extended(e), bdffExact)), '179769313486231579992329164499081615706498952907114138183961560987905521200486755879277940485341885576384472483301950499965621577134693204981507316787695133695347227930497525129506440238459624715983757654580189366809112889605244039629121743040331123352463048003534791636961628423171184182235632222787862528');
+  test(BigDecimalToStr(FloatToBigDecimal(extended(92233720368547758), bdffExact)), '92233720368547758');
+
+
+  writeln('bd complete');
+end;
+
+
+
+
+
+
+end.
+
+
+
+
+
+
+
