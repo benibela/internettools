@@ -52,8 +52,10 @@ exception statement from your version.
 unit bbutils_template;
 {%END-REPEAT}
 
-
+{$IFDEF FPC}
 {$mode objfpc}{$H+}
+{$COPERATORS OFF}
+{$ENDIF}
 
 interface
 
@@ -677,7 +679,7 @@ begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
   result:=len;
-  len+=1;
+  inc(len);
   a[result] := e;
 end;
 
@@ -685,7 +687,7 @@ procedure arrayPrependFast(var a: T__ArrayType__; var len: longint; const e: T__
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
-  len += 1;
+  inc(len);
   if len >= 2 then begin
     {%COMPARE T__ElementType__ = string }FillChar(a[len-1], sizeof(a[0]), 0); {%END-COMPARE}
     move(a[0], a[1], (len - 1) * sizeof(a[0]));
@@ -704,14 +706,14 @@ begin
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
     {%COMPARE T__ElementType__ = string}FillChar(a[high(a)], sizeof(a[0]), 0);{%END-COMPARE}
   end;
-  len-=1;
+  dec(len);
 end;
 
 function arrayDeleteUnorderedFast(var a: T__ArrayType__; var len: longint; const i: longint): T__ElementType__;
 begin
   if (i<0) or (i>=len) then exit(__ELEMENT__DEFAULT__);
   result:=a[i];
-  len-=1;
+  dec(len);
   a[i]:=a[len];
 end;
 
@@ -1079,7 +1081,7 @@ begin
       if strlsequal(str, searched, l2) then
         exit();
     inc(str);
-    result+=1;
+    inc(result);
   end;
   result:=-1;
 end;
@@ -1096,7 +1098,7 @@ begin
       if strlsiequal(str+1, searched+1, l2-1, l2-1) then
         exit();
     inc(str);
-    result+=1;
+    inc(result);
   end;
   result:=-1;
 end;
@@ -1116,7 +1118,7 @@ begin
   if from > length(str) then exit(0);
   result := strlsIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
   if result < 0 then exit(0);
-  result += from;
+  inc(result,  from);
 end;
 
 function striindexof(const str, searched: string; from: longint): longint;
@@ -1124,7 +1126,7 @@ begin
   if from > length(str) then exit(0);
   result := strlsiIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
   if result < 0 then exit(0);
-  result += from;
+  inc(result,  from);
 end;
 
 function strContains(const str, searched: string): boolean;
@@ -1174,7 +1176,7 @@ begin
   result:=0;
   for i:=0 to len-1 do begin
     if searchIn[i]=search then
-      result+=1;
+      inc(result);
     if searchIn[i] = #0 then
       exit;
   end;
@@ -1187,7 +1189,7 @@ var
 begin
   result := 0;
   for i := from to length(str) do
-    if str[i] = searched then result+=1;
+    if str[i] = searched then inc(result);
 end;
 
 function strslice(const  first, last: pchar): string;
@@ -1260,10 +1262,10 @@ begin
  for i:=1 to length(result) do begin
    if not (result[i] in trimCharacters)  then begin
      result[j]:=result[i];
-     j+=1;
+     inc(j);
    end else if result[j-1] <> ' ' then begin
      result[j]:=' ';
-     j+=1;
+     inc(j);
    end;
  end;
  if j -1 <> length(result) then
@@ -1285,7 +1287,7 @@ begin
       end
       else result[p] := result[i];
     end;
-    p+=1;
+    inc(p);
   end;
   case result[length(result)] of
     #13: result[p] := #10;
@@ -1341,7 +1343,7 @@ begin
       if lastTextStart > i  then continue;
       arrayAdd(result, copy(Line,lastTextStart,i-lastTextStart));
       lastTextStart:=i+1;
-      if (i < length(line)) and (line[i] <> line[i+1]) and (line[i+1] in [#13, #10]) then lastTextStart+=1;
+      if (i < length(line)) and (line[i] <> line[i+1]) and (line[i+1] in [#13, #10]) then inc(lastTextStart);
     end;
     if (i < length(line)) and (line[i+1] in BreakChars) then begin
       lastBreakChance:=i+1;
@@ -1350,7 +1352,7 @@ begin
     if i - lastTextStart + 1 >= MaxCol then begin
       if lastBreakChance >= lastTextStart then begin
         tempBreak := lastBreakChance;
-        while (tempBreak > 1) and  (line[tempBreak-1] in BreakChars) do tempBreak-=1; //remove spaces before line wrap
+        while (tempBreak > 1) and  (line[tempBreak-1] in BreakChars) do dec(tempBreak); //remove spaces before line wrap
         arrayAdd(result, copy(Line,lastTextStart,tempBreak-lastTextStart));
         lastTextStart:=lastBreakChance+1;
       end else begin
@@ -1379,15 +1381,15 @@ begin
   pos := 1;
   while (pos <= length(text)) and (opened >= 1) do begin
     if strlcomp(@text[pos], @openBracket[1], length(openBracket)) = 0 then begin
-      opened += 1;
-      pos += length(openBracket);
+      inc(opened);
+      inc(pos,  length(openBracket));
     end else if strlcomp(@text[pos], @closingBracket[1], length(closingBracket)) = 0 then begin
-      opened -= 1;
-      pos += length(closingBracket);
-    end else pos+=1;
+      dec(opened);
+      inc(pos,  length(closingBracket));
+    end else inc(pos);
   end;
   if opened < 1 then begin
-    pos-=1;
+    dec(pos);
     result := copy(text, 1, pos - length(closingBracket));
     if updateText then delete(text, 1, pos);
   end else begin
@@ -1432,7 +1434,7 @@ begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
   result:=len;
-  len+=1;
+  inc(len);
   a[result] := e;
 end;                           }
 {%END-REPEAT}
@@ -1480,21 +1482,21 @@ begin
   result := 0;
   i := 1;
   while i <= length(str) do begin
-    result+=1;
+    inc(result);
     case ord(str[i]) of
-      $00..$7F: i+=1;
+      $00..$7F: inc(i);
       $80..$BF: begin //in multibyte character (should never appear)
-        i+=1;
-        result-=1;
+        inc(i);
+        dec(result);
       end;
-      $C0..$C1: i+=2;  //invalid (two bytes used for single byte)
-      $C2..$DF: i+=2;
-      $E0..$EF: i+=3;
-      $F0..$F4: i+=4;
-      $F5..$F7: i+=4;  //not allowed after rfc3629
-      $F8..$FB: i+=5;  //"
-      $FC..$FD: i+=6;  //"
-      $FE..$FF: i+=1; //invalid
+      $C0..$C1: inc(i, 2);  //invalid (two bytes used for single byte)
+      $C2..$DF: inc(i, 2);
+      $E0..$EF: inc(i, 3);
+      $F0..$F4: inc(i, 4);
+      $F5..$F7: inc(i, 4);  //not allowed after rfc3629
+      $F8..$FB: inc(i, 5);  //"
+      $FC..$FD: inc(i, 6);  //"
+      $FE..$FF: inc(i); //invalid
     end;
   end;
 end;
@@ -1508,7 +1510,7 @@ begin
   i := 1;
   while i < length(str) do begin
     PWord(@str[i])^ := SwapEndian(PWord(@str[i])^);
-    i+=2;
+    inc(i, 2);
   end;
 end;
 
@@ -1521,7 +1523,7 @@ begin
   i := 1;
   while i < length(str) do begin
     PDWord(@str[i])^ := SwapEndian(PDWord(@str[i])^);
-    i+=4;
+    inc(i, 4);
   end;
 end;
 
@@ -1552,7 +1554,7 @@ begin
       //calculate length of resulting utf-8 string (gets larger)
       reslen:=len;
       for i:=1 to len do
-        if str[i] >= #$80 then reslen+=1;
+        if str[i] >= #$80 then inc(reslen);
       //optimization
       if reslen = len then
         exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
@@ -1567,10 +1569,10 @@ begin
         else begin
           //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
           result[pos]:=chr($C0 or (ord(str[i]) shr 6));
-          pos+=1;
+          inc(pos);
           result[pos]:=chr($80 or (ord(str[i]) and $3F));
         end;
-        pos+=1;
+        inc(pos);
       end;
       assert(pos=reslen+1);
     end;
@@ -1625,9 +1627,9 @@ begin
         else begin
           //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
           result[i] := chr(((ord(str[pos]) and $3) shl 6) or (ord(str[pos+1]) and $3f));
-          pos+=1;
+          inc(pos);
         end;
-        pos+=1;
+        inc(pos);
       end ;
     end;
     {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
@@ -1683,39 +1685,39 @@ begin
   case ord(str[curpos]) of
     $00..$7F: begin
       result:=ord(str[curpos]);
-      curpos+=1;
+      inc(curpos);
     end;
     $80..$BF: begin //in multibyte character (should never appear)
       result:=-1;
-      curpos+=1;
+      inc(curpos);
     end;
     $C0..$C1: begin //invalid (two bytes used for single byte)
       result:=-1;
-      curpos+=2;
+      inc(curpos, 2);
     end;
     $C2..$DF: begin
-      if curpos + 1  > length(str) then begin curpos+=2; exit(-2); end;
+      if curpos + 1  > length(str) then begin inc(curpos, 2); exit(-2); end;
       result := ((ord(str[curpos]) and not $C0) shl 6) or (ord(str[curpos+1]) and not $80);
-      curpos+=2;
+      inc(curpos, 2);
     end;
     $E0..$EF: begin
-      if curpos + 2  > length(str) then begin curpos+=3; exit(-2); end;
+      if curpos + 2  > length(str) then begin inc(curpos, 3); exit(-2); end;
       result := ((ord(str[curpos]) and not $E0) shl 12) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80);
-      curpos+=3;
+      inc(curpos, 3);
     end;
     $F0..$F4: begin
-      if curpos + 3  > length(str) then begin curpos+=4; exit(-2); end;
+      if curpos + 3  > length(str) then begin inc(curpos, 4); exit(-2); end;
       result := ((ord(str[curpos]) and not $F0) shl 18) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80) or (ord(str[curpos+3]) and not $80);
-      curpos+=4;
+      inc(curpos, 4);
     end;
     else begin
       result:=-1;
-      curpos+=1;
+      inc(curpos);
     end;
-    (* $F5..$F7: i+=4;  //not allowed after rfc3629
-    $F8..$FB: i+=5;  //"
-    $FC..$FD: i+=6;  //"
-    $FE..$FF: i+=1; //invalid*)
+    (* $F5..$F7: i := i + 4;  //not allowed after rfc3629
+    $F8..$FB: i := i + 5;  //"
+    $FC..$FD: i := i + 6;  //"
+    $FE..$FF: inc(i); //invalid*)
   end;
 end;
 
@@ -1768,8 +1770,8 @@ var
 begin
   if length(s) = 0 then exit('');
   for i:=1 to length(s) do begin
-    if s[i] in toEscape then result += escapeChar;
-    result += s[i];
+    if s[i] in toEscape then result := result +  escapeChar;
+    result := result +  s[i];
   end;
 end;
 
@@ -1838,17 +1840,17 @@ begin
   result:=sl[0];
   if (limit = 0) or (sl.count <= abs(limit)) then begin
     for i:=1 to sl.Count-1 do
-      result+=sep+sl[i];
+      result := result + sep+sl[i];
   end else if limit > 0 then begin
     for i:=1 to limit-1 do
-      result+=sep+sl[i];
-    result+=limitStr;
+      result := result + sep+sl[i];
+    result := result + limitStr;
   end else begin
     for i:=1 to (-limit-1) div 2 do
-      result+=sep+sl[i];
-    result+=sep+limitStr;
+      result := result + sep+sl[i];
+    result := result + sep+limitStr;
     for i:=sl.Count - (-limit) div 2 to sl.Count-1 do
-      result+=sep+sl[i];
+      result := result + sep+sl[i];
   end;
 end;
 
@@ -1861,17 +1863,17 @@ begin
   result:=sl[0];
   if (limit = 0) or (length(sl) <= abs(limit)) then begin
     for i:=1 to high(sl) do
-      result+=sep+sl[i];
+      result := result + sep+sl[i];
   end else if limit > 0 then begin
     for i:=1 to limit-1 do
-      result+=sep+sl[i];
-    result+=limitStr;
+      result := result + sep+sl[i];
+    result := result + limitStr;
   end else begin
     for i:=1 to (-limit-1) div 2 do
-      result+=sep+sl[i];
-    result+=sep+limitStr;
+      result := result + sep+sl[i];
+    result := result + sep+limitStr;
     for i:=length(sl) - (-limit) div 2 to high(sl) do
-      result+=sep+sl[i];
+      result := result + sep+sl[i];
   end;
 end;
 
@@ -2066,12 +2068,12 @@ begin
   if p > 0 then delete(base, p, length(base) - p + 1);
   p := pos('?', base);
   if p > 0 then delete(base, p, length(base) - p + 1);
-  schemeLength := pos(':', base); schemeLength+=1;
-  if (schemeLength <= length(base)) and (base[schemeLength] = '/') then schemeLength+=1;
-  if (schemeLength <= length(base)) and (base[schemeLength] = '/') then schemeLength+=1;
+  schemeLength := pos(':', base); inc(schemeLength);
+  if (schemeLength <= length(base)) and (base[schemeLength] = '/') then inc(schemeLength);
+  if (schemeLength <= length(base)) and (base[schemeLength] = '/') then inc(schemeLength);
   if strBeginsWith(rel, '/') then begin
     if isWindowsFileUrl() then  //Windows file:///c:/ special case
-      schemeLength += 3;
+      schemeLength := schemeLength +  3;
     p := strIndexOf(base, '/', schemeLength);
     delete(base, p, length(base) - p + 1);
     exit(base+rel);
@@ -2084,7 +2086,7 @@ begin
   relsplit:=strSplit(rel, '/');
   basesplit:=strSplit(strCopyFrom(base,schemeLength),'/');
   basesplit[0] := copy(base,1,schemeLength-1) + basesplit[0];
-  if isWindowsFileUrl() then begin basesplit[0] += '/' + basesplit[1]; arrayDelete(basesplit, 1); end;
+  if isWindowsFileUrl() then begin basesplit[0] := basesplit[0] + '/' + basesplit[1]; arrayDelete(basesplit, 1); end;
   for i:=high(relsplit) downto 0 do if relsplit[i] = '.' then arrayDelete(relsplit, i);
 
   if (length(basesplit) > 1) then SetLength(basesplit, high(basesplit));
@@ -2182,7 +2184,7 @@ function intLog10(i: longint): longint;
 begin
   result:=0;
   while i >=10 do begin
-    result+=1;
+    inc(result);
     i:=i div 10;
   end;
 end;
@@ -2191,7 +2193,7 @@ function intLog(n, b: longint): longint;
 begin
   result:=0;
   while n >=b do begin
-    result+=1;
+    inc(result);
     n:=n div b;
   end;
 end;
@@ -2215,7 +2217,7 @@ begin
 
   pe := pold * p;
   while r mod pe = 0 do begin
-    e += 1;
+    inc(e);
     pold := pe;
     pe := pe * p;
   end;
@@ -2235,7 +2237,7 @@ begin
   while m = 0 do begin
     r := d;
     DivMod(r,p,d,m);
-    e += 1;
+    inc(e);
   end;
 end;
 
@@ -2329,7 +2331,7 @@ begin
   if i<0 then exit(factorial(-i));
   result:=1;
   for j:=2 to i do
-    result*=j;
+    result := result * j;
 end;
 function binomial(n,k: longint): float;
 var i:longint;
@@ -2345,9 +2347,9 @@ begin
   
   result:=1;
   for i:=n-k+1 to n do
-    result*=i;
+    result := result * i;
   for i:=2 to k do
-    result/=i;
+    result := result / i;
 end;
 
 function binomialExpectation(n: longint; p: float): float;
@@ -2376,7 +2378,7 @@ var i:longint;
 begin
   result:=0;
   for i:=k to n do
-    result+=binomialProbability(n,p,i);
+    result := result + binomialProbability(n,p,i);
 end;
 
 function binomialProbabilityLE(n: longint; p: float; k: longint): float;
@@ -2384,7 +2386,7 @@ var i:longint;
 begin
   result:=0;
   for i:=0 to k do
-    result+=binomialProbability(n,p,i);
+    result := result + binomialProbability(n,p,i);
 end;
 
 function binomialProbabilityDeviationOf(n: longint; p: float; dif: float
@@ -2457,7 +2459,7 @@ begin
   while j <= n do begin
     e := (j) and (-j);     //calculate the largest e (or k) with e = 2^k dividing j
     totient[j] := e shr 1;
-    j += 4;
+    inc(j,  4);
   end;
 
   for p:=3 to n do begin
@@ -2471,21 +2473,21 @@ begin
       while j <= n do begin
         totient[j] := totient[j div powers[e]] * (powers[e-1]) * (p - 1);
 
-        j+=p;
+        inc(j, p);
 
         //we need to find the largest e with (j mod p^e) = 0, so write j in base p and count trailing zeros
-        exps[1] += 1;
+        exps[1] := exps[1] +  1;
         e:=1;
         if exps[e] = p then begin
           repeat
             exps[e] := 0;
-            e+=1;
-            exps[e] += 1;
+            inc(e);
+            exps[e] := exps[e] +  1;
           until  (e > exphigh) or (exps[e] < p);
 
           if exps[exphigh] = 0 then begin
             powers[exphigh + 1] := powers[exphigh] * p;
-            exphigh+=1;
+            inc(exphigh);
             exps[exphigh] := 1;
           end;
         end;
@@ -2506,8 +2508,8 @@ begin
   for i:=2 to high(divcount) do begin
     j:=i;
     while j < length(divcount) do begin
-      divcount[j]+=1;
-      j+=i;
+      divcount[j] := divcount[j] + 1;
+      inc(j, i);
     end;
   end;
 end;
@@ -2580,7 +2582,7 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
 function readNumber(const s:string; var ip: integer; const count: integer): integer;
 begin
   result := StrToIntDef(copy(input, ip, count), -1);
-  ip += count;
+  inc(ip,  count);
 end;
 
 var
@@ -2613,7 +2615,7 @@ begin
     {if pos('[', mid) = 0 then begin
       formatChars:=0;
       for i:=1 to length(mid) do
-        if (mid[i] in DATETIME_PARSING_FORMAT_CHARS) then formatChars+=1;  //todo: check for ", but really, whotf cares?
+        if (mid[i] in DATETIME_PARSING_FORMAT_CHARS) then inc(formatChars);  //todo: check for ", but really, whotf cares?
       for i:=1 to formatChars-1 do begin
         for j:=1 to length(mid) do
           if (mid[j] in DATETIME_PARSING_FORMAT_CHARS) then begin //mmm <> mm??
@@ -2640,16 +2642,16 @@ begin
         count := 0;
         base := mask[mp];
         if mask[mp] <> 'a' then begin
-          while (mp <= length(mask)) and (mask[mp] = base) do begin mp+=1; count+=1; end;
+          while (mp <= length(mask)) and (mask[mp] = base) do begin inc(mp); inc(count); end;
           truecount:=count;
           if (mp <= length(mask)) and (mask[mp] = '+') then begin
-            while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do count+=1;
-            if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then count-=1;
-            mp+=1;
+            while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do inc(count);
+            if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then dec(count);
+            inc(mp);
           end;
         end else begin //am/pm special case
-          if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then mp+=5
-          else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then mp+=3
+          if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then inc(mp, 5)
+          else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then inc(mp, 3)
           else if (ip > length(input)) and (input[ip] <> 'a') then exit(false)
           else continue;
         end;
@@ -2668,7 +2670,7 @@ begin
 
         case base of
           'y': if (input[ip] = '-') then begin //special case: allow negative years
-            ip+=1;
+            inc(ip);
             parts[index] := - readNumber(input,ip,count);
             if parts[index] = --1 then exit(false);
             continue;
@@ -2681,7 +2683,7 @@ begin
               for i:=low(DefaultShortMonths) to high(DefaultShortMonths) do
                 if ((length(DefaultShortMonths[i].n) = 3) and (mid = DefaultShortMonths[i].n)) or
                    ((length(DefaultShortMonths[i].n) <> 3) and strliequal(@input[ip], DefaultShortMonths[i].n, length(DefaultShortMonths[i].n))) then begin
-                     ip += length(DefaultShortMonths[i].n);
+                     inc(ip,  length(DefaultShortMonths[i].n));
                      parts[2] := DefaultShortMonths[i].v;
                      break;
                    end;
@@ -2689,7 +2691,7 @@ begin
               for i:=1 to 12 do
                 if ((length(DefaultFormatSettings.ShortMonthNames[i]) = 3) and (DefaultFormatSettings.ShortMonthNames[i] = mid)) or
                    (strliequal(@input[ip], DefaultFormatSettings.ShortMonthNames[i], length(DefaultFormatSettings.ShortMonthNames[i]))) then begin
-                     ip += length(DefaultFormatSettings.ShortMonthNames[i]);
+                     inc(ip,  length(DefaultFormatSettings.ShortMonthNames[i]));
                      parts[2] := i;
                      break;
                    end;
@@ -2701,14 +2703,14 @@ begin
               parts[2] := high(parts[2]);
               for i:=low(DefaultLongMonths) to high(DefaultLongMonths) do
                 if strliequal(@input[ip], DefaultLongMonths[i].n, length(DefaultLongMonths[i].n)) then begin
-                     ip += length(DefaultLongMonths[i].n);
+                     inc(ip,  length(DefaultLongMonths[i].n));
                      parts[2] := DefaultLongMonths[i].v;
                      break;
                    end;
               if parts[2] <> high(parts[2]) then continue;
               for i:=1 to 12 do
                 if strliequal(@input[ip], DefaultFormatSettings.LongMonthNames[i], length(DefaultFormatSettings.LongMonthNames[i])) then begin
-                  ip += length(DefaultFormatSettings.LongMonthNames[i]);
+                  inc(ip,  length(DefaultFormatSettings.LongMonthNames[i]));
                   parts[2] := i;
                   break;
                 end;
@@ -2718,19 +2720,19 @@ begin
           end;
           'Z': begin //timezone
             if ip > length(input) then exit(false);
-            if input[ip] = 'Z' then begin parts[index] := 0; ip+=1; end //timezone = utc
+            if input[ip] = 'Z' then begin parts[index] := 0; inc(ip); end //timezone = utc
             else if (input[ip] in ['-','+']) then begin
               parts[index]  := 0;
               positive := input[ip] = '+';
-              ip+=1;
+              inc(ip);
               parts[index] := 60 * readNumber(input, ip, 2);
               if parts[index] = -1 then exit(false);
               if ip <= length(input) then begin
-                if input[ip] = ':' then ip+=1;
+                if input[ip] = ':' then inc(ip);
                 if input[ip] in ['0'..'9'] then begin
                   i := readNumber(input, ip, 2);
                   if i = -1 then exit(false);
-                  parts[index] += i;
+                  parts[index] := parts[index] +  i;
                 end;
               end;
               if not positive then parts[index] := - parts[index];
@@ -2741,10 +2743,10 @@ begin
             if (input[ip] in ['a', 'A']) then parts[index] := 0
             else if (input[ip] in ['p', 'P']) then parts[index] := 12
             else exit(false);
-            ip+=1;
+            inc(ip);
             if mask[mp-1] = 'm' then begin
               if not (input[ip] in ['m', 'M']) then exit(false);
-              ip += 1;
+              inc(ip);
             end;
             continue;
           end;
@@ -2755,7 +2757,7 @@ begin
 
         if base = 'z' then
           for i:=count + 1 to 9 do
-            parts[index] *= 10; //fixed length ms
+            parts[index] := parts[index] *  10; //fixed length ms
         if (base = 'y') and (count <= 2) then
           if (parts[index] >= 0) and (parts[index] < 100) then
             if parts[index] < 90 then parts[index] := parts[index] + 2000
@@ -2763,27 +2765,27 @@ begin
       end;
       ']': raise EDateTimeParsingException.Create('Invalid mask: missing [, you can use \] to escape ]');
       '"': begin   //verbatim
-        mp+=1;
+        inc(mp);
         while (mp <= length(mask)) and (ip <= length(input)) and (mask[mp] <> '"') and  (mask[mp] = input[ip]) do begin
-          ip+=1;
-          mp+=1;
+          inc(ip);
+          inc(mp);
         end;
         if (mp > length(mask)) or (mask[mp] <> '"') then exit(false);
-        mp+=1;
+        inc(mp);
       end;
       ' ',#9: begin //skip whitespace
         if ip > length(input) then exit(false);
-        while (mp <= length(mask)) and (mask[mp] in [' ',#9]) do mp+=1;
+        while (mp <= length(mask)) and (mask[mp] in [' ',#9]) do inc(mp);
         if not (input[ip] in [' ',#9]) then exit(false);
-        while (ip <= length(input)) and (input[ip] in [' ',#9]) do ip+=1;
+        while (ip <= length(input)) and (input[ip] in [' ',#9]) do inc(ip);
       end
       else if (mask[mp] = '$') and (mp  = length(mask)) then begin
         result := ip = length(input) + 1;
         exit;
       end else if (ip > length(input)) or (mask[mp]<>input[ip]) then exit(false)
       else begin
-        mp+=1;
-        ip+=1;
+        inc(mp);
+        inc(ip);
       end;
     end;
   end;
@@ -2810,7 +2812,7 @@ begin
   if assigned(outDay) then outDay^:=parts[3];
   if assigned(outHour) then begin
     outHour^:=parts[4];
-    if parts[9] = 12 then outHour^ += 12;
+    if parts[9] = 12 then inc(outHour^, 12);
   end;
   if assigned(outMinutes) then outMinutes^:=parts[5];
   if assigned(outSeconds) then outSeconds^:=parts[6];
@@ -2859,7 +2861,7 @@ var mp: integer;
       oldpos := mp;
       result := strcopyfrom(mask, mp);
       result := strSplitGetBetweenBrackets(result, '[', ']', false);
-      mp += length(result) + 2;
+      mp := mp +  length(result) + 2;
       okc := #0;
       for i:=1 to length(result) do
         if (result[i] in SPECIAL_MASK_CHARS) and isValid(result[i]) then begin
@@ -2875,22 +2877,22 @@ var mp: integer;
     end;
     while (mp <= length(mask)) and (mask[mp] = '"') do begin
       oldpos := mp;
-      mp+=1;
+      inc(mp);
       while (mp <= length(mask)) and (mask[mp] <> '"') do
-        mp+=1;
-      mp+=1;
+        inc(mp);
+      inc(mp);
       result := copy(mask, oldpos, mp - oldpos);
       exit;
     end;
     if mp > length(mask) then exit;
-    if mask[mp] = '$' then begin mp+=1; exit(''); end;
+    if mask[mp] = '$' then begin inc(mp); exit(''); end;
     oldpos := mp;
     if mask[mp] in SPECIAL_MASK_CHARS then begin
-      while (mp <= length(mask)) and (mask[mp] = mask[oldpos]) do mp+=1;
+      while (mp <= length(mask)) and (mask[mp] = mask[oldpos]) do inc(mp);
       result := copy(mask, oldpos, mp - oldpos);
-      if (mp <= length(mask)) and (mask[mp] = '+') then mp+=1;
+      if (mp <= length(mask)) and (mask[mp] = '+') then inc(mp);
     end else begin
-      while (mp <= length(mask)) and not (mask[mp] in (SPECIAL_MASK_CHARS + ['$','"','['])) do mp+=1;
+      while (mp <= length(mask)) and not (mask[mp] in (SPECIAL_MASK_CHARS + ['$','"','['])) do inc(mp);
       result := copy(mask, oldpos, mp - oldpos);
     end;
   end;
@@ -2908,12 +2910,12 @@ begin
     if pointer(part) = pointer(TryAgainWithRoundedSeconds) then exit(TryAgainWithRoundedSeconds);
     if length(part) = 0 then continue;
     case part[1] of
-      'y','Y': result += strFromInt(y, length(part));
-      'm': result += strFromInt(m, length(part));
-      'd': result += strFromInt(d, length(part));
-      'h': result += strFromInt(h, length(part));
-      'n': result += strFromInt(n, length(part));
-      's': result += strFromInt(s, length(part));
+      'y','Y': result := result +  strFromInt(y, length(part));
+      'm': result := result +  strFromInt(m, length(part));
+      'd': result := result +  strFromInt(d, length(part));
+      'h': result := result +  strFromInt(h, length(part));
+      'n': result := result +  strFromInt(n, length(part));
+      's': result := result +  strFromInt(s, length(part));
       'z': begin
         if (mask[mp-1] = '+') and (length(part) < 6) then len := 6
         else len := length(part);
@@ -2921,17 +2923,17 @@ begin
         temp := round(secondFraction*scale);
         if temp >= scale then exit(TryAgainWithRoundedSeconds);
         toadd := strTrimRight(strFromInt(temp, len), ['0']);
-        result += toadd;
-        if length(toadd) < length(part) then result += strDup('0', length(part) - length(toadd));
+        result := result +  toadd;
+        if length(toadd) < length(part) then result := result +  strDup('0', length(part) - length(toadd));
       end;
       'Z': if not IsNan(timezone) then begin; //no timezone
-        if timezone = 0 then result += 'Z'
+        if timezone = 0 then result := result + 'Z'
         else
-          if timezone > 0 then result += '+' + strFromInt(round(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(timezone * MinsPerDay) mod 60, 2)
-          else                 result += '-' + strFromInt(round(-timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(-timezone * MinsPerDay) mod 60, 2);
+          if timezone > 0 then result := result +  '+' + strFromInt(round(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(timezone * MinsPerDay) mod 60, 2)
+          else                 result := result +  '-' + strFromInt(round(-timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(-timezone * MinsPerDay) mod 60, 2);
       end;
-      '"': result += copy(part, 2, length(part) - 2);
-      else result += part;
+      '"': result := result +  copy(part, 2, length(part) - 2);
+      else result := result +  part;
     end;
   end;
 end;
@@ -2952,9 +2954,9 @@ begin
   if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
 
   result := trunc(EncodeDate(y,m,d)) + EncodeTime(hour,minutes,seconds,0);
-  if not IsNan(milliseconds) then result += milliseconds / SecsPerDay;
+  if not IsNan(milliseconds) then result := result +  milliseconds / SecsPerDay;
   if outtimezone <> nil then outtimezone^ := timeZone
-  else if not IsNan(timeZone) then result -= timeZone;
+  else if not IsNan(timeZone) then result := result -  timeZone;
 end;
 
 function dateTimeFormat(const mask: string; y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
@@ -2962,27 +2964,27 @@ const invalid = high(integer);
 begin
   Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,secondFraction,timezone);
   if pointer(Result) = Pointer(TryAgainWithRoundedSeconds) then begin
-    s += 1;
+    inc(s);
     //handle overflow
     if s >= 60 then begin
       s := 0;
       if n <> invalid then begin
-        n+=1;
+        inc(n);
         if n >= 60 then begin
           n := 0;
           if h <> invalid then begin
-            h+=1;
+            inc(h);
             if h >= 24 then begin
               h := 0;
               if d <> invalid then begin
-                d+=1;
+                inc(d);
                 if (y <> invalid) and (m <> invalid) and (d > MonthDays[dateIsLeapYear(y), m]) then begin
                    d := 1;
-                   m += 1;
+                   inc(m);
                    if m > 12 then begin
                      m := 1;
-                     y += 1;
-                     if y = 0 then y+=1;
+                     inc(y);
+                     if y = 0 then inc(y);
                    end;
                 end;
               end;
@@ -3028,8 +3030,8 @@ begin
   if minutes=high(minutes) then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
   if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
   result := EncodeTime(hour,minutes,seconds,0);
-  if not IsNan(milliseconds) then result += milliseconds / SecsPerDay;
-  if not IsNan(timeZone) then result -= timeZone;
+  if not IsNan(milliseconds) then result := result +  milliseconds / SecsPerDay;
+  if not IsNan(timeZone) then result := result -  timeZone;
 end;
 
 function timeFormat(const mask: string; const h, n, s: integer; const secondFraction: double; const timezone: TDateTime): string;
@@ -3067,13 +3069,13 @@ begin
             (month >= 1) and (month <= 12) and (day >= 1) and (day<=MonthDays[leap,month]);
   if not result then exit;
   dt := - DateDelta; // -693594
-  if year > 0 then year -= 1;
+  if year > 0 then dec(year);
   //end else begin
   //  dt := -  DateDelta; //not sure if this is correct, but it fits at the borders
   //end;
   century := year div 100;
   yearincent := year - 100*century;
-  dt += (146097*century) div 4  + (1461* yearincent) div 4 +  DateMonthDaysCumSum[leap, month-1] + day;
+  dt := dt +  (146097*century) div 4  + (1461* yearincent) div 4 +  DateMonthDaysCumSum[leap, month-1] + day;
 end;
 
 function dateEncode(year, month, day: integer): TDateTime;
@@ -3100,14 +3102,14 @@ begin
   datei := trunc(date) + DateDelta;
   if datei > 146097 then begin // decode years over 65535?, 146097 days = 400 years so it is tested
     DecodeDate(((146097 + datei - 365) mod 146097) - DateDelta + 365, PWord(year)^, PWord(month)^, PWord(day)^);
-    year^ += ((datei - 365) div 146097) * 400;
+    year^ := year^ + ((datei - 365) div 146097) * 400;
   end else if datei  <= 0 then begin
     datei := -DateDelta - datei + 1;
     DecodeDate(datei, PWord(year)^, PWord(month)^, PWord(day)^);
-    year^ *= -1;
+    year^ := -year^;
     //year is correct, but days are inverted
     leap := dateIsLeapYear(year^);
-    datei +=  DateMonthDaysCumSum[leap, 12] + 1 - 2 * (DateMonthDaysCumSum[leap,month^-1] + day^);
+    datei := datei +   DateMonthDaysCumSum[leap, 12] + 1 - 2 * (DateMonthDaysCumSum[leap,month^-1] + day^);
     DecodeDate(datei, temp, PWord(month)^, PWord(day)^);
   end else DecodeDate(date, PWord(year)^, PWord(month)^, PWord(day)^);
                       {todo: implement own conversion?
@@ -3203,7 +3205,7 @@ begin
     raise Exception.Create('Invalid size for sorting');
   if b<=a then
     exit(); //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
-  length+=1; //add 1 because a=b if there is exactly one element
+  inc(length); //add 1 because a=b if there is exactly one element
 
   //check for small input and use insertsort if small
   if length<8 then begin
@@ -3211,7 +3213,7 @@ begin
       j:=i;
       //use place to insert
       while (j>0) and (compareFunction(compareFunctionData, @a[j-1], @a[i]) > 0) do
-        j-=1;
+        dec(j);
       if i<>j then begin
         //save temporary in tempItem (size is checked) and move block forward
         tempItem:=a[i];
@@ -3271,7 +3273,7 @@ begin
     raise Exception.Create('Invalid size for sorting');
   if b<=a then
     exit(); //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)y
-  length+=1; //add 1 because a=b if there is exactly one element
+  inc(length); //add 1 because a=b if there is exactly one element
   setlength(tempArray,length);
   stableSortSDr(a,b,compareFunction,compareFunctionData,tempArray);
 end;
@@ -3322,7 +3324,7 @@ begin
   length:=(b-a) div size; //will be divided by pointer size automatically
   if @PBYTE(a)[length*size] <> b then
     raise Exception.Create('Invalid size for sorting');
-  length+=1;
+  inc(length);
   setlength(tempArray,length);
   if compareFunction = nil then begin
     compareFunction:=@compareRawMemory; //todo: use different wrappers for the two if branches
@@ -3465,7 +3467,7 @@ begin
     else if length(data)<=128 then setlength(data,length(data)*2)
     else setlength(data,length(data)+256);
   data[reallength]:=v;
-  reallength+=1;
+  inc(reallength);
 end;
   {
 procedure TSet.insertAll(other: TObject);
@@ -3485,7 +3487,7 @@ begin
   for i:=0 to reallength-1 do
     if data[i]=v then begin
       data[i]:=data[reallength-1];
-      reallength-=1;
+      dec(reallength);
       if (length(data)>4) and (reallength < length(data) div 2) then
         setlength(data,length(data) div 2);
     end;
