@@ -6,7 +6,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess
+  Classes, sysutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
   { you can add units after this };
 type
 
@@ -81,6 +81,7 @@ TTestCase = class
   expected: string;
   constructor create(e: TTreeNode);
   function run: TTestCaseResultValue;
+  procedure importModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
 { TModule }
@@ -254,7 +255,7 @@ end;
 constructor TModule.create(e: TTreeNode);
 begin
   uri := e['uri'];
-  fn := e['file'];
+  fn := strResolveURI(e['file'], e.getDocument().baseURI);
   {        <xs:complexType>
               <xs:attribute name="uri" type="xs:anyURI"/>
               <xs:attribute name="file" type="xs:anyURI"/>
@@ -324,6 +325,7 @@ begin
     end;
   fragment1 += '</WRAP>';
 
+  try
   compareTree.clearTrees;
   tree1 := compareTree.parseTree(fragment1);
   //tree1.changeEncoding(eUTF8,eUTF8,true,false);
@@ -332,6 +334,11 @@ begin
   //tree2.changeEncoding(eUTF8,eUTF8,true,false);
   sorttree(tree2);
   result := tree1.outerXML() = tree2.outerXML();
+
+  except
+    on e: ETreeParseException do
+      result := false;
+  end;
 
   compareTree.free;
 end;
@@ -373,6 +380,8 @@ function TAssertionAssert.check(errorCode: string): TTestCaseResult;
 const OK: array[boolean] of TTestCaseResult = (tcrFail, tcrPass);
 var
   str: String;
+  regex: TRegExpr;
+  node: TTreeNode;
 
 begin
   if errorCode <> '' then
@@ -387,7 +396,18 @@ begin
     aakXml: result := OK[xmlEqual(res, value)];
     //aakXml: result := OK[xqfunctionDeep_Equal res.getSequenceCount = StrToInt(value)];
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
-    aakSerializationMatches: raise exception.Create('assert serialization-matches not supported ');
+    aakSerializationMatches: begin//raise exception.Create('assert serialization-matches not supported ');
+      result := tcrFail;
+      node := res.toNode;
+      if node = nil then exit();
+      regex := TRegExpr.Create(value);
+      try
+        result := OK[regex.Exec(node.outerXML())]
+      finally
+        regex.free;
+      end;
+    end;
+
     aakEmpty: result := OK[res.isUndefined];
     aakType: result := OK[xq.evaluateXPath2('$result instance of '+value).toBoolean];
     aakTrue: result := OK[(res.kind = pvkBoolean) and res.toBoolean];
@@ -500,7 +520,11 @@ begin
     end;
   contexttree := nil;
   for i := 0 to environments.count - 1 do
-    contexttree := loadEnvironment(TEnvironment(environments[i]));
+    contexttree :=  loadEnvironment(TEnvironment(environments[i]));
+  xq.OnImportModule:=@importModule;
+  for i := 0 to modules.Count - 1 do
+    if xq.findModule(TModule(modules[i]).uri) = nil then
+      xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);
   if tests.Count <> 1 then raise Exception.Create('invalid test count');
   try
     result.value := xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree);
@@ -519,6 +543,15 @@ begin
   end;
   if result.error = '' then
     result.result := TResult(results[0]).check;    ;
+end;
+
+procedure TTestCase.importModule(sender: TObject; const namespace: string; const at: array of string);
+var
+  i: Integer;
+begin
+  for i := 0 to modules.Count-1 do
+    if TModule(modules[i]).uri = namespace then
+      xq.registerModule(xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version));
 end;
 
 { TDependency }
@@ -664,7 +697,8 @@ var totalResults: TResultSet = (0, 0, 0, 0, 0, 0, 0);
 
 procedure printResults(const r: TResultSet);
 begin
-  writeln('  Passed: ', r[tcrPass], ' Failed: ', r[tcrFail], ' Wrong error: ', r[tcrWrongError], ' N/A: ', r[tcrNA], ' Other: ', r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun] );
+  writeln(stdout, '  Passed: ', r[tcrPass], ' Failed: ', r[tcrFail], ' Wrong error: ', r[tcrWrongError], ' N/A: ', r[tcrNA], ' Other: ', r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun] );
+  writeln(stderr, '  Passed: ', r[tcrPass], ' Failed: ', r[tcrFail], ' Wrong error: ', r[tcrWrongError], ' N/A: ', r[tcrNA], ' Other: ', r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun] );
 end;
 
 procedure TTestSet.run;
@@ -757,6 +791,7 @@ begin
     except
       on e: ETreeParseException do ftree := nil;
     end;
+    if ftree = nil then exit;
     if url <> '' then xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
     doc := ftree.getDocument(); //doc = ftree
     if not strContains(doc.documentURI, '://') then doc.documentURI := 'file://' + doc.documentURI;
@@ -887,6 +922,7 @@ begin
 
   xq.OnCollection:=@env.getCollection;
 
+
   for i := 0 to high(env.params) do
     xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
 
@@ -924,6 +960,7 @@ begin
   clr.declareFlag('skip-negative', 'Ignore tests expecting only an error');
   clr.declareString('test-set', 'Only runs a certain test set');
   clr.declareString('test-case', 'Only runs a certain test case');
+  //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
   case clr.readString('mode') of
     'xquery1': config.version := xqpmXQuery1;
@@ -934,7 +971,7 @@ begin
   config.skipNegative := clr.readFlag('skip-negative');
   config.forceTestSet := clr.readString('test-set');
   config.forceTestCase := clr.readString('test-case');
-
+  //config.excludeTestCases := strSplit( clr.readString('test-case'), ',');
 
   TDependency.init;
 
@@ -964,6 +1001,7 @@ begin
   xq.StaticContext.collation := xq.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
+  xq.AutomaticallyRegisterParsedModules := true;
   defaultInternetAccessClass := TMockInternetAccess;
 
 
