@@ -879,7 +879,7 @@ end;
 
 function arrayDelete(var a: TStringArray; const i: longint): string;
 begin
-  if (i<0) or (i>high(a)) then exit('');
+  if (i<0) or (i>high(a)) then begin result := ''; exit; end;
   result := a[i];
   if i < high(a) then begin
     a[i] := ''; 
@@ -892,7 +892,7 @@ end;
 
 function arrayDeleteUnordered(var a: TStringArray; const i: longint): string;
 begin
-  if (i<0) or (i>high(a)) then exit('');
+  if (i<0) or (i>high(a)) then begin result := ''; exit; end;
   result:=a[i];
   a[i]:=a[high(a)];
   SetLength(a,high(a));
@@ -936,7 +936,7 @@ end;
 
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint): string;
 begin
-  if (i<0) or (i>=len) then exit('');
+  if (i<0) or (i>=len) then begin result := ''; exit; end;
   result:=a[i];
   if i < high(a) then begin
     a[i] := '';
@@ -948,7 +948,7 @@ end;
 
 function arrayDeleteUnorderedFast(var a: TStringArray; var len: longint; const i: longint): string;
 begin
-  if (i<0) or (i>=len) then exit('');
+  if (i<0) or (i>=len) then begin result := ''; exit; end;
   result:=a[i];
   dec(len);
   a[i]:=a[len];
@@ -972,7 +972,7 @@ begin
   arraySliceIndices(a, slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
-      exit(i);
+      begin result := i; exit; end;
   result:=-1;
 end;
 
@@ -1034,8 +1034,8 @@ end;
 
 function arrayLast(a: array of string; const default: string): string;
 begin
-  if length(a) = 0 then exit(default);
-  result := a[high(a)];
+  if length(a) = 0 then result := default
+  else result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of string; slice1a: integer; slice1b: integer;
@@ -1045,12 +1045,15 @@ var
 begin
   arraySliceIndices(a, slice1a, slice2a);
   arraySliceIndices(b, slice1b, slice2b);
-  if slice2a - slice1a < slice2b - slice1b then exit(-1);
-  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
+  if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
-    if a[slice1a+i] < b[slice1b+i] then exit(-1)
-    else if a[slice1a+i] > b[slice1b+i] then exit(1);
-  exit(0);
+    if a[slice1a+i] <> b[slice1b+i] then begin
+      if a[slice1a+i] < b[slice1b+i] then result := -1
+      else result := 1;
+      exit;
+    end;
+  result := 0;
 end;
 
 function arrayEqual(a, b: array of string; slice1a: integer; slice1b: integer;
@@ -1091,7 +1094,7 @@ end;
 
 function arrayDelete(var a: TLongintArray; const i: longint): longint;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
   if i < high(a) then begin
     
@@ -1104,7 +1107,7 @@ end;
 
 function arrayDeleteUnordered(var a: TLongintArray; const i: longint): longint;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
   a[i]:=a[high(a)];
   SetLength(a,high(a));
@@ -1148,7 +1151,7 @@ end;
 
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint): longint;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   if i < high(a) then begin
     
@@ -1160,7 +1163,7 @@ end;
 
 function arrayDeleteUnorderedFast(var a: TLongintArray; var len: longint; const i: longint): longint;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   dec(len);
   a[i]:=a[len];
@@ -1184,7 +1187,7 @@ begin
   arraySliceIndices(a, slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
-      exit(i);
+      begin result := i; exit; end;
   result:=-1;
 end;
 
@@ -1246,8 +1249,8 @@ end;
 
 function arrayLast(a: array of longint; const default: longint): longint;
 begin
-  if length(a) = 0 then exit(default);
-  result := a[high(a)];
+  if length(a) = 0 then result := default
+  else result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of longint; slice1a: integer; slice1b: integer;
@@ -1257,12 +1260,15 @@ var
 begin
   arraySliceIndices(a, slice1a, slice2a);
   arraySliceIndices(b, slice1b, slice2b);
-  if slice2a - slice1a < slice2b - slice1b then exit(-1);
-  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
+  if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
-    if a[slice1a+i] < b[slice1b+i] then exit(-1)
-    else if a[slice1a+i] > b[slice1b+i] then exit(1);
-  exit(0);
+    if a[slice1a+i] <> b[slice1b+i] then begin
+      if a[slice1a+i] < b[slice1b+i] then result := -1
+      else result := 1;
+      exit;
+    end;
+  result := 0;
 end;
 
 function arrayEqual(a, b: array of longint; slice1a: integer; slice1b: integer;
@@ -1303,7 +1309,7 @@ end;
 
 function arrayDelete(var a: TLongwordArray; const i: longint): longword;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
   if i < high(a) then begin
     
@@ -1316,7 +1322,7 @@ end;
 
 function arrayDeleteUnordered(var a: TLongwordArray; const i: longint): longword;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
   a[i]:=a[high(a)];
   SetLength(a,high(a));
@@ -1360,7 +1366,7 @@ end;
 
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint): longword;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   if i < high(a) then begin
     
@@ -1372,7 +1378,7 @@ end;
 
 function arrayDeleteUnorderedFast(var a: TLongwordArray; var len: longint; const i: longint): longword;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   dec(len);
   a[i]:=a[len];
@@ -1396,7 +1402,7 @@ begin
   arraySliceIndices(a, slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
-      exit(i);
+      begin result := i; exit; end;
   result:=-1;
 end;
 
@@ -1458,8 +1464,8 @@ end;
 
 function arrayLast(a: array of longword; const default: longword): longword;
 begin
-  if length(a) = 0 then exit(default);
-  result := a[high(a)];
+  if length(a) = 0 then result := default
+  else result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of longword; slice1a: integer; slice1b: integer;
@@ -1469,12 +1475,15 @@ var
 begin
   arraySliceIndices(a, slice1a, slice2a);
   arraySliceIndices(b, slice1b, slice2b);
-  if slice2a - slice1a < slice2b - slice1b then exit(-1);
-  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
+  if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
-    if a[slice1a+i] < b[slice1b+i] then exit(-1)
-    else if a[slice1a+i] > b[slice1b+i] then exit(1);
-  exit(0);
+    if a[slice1a+i] <> b[slice1b+i] then begin
+      if a[slice1a+i] < b[slice1b+i] then result := -1
+      else result := 1;
+      exit;
+    end;
+  result := 0;
 end;
 
 function arrayEqual(a, b: array of longword; slice1a: integer; slice1b: integer;
@@ -1515,7 +1524,7 @@ end;
 
 function arrayDelete(var a: TInt64Array; const i: longint): int64;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
   if i < high(a) then begin
     
@@ -1528,7 +1537,7 @@ end;
 
 function arrayDeleteUnordered(var a: TInt64Array; const i: longint): int64;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
   a[i]:=a[high(a)];
   SetLength(a,high(a));
@@ -1572,7 +1581,7 @@ end;
 
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint): int64;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   if i < high(a) then begin
     
@@ -1584,7 +1593,7 @@ end;
 
 function arrayDeleteUnorderedFast(var a: TInt64Array; var len: longint; const i: longint): int64;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   dec(len);
   a[i]:=a[len];
@@ -1608,7 +1617,7 @@ begin
   arraySliceIndices(a, slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
-      exit(i);
+      begin result := i; exit; end;
   result:=-1;
 end;
 
@@ -1670,8 +1679,8 @@ end;
 
 function arrayLast(a: array of int64; const default: int64): int64;
 begin
-  if length(a) = 0 then exit(default);
-  result := a[high(a)];
+  if length(a) = 0 then result := default
+  else result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of int64; slice1a: integer; slice1b: integer;
@@ -1681,12 +1690,15 @@ var
 begin
   arraySliceIndices(a, slice1a, slice2a);
   arraySliceIndices(b, slice1b, slice2b);
-  if slice2a - slice1a < slice2b - slice1b then exit(-1);
-  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
+  if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
-    if a[slice1a+i] < b[slice1b+i] then exit(-1)
-    else if a[slice1a+i] > b[slice1b+i] then exit(1);
-  exit(0);
+    if a[slice1a+i] <> b[slice1b+i] then begin
+      if a[slice1a+i] < b[slice1b+i] then result := -1
+      else result := 1;
+      exit;
+    end;
+  result := 0;
 end;
 
 function arrayEqual(a, b: array of int64; slice1a: integer; slice1b: integer;
@@ -1727,7 +1739,7 @@ end;
 
 function arrayDelete(var a: TFloatArray; const i: longint): float;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
   if i < high(a) then begin
     
@@ -1740,7 +1752,7 @@ end;
 
 function arrayDeleteUnordered(var a: TFloatArray; const i: longint): float;
 begin
-  if (i<0) or (i>high(a)) then exit(0);
+  if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
   a[i]:=a[high(a)];
   SetLength(a,high(a));
@@ -1784,7 +1796,7 @@ end;
 
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint): float;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   if i < high(a) then begin
     
@@ -1796,7 +1808,7 @@ end;
 
 function arrayDeleteUnorderedFast(var a: TFloatArray; var len: longint; const i: longint): float;
 begin
-  if (i<0) or (i>=len) then exit(0);
+  if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
   dec(len);
   a[i]:=a[len];
@@ -1820,7 +1832,7 @@ begin
   arraySliceIndices(a, slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
-      exit(i);
+      begin result := i; exit; end;
   result:=-1;
 end;
 
@@ -1882,8 +1894,8 @@ end;
 
 function arrayLast(a: array of float; const default: float): float;
 begin
-  if length(a) = 0 then exit(default);
-  result := a[high(a)];
+  if length(a) = 0 then result := default
+  else result := a[high(a)];
 end;
 
 function arrayCompare(a, b: array of float; slice1a: integer; slice1b: integer;
@@ -1893,12 +1905,15 @@ var
 begin
   arraySliceIndices(a, slice1a, slice2a);
   arraySliceIndices(b, slice1b, slice2b);
-  if slice2a - slice1a < slice2b - slice1b then exit(-1);
-  if slice2a - slice1a > slice2b - slice1b then exit(1);
+  if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
+  if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
-    if a[slice1a+i] < b[slice1b+i] then exit(-1)
-    else if a[slice1a+i] > b[slice1b+i] then exit(1);
-  exit(0);
+    if a[slice1a+i] <> b[slice1b+i] then begin
+      if a[slice1a+i] < b[slice1b+i] then result := -1
+      else result := 1;
+      exit;
+    end;
+  result := 0;
 end;
 
 function arrayEqual(a, b: array of float; slice1a: integer; slice1b: integer;
@@ -1925,10 +1940,11 @@ function unequal(const a: array of integer): boolean;
 var
   i,j: Integer;
 begin
+  result := true;
   for i:=0 to high(a) do
     for j:=0 to i-1 do
-      if a[i] <> a[j] then exit(true);
-  exit(false);
+      if a[i] <> a[j] then exit;
+  result := false;
 end;
 
 function unequal(const a, b: cardinal): boolean;
@@ -1945,10 +1961,11 @@ function unequal(const a: array of cardinal): boolean;
 var
   i,j: Integer;
 begin
+  result := true;
   for i:=0 to high(a) do
     for j:=0 to i-1 do
-      if a[i] <> a[j] then exit(true);
-  exit(false);
+      if a[i] <> a[j] then exit;
+  result := false;
 end;
 
 function unequal(const a, b: string): boolean;
@@ -1965,10 +1982,11 @@ function unequal(const a: array of string): boolean;
 var
   i,j: Integer;
 begin
+  result := true;
   for i:=0 to high(a) do
     for j:=0 to i-1 do
-      if a[i] <> a[j] then exit(true);
-  exit(false);
+      if a[i] <> a[j] then exit;
+  result := false;
 end;
 
 function unequal(const a, b: int64): boolean;
@@ -1985,10 +2003,11 @@ function unequal(const a: array of int64): boolean;
 var
   i,j: Integer;
 begin
+  result := true;
   for i:=0 to high(a) do
     for j:=0 to i-1 do
-      if a[i] <> a[j] then exit(true);
-  exit(false);
+      if a[i] <> a[j] then exit;
+  result := false;
 end;
 
 
@@ -2103,7 +2122,7 @@ begin
   result := true;
   for i:=0 to l-1 do
     if upcase(p1[i])<>upCase(p2[i]) then
-      exit(false);
+      begin result := false; exit; end;
 end;
 
 //equal comparison, case insensitive, ignoring #0-bytes
@@ -2120,9 +2139,9 @@ var i:integer;
 begin
   for i:=0 to l2-1 do begin
     if p1[i]<>p2[i] then
-      exit(false);
+      begin result := false; exit; end;
     if p1[i]=#0 then
-      exit(i = l2-1)
+      begin result := i = l2-1; exit; end
   end;
   result:=true;
 end;
@@ -2133,9 +2152,9 @@ var i:integer;
 begin
   for i:=0 to l2-1 do begin
     if upcase(p1[i])<>upcase(p2[i]) then
-      exit(false);
+      begin result := false; exit; end;
     if p1[i]=#0 then
-      exit(i = l2-1)
+      begin result := i = l2-1; exit; end
   end;
   result:=true;
 end;
@@ -2217,14 +2236,14 @@ end;
 function strlsIndexOf(str, searched: pchar; l1, l2: longint): longint;
 var last: pchar;
 begin
-  if l2<=0 then exit(0);
-  if l1<l2 then exit(-1);
+  if l2<=0 then begin result := 0; exit; end;
+  if l1<l2 then begin result := -1; exit; end;
   last:=str+(l1-l2);
   result:=0;
   while str <= last do begin
     if str^ = searched^ then
       if strlsequal(str, searched, l2) then
-        exit();
+        exit;
     inc(str);
     inc(result);
   end;
@@ -2234,14 +2253,14 @@ end;
 function strlsiIndexOf(str, searched: pchar; l1, l2: longint): longint;
 var last: pchar;
 begin
-  if l2<=0 then exit(0);
-  if l1<l2 then exit(-1);
+  if l2<=0 then begin result := 0; exit; end;
+  if l1<l2 then begin result := -1; exit; end;
   last:=str+(l1-l2);
   result:=0;
   while str <= last do begin
     if upcase(str^) = upcase(searched^) then
       if strlsiequal(str+1, searched+1, l2-1, l2-1) then
-        exit();
+        exit;
     inc(str);
     inc(result);
   end;
@@ -2260,17 +2279,17 @@ end;
 
 function strindexof(const str, searched: string; from: longint): longint;
 begin
-  if from > length(str) then exit(0);
+  if from > length(str) then begin result := 0; exit; end;
   result := strlsIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
-  if result < 0 then exit(0);
+  if result < 0 then begin result := 0; exit; end;
   inc(result,  from);
 end;
 
 function striindexof(const str, searched: string; from: longint): longint;
 begin
-  if from > length(str) then exit(0);
+  if from > length(str) then begin result := 0; exit; end;
   result := strlsiIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
-  if result < 0 then exit(0);
+  if result < 0 then begin result := 0; exit; end;
   inc(result,  from);
 end;
 
@@ -2310,8 +2329,8 @@ var i:longint;
 begin
   for i:=length(s) downto 1 do
     if s[i]=c then
-      exit(i);
-  exit(0);
+      begin result := i; exit; end;
+  result := 0;
 end;
 
 function strlcount(const search: char; const searchIn: pchar; const len: longint): longint;
@@ -2446,14 +2465,14 @@ end;
 
 function strPrependIfMissing(const s: string; const expectedStart: string): string;
 begin
-  if strbeginswith(s, expectedStart) then exit(s)
-  else exit(expectedStart + s);
+  if strbeginswith(s, expectedStart) then result := s
+  else result := expectedStart + s;
 end;
 
 function strAppendIfMissing(const s: string; const expectedEnd: string): string;
 begin
-  if strendswith(s, expectedEnd) then exit(s)
-  else exit(s + expectedEnd);
+  if strendswith(s, expectedEnd) then result := s
+  else result := s + expectedEnd;
 end;
 
 function strSplitGet(const separator: string; var remainingPart: string): string;
@@ -2549,7 +2568,7 @@ var
   temp: String;
 begin
   start := pos(openBracket, text);
-  if start = 0 then exit('');
+  if start = 0 then begin result := ''; exit; end;
   if updateText then begin
     delete(text, 1, start + length(openBracket) - 1);
     result := strSplitGetUntilBracketClosing(text, openBracket, closingBracket, updateText);
@@ -2665,7 +2684,7 @@ var len: longint;
     pos: longint;
     i: Integer;
 begin
-  if length(str) = 0 then exit('');
+  if length(str) = 0 then begin result := ''; exit; end;
   //use my own conversion, because i found no existing source which doesn't relies on iconv
   //(AnsiToUtf8 doesn't work, since Ansi<>latin1)
   //edit: okay, now i found lconvencoding, but i let this here, because i don't want to change it again
@@ -2679,7 +2698,7 @@ begin
         if str[i] >= #$80 then inc(reslen);
       //optimization
       if reslen = len then
-        exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
+        begin result := str; exit; end; //no special chars in str => utf-8=latin-8 => no conversion necessary
       //reserve string
       result := '';
       SetLength(result, reslen);
@@ -2738,7 +2757,7 @@ begin
       reslen:=strLengthUtf8(str);//character len = new byte length
       //optimization
       if reslen = len then
-        exit(str); //no special chars in str => utf-8=latin-8 => no conversion necessary
+        begin result := str; exit; end; //no special chars in str => utf-8=latin-8 => no conversion necessary
       //conversion
       result := '';
       SetLength(result,reslen);
@@ -2775,7 +2794,7 @@ end;
 function strChangeEncoding(const str: string; from, toe: TEncoding): string;
 var utf8temp: UTF8String;
 begin
-  if (from=toe) or (from=eUnknown) or (toe=eUnknown) then exit(str);
+  if (from=toe) or (from=eUnknown) or (toe=eUnknown) then begin result := str; exit; end;
   //two pass encoding: from -> utf8 -> to
   utf8temp:=strConvertToUtf8(str, from);
   result:=strConvertFromUtf8(utf8temp, toe);
@@ -2803,7 +2822,7 @@ end;
 
 function strDecodeUTF8Character(const str: string; var curpos: integer): integer;
 begin
-  if curpos > length(str) then exit(-2);
+  if curpos > length(str) then begin result := -2; exit; end;
   case ord(str[curpos]) of
     $00..$7F: begin
       result:=ord(str[curpos]);
@@ -2818,17 +2837,17 @@ begin
       inc(curpos, 2);
     end;
     $C2..$DF: begin
-      if curpos + 1  > length(str) then begin inc(curpos, 2); exit(-2); end;
+      if curpos + 1  > length(str) then begin inc(curpos, 2); begin result := -2; exit; end; end;
       result := ((ord(str[curpos]) and not $C0) shl 6) or (ord(str[curpos+1]) and not $80);
       inc(curpos, 2);
     end;
     $E0..$EF: begin
-      if curpos + 2  > length(str) then begin inc(curpos, 3); exit(-2); end;
+      if curpos + 2  > length(str) then begin inc(curpos, 3); begin result := -2; exit; end; end;
       result := ((ord(str[curpos]) and not $E0) shl 12) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80);
       inc(curpos, 3);
     end;
     $F0..$F4: begin
-      if curpos + 3  > length(str) then begin inc(curpos, 4); exit(-2); end;
+      if curpos + 3  > length(str) then begin inc(curpos, 4); begin result := -2; exit; end; end;
       result := ((ord(str[curpos]) and not $F0) shl 18) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80) or (ord(str[curpos+3]) and not $80);
       inc(curpos, 4);
     end;
@@ -3408,7 +3427,7 @@ function strEscape(s: string; const toEscape: TCharSet; escapeChar: char): strin
 var
  i: Integer;
 begin
-  if length(s) = 0 then exit('');
+  if length(s) = 0 then begin result := ''; exit; end;
   for i:=1 to length(s) do begin
     if s[i] in toEscape then result := result +  escapeChar;
     result := result +  s[i];
@@ -3465,7 +3484,7 @@ end;
 
 function strFromPchar(p: pchar; l: longint): string;
 begin
-  if l=0 then exit('');
+  if l=0 then begin result := ''; exit; end;
   result := '';
   setlength(result,l);
   move(p^,result[1],l);
@@ -3543,7 +3562,7 @@ begin
   result := filename;
 
   if not stribeginswith(result, 'file://') then
-    exit(result);
+    begin result := result; exit; end;
 
   delete(result, 1, 7);
   if (length(result) >= 4) and (result[1] = '/') and (result[3] = ':') and (result[4] = '\') then
@@ -3601,7 +3620,7 @@ end;
 
 function strFromInt(i: int64; displayLength: longint): string;
 begin
-  if i < 0 then exit('-'+strFromInt(-i, displayLength));
+  if i < 0 then begin result := '-'+strFromInt(-i, displayLength); exit; end;
   result := IntToStr(i);
   if length(result) < (displayLength) then
     result := strDup('0', (displayLength) - length(Result)) + result;
@@ -3716,13 +3735,13 @@ begin
       schemeLength := schemeLength +  3;
     p := strIndexOf(base, '/', schemeLength);
     delete(base, p, length(base) - p + 1);
-    exit(base+rel);
+    begin result := base+rel; exit; end;
   end;
   p := pos('#', rel);
   if p > 0 then begin relparams:=strCopyFrom(rel, p); delete(rel, p, length(rel) - p + 1);end;
   p := pos('?', rel);
   if p > 0 then begin relparams:=strCopyFrom(rel, p) + relparams; delete(rel, p, length(rel) - p + 1);end;
-  if rel = '' then exit(base + relparams);
+  if rel = '' then begin result := base + relparams; exit; end;
   relsplit:=strSplit(rel, '/');
   basesplit:=strSplit(strCopyFrom(base,schemeLength),'/');
   basesplit[0] := copy(base,1,schemeLength-1) + basesplit[0];
@@ -3753,7 +3772,7 @@ var
   baseIsAbsolute: Boolean;
   isWindowsFileUrl: Boolean;
 begin
-  if strIsAbsoluteURI(rel) or (base = '') then exit(rel);
+  if strIsAbsoluteURI(rel) or (base = '') then begin result := rel; exit; end;
 
   schemaLength := pos(':', base);
   isWindowsFileUrl := (schemaLength = 2) and (length(base) >= 3) and (base[3] in ['/', '\']) and ((length(base) = 3) or (base[4] <> '/'));;
@@ -3771,16 +3790,16 @@ begin
       else base := 'file:///' + base;
       result := strResolveURIReal(rel, base);
       if baseIsAbsolute or (strbeginswith(rel, '/') and not isWindowsFileUrl) then
-        exit(strcopyfrom(result, length('file:///')))
+        result := strcopyfrom(result, length('file:///'))
        else
-        exit(strcopyfrom(result, length('file:///') + 1))
+        result := strcopyfrom(result, length('file:///') + 1);
+      exit;
   end;
 
   if strbeginswith(rel, '//') and (schemaLength > 0) then
-    exit(copy(base, 1, schemaLength) + rel); //protocol relative uri
-
-
-  result := strResolveURIReal(rel, base);
+    result := copy(base, 1, schemaLength) + rel //protocol relative uri
+  else
+    result := strResolveURIReal(rel, base);
 end;
 
 function strSimilarity(const s, t: string): integer;
@@ -3789,9 +3808,9 @@ var v: array[0..1] of array of integer;
   i,j : Integer;
   cost, v0, v1: Integer;
 begin
-  if s = t then exit(0);
-  if s = '' then exit(length(t));
-  if t = '' then exit(length(s));
+  if s = t then begin result := 0; exit; end;
+  if s = '' then begin result := length(t); exit; end;
+  if t = '' then begin result := length(s); exit; end;
 
   // create two work vectors of integer distances
   setlength(v[0], length(t) + 1);
@@ -3816,7 +3835,7 @@ begin
     v1 := 1 - v1;
   end;
 
-  exit(v[v1, length(t)]);
+  result := v[v1, length(t)];
 end;
 
 
@@ -3886,8 +3905,8 @@ function intSqrt(const i: longint): longint;
 var
   e, eo: longint;
 begin
-  if i = 0 then exit(0);
-  if i = 1 then exit(1);
+  if i = 0 then begin result := 0; exit; end;
+  if i = 1 then begin result := 1; exit; end;
   if i < 0 then raise Exception.Create('Negative sqrt is not defined');
   Result := i div 2;
   e := abs(i - Result*Result);
@@ -3904,8 +3923,8 @@ function intSqrt(const i: int64): int64;
 var
   e, eo: int64;
 begin
-  if i = 0 then exit(0);
-  if i = 1 then exit(1);
+  if i = 0 then begin result := 0; exit; end;
+  if i = 1 then begin result := 1; exit; end;
   if i < 0 then raise Exception.Create('Negative sqrt is not defined');
   Result := i div 2;
   e := abs(i - Result*Result);
@@ -3921,26 +3940,26 @@ end;
 
 function gcd(a, b: integer): integer;
 begin
-  if b<a then exit(gcd(b,a));
-  if a=0 then exit(b);
-  if a=b then exit(a);
-  result:=gcd(b mod a, a);
+  if b<a then result := gcd(b,a)
+  else if a=0 then result := b
+  else if a=b then result := a
+  else result:=gcd(b mod a, a);
 end;
 
 function gcd(a, b: cardinal): cardinal;
 begin
-  if b<a then exit(gcd(b,a));
-  if a=0 then exit(b);
-  if a=b then exit(a);
-  result:=gcd(b mod a, a);
+  if b<a then result := gcd(b,a)
+  else if a=0 then result := b
+  else if a=b then result := a
+  else result:=gcd(b mod a, a);
 end;
 
 function gcd(a, b: int64): int64;
 begin
-  if b<a then exit(gcd(b,a));
-  if a=0 then exit(b);
-  if a=b then exit(a);
-  result:=gcd(b mod a, a);
+  if b<a then result := gcd(b,a)
+  else if a=0 then result := b
+  else if a=b then result := a
+  else result:=gcd(b mod a, a);
 end;
 
 function lcm(a, b: int64): int64;
@@ -3950,9 +3969,9 @@ end;
 
 function coprime(a,b:cardinal): boolean;
 begin
-  if (a = 1) or (b=1) then exit(true);
-  if (a = 0) or (b=0) then exit(false);//according to wikipedia
-  result:=gcd(a,b) = 1;
+  if (a = 1) or (b=1) then result := true
+  else if (a = 0) or (b=0) then result := false//according to wikipedia
+  else result:=gcd(a,b) = 1;
 end;
 
 
@@ -3974,9 +3993,9 @@ end;
 
 function intBound(min, i, max: longint): longint;
 begin
-  if i < min then exit(min);
-  if i > max then exit(max);
-  result := i;
+  if i < min then result := min
+  else if i > max then result := max
+  else result := i;
 end;
 
 
@@ -3996,9 +4015,9 @@ end;
 
 function intBound(min, i, max: int64): int64;
 begin
-  if i < min then exit(min);
-  if i > max then exit(max);
-  result := i;
+  if i < min then result := min
+  else if i > max then result := max
+  else result := i;
 end;
 
 
@@ -4008,7 +4027,7 @@ end;
 function factorial(i: longint): float;
 var j:longint;
 begin
-  if i<0 then exit(factorial(-i));
+  if i<0 then begin result := factorial(-i); exit; end;
   result:=1;
   for j:=2 to i do
     result := result * j;
@@ -4016,9 +4035,9 @@ end;
 function binomial(n,k: longint): float;
 var i:longint;
 begin
-  if (k=0) or (n=k) then exit(1);
-  if n=0 then exit(1);
-  if n-k<k then exit(binomial(n,n-k));
+  if (k=0) or (n=k) then begin result := 1; exit; end;
+  if n=0 then begin result := 1; exit; end;
+  if n-k<k then begin result := binomial(n,n-k); exit; end;
 
 
   // /n\      n!            1*2*...*n           (n-k+1)*(n-k+2)*..*n
@@ -4049,8 +4068,8 @@ end;
 
 function binomialProbability(n: longint; p: float; k: longint): float;
 begin
-  if (k<0)or(k>n) then exit(0);
-  result:=binomial(n,k)*intpower(p,k)*intpower(1-p,n-k);
+  if (k<0)or(k>n) then result := 0
+  else result:=binomial(n,k)*intpower(p,k)*intpower(1-p,n-k);
 end;
 
 function binomialProbabilityGE(n: longint; p: float; k: longint): float;
@@ -4084,7 +4103,7 @@ end;
 function binomialProbabilityApprox(n: longint; p: float; k: longint): float;
 var sigma:float;
 begin
-  if (k<0)or(k>n) then exit(0);
+  if (k<0)or(k>n) then begin result := 0; exit; end;
   sigma:=binomialDeviation(n,p);
   if sigma>=3 then //Moivre and Laplace
     result:=1/(sigma*sqrt(2*pi)) * exp(sqr(k-n*p)/(2*sigma*sigma))
@@ -4332,7 +4351,7 @@ begin
         end else begin //am/pm special case
           if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then inc(mp, 5)
           else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then inc(mp, 3)
-          else if (ip > length(input)) and (input[ip] <> 'a') then exit(false)
+          else if (ip > length(input)) and (input[ip] <> 'a') then begin result := false; exit; end
           else continue;
         end;
 
@@ -4346,13 +4365,13 @@ begin
           else assert(false);
         end;
 
-        if ip+count-1 > length(input) then exit(false);
+        if ip+count-1 > length(input) then begin result := false; exit; end;
 
         case base of
           'y': if (input[ip] = '-') then begin //special case: allow negative years
             inc(ip);
             parts[index] := - readNumber(input,ip,count);
-            if parts[index] = --1 then exit(false);
+            if parts[index] = --1 then begin result := false; exit; end;
             continue;
           end;
           'm': case truecount of
@@ -4376,7 +4395,7 @@ begin
                      break;
                    end;
               if parts[2] <> high(parts[2]) then continue;
-              exit(false)
+              begin result := false; exit; end
             end;
             4: begin
               //special month name handling
@@ -4395,37 +4414,37 @@ begin
                   break;
                 end;
               if parts[2] <> high(parts[2]) then continue;
-              exit(false)
+              begin result := false; exit; end
             end;
           end;
           'Z': begin //timezone
-            if ip > length(input) then exit(false);
+            if ip > length(input) then begin result := false; exit; end;
             if input[ip] = 'Z' then begin parts[index] := 0; inc(ip); end //timezone = utc
             else if (input[ip] in ['-','+']) then begin
               parts[index]  := 0;
               positive := input[ip] = '+';
               inc(ip);
               parts[index] := 60 * readNumber(input, ip, 2);
-              if parts[index] = -1 then exit(false);
+              if parts[index] = -1 then begin result := false; exit; end;
               if ip <= length(input) then begin
                 if input[ip] = ':' then inc(ip);
                 if input[ip] in ['0'..'9'] then begin
                   i := readNumber(input, ip, 2);
-                  if i = -1 then exit(false);
+                  if i = -1 then begin result := false; exit; end;
                   parts[index] := parts[index] +  i;
                 end;
               end;
               if not positive then parts[index] := - parts[index];
-            end else exit(false);
+            end else begin result := false; exit; end;
             continue;
           end;
           'a': begin //am/pm or a/p
             if (input[ip] in ['a', 'A']) then parts[index] := 0
             else if (input[ip] in ['p', 'P']) then parts[index] := 12
-            else exit(false);
+            else begin result := false; exit; end;
             inc(ip);
             if mask[mp-1] = 'm' then begin
-              if not (input[ip] in ['m', 'M']) then exit(false);
+              if not (input[ip] in ['m', 'M']) then begin result := false; exit; end;
               inc(ip);
             end;
             continue;
@@ -4433,7 +4452,7 @@ begin
         end;
 
         parts[index] := readNumber(input, ip, count);
-        if parts[index] = -1 then exit(false);
+        if parts[index] = -1 then begin result := false; exit; end;
 
         if base = 'z' then
           for i:=count + 1 to 9 do
@@ -4450,19 +4469,19 @@ begin
           inc(ip);
           inc(mp);
         end;
-        if (mp > length(mask)) or (mask[mp] <> '"') then exit(false);
+        if (mp > length(mask)) or (mask[mp] <> '"') then begin result := false; exit; end;
         inc(mp);
       end;
       ' ',#9: begin //skip whitespace
-        if ip > length(input) then exit(false);
+        if ip > length(input) then begin result := false; exit; end;
         while (mp <= length(mask)) and (mask[mp] in [' ',#9]) do inc(mp);
-        if not (input[ip] in [' ',#9]) then exit(false);
+        if not (input[ip] in [' ',#9]) then begin result := false; exit; end;
         while (ip <= length(input)) and (input[ip] in [' ',#9]) do inc(ip);
       end
       else if (mask[mp] = '$') and (mp  = length(mask)) then begin
         result := ip = length(input) + 1;
         exit;
-      end else if (ip > length(input)) or (mask[mp]<>input[ip]) then exit(false)
+      end else if (ip > length(input)) or (mask[mp]<>input[ip]) then begin result := false; exit; end
       else begin
         inc(mp);
         inc(ip);
@@ -4551,7 +4570,8 @@ var mp: integer;
       if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then begin
         result := dateTimeFormatInternal(result, y, m, d, h, n, s, secondFraction, timezone);
         if pointer(result) = pointer(TryAgainWithRoundedSeconds) then exit;
-        exit('"' + result + '"');
+        result := '"' + result + '"';
+        exit;
       end;
       result:='';
     end;
@@ -4565,7 +4585,7 @@ var mp: integer;
       exit;
     end;
     if mp > length(mask) then exit;
-    if mask[mp] = '$' then begin inc(mp); exit(''); end;
+    if mask[mp] = '$' then begin inc(mp); begin result := ''; exit; end; end;
     oldpos := mp;
     if mask[mp] in SPECIAL_MASK_CHARS then begin
       while (mp <= length(mask)) and (mask[mp] = mask[oldpos]) do inc(mp);
@@ -4587,7 +4607,7 @@ begin
   result := '';
   while mp <= length(mask) do begin
     part := nextMaskPart;
-    if pointer(part) = pointer(TryAgainWithRoundedSeconds) then exit(TryAgainWithRoundedSeconds);
+    if pointer(part) = pointer(TryAgainWithRoundedSeconds) then begin result := TryAgainWithRoundedSeconds; exit; end;
     if length(part) = 0 then continue;
     case part[1] of
       'y','Y': result := result +  strFromInt(y, length(part));
@@ -4601,7 +4621,7 @@ begin
         else len := length(part);
         scale := powersOf10[len];
         temp := round(secondFraction*scale);
-        if temp >= scale then exit(TryAgainWithRoundedSeconds);
+        if temp >= scale then begin result := TryAgainWithRoundedSeconds; exit; end;
         toadd := strTrimRight(strFromInt(temp, len), ['0']);
         result := result +  toadd;
         if length(toadd) < length(part) then result := result +  strDup('0', length(part) - length(toadd));
@@ -4819,12 +4839,12 @@ begin
   result:=0-1; //WTF!!
   for i:=0 to high(data) do
     if data[i].key=key then
-      exit(i);
+      begin result := i; exit; end;
 end;
 
 procedure TMap.insert(key: T_Key; value: T_Value);
 begin
-  if getKeyID(key)<>0-1 then exit();
+  if getKeyID(key)<>0-1 then exit;
   SetLength(data,length(data)+1);
   data[high(data)].key:=key;
   data[high(data)].value:=value;
@@ -4884,7 +4904,7 @@ begin
   if @a[length] <> b then
     raise Exception.Create('Invalid size for sorting');
   if b<=a then
-    exit(); //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
+    exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
   inc(length); //add 1 because a=b if there is exactly one element
 
   //check for small input and use insertsort if small
@@ -4952,7 +4972,7 @@ begin
   if @a[length] <> b then
     raise Exception.Create('Invalid size for sorting');
   if b<=a then
-    exit(); //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)y
+    exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)y
   inc(length); //add 1 because a=b if there is exactly one element
   setlength(tempArray,length);
   stableSortSDr(a,b,compareFunction,compareFunctionData,tempArray);
@@ -4979,12 +4999,12 @@ begin
   ap := a;
   bp := b;
   for i:=1 to size do begin
-    if ap^ < bp^ then exit(-1);
-    if ap^ > bp^ then exit(1);
+    if ap^ < bp^ then begin result := -1; exit; end;
+    if ap^ > bp^ then begin result := 1; exit; end;
     inc(ap);
     inc(bp);
   end;
-  exit(0);
+  begin result := 0; exit; end;
 end;
 
 procedure stableSort(a,b: pointer; size: longint;
@@ -5060,7 +5080,7 @@ var temp: pointer;
   cmpResult: TValueSign;
 begin
   result := nil;
-  if b < a then exit(nil);
+  if b < a then exit;
 
   //the comparison result looks like:  +1 +1 +1 0 0 0 0 -1 -1 -1
 
@@ -5116,9 +5136,9 @@ function arrayBinarySearch(a: TStringArray; value: string; choosen: TBinarySearc
 var
   element: Pointer;
 begin
-  if length(a) = 0 then exit(-1);
+  if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TStringArrayCompare, tobject(@value), choosen, condition);
-  if element = nil then exit(-1);
+  if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
 
@@ -5133,9 +5153,9 @@ function arrayBinarySearch(a: TLongintArray; value: longint; choosen: TBinarySea
 var
   element: Pointer;
 begin
-  if length(a) = 0 then exit(-1);
+  if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TLongintArrayCompare, tobject(@value), choosen, condition);
-  if element = nil then exit(-1);
+  if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
 
@@ -5150,9 +5170,9 @@ function arrayBinarySearch(a: TLongwordArray; value: longword; choosen: TBinaryS
 var
   element: Pointer;
 begin
-  if length(a) = 0 then exit(-1);
+  if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TLongwordArrayCompare, tobject(@value), choosen, condition);
-  if element = nil then exit(-1);
+  if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
 
@@ -5167,9 +5187,9 @@ function arrayBinarySearch(a: TInt64Array; value: int64; choosen: TBinarySearchC
 var
   element: Pointer;
 begin
-  if length(a) = 0 then exit(-1);
+  if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TInt64ArrayCompare, tobject(@value), choosen, condition);
-  if element = nil then exit(-1);
+  if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
 
@@ -5184,9 +5204,9 @@ function arrayBinarySearch(a: TFloatArray; value: float; choosen: TBinarySearchC
 var
   element: Pointer;
 begin
-  if length(a) = 0 then exit(-1);
+  if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TFloatArrayCompare, tobject(@value), choosen, condition);
-  if element = nil then exit(-1);
+  if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
 
@@ -5251,7 +5271,7 @@ begin
   result:=false;
   for i:=0 to reallength-1 do
     if data[i]=v then
-      exit(true);
+      begin result := true; exit; end;
 end;
 
 
