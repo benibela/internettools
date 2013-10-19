@@ -49,9 +49,22 @@ exception statement from your version.
 unit bbutils;
 
 
+{$DEFINE HASISNAN}
+
 {$IFDEF FPC}
 {$mode objfpc}{$H+}
 {$COPERATORS OFF}
+{$DEFINE HASINLINE}
+{$DEFINE HASDefaultFormatSettings}
+
+
+{$ELSE} //DELPHI
+
+{$IFDEF VER120}{$UNDEF HASISNAN}{$ENDIF}
+{$IFDEF VER110}{$UNDEF HASISNAN}{$ENDIF}
+{$IFDEF VER100}{$UNDEF HASISNAN}{$ENDIF}
+
+
 {$ENDIF}
 
 interface
@@ -64,12 +77,44 @@ uses
 
 
 //-------------------------Array functions-----------------------------
+
+
+type
+{$IFDEF FPC}
+     RawByteString = AnsiString;
+{$ifdef FPC_HAS_TYPE_Extended}float = extended;
+{$else} {$ifdef FPC_HAS_TYPE_Double}float = double;
+{$else} {$ifdef FPC_HAS_TYPE_Single}float = single;
+{$endif}{$endif}{$endif}
+{$else}
+     float = extended;
+     TTime = TDateTime;
+     SizeInt = integer;
+     TValueSign = -1..1;
+{$IFDEF  CPU386}
+     PtrUInt = DWORD;
+     PtrInt = longint;
+{$ELSE}{$IFDEF  CPUX64}
+     PtrUInt = QWORD;
+     PtrInt = int64;
+{$ENDIF}{$ENDIF}
+{$IFNDEF UNICODE}
+     RawByteString = ansistring;
+{$ENDIF}
+const
+   NaN = 0.0/0.0;
+   Infinity = 1.0/0.0;
+   NegInfinity = -1.0/0.0;
+   LineEnding = #13#10;
+
+{$endif}
+
 type
   TStringArray=array of string;
   TLongintArray =array of longint;
   TLongwordArray =array of longword;
   TInt64Array =array of int64;
-  TFloatArray =array of float;
+  TFloatArray = array of float;
 
 
 
@@ -80,7 +125,7 @@ function arrayAdd(var a: TStringArray; const e: string):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TStringArray; const a2: array of string):longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrepend(var a: TStringArray; const e: string);
+procedure arrayPrepend(var a: TStringArray; const e: string); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TStringArray; const i: longint):string; overload;
@@ -89,11 +134,11 @@ function arrayDelete(var a: TStringArray; const i: longint):string; overload;
 function arrayDeleteUnordered(var a: TStringArray; const i: longint):string; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
-procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint); overload;
 //**returns i with a[i]=e
-function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint;
+function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrependFast(var a: TStringArray; var len: longint; const e: string);
+procedure arrayPrependFast(var a: TStringArray; var len: longint; const e: string); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
@@ -102,24 +147,24 @@ function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint
 function arrayDeleteUnorderedFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer; overload;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TStringArray; slice1: integer = -1;slice2: integer = -1);overload;
 
 //**Extracts a array slice
-function arraySlice(a: array of string; slice1: integer = -1;slice2: integer = -1): TStringArray;
+function arraySlice(a: array of string; slice1: integer = -1;slice2: integer = -1): TStringArray; overload;
 
 //**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
-function arrayGet(a: array of string; const i: integer): string;
+function arrayGet(a: array of string; const i: integer): string; overload;
 //**Returns the last element of the array, raises exception, iff the array is empty
-function arrayLast(a: array of string): string;
+function arrayLast(a: array of string): string; overload;
 //**Returns the last element of the array, returns default, iff the array is empty
-function arrayLast(a: array of string; const default: string): string;
+function arrayLast(a: array of string; const default: string): string; overload;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of string; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
@@ -132,7 +177,7 @@ function arrayAdd(var a: TLongintArray; const e: longint):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TLongintArray; const a2: array of longint):longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrepend(var a: TLongintArray; const e: longint);
+procedure arrayPrepend(var a: TLongintArray; const e: longint); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongintArray; const i: longint):longint; overload;
@@ -141,11 +186,11 @@ function arrayDelete(var a: TLongintArray; const i: longint):longint; overload;
 function arrayDeleteUnordered(var a: TLongintArray; const i: longint):longint; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
-procedure arrayReserveFast(var a: TLongintArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TLongintArray; const len: longint; const reserveLength: longint); overload;
 //**returns i with a[i]=e
-function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint): longint;
+function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint): longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrependFast(var a: TLongintArray; var len: longint; const e: longint);
+procedure arrayPrependFast(var a: TLongintArray; var len: longint; const e: longint); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
@@ -154,24 +199,24 @@ function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longin
 function arrayDeleteUnorderedFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer; overload;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongintArray; slice1: integer = -1;slice2: integer = -1);overload;
 
 //**Extracts a array slice
-function arraySlice(a: array of longint; slice1: integer = -1;slice2: integer = -1): TLongintArray;
+function arraySlice(a: array of longint; slice1: integer = -1;slice2: integer = -1): TLongintArray; overload;
 
 //**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
-function arrayGet(a: array of longint; const i: integer): longint;
+function arrayGet(a: array of longint; const i: integer): longint; overload;
 //**Returns the last element of the array, raises exception, iff the array is empty
-function arrayLast(a: array of longint): longint;
+function arrayLast(a: array of longint): longint; overload;
 //**Returns the last element of the array, returns default, iff the array is empty
-function arrayLast(a: array of longint; const default: longint): longint;
+function arrayLast(a: array of longint; const default: longint): longint; overload;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of longint; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
@@ -184,7 +229,7 @@ function arrayAdd(var a: TLongwordArray; const e: longword):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TLongwordArray; const a2: array of longword):longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrepend(var a: TLongwordArray; const e: longword);
+procedure arrayPrepend(var a: TLongwordArray; const e: longword); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TLongwordArray; const i: longint):longword; overload;
@@ -193,11 +238,11 @@ function arrayDelete(var a: TLongwordArray; const i: longint):longword; overload
 function arrayDeleteUnordered(var a: TLongwordArray; const i: longint):longword; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
-procedure arrayReserveFast(var a: TLongwordArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TLongwordArray; const len: longint; const reserveLength: longint); overload;
 //**returns i with a[i]=e
-function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword): longint;
+function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword): longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrependFast(var a: TLongwordArray; var len: longint; const e: longword);
+procedure arrayPrependFast(var a: TLongwordArray; var len: longint; const e: longword); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
@@ -206,24 +251,24 @@ function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longi
 function arrayDeleteUnorderedFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer; overload;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongwordArray; slice1: integer = -1;slice2: integer = -1);overload;
 
 //**Extracts a array slice
-function arraySlice(a: array of longword; slice1: integer = -1;slice2: integer = -1): TLongwordArray;
+function arraySlice(a: array of longword; slice1: integer = -1;slice2: integer = -1): TLongwordArray; overload;
 
 //**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
-function arrayGet(a: array of longword; const i: integer): longword;
+function arrayGet(a: array of longword; const i: integer): longword; overload;
 //**Returns the last element of the array, raises exception, iff the array is empty
-function arrayLast(a: array of longword): longword;
+function arrayLast(a: array of longword): longword; overload;
 //**Returns the last element of the array, returns default, iff the array is empty
-function arrayLast(a: array of longword; const default: longword): longword;
+function arrayLast(a: array of longword; const default: longword): longword; overload;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of longword; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
@@ -236,7 +281,7 @@ function arrayAdd(var a: TInt64Array; const e: int64):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TInt64Array; const a2: array of int64):longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrepend(var a: TInt64Array; const e: int64);
+procedure arrayPrepend(var a: TInt64Array; const e: int64); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TInt64Array; const i: longint):int64; overload;
@@ -245,11 +290,11 @@ function arrayDelete(var a: TInt64Array; const i: longint):int64; overload;
 function arrayDeleteUnordered(var a: TInt64Array; const i: longint):int64; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
-procedure arrayReserveFast(var a: TInt64Array; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TInt64Array; const len: longint; const reserveLength: longint); overload;
 //**returns i with a[i]=e
-function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): longint;
+function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrependFast(var a: TInt64Array; var len: longint; const e: int64);
+procedure arrayPrependFast(var a: TInt64Array; var len: longint; const e: int64); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
@@ -258,24 +303,24 @@ function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint)
 function arrayDeleteUnorderedFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer; overload;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TInt64Array; slice1: integer = -1;slice2: integer = -1);overload;
 
 //**Extracts a array slice
-function arraySlice(a: array of int64; slice1: integer = -1;slice2: integer = -1): TInt64Array;
+function arraySlice(a: array of int64; slice1: integer = -1;slice2: integer = -1): TInt64Array; overload;
 
 //**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
-function arrayGet(a: array of int64; const i: integer): int64;
+function arrayGet(a: array of int64; const i: integer): int64; overload;
 //**Returns the last element of the array, raises exception, iff the array is empty
-function arrayLast(a: array of int64): int64;
+function arrayLast(a: array of int64): int64; overload;
 //**Returns the last element of the array, returns default, iff the array is empty
-function arrayLast(a: array of int64; const default: int64): int64;
+function arrayLast(a: array of int64; const default: int64): int64; overload;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of int64; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
@@ -288,7 +333,7 @@ function arrayAdd(var a: TFloatArray; const e: float):longint; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
 function arrayAdd(var a: TFloatArray; const a2: array of float):longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrepend(var a: TFloatArray; const e: float);
+procedure arrayPrepend(var a: TFloatArray; const e: float); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDelete(var a: TFloatArray; const i: longint):float; overload;
@@ -297,11 +342,11 @@ function arrayDelete(var a: TFloatArray; const i: longint):float; overload;
 function arrayDeleteUnordered(var a: TFloatArray; const i: longint):float; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
-procedure arrayReserveFast(var a: TFloatArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TFloatArray; const len: longint; const reserveLength: longint); overload;
 //**returns i with a[i]=e
-function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): longint;
+function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): longint; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrependFast(var a: TFloatArray; var len: longint; const e: float);
+procedure arrayPrependFast(var a: TFloatArray; var len: longint; const e: float); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
 function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
@@ -310,24 +355,24 @@ function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint)
 function arrayDeleteUnorderedFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOf(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfSmallest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer;
+function arrayIndexOfLargest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer; overload;
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TFloatArray; slice1: integer = -1;slice2: integer = -1);overload;
 
 //**Extracts a array slice
-function arraySlice(a: array of float; slice1: integer = -1;slice2: integer = -1): TFloatArray;
+function arraySlice(a: array of float; slice1: integer = -1;slice2: integer = -1): TFloatArray; overload;
 
 //**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
-function arrayGet(a: array of float; const i: integer): float;
+function arrayGet(a: array of float; const i: integer): float; overload;
 //**Returns the last element of the array, raises exception, iff the array is empty
-function arrayLast(a: array of float): float;
+function arrayLast(a: array of float): float; overload;
 //**Returns the last element of the array, returns default, iff the array is empty
-function arrayLast(a: array of float; const default: float): float;
+function arrayLast(a: array of float; const default: float): float; overload;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
 function arrayCompare(a, b: array of float; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
@@ -338,32 +383,32 @@ function arrayEqual(a, b: array of float; slice1a: integer = -1; slice1b: intege
 //-----------------------Conditional additions------------------------
 
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b: integer): boolean;
+function unequal(const a, b: integer): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b, c: integer): boolean;
+function unequal(const a, b, c: integer): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a: array of integer): boolean;
+function unequal(const a: array of integer): boolean; overload;
 
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b: cardinal): boolean;
+function unequal(const a, b: cardinal): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b, c: cardinal): boolean;
+function unequal(const a, b, c: cardinal): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a: array of cardinal): boolean;
+function unequal(const a: array of cardinal): boolean; overload;
 
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b: string): boolean;
+function unequal(const a, b: RawByteString): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b, c: string): boolean;
+function unequal(const a, b, c: RawByteString): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a: array of string): boolean;
+function unequal(const a: array of RawByteString): boolean; overload;
 
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b: int64): boolean;
+function unequal(const a, b: int64): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b, c: int64): boolean;
+function unequal(const a, b, c: int64): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a: array of int64): boolean;
+function unequal(const a: array of int64): boolean; overload;
 
 
 //-----------------------Flow/Thread control functions------------------------
@@ -387,155 +432,156 @@ type
 
 //copy
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
-function strlmove(dest,source:pchar;destLen,sourceLen: longint):pchar;
+function strlmove(dest,source:pansichar;destLen,sourceLen: longint):pansichar;
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
 function widestrlmove(dest,source:pwidechar;destLen,sourceLen: longint):pwidechar;
 //**Returns the substring of s containing all characters after start (including s[start]
-function strCopyFrom(const s:string; start:longint):string;inline;
+function strCopyFrom(const s:RawByteString; start:longint):RawByteString; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Returns a string with all characters between first and last (including first, last)
-function strSlice(const first,last:pchar):string;
+function strSlice(const first,last:pansichar):RawByteString; overload;
 //**Returns a string with all characters between start and last (including start, last)
-function strSlice(const s:string; start,last:longint):string;
+function strSlice(const s:RawByteString; start,last:longint):RawByteString; overload;
 
 //comparison
 
-//all pchar<->pchar comparisons are null-terminated (except strls.. functions with length-strict)
-//all pchar<->string comparisons are null-terminated iff the string doesn't contain #0 characters
+//all pansichar<->pansichar comparisons are null-terminated (except strls.. functions with length-strict)
+//all pansichar<->string comparisons are null-terminated iff the string doesn't contain #0 characters
 
 //length limited
-function strlEqual(const p1,p2:pchar;const l: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strlEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(const p1,p2:pchar;const l: longint):boolean; inline; //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strlsEqual(const p1,p2:pchar;const l: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsiEqual(const p1,p2:pchar;const l: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsiEqual(const p1,p2:pchar;const l1,l2: longint):boolean; inline; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlEqual(const p1,p2:pansichar;const l: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strlEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(const p1,p2:pansichar;const l: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strlsEqual(const p1,p2:pansichar;const l: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsiEqual(const p1,p2:pansichar;const l: longint):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsiEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsequal(p: pansichar; const s: RawByteString; l: longint): boolean; overload;
 
-function strlEqual(p:pchar;const s:string; l: longint):boolean; //**< Tests if the strings are case-sensitive equal (same length and same characters)
-function strliEqual(p:pchar;const s:string;l: longint):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters)
-function strlBeginsWith(const p:pchar; l:longint; const expectedStart:string):boolean; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-sensitive)
-function strliBeginsWith(const p:pchar;l: longint;const expectedStart:string):boolean; inline; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-insensitive)
+function strlEqual(p:pansichar;const s:RawByteString; l: longint):boolean; overload; //**< Tests if the strings are case-sensitive equal (same length and same characters)
+function strliEqual(p:pansichar;const s:RawByteString;l: longint):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters)
+function strlBeginsWith(const p:pansichar; l:longint; const expectedStart:RawByteString):boolean; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-sensitive)
+function strliBeginsWith(const p:pansichar;l: longint;const expectedStart:RawByteString):boolean; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Test if p begins with expectedStart (__STRICT_HELP__, case-insensitive)
 
 
 //not length limited
-function strEqual(const s1,s2:string):boolean; inline;//**< Tests if the strings are case-insensitive equal (same length and same characters)
-function striEqual(const s1,s2:string):boolean; inline;//**< Tests if the strings are case-insensitive equal (same length and same characters)
-function strBeginsWith(const strToBeExaminated,expectedStart:string):boolean; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
-function striBeginsWith(const strToBeExaminated,expectedStart:string):boolean; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
-function strBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
-function striBeginsWith(const p:pchar; const expectedStart:string):boolean; inline; //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
-function strEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
-function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
+function strEqual(const s1,s2:RawByteString):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}//**< Tests if the strings are case-insensitive equal (same length and same characters)
+function striEqual(const s1,s2:RawByteString):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}//**< Tests if the strings are case-insensitive equal (same length and same characters)
+function strBeginsWith(const strToBeExaminated,expectedStart:RawByteString):boolean; overload; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
+function striBeginsWith(const strToBeExaminated,expectedStart:RawByteString):boolean; overload; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
+function strBeginsWith(const p:pansichar; const expectedStart:RawByteString):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
+function striBeginsWith(const p:pansichar; const expectedStart:RawByteString):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
+function strEndsWith(const strToBeExaminated,expectedEnd:RawByteString):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
+function striEndsWith(const strToBeExaminated,expectedEnd:RawByteString):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
 
 
 //**Case sensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
-function strCompareClever(const s1, s2: string): integer;
+function strCompareClever(const s1, s2: RawByteString): integer;
 //**Case insensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
-function striCompareClever(const s1, s2: string): integer; inline;
+function striCompareClever(const s1, s2: RawByteString): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //search
 //**Searchs the last index of c in s
-function strRpos(c:char;s:string):longint;
+function strRpos(c:ansichar;s:RawByteString):longint;
 //**Counts all occurrences of search in searchIn (case sensitive)
-function strCount(const str: string; const searched: char; from: longint = 1): longint;
+function strCount(const str: RawByteString; const searched: ansichar; from: longint = 1): longint;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsIndexOf(str,searched:pchar; l1, l2: longint): longint;
+function strlsIndexOf(str,searched:pansichar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
-function strlsiIndexOf(str,searched:pchar; l1, l2: longint): longint;
+function strlsiIndexOf(str,searched:pansichar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string):longint;inline;
+function strIndexOf(const str,searched:RawByteString):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string):longint; inline;
+function striIndexOf(const str,searched:RawByteString):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string; from: longint):longint;inline;
+function strIndexOf(const str,searched:RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string; from: longint):longint; inline;
+function striIndexOf(const str,searched:RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strContains(const str,searched:string):boolean; inline;
+function strContains(const str,searched:RawByteString):boolean;overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striContains(const str,searched:string):boolean; inline;
+function striContains(const str,searched:RawByteString):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strContains(const str,searched:string; from: longint):boolean; inline;
+function strContains(const str,searched:RawByteString; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striContains(const str,searched:string; from: longint):boolean; inline;
+function striContains(const str,searched:RawByteString; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //more specialized
-type TCharSet = set of char;
+type TCharSet = set of ansichar;
 //**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
-procedure strlTrimLeft(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+procedure strlTrimLeft(var p: pansichar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
 //**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
-procedure strlTrimRight(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+procedure strlTrimRight(var p: pansichar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
 //**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
-procedure strlTrim(var p: pchar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+procedure strlTrim(var p: pansichar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
 
 //**Removes all occurrences of trimCharacter from the left/right side of the string
-function strTrimLeft(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; inline;
-function strTrimRight(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; inline;
-function strTrim(const s: string; const trimCharacters: TCharSet = [#0..' ']):string; inline;
-function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [#0..' ']):string;
+function strTrimLeft(const s:RawByteString; const trimCharacters: TCharSet = [#0..' ']):RawByteString; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strTrimRight(const s:RawByteString; const trimCharacters: TCharSet = [#0..' ']):RawByteString; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strTrim(const s: RawByteString; const trimCharacters: TCharSet = [#0..' ']):RawByteString; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strTrimAndNormalize(const s: RawByteString; const trimCharacters: TCharSet = [#0..' ']):RawByteString;
 
 //**<Replaces all #13#10 or #13 by #10
-function strNormalizeLineEndings(const s: string): string;
+function strNormalizeLineEndings(const s: RawByteString): RawByteString;
 
 //**< Prepends expectedStart, if s does not starts with expectedStart
-function strPrependIfMissing(const s: string; const expectedStart: string): string;
+function strPrependIfMissing(const s: RawByteString; const expectedStart: RawByteString): RawByteString;
 //**< Appends expectedEnd, if s does not end with expectedEnd
-function strAppendIfMissing(const s: string; const expectedEnd: string): string;
+function strAppendIfMissing(const s: RawByteString; const expectedEnd: RawByteString): RawByteString;
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first part is returned as function result, the second one is again assign to remainingPart
 //**(If remainingPart does not contain separator, it returns remainingPart and sets remainingPart := '')
-function strSplitGet(const separator: string; var remainingPart: string):string;overload;
+function strSplitGet(const separator: RawByteString; var remainingPart: RawByteString):RawByteString;overload;
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is assign to firstPart, the second one is again assign to remainingPart
-procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
+procedure strSplit(out firstPart: RawByteString; const separator: RawByteString; var remainingPart: RawByteString);overload;
 //**Splits the string s into the array splitted at every occurrence of sep
-procedure strSplit(out splitted: TStringArray;s:string;sep:string=',';includeEmpty:boolean=true);overload;
+procedure strSplit(out splitted: TStringArray;s:RawByteString;sep:RawByteString=',';includeEmpty:boolean=true);overload;
 //**Splits the string s into the array splitted at every occurrence of sep
-function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArray;overload;
+function strSplit(s:RawByteString;sep:RawByteString=',';includeEmpty:boolean=true):TStringArray;overload;
 
-function strWrapSplit(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
-function strWrap(Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): string;
+function strWrapSplit(const Line: RawByteString; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
+function strWrap(Line: RawByteString; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): RawByteString;
 
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
 //the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
 //If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
-function strSplitGetUntilBracketClosing(var text: string; const openBracket, closingBracket: string; updateText: boolean): string;
-function strSplitGetBetweenBrackets(var text: string; const openBracket, closingBracket: string; updateText: boolean): string;
+function strSplitGetUntilBracketClosing(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
+function strSplitGetBetweenBrackets(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
 
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
-function strJoin(const sl: TStrings; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
+function strJoin(const sl: TStrings; const sep: RawByteString = ', '; limit: Integer=0; const limitStr: RawByteString='...'): RawByteString;overload;
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
-function strJoin(const sl: TStringArray; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
+function strJoin(const sl: TStringArray; const sep: RawByteString = ', '; limit: Integer=0; const limitStr: RawByteString='...'): RawByteString;overload;
 
 //**Converts a str to a bool (for fpc versions previous 2.2)
-function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
+function StrToBoolDef(const S: RawByteString;const Def:Boolean): Boolean;
 
 //**Removes a file:// prefix from filename if it is there
-function strRemoveFileURLPrefix(const filename: string): string;
+function strRemoveFileURLPrefix(const filename: RawByteString): RawByteString;
 
 //**loads a file as string. The filename is directly passed to the fpc rtl and uses the system
 //**encoding @seealso(strLoadFromFileUTF8)
-function strLoadFromFile(filename:string):string;
+function strLoadFromFile(filename:RawByteString):RawByteString;
 //**saves a string as file. The filename is directly passed to the fpc rtl and uses the system
 //**encoding @seealso(strSaveToFileUTF8)
-procedure strSaveToFile(filename: string;str:string);
+procedure strSaveToFile(filename: RawByteString;str:RawByteString);
 //**loads a file as string. The filename should be encoded in utf-8
 //**@seealso(strLoadFromFile)
-function strLoadFromFileUTF8(filename:string):string;
+function strLoadFromFileUTF8(filename:RawByteString):RawByteString;
 //**saves a string as file. The filename should be encoded in utf-8
 //**@seealso(strSaveToFile)
-procedure strSaveToFileUTF8(filename: string;str:string);
+procedure strSaveToFileUTF8(filename: RawByteString;str:RawByteString);
 //**converts a size (measured in bytes) to a string (e.g. 1025 -> 1 KiB)
 function strFromSIze(size: int64):string;
 
@@ -544,52 +590,60 @@ function strFromSIze(size: int64):string;
 //**length of an utf8 string @br
 //**A similar function exists in lclproc, but this unit should be independent of the lcl to make it easier to compile with fpc on the command line@br
 //**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
-function strLengthUtf8(str: string): longint;
-function strConvertToUtf8(str: string; from: TEncoding): string; //**< Returns a utf-8 string from the string in encoding @code(from)
-function strConvertFromUtf8(str: string; toe: TEncoding): string; //**< Converts a utf-8 string to the encoding @code(from)
-function strChangeEncoding(const str: string; from,toe: TEncoding):string; //**< Changes the string encoding from @code(from) to @code(toe)
-function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): string; //**< Get unicode character @code(character) in a certain encoding
-function strDecodeUTF8Character(const str: string; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
-function strEncodingFromName(str:string):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
-function strEncodingFromBOMRemove(var str:string):TEncoding; //**< Gets the encoding from an unicode bom and removes it
+function strLengthUtf8(str: RawByteString): longint;
+function strConvertToUtf8(str: RawByteString; from: TEncoding): RawByteString; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
+function strConvertFromUtf8(str: RawByteString; toe: TEncoding): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
+function strChangeEncoding(const str: RawByteString; from,toe: TEncoding):RawByteString; //**< Changes the string encoding from @code(from) to @code(toe)
+function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
+function strGetUnicodeCharacterUTFLength(const character: integer): integer;
+procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
+function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
+function strEncodingFromName(str:RawByteString):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+function strEncodingFromBOMRemove(var str:RawByteString):TEncoding; //**< Gets the encoding from an unicode bom and removes it
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
+function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TEncoding; strict: boolean = false):RawByteString; overload;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(s:string;encoding:TEncoding; strict: boolean = false):string;
+function strDecodeHTMLEntities(s:RawByteString;encoding:TEncoding; strict: boolean = false):RawByteString; overload;
 //**Replace all occurences of x \in toEscape with escapeChar + x
-function strEscape(s:string; const toEscape: TCharSet; escapeChar: char = '\'): string;
+function strEscape(s:RawByteString; const toEscape: TCharSet; escapeChar: ansichar = '\'): RawByteString;
 //**Returns a regex matching s
-function strEscapeRegex(const s:string): string;
-function strDecodeHex(s:string):string;
-function strEncodeHex(s:string; const code: string = '0123456789ABCDEF'):string;
+function strEscapeRegex(const s:RawByteString): RawByteString;
+function strDecodeHex(s:RawByteString):RawByteString;
+function strEncodeHex(s:RawByteString; const code: RawByteString = '0123456789ABCDEF'):RawByteString;
 //**Returns the first l bytes of p (copies them so O(n))
-function strFromPchar(p:pchar;l:longint):string;
+function strFromPchar(p:pansichar;l:longint):RawByteString;
 
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
-function strFromPtr(p: pointer): string;
+function strFromPtr(p: pointer): RawByteString;
 //**Creates a string to display an integer. The result will have at least displayLength digits (digits, not characters, so -1 with length 2, will become -02).
-function strFromInt(i: int64; displayLength: longint): string;
+function strFromInt(i: int64; displayLength: longint): RawByteString;
 
 //**Creates count copies of rep
-function strDup(rep: string; const count: integer): string;
+function strDup(rep: RawByteString; const count: integer): RawByteString;
 
 //**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
-function strIsAbsoluteURI(const s: string): boolean;
+function strIsAbsoluteURI(const s: RawByteString): boolean;
 //**Returns a absolute uri for a uri relative to the uri base.@br
 //**E.g. strResolveURI('foo/bar', 'http://example.org/abc/def') returns 'http://example.org/abc/foo/bar'@br
 //**Or.  strResolveURI('foo/bar', 'http://example.org/abc/def/') returns 'http://example.org/abc/def/foo/bar'@br
 //**base may be relative itself (e.g. strResolveURI('foo/bar', 'test/') becomes 'test/foo/bar')
-function strResolveURI(rel, base: string): string;
+function strResolveURI(rel, base: RawByteString): RawByteString;
 
 //**Levenshtein distance between s and t
 //**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space
-function strSimilarity(const s, t: string): integer;
+function strSimilarity(const s, t: RawByteString): integer;
 
 //----------------Mathematical functions-------------------------------
+
+{$IFNDEF FPC}
+function SwapEndian(const w: Word): Word; overload;
+function SwapEndian(const w: DWord): DWord; overload;
+{$ENDIF}
+
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
 //**log 10 rounded down (= number of digits in base 10 - 1)
 function intLog10(i:longint):longint; overload;
@@ -599,22 +653,22 @@ function intLog(n,b: longint): longint; overload;
 procedure intFactor(const n,p: longint; out e, r:longint);
 
 
-function intSqrt(const i: longint): longint;
+function intSqrt(const i: longint): longint; overload;
 
-function intSqrt(const i: int64): int64;
+function intSqrt(const i: int64): int64; overload;
 
 
-function gcd(a,b: integer): integer; //**< Calculates the greatest common denominator
-function gcd(a,b: cardinal): cardinal; //**< Calculates the greatest common denominator
-function gcd(a,b: int64): int64; //**< Calculates the greatest common denominator
+function gcd(a,b: integer): integer; overload; //**< Calculates the greatest common denominator
+function gcd(a,b: cardinal): cardinal; overload; //**< Calculates the greatest common denominator
+function gcd(a,b: int64): int64; overload;  //**< Calculates the greatest common denominator
 function lcm(a,b: int64): int64; //**< Calculates the least common multiple (just a*b div gcd(a,b), so it can easily overflow)
 function coprime(a,b:cardinal): boolean; //**< Checks if two numbers are coprime
 
-function modPow(i, e, m: longint): longint; //**< Calculates i^e mod m in O(log(e)) and never exceeding m
-function intBound(min, i, max: longint): longint;
+function modPow(i, e, m: longint): longint; overload;  //**< Calculates i^e mod m in O(log(e)) and never exceeding m
+function intBound(min, i, max: longint): longint; overload;
 
-function modPow(i, e, m: int64): int64; //**< Calculates i^e mod m in O(log(e)) and never exceeding m
-function intBound(min, i, max: int64): int64;
+function modPow(i, e, m: int64): int64; overload;  //**< Calculates i^e mod m in O(log(e)) and never exceeding m
+function intBound(min, i, max: int64): int64; overload;
 
 function factorial(i:longint):float; //**< Calculates i!
 function binomial(n,k: longint): float;//**< Calculates n|k = n!/k!(n-k)!
@@ -664,7 +718,7 @@ const DateMonthDaysCumSum: array[false..true,0..12] of Cardinal =
 //**Week of year
 function dateWeekOfYear(const date:TDateTime):word;
 //**@returns if year is a leap year (supports negative years, i think)
-function dateIsLeapYear(const year: integer): boolean; inline;
+function dateIsLeapYear(const year: integer): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 type EDateTimeParsingException = class(Exception);
 //**Reads a date time string given a certain mask (mask is case-sensitive)@br
 //**The uses the same mask types as FormatDate:@br
@@ -677,7 +731,7 @@ type EDateTimeParsingException = class(Exception);
 //**yy, yyyy or [yy]yy for the year. (if the year is < 90, it will become 20yy, else if it is < 100, it will become 19yy, unless you use uppercase Y instead of y)  @br
 //**YY, YYYY or [YY]YY for the year  @br
 //**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional ms with up to 6 digit precision)
-//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format char (except mmm) matching several characters)
+//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format ansichar (except mmm) matching several characters)
 //**The letter formats d/y/h/n/s matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
 //**Generally [x] marks the part x as optional (it tries all possible combinations, so you shouldn't have more than 10 optional parts)@br
@@ -687,33 +741,33 @@ type EDateTimeParsingException = class(Exception);
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names@br
 //**If a part is not found, it returns high(integer), except for outSecondFraction which will be 0 at not found, and outtimezone which will be NaN@br
 //**@return(If input could be matched with mask. It does not check, if the returned values are valid (e.g. month = 13 is allowed, in case you have to match durations))
-function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil): boolean;
 //**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
-procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+procedure dateTimeParseParts(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads date/time from a input matching a given mask (@see dateTimeParsePartsTry)
-function dateTimeParse(const input,mask:string; outtimezone: PDateTime = nil): TDateTime;
+function dateTimeParse(const input,mask:RawByteString; outtimezone: PDateTime = nil): TDateTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function dateTimeFormat(const mask: string; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+function dateTimeFormat(const mask: RawByteString; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; overload;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
+function dateTimeFormat(const mask: RawByteString; const dateTime: TDateTime): RawByteString; overload;
 //**Encodes a date time
 function dateTimeEncode(const y,m,d,h,n,s:integer; const secondFraction: double = 0): TDateTime;
 
 
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry)@br
-procedure timeParseParts(const input,mask:string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+procedure timeParseParts(const input,mask:RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry).@br This function checks, if the time is valid.
-function timeParse(const input,mask:string): TTime;
+function timeParse(const input,mask:RawByteString): TTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function timeFormat(const mask: string; const h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+function timeFormat(const mask: RawByteString; const h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString;
 
 
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br
-procedure dateParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil);
+procedure dateParseParts(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil);
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br This function checks, if the date is valid.
-function dateParse(const input,mask:string): longint;
+function dateParse(const input,mask:RawByteString): longint;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function dateFormat(const mask: string; const y, m, d: integer; const timezone: TDateTime = nan): string;
+function dateFormat(const mask: RawByteString; const y, m, d: integer; const timezone: TDateTime = nan): RawByteString;
 //**Encodes a date as datetime (supports negative years)
 function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
 //**Encodes a date as datetime (supports negative years)
@@ -778,9 +832,9 @@ type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**compareFunction is a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers). @br
 //**Only the > 0 and <= 0 return values are discerned. (i.e. you can safely use a comparison function that e.g. only returns +7 and 0)  @br
 //**Currently it uses a combination of merge and insert sort. Merge requires the allocation of additional memory.
-procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil);
+procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
 //**general stable sort function (using merge + insert sort in the moment)
-procedure stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil);
+procedure stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil); overload;
 
 
 type TBinarySearchChoosen = (bsAny, bsFirst, bsLast);
@@ -808,7 +862,7 @@ function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearc
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TStringArray; value: string; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TStringArray; value: string; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
 
 //** Binary search in a longint array @br
 //** @br @code(a) the ascending, sorted array
@@ -816,7 +870,7 @@ function arrayBinarySearch(a: TStringArray; value: string; choosen: TBinarySearc
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TLongintArray; value: longint; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TLongintArray; value: longint; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
 
 //** Binary search in a longword array @br
 //** @br @code(a) the ascending, sorted array
@@ -824,7 +878,7 @@ function arrayBinarySearch(a: TLongintArray; value: longint; choosen: TBinarySea
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TLongwordArray; value: longword; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TLongwordArray; value: longword; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
 
 //** Binary search in a int64 array @br
 //** @br @code(a) the ascending, sorted array
@@ -832,7 +886,7 @@ function arrayBinarySearch(a: TLongwordArray; value: longword; choosen: TBinaryS
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TInt64Array; value: int64; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TInt64Array; value: int64; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
 
 //** Binary search in a float array @br
 //** @br @code(a) the ascending, sorted array
@@ -840,12 +894,25 @@ function arrayBinarySearch(a: TInt64Array; value: int64; choosen: TBinarySearchC
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TFloatArray; value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TFloatArray; value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
 
 
 implementation
 
+const MinsPerDay = 24 * 60;
+
 //========================array functions========================
+
+procedure arraySliceIndices(const higha: integer; var slice1, slice2: integer); overload;
+begin
+  if (slice2 = -1) and (slice1 = -1) then begin
+    slice2 := higha;
+    slice1 := 0;
+  end else if slice2 = -1 then begin
+    slice2 := slice1;
+    slice1 := 0;
+  end;
+end;
 
 
 
@@ -954,22 +1021,11 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: array of string; var slice1, slice2: integer); overload;
-begin
-  if (slice2 = -1) and (slice1 = -1) then begin
-    slice2 := high(a);
-    slice1 := 0;
-  end else if slice2 = -1 then begin
-    slice2 := slice1;
-    slice1 := 0;
-  end;
-end;
-
 function arrayIndexOf(const a: array of string; const e: string;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
       begin result := i; exit; end;
@@ -981,7 +1037,7 @@ function arraySlice(a: array of string; slice1: integer; slice2: integer
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
@@ -991,7 +1047,7 @@ end;
 function arrayIndexOfSmallest(const a: array of string; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] < a[result] then
@@ -1001,7 +1057,7 @@ end;
 function arrayIndexOfLargest(const a: array of string; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] > a[result] then
@@ -1012,7 +1068,7 @@ procedure arrayInvert(a: TStringArray; slice1: integer; slice2: integer);
 var temp: string;
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
     temp:=a[slice1+i];
     a[slice1+i] := a[slice2-i];
@@ -1043,8 +1099,8 @@ function arrayCompare(a, b: array of string; slice1a: integer; slice1b: integer;
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1a, slice2a);
-  arraySliceIndices(b, slice1b, slice2b);
+  arraySliceIndices(high(a), slice1a, slice2a);
+  arraySliceIndices(high(b), slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
   if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
@@ -1169,22 +1225,11 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: array of longint; var slice1, slice2: integer); overload;
-begin
-  if (slice2 = -1) and (slice1 = -1) then begin
-    slice2 := high(a);
-    slice1 := 0;
-  end else if slice2 = -1 then begin
-    slice2 := slice1;
-    slice1 := 0;
-  end;
-end;
-
 function arrayIndexOf(const a: array of longint; const e: longint;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
       begin result := i; exit; end;
@@ -1196,7 +1241,7 @@ function arraySlice(a: array of longint; slice1: integer; slice2: integer
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
@@ -1206,7 +1251,7 @@ end;
 function arrayIndexOfSmallest(const a: array of longint; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] < a[result] then
@@ -1216,7 +1261,7 @@ end;
 function arrayIndexOfLargest(const a: array of longint; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] > a[result] then
@@ -1227,7 +1272,7 @@ procedure arrayInvert(a: TLongintArray; slice1: integer; slice2: integer);
 var temp: longint;
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
     temp:=a[slice1+i];
     a[slice1+i] := a[slice2-i];
@@ -1258,8 +1303,8 @@ function arrayCompare(a, b: array of longint; slice1a: integer; slice1b: integer
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1a, slice2a);
-  arraySliceIndices(b, slice1b, slice2b);
+  arraySliceIndices(high(a), slice1a, slice2a);
+  arraySliceIndices(high(b), slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
   if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
@@ -1384,22 +1429,11 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: array of longword; var slice1, slice2: integer); overload;
-begin
-  if (slice2 = -1) and (slice1 = -1) then begin
-    slice2 := high(a);
-    slice1 := 0;
-  end else if slice2 = -1 then begin
-    slice2 := slice1;
-    slice1 := 0;
-  end;
-end;
-
 function arrayIndexOf(const a: array of longword; const e: longword;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
       begin result := i; exit; end;
@@ -1411,7 +1445,7 @@ function arraySlice(a: array of longword; slice1: integer; slice2: integer
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
@@ -1421,7 +1455,7 @@ end;
 function arrayIndexOfSmallest(const a: array of longword; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] < a[result] then
@@ -1431,7 +1465,7 @@ end;
 function arrayIndexOfLargest(const a: array of longword; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] > a[result] then
@@ -1442,7 +1476,7 @@ procedure arrayInvert(a: TLongwordArray; slice1: integer; slice2: integer);
 var temp: longword;
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
     temp:=a[slice1+i];
     a[slice1+i] := a[slice2-i];
@@ -1473,8 +1507,8 @@ function arrayCompare(a, b: array of longword; slice1a: integer; slice1b: intege
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1a, slice2a);
-  arraySliceIndices(b, slice1b, slice2b);
+  arraySliceIndices(high(a), slice1a, slice2a);
+  arraySliceIndices(high(b), slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
   if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
@@ -1599,22 +1633,11 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: array of int64; var slice1, slice2: integer); overload;
-begin
-  if (slice2 = -1) and (slice1 = -1) then begin
-    slice2 := high(a);
-    slice1 := 0;
-  end else if slice2 = -1 then begin
-    slice2 := slice1;
-    slice1 := 0;
-  end;
-end;
-
 function arrayIndexOf(const a: array of int64; const e: int64;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
       begin result := i; exit; end;
@@ -1626,7 +1649,7 @@ function arraySlice(a: array of int64; slice1: integer; slice2: integer
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
@@ -1636,7 +1659,7 @@ end;
 function arrayIndexOfSmallest(const a: array of int64; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] < a[result] then
@@ -1646,7 +1669,7 @@ end;
 function arrayIndexOfLargest(const a: array of int64; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] > a[result] then
@@ -1657,7 +1680,7 @@ procedure arrayInvert(a: TInt64Array; slice1: integer; slice2: integer);
 var temp: int64;
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
     temp:=a[slice1+i];
     a[slice1+i] := a[slice2-i];
@@ -1688,8 +1711,8 @@ function arrayCompare(a, b: array of int64; slice1a: integer; slice1b: integer;
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1a, slice2a);
-  arraySliceIndices(b, slice1b, slice2b);
+  arraySliceIndices(high(a), slice1a, slice2a);
+  arraySliceIndices(high(b), slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
   if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
@@ -1814,22 +1837,11 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arraySliceIndices(const a: array of float; var slice1, slice2: integer); overload;
-begin
-  if (slice2 = -1) and (slice1 = -1) then begin
-    slice2 := high(a);
-    slice1 := 0;
-  end else if slice2 = -1 then begin
-    slice2 := slice1;
-    slice1 := 0;
-  end;
-end;
-
 function arrayIndexOf(const a: array of float; const e: float;
  slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
     if a[i] = e then
       begin result := i; exit; end;
@@ -1841,7 +1853,7 @@ function arraySlice(a: array of float; slice1: integer; slice2: integer
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := nil;
   SetLength(result, slice2-slice1+1);
   for i:=0 to high(result) do
@@ -1851,7 +1863,7 @@ end;
 function arrayIndexOfSmallest(const a: array of float; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] < a[result] then
@@ -1861,7 +1873,7 @@ end;
 function arrayIndexOfLargest(const a: array of float; slice1: integer; slice2: integer): integer;
 var i:longint;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
   for i:=slice1+1 to slice2 do
      if a[i] > a[result] then
@@ -1872,7 +1884,7 @@ procedure arrayInvert(a: TFloatArray; slice1: integer; slice2: integer);
 var temp: float;
  i: Integer;
 begin
-  arraySliceIndices(a, slice1, slice2);
+  arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
     temp:=a[slice1+i];
     a[slice1+i] := a[slice2-i];
@@ -1903,8 +1915,8 @@ function arrayCompare(a, b: array of float; slice1a: integer; slice1b: integer;
 var
  i: Integer;
 begin
-  arraySliceIndices(a, slice1a, slice2a);
-  arraySliceIndices(b, slice1b, slice2b);
+  arraySliceIndices(high(a), slice1a, slice2a);
+  arraySliceIndices(high(b), slice1b, slice2b);
   if slice2a - slice1a < slice2b - slice1b then begin result := -1; exit; end;
   if slice2a - slice1a > slice2b - slice1b then begin result := 1; exit; end;
   for i:=0 to slice2a - slice1a do
@@ -2038,7 +2050,9 @@ end;
 
 function procedureToMethod(proc: TProcedure): TMethod;
 begin
-  result.code:=proc;
+  assert(sizeof(result.code) = sizeof(proc));
+  move(proc, result.code, sizeof(proc));
+  //result.code:=proc;
   result.Data:=nil;
 end;
 
@@ -2065,7 +2079,7 @@ end;
 
 //=========================String functions======================
 
-function strlmove(dest, source: pchar; destLen, sourceLen: longint): pchar;
+function strlmove(dest, source: pansichar; destLen, sourceLen: longint): pansichar;
 begin
   move(source^,dest^,min(sourceLen,destLen));
   result:=dest;
@@ -2079,44 +2093,60 @@ end;
 
 //---------------------Comparison----------------------------
 //--Length-limited
-function strlEqual(const p1, p2: pchar; const l: longint): boolean;
+function strlEqual(const p1, p2: pansichar; const l: longint): boolean;
 begin
   result:=(strlcomp(p1, p2, l) = 0);
 end;
 
 //Length limited && null terminated
 //equal comparison, case sensitive, stopping at #0-bytes
-function strlequal(const p1,p2:pchar;const l1,l2: longint):boolean;
+function strlequal(const p1,p2:pansichar;const l1,l2: longint):boolean;
 begin
   result:=(l1=l2) and (strlcomp(p1, p2,l1) = 0);
 end;
 
 //equal comparison, case insensitive, stopping at #0-bytes
-function strliEqual(const p1, p2: pchar; const l: longint): boolean;
+function strliEqual(const p1, p2: pansichar; const l: longint): boolean;
 begin
   result:=(strlicomp(p1,p2,l)=0);
 end;
 
 //equal comparison, case insensitive, stopping at #0-bytes
-function strliequal(const p1,p2:pchar;const l1,l2: longint):boolean;
+function strliequal(const p1,p2:pansichar;const l1,l2: longint):boolean;
 begin
   result:=(l1=l2) and (strlicomp(p1,p2,l1)=0);
 end;
 
+{$IFNDEF FPC}
+function compareByte(const a, b; size: integer):longint;
+var ap, bp: pansichar;
+    i: Integer;
+begin
+  ap := @a;
+  bp := @b;
+  for i:=1 to size do begin
+    if ap^ < bp^ then begin result := -1; exit; end;
+    if ap^ > bp^ then begin result := 1; exit; end;
+    inc(ap);
+    inc(bp);
+  end;
+  begin result := 0; exit; end;
+end;
+{$ENDIF}
 
 //equal comparison, case sensitive, ignoring #0-bytes
-function strlsequal(const p1,p2:pchar;const l: longint):boolean; inline;
+function strlsequal(const p1,p2:pansichar;const l: longint):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
   result:= (CompareByte(p1^, p2^, l) = 0);
 end;
 
 //equal comparison, case sensitive, ignoring #0-bytes
-function strlsequal(const p1,p2:pchar;const l1,l2: longint):boolean; inline;
+function strlsequal(const p1,p2:pansichar;const l1,l2: longint):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
   result:= (l1=l2) and (CompareByte(p1^, p2^, l1) = 0);
 end;
 
-function strlsiEqual(const p1, p2: pchar; const l: longint): boolean;
+function strlsiEqual(const p1, p2: pansichar; const l: longint): boolean;
 var i:integer;
 begin
   result := true;
@@ -2126,7 +2156,7 @@ begin
 end;
 
 //equal comparison, case insensitive, ignoring #0-bytes
-function strlsiequal(const p1, p2: pchar; const l1, l2: longint): boolean;
+function strlsiequal(const p1, p2: pansichar; const l1, l2: longint): boolean;
 var i:integer;
 begin
   result:=(l1=l2) and strlsiequal(p1, p2, l1);
@@ -2134,7 +2164,7 @@ end;
 
 
 //equal comparison, case sensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
-function strlnsequal(p1,p2:pchar;l2: longint):boolean;
+function strlnsequal(p1,p2:pansichar;l2: longint):boolean;
 var i:integer;
 begin
   for i:=0 to l2-1 do begin
@@ -2147,7 +2177,7 @@ begin
 end;
 
 //equal comparison, case insensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
-function strlnsiequal(p1,p2:pchar;l2: longint):boolean;
+function strlnsiequal(p1,p2:pansichar;l2: longint):boolean;
 var i:integer;
 begin
   for i:=0 to l2-1 do begin
@@ -2160,81 +2190,81 @@ begin
 end;
 
 
-function strlsequal(p: pchar; const s: string; l: longint): boolean;
+function strlsequal(p: pansichar; const s: RawByteString; l: longint): boolean;
 begin
-  result:=(l = length(s)) and ((l = 0) or (strlsequal(p, pchar(pointer(s)),l,l)));
+  result:=(l = length(s)) and ((l = 0) or (strlsequal(p, pansichar(pointer(s)),l,l)));
 end;
 
-function strlequal(p: pchar; const s: string; l: longint): boolean;
+function strlequal(p: pansichar; const s: RawByteString; l: longint): boolean;
 begin
-  result := (l = length(s)) and ( (l = 0) or strlsequal(p, pchar(pointer(s)), l, l));
+  result := (l = length(s)) and ( (l = 0) or strlsequal(p, pansichar(pointer(s)), l, l));
 end;
 
-function strliequal(p: pchar; const s:string;l: longint): boolean;
+function strliequal(p: pansichar; const s:RawByteString;l: longint): boolean;
 begin
-  result := (l = length(s)) and ( (l = 0) or strlsiequal(p, pchar(pointer(s)), l, l));
+  result := (l = length(s)) and ( (l = 0) or strlsiequal(p, pansichar(pointer(s)), l, l));
 end;
 
 
 
-function strEqual(const s1, s2: string): boolean;
+function strEqual(const s1, s2: RawByteString): boolean;
 begin
   result:=CompareStr(s1,s2)=0;
 end;
 
-function striequal(const s1, s2: string): boolean;
+function striequal(const s1, s2: RawByteString): boolean;
 begin
   result:=CompareText(s1,s2)=0;
 end;
 
-function strlbeginswith(const p: pchar; l: longint; const expectedStart: string): boolean;
+function strlbeginswith(const p: pansichar; l: longint; const expectedStart: RawByteString): boolean;
 begin
-  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsequal(p,pchar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
+  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsequal(p,pansichar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
 end;
 
-function strlibeginswith(const p: pchar; l: longint; const expectedStart: string): boolean;
+function strlibeginswith(const p: pansichar; l: longint; const expectedStart: RawByteString): boolean;
 begin
-  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsiequal(p,pchar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
+  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsiequal(p,pansichar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
 end;
 
 
-function strbeginswith(const p: pchar; const expectedStart: string): boolean;
+function strbeginswith(const p: pansichar; const expectedStart: RawByteString): boolean;
 begin
-  result:=(expectedStart='') or (strlnsequal(p, pchar(pointer(expectedStart)), length(expectedStart)));
+  result:=(expectedStart='') or (strlnsequal(p, pansichar(pointer(expectedStart)), length(expectedStart)));
 end;
 
-function stribeginswith(const p: pchar; const expectedStart: string): boolean;
+function stribeginswith(const p: pansichar; const expectedStart: RawByteString): boolean;
 begin
-  result:=(expectedStart='') or (strlnsiequal(p, pchar(pointer(expectedStart)), length(expectedStart)));
+  result:=(expectedStart='') or (strlnsiequal(p, pansichar(pointer(expectedStart)), length(expectedStart)));
 end;
 
-function strbeginswith(const strToBeExaminated,expectedStart: string): boolean;
+function strbeginswith(const strToBeExaminated,expectedStart: RawByteString): boolean;
 begin
-  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsequal(pchar(pointer(strToBeExaminated)), pchar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
+  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsequal(pansichar(pointer(strToBeExaminated)), pansichar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
 end;
 
-function stribeginswith(const strToBeExaminated,expectedStart: string): boolean;
+function stribeginswith(const strToBeExaminated,expectedStart: RawByteString): boolean;
 begin
-  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsiequal(pchar(pointer(strToBeExaminated)), pchar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
+  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsiequal(pansichar(pointer(strToBeExaminated)), pansichar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
 end;
 
-function strendswith(const strToBeExaminated, expectedEnd: string): boolean;
-begin
-  result := (length(strToBeExaminated)>=Length(expectedEnd)) and
-            ( (expectedEnd='') or
-              (strlsequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pchar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
-end;
-
-function striendswith(const strToBeExaminated, expectedEnd: string): boolean;
+function strendswith(const strToBeExaminated, expectedEnd: RawByteString): boolean;
 begin
   result := (length(strToBeExaminated)>=Length(expectedEnd)) and
             ( (expectedEnd='') or
-              (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pchar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
+              (strlsequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pansichar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
+end;
+
+function striendswith(const strToBeExaminated, expectedEnd: RawByteString): boolean;
+begin
+  result := (length(strToBeExaminated)>=Length(expectedEnd)) and
+            ( (expectedEnd='') or
+              (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pansichar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
 end;
 
 
-function strlsIndexOf(str, searched: pchar; l1, l2: longint): longint;
-var last: pchar;
+function strlsIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+var last: pansichar;
 begin
   if l2<=0 then begin result := 0; exit; end;
   if l1<l2 then begin result := -1; exit; end;
@@ -2250,8 +2280,8 @@ begin
   result:=-1;
 end;
 
-function strlsiIndexOf(str, searched: pchar; l1, l2: longint): longint;
-var last: pchar;
+function strlsiIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+var last: pansichar;
 begin
   if l2<=0 then begin result := 0; exit; end;
   if l1<l2 then begin result := -1; exit; end;
@@ -2267,64 +2297,64 @@ begin
   result:=-1;
 end;
 
-function strIndexOf(const str, searched: string): longint;
+function strIndexOf(const str, searched: RawByteString): longint;
 begin
   result := strIndexOf(str, searched, 1);      //no default paramert, so you can take the address of both functions
 end;
 
-function striIndexOf(const str, searched: string): longint;
+function striIndexOf(const str, searched: RawByteString): longint;
 begin
   result := striIndexOf(str, searched, 1);
 end;
 
-function strindexof(const str, searched: string; from: longint): longint;
+function strindexof(const str, searched: RawByteString; from: longint): longint;
 begin
   if from > length(str) then begin result := 0; exit; end;
-  result := strlsIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
+  result := strlsIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
   if result < 0 then begin result := 0; exit; end;
   inc(result,  from);
 end;
 
-function striindexof(const str, searched: string; from: longint): longint;
+function striindexof(const str, searched: RawByteString; from: longint): longint;
 begin
   if from > length(str) then begin result := 0; exit; end;
-  result := strlsiIndexOf(pchar(pointer(str))+from-1, pchar(pointer(searched)), length(str) - from + 1, length(searched));
+  result := strlsiIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
   if result < 0 then begin result := 0; exit; end;
   inc(result,  from);
 end;
 
-function strContains(const str, searched: string): boolean;
+function strContains(const str, searched: RawByteString): boolean;
 begin
   result := strContains(str, searched, 1);
 end;
 
-function striContains(const str, searched: string): boolean;
+function striContains(const str, searched: RawByteString): boolean;
 begin
   result := striContains(str, searched, 1);
 end;
 
-function strcontains(const str, searched: string; from: longint): boolean;
+function strcontains(const str, searched: RawByteString; from: longint): boolean;
 begin
   result:=strindexof(str, searched, from) > 0;
 end;
 
-function stricontains(const str, searched: string; from: longint): boolean;
+function stricontains(const str, searched: RawByteString; from: longint): boolean;
 begin
   result:=striindexof(str, searched, from) > 0;
 end;
 
-function strcopyfrom(const s: string; start: longint): string; inline;
+function strcopyfrom(const s: RawByteString; start: longint): RawByteString; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
   result:=copy(s,start,length(s)-start+1);
 end;
 
-function strslice(const s: string; start, last: longint): string;
+function strslice(const s: RawByteString; start, last: longint): RawByteString;
 begin
   result:=copy(s,start,last-start+1);
 end;
 
 
-function strrpos(c: char; s: string): longint;
+function strrpos(c: ansichar; s: RawByteString): longint;
 var i:longint;
 begin
   for i:=length(s) downto 1 do
@@ -2333,7 +2363,7 @@ begin
   result := 0;
 end;
 
-function strlcount(const search: char; const searchIn: pchar; const len: longint): longint;
+function strlcount(const search: ansichar; const searchIn: pansichar; const len: longint): longint;
 var
   i: Integer;
 begin
@@ -2347,7 +2377,7 @@ begin
 end;
 
 
-function strCount(const str: string; const searched: char; from: longint): longint;
+function strCount(const str: RawByteString; const searched: ansichar; from: longint): longint;
 var
   i: LongInt;
 begin
@@ -2356,7 +2386,7 @@ begin
     if str[i] = searched then inc(result);
 end;
 
-function strslice(const  first, last: pchar): string;
+function strslice(const  first, last: pansichar): RawByteString;
 begin
   if first>last then exit;
   result := '';
@@ -2364,7 +2394,7 @@ begin
   move(first^,result[1],length(result));
 end;
 
-procedure strlTrimLeft(var p: pchar; var l: integer; const trimCharacters: TCharSet);
+procedure strlTrimLeft(var p: pansichar; var l: integer; const trimCharacters: TCharSet);
 begin
   while (l > 0) and (p^ in trimCharacters) do begin
     inc(p);
@@ -2372,53 +2402,53 @@ begin
   end;
 end;
 
-procedure strlTrimRight(var p: pchar; var l: integer; const trimCharacters: TCharSet);
+procedure strlTrimRight(var p: pansichar; var l: integer; const trimCharacters: TCharSet);
 begin
   while (l > 0) and (p[l-1] in trimCharacters) do
     dec(l);
 end;
 
-procedure strlTrim(var p: pchar; var l: integer; const trimCharacters: TCharSet);
+procedure strlTrim(var p: pansichar; var l: integer; const trimCharacters: TCharSet);
 begin
   strlTrimLeft(p,l,trimCharacters);
   strlTrimRight(p,l,trimCharacters);
 end;
 
-type TStrTrimProcedure = procedure (var p: pchar; var l: integer; const trimCharacters: TCharSet);
+type TStrTrimProcedure = procedure (var p: pansichar; var l: integer; const trimCharacters: TCharSet);
 
-function strTrimCommon(const s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
-var p: pchar;
+function strTrimCommon(const s: RawByteString; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): RawByteString;
+var p: pansichar;
     l: Integer;
     cutOffFront: integer;
 begin
   result := s;
   l := length(Result);
   if l = 0 then exit;
-  p := pchar(pointer(result));
+  p := pansichar(pointer(result));
   trimProc(p, l, trimCharacters);
-  if (p = pchar(pointer(result))) and (l = length(result)) then exit;
-  cutOffFront := p - pchar(pointer(result));
+  if (p = pansichar(pointer(result))) and (l = length(result)) then exit;
+  cutOffFront := p - pansichar(pointer(result));
   result := copy(result, 1 + cutOffFront, l);
 end;
 
-function strTrimLeft(const s: string; const trimCharacters: TCharSet): string;
+function strTrimLeft(const s: RawByteString; const trimCharacters: TCharSet): RawByteString;
 begin
   result:=strTrimCommon(s, trimCharacters, @strlTrimLeft);
 end;
 
-function strTrimRight(const s: string; const trimCharacters: TCharSet): string;
+function strTrimRight(const s: RawByteString; const trimCharacters: TCharSet): RawByteString;
 begin
   result:=strTrimCommon(s, trimCharacters, @strlTrimRight);
 end;
 
-function strTrim(const s: string; const trimCharacters: TCharSet): string;
+function strTrim(const s: RawByteString; const trimCharacters: TCharSet): RawByteString;
 begin
   result:=strTrimCommon(s, trimCharacters, @strlTrim);
 end;
 
 
-function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet
- ): string;
+function strTrimAndNormalize(const s: RawByteString; const trimCharacters: TCharSet
+ ): RawByteString;
 var i,j: integer;
 begin
  result:=strTrim(s,trimCharacters);
@@ -2436,7 +2466,7 @@ begin
    setlength(result,j-1);
 end;
 
-function strNormalizeLineEndings(const s: string): string;
+function strNormalizeLineEndings(const s: RawByteString): RawByteString;
 var
   i, p: Integer;
 begin
@@ -2463,25 +2493,25 @@ begin
   sr := StringReplace(str, #13, #10, [rfReplaceAll]);}
 end;
 
-function strPrependIfMissing(const s: string; const expectedStart: string): string;
+function strPrependIfMissing(const s: RawByteString; const expectedStart: RawByteString): RawByteString;
 begin
   if strbeginswith(s, expectedStart) then result := s
   else result := expectedStart + s;
 end;
 
-function strAppendIfMissing(const s: string; const expectedEnd: string): string;
+function strAppendIfMissing(const s: RawByteString; const expectedEnd: RawByteString): RawByteString;
 begin
   if strendswith(s, expectedEnd) then result := s
   else result := s + expectedEnd;
 end;
 
-function strSplitGet(const separator: string; var remainingPart: string): string;
+function strSplitGet(const separator: RawByteString; var remainingPart: RawByteString): RawByteString;
 begin
   strsplit(result,separator,remainingPart);
 end;
 
-procedure strSplit(out firstPart: string; const separator: string;
-  var remainingPart: string);
+procedure strSplit(out firstPart: RawByteString; const separator: RawByteString;
+  var remainingPart: RawByteString);
 var p:longint;
 begin
   p:=pos(separator,remainingPart);
@@ -2494,7 +2524,7 @@ begin
   end;
 end;
 
-function strWrapSplit(const Line: string; MaxCol: Integer; const BreakChars: TCharSet): TStringArray;
+function strWrapSplit(const Line: RawByteString; MaxCol: Integer; const BreakChars: TCharSet): TStringArray;
 var i: integer;
     lastTextStart, lastBreakChance: integer;
     tempBreak: Integer;
@@ -2529,7 +2559,7 @@ begin
   if length(result) = 0 then arrayAdd(result, '');
 end;
 
-function strWrap(Line: string; MaxCol: Integer; const BreakChars: TCharSet): string;
+function strWrap(Line: RawByteString; MaxCol: Integer; const BreakChars: TCharSet): RawByteString;
 begin
   result := strJoin(strWrapSplit(line, MaxCol, BreakChars), LineEnding);
 end;
@@ -2537,7 +2567,7 @@ end;
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
 //the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
 //If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
-function strSplitGetUntilBracketClosing(var text: string; const openBracket, closingBracket: string; updateText: boolean): string;
+function strSplitGetUntilBracketClosing(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
 var pos: integer;
   opened: Integer;
 begin
@@ -2562,10 +2592,10 @@ begin
   end;
 end;
 
-function strSplitGetBetweenBrackets(var text: string; const openBracket, closingBracket: string; updateText: boolean): string;
+function strSplitGetBetweenBrackets(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
 var
   start: SizeInt;
-  temp: String;
+  temp: RawByteString;
 begin
   start := pos(openBracket, text);
   if start = 0 then begin result := ''; exit; end;
@@ -2580,7 +2610,7 @@ end;
 
 
 
-procedure strSplit(out splitted: TStringArray; s, sep: string; includeEmpty: boolean);
+procedure strSplit(out splitted: TStringArray; s, sep: RawByteString; includeEmpty: boolean);
 var p:longint;
     m: longint;
     reslen: longint;
@@ -2610,13 +2640,13 @@ begin
   SetLength(splitted, reslen);
 end;
 
-function strSplit(s, sep: string; includeEmpty: boolean): TStringArray;
+function strSplit(s, sep: RawByteString; includeEmpty: boolean): TStringArray;
 begin
   strSplit(result, s, sep, includeEmpty);
 end;
 
 //based on wikipedia
-function strLengthUtf8(str: string): longint;
+function strLengthUtf8(str: RawByteString): longint;
 var
   i: Integer;
 begin
@@ -2642,7 +2672,7 @@ begin
   end;
 end;
 
-procedure strSwapEndianWord(var str: string);
+procedure strSwapEndianWord(var str: RawByteString);
 var
   i: Integer;
 begin
@@ -2655,7 +2685,7 @@ begin
   end;
 end;
 
-procedure strSwapEndianDWord(var str: string);
+procedure strSwapEndianDWord(var str: RawByteString);
 var
   i: Integer;
 begin
@@ -2669,16 +2699,28 @@ begin
 end;
 
 
-function strConvertToUtf8FromUTF32N(str: string): string;
-var temp: UCS4String;
+function strConvertToUtf8FromUTF32N(str: RawByteString): RawByteString;
+var i, reslen: Integer;
 begin
-  SetLength(temp, length(str) div 4 + 1);
-  move(str[1], temp[0], length(str));
-  temp[high(temp)] := 0; //tailing #0
-  result := UTF8Encode(UCS4StringToUnicodeString(temp));
+  assert(length(str) and $3 = 0);
+  i := 1;
+  reslen := 0;
+  while i <= length(str) - 3 do begin
+    reslen := reslen + strGetUnicodeCharacterUTFLength(PDWord(@str[i])^);
+    i := i + 4;
+  end;
+
+  SetLength(result, reslen);
+  i := 1;
+  reslen := 1;
+  while i <= length(str) - 3 do begin
+    strGetUnicodeCharacterUTF(PDWord(@str[i])^, @result[reslen]);
+    reslen := reslen + strGetUnicodeCharacterUTFLength(PDWord(@str[i])^);
+    i := i + 4;
+  end;
 end;
 
-function strConvertToUtf8(str: string; from: TEncoding): string;
+function strConvertToUtf8(str: RawByteString; from: TEncoding): RawByteString;
 var len: longint;
     reslen: longint;
     pos: longint;
@@ -2719,8 +2761,13 @@ begin
     end;
     {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
       SetLength(result, (length(str) * 3) div 2);
+      {$IFDEF FPC}
       i := UnicodeToUtf8(pointer(result), length(result) + 1, pointer(str), length(str) div 2);
-      if i > 0 then SetLength(result, i - 1);
+      i := i - 1;
+      {$ELSE}
+      i := WideCharToMultiByte(CP_UTF8, 0, pointer(str), length(str) div 2, pointer(result), length(result), nil, nil);
+      {$ENDIF}
+      SetLength(result, max(i, 0));
     end;
     {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
       result := str;
@@ -2738,15 +2785,18 @@ begin
 end;
 
 
-function strConvertFromUtf8ToUTF32N(str: string): string;
-var temp: UCS4String;
+function strConvertFromUtf8ToUTF32N(str: RawByteString): RawByteString;
+var i, j: integer;
 begin
-  temp := UnicodeStringToUCS4String(UTF8Decode(str));
-  setlength(str, (length(temp) - 1)*4);
-  move(temp[0], str[1], length(str));
+  SetLength(result, strLengthUtf8(str) * 4);
+  j := 0;
+  while i <= length(str) do begin
+    PDWord(@result[j])^ := strDecodeUTF8Character(str, i);
+    j := j + 4;
+  end;
 end;
 
-function strConvertFromUtf8(str: string; toe: TEncoding): string;
+function strConvertFromUtf8(str: RawByteString; toe: TEncoding): RawByteString;
 var len, reslen, i, pos: longint;
 begin
   if str = '' then exit;
@@ -2774,9 +2824,14 @@ begin
       end ;
     end;
     {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
-      SetLength(result, length(str)*2);           ;
-    i := Utf8ToUnicode(pointer(result), length(result), pointer(str), length(str));
-      if i > 0 then SetLength(result, (i - 1) * 2);
+      SetLength(result, length(str)*2);
+      {$IFDEF FPC};
+      i := Utf8ToUnicode(pointer(result), length(result), pointer(str), length(str));
+      i := i - 1;
+      {$ELSE}
+      i := MultiByteToWideChar(CP_UTF8, 0, pointer(str), length(str), pointer(result), length(result) * 2);
+      {$ENDIF}
+      SetLength(result, max(i, 0) * 2);
     end;
     {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
       result := strConvertFromUtf8(str, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
@@ -2791,8 +2846,8 @@ begin
   end;
 end;
 
-function strChangeEncoding(const str: string; from, toe: TEncoding): string;
-var utf8temp: UTF8String;
+function strChangeEncoding(const str: RawByteString; from, toe: TEncoding): RawByteString;
+var utf8temp: RawByteString;
 begin
   if (from=toe) or (from=eUnknown) or (toe=eUnknown) then begin result := str; exit; end;
   //two pass encoding: from -> utf8 -> to
@@ -2808,19 +2863,48 @@ begin
   }
 end;
 
-function strGetUnicodeCharacter(const character: integer; encoding: TEncoding): string;
+function strGetUnicodeCharacterUTFLength(const character: integer): integer;
+begin
+  case character of
+       $00 ..    $7F: result:=1;
+       $80 ..   $7FF: result:=2;
+      $800 ..  $FFFF: result:=3;
+    $10000 ..$10FFFF: result:=4;
+    else result := 0;
+  end;
+end;
+
+procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 begin
   //result:=UnicodeToUTF8(character);
   case character of
-       $00 ..    $7F: result:=chr(character);
-       $80 ..   $7FF: result:=chr($C0 or (character shr 6))  + chr($80 or (character and $3F));
-      $800 ..  $FFFF: result:=chr($E0 or (character shr 12)) + chr($80 or ((character shr 6) and $3F)) + chr($80 or (character and $3F));
-    $10000 ..$10FFFF: result:=chr($F0 or (character shr 18)) + chr($80 or ((character shr 12) and $3F)) + chr($80 or ((character shr 6) and $3F)) + chr($80 or (character and $3F));
+       $00 ..    $7F: buffer[0]:=chr(character);
+       $80 ..   $7FF: begin
+         buffer[0] := chr($C0 or (character shr 6));
+         buffer[1] := chr($80 or (character and $3F));
+       end;
+      $800 ..  $FFFF: begin
+         buffer[0] := chr($E0 or (character shr 12));
+         buffer[1] := chr($80 or ((character shr 6) and $3F));
+         buffer[2] := chr($80 or (character and $3F));
+      end;
+    $10000 ..$10FFFF: begin
+         buffer[0] := chr($F0 or (character shr 18));
+         buffer[1] := chr($80 or ((character shr 12) and $3F));
+         buffer[2] := chr($80 or ((character shr 6) and $3F));
+         buffer[3] := chr($80 or (character and $3F));
+    end;
   end;
+end;
+
+function strGetUnicodeCharacter(const character: integer; encoding: TEncoding): RawByteString;
+begin
+  setlength(result, strGetUnicodeCharacterUTFLength(character));
+  strGetUnicodeCharacterUTF(character, @result[1]);
   if not (encoding in [eUnknown, eUTF8]) then result:=strConvertFromUtf8(result, encoding);
 end;
 
-function strDecodeUTF8Character(const str: string; var curpos: integer): integer;
+function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer;
 begin
   if curpos > length(str) then begin result := -2; exit; end;
   case ord(str[curpos]) of
@@ -2863,7 +2947,7 @@ begin
 end;
 
 
-function strEncodingFromName(str: string): TEncoding;
+function strEncodingFromName(str: RawByteString): TEncoding;
 begin
   str:=UpperCase(str);
   if (str='UTF-8') or (str='UTF8' {fehlerkorrigierend}) then result:=eUTF8
@@ -2872,7 +2956,7 @@ begin
 
 end;
 
-function strEncodingFromBOMRemove(var str: string): TEncoding;
+function strEncodingFromBOMRemove(var str: RawByteString): TEncoding;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
     delete(str,1,3);
@@ -3361,7 +3445,7 @@ begin
              if p^ in ['0'..'9'] then entity := entity + ord(p^) - ord('0') 
              else if p^ in ['A'..'F'] then entity := entity + ord(p^) - ord('A') + 10
              else if p^ in ['a'..'f'] then entity := entity + ord(p^) - ord('a') + 10
-             else raise exception.create('???');
+             else raise exception.create('Invalid symbol in hex entity: '+copy(string(p), 1, 10));
              inc(p);
            end;
            entityStr := strGetUnicodeCharacter(entity, encoding);
@@ -3416,14 +3500,14 @@ end;
 
 {$ifndef BBUTILS_INCLUDE_COMPLETE}
 
-function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding; strict: boolean = false):string;
+function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TEncoding; strict: boolean = false):RawByteString;
 begin
   raise Exception.Create('bbutils include missing');
 end;
 
 {$endif}
 
-function strEscape(s: string; const toEscape: TCharSet; escapeChar: char): string;
+function strEscape(s: RawByteString; const toEscape: TCharSet; escapeChar: ansichar): RawByteString;
 var
  i: Integer;
 begin
@@ -3434,19 +3518,19 @@ begin
   end;
 end;
 
-function strEscapeRegex(const s: string): string;
+function strEscapeRegex(const s: RawByteString): RawByteString;
 begin
   result := strEscape(s, ['(','|', '.', '*', '?', '^', '$', '-', '[', '{', '}', ']', ')', '\'], '\');
 end;
 
-function strDecodeHTMLEntities(s: string; encoding: TEncoding; strict: boolean
-  ): string;
+function strDecodeHTMLEntities(s: RawByteString; encoding: TEncoding; strict: boolean
+  ): RawByteString;
 begin
-  result:=strDecodeHTMLEntities(pchar(s), length(s), encoding, strict);
+  result:=strDecodeHTMLEntities(pansichar(s), length(s), encoding, strict);
 end;
 
-function strDecodeHex(s: string): string;
-  function decodeSingleHex(const c: char): byte; inline;
+function strDecodeHex(s: RawByteString): RawByteString;
+  function decodeSingleHex(const c: ansichar): byte; {$IFDEF HASINLINE} inline; {$ENDIF}
   begin
     case c of
       '0'..'9': result := ord(c) - ord('0') + $0;
@@ -3465,10 +3549,10 @@ begin
     result[i] := chr((decodeSingleHex(s[2*i-1]) shl 4) or decodeSingleHex(s[2*i]));
 end;
 
-function strEncodeHex(s: string; const code: string): string;
+function strEncodeHex(s: RawByteString; const code: RawByteString): RawByteString;
 var
   o: Integer;
-  pcode: pchar;
+  pcode: pansichar;
   i: Integer;
 begin
   assert(length(code) = 16);
@@ -3482,7 +3566,7 @@ begin
   end;
 end;
 
-function strFromPchar(p: pchar; l: longint): string;
+function strFromPchar(p: pansichar; l: longint): RawByteString;
 begin
   if l=0 then begin result := ''; exit; end;
   result := '';
@@ -3491,7 +3575,7 @@ begin
 end;
 
 
-function strJoin(const sl: TStrings; const sep: string; limit: Integer=0; const limitStr: string='...'): string;
+function strJoin(const sl: TStrings; const sep: RawByteString  = ', '; limit: Integer=0; const limitStr: RawByteString='...'): RawByteString; overload;
 var i:longint;
 begin
   Result:='';
@@ -3513,8 +3597,9 @@ begin
   end;
 end;
 
-function strJoin(const sl: TStringArray; const sep: string; limit: Integer;
- const limitStr: string): string;
+
+function strJoin(const sl: TStringArray; const sep: RawByteString = ', '; limit: Integer = 0;
+ const limitStr: RawByteString = '...'): RawByteString; overload;
 var i:longint;
 begin
   Result:='';
@@ -3537,27 +3622,39 @@ begin
 end;
 
 
-function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
+function StrToBoolDef(const S: RawByteString;const Def:Boolean): Boolean;
 
 Var
-  Temp : String;
-  D : Double;
-  Code: word;
-
+  foundDot, foundExp: boolean;
+  i: Integer;
 begin
-  Temp:=upcase(S);
-  Val(temp,D,code);
-  If Code=0 then
-    Result:=(D<>0.0)
-  else If Temp='TRUE' then
+  If striequal(S, 'TRUE') then
     result:=true
-  else if Temp='FALSE' then
+  else if striequal(S, 'FALSE') then
     result:=false
-  else
-    result:=Def;
+  else begin
+    i := 1;
+    if s[i] in ['-', '+'] then inc(i);
+    foundDot := false; foundExp := false;
+    result := def;
+    while i <= length(s) do begin
+      case s[i] of
+        '.': if foundDot then exit else foundDot := true;
+        'e': if foundExp then exit else begin
+          foundExp := true;
+          if i < length(s) then if s[i+1] in ['+', '-'] then inc(i);
+        end;
+        '0': ;
+        '1'..'9': if not foundExp then begin result := true; exit; end;
+        else exit;
+      end;
+      inc(i);
+    end;
+    result := false;
+  end;
 end;
 
-function strRemoveFileURLPrefix(const filename: string): string;
+function strRemoveFileURLPrefix(const filename: RawByteString): RawByteString;
 begin
   result := filename;
 
@@ -3569,7 +3666,7 @@ begin
     delete(result, 1, 1); //Windows like file:///C:\abc\def url
 end;
 
-function strLoadFromFile(filename: string): string;
+function strLoadFromFile(filename: RawByteString): RawByteString;
 var f:TFileStream;
 begin
   f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmOpenRead);
@@ -3580,7 +3677,7 @@ begin
   f.Free;
 end;
 
-procedure strSaveToFile(filename: string;str:string);
+procedure strSaveToFile(filename: RawByteString;str:RawByteString);
 var f:TFileStream;
 begin
   f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmCreate);
@@ -3588,22 +3685,42 @@ begin
   f.Free;
 end;
 
-function strLoadFromFileUTF8(filename: string): string;
+{$IFNDEF FPC}
+var codePage: integer = -1;
+function UTF8ToAnsi(const s: RawByteString): RawByteString;
+var temp: RawByteString;
+    tempws: WideString;
+begin
+  if s = '' then exit;
+  if codePage = -1 then codePage := getACP;
+  if codePage = CP_UTF8 then result := s
+  else if (codePage = {CP_LATIN1} 28591) or (codePage = 1252) then result := strConvertFromUtf8(s, eWindows1252)
+  else begin
+    temp := strConvertFromUtf8(s, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+    setlength(tempws, (length(temp) + 1) div 2);
+    move(s[1], tempws[1], length(temp));
+    result := AnsiString(tempws); //todo
+  end;
+end;
+{$ENDIF}
+
+function strLoadFromFileUTF8(filename: RawByteString): RawByteString;
 begin
   result:=strLoadFromFile(Utf8ToAnsi(filename));
 end;
 
-procedure strSaveToFileUTF8(filename: string; str: string);
+procedure strSaveToFileUTF8(filename: RawByteString; str: RawByteString);
 begin
   strSaveToFile(Utf8ToAnsi(filename),str);
 end;
 
-function strFromSize(size: int64): string;
-const iec: string='KMGTPEZY';
+function strFromSize(size: int64): RawByteString;
+const iec: RawByteString='KMGTPEZY';
 var res: int64;
     i:longint;
 begin
   i:=0;
+  res := 0;
   while (i<=length(iec)) and (size>=2048) do begin
     res:=size mod 1024;
     size:=size div 1024;
@@ -3613,12 +3730,12 @@ begin
   else result:=format('%4f ',[size+res/1024])+iec[i]+'iB';
 end;
 
-function strFromPtr(p: pointer): string;
+function strFromPtr(p: pointer): RawByteString;
 begin
   result:=IntToHex(PtrUInt(p), 2*sizeof(Pointer));
 end;
 
-function strFromInt(i: int64; displayLength: longint): string;
+function strFromInt(i: int64; displayLength: longint): RawByteString;
 begin
   if i < 0 then begin result := '-'+strFromInt(-i, displayLength); exit; end;
   result := IntToStr(i);
@@ -3627,8 +3744,8 @@ begin
 end;
 
 //incase-sensitive, intelligent string compare (splits in text, number parts)
-function strCompareClever(const s1, s2: string): integer;
-var t1,t2:string; //lowercase text
+function strCompareClever(const s1, s2: RawByteString): integer;
+var t1,t2:RawByteString; //lowercase text
     i,j,ib,jb,p: longint;
 begin
   t1 := s1;
@@ -3681,12 +3798,12 @@ begin
   result:=0;
 end;
 
-function striCompareClever(const s1, s2: string): integer;
+function striCompareClever(const s1, s2: RawByteString): integer;
 begin
   result := strCompareClever(lowercase(s1), lowercase(s2)); //todo optimize
 end;
 
-function strDup(rep: string; const count: integer): string;
+function strDup(rep: RawByteString; const count: integer): RawByteString;
 var
   i: Integer;
 begin
@@ -3695,7 +3812,7 @@ begin
     result := result + rep;
 end;
 
-function strIsAbsoluteURI(const s: string): boolean;
+function strIsAbsoluteURI(const s: RawByteString): boolean;
 var
   p: SizeInt;
   i: Integer;
@@ -3710,7 +3827,7 @@ begin
   result := true;
 end;
 
-function strResolveURIReal(rel, base: string): string;  //base must be an absolute uri
+function strResolveURIReal(rel, base: RawByteString): RawByteString;  //base must be an absolute uri
   function isWindowsFileUrl(): boolean;
   begin
     result := stribeginswith(base, 'file:///') and (length(base) >= 11) and (base[10] = ':') and (base[11] in ['/', '\']);
@@ -3721,7 +3838,7 @@ var
   p: SizeInt;
   relsplit, basesplit: TStringArray;
   i: Integer;
-  relparams: string;
+  relparams: RawByteString;
 begin
   p := pos('#', base);
   if p > 0 then delete(base, p, length(base) - p + 1);
@@ -3766,7 +3883,7 @@ begin
   result := strJoin(basesplit, '/') + '/' + relparams;
 end;
 
-function strResolveURI(rel, base: string): string;
+function strResolveURI(rel, base: RawByteString): RawByteString;
 var
     schemaLength: SizeInt;
   baseIsAbsolute: Boolean;
@@ -3802,7 +3919,7 @@ begin
     result := strResolveURIReal(rel, base);
 end;
 
-function strSimilarity(const s, t: string): integer;
+function strSimilarity(const s, t: RawByteString): integer;
 //see http://en.wikipedia.org/wiki/Levenshtein_distance
 var v: array[0..1] of array of integer;
   i,j : Integer;
@@ -3837,6 +3954,28 @@ begin
 
   result := v[v1, length(t)];
 end;
+
+
+
+{$IFNDEF FPC}
+function SwapEndian(const w: Word): Word;
+//aabb => bbaa
+begin
+  result := Word((w shl 8) or (w shr 8));
+end;
+
+function SwapEndian(const w: DWord): DWord;
+//aabbccdd => ddccbbaa
+var w1, w2: word;
+begin
+  w1 := Word(w shr 16);
+  w2 := Word(w);
+  result := (Word((w2 shl 8) or (w2 shr 8)) shl 16)
+          or Word((w1 shl 8) or (w1 shr 8));
+end;
+{$ENDIF}
+
+
 
 
 function intLog10(i: longint): longint;
@@ -3884,9 +4023,16 @@ begin
   r := n div pold;
 end;             }
 
+{$IFNDEF FPC}
+procedure DivMod(const a, b: integer; out res, modulo: integer);
+begin
+  res := a div b;
+  modulo := a - res * b;
+end;
+{$ENDIF}
 
 procedure intFactor(const n, p: longint; out e, r: longint);
-var pold: longint;
+var
   m: Integer;
   d: Integer;
 begin
@@ -4143,7 +4289,7 @@ end;
 
 procedure intSieveEulerPhi(const n: cardinal; var totient: TLongwordArray);
 var
-  p,j,e,r: cardinal;
+  p,j,e: cardinal;
   exps: array[1..32] of cardinal;
   powers: array[0..32] of cardinal;
   exphigh: cardinal;
@@ -4255,9 +4401,9 @@ end;
 
 type T9Ints = array[1..9] of integer;
 
-function dateTimeParsePartsTryInternal(input,mask:string; var parts: T9Ints): boolean;
+function dateTimeParsePartsTryInternal(input,mask:RawByteString; var parts: T9Ints): boolean;
 type THumanReadableName = record
-  n: string;
+  n: RawByteString;
   v: integer;
 end;
 const DefaultShortMonths: array[1..17] of THumanReadableName = (
@@ -4278,7 +4424,7 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
   (n:'juli';v:7), (n:'oktober';v:10), (n:'dezember';v:12),
   (n:'m'#$C3#$A4'rz';v:3));
 
-function readNumber(const s:string; var ip: integer; const count: integer): integer;
+function readNumber(const s:RawByteString; var ip: integer; const count: integer): integer;
 begin
   result := StrToIntDef(copy(input, ip, count), -1);
   inc(ip,  count);
@@ -4287,11 +4433,11 @@ end;
 var
   i,j: Integer;
 
-  prefix, mid, suffix: String;
+  prefix, mid, suffix: RawByteString;
   p, formatChars: Integer;
 
   count: integer;
-  base: Char;
+  base: ansichar;
   index: Integer;
 
   mp, ip: integer;
@@ -4386,6 +4532,7 @@ begin
                      parts[2] := DefaultShortMonths[i].v;
                      break;
                    end;
+              {$IFDEF HASDefaultFormatSettings}
               if parts[2] <> high(parts[2]) then continue;
               for i:=1 to 12 do
                 if ((length(DefaultFormatSettings.ShortMonthNames[i]) = 3) and (DefaultFormatSettings.ShortMonthNames[i] = mid)) or
@@ -4394,6 +4541,7 @@ begin
                      parts[2] := i;
                      break;
                    end;
+              {$ENDIF}
               if parts[2] <> high(parts[2]) then continue;
               begin result := false; exit; end
             end;
@@ -4406,6 +4554,7 @@ begin
                      parts[2] := DefaultLongMonths[i].v;
                      break;
                    end;
+              {$IFDEF HASDefaultFormatSettings}
               if parts[2] <> high(parts[2]) then continue;
               for i:=1 to 12 do
                 if strliequal(@input[ip], DefaultFormatSettings.LongMonthNames[i], length(DefaultFormatSettings.LongMonthNames[i])) then begin
@@ -4413,6 +4562,7 @@ begin
                   parts[2] := i;
                   break;
                 end;
+              {$ENDIF}
               if parts[2] <> high(parts[2]) then continue;
               begin result := false; exit; end
             end;
@@ -4492,16 +4642,16 @@ begin
 end;
 
 
-function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil): boolean;
 var parts: T9Ints;
   i: Integer;
-  mask2: String;
-const singleletters: string = 'mdhns';
+  mask2: RawByteString;
+const singleletters: RawByteString = 'mdhns';
 begin
   for i:=low(parts) to high(parts) do parts[i] := high(parts[i]);
   mask2 := trim(mask);
   for i:=1 to length(singleletters) do begin//single m,d,h,n,s doesn't make sense, so replace x by [x]x
-    if strlcount(singleletters[i], pchar(mask2), length(mask2)) <> 1 then continue;
+    if strlcount(singleletters[i], pansichar(mask2), length(mask2)) <> 1 then continue;
     mask2 := StringReplace(mask2, singleletters[i], '['+singleletters[i]+']'+singleletters[i],[]);
   end;
   result := dateTimeParsePartsTryInternal(trim(input), mask2, parts);
@@ -4524,18 +4674,26 @@ begin
   end;
 end;
 
-procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+procedure dateTimeParseParts(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
 begin
   if not dateTimeParsePartsTry(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone) then
     raise Exception.Create('The date time ' + input + ' does not correspond to the date time format ' + mask);
 end;
 
-const TryAgainWithRoundedSeconds: string = '<TryAgainWithRoundedSeconds>';
+const TryAgainWithRoundedSeconds: RawByteString = '<TryAgainWithRoundedSeconds>';
 
-function dateTimeFormatInternal(const mask: string; const y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+{$IFNDEF HASISNAN}
+function IsNan(const d: double): boolean;
+begin
+  result := (d = NaN);
+end;
+
+{$ENDIF}
+
+function dateTimeFormatInternal(const mask: RawByteString; const y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString;
 var mp: integer;
-  function nextMaskPart: string;
-  function isValid(const c: char): boolean;
+  function nextMaskPart: RawByteString;
+  function isValid(const c: ansichar): boolean;
   begin
     case c of
       'y','Y': result := (y <> 0) and (y <> high(integer));
@@ -4553,7 +4711,7 @@ var mp: integer;
   const SPECIAL_MASK_CHARS = ['y','Y','m','d','h','n','s','z','Z'];
   var
     oldpos: Integer;
-    okc: Char;
+    okc: ansichar;
     i: Integer;
   begin
     while (mp <= length(mask)) and (mask[mp] = '[') do begin
@@ -4597,10 +4755,10 @@ var mp: integer;
     end;
   end;
 
-var part: String;
+var part: RawByteString;
   temp: Int64;
   scale: Integer;
-  toadd: String;
+  toadd: RawByteString;
   len: Integer;
 begin
   mp := 1;
@@ -4638,7 +4796,7 @@ begin
   end;
 end;
 
-function dateTimeParse(const input, mask: string; outtimezone: PDateTime): TDateTime;
+function dateTimeParse(const input, mask: RawByteString; outtimezone: PDateTime): TDateTime;
 var y,m,d: integer;
     hour, minutes, seconds: integer;
     milliseconds: double;
@@ -4659,7 +4817,7 @@ begin
   else if not IsNan(timeZone) then result := result -  timeZone;
 end;
 
-function dateTimeFormat(const mask: string; y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): string;
+function dateTimeFormat(const mask: RawByteString; y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString;
 const invalid = high(integer);
 begin
   Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,secondFraction,timezone);
@@ -4698,11 +4856,11 @@ begin
 end;
 
 
-function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
+function dateTimeFormat(const mask: RawByteString; const dateTime: TDateTime): RawByteString;
 var
   y,m,d: Integer;
   h,n,s,ms: word;
-  part: String;
+  part: RawByteString;
 begin
   dateDecode(dateTime, @y, @m, @d);
   DecodeTime(dateTime, h, n, s, ms);
@@ -4714,12 +4872,12 @@ begin
   result := dateEncode(y,m,d) + EncodeTime(h,m,d,0) + secondFraction / SecsPerDay;
 end;
 
-procedure timeParseParts(const input, mask: string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble; outtimezone: PDateTime);
+procedure timeParseParts(const input, mask: RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble; outtimezone: PDateTime);
 begin
   dateTimeParseParts(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone);
 end;
 
-function timeParse(const input, mask: string): TTime;
+function timeParse(const input, mask: RawByteString): TTime;
 var
   hour, minutes, seconds: integer;
   milliseconds: double;
@@ -4734,17 +4892,17 @@ begin
   if not IsNan(timeZone) then result := result -  timeZone;
 end;
 
-function timeFormat(const mask: string; const h, n, s: integer; const secondFraction: double; const timezone: TDateTime): string;
+function timeFormat(const mask: RawByteString; const h, n, s: integer; const secondFraction: double; const timezone: TDateTime): RawByteString;
 begin
   result := dateTimeFormat(mask, high(integer), high(integer), high(integer), h, n, s, secondFraction, timezone);
 end;
 
-procedure dateParseParts(const input, mask: string; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime);
+procedure dateParseParts(const input, mask: RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime);
 begin
   dateTimeParseParts(input, mask, outYear, outMonth, outDay, nil, nil, nil, nil, outtimezone);
 end;
 
-function dateParse(const input, mask: string): longint;
+function dateParse(const input, mask: RawByteString): longint;
 var y,m,d: integer;
 begin
   dateParseParts(input, mask, @y, @m, @d);
@@ -4754,7 +4912,7 @@ begin
   result := trunc(EncodeDate(y,m,d));
 end;
 
-function dateFormat(const mask: string; const y, m, d: integer; const timezone: TDateTime): string;
+function dateFormat(const mask: RawByteString; const y, m, d: integer; const timezone: TDateTime): RawByteString;
 begin
   result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), timezone);
 end;
@@ -4894,14 +5052,15 @@ end;
 type TSortData = Pointer;
      PSortData = ^TSortData; //ppointer would be to confusing (and howfully there will be generics in the stable binaries soon)
 //universal stabile sort function (using merge sort in the moment)
-procedure stableSortSDr(a,b: PSortData; compareFunction: TPointerCompareFunction; compareFunctionData: TObject; tempArray: array of TSortData);
+procedure stableSortSDr(a,b: pansichar; compareFunction: TPointerCompareFunction; compareFunctionData: TObject; tempArray: array of TSortData);
+const psize = sizeof(TSortData);
 var length,i,j,mi: cardinal;
-    m,n,oldA:PSortData;
+    m,n,oldA:PAnsiChar;
     tempItem: TSortData;
 begin
   //calculate length and check if the input (size) is possible
-  length:=b-a; //will be divided by pointer size automatically
-  if @a[length] <> b then
+  length:=(b-a) div sizeof(TSortData);
+  if @a[sizeof(TSortData) * length] <> b then
     raise Exception.Create('Invalid size for sorting');
   if b<=a then
     exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
@@ -4912,13 +5071,13 @@ begin
     for i:=1 to length-1 do begin
       j:=i;
       //use place to insert
-      while (j>0) and (compareFunction(compareFunctionData, @a[j-1], @a[i]) > 0) do
+      while (j>0) and (compareFunction(compareFunctionData, a + (j-1)*psize, a+i*psize) > 0) do
         dec(j);
       if i<>j then begin
         //save temporary in tempItem (size is checked) and move block forward
-        tempItem:=a[i];
-        move(a[j], a[j+1], sizeof(TSortData)*(i-j));
-        a[j]:=tempItem;
+        tempItem:=PSortData(a+i*psize)^;
+        move((a+j*psize)^, (a+(j+1)*psize)^, psize*(i-j));
+        PSortData(a+j*psize)^:=tempItem;
       end;
     end;
     exit; //it is now sorted with insert sort
@@ -4929,8 +5088,8 @@ begin
   assert(length<=cardinal(high(tempArray)+1));
   //rec calls
   mi:=length div 2;
-  m:=@a[mi];   //will stay constant during merge phase
-  n:=@a[mi+1]; //will be moved during merge phase
+  m:=a+mi*psize;   //will stay constant during merge phase
+  n:=a+(mi+1)*psize; //will be moved during merge phase
   stableSortSDr(a, m, compareFunction, compareFunctionData,tempArray);
   stableSortSDr(n, b, compareFunction, compareFunctionData,tempArray);
 
@@ -4939,22 +5098,22 @@ begin
   i:=0;
   while (a <= m) and (n <= b) do begin
     if compareFunction(compareFunctionData,a,n)<=0 then begin
-      tempArray[i]:=a^;
-      inc(a); //increase by pointer size
+      tempArray[i]:=PSortData(a)^;
+      inc(a, psize); //increase by pointer size
     end else begin
-      tempArray[i]:=n^;
-      inc(n);
+      tempArray[i]:=PSortData(n)^;
+      inc(n, psize);
     end;
     inc(i);
   end;
   while a <= m do begin
-    tempArray[i]:=a^;
-    inc(a);
+    tempArray[i]:=PSortData(a)^;
+    inc(a, psize);
     inc(i);
   end;
   while n <= b do begin
-    tempArray[i]:=n^;
-    inc(n);
+    tempArray[i]:=PSortData(n)^;
+    inc(n, psize);
     inc(i);
   end;
 
@@ -4963,13 +5122,14 @@ end;
 
 //just allocates the memory for the recursive stableSort4r
 //TODO: make it iterative => merge the two functions
-procedure stableSortSD(a,b: PSortData; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
+procedure stableSortSD(a,b: PAnsiChar; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
+const psize = sizeof(TSortData);
 var tempArray: array of TSortData;
     length:longint;
 begin
   //calculate length and check if the input (size) is possible
-  length:=b-a; //will be divided by pointer size automatically
-  if @a[length] <> b then
+  length:=(b-a) div psize; //will be divided by pointer size automatically
+  if @a[length*psize] <> b then
     raise Exception.Create('Invalid size for sorting');
   if b<=a then
     exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)y
@@ -4983,28 +5143,19 @@ type TCompareFunctionWrapperData = record
   data: TObject;
 end;
     PCompareFunctionWrapperData=^TCompareFunctionWrapperData;
+    PPointer=^Pointer;
 
 function compareFunctionWrapper(c:TObject; a,b:pointer):longint;
-var data: ^TCompareFunctionWrapperData;
+var data: ^TCompareFunctionWrapperData absolute c;
 begin
-  data:=PCompareFunctionWrapperData(c);
+//  data:=PCompareFunctionWrapperData(c);
   result:=data^.realFunction(data^.data,ppointer(a)^,ppointer(b)^);
 end;
 function compareRawMemory(c:TObject; a, b:pointer):longint;
 var size: integer;
-    ap, bp: pchar;
-    i: Integer;
 begin
   size := PtrInt(pointer(c));
-  ap := a;
-  bp := b;
-  for i:=1 to size do begin
-    if ap^ < bp^ then begin result := -1; exit; end;
-    if ap^ > bp^ then begin result := 1; exit; end;
-    inc(ap);
-    inc(bp);
-  end;
-  begin result := 0; exit; end;
+  result := CompareByte(a^, b^, size);
 end;
 
 procedure stableSort(a,b: pointer; size: longint;
@@ -5013,7 +5164,7 @@ var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(TSortData)
     tempBackArray: array of longint;
     length:longint;
     data: TCompareFunctionWrapperData;
-    tempData: pbyte;
+    tempData: pansichar;
     i: Integer;
 begin
   if size=sizeof(TSortData) then begin
@@ -5021,26 +5172,26 @@ begin
     exit;
   end;
   //use temporary array (merge sort will anyways use additional memory)
-  length:=(b-a) div size; //will be divided by pointer size automatically
-  if @PBYTE(a)[length*size] <> b then
+  length:=(PAnsiChar(b)-PAnsiChar(a)) div size;
+  if @PAnsiChar(a)[length*size] <> b then
     raise Exception.Create('Invalid size for sorting');
   inc(length);
   setlength(tempArray,length);
-  if compareFunction = nil then begin
+  if {$IFNDEF FPC}@{$ENDIF}compareFunction = nil then begin
     compareFunction:=@compareRawMemory; //todo: use different wrappers for the two if branches
     compareFunctionData:=tobject(pointer(PtrInt(size)));
   end;
   if size < sizeof(TSortData) then begin
     //copy the values in the temp array
     for i:=0 to length-1 do
-      move(pbyte(a)[i*size], tempArray[i], size);
+      move(PAnsiChar(a)[i*size], tempArray[i], size);
     stableSortSD(@tempArray[0],@tempArray[length-1], compareFunction,compareFunctionData);
     for i:=0 to length-1 do
-      move(tempArray[i], pbyte(a)[i*size], size);
+      move(tempArray[i], PAnsiChar(a)[i*size], size);
   end else begin
     //fill the temp array with pointer to the values
     for i:=0 to length-1 do
-      tempArray[i]:=@PBYTE(a)[i*size];
+      tempArray[i]:=@PAnsiChar(a)[i*size];
     //and then call with wrapper function
     data.realFunction:=compareFunction;
     data.data:=compareFunctionData;
@@ -5049,17 +5200,17 @@ begin
     //create back map (hashmap pointer => index in tempArray)
     setlength(tempBackArray,length);
     for i:=0 to length-1 do
-      tempBackArray[(tempArray[i]-a) div size]:=i;
+      tempBackArray[(pansichar(tempArray[i])-pansichar(a)) div size]:=i;
     //move to every position the correct object and update pointer so they not point to garbage after every change
-    tempData:=getMem(size); //temporary object
+    getMem(tempData, size); //temporary object
     for i:=0 to length-1 do begin
       //swap
-      move(PBYTE(a)[i*size], tempData^, size);
-      move(tempArray[i]^,PBYTE(a)[i*size],size);
+      move(PAnsiChar(a)[i*size], tempData^, size);
+      move(tempArray[i]^,PAnsiChar(a)[i*size],size);
       move(tempData^, tempArray[i]^, size);
       //search pointer pointing to PBYTE(a)[i*size] and set to tempArray[i]
       tempArray[tempBackArray[i]]:=tempArray[i];
-      tempBackArray[(tempArray[tempBackArray[i]]-a) div size]:=tempBackArray[i];
+      tempBackArray[(PAnsiChar(tempArray[tempBackArray[i]])-PAnsiChar(a)) div size]:=tempBackArray[i];
     end;
 
     FreeMem(tempData);
@@ -5073,14 +5224,25 @@ begin
   if length(intArray)<=1  then exit;
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
-      function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
-var temp: pointer;
+
+{$IFNDEF HASSIGN}
+function Sign(a: integer): TValueSign;
+begin
+  if a < 0 then result := -1
+  else if a > 0 then result := 1
+  else result := 0;
+end;
+
+{$ENDIF}
+
+function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
+var temp: PAnsiChar;
   l, h, m: Integer;
   acceptedFlags, moveFlags: array[TValueSign] of boolean;
   cmpResult: TValueSign;
 begin
   result := nil;
-  if b < a then exit;
+  if pansichar(b) < pansichar(a) then exit;
 
   //the comparison result looks like:  +1 +1 +1 0 0 0 0 -1 -1 -1
 
@@ -5112,7 +5274,7 @@ begin
   //choose first (or any)
   while l <= h do begin
     m := l + (h - l) div 2;
-    temp := a + m * size;
+    temp := pansichar(a) + m * size;
     cmpResult := Sign(compareFunction(compareFunctionData, temp));
     if acceptedFlags[cmpResult] then begin
       result := temp;
@@ -5130,6 +5292,7 @@ function TStringArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^string;
 begin
   result := CompareStr(ptemp(searched)^, ptemp(current)^);
+  
 end;
 
 function arrayBinarySearch(a: TStringArray; value: string; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
@@ -5146,7 +5309,12 @@ end;
 function TLongintArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^longint;
 begin
-  result := CompareValue(ptemp(searched)^, ptemp(current)^);
+  
+  
+  if ptemp(searched)^ < ptemp(current)^ then result := -1
+  else if ptemp(searched)^ > ptemp(current)^ then result := 1
+  else result := 0;
+  
 end;
 
 function arrayBinarySearch(a: TLongintArray; value: longint; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
@@ -5163,7 +5331,12 @@ end;
 function TLongwordArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^longword;
 begin
-  result := CompareValue(ptemp(searched)^, ptemp(current)^);
+  
+  
+  if ptemp(searched)^ < ptemp(current)^ then result := -1
+  else if ptemp(searched)^ > ptemp(current)^ then result := 1
+  else result := 0;
+  
 end;
 
 function arrayBinarySearch(a: TLongwordArray; value: longword; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
@@ -5180,7 +5353,12 @@ end;
 function TInt64ArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^int64;
 begin
-  result := CompareValue(ptemp(searched)^, ptemp(current)^);
+  
+  
+  if ptemp(searched)^ < ptemp(current)^ then result := -1
+  else if ptemp(searched)^ > ptemp(current)^ then result := 1
+  else result := 0;
+  
 end;
 
 function arrayBinarySearch(a: TInt64Array; value: int64; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
@@ -5197,7 +5375,12 @@ end;
 function TFloatArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^float;
 begin
-  result := CompareValue(ptemp(searched)^, ptemp(current)^);
+  
+  
+  if ptemp(searched)^ < ptemp(current)^ then result := -1
+  else if ptemp(searched)^ > ptemp(current)^ then result := 1
+  else result := 0;
+  
 end;
 
 function arrayBinarySearch(a: TFloatArray; value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
@@ -5284,4 +5467,4 @@ end;
 
 
 end.
-
+

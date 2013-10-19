@@ -23,7 +23,7 @@ uses
 
 {$R *.res}
 
-
+const LineEnding = #13#10;
 //This generate the strDecodeHTMLEntities function of bbutils.pas
 
 type TEntity=record s:string; c:longint; end;
