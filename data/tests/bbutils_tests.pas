@@ -488,6 +488,7 @@ var ar8: array[0..100] of shortint;
     ms: double;
     tz: TDateTime;
     order: TBinarySearchChoosen;
+    e, f: TEncoding;
 begin
   //parse date function
   for i:=1 to high(strs) do
@@ -647,6 +648,8 @@ begin
   test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), eUTF16BE), #$D8#$34#$DD#$1E#$D8#$34#$DD#$1E);
   test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), eUTF16LE), #$34#$D8#$1E#$DD#$34#$D8#$1E#$DD);
 
+  test('', strConvertToUtf8('', eUTF16BE));
+  test('', strConvertToUtf8('', eUTF16LE));
   test(#$79, strConvertToUtf8(#$00#$79, eUTF16BE));
   test(#$79, strConvertToUtf8(#$79#$00, eUTF16LE));
   test(#$79#$79, strConvertToUtf8(#$00#$79#$00#$79, eUTF16BE));
@@ -654,10 +657,44 @@ begin
   test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$D8#$34#$DD#$1E#$D8#$34#$DD#$1E, eUTF16BE));
   test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$34#$D8#$1E#$DD#$34#$D8#$1E#$DD, eUTF16LE));
 
+  test('', strConvertFromUtf8('', eUTF16BE));
+  test('', strConvertFromUtf8('', eUTF16LE));
+  test(#$00#$79, strConvertFromUtf8(#$79, eUTF16BE));
+  test(#$79#$00, strConvertFromUtf8(#$79, eUTF16LE));
+  test(#$00#$79#$00#$79, strConvertFromUtf8(#$79#$79, eUTF16BE));
+  test(#$79#$00#$79#$00, strConvertFromUtf8(#$79#$79, eUTF16LE));
+  test(#00#00, strGetUnicodeCharacter(0, eUTF16BE));
+  test(#00#00, strGetUnicodeCharacter(0, eUTF16LE));
+
+
+  test('', strConvertToUtf8('', eUTF32BE));
+  test('', strConvertToUtf8('', eUTF32LE));
   test(#$79, strConvertToUtf8(#$00#$00#$00#$79, eUTF32BE));
   test(#$79, strConvertToUtf8(#$79#$00#$00#$00, eUTF32LE));
   test(#$79 + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$00#$00#$00#$79#$00#$01#$D1#$1E, eUTF32BE));
   test(#$79 + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$79#$00#$00#$00#$1E#$D1#$01#$00, eUTF32LE));
+
+  test('', strConvertFromUtf8('', eUTF32BE));
+  test('', strConvertFromUtf8('', eUTF32LE));
+  test(#$00#$00#$00#$79, strConvertFromUtf8(#$79, eUTF32BE));
+  test(#$79#$00#$00#$00, strConvertFromUtf8(#$79, eUTF32LE));
+  test(#$00#$00#$00#$79#$00#$00#$00#$79, strConvertFromUtf8(#$79#$79, eUTF32BE));
+  test(#$79#$00#$00#$00#$79#$00#$00#$00, strConvertFromUtf8(#$79#$79, eUTF32LE));
+  test(#00#00#00#00, strGetUnicodeCharacter(0, eUTF32BE));
+  test(#00#00#00#00, strGetUnicodeCharacter(0, eUTF32LE));
+
+  test(ord(eUTF32LE) - ord(eUTF8), 4);
+  for e := eUTF8 to eUTF32LE do
+    for f := eUTF8 to eUTF32LE do begin
+      test(strChangeEncoding('', e, f), '');
+      test(strChangeEncoding(strGetUnicodeCharacter(0, e), e, f), strGetUnicodeCharacter(0, f));
+      test(strChangeEncoding(strGetUnicodeCharacter($80, e), e, f), strGetUnicodeCharacter($80, f));
+      test(strChangeEncoding(strGetUnicodeCharacter($123, e), e, f), strGetUnicodeCharacter($123, f));
+      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e), e, f), strGetUnicodeCharacter($1D11E, f));
+      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter($1D11F, f));
+      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(ord(' '), e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(ord(' '), f)+strGetUnicodeCharacter($1D11F, f));
+      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(0, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(0, f)+strGetUnicodeCharacter($1D11F, f));
+    end;
 
   //splitting
   test(strSplit('hallo,welt,maus')[1] = 'welt');

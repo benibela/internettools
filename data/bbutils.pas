@@ -2789,7 +2789,8 @@ function strConvertFromUtf8ToUTF32N(str: RawByteString): RawByteString;
 var i, j: integer;
 begin
   SetLength(result, strLengthUtf8(str) * 4);
-  j := 0;
+  j := 1;
+  i := 1;
   while i <= length(str) do begin
     PDWord(@result[j])^ := strDecodeUTF8Character(str, i);
     j := j + 4;
@@ -2932,7 +2933,7 @@ begin
     end;
     $F0..$F4: begin
       if curpos + 3  > length(str) then begin inc(curpos, 4); begin result := -2; exit; end; end;
-      result := ((ord(str[curpos]) and not $F0) shl 18) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80) or (ord(str[curpos+3]) and not $80);
+      result := ((ord(str[curpos]) and not $F0) shl 18) or ((ord(str[curpos+1]) and not $80) shl 12) or ((ord(str[curpos+2]) and not $80) shl 6) or (ord(str[curpos+3]) and not $80);
       inc(curpos, 4);
     end;
     else begin
@@ -5470,4 +5471,4 @@ end;
 
 
 end.
-
+
