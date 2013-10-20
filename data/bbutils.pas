@@ -3629,7 +3629,9 @@ Var
   foundDot, foundExp: boolean;
   i: Integer;
 begin
-  If striequal(S, 'TRUE') then
+  if s = '' then
+    result := def //good idea? probably for StrToBoolDef(@attribute, def) and if @attribute is missing (=> '') it should def
+  else if striequal(S, 'TRUE') then
     result:=true
   else if striequal(S, 'FALSE') then
     result:=false
@@ -3641,7 +3643,7 @@ begin
     while i <= length(s) do begin
       case s[i] of
         '.': if foundDot then exit else foundDot := true;
-        'e': if foundExp then exit else begin
+        'e', 'E': if foundExp then exit else begin
           foundExp := true;
           if i < length(s) then if s[i+1] in ['+', '-'] then inc(i);
         end;
