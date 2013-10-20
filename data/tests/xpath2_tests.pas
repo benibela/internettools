@@ -3541,6 +3541,8 @@ begin
   t('outer-xml(//c/ancestor::*[1])', '<b><c/></b>', '');
   t('outer-xml(//c/ancestor::*[2])', '<a><b><c/></b><x/><y/></a>', '');
   t('outer-xml(//c/ancestor::*[3])', '', '');
+  t('/ < 2', 'true', '<a>1</a>');
+  t('/<2', 'true', '<a>1</a>');
 
 
   t('base-uri(/)', '', '!<root xml:base="http://www.example.org"><!--comment--><sub1 xml:base="foobar"><sub1a xml:base="123" attrib="maus"/></sub1><sub2 xml:base="test/xyz"><sub2b xml:base="tiu/"/><sub2c xml:base="tiv"/></sub2><sub3 xml:base="456/"/><sub4 xml:base="http://www.benibela.de"/></root>');

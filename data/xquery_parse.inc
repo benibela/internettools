@@ -1070,7 +1070,8 @@ begin
     '/': begin
       if pos^ = '/' then begin expect('/'); word+='/';end;
       skipWhitespaceAndComment();
-      if pos^ in [#0,',',')',']','}','=','|','+',';'] then exit(TXQTermNodeMatcher.Create('/')) //leading lone slash (see standard#parse-note-leading-lone-slash)
+      if (pos^ in [#0,',',')',']','}','=','|','+',';']) or ((pos^ = '<') and (parsingModel in [xqpmXPath2, xqpmXPath3])) then
+        exit(TXQTermNodeMatcher.Create('/')) //leading lone slash (see standard#parse-note-leading-lone-slash)
       else exit(TXQTermBinaryOp.Create(word, TXQTermNodeMatcher.Create('/'), parseValue()));
     end;
 

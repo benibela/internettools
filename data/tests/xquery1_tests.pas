@@ -853,6 +853,9 @@ begin
   t('for $x in <r><a>A</a><a>AA</a><a>AAA</a><a>AAAA</a></r> / a order by $x return $x', 'A AA AAA AAAA');
   t('for $x in <r><a>A</a><a>AA</a><a>AAA</a><a>AAAA</a></r> / a order by $x descending return $x', 'AAAA AAA AA A');
 
+  f('/ < 2', 'err:XPST0003', '<a>1</a>');
+  f('/<2', 'err:XPST0003', '<a>1</a>');
+
   t('element a {"b"}', 'b');
   t('document { document { element a {"b"}}}', 'b');
   t('outer-xml(<a xmlns="example">abc</a>)', '<a xmlns="example">abc</a>');
