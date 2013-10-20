@@ -4684,10 +4684,13 @@ const TryAgainWithRoundedSeconds: RawByteString = '<TryAgainWithRoundedSeconds>'
 
 {$IFNDEF HASISNAN}
 function IsNan(const d: double): boolean;
+var data: array[0..1] of longword absolute d;
+const LO = 0; HI = 1;
 begin
-  result := (d = NaN);
+  //sign := (PQWord(@d)^ shr 63) <> 0;
+  result := ((data[HI] and $7FF00000) = $7FF00000) and
+            ((data[LO] <> 0) or (data[HI] and not $FFF00000 <> 0));
 end;
-
 {$ENDIF}
 
 function dateTimeFormatInternal(const mask: RawByteString; const y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString;

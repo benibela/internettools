@@ -1,6 +1,8 @@
 unit bbutils_tests;
 
+{$IFDEF FPC}
 {$mode objfpc}{$H+}
+{$ENDIF}
 
 interface
 
@@ -13,38 +15,41 @@ implementation
 
 uses bbutils,math;
 
+type PShortInt = ^ShortInt;
+     PInteger = ^integer;
+
 function shortintCompareFunction(c:TObject; a,b:pointer):longint;
 begin
-  if PShortInt(a)^<PShortInt(b)^ then exit(-1)
-  else if PShortInt(a)^>PShortInt(b)^ then exit(1)
-  else exit(0);
+  if PShortInt(a)^<PShortInt(b)^ then result := -1
+  else if PShortInt(a)^>PShortInt(b)^ then result := 1
+  else result := 0;
 end;
 function intCompareFunction(c:TObject; a,b:pointer):longint;
 begin
-  if pinteger(a)^<pinteger(b)^ then exit(-1)
-  else if pinteger(a)^>pinteger(b)^ then exit(1)
-  else exit(0);
+  if pinteger(a)^<pinteger(b)^ then result := -1
+  else if pinteger(a)^>pinteger(b)^ then result := 1
+  else result := 0
 end;
 function int64CompareFunction(c:TObject; a,b:pointer):longint;
 begin
-  if pint64(a)^<pint64(b)^ then exit(-1)
-  else if pint64(a)^>pint64(b)^ then exit(1)
-  else exit(0);
+  if pint64(a)^<pint64(b)^ then result := -1
+  else if pint64(a)^>pint64(b)^ then result := 1
+  else result := 0
 end;
-procedure test(condition: boolean; name: string='');
+procedure test(condition: boolean; name: string='');overload;
 begin
   if not condition then raise Exception.Create('test: '+name);
 end;
-procedure test(a, b: string; name: string = '');
+procedure test(a, b: string; name: string = '');overload;
 begin
   if a <> b then
     raise Exception.Create('test: '+name+': '+a+' <> '+b);
 end;
-procedure test(a, b: integer; name: string = '');
+procedure test(a, b: integer; name: string = '');overload;
 begin
   if a <> b then raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
 end;
-procedure test(a, b: extended; name: string = '');
+procedure test(a, b: extended; name: string = '');overload;
 begin
   if abs(a-b) > 0.0000001 then raise Exception.Create('test: '+name+': '+FloatToStr (a)+' <> '+FloatToStr(b));
 end;
@@ -54,6 +59,7 @@ end;
 {%END-REPEAT}
 
 
+{$IFDEF FPC}
 procedure intArrayUnitTests;
 var a: TLongintArray;
     len:longint;
@@ -160,6 +166,7 @@ begin
 
 end;
 
+
 procedure stringArrayUnitTests;
 var a: TStringArray;
     len: integer;
@@ -215,7 +222,44 @@ begin
   test(arrayEqual(['a', '', ''], ['a', 'a', 'a']) = false);
 
 end;
+{$ELSE}
+function IsNan(const d: double): boolean;
+var data: array[0..1] of longword absolute d;
+const LO = 0; HI = 1;
+begin
+  //sign := (PQWord(@d)^ shr 63) <> 0;
+  result := ((data[HI] and $7FF00000) = $7FF00000) and
+            ((data[LO] <> 0) or (data[HI] and not $FFF00000 <> 0));
+end;
+procedure  intArrayUnitTests();
+begin
+end;
 
+procedure  stringArrayUnitTests;
+begin
+end;
+
+function arrayAddLI(var a: TLongintArray; const a2: array of longint):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
+end;
+
+function arrayAddS(var a: TStringArray; const a2: array of string):longint;
+var
+  i: LongInt;
+begin
+  result := length(a);
+  setlength(a, result + length(a2));
+  for i:=result to high(a) do
+    a[i] := a2[i - result];
+end;
+
+{$ENDIF}
 procedure stringUnitTests( );
 var
  sa: TStringArray;
@@ -574,10 +618,10 @@ begin
   //basic string tests
   stringUnitTests();
 
-  if not strliequal('', '', 0) then raise Exception.Create('strliequal failed');
-  if not strliequal('abcd', 'abc', 3) then raise Exception.Create('strliequal failed');
-  if strliequal('', 'a', 1) then raise Exception.Create('strliequal failed');
-  if strliequal('abcd', 'abcd', 3) then raise Exception.Create('strliequal failed');
+  if not strliequal(pansichar(''), '', 0) then raise Exception.Create('strliequal failed');
+  if not strliequal(pansichar('abcd'), 'abc', 3) then raise Exception.Create('strliequal failed');
+  if strliequal(pansichar(''), 'a', 1) then raise Exception.Create('strliequal failed');
+  if strliequal(pansichar('abcd'), 'abcd', 3) then raise Exception.Create('strliequal failed');
 
   if strLengthUtf8('hallo') <> 5 then raise Exception.Create('strLengthUtf8 failed, 1');
   if strLengthUtf8('hallo'#$C3#$84'<<') <> 8 then raise Exception.Create('strLengthUtf8 failed, 2');
@@ -720,7 +764,7 @@ begin
 
   //========Binary search=========
   setlength(ai32, 0);
-  arrayAdd(ai32, [00, 10,20,30,40,40,50,60,70]);
+  {$IFDEF FPC}arrayAdd{$ELSE}arrayAddLI{$ENDIF}(ai32, [00, 10,20,30,40,40,50,60,70]);
   //basic checks
   test(arrayBinarySearch(ai32, 30, bsFirst), 3);
   test(arrayBinarySearch(ai32, 30, bsAny), 3);
@@ -799,7 +843,10 @@ begin
       test(arrayBinarySearch(ai32, 10*j, bsFirst, [bsGreater, bsEqual]), j);
       test(arrayBinarySearch(ai32, 10*j, bsLast, [bsLower, bsEqual]), j);
 
-      test(arrayBinarySearch(ai32, 10*j, bsFirst, [bsGreater]), ifthen(j < high(ai32), j+1, -1));
+      if j < high(ai32) then
+        test(arrayBinarySearch(ai32, 10*j, bsFirst, [bsGreater]), j+1)
+      else
+        test(arrayBinarySearch(ai32, 10*j, bsFirst, [bsGreater]),  -1);
       test(arrayBinarySearch(ai32, 10*j, bsLast, [bsLower]), j - 1);
     end;
   end;
@@ -807,7 +854,7 @@ begin
 
     //another equal test
   setlength(ai32, 0);
-  arrayAdd(ai32, [10,10,10,23,23,23,23,23]);
+  {$IFDEF FPC}arrayAdd{$ELSE}arrayAddLI{$ENDIF}(ai32, [10,10,10,23,23,23,23,23]);
 
   test(arrayBinarySearch(ai32, 3, bsFirst), -1);
   test(arrayBinarySearch(ai32, 3, bsAny), -1);
@@ -915,7 +962,7 @@ begin
   test(arrayBinarySearch(ai32, 35, bsLast, [bsGreater]), -1);
 
   SetLength(sa, 0);
-  arrayAdd(sa, ['abc', 'def', 'def', 'def', 'foobar', 'hallo', 'welt', 'xyz', 'xyz', 'xyz', 'xyz', 'xyz', 'xyz']);
+  {$IFDEF FPC}arrayAdd{$ELSE}arrayAddS{$ENDIF}(sa, ['abc', 'def', 'def', 'def', 'foobar', 'hallo', 'welt', 'xyz', 'xyz', 'xyz', 'xyz', 'xyz', 'xyz']);
 
   test(arrayBinarySearch(sa, 'def'), 2); //implementation detail, not guaranteed
   test(arrayBinarySearch(sa, 'def', bsFirst), 1);
@@ -937,7 +984,7 @@ begin
   arrayPrependFast(sa, i, 'a'); test(strJoin(sa, '|'), 'a|b|c|'); test(i, 3);
 
   SetLength(sa, 0);
-  arrayAdd(sa, ['x','y','z']);
+  {$IFDEF FPC}arrayAdd{$ELSE}arrayAddS{$ENDIF}(sa, ['x','y','z']);
   i := 0;
   arrayPrependFast(sa, i, 'c'); test(strJoin(sa, '|'), 'c|y|z'); test(i, 1);
   arrayPrependFast(sa, i, 'b'); test(strJoin(sa, '|'), 'b|c|z'); test(i, 2);
