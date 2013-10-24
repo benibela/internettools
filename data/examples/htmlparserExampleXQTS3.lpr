@@ -315,13 +315,22 @@ var compareTree: TTreeParser;
     fragment1: String;
     tree1: TTreeDocument;
     tree2: TTreeDocument;
+    previousValue: Boolean;
 begin
   compareTree := TTreeParser.Create;
   fragment1 := '<WRAP>';
+  previousValue := false;
   for x in a do
     case x.kind of
-      pvkNode: fragment1 := fragment1 + x.toNode.outerXML();
-      else fragment1 += x.toString;
+      pvkNode: begin
+        fragment1 := fragment1 + x.toNode.outerXML();
+        previousValue := false;
+      end
+      else begin
+        if previousValue then fragment1 += ' ';
+        fragment1 += x.toString;
+        previousValue := true;
+      end;
     end;
   fragment1 += '</WRAP>';
 
