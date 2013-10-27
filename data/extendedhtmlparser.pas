@@ -75,8 +75,9 @@ EHTMLParseException = class(Exception);
 { EHTMLParseMatchingException }
 
 EHTMLParseMatchingException = class(EHTMLParseException)
-  partialMatches: string;
-  constructor create(const mes, matches: string);
+  sender: TObject;
+  constructor create(const mes: string; const asender: TObject);
+  function partialMatches: string;
 end;
 
 THtmlTemplateParser=class;
@@ -671,6 +672,7 @@ THtmlTemplateParser=class
     function replaceEnclosedExpressions(str:string):string;
 
     function debugMatchings(const width: integer): string;
+    function debugMatchings(const width: integer; includeText: boolean; includeAttributes: array of string): string;
     function parseQuery(const expression: string): IXQuery; //**< Returns a IXQuery that accesses the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables (variableChangeLog is usually faster)
@@ -701,7 +703,7 @@ THtmlTemplateParser=class
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 implementation
 
-uses math, strutils;
+uses math;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchText;
@@ -736,10 +738,16 @@ procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end
 
 { EHTMLParseMatchingException }
 
-constructor EHTMLParseMatchingException.create(const mes, matches: string);
+constructor EHTMLParseMatchingException.create(const mes: string; const asender: TObject);
 begin
   inherited create(mes);
-  partialMatches:=matches;
+  sender := asender;
+end;
+
+function EHTMLParseMatchingException.partialMatches: string;
+begin
+  if sender is THtmlTemplateParser then result := THtmlTemplateParser(sender).debugMatchings(80)
+  else result := '';
 end;
 
 function TTemplateElement.templateReverse: TTemplateElement;
@@ -1078,7 +1086,7 @@ begin
           for k:= 0 to high(htmlList) do if striEqual(templateList[j], htmlList[k]) then begin found := true; break; end;
           if not found then exit(false);
         end;
-      end else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind','');
+      end else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind', self);
       {todo: cacheRegExpr('regex', '', '', false);
       cacheRegExpr('starts-with', '^', '.*$', true);
       cacheRegExpr('ends-with', '^.*', '$', true);
@@ -1522,7 +1530,7 @@ begin
                    'Couldn''t find a match for: '+cur.toString+#13#10;
             if realLast <> nil then err += 'Previous element is:'+reallast.toString+#13#10;
             if last <> nil then err += 'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString;
-            raise EHTMLParseMatchingException.create(err, debugMatchings(80));
+            raise EHTMLParseMatchingException.create(err, self);
           end;
           last:=cur;
         end;
@@ -1535,7 +1543,7 @@ begin
       realLast := cur;
       cur := cur.templateNext;
     end;
-    raise EHTMLParseMatchingException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason', '');
+    raise EHTMLParseMatchingException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason', self);
   end;
 //TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;
@@ -1745,6 +1753,11 @@ begin
 end;
 
 function THtmlTemplateParser.debugMatchings(const width: integer): string;
+begin
+  result := debugMatchings(width, true, ['*']);
+end;
+
+function THtmlTemplateParser.debugMatchings(const width: integer; includeText: boolean; includeAttributes: array of string): string;
 var res: TStringArray;
     template: TTemplateElement;
     html: TTreeNode;
@@ -1760,13 +1773,19 @@ var res: TStringArray;
     cache := strDup(' ', min(width div 2, count));
   end;
 
+  function htmlToString(): string;
+  begin
+    if (length(includeAttributes) = 1) and (includeAttributes[0] = '*') then result := html.toString
+    else result := html.toString(includeText, includeAttributes);
+  end;
+
   procedure printHTMLUntil(endElement: TTreeNode);
   var
     i: Integer;
   begin
     while (html <> nil) and (html <> endElement) do begin
-      hsl := strWrapSplit(html.toString(), width - length(tempHTMLIndent));
-      for i:=0 to high(hsl) do arrayAdd(res, EMPTY + tempHTMLIndent + hsl[i]);
+      hsl := strWrapSplit(htmlToString(), width - length(tempHTMLIndent));
+      for i:=0 to high(hsl) do arrayAdd(res, tempHTMLIndent + hsl[i]);
       updateIndentation(html, htmlIndent, tempHTMLIndent);
       html := html.next;
     end;
@@ -1775,7 +1794,7 @@ var res: TStringArray;
 var i: Integer;
 
 begin
-  LINK :=   ' ----> ';
+  LINK :=   ' <---- ';
   NOLINK := '       ';
   EMPTY := strDup(' ', width) + NOLINK;
 
@@ -1789,15 +1808,15 @@ begin
   while template <> nil do begin
     tsl := strWrapSplit(template.toString(), width - length(tempTemplateIndent));
     if template.match = nil then begin
-      for i:=0 to high(tsl) do arrayAdd(res, tempTemplateIndent + tsl[i])
+      for i:=0 to high(tsl) do arrayAdd(res, EMPTY + tempTemplateIndent + tsl[i])
     end else begin
       if (html <> nil) and (template.match.offset > html.offset) then
         printHTMLUntil(template.match);
       if html = template.match then begin
-        hsl := strWrapSplit(html.toString(), width - length(tempHTMLIndent));
-        for i:=0 to min(high(hsl), high(tsl)) do arrayAdd(res, tempTemplateIndent + tsl[i] + strDup(' ', width - length(tsl[i])) + LINK + tempHTMLIndent + hsl[i]);
-        for i:=length(hsl) to high(tsl) do arrayAdd(res, tempTemplateIndent + tsl[i]);
-        for i:=length(tsl) to high(hsl) do arrayAdd(res, EMPTY + tempHTMLIndent + hsl[i]);
+        hsl := strWrapSplit(htmlToString(), width - length(tempHTMLIndent));
+        for i:=0 to min(high(hsl), high(tsl)) do arrayAdd(res, tempHTMLIndent + hsl[i] + strDup(' ', width - length(hsl[i]) - length(tempHTMLIndent) ) + LINK + tempTemplateIndent + tsl[i]);
+        for i:=length(hsl) to high(tsl) do arrayAdd(res, EMPTY + tempTemplateIndent + tsl[i]);
+        for i:=length(tsl) to high(hsl) do arrayAdd(res, tempHTMLIndent + hsl[i]);
         updateIndentation(html, htmlIndent, tempHTMLIndent);
         html := html.next;
       end;

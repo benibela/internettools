@@ -235,6 +235,7 @@ protected
 
 public
   function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
+  function toString(includeText: boolean; includeAttributes: array of string): string; reintroduce; //**< converts the element to a string (not recursive)
 
   constructor create();
   constructor create(atyp: TTreeNodeType; avalue: string = '');
@@ -408,7 +409,7 @@ end;
 var omittedEndTags: THTMLOmittedEndTags;
     omittedStartTags: THTMLOmittedEndTags;
 
-function arrayContainsI(const a: TStringArray; const s: string): boolean;
+function arrayContainsI(const a: array of string; const s: string): boolean;
 var
   i: Integer;
 begin
@@ -1517,6 +1518,29 @@ begin
     tetDocument: result := innerXML();
     tetComment: exit('<!--'+value+'-->');
     else exit('??');
+  end;
+end;
+
+function TTreeNode.toString(includeText: boolean; includeAttributes: array  of string): string;
+var
+  attrib: TTreeAttribute;
+begin
+  result := '';
+  if self = nil then exit();
+  case typ of
+    tetText: if includeText then result := value;
+    tetClose: result := '</'+value+'>';
+    tetOpen: begin
+      result := '<'+value;
+      if attributes <> nil then
+        for attrib in attributes do
+          if arrayContainsI(includeAttributes, attrib.value) then
+            result += ' '+attrib.value + '="'+attrib.realvalue+'"';
+      result+='>';
+    end;
+    tetDocument: if getFirstChild() <> nil then result := getFirstChild().toString(includeText, includeAttributes);
+    tetComment: if includeText then result := '<!--'+value+'-->';
+    else result := '??';
   end;
 end;
 
