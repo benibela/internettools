@@ -197,6 +197,7 @@ begin
       end;
       'assert-string-value': begin
         a := TAssertionAssert.Create(aakStringValue, f.deepNodeText());
+        TAssertionAssert(a).normalizeSpace:=StrToBoolDef(f['normalize-space'], false);
       end;
       'assert-true': begin
         a := TAssertionAssert.Create(aakTrue, f.deepNodeText());
