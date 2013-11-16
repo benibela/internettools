@@ -2427,9 +2427,15 @@ end;
 function myDecimalToStr(const v:single): string;
 begin
   //if (frac(v) = 0) and (v >= -9200000000000000000) and (v <= 9200000000000000000) then exit(IntToStr(trunc(v)));
-  if ((v >= single(0.000001)) and (v < 1000000)) or ((v > -1000000) and (v <= single(-0.000001)))  then str(v:0:7, result)
+  if ((v >= single(0.000001)) and (v < 1000000)) or ((v > -1000000) and (v <= single(-0.000001)))  then
+    result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExact)
+  else begin
+    result := FloatToStrF(V, ffExponent, 8, 0, FormatSettings);
+    result := killTrailingZeros(result);
+  end;
+    {str(v:0:7, result)
   else result := FloatToStrF(V, ffExponent, 8, 0, FormatSettings);
-  result := killTrailingZeros(result);
+  result := killTrailingZeros(result);                                                                   }
 end;
 {$endif FPC_HAS_TYPE_SINGLE}
 {$ifdef FPC_HAS_TYPE_DOUBLE}
