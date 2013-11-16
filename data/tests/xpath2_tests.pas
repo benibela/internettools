@@ -3161,6 +3161,9 @@ begin
   t('fn:round-half-to-even(-10.354, 2)', '-10.35');
   t('fn:round-half-to-even(-10.355, 2)', '-10.36');
   t('fn:round-half-to-even(-10.356, 2)', '-10.36');
+  t('fn:round-half-to-even(-12550, -2)', '-12600');
+  t('xs:float(12345.6)', '12345.6');
+  t('fn:round-half-to-even(xs:float(12345.6), 2)', '12345.6');
   t('fn:round(xs:nonNegativeInteger("303884545991464527"))', '303884545991464527');
   //node comparison
   t('.//@att', 'xyz', '<a><b><c att="xyz">C</c></b></a>');

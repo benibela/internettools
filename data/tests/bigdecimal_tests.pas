@@ -715,6 +715,8 @@ begin
     end;
   end;
 
+  test(BigDecimalToStr(round(-12550, 2, bfrmRoundHalfToEven)), '-12600');
+
   test(BigDecimalToStr(sqrt(StrToBigDecimal('9'))), '3');
   test(BigDecimalToStr(sqrt(StrToBigDecimal('121'))), '11');
   test(BigDecimalToStr(sqrt(StrToBigDecimal('8'))), '2.828427125');

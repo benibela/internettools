@@ -1107,12 +1107,13 @@ function xqFunctionRound_Half_To_Even(const args: TXQVArray): IXQValue;
       if result >= 0 then result += 1
       else result -= 1;
     end else if (modu = switchPoint) and (result and 1 = 1) then
-      result += 1;
+      if result < 0 then result -= 1
+      else result += 1;
     result := result * rpower;
   end;
 
-  function floatRoundHalfToEven(const d: xqfloat): xqfloat;
-  var f: xqfloat;
+  function floatRoundHalfToEven(const d: Extended): Extended;
+  var f: extended;
   begin
     f := frac(d);
     if f = 0 then exit(d)
@@ -1124,7 +1125,8 @@ function xqFunctionRound_Half_To_Even(const args: TXQVArray): IXQValue;
   end;
 
 var
-  f, p: xqfloat;
+  f: xqfloat;
+  temp, p: extended;
   prec: Int64;
   baseType: TXSType;
 
@@ -1157,7 +1159,9 @@ begin
         else if prec > 4933 then result := baseType.createValue(0)
         else begin
           p := power(10, prec);
-          result := baseType.createValue(floatRoundHalfToEven(f /  p) * p)
+          temp := f /  p;
+          if frac(temp) = 0 then result := baseType.createValue(f)
+          else result := baseType.createValue(floatRoundHalfToEven(temp) * p)
         end;
       end;
     end
