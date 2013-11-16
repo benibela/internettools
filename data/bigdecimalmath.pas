@@ -216,7 +216,11 @@ const divisionDefaultPrecision = 18;
 
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
 
-
+//returns:
+//@þaram(intstart Position of the first digit in integer part)
+//@þaram(intend Position of the last digit in integer part)
+//@þaram(dot Position of the . character, or 0)
+//@þaram(exp Positiion of the [eE] character or 0)
 function TryStrDecodeDecimal(const s: string; out intstart, intend, dot, exp: integer): boolean;
 var
   i: Integer;
@@ -294,7 +298,7 @@ begin
     end;
     p += 1;
     if (i > dot) and (dot > 0) then i -= 1;
-    if signed then i -= 1;
+    i -= intstart - 1;
     while i <= totalintlength do begin
       digits[p] := digits[p] * 10;
       i += 1;
