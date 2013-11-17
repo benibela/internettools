@@ -3016,15 +3016,18 @@ end;
 function xqFunctionPosition(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,0,0);
-  if context.SeqValue = nil then raise EXQEvaluationException.Create('XPDY0002', 'position() called but no sequence available');
-  result := xqvalue(context.SeqIndex);
+  if context.SeqValue <> nil then result := xqvalue(context.SeqIndex)
+  else if context.ParentElement <> nil then result := xqvalue(1)
+  else raise EXQEvaluationException.Create('XPDY0002', 'position() called but no sequence available');
+
 end;
 
 function xqFunctionLast(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,0,0);
-  if context.SeqValue = nil then raise EXQEvaluationException.Create('XPDY0002', 'last() called but no sequence available');
-  result := xqvalue(context.SeqLength);
+  if context.SeqValue <> nil then result := xqvalue(context.SeqLength)
+  else if context.ParentElement <> nil then result := xqvalue(1)
+  else raise EXQEvaluationException.Create('XPDY0002', 'last() called but no sequence available');
 end;
 
 function xqFunctionId(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
