@@ -1,3 +1,32 @@
+{
+Copyright (C) 2013 Benito van der Zander (BeniBela)
+                   benito@benibela.de
+                   www.benibela.de
+
+This file is distributed under under the same license as Lazarus and the LCL itself:
+
+This file is distributed under the Library GNU General Public License
+with the following modification:
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent modules,
+and to copy and distribute the resulting executable under terms of your choice,
+provided that you also meet, for each linked independent module, the terms
+and conditions of the license of that module. An independent module is a
+module which is not derived from or based on this library. If you modify this
+library, you may extend this exception to your version of the library, but
+you are not obligated to do so. If you do not wish to do so, delete this
+exception statement from your version.
+
+}
+
+(***
+
+  An unit for arbitrary precision arithmetic on bcd floats
+
+*)
+
 {%REPEAT}unit bigdecimalmath_template;{$ifdef undefined}{%END-REPEAT}
 unit bigdecimalmath;
 {%REPEAT}{$endif}{%END-REPEAT}
@@ -52,7 +81,7 @@ Invalid digit count
 {$ENDIF}
 
 type
-  //** Big Decimal type. @br
+  //** @abstract(Big Decimal type). @br
   //** Consisting of an bcd integer times a decimal exponent ([integer digits] * 10 ^ (DIGITS_PER_ELEMENT * exponent)) @br
   //** It can be used like a normal floating point number. E.g: @longCode(#
   //**   var bf: BigDecimal;
@@ -83,8 +112,10 @@ type TBigDecimalFormat = (bdfExact, bdfExponent);
 function BigDecimalToStr(const v: BigDecimal; format: TBigDecimalFormat = bdfExact): string;
 
 {%REPEAT T_NativeInt_, [Integer, Int64]}
+//**Converts a bigdecimal to a native int (can overflow)
 function BigDecimalToT_NativeInt_(const a: BigDecimal): T_NativeInt_;
 {%END-REPEAT}
+//**Converts a bigdecimal to an extended (may introduce rounding errors)
 function BigDecimalToExtended(const a: BigDecimal): Extended;
 
 
@@ -97,9 +128,12 @@ function FloatToBigDecimal(const v: T_NativeFloat_; format: TBigDecimalFloatForm
 
 {%REPEAT T_NativeInt_, [Integer, Int64, QWord]}
 //operator :=(const a: BigDecimal): T_NativeInt_;
+//** Converts a native integer to a BigDecimal
 operator :=(const a: T_NativeInt_): BigDecimal;
 {%END-REPEAT}
 //operator :=(const a: BigDecimal): Extended; auto conversion of bigdecimal to extended is possible, but it confuses fpc overload resolution. Then e.g. power calls either math or bigdecimalbc depending on the unit order in the uses clause
+//** Converts an extended to a BigDecimal @br
+//** May lead to rounding errors. FloatToBigDecimal is exact, but probably some magnitudes slower
 operator :=(const a: Extended): BigDecimal;
 
 //** Standard operator unary -
@@ -135,6 +169,7 @@ type TBigDecimalDivisionFlags = set of (bddfKeepDividentPrecision, bddfKeepDivis
 //**  bddfNoFractionalPart: Do not calculate the fractional part of the quotient (remember that a bigdecimal is a scaled integer. So bfdfFillIntegerPart ensures that the result has not less digits than an integer division (necessary in case of an exponent > 0) and bfdfKillFractions that the result has not more digits than an integer division (in case of an exponent < 0) )  @br
 //** not all flag combinations were tested
 procedure divideModNoAlias(out quotient, remainder: BigDecimal; const a, b: BigDecimal; targetPrecision: integer = 18; flags: TBigDecimalDivisionFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit]);
+//** Wrapper around divideModNoAlias, ignoring the calculated remainder
 function divide(const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit]): BigDecimal;
 
 //** Calculates a decimal shift: @code(v := v * 10^shift)
@@ -157,6 +192,8 @@ type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmR
 //** Rounds v to the precision of a certain digit, subject to a certain rounding mode. @br
 //** Positive toDigit will round to an integer with toDigit trailing zeros, negative toDigit will round to a decimal with -toDigit numbers after the decimal point
 function round(const v: BigDecimal; toDigit: integer = 0; roundingMode: TBigDecimalRoundingMode = bfrmRound): BigDecimal; overload;
+//** Returns the digit-th digit of v. @br
+//** Last integer digit is digit 0, digits at negative indices are behind the decimal point.
 function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
 
 //** Sets the bigdecimal to 0
@@ -174,19 +211,19 @@ function abs(const v: BigDecimal): BigDecimal; overload;
 
 //** Calculates v ** exp, with exp being an integer
 function power(const v: BigDecimal; const exp: Int64): BigDecimal; overload;
-//**< Calculates the square root of v, to precision digits after the decimal point  @br
-//**< Not much tested
+//** Calculates the square root of v, to precision digits after the decimal point  @br
+//** Not much tested
 function sqrt(const v: BigDecimal; precision: integer = 9): BigDecimal; overload;
 
 
-//**< Calculates the greatest common denominator (only makes sense for positive integer input)
+//** Calculates the greatest common denominator (only makes sense for positive integer input)
 function gcd(const a,b: BigDecimal): BigDecimal; overload;
-//**< Calculates the least common multiple
+//** Calculates the least common multiple
 function lcm(const a,b: BigDecimal): BigDecimal; overload;
 
-//** Calculates 2 ** exp, with exp being an integer (faster for negative numbers)
+//** Calculates 2 ** exp exactly, with exp being an integer (faster than power for negative exp)
 function fastpower2to(const exp: Int64): BigDecimal;
-//** Calculates 5 ** exp, with exp being an integer (faster for negative numbers)
+//** Calculates 5 ** exp exactly, with exp being an integer (faster than power for negative exp)
 function fastpower5to(const exp: Int64): BigDecimal;
 
 implementation

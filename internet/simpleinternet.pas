@@ -133,6 +133,7 @@ implementation
 {$ENDIF}
 
 uses bbutils, extendedhtmlparser
+     ,xquery_json //enable json as default
 {$IFDEF USE_SYNAPSE_WRAPPER}
 , synapseinternetaccess
 {$ENDIF}
