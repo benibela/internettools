@@ -25,6 +25,8 @@ exception statement from your version.
 
   An unit for arbitrary precision arithmetic on bcd floats
 
+  See @link(BigDecimal)
+
 *)
 
 {%REPEAT}unit bigdecimalmath_template;{$ifdef undefined}{%END-REPEAT}
@@ -84,10 +86,11 @@ type
   //** @abstract(Big Decimal type). @br
   //** Consisting of an bcd integer times a decimal exponent ([integer digits] * 10 ^ (DIGITS_PER_ELEMENT * exponent)) @br
   //** It can be used like a normal floating point number. E.g: @longCode(#
-  //**   var bf: BigDecimal;
-  //**   bf := 12.34;
-  //**   bf := bf * 1000 - 42;  // bf = 12298
-  //**   bf := bf / 7.0;        // bf = 1756.857142857142857143
+  //**   var bd: BigDecimal;
+  //**   bd := 12.34;
+  //**   bd := bd * 1000 - 42;  // bd = 12298
+  //**   bd := bd / 7.0;        // bd = 1756.85714285714286
+  //**   bd := StrToBigDecimal('123456789012345678901234567890123456789') + 1; // bd = 123456789012345678901234567890123456790
   //** #) @br@br
   //** It has an arbitrary precision (up to 18 billion digits), and can be converted to a decimal string without loss of precision, since
   //** it stores decimal digits (up to 9 digits / array element, depending on compiler define). @br
