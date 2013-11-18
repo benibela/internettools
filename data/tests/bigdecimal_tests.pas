@@ -517,6 +517,11 @@ begin
   bd := StrToBigDecimal('1E21') div  StrToBigDecimal('3');
   test(BigDecimalToStr(bd),  '333333333333333333333');
   test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333333E20');
+  for i := 2 to 50 do begin
+    bd := StrToBigDecimal('1E'+IntToStr(i)) div StrToBigDecimal('3');
+    test(BigDecimalToStr(bd),              strDup('3', i));
+    test(BigDecimalToStr(bd, bdfExponent),  '3.'+strDup('3', i-1)+'E'+inttostr(i-1));
+  end;
   bd := StrToBigDecimal('12345678901234567890') div StrToBigDecimal('999888777999888777');
   test(BigDecimalToStr(bd),  '12');
   test(BigDecimalToStr(bd, bdfExponent),  '1.2E1');
@@ -536,6 +541,19 @@ begin
   bd := StrToBigDecimal('1E25') / StrToBigDecimal('3');
   test(BigDecimalToStr(bd),               '3333333333333333333333333');
   test(BigDecimalToStr(bd, bdfExponent),  '3.333333333333333333333333E24');
+  bd := StrToBigDecimal('1E28') / StrToBigDecimal('3');
+  test(BigDecimalToStr(bd),               '3333333333333333333333333333');
+  test(BigDecimalToStr(bd, bdfExponent),  '3.333333333333333333333333333E27');
+  for i := 2 to 18 {min precision} do begin
+    bd := StrToBigDecimal('1E'+IntToStr(i)) / StrToBigDecimal('3');
+    if i <> 18 then test(BigDecimalToStr(bd),              strDup('3', i)+'.'+strDup('3', 18-i));
+    test(BigDecimalToStr(bd, bdfExponent),  '3.33333333333333333E'+inttostr(i-1));
+  end;
+  for i := 19 {higher than min precision} to 50 do begin
+    bd := StrToBigDecimal('1E'+IntToStr(i)) / StrToBigDecimal('3');
+    test(BigDecimalToStr(bd),              strDup('3', i));
+    test(BigDecimalToStr(bd, bdfExponent),  '3.'+strDup('3', i-1)+'E'+inttostr(i-1));
+  end;
   bd := StrToBigDecimal('1') / StrToBigDecimal('2');
   test(BigDecimalToStr(bd),  '0.5');
   test(BigDecimalToStr(bd, bdfExponent),  '5.0E-1');

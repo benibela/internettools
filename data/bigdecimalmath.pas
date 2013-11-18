@@ -1784,10 +1784,14 @@ begin
   SetLength(temp.digits, length(b.digits) + 1);
   len := (targetPrecision + DIGITS_PER_ELEMENT - 1 ) div DIGITS_PER_ELEMENT + {bad splitting: } 1;
   quotient.exponent :=  a.exponent - b.exponent + high(a.digits) - (len - 1);
-  if (bddfFillIntegerPart in flags) and (quotient.exponent > 0) then begin
+  if (bddfFillIntegerPart in flags) and (quotient.exponent >= 0) then begin
     targetPrecision += DIGITS_PER_ELEMENT * quotient.exponent;
     len := (targetPrecision + DIGITS_PER_ELEMENT - 1 ) div DIGITS_PER_ELEMENT + {bad splitting: } 1;
     quotient.exponent :=  a.exponent - b.exponent + high(a.digits) - (len - 1);
+    if (bddfAddHiddenDigit in flags) and (quotient.exponent = 0) then begin
+      len += 1;
+      quotient.exponent -= 1;
+    end;
   end;
 
   SetLength(quotient.digits,  len);
