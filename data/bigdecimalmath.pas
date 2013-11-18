@@ -503,7 +503,7 @@ begin
         tempdecimal := round(v, (exponent + lowskip + 1) * DIGITS_PER_ELEMENT - (lowBinLength - 1));
         displayed := @tempdecimal;
         init;
-        if length(digits) = skip + lowskip then exit(BigDecimalZeroResult);
+        if length(displayed^.digits) = skip + lowskip then exit(BigDecimalZeroResult);
       end else if (lowskip <= dotBinPos) then begin
         lowBin := lowBin div 10;
         lowBinLength -= 1;
