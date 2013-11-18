@@ -431,7 +431,7 @@ var
  begin
    with displayed^ do begin
      dotBinPos := -exponent - 1; //first bin after the decimal point (every bin i <= dotBinPos belongs to the fractional part)
-     skipZeros(v, skip, lowskip);
+     skipZeros(displayed^, skip, lowskip);
      firstHigh:=high(digits) - skip;
      if length(digits) = skip + lowskip then exit();
    end;
