@@ -1028,6 +1028,22 @@ begin
   test(BigDecimalToStr(FloatToBigDecimal(extended(92233720368547758), bdffExact)), '92233720368547758');
 
 
+  //tests for very large exponents
+  test(BigDecimalToStr(StrToBigDecimal('1E1234567890'), bdfExponent), '1.0E1234567890');
+  test(BigDecimalToStr(StrToBigDecimal('1E-1234567890'), bdfExponent), '1.0E-1234567890');
+  test(BigDecimalToStr(StrToBigDecimal('1E1234567890') - StrToBigDecimal('1E1234567890'), bdfExponent), '0');
+  test(BigDecimalToStr(StrToBigDecimal('1E1234567890') + StrToBigDecimal('1E1234567890'), bdfExponent), '2.0E1234567890');
+  test(BigDecimalToStr(StrToBigDecimal('1E1234567890') * StrToBigDecimal('1E-1234567890'), bdfExponent), '1.0E0');
+  if DIGITS_PER_ELEMENT = 9 then begin  //very large exponents require 9 digits/bin
+    test(BigDecimalToStr(StrToBigDecimal('1E19327352823'), bdfExponent), '1.0E19327352823');
+    test(BigDecimalToStr(StrToBigDecimal('1E-19327352814'), bdfExponent), '1.0E-19327352814');
+    test(BigDecimalToStr(StrToBigDecimal('1E19327352814') - StrToBigDecimal('1E19327352814'), bdfExponent), '0');
+    test(BigDecimalToStr(StrToBigDecimal('1E19327352814') + StrToBigDecimal('1E19327352814'), bdfExponent), '2.0E19327352814');
+    test(BigDecimalToStr(StrToBigDecimal('1E19327352814') * StrToBigDecimal('1E-19327352814'), bdfExponent), '1.0E0');
+    test(BigDecimalToStr(StrToBigDecimal('1E19327352814') * 17, bdfExponent), '1.7E19327352815');
+  end;
+
+
   writeln('bd complete');
 end;
 

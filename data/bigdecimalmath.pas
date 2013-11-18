@@ -295,7 +295,7 @@ function TryStrToBigDecimal(const s: string; res: PBigDecimal): boolean;
 var dot, exp, i: integer;
   intstart: Integer;
   intend: Integer;
-  trueexponent: integer;
+  trueexponent: int64;
   p: Integer;
   j: Integer;
   totalintlength: Integer;
@@ -303,14 +303,16 @@ begin
   result := TryStrDecodeDecimal(s, intstart, intend, dot, exp);
   if exp = 0 then trueexponent := 0
   else begin
-    if (length(s) - exp <= 9) and (res = nil) then exit;
-    if not TryStrToInt(copy(s, exp + 1, length(s)), trueexponent) then begin
+    if (length(s) - exp <= 10) and (res = nil) then exit;
+    if not TryStrToInt64(copy(s, exp + 1, length(s)), trueexponent) then begin
       //exponent to big
       for i := 1 to exp - 1 do
         if not (s[i] in ['0', '.', '-']) then exit(false);
       if res <> nil then setZero(res^); //but if all digigts are 0, the exponent can be ignored
       exit;
     end;
+    if (trueexponent < DIGITS_PER_ELEMENT * int64(low(integer))) or (trueexponent > DIGITS_PER_ELEMENT * int64(high(integer))) then
+      exit(false);
   end;
   if not result then exit;
   if res = nil then exit;
@@ -471,7 +473,7 @@ var
   additionalCarry: Boolean;
   tempdecimal: BigDecimal;
   explength: Integer;
-  realexponent: Integer;
+  realexponent: int64;
 begin
   //Algorithm for bdfExact:
   //print all numbers bin starting at the lexical last one (bin nr. 0)
@@ -590,8 +592,13 @@ begin
         reslen += 1; //dot
       //  if reslen = 2 then reslen += 1; //always something after the dot
 
-      realexponent := (exponent + firstHigh) * DIGITS_PER_ELEMENT + highBinLength - 1;
-        explength := digitsInBin(abs(realexponent));
+        realexponent := int64(exponent + firstHigh) * DIGITS_PER_ELEMENT + highBinLength - 1;
+        if (realexponent >= low(integer)) and (realexponent <= high(integer)) then explength := digitsInBin(abs(realexponent))
+        else begin
+          explength := digitsInBin(abs(realexponent) div 1000000000);
+          reslen += 9;
+        end;
+
         reslen += 1 + explength;             //E...
         if realexponent < 0 then reslen+=1;  //E-...
         if signed then reslen += 1;
@@ -599,7 +606,11 @@ begin
         //generate result
         SetLength(result, reslen);
         p := @result[length(Result)];
-        intToStrFixedLength(abs(realexponent), p, explength);
+        if (realexponent >= low(integer)) and (realexponent <= high(integer)) then intToStrFixedLength(abs(realexponent), p, explength)
+        else begin
+          intToStrFixedLength(abs(realexponent) mod 1000000000, p, 9);
+          intToStrFixedLength(abs(realexponent) div 1000000000, p, explength);
+        end;
         if realexponent < 0 then begin p^ := '-'; dec(p); end;
         p^ := BigDecimalExponent; dec(p);
         if lowskip <> firstHigh then begin
