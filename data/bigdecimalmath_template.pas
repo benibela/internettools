@@ -450,6 +450,7 @@ var
   explength: Integer;
   realexponent: Integer;
 begin
+  //Algorithm for bdfExact:
   //print all numbers bin starting at the lexical last one (bin nr. 0)
   // trim trailing 0 after .
   // print bins till .
@@ -533,7 +534,9 @@ begin
           p -= DIGITS_PER_ELEMENT;
           FillChar(p^, DIGITS_PER_ELEMENT + 1, '0');
         end;
+        if lowskip > 0 then lowskip := 0; //print zeros here (they are only skipped for exponent output format)
         if (lowskip > dotBinPos) and (lowskip < firstHigh) then begin
+          lowBin := displayed^.digits[lowskip];
           intToStrFixedLength(lowBin, p,  DIGITS_PER_ELEMENT);
           i := lowskip + 1;
         end else i := max(-exponent, 0);
