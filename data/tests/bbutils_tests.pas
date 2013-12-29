@@ -153,6 +153,39 @@ begin
   test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 2, 4) );
   test(arrayEqual([longint(1),2,3,4,5], [3,4,5], 2, 0, 4, 2) );
 
+  //insert
+  SetLength(a, 0);
+  arrayInsert(a, 0, 10);
+  test(arrayEqual(a, [10]));
+  arrayInsert(a, 0, 5);
+  test(arrayEqual(a, [5, 10]));
+  arrayInsert(a, 0, 1);
+  test(arrayEqual(a, [1, 5, 10]));
+  arrayInsert(a, 1, 3);
+  test(arrayEqual(a, [1, 3, 5, 10]));
+  arrayInsert(a, 2, 4);
+  test(arrayEqual(a, [1, 3, 4, 5, 10]));
+  arrayInsert(a, 100, 100);
+  test(arrayEqual(a, [1, 3, 4, 5, 10, 100]));
+  arrayInsert(a, -100, -100);
+  test(arrayEqual(a, [-100, 1, 3, 4, 5, 10, 100]));
+
+
+  len := 0;
+  SetLength(a, 0);
+  arrayAdd(a, [0, -1,-2,-3,-4,-5]);
+  arrayInsertFast(a, len, 0, 17);
+  test(arrayEqual(a, [17, -1,-2,-3,-4,-5]));
+  arrayInsertFast(a, len, 1, 117);
+  test(arrayEqual(a, [17, 117,-2,-3,-4,-5]));
+  arrayInsertFast(a, len, 1, 55);
+  test(arrayEqual(a, [17, 55, 117, -3,-4,-5]));
+  arrayInsertFast(a, len, 3, 77);
+  test(arrayEqual(a, [17, 55, 117, 77,-4,-5]));
+  arrayInsertFast(a, len, 0, 11);
+  test(arrayEqual(a, [11, 17, 55, 117, 77,-5]));
+
+
   //fast allocation  , it is a little bit slow
  { len:=0;
   for i:=0 to 100000 do begin
@@ -221,6 +254,18 @@ begin
 
   test(arrayEqual(['a', '', ''], ['a', 'a', 'a']) = false);
 
+
+  SetLength(a, 0);
+  arrayInsert(a, -1, 'hallo');
+  test(strJoin(a, ':'), 'hallo');
+  arrayInsert(a, 2, 'welt');
+  test(strJoin(a, ':'), 'hallo:welt');
+  arrayInsert(a, 1, '---');
+  test(strJoin(a, ':'), 'hallo:---:welt');
+  arrayInsert(a, 10, '!');
+  test(strJoin(a, ':'), 'hallo:---:welt:!');
+  arrayInsert(a, 0, '....');
+  test(strJoin(a, ':'), '....:hallo:---:welt:!');
 end;
 {$ELSE}
 function IsNan(const d: double): boolean;
@@ -452,6 +497,25 @@ begin
   test(sa[2] = 'bar');
   test(sa[3] = 'xyt');
   test(sa[4] = '');
+
+  test(strCount('abcbc', 'x'), 0);
+  test(strCount('abcbc', 'a'), 1);
+  test(strCount('abcbc', 'b'), 2);
+  test(strCount('', 'b'), 0);
+  test(strCount('abcbc', 'x', 2), 0);
+  test(strCount('abcbc', 'a', 2), 0);
+  test(strCount('abcbc', 'b', 2), 2);
+  test(strCount('', 'b', 2), 0);
+  test(strCount('abcbc', ['a']), 1);
+  test(strCount('abcbc', ['b','c']), 4);
+  test(strCount('abcbc', ['b','c'], 3), 3);
+
+
+  test(strEscapeToHex('abcbc', ['a']), '\x61bcbc');
+  test(strEscapeToHex('abcbc', ['x']), 'abcbc');
+  test(strEscapeToHex('abcbc', ['b','c']), 'a\x62\x63\x62\x63');
+  test(strEscapeToHex('abcbc', ['b','c'], '%'), 'a%62%63%62%63');
+  test(strEscapeToHex('abcbc+', ['b','c', '+'], ''), 'a626362632B');
 end;
 
 procedure unitTests();

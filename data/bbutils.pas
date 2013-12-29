@@ -116,6 +116,8 @@ type
   TInt64Array =array of int64;
   TFloatArray = array of float;
 
+  TCharSet = set of ansichar;
+
 
 
 
@@ -145,6 +147,11 @@ function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDeleteUnorderedFast(var a: TStringArray; var len: longint; const i: longint):string; overload;
+
+//**Inserts element e at position i in a
+procedure arrayInsert(var a: TStringArray; i: longint; const e: string); overload;
+//**Inserts element e at position i in a
+procedure arrayInsertFast(var a: TStringArray; var len: longint; i: longint; const e: string); overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): integer; overload;
@@ -198,6 +205,11 @@ function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longin
 //**Returns e=a[i]
 function arrayDeleteUnorderedFast(var a: TLongintArray; var len: longint; const i: longint):longint; overload;
 
+//**Inserts element e at position i in a
+procedure arrayInsert(var a: TLongintArray; i: longint; const e: longint); overload;
+//**Inserts element e at position i in a
+procedure arrayInsertFast(var a: TLongintArray; var len: longint; i: longint; const e: longint); overload;
+
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the smallest element, in the array/slice (see above)
@@ -249,6 +261,11 @@ function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longi
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDeleteUnorderedFast(var a: TLongwordArray; var len: longint; const i: longint):longword; overload;
+
+//**Inserts element e at position i in a
+procedure arrayInsert(var a: TLongwordArray; i: longint; const e: longword); overload;
+//**Inserts element e at position i in a
+procedure arrayInsertFast(var a: TLongwordArray; var len: longint; i: longint; const e: longword); overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): integer; overload;
@@ -302,6 +319,11 @@ function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint)
 //**Returns e=a[i]
 function arrayDeleteUnorderedFast(var a: TInt64Array; var len: longint; const i: longint):int64; overload;
 
+//**Inserts element e at position i in a
+procedure arrayInsert(var a: TInt64Array; i: longint; const e: int64); overload;
+//**Inserts element e at position i in a
+procedure arrayInsertFast(var a: TInt64Array; var len: longint; i: longint; const e: int64); overload;
+
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the smallest element, in the array/slice (see above)
@@ -353,6 +375,11 @@ function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint)
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
 function arrayDeleteUnorderedFast(var a: TFloatArray; var len: longint; const i: longint):float; overload;
+
+//**Inserts element e at position i in a
+procedure arrayInsert(var a: TFloatArray; i: longint; const e: float); overload;
+//**Inserts element e at position i in a
+procedure arrayInsertFast(var a: TFloatArray; var len: longint; i: longint; const e: float); overload;
 
 //**Find element e in the array/slice (see above)
 function arrayIndexOf(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): integer; overload;
@@ -442,6 +469,9 @@ function strSlice(const first,last:pansichar):RawByteString; overload;
 //**Returns a string with all characters between start and last (including start, last)
 function strSlice(const s:RawByteString; start,last:longint):RawByteString; overload;
 
+//**Like move: moves count strings from source memory to dest memory. Keeps the reference count intact. Size is count of strings * sizeof(string)!
+procedure strMoveRef(var source: string; var dest: string; const size: longint); {$IFDEF HASINLINE} inline; {$ENDIF}
+
 //comparison
 
 //all pansichar<->pansichar comparisons are null-terminated (except strls.. functions with length-strict)
@@ -485,8 +515,10 @@ function striCompareClever(const s1, s2: RawByteString): integer; {$IFDEF HASINL
 //search
 //**Searchs the last index of c in s
 function strRpos(c:ansichar;s:RawByteString):longint;
-//**Counts all occurrences of search in searchIn (case sensitive)
-function strCount(const str: RawByteString; const searched: ansichar; from: longint = 1): longint;
+//**Counts all occurrences of searched in searchIn (case sensitive)
+function strCount(const str: RawByteString; const searched: ansichar; from: longint = 1): longint; overload;
+//**Counts all occurrences of searched in searchIn (case sensitive)
+function strCount(const str: RawByteString; const searched: TCharSet; from: longint = 1): longint; overload;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
 function strlsIndexOf(str,searched:pansichar; l1, l2: longint): longint;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
@@ -509,7 +541,6 @@ function strContains(const str,searched:RawByteString; from: longint):boolean; o
 function striContains(const str,searched:RawByteString; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //more specialized
-type TCharSet = set of ansichar;
 //**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrimLeft(var p: pansichar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
@@ -610,6 +641,8 @@ function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TEncoding; strict:
 function strDecodeHTMLEntities(s:RawByteString;encoding:TEncoding; strict: boolean = false):RawByteString; overload;
 //**Replace all occurences of x \in toEscape with escapeChar + x
 function strEscape(s:RawByteString; const toEscape: TCharSet; escapeChar: ansichar = '\'): RawByteString;
+//**Replace all occurences of x \in toEscape with escape + hex(ord(x))
+function strEscapeToHex(s:RawByteString; const toEscape: TCharSet; escape: RawByteString = '\x'): RawByteString;
 //**Returns a regex matching s
 function strEscapeRegex(const s:RawByteString): RawByteString;
 function strDecodeHex(s:RawByteString):RawByteString;
@@ -916,6 +949,7 @@ end;
 
 
 
+
 function arrayAdd(var a: TStringArray; const e: string): longint;
 begin
   result:=length(a);
@@ -948,11 +982,8 @@ function arrayDelete(var a: TStringArray; const i: longint): string;
 begin
   if (i<0) or (i>high(a)) then begin result := ''; exit; end;
   result := a[i];
-  if i < high(a) then begin
-    a[i] := ''; 
-    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    FillChar(a[high(a)], sizeof(a[0]), 0); 
-  end;
+  if i < high(a) then
+    strMoveRef(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
   SetLength(a,high(a));
 end;
 
@@ -992,11 +1023,8 @@ begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
   inc(len);
-  if len >= 2 then begin
-    FillChar(a[len-1], sizeof(a[0]), 0); 
-    move(a[0], a[1], (len - 1) * sizeof(a[0]));
-  end;
-  FillChar(a[0], sizeof(a[0]), 0); 
+  if len >= 2 then
+    strMoveRef(a[0], a[1], (len - 1) * sizeof(a[0]));
   a[0] := e;
 end;
 
@@ -1005,11 +1033,8 @@ function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint
 begin
   if (i<0) or (i>=len) then begin result := ''; exit; end;
   result:=a[i];
-  if i < high(a) then begin
-    a[i] := '';
-    move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    FillChar(a[high(a)], sizeof(a[0]), 0);
-  end;
+  if i < high(a) then
+    strMoveRef(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
   dec(len);
 end;
 
@@ -1019,6 +1044,28 @@ begin
   result:=a[i];
   dec(len);
   a[i]:=a[len];
+end;
+
+procedure arrayInsert(var a: TStringArray; i: longint; const e: string);
+begin
+  if (i < 0) then i := 0
+  else if i > length(a) then i := length(a);
+  SetLength(a, length(a) + 1);
+  if i + 1 <= high(a) then
+    strMoveRef(a[i], a[i+1], (high(a) - i) * sizeof(a[0]));
+  a[i] := e;
+end;
+
+procedure arrayInsertFast(var a: TStringArray; var len: longint; i: longint; const e: string);
+var
+  oldlen: LongInt;
+begin
+  oldlen := len;
+  if i >= length(a) then arrayReserveFast(a, len, i+1)
+  else if length(a) < oldlen + 1 then arrayReserveFast(a, len, len + 1);
+  if i + 1 <= oldlen then
+    strMoveRef(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
+  a[i] := e;
 end;
 
 function arrayIndexOf(const a: array of string; const e: string;
@@ -1152,11 +1199,8 @@ function arrayDelete(var a: TLongintArray; const i: longint): longint;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   SetLength(a,high(a));
 end;
 
@@ -1196,11 +1240,8 @@ begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
   inc(len);
-  if len >= 2 then begin
-    
+  if len >= 2 then
     move(a[0], a[1], (len - 1) * sizeof(a[0]));
-  end;
-  
   a[0] := e;
 end;
 
@@ -1209,11 +1250,8 @@ function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longin
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   dec(len);
 end;
 
@@ -1223,6 +1261,29 @@ begin
   result:=a[i];
   dec(len);
   a[i]:=a[len];
+end;
+
+procedure arrayInsert(var a: TLongintArray; i: longint; const e: longint);
+begin
+  if (i < 0) then i := 0
+  else if i > length(a) then i := length(a);
+  SetLength(a, length(a) + 1);
+  if i + 1 <= high(a) then
+    move(a[i], a[i+1], (high(a) - i) * sizeof(a[0]));
+  a[i] := e;
+end;
+
+procedure arrayInsertFast(var a: TLongintArray; var len: longint; i: longint; const e: longint);
+var
+  oldlen: LongInt;
+begin
+  oldlen := len;
+  if i >= length(a) then arrayReserveFast(a, len, i+1)
+  else if length(a) < oldlen + 1 then arrayReserveFast(a, len, len + 1);
+  if i + 1 <= oldlen then
+    move(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
+  a[i] := e;
+  len := len + 1;
 end;
 
 function arrayIndexOf(const a: array of longint; const e: longint;
@@ -1356,11 +1417,8 @@ function arrayDelete(var a: TLongwordArray; const i: longint): longword;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   SetLength(a,high(a));
 end;
 
@@ -1400,11 +1458,8 @@ begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
   inc(len);
-  if len >= 2 then begin
-    
+  if len >= 2 then
     move(a[0], a[1], (len - 1) * sizeof(a[0]));
-  end;
-  
   a[0] := e;
 end;
 
@@ -1413,11 +1468,8 @@ function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longi
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   dec(len);
 end;
 
@@ -1427,6 +1479,28 @@ begin
   result:=a[i];
   dec(len);
   a[i]:=a[len];
+end;
+
+procedure arrayInsert(var a: TLongwordArray; i: longint; const e: longword);
+begin
+  if (i < 0) then i := 0
+  else if i > length(a) then i := length(a);
+  SetLength(a, length(a) + 1);
+  if i + 1 <= high(a) then
+    move(a[i], a[i+1], (high(a) - i) * sizeof(a[0]));
+  a[i] := e;
+end;
+
+procedure arrayInsertFast(var a: TLongwordArray; var len: longint; i: longint; const e: longword);
+var
+  oldlen: LongInt;
+begin
+  oldlen := len;
+  if i >= length(a) then arrayReserveFast(a, len, i+1)
+  else if length(a) < oldlen + 1 then arrayReserveFast(a, len, len + 1);
+  if i + 1 <= oldlen then
+    move(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
+  a[i] := e;
 end;
 
 function arrayIndexOf(const a: array of longword; const e: longword;
@@ -1560,11 +1634,8 @@ function arrayDelete(var a: TInt64Array; const i: longint): int64;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   SetLength(a,high(a));
 end;
 
@@ -1604,11 +1675,8 @@ begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
   inc(len);
-  if len >= 2 then begin
-    
+  if len >= 2 then
     move(a[0], a[1], (len - 1) * sizeof(a[0]));
-  end;
-  
   a[0] := e;
 end;
 
@@ -1617,11 +1685,8 @@ function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint)
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   dec(len);
 end;
 
@@ -1631,6 +1696,28 @@ begin
   result:=a[i];
   dec(len);
   a[i]:=a[len];
+end;
+
+procedure arrayInsert(var a: TInt64Array; i: longint; const e: int64);
+begin
+  if (i < 0) then i := 0
+  else if i > length(a) then i := length(a);
+  SetLength(a, length(a) + 1);
+  if i + 1 <= high(a) then
+    move(a[i], a[i+1], (high(a) - i) * sizeof(a[0]));
+  a[i] := e;
+end;
+
+procedure arrayInsertFast(var a: TInt64Array; var len: longint; i: longint; const e: int64);
+var
+  oldlen: LongInt;
+begin
+  oldlen := len;
+  if i >= length(a) then arrayReserveFast(a, len, i+1)
+  else if length(a) < oldlen + 1 then arrayReserveFast(a, len, len + 1);
+  if i + 1 <= oldlen then
+    move(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
+  a[i] := e;
 end;
 
 function arrayIndexOf(const a: array of int64; const e: int64;
@@ -1764,11 +1851,8 @@ function arrayDelete(var a: TFloatArray; const i: longint): float;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   SetLength(a,high(a));
 end;
 
@@ -1808,11 +1892,8 @@ begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
   inc(len);
-  if len >= 2 then begin
-    
+  if len >= 2 then
     move(a[0], a[1], (len - 1) * sizeof(a[0]));
-  end;
-  
   a[0] := e;
 end;
 
@@ -1821,11 +1902,8 @@ function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint)
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
-  if i < high(a) then begin
-    
+  if i < high(a) then
     move(a[i+1], a[i], (high(a) - i) * sizeof(a[0]));
-    
-  end;
   dec(len);
 end;
 
@@ -1835,6 +1913,28 @@ begin
   result:=a[i];
   dec(len);
   a[i]:=a[len];
+end;
+
+procedure arrayInsert(var a: TFloatArray; i: longint; const e: float);
+begin
+  if (i < 0) then i := 0
+  else if i > length(a) then i := length(a);
+  SetLength(a, length(a) + 1);
+  if i + 1 <= high(a) then
+    move(a[i], a[i+1], (high(a) - i) * sizeof(a[0]));
+  a[i] := e;
+end;
+
+procedure arrayInsertFast(var a: TFloatArray; var len: longint; i: longint; const e: float);
+var
+  oldlen: LongInt;
+begin
+  oldlen := len;
+  if i >= length(a) then arrayReserveFast(a, len, i+1)
+  else if length(a) < oldlen + 1 then arrayReserveFast(a, len, len + 1);
+  if i + 1 <= oldlen then
+    move(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
+  a[i] := e;
 end;
 
 function arrayIndexOf(const a: array of float; const e: float;
@@ -2262,7 +2362,6 @@ begin
               (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pansichar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
 end;
 
-
 function strlsIndexOf(str, searched: pansichar; l1, l2: longint): longint;
 var last: pansichar;
 begin
@@ -2354,6 +2453,45 @@ begin
 end;
 
 
+procedure strMoveRef(var source: string; var dest: string; const size: longint); {$IFDEF HASINLINE} inline; {$ENDIF}
+var ps, pd: PAnsiChar;
+    clearFrom: PAnsiChar;
+    clearTo: PAnsiChar;
+    countHighSize: integer;
+begin
+  if size <= 0 then exit;
+
+  countHighSize := size - sizeof(string);
+
+  //clear reference count of target ( [dest:0..size-1] - [source:0..size-1] )
+
+  clearFrom := PAnsiChar(@dest);
+  clearTo := clearFrom + countHighSize;
+  if (clearFrom >= PAnsiChar(@source)) and (clearFrom <= PAnsiChar(@source) + countHighSize) then
+    clearFrom := PAnsiChar(@source) + countHighSize + sizeof(string);
+  if (clearTo >= PAnsiChar(@source)) and (clearTo <= PAnsiChar(@source) + countHighSize) then
+    clearTo := PAnsiChar(@source) - sizeof(string);
+
+  while clearFrom <= clearTo do begin
+    PString(clearFrom)^ := '';
+    inc(clearFrom, sizeof(string));
+  end;
+
+  //move
+  move(source, dest, size);
+
+  //remove source ( [source:0..size-1] - [dest:0..size-1] )
+  clearFrom := PAnsiChar(@source);
+  clearTo := clearFrom + countHighSize;
+  if (clearFrom >= PAnsiChar(@dest)) and (clearFrom <= PAnsiChar(@dest) + countHighSize) then
+    clearFrom := PAnsiChar(@dest) + countHighSize + sizeof(string);
+  if (clearTo >= PAnsiChar(@dest)) and (clearTo <= PAnsiChar(@dest) + countHighSize) then
+    clearTo := PAnsiChar(@dest) - sizeof(string);
+
+  if clearFrom <= clearTo then
+    FillChar(clearFrom^, PtrUInt(clearTo - clearFrom) + sizeof(string), 0);
+end;
+
 function strrpos(c: ansichar; s: RawByteString): longint;
 var i:longint;
 begin
@@ -2385,6 +2523,16 @@ begin
   for i := from to length(str) do
     if str[i] = searched then inc(result);
 end;
+
+function strCount(const str: RawByteString; const searched: TCharSet; from: longint): longint;
+var
+  i: LongInt;
+begin
+  result := 0;
+  for i := from to length(str) do
+    if str[i] in searched then inc(result);
+end;
+
 
 function strslice(const  first, last: pansichar): RawByteString;
 begin
@@ -3517,6 +3665,38 @@ begin
     if s[i] in toEscape then result := result +  escapeChar;
     result := result +  s[i];
   end;
+end;
+
+function strEscapeToHex(s:RawByteString; const toEscape: TCharSet; escape: RawByteString): RawByteString;
+var
+  p: Integer;
+  i: Integer;
+  temp: String;
+  escapeCount: integer;
+  escapeP: pansichar;
+begin
+  result := s;
+  escapeCount := strCount(s, toEscape);
+  if escapeCount = 0 then exit
+  else if length(s) = 0 then exit;
+
+  if length(escape) > 0 then escapeP := @escape[1]
+  else escapeP := @s[1]; //value is not used, but
+
+  SetLength(result, length(s) + escapeCount * ( 2 + length(escape) - 1 ));
+  p := 1;
+  for i := 1 to length(s) do
+    if not (s[i] in toEscape) then begin
+      result[p] := s[i];
+      inc(p);
+    end else begin
+      move(escapeP^, result[p], length(escape));
+      inc(p, length(escape));
+      temp := IntToHex(ord(s[i]), 2);
+      move(temp[1], result[p], 2);
+      inc(p, 2);
+    end;
+  //setlength(result, p-1);
 end;
 
 function strEscapeRegex(const s: RawByteString): RawByteString;
