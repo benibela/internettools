@@ -311,8 +311,12 @@ var
   resultString: string;
   args: array[0..1] of jvalue;
 
-
+  const allowedUnreserved =  ['0'..'9', 'A'..'Z', 'a'..'z',    '-', '_', '.', '!', '~', '*', '''', '(', ')', '%'];
+        allowedPath = allowedUnreserved  + [':','@','&','=','+','$',',', ';','/'];
+        allowedURI = allowedUnreserved + [';','/','?',':','@','&','=','+','$',',','[',']','"'];
+        low = [#0..#128];
 begin
+
   result:='';
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
@@ -320,6 +324,10 @@ begin
     j.env^^.ExceptionClear(j.env);
     //log('Warning: Ignoring exception');
   end;
+
+  url.path := strEscapeToHex(url.path, low - allowedPath, '%');
+  url.params := strEscapeToHex(url.params, low - allowedURI, '%');
+  url.linktarget := strEscapeToHex(url.linktarget, low - allowedURI, '%'); //? or set to ''
 
   url.prepareSelfForRequest(lastConnectedUrl);
 
@@ -331,6 +339,7 @@ begin
       //HttpGet httpget = new HttpGet(url);
       jUrl := j.NewStringUTF8(pchar(url.combined));
       jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
+      j.RethrowJavaExceptionIfThereIsOne(EInternetException);
       j.DeleteLocalRef(jUrl);
 
       if lastUrl <> '' then
@@ -341,6 +350,7 @@ begin
         setRequestData();
 
       jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
+      j.RethrowJavaExceptionIfThereIsOne(EInternetException);
 
       //send
       args[0].l := jRequest;
