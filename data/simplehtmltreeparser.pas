@@ -1839,10 +1839,16 @@ begin
       if pos(':', attrib.value) > 0 then
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
   end;
-  if (pos(':', new.value) > 0) then
+  if (pos(':', new.value) > 0) then begin
     new.namespace := findNamespace(strSplitGet(':', new.value))
-   else
+  end else
     new.namespace := FCurrentNamespace;;
+  if new.value = '' then
+    if parsingModel = pmStrict then raise ETreeParseException.Create('Invalid node with empty name: '+strFromPchar(tagName, tagNameLen))
+    else begin
+      new.value:= '<' +  strFromPchar(tagName, tagNameLen);
+      new.typ :=tetText;
+    end;
 
   new.initialized;
 end;
@@ -1932,9 +1938,11 @@ begin
     if htmlElementChildless(name) then begin
       parenDelta := 0;
       last := FCurrentElement;
+      weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
       while last <> nil do begin
         if last.typ = tetClose then parenDelta -= 1
         else if (last.typ = tetOpen) then begin
+          if htmlTagWeight(last.value) > weight then break;//this will still crash with same weight elements
           parenDelta+=1;
           if (last.value = name) then begin
             if (last.reverse <> last.next) or (parenDelta <> 0) then break; //do not allow nested auto closed elements (reasonable?)
@@ -1949,6 +1957,7 @@ begin
             temp := last.getFirstChild();
             while (temp <> nil) and (last <> new) do begin
               if temp.parent = last.parent then temp.parent := last;
+              if (temp.typ in [tetOpen, tetDocument]) and (temp.reverse = nil) then break;
               temp := temp.getNextSibling();
             end;
             break;

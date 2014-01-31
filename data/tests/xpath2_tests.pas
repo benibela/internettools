@@ -3685,6 +3685,8 @@ begin
   t('outer-html(/)', '<table><tr><td><TABLE><tr><td>1</td></tr></TABLE></td></tr></table>' {end tags should be uppercase}, '<table><tr><td><TABLE><tr><td>1</td></tr></TABLE></TD></TR></table>');
   t('outer-html(/)', '<table><TR><TD>1</TD><td>2</td><TD>3</TD></TR></table>', '<table><TR><TD>1<td>2<TD>3</TR></table>');
 
+  t('outer-html(/)', '<table><tr><td><br></td><td>'+{firefox: </br>}'</td></tr></table>', '<table><tr><td><br></td><td></br></td></tr></table>');
+  t('outer-html(/)', '<body>some text&lt;http:/some-text&gt; some text</body>','<body>some text <http://some-text> some text</body>'); //this does not make much sense. not removing the last slash from http:// would be better. firefox turns it into an element: <http: some-text=""> some text</http:>
 
 
   xml.repairMissingStartTags:=true;
