@@ -52,9 +52,18 @@ type
   end;
   { TDecodedUrl }
 
+  TDecodedUrlParts = set of (dupProtocol, dupUsername, dupPassword, dupHost, dupPort, dupPath, dupParams, dupLinkTarget);
+const
+  DecodedUrlPartsALL = [dupProtocol, dupUsername, dupPassword, dupHost, dupPort, dupPath, dupParams, dupLinkTarget];
+type
+  //** @abstract(A record storing a decoded url.)
+  //** Use decodeUrl to create it.@br
+  //** It only splits the string into parts, so parts that are url encoded (username, password, path, params, linktarget) will still be url encoded. @br
+  //** path, params, linktarget include their delimiter, so an empty string denotes the absence of these parts.
   TDecodedUrl = record
     protocol, username, password, host, port, path, params, linktarget: string;
-    function combined: string;
+    function combined(use: TDecodedUrlParts = DecodedUrlPartsALL): string;
+    function combinedExclude(doNotUse: TDecodedUrlParts = []): string; inline;
     function resolved(rel: string): TDecodedUrl;
     function serverConnectionOnly: TDecodedUrl;
     procedure prepareSelfForRequest(const lastConnectedURL: TDecodedUrl);
@@ -162,6 +171,7 @@ type
 
 
 //procedure decodeURL(const totalURL: string; out protocol, host, url: string);
+//** Splits a url into parts
 function decodeURL(const totalURL: string): TDecodedUrl;
 
 type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
@@ -342,21 +352,28 @@ end;
 
 { TDecodedUrl }
 
-function TDecodedUrl.combined: string;
+function TDecodedUrl.combined(use: TDecodedUrlParts): string;
 begin
   result := '';
-  if protocol <> '' then result += protocol+'://';
-  if username <> '' then begin
+  if (dupProtocol in use) and (protocol <> '') then result += protocol+'://';
+  if (dupUsername in use) and (username <> '') then begin
     result += username;
-    if password <> '' then result += ':'+password;
+    if (dupPassword in use) and (password <> '') then result += ':'+password;
     Result+='@';
   end;
-  if strContains(host, ':') then result += '['+host+']'
-  else result += host;
-  if port <> '' then result += ':'+port;
-  result += path;
-  result += params;
-  result += linktarget;
+  if dupHost in use then begin
+    if strContains(host, ':') then result += '['+host+']'
+    else result += host;
+    if (dupPort in use) and (port <> '') then result += ':'+port;
+  end;
+  if dupPath in use then result += path;
+  if dupParams in use then result += params;
+  if dupLinkTarget in use then result += linktarget;
+end;
+
+function TDecodedUrl.combinedExclude(doNotUse: TDecodedUrlParts): string;
+begin
+  result := combined(DecodedUrlPartsALL - doNotUse);
 end;
 
 function TDecodedUrl.resolved(rel: string): TDecodedUrl;

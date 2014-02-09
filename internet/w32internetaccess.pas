@@ -327,8 +327,8 @@ begin
       tempPort := StrToIntDef(decoded.port, 80);
     //huh? wininet seems to remember the password, if it is set once and continues sending it with new requests, even if is unset. (tested with WINE and Windows 7)
     if (decoded.username = '') and (decoded.password = '') then hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,nil,            nil,temp,0,0)
-    else if decoded.password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(decoded.username),nil,temp,0,0)
-    else                                        hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(decoded.username),pchar(decoded.password),temp,0,0);
+    else if decoded.password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),nil,temp,0,0)
+    else                                        hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),pchar(strUnescapeHex(decoded.password, '%')),temp,0,0);
     if hLastConnection=nil then
       raise EW32InternetException.create(format(rsConnectingTo0SFailed, [decoded.host]));
     lastConnectedUrl := decoded;

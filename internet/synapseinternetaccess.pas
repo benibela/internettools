@@ -172,11 +172,15 @@ begin
   url.prepareSelfForRequest(lastConnectedUrl);
 
   initConnection;
-  ok := connection.HTTPMethod(method,url.combined);
+  if (url.username <> '') then begin
+    connection.UserName := strUnescapeHex(url.username, '%');
+    connection.Password := strUnescapeHex(url.password, '%');
+  end;
+  ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
 
   if (not ok) and (checkEtcResolv) then begin
     initConnection;
-    ok := connection.HTTPMethod(method,url.combined);
+    ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
   end;
 
   if ok then begin
@@ -198,8 +202,8 @@ begin
   end else
     raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
 
-  url.username:=''; url.password:=''; url.linktarget:=''; //keep it secret in referer
-  lastUrl:=url.combined;
+  //url.username:=''; url.password:=''; url.linktarget:=''; //keep it secret in referer
+  lastUrl:=url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]);
   lastHTTPResultCode := connection.ResultCode;
 
   if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then

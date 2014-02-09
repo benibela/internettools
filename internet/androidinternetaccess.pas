@@ -63,6 +63,9 @@ public
   procedure closeOpenedConnections();override;
 
   function internalHandle: TObject; override;
+
+  //sets username and password for an host
+  procedure setCredentials(const username, password: string; const host: string);
 end;
 TAndroidInternetAccessClass = class of TAndroidInternetAccess;
 
@@ -337,7 +340,7 @@ begin
   try
     with classInfos do begin;
       //HttpGet httpget = new HttpGet(url);
-      jUrl := j.NewStringUTF8(pchar(url.combined));
+      jUrl := j.NewStringUTF8(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
       jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
       j.RethrowJavaExceptionIfThereIsOne(EInternetException);
       j.DeleteLocalRef(jUrl);
@@ -351,6 +354,10 @@ begin
 
       jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
       j.RethrowJavaExceptionIfThereIsOne(EInternetException);
+
+      if url.username <> '' then
+        setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ); //problem: this is host specific, so it does not work for redirections
+
 
       //send
       args[0].l := jRequest;
@@ -526,7 +533,63 @@ begin
  result:=tobject(jhttpclient);
 end;
 
+procedure TAndroidInternetAccess.setCredentials(const username, password: string; const host: string);
+var jcCredentialsProvider, jcAbstractHttpClient, jcAuthScope, jcUsernamePasswordCredentials: jclass;
+    jmAbstractHttpClientGetCredentialsProvider, jmCredentialsProviderSetCredentials, jmAuthScopeConstructor, jmUsernamePasswordCredentialsConstructor: jmethodID;
+    jhost, jusername, jpassword, authScope, creds, credProvider: jclass;
+    tempargs: array[0..1] of jvalue;
+begin
+  if jhttpclient = nil then raise EAndroidInterfaceException.Create('HttpClient not created');
+  //jhttpclient.getCredentialsProvider().setCredentials(new AuthScope(host, AuthScope.ANY_PORT), new UsernamePasswordCredentials(username, password));
+  with needJ do begin
+    jcAbstractHttpClient := getclass('org/apache/http/impl/client/AbstractHttpClient');
+    jmAbstractHttpClientGetCredentialsProvider := getmethod(jcAbstractHttpClient, 'getCredentialsProvider', '()Lorg/apache/http/client/CredentialsProvider;');
+    jcCredentialsProvider := getclass('org/apache/http/client/CredentialsProvider');
+    jmCredentialsProviderSetCredentials := getmethod(jcCredentialsProvider, 'setCredentials', '(Lorg/apache/http/auth/AuthScope;Lorg/apache/http/auth/Credentials;)V');
+    jcAuthScope := getclass('org/apache/http/auth/AuthScope');
+    jmAuthScopeConstructor := getmethod(jcAuthScope, '<init>', '(Ljava/lang/String;I)V');
+    jcUsernamePasswordCredentials := getclass('org/apache/http/auth/UsernamePasswordCredentials');
+    jmUsernamePasswordCredentialsConstructor := getmethod(jcUsernamePasswordCredentials, '<init>', '(Ljava/lang/String;Ljava/lang/String;)V');
+
+    try
+      if host <> '' then jhost := NewStringUTF8(host)
+      else jhost := nil; //httpclient documentation says we can use null to set if for all hosts. But this this DOES NOT WORK and raises an illegalargumentexception.
+      jusername := NewStringUTF8(username);
+      jpassword := NewStringUTF8(password);
+
+      try
+        tempargs[0].l := jhost;
+        tempargs[1].i := {AuthScope.ANY_PORT} -1;
+        authScope := newObject(jcAuthScope, jmAuthScopeConstructor, @tempargs);
+        tempargs[0].l := jusername;
+        tempargs[1].l := jpassword;
+        creds := newObject(jcUsernamePasswordCredentials, jmUsernamePasswordCredentialsConstructor, @tempargs);
+        try
+          credProvider := callObjectMethod(jhttpclient, jmAbstractHttpClientGetCredentialsProvider);
+          tempargs[0].l := authScope;
+          tempargs[1].l := creds;
+          callVoidMethod(credProvider, jmCredentialsProviderSetCredentials, @tempargs);
+          deleteLocalRef(credProvider);
+        finally
+          deleteLocalRef(authScope);
+          deleteLocalRef(creds);
+        end;
+      finally
+        deleteLocalRef(jpassword);
+        deleteLocalRef(jusername);
+        if jhost <> nil then deleteLocalRef(jhost);
+      end;
+    finally
+      deleteLocalRef(jcCredentialsProvider);
+      deleteLocalRef(jcAuthScope);
+      deleteLocalRef(jcUsernamePasswordCredentials);
+    end;
+  end;
+end;
+
+
 {$ENDIF}
+
 
 end.
 
