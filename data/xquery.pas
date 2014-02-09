@@ -2950,7 +2950,7 @@ begin
   if (staticContext.moduleVariables <> nil) then begin
     result := staticContext.moduleVariables.hasVariable(name, @temp, ns);
     value := temp;
-    exit;
+    if result then exit;
   end;
   module := findModule(ns);
   if (module <> nil) then begin
