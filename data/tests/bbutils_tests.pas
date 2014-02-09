@@ -511,11 +511,21 @@ begin
   test(strCount('abcbc', ['b','c'], 3), 3);
 
 
+  test(strEscapeToHex('', []), '');
+  test(strUnescapeHex(''), '');
+  test(strEscapeToHex('a', ['a']), '\x61');
+  test(strUnescapeHex('\x61'), 'a');
   test(strEscapeToHex('abcbc', ['a']), '\x61bcbc');
+  test(strUnescapeHex('\x61bcbc'), 'abcbc');
   test(strEscapeToHex('abcbc', ['x']), 'abcbc');
+  test(strUnescapeHex('abcbc'), 'abcbc');
   test(strEscapeToHex('abcbc', ['b','c']), 'a\x62\x63\x62\x63');
+  test(strUnescapeHex('a\x62\x63\x62\x63'), 'abcbc');
   test(strEscapeToHex('abcbc', ['b','c'], '%'), 'a%62%63%62%63');
+  test(strUnescapeHex('a%62%63%62%63', '%'), 'abcbc');
   test(strEscapeToHex('abcbc+', ['b','c', '+'], ''), 'a626362632B');
+
+
 end;
 
 procedure unitTests();

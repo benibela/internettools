@@ -216,6 +216,12 @@ procedure threadedCall(proc: TProcedureOfObject; isfinished: TProcedureOfObject)
 //**Calls proc in an new thread
 procedure threadedCall(proc: TProcedure; isfinished: TProcedureOfObject);overload;
 
+//------------------------------Charfunctions--------------------------
+//Converts 0..9A..Za..z to a corresponding integer digit
+function charDecodeDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
+//Converts 0..9A..Fa..f to a corresponding integer digit
+function charDecodeHexDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
+
 //------------------------------Stringfunctions--------------------------
 //All of them start with 'str' or 'widestr' so can find them easily
 //Naming scheme str <l> <i> <name>
@@ -411,10 +417,14 @@ function strDecodeHTMLEntities(s:RawByteString;encoding:TEncoding; strict: boole
 function strEscape(s:RawByteString; const toEscape: TCharSet; escapeChar: ansichar = '\'): RawByteString;
 //**Replace all occurences of x \in toEscape with escape + hex(ord(x))
 function strEscapeToHex(s:RawByteString; const toEscape: TCharSet; escape: RawByteString = '\x'): RawByteString;
+//**Replace all occurences of escape + XX with chr(XX)
+function strUnescapeHex(s:RawByteString; escape: RawByteString = '\x'): RawByteString;
 //**Returns a regex matching s
 function strEscapeRegex(const s:RawByteString): RawByteString;
-function strDecodeHex(s:RawByteString):RawByteString;
-function strEncodeHex(s:RawByteString; const code: RawByteString = '0123456789ABCDEF'):RawByteString;
+//**Decodes a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strUnescapeHex)
+function strDecodeHex(s:RawByteString):RawByteString; {$ifdef fpc}deprecated;{$endif}
+//**Encodes to a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strEscapeToHex)
+function strEncodeHex(s:RawByteString; const code: RawByteString = '0123456789ABCDEF'):RawByteString;{$ifdef fpc}deprecated;{$endif}
 //**Returns the first l bytes of p (copies them so O(n))
 function strFromPchar(p:pansichar;l:longint):RawByteString;
 
@@ -799,7 +809,7 @@ begin
   a[i] := e;
 end;
 
-procedure arrayInsertFast(var a: TLongintArray; var len: longint; i: longint; const e: longint);
+procedure arrayInsertFast(var a: T__ArrayType__; var len: longint; i: longint; const e: T__ElementType__);
 var
   oldlen: LongInt;
 begin
@@ -807,7 +817,7 @@ begin
   if i >= length(a) then arrayReserveFast(a, len, i+1)
   else if length(a) < oldlen + 1 then arrayReserveFast(a, len, len + 1);
   if i + 1 <= oldlen then
-    move(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
+    {%COMPARE T__ElementType__ = string }strMoveRef{%END-COMPARE}{%COMPARE T__ElementType__ <> string }move{%END-COMPARE}(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
   a[i] := e;
   len := len + 1;
 end;
@@ -986,6 +996,26 @@ end;
 procedure threadedCall(proc: TProcedure; isfinished: TProcedureOfObject);
 begin
   threadedCallBase(TProcedureOfObject(procedureToMethod(proc)),TNotifyEvent(isfinished));
+end;
+
+function charDecodeDigit(c: char): integer;
+begin
+  case c of
+    '0'..'9': result := ord(c) - ord('0');
+    'a'..'z': result := ord(c) - ord('a');
+    'A'..'Z': result := ord(c) - ord('A');
+    else raise Exception.Create('Character '+c+' is not a valid digit');
+  end;
+end;
+
+function charDecodeHexDigit(c: char): integer;
+begin
+  case c of
+    '0'..'9': result := ord(c) - ord('0');
+    'a'..'f': result := ord(c) - ord('a');
+    'A'..'F': result := ord(c) - ord('A');
+    else raise Exception.Create('Character '+c+' is not a valid hex digit');
+  end;
 end;
 
 
@@ -2016,6 +2046,39 @@ begin
   //setlength(result, p-1);
 end;
 
+function strUnescapeHex(s: RawByteString; escape: RawByteString): RawByteString;
+var
+  f, t: Integer;
+  start: Integer;
+  last: Integer;
+begin
+  if escape = '' then exit(strDecodeHex(s));
+  start := pos(escape, s);
+  if start <= 0 then exit(s);
+  SetLength(result, length(s));
+  move(s[1], result[1], start-1);
+  f := start;
+  t := start;
+  last := length(s) - length(escape) + 1 - 2;
+  while f <= last do begin
+    if strlsequal(@s[f], pchar(escape), length(escape)) then begin
+      inc(f, length(escape));
+      result[t] := chr(charDecodeHexDigit(s[f]) shl 4 or charDecodeHexDigit(s[f+1]));
+      inc(f, 2);
+      inc(t, 1);
+    end else begin
+      result[t] := s[f];
+      inc(f, 1);
+      inc(t, 1);
+    end;
+  end;
+  if (f > last) and (f <= length(s)) then begin
+    move(s[f], result[t], length(s) - f + 1);
+    inc(t, length(s) - f + 1);
+  end;
+  SetLength(result, t-1);
+end;
+
 function strEscapeRegex(const s: RawByteString): RawByteString;
 begin
   result := strEscape(s, ['(','|', '.', '*', '?', '^', '$', '-', '[', '{', '}', ']', ')', '\'], '\');
@@ -2028,15 +2091,6 @@ begin
 end;
 
 function strDecodeHex(s: RawByteString): RawByteString;
-  function decodeSingleHex(const c: ansichar): byte; {$IFDEF HASINLINE} inline; {$ENDIF}
-  begin
-    case c of
-      '0'..'9': result := ord(c) - ord('0') + $0;
-      'A'..'F': result := ord(c) - ord('A') + $A;
-      'a'..'f': result := ord(c) - ord('a') + $a;
-      else assert(false);
-    end;
-  end;
 var
   i: Integer;
 begin
@@ -2044,7 +2098,7 @@ begin
   result := '';
   setlength(result, length(s) div 2);
   for i:=1 to length(result) do
-    result[i] := chr((decodeSingleHex(s[2*i-1]) shl 4) or decodeSingleHex(s[2*i]));
+    result[i] := chr((charDecodeHexDigit(s[2*i-1]) shl 4) or charDecodeHexDigit(s[2*i]));
 end;
 
 function strEncodeHex(s: RawByteString; const code: RawByteString): RawByteString;
