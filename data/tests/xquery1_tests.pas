@@ -191,8 +191,8 @@ begin
   ps.ImplicitTimezone:=-5 / HoursPerDay;
   //ps.OnEvaluateVariable:=@vars.evaluateVariable;
   //ps.OnDefineVariable:=@vars.defineVariable;
-  ps.AllowJSONLiterals:=false;
-  ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+  ps.ParsingOptions.AllowJSONLiterals:=false;
+  ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   xml := TTreeParser.Create;
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
@@ -1713,10 +1713,10 @@ begin
   t('let $a := {"a": 78}, $b := [$a] return $b(1)("a")', '78');
   t('let $a := [100], $b := {"x": $a} return $b("x")(1)', '100');
   t('let $a := true return $a', '');
-  ps.AllowJSONLiterals:=true;
+  ps.ParsingOptions.AllowJSONLiterals:=true;
   t('let $a := true return $a', 'true');
   t('for $a in (true, false, null) return $a', 'true false null');
-  ps.AllowJSONLiterals:=false;
+  ps.ParsingOptions.AllowJSONLiterals:=false;
 
   t('serialize-json(<r><a>AA</a><b>BB</b></r> / {(a): b})', '{"AA": "<b>BB</b>"}');
   t('serialize-json(<r><a>AA</a><b>BB</b></r> / {./a: b})', '{"AA": "<b>BB</b>"}');

@@ -1573,7 +1573,7 @@ begin
   FAttributeMatching.Values['class'] := 'list-contains';
 
   FQueryEngine := TXQueryEngine.create;
-  FQueryEngine.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+  FQueryEngine.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   //FQueryEngine.OnDefineVariable:=@defineXQVariable;
   //FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));

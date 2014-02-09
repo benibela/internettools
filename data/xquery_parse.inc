@@ -25,10 +25,7 @@ type
  TXQParsingContext = class
   engine: TXQueryEngine;
 
-  AllowExtendedStrings: boolean;
-  AllowPropertyDotNotation: TXQPropertyDotNotation;
-  AllowJSON: boolean;
-  AllowJSONLiterals: Boolean;
+  options: TXQParsingOptions;
   parsingModel: TXQParsingModel;
   encoding: TEncoding;
   staticContext: TXQStaticContext;
@@ -307,7 +304,7 @@ begin
          result.kind:=tikElementTest;
          result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
       end;
-    end else if AllowJSON and ((word = 'array') or (word = 'object') or (word = 'json-item') or (word = 'structured-item')) then begin
+    end else if options.AllowJSON and ((word = 'array') or (word = 'object') or (word = 'json-item') or (word = 'structured-item')) then begin
       expect('('); expect(')');
       case word of
         'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
@@ -815,7 +812,7 @@ var
   propertyAccess: Boolean;
 begin
   result := TXQTermVariable.Create(nextTokenQName(), staticContext);
-  if (AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(TXQTermVariable(result).value, '.') then begin
+  if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(TXQTermVariable(result).value, '.') then begin
     propertyAccess := true;
     operatorMode := strEndsWith(TXQTermVariable(result).value, '.');
     if operatorMode then begin
@@ -1086,17 +1083,17 @@ begin
     end;
 
     '{': begin
-      if not AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension, to create a json like object) ');
+      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension, to create a json like object) ');
       exit(parseJSONLikeObjectConstructor);
     end;
     '[': begin
-      if not AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension, to create a json like array) ');
+      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension, to create a json like array) ');
       exit(parseJSONLikeArray());
     end
 
 
     else if (word = 'x') and (pos^ in ['"', '''']) then begin
-      if not AllowExtendedStrings then raiseParsingError('err:XPST0003', 'Extended string syntax was disabled');
+      if not options.AllowExtendedStrings then raiseParsingError('err:XPST0003', 'Extended string syntax was disabled');
       exit(parseXString());
     end else begin
       wordlookahead := nextToken(true);
@@ -1325,19 +1322,19 @@ begin
           if result is TXQTermNodeMatcher then begin
             result := TXQTermVariable.create(IfThen(TXQTermNodeMatcher(astroot).namespace = '', TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).namespace + ':' + TXQTermNodeMatcher(astroot).select), staticContext);
             astroot.free;
-            if (AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(result).value, '.')) then
+            if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(result).value, '.')) then
               result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
           end;
           result := TXQTermDefineVariable.Create(result, parseSomething());
           //staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
           exit;
         end;
-        '|': if AllowJSON and ((pos+1)^ = '}') then exit(astroot) // {| .. |} object merging syntax
+        '|': if options.AllowJSON and ((pos+1)^ = '}') then exit(astroot) // {| .. |} object merging syntax
              else pushBinaryOp(TXQueryEngine.findOperator(pos)); //| operator
         else begin
           op := TXQueryEngine.findOperator(pos);
           if op <> nil then pushBinaryOp(op)
-          else if (word[1] = '.') and (AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
+          else if (word[1] = '.') and (options.AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
             expect(word);
             parseDotOperator;
           end else
@@ -1679,13 +1676,13 @@ begin
             if (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
               case token of
                 'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
-                'extended-strings': readBoolean(AllowExtendedStrings, temp);
-                'json': readBoolean(AllowJSON, temp);
+                'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
+                'json': readBoolean(options.AllowJSON, temp);
                 'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
                   case temp of
-                    'on':  AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
-                    'off': AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
-                    'unambiguous': AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
+                    'on':  options.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+                    'off': options.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+                    'unambiguous': options.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
                     'toggle': raiseParsingError('pxp:XPST0003', 'The "toggle" value has been removed for the property-dot-notation option.');
                     else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/unambiguous');
                   end;
@@ -1697,8 +1694,8 @@ begin
               case token of
                 'jsoniq-boolean-and-null-literals':
                   case temp of
-                    'yes': AllowJSONLiterals:=true;
-                    'no': AllowJSONLiterals:=false;
+                    'yes': options.AllowJSONLiterals:=true;
+                    'no': options.AllowJSONLiterals:=false;
                     else raiseParsingError('XQST0013', 'Unknown option value: '+temp+' for '+token+' (allowed is yes/no)');
                   end;
               end;
@@ -1722,7 +1719,7 @@ begin
   end;
 
   if result <> nil then begin
-    if AllowJSONLiterals then
+    if options.AllowJSONLiterals then
       postprocessJSONLiterals(result);
   end;
 end;

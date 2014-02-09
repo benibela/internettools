@@ -1557,7 +1557,13 @@ type
   type TXQParseDocEvent = procedure (sender: TXQueryEngine; data, url, contenttype: string; var node: TTreeNode) of object;
 
 
-
+  //** Record grouping different parsing options
+  TXQParsingOptions = record
+    AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
+    AllowPropertyDotNotation: TXQPropertyDotNotation; //**< If it is possible to access (json) object properties with the @code(($obj).property) or even @code($obj.property) syntax (default is xqpdnAllowUnambiguousDotNotation, property syntax can be used, where a dot would be an invalid expression in standard xquery)
+    AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
+    AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
+  end;
 
 
 
@@ -1766,6 +1772,7 @@ type
     )
     @item(API changes to previous versions:
       @unorderedList(
+      @item(Parsing modifying properties Allow* are now moved in a ParsingOptions record. It was becoming too confusing)
       @item(everything has been renamed, pseudoxpath.pas => xquery.pas, TPseudoXPathParser => TXQueryEngine, TPXPValue => IXQValue)
       @item(The TPXPValue class has been replaced by an interface => memory deallocation has become implicit and .free must not be called.@br
             => functions like toString and asString become identically and latter has been removed. Similarly functions like getValueAsString() are not needed anymore and have been removed as well )
@@ -1804,10 +1811,8 @@ type
     OnCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
     OnParseDoc: TXQParseDocEvent; //**< Event called by fn:doc (if nil, a default xml parser is used)
 
-    AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
-    AllowPropertyDotNotation: TXQPropertyDotNotation; //**< If it is possible to access (json) object properties with the @code(($obj).property) or even @code($obj.property) syntax (default is xqpdnAllowUnambiguousDotNotation, property syntax can be used, where a dot would be an invalid expression in standard xquery)
-    AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
-    AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
+    ParsingOptions: TXQParsingOptions;
+
     GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
 
     AutomaticallyRegisterParsedModules: boolean;
@@ -4291,10 +4296,10 @@ constructor TXQueryEngine.create;
 begin
   self.CurrentDateTime:=now;
   ImplicitTimezone:=getNaN;
-  AllowExtendedStrings:=true;
-  AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
-  AllowJSON:=AllowJSONDefaultInternal;
-  AllowJSONLiterals:=true;
+  ParsingOptions.AllowExtendedStrings:=true;
+  ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
+  ParsingOptions.AllowJSON:=AllowJSONDefaultInternal;
+  ParsingOptions.AllowJSONLiterals:=true;
   VariableChangelog := TXQVariableChangeLog.create();
   //OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   //OnDefineVariable:= @VariableChangelog.defineVariable;
@@ -4446,10 +4451,7 @@ begin
   if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
-  cxt.AllowExtendedStrings := AllowExtendedStrings;
-  cxt.AllowPropertyDotNotation:= allowPropertyDotNotation;
-  cxt.AllowJSON:=allowJSON;
-  cxt.AllowJSONLiterals:=AllowJSON and AllowJSONLiterals;
+  cxt.options := ParsingOptions;
   cxt.staticContext := context;
   cxt.parsingModel:=model;
   cxt.engine := self;
@@ -4484,10 +4486,8 @@ begin
   if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
-  cxt.AllowExtendedStrings := true;
-  cxt.AllowPropertyDotNotation:=allowPropertyDotNotation;
-  cxt.AllowJSON:=AllowJSON;
-  cxt.AllowJSONLiterals:=AllowJSON and AllowJSONLiterals;
+  cxt.options :=ParsingOptions;
+  cxt.options.AllowExtendedStrings:=true;
   cxt.staticContext := context;
   cxt.parsingModel:=xqpmXPath2;
   cxt.engine := self;
@@ -5574,7 +5574,7 @@ collations.OwnsObjects:=true;
 nativeModules := TStringList.Create;
 globalTypeParsingContext := TXQParsingContext.Create;
 globalTypeParsingContext.staticContext := TXQStaticContext.Create;
-globalTypeParsingContext.AllowJSON:=true;
+globalTypeParsingContext.options.AllowJSON:=true;
 //namespaces
 GlobalStaticNamespaces:=TNamespaceList.Create;
 XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');

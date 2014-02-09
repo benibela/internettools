@@ -83,7 +83,7 @@ begin
   //vars:= TXQVariableChangeLog.create();
 
   ps := TXQueryEngine.Create;
-  ps.AllowJSONLiterals:=false;
+  ps.ParsingOptions.AllowJSONLiterals:=false;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.StaticContext.useLocalNamespaces:=false;
   ps.ImplicitTimezone:=-5 / HoursPerDay;
@@ -1993,7 +1993,7 @@ begin
   t('uri-combine({"x": "++", "y&": 123}, {"x": 0, "y": 456})', 'x=0&y%26=123&y=456');
   t('uri-combine({"x": "++", "y&": 123}, {"y": "456", "x": 0})', 'x=0&y%26=123&y=456');
 
-  ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+  ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
 
                //Objects extension
   t('obj := object()', '', '');
@@ -2246,7 +2246,7 @@ begin
 
   //t('join(jn:keys(({"a": 1}, {"b": 2}, {"c": 3})))', 'a b c');
 
-  ps.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
+  ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
   t('$a := 123', '123');
   t('$a.b.c := 456', '456');
   t('$a', '123');
@@ -2256,7 +2256,7 @@ begin
   f('$a.b', 'err:XPST0008');
   t('$a("b")', '17');
 
-  ps.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+  ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   t('$a.b', '17');
   t('$a.b.c', '');
 
@@ -2359,7 +2359,7 @@ begin
     t('true', '');
     t('false', '');
     if not ps.StaticContext.strictTypeChecking then  t('jn:is-null(null)', 'false');
-    ps.AllowJSONLiterals:=true;
+    ps.ParsingOptions.AllowJSONLiterals:=true;
     t('true', 'true');
     t('false', 'false');
     t('jn:is-null(null)', 'true');
@@ -2431,7 +2431,7 @@ begin
     t('serialize-json({| {"a": 123}, {}, {}, {} |})', '{"a": 123}');
     t('serialize-json({| {"a": 123}, {"b": 4, "c": 7} |})', '{"a": 123, "b": 4, "c": 7}');
 
-    ps.AllowJSONLiterals:=false;
+    ps.ParsingOptions.AllowJSONLiterals:=false;
 
   end;
 
