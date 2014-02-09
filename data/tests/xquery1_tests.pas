@@ -211,6 +211,7 @@ begin
   t('''&quot;''',                 '"',                        '');
   t('"x&quot;y"',                   'x"y',                        '');
   t('''x&quot;y''',                 'x"y',                        '');
+
   t('"Ben &amp; Jerry&apos;s"', 'Ben & Jerry''s');
   t('"&#8364;99.50"', '€99.50'); //assuming utf 8 encoding
 
@@ -690,6 +691,27 @@ begin
   f('declare option pxp:extended-strings "on"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'err:XPST0003');
   m('declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
   m('xquery version "1.0"; declare option pxp:extended-strings "off"; declare option pxp:extended-strings "toggle";  declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
+
+  //xpath like strings
+  ps.ParsingOptions.StringEntities:=xqseResolveLikeXQuery;
+  t('"&quot;"',                   '"',                        '');
+  t('''&quot;''',                 '"',                        '');
+  t('"x&quot;y"',                   'x"y',                        '');
+  t('''x&quot;y''',                 'x"y',                        '');
+  m('declare option pxp:string-entities "off"; "&quot;"',                   '&quot;',                        '');
+  m('declare option pxp:string-entities "off"; ''&quot;''',                 '&quot;',                        '');
+  m('declare option pxp:string-entities "off";  "x&quot;y"',                   'x&quot;y',                        '');
+  m('declare option pxp:string-entities "off";  ''x&quot;y''',                 'x&quot;y',                        '');
+  ps.ParsingOptions.StringEntities:=xqseIgnoreLikeXPath;
+  t('"&quot;"',                   '&quot;',                        '');
+  t('''&quot;''',                 '&quot;',                        '');
+  t('"x&quot;y"',                   'x&quot;y',                        '');
+  t('''x&quot;y''',                 'x&quot;y',                        '');
+  m('declare option pxp:string-entities "on"; "&quot;"',                   '"',                        '');
+  m('declare option pxp:string-entities "on"; ''&quot;''',                 '"',                        '');
+  m('declare option pxp:string-entities "on";  "x&quot;y"',                   'x"y',                        '');
+  m('declare option pxp:string-entities "on";  ''x&quot;y''',                 'x"y',                        '');
+  ps.ParsingOptions.StringEntities:=xqseDefault;
 
 
   m('declare default order empty least; string-join(for $i in (1,2,3,4,5) order by if ($i < 3) then () else 1 empty least return $i, " ")', '1 2 3 4 5');

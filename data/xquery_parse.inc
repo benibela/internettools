@@ -867,7 +867,8 @@ function TXQParsingContext.parseString(const w: string): TXQTerm;
 var s: string;
 begin
   s := StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]);
-  if parsingModel in [xqpmXQuery1] then s := replaceEntities(s);
+  if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
+    s := replaceEntities(s);
   exit(TXQTermString.create(s));
 end;
 
@@ -911,7 +912,8 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
   begin
     if too < from then exit;
     v := strFromPchar(from, too - from + 1);
-    if parsingModel in [xqpmXQuery1] then v := replaceEntities(v);
+    if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
+      v := replaceEntities(v);
     if result <> nil then begin
       if result is TXQTermString then TXQTermString(result).value += v
       else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result))
@@ -1689,6 +1691,13 @@ begin
                 'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
                 'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
                 'pure-json-objects': readBoolean(staticContext.objectsRestrictedToJSONTypes, temp);
+                'string-entities':
+                  case temp of
+                    'off': options.StringEntities:=xqseIgnoreLikeXPath;
+                    'on': options.StringEntities:=xqseResolveLikeXQuery;
+                    'default': options.StringEntities:=xqseDefault;
+                    else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/default');
+                  end;
               end;
             end else if namespace.getURL = 'http://jsoniq.org/functions' then
               case token of
