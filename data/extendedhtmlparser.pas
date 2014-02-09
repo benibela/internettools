@@ -974,8 +974,7 @@ begin
   if expression = '' then raise ETemplateParseException.Create('no expression given');
   context := nil;
   if FSingleQueryModule then context := QueryEngine.StaticContext;
-  if strBeginsWith(trim(expression), 'xquery') then result := FQueryEngine.parseXQuery1(expression, context)
-  else result := FQueryEngine.parseXPath2(expression, context);
+  result := FQueryEngine.parseXQuery3(expression, context);
 end;
 
 function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;
@@ -1574,6 +1573,7 @@ begin
 
   FQueryEngine := TXQueryEngine.create;
   FQueryEngine.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+  FQueryEngine.ParsingOptions.StringEntities:=xqseIgnoreLikeXPath;
   //FQueryEngine.OnDefineVariable:=@defineXQVariable;
   //FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
