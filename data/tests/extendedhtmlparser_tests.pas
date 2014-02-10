@@ -836,8 +836,8 @@ begin
   t('<a><t:if test="false()"><b>{.}</b></t:if></a>', '<a><c>foobar</c><b>1</b></a>', '');
 
   t('<a><t:s>declare function testfunc(){''&amp;quot;''}; testfunc()</t:s></a>', '<a>t</a>', '_result=&quot;'); //xquery with xpath strings (&amp is replaced by xml not xquery parser)
-  //t('<a>{declare function testfunc(){"a"}; testfunc()}</a>', '<a>t</a>', '_result=a');
-  //t('<a>{declare function testfunc2(){concat(testfunc(), "b")}; testfunc2()}</a>', '<a>t</a>', '_result=ab');
+  t('<a>{declare function testfunc(){"a"}; testfunc()}</a>', '<a>t</a>', '_result=a');
+  //f('<a>{declare function testfunc2(){concat(testfunc(), "b")}; testfunc2()}</a>', '<a>t</a>'); fails as it should, but test harness does not test for EXQEvaluationException s
 
   //  t('<a><b>{.}</b>{3}</a>', '<a><b>12</b><b>34</b></a>', '_result=12'#10'_result=34');
 

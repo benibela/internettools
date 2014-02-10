@@ -1463,6 +1463,8 @@ function THtmlTemplateParser.matchLastTrees: Boolean;
 var cur,last,realLast:TTemplateElement;
     temp: TTreeNode;
     err: String;
+    i: Integer;
+    oldFunctionCount: Integer;
 begin
   FreeAndNil(FVariables);
   if FKeepOldVariables = kpvForget then
@@ -1474,6 +1476,8 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
   FreeAndNil(FVariableLogCondensed);
+
+  oldFunctionCount := length(FQueryEngine.StaticContext.functions);
 
   if FTemplate.getLastTree <> nil then begin
     if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
@@ -1514,6 +1518,11 @@ begin
   temp := FHtmlTree;
   if temp is TTreeDocument then temp := temp.next;
   result:=matchTemplateTree(FHtmlTree, temp, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
+
+  //delete functions, so multiple parsing attempts do not intermix
+  for i := oldFunctionCount to high(FQueryEngine.StaticContext.functions) do
+    FQueryEngine.StaticContext.functions[i].free;
+  SetLength(FQueryEngine.StaticContext.functions, oldFunctionCount);
 
   if not result and FParsingExceptions then begin
     cur := TTemplateElement(FTemplate.getLastTree.next);
