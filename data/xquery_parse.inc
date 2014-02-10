@@ -676,7 +676,10 @@ begin
     expect(marker^);
     token := nextTokenMaybeQName();
   end;
-  if token = '' then raiseParsingError('XPST0003', 'Attribute expected');
+  if token = '' then begin
+    result.Free;
+    raiseParsingError('XPST0003', 'Attribute expected');
+  end;
   if token = '/' then begin
     expect('>');
     exit;
@@ -1097,7 +1100,7 @@ begin
     else if (word = 'x') and (pos^ in ['"', '''']) then begin
       if not options.AllowExtendedStrings then raiseParsingError('err:XPST0003', 'Extended string syntax was disabled');
       exit(parseXString());
-    end else begin
+    end else try
       wordlookahead := nextToken(true);
       if wordlookahead='::' then begin
         word+=nextToken();
@@ -1139,7 +1142,8 @@ begin
             if pos^ <> ')' then begin
               result.push(parseValue());   skipWhitespaceAndComment();
               if pos^ = ',' then begin
-                if (word <> 'element') and (word <> 'attribute') then raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
+                if (word <> 'element') and (word <> 'attribute') then
+                  raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
                 expect(',');
                 result.push(parseSequenceType());
               end;
@@ -1205,6 +1209,9 @@ begin
       end;
 
       result := TXQTermNodeMatcher.Create(word);
+    except
+      result.free;
+      raise;
     end;
   end;
 end;
