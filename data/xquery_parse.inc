@@ -815,6 +815,7 @@ var
   propertyAccess: Boolean;
 begin
   result := TXQTermVariable.Create(nextTokenQName(), staticContext);
+  operatorMode := false;
   if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(TXQTermVariable(result).value, '.') then begin
     propertyAccess := true;
     operatorMode := strEndsWith(TXQTermVariable(result).value, '.');
@@ -824,12 +825,17 @@ begin
     end;
     if propertyAccess then
       result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
-    if operatorMode then begin
-      result := TXQTermDynamicFunctionCall.create(result, parseValue());
-      if result.children[1] is TXQTermNodeMatcher then begin
-        result.free;
-        raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
-      end;
+  end else if (options.AllowPropertyDotNotation = xqpdnAllowUnambiguousDotNotation) and strEndsWith(TXQTermVariable(result).value, '.') then begin
+    skipWhitespaceAndComment();
+    operatorMode := pos^ in ['"', '''', '$'];
+    if operatorMode then
+      delete(TXQTermVariable(result).value, length(TXQTermVariable(result).value), 1);
+  end;
+  if operatorMode then begin
+    result := TXQTermDynamicFunctionCall.create(result, parseValue());
+    if result.children[1] is TXQTermNodeMatcher then begin
+      result.free;
+      raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
     end;
   end;
 end;

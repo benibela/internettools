@@ -1638,11 +1638,12 @@ type
           @br
           @br Object can be created with @code({"foobar": 123, "hallo": "world!", ...})
           @br They stores a set of values as associative map.
-              The values can be accessed similar to a function call, e.g.: @code({"name": value, ...}("name")).
+              The values can be accessed similar to a function call, e.g.: @code({"name": value, ...}("name")) as documented in the JSONiq extension standard.
           @br This implementation also provides an alternative property syntax, where these properties can be accessed with the usual OOP property dot syntax,
               i.e. @code({"name": 123}.name) will evaluate to @code(123)  (can be changed with the option property-dot-notation).
           @br If an object is assigned to a variable, you can append the dot to the variable name, e.g. @code(let $obj := {"name": 123} return $obj.name).
-              (drawback: variable names are not allowed to contains dots, if this extension is enabled)
+              (drawback: variable names are not allowed to contains dots, if this extension is enabled. If set to "unambiguous", the dot operator can
+              be used in cases where no confusion with variables with dots in their name can occur, e.g. @code(($a).b), @code($a .b) or @code($a."b"). )
           @br Objects are immutable, but the properties of objects that are global variables can seemingly be changed with @code($obj.property := newvalue).
               This creates a new object with name @code($obj) that has all the properties of the old objects plus the changed properties.@br
           @br Objects can be assigned to each other (e.g. @code(obj1 := {}, obj2 := {}, obj2.prop := 123, obj1.sub := obj2 ) ).

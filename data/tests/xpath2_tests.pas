@@ -2254,7 +2254,14 @@ begin
   f('$a.b', 'err:XPST0008');
   t('$a := {"b": 17}', '');
   f('$a.b', 'err:XPST0008');
+  f('$a. b', 'err:XPST0003');
+  t('$a .b', '17');
   t('$a("b")', '17');
+  t('$a."b"', '17');
+  t('$a.''b''', '17');
+  f('$a.("b")', 'err:XPST0008');
+  t('$te.mp := "b"', 'b');
+  t('$a.$te.mp', '17');
 
   ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   t('$a.b', '17');
