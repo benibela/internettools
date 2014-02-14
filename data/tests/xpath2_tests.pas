@@ -3794,6 +3794,9 @@ begin
   f('(xs:string("a"), 1) and true()', 'err:FORG0006');
   f('(0, xs:string("a")) and true()', 'err:FORG0006');
   f('(jn:null(), 8) and true()', 'err:FORG0006');
+  f('form := uri-combine($confirm-form, {"MakeResTypeDef.Reservation.RecipientLocn": $choose-result]})', 'pxp:OBJ');
+  f('},', 'err:XPST0003');
+  f(',,', 'err:XPST0003');
 
 
   //XQuery/XPath 3 syntax tests which must fail in the old version

@@ -1208,6 +1208,8 @@ begin
         raiseParsingError('XPST0075', 'Schema validation is not supported');
       end;
 
+      if (word = '') or (word[1] in [',', ';', ':', ')', ']', '}']) then //todo: check if valid xml node name
+        raiseParsingError('XPST0003', 'Unexpected character: ' + word);
       result := TXQTermNodeMatcher.Create(word);
     except
       result.free;
@@ -1330,7 +1332,7 @@ begin
           result := astroot;
           if result is TXQTermNodeMatcher then begin
             result := TXQTermVariable.create(IfThen(TXQTermNodeMatcher(astroot).namespace = '', TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).namespace + ':' + TXQTermNodeMatcher(astroot).select), staticContext);
-            astroot.free;
+            FreeAndNil(astroot);
             if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(result).value, '.')) then
               result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
           end;
