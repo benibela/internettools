@@ -403,9 +403,14 @@ begin
   if length(children) = 0 then exit(xqvalue);
   if length(children) = 1 then exit(children[0].evaluate(context));
   tempSeq := TXQValueSequence.create(length(children));
-  for i := 0 to high(children) do
-    tempSeq.addChild(children[i].evaluate(context));
-  result := tempSeq;
+  try
+    for i := 0 to high(children) do
+      tempSeq.addChild(children[i].evaluate(context));
+    result := tempSeq;
+  except
+    tempSeq.free;
+    raise;
+  end;
 end;
 
 function TXQTermSequence.getContextDependencies: TXQContextDependencies;
