@@ -656,6 +656,7 @@ type
     function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
 
     procedure enumerateKeys(sl: TStringList);
+    function enumerateValues: IXQValue;
 
     function toBooleanEffective: boolean; override;
 
@@ -4989,7 +4990,9 @@ begin
     pvkObject: begin
       obj := (node as TXQValueObject);
       if (obj.prototype = nil) then begin
-        if obj.hasProperty(searchedProperty, @temp) then xqvalueSeqAdd(newSequence, temp);
+        if searchedProperty <> '' then begin
+          if obj.hasProperty(searchedProperty, @temp) then xqvalueSeqAdd(newSequence, temp);
+        end else xqvalueSeqAdd(newSequence, obj.enumerateValues);
         for i := 0 to obj.values.count - 1 do
           jsoniqDescendants(obj.values[i], searchedProperty);
         exit;
@@ -4998,7 +5001,9 @@ begin
       tempsl := TStringList.Create;
       try  //todo: optimize
         obj.enumerateKeys(tempsl);
-        if tempsl.IndexOf(searchedProperty) >= 0 then xqvalueSeqAdd(newSequence, obj.getProperty(searchedProperty));
+        if searchedProperty <> '' then begin
+          if tempsl.IndexOf(searchedProperty) >= 0 then xqvalueSeqAdd(newSequence, obj.getProperty(searchedProperty));
+        end else xqvalueSeqAdd(newSequence, obj.enumerateValues);
         for i := 0 to tempsl.Count - 1 do
           jsoniqDescendants(obj.getProperty(tempsl[i]), searchedProperty);
       finally
@@ -5096,7 +5101,7 @@ begin
             if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extension are disabled');
             if (command.namespacePrefix <> '') or (command.requiredType <> nil)
                or not (command.typ in [qcDirectChild, qcDescendant, qcSameNode])
-               or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespace, qmCheckOnSingleChild] <> [qmElement, qmValue]))
+               or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespace, qmCheckOnSingleChild, qmValue, qmAttribute] <> [qmElement]))
                or ((command.typ = qcSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
                then
                  raise EXQEvaluationException.create('pxp:JSON', 'too complex query for JSON object');
@@ -5104,17 +5109,29 @@ begin
             else newSequence := nil;
             case command.typ of
               qcDirectChild: begin
-                //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
-                if tempKind = pvkObject then begin
-                  if (n as TXQValueObject).hasProperty(command.value, @tempProp) then
-                    xqvalueSeqAdd(newSequence, tempProp);
-                end else begin
-                  newSequenceSeq := (n as TXQValueJSONArray).seq;
-                  for j := 0 to newSequenceSeq.Count - 1 do
-                    if not (newSequenceSeq[j] is TXQValueObject) then
-                      raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+newSequenceSeq[j].debugAsStringWithTypeAnnotation()+'"')
-                    else if (newSequenceSeq[j] as TXQValueObject).hasProperty(command.value, @tempProp) then
+                if qmValue in command.matching then begin //read named property
+                  //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
+                  if tempKind = pvkObject then begin
+                    if (n as TXQValueObject).hasProperty(command.value, @tempProp) then
                       xqvalueSeqAdd(newSequence, tempProp);
+                  end else begin
+                    newSequenceSeq := (n as TXQValueJSONArray).seq;
+                    for j := 0 to newSequenceSeq.Count - 1 do
+                      if not (newSequenceSeq[j] is TXQValueObject) then
+                        raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+newSequenceSeq[j].debugAsStringWithTypeAnnotation()+'"')
+                      else if (newSequenceSeq[j] as TXQValueObject).hasProperty(command.value, @tempProp) then
+                        xqvalueSeqAdd(newSequence, tempProp);
+                  end;
+                end else begin
+                  //get all properties
+                  if tempKind = pvkObject then xqvalueSeqAdd(newSequence, (n as TXQValueObject).enumerateValues())
+                  else begin
+                    newSequenceSeq := (n as TXQValueJSONArray).seq;
+                    for j := 0 to newSequenceSeq.Count - 1 do
+                      if not (newSequenceSeq[j] is TXQValueObject) then
+                        raise EXQEvaluationException.create('pxp:JSON', 'The /* operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+newSequenceSeq[j].debugAsStringWithTypeAnnotation()+'"')
+                      else xqvalueSeqAdd(newSequence, (newSequenceSeq[j] as TXQValueObject).enumerateValues());
+                  end;
                 end;
               end;
               qcDescendant:

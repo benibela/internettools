@@ -2295,6 +2295,15 @@ begin
   f('join($seq / . / e () / a )', 'err:XPST0017'); //it thinks "e()" is a function
   t('join($seq / . / e / .() / a )', '10');
   t('join($seq / . / e / a )', '10');
+  t('join($seq[1] / *)', '1 2 3');
+  f('join($seq[1] / @*)', 'err:XPTY0020');
+  f('join($seq[1] / attribute::*)', 'err:XPTY0020');
+  t('join($seq[2] / *)', '4 5 6  '); //2 space because objects become empty strings
+  t('join($seq / *)', '1 2 3 4 5 6  '); //2 space because objects become empty strings
+
+  t('join($seq[1] // *)', '1 2 3');
+  t('join($seq // *)', '1 2 3 4 5 6   10 11 20 21');
+
   t('join([{"a": 1}, {"a": 2}, {"a": 3}] / a)', '1 2 3');
   f('join([{"a": 1}, {"a": 2}, {"a": 3}, 80, 90] / a)', 'pxp:JSON');
   f('join([{"a": 1}, {"a": 2}, {"a": 3}, [{"a": 4}] ] / a)', 'pxp:JSON');

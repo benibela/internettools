@@ -1406,6 +1406,36 @@ begin
   end;
 end;
 
+function TXQValueObject.enumerateValues: IXQValue;
+var
+  i: Integer;
+  tempSeq: TXQValueSequence;
+  tempsl: TStringList;
+begin
+  if (prototype = nil) then begin
+    if values.count = 0 then exit(xqvalue());
+    if values.count = 1 then exit(values[0]);
+
+    tempSeq := TXQValueSequence.create(values.count);
+    for i := 0 to values.count - 1 do
+      tempSeq.addChild(values[i]);
+    exit(tempSeq);
+  end;
+
+  tempsl := TStringList.Create;
+  try  //todo: optimize
+    enumerateKeys(tempsl);
+    if tempsl.Count = 0 then exit(xqvalue());
+    if tempsl.Count = 1 then exit(getProperty(tempsl[0]));
+    tempSeq := TXQValueSequence.create(values.count);
+    for i := 0 to tempsl.count - 1 do
+      tempSeq.addChild(getProperty(tempsl[i]));
+    exit(tempSeq);
+  finally
+    tempsl.free;
+  end;
+end;
+
 
 function TXQValueObject.toBooleanEffective: boolean;
 begin
