@@ -1339,10 +1339,11 @@ begin
           if result is TXQTermNodeMatcher then begin
             result := TXQTermVariable.create(IfThen(TXQTermNodeMatcher(astroot).namespace = '', TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).namespace + ':' + TXQTermNodeMatcher(astroot).select), staticContext);
             FreeAndNil(astroot);
-            if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(result).value, '.')) then
-              result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
+            astroot := result; //only astroot should contain allocated objects that need to be freed in case of a subsequent parsing error
+            if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and (strContains(TXQTermVariable(astroot).value, '.')) then
+              astroot := TXQTermVariable.splitForDotNotation(TXQTermVariable(astroot));
           end;
-          result := TXQTermDefineVariable.Create(result, parseSomething());
+          result := TXQTermDefineVariable.Create(astroot, parseSomething());
           //staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
           exit;
         end;
