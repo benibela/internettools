@@ -133,6 +133,7 @@ type
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
     objectsRestrictedToJSONTypes: boolean; //**< When false, all values can be stored in object properties; when true all property values are JSON values (e.g. sequences become arrays, () becomes null, xml is serialized, ...)
+    jsonPXPExtensions: boolean; //**< Allows further json extensions, going beyond jsoniq (especially child and descendant axis test matching object properties) (for dot operator, see TXQParsingOptions) (default is true)
 
     //ignored
     ordering: boolean;  //**< unused
@@ -634,7 +635,7 @@ type
   //**that is linked to the previous objects (i.e. has the old object as prototype). @br
   //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
   TXQValueObject = class (TXQValueJSONIQItem)
-    values: TXQVariableChangeLog;
+    values: TXQVariableChangeLog; //todo: can there be multiple properties with the same name? some parts assume theq are unique
     prototype: IXQValue;
 
     constructor create(); reintroduce; virtual;
@@ -1637,7 +1638,7 @@ type
           @br Like a sequence they store a list of values, but they can be nested with each other and within sequences.
           @br
           @br Object can be created with @code({"foobar": 123, "hallo": "world!", ...})
-          @br They stores a set of values as associative map.
+          @br They store a set of values as associative map.
               The values can be accessed similar to a function call, e.g.: @code({"name": value, ...}("name")) as documented in the JSONiq extension standard.
           @br This implementation also provides an alternative property syntax, where these properties can be accessed with the usual OOP property dot syntax,
               i.e. @code({"name": 123}.name) will evaluate to @code(123)  (can be changed with the option property-dot-notation).
@@ -1955,7 +1956,7 @@ type
   function xqvalue(v: xqfloat):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   function xqvalue(const v: BigDecimal):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   function xqvalue(v: string):IXQValue; inline; //**< Creates an string IXQValue
-  function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Creates an TDateTime IXQValue
+  function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Raises an exception (to prevent xquery(TDateTime) from using xquery(float))
   function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates an node TXQValue
   function xqvalue(sl: TStringList): IXQValue; //**< Creates an sequence of strings (does *not* free the list)
 
@@ -2625,6 +2626,7 @@ begin
   result.strictTypeChecking:=strictTypeChecking;
   Result.useLocalNamespaces:=useLocalNamespaces;
   result.objectsRestrictedToJSONTypes:=objectsRestrictedToJSONTypes;
+  result.jsonPXPExtensions := jsonPXPExtensions;
 end;
 
 destructor TXQStaticContext.Destroy;
@@ -4316,6 +4318,7 @@ begin
   StaticContext.copyNamespacePreserve:=true;
   StaticContext.stringEncoding:=eUTF8;
   StaticContext.useLocalNamespaces:=true;
+  StaticContext.jsonPXPExtensions:=true;
   FModules := TInterfaceList.Create;
 end;
 
@@ -4967,6 +4970,48 @@ class function TXQueryEngine.expandSequence(previous: IXQValue; const command: T
 var oldnode,newnode: TTreeNode;
     newSequence: IXQValue;
     nodeCondition: TXQPathNodeCondition;
+
+procedure jsoniqDescendants(const node: IXQValue; const searchedProperty: string);
+var
+  seq: TXQVList;
+  obj: TXQValueObject;
+  temp: TXQValue;
+  tempsl: TStringList;
+  tempvi: IXQValue;
+  i: Integer;
+begin
+  case node.kind of
+    pvkArray: begin
+      seq := (node as TXQValueJSONArray).seq;
+      for i := 0 to seq.Count - 1 do
+        jsoniqDescendants(seq[i], searchedProperty);
+    end;
+    pvkObject: begin
+      obj := (node as TXQValueObject);
+      if (obj.prototype = nil) then begin
+        if obj.hasProperty(searchedProperty, @temp) then xqvalueSeqAdd(newSequence, temp);
+        for i := 0 to obj.values.count - 1 do
+          jsoniqDescendants(obj.values[i], searchedProperty);
+        exit;
+      end;
+
+      tempsl := TStringList.Create;
+      try  //todo: optimize
+        obj.enumerateKeys(tempsl);
+        if tempsl.IndexOf(searchedProperty) >= 0 then xqvalueSeqAdd(newSequence, obj.getProperty(searchedProperty));
+        for i := 0 to tempsl.Count - 1 do
+          jsoniqDescendants(obj.getProperty(tempsl[i]), searchedProperty);
+      finally
+        tempsl.free;
+      end;
+    end;
+    pvkSequence:
+      for tempvi in node do
+        jsoniqDescendants(tempvi, searchedProperty)
+    else ;//we must ignore non structured item, otherwise it would be useless for any object (like a string<->string map) containing them
+  end;
+end;
+
 var
   j: Integer;
   tempContext: TXQEvaluationContext;
@@ -4976,6 +5021,8 @@ var
   resultSeq: TXQValueSequence;
   cachedNamespace: INamespace;
   cachedNamespaceURL: string;
+  tempKind: TXQValueKind;
+  tempProp: IXQValue;
 
   procedure add(const v: IXQValue); inline;
   begin
@@ -4990,73 +5037,112 @@ begin
   if previous.getSequenceCount = 0 then exit(previous);
 
   resultSeq:=TXQValueSequence.create(previous.getSequenceCount);
-
-  if command.typ = qcFunctionSpecialCase then begin
-    tempContext := context;
-    tempContext.SeqLength:=previous.getSequenceCount;
-    tempContext.SeqIndex:=0;
-  end;
-
-  if qmCheckNamespace in command.matching then begin
-    if qmAttribute in command.matching then cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkUnknown)
-    else cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkElementType);
-    if cachedNamespace <> nil then cachedNamespaceURL:=cachedNamespace.getURL
-    else if not context.staticContext.useLocalNamespaces then begin
-      if command.namespacePrefix <> '' then raise EXQEvaluationException.Create('XPST0008', 'Unknown namespace prefix: '+command.namespacePrefix+' for element matching');
-      cachedNamespaceURL:='';
-      cachedNamespace := XMLNamespace_XMLSchema; //just assign something, so it is not nil. The value is not used
-    end;
-  end;
-
-  newSequence := nil;
-  nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
-  onlyNodes := false;
-  for n in previous do begin
+  try
     if command.typ = qcFunctionSpecialCase then begin
-      if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
-      else newSequence := nil;
-      tempContext.SeqIndex += 1;
-      tempContext.SeqValue := n;
-      if n is TXQValueNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
-      xqvalueSeqAdd(newSequence, command.specialCase.evaluate(tempContext));
-    end else begin
-      if not (n is TXQValueNode) then continue;
-      assert(n.toNode <> nil);
-      oldnode := n.toNode;
-      unifyQuery(oldnode, command, nodeCondition);
-      if xqpncCheckNamespace in nodeCondition.options then
-        if (cachedNamespace <> nil) then nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
-        else Exclude(nodeCondition.options, xqpncCheckNamespace);
-      newnode := getNextQueriedNode(nil, nodeCondition);
-      if newnode = nil then continue;
-      j:=0;
-      if (newSequence = nil) or not (newSequence is TXQValueSequence) then newSequence := TXQValueSequence.create(0);
-      newSequenceSeq := (newSequence as TXQValueSequence).seq;
-      newSequenceSeq.count := 0;
-      while newnode <> nil do begin
-        if ((qmCheckNamespace in command.matching) = (xqpncCheckNamespace in nodeCondition.options))
-           or (newnode.getNamespacePrefix() = command.namespacePrefix)                            //extension, use namespace bindings of current item, if it is not statically known
-           or (newnode.getNamespaceURL(command.namespacePrefix) = newnode.getNamespaceURL()) then
-        newSequenceSeq.add(xqvalue(newnode));
-        newnode := getNextQueriedNode(newnode, nodeCondition);
-      end;
-      if command.typ = qcPrecedingSibling then
-        newSequenceSeq.revert;
+      tempContext := context;
+      tempContext.SeqLength:=previous.getSequenceCount;
+      tempContext.SeqIndex:=0;
     end;
 
-    filterSequence(newSequence, command.filters, context);
+    if qmCheckNamespace in command.matching then begin
+      if qmAttribute in command.matching then cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkUnknown)
+      else cachedNamespace := context.findNamespace(command.namespacePrefix, xqdnkElementType);
+      if cachedNamespace <> nil then cachedNamespaceURL:=cachedNamespace.getURL
+      else if not context.staticContext.useLocalNamespaces then begin
+        if command.namespacePrefix <> '' then raise EXQEvaluationException.Create('XPST0008', 'Unknown namespace prefix: '+command.namespacePrefix+' for element matching');
+        cachedNamespaceURL:='';
+        cachedNamespace := XMLNamespace_XMLSchema; //just assign something, so it is not nil. The value is not used
+      end;
+    end;
 
-    if (newSequence = nil) or (newSequence.getSequenceCount = 0) then
-      continue;
+    newSequence := nil;
+    nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
+    onlyNodes := false;
+    for n in previous do begin
+      if command.typ = qcFunctionSpecialCase then begin
+        if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
+        else newSequence := nil;
+        tempContext.SeqIndex += 1;
+        tempContext.SeqValue := n;
+        if n is TXQValueNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
+        xqvalueSeqAdd(newSequence, command.specialCase.evaluate(tempContext));
+      end else begin
+        tempKind := n.kind;
+        case tempKind of
+          pvkNode: begin
+            assert(n.toNode <> nil);
+            oldnode := n.toNode;
+            unifyQuery(oldnode, command, nodeCondition);
+            if xqpncCheckNamespace in nodeCondition.options then
+              if (cachedNamespace <> nil) then nodeCondition.requiredNamespaceURL:=cachedNamespaceURL
+              else Exclude(nodeCondition.options, xqpncCheckNamespace);
+            newnode := getNextQueriedNode(nil, nodeCondition);
+            if newnode = nil then continue;
+            j:=0;
+            if (newSequence = nil) or not (newSequence is TXQValueSequence) then newSequence := TXQValueSequence.create(0);
+            newSequenceSeq := (newSequence as TXQValueSequence).seq;
+            newSequenceSeq.count := 0;
+            while newnode <> nil do begin
+              if ((qmCheckNamespace in command.matching) = (xqpncCheckNamespace in nodeCondition.options))
+                 or (newnode.getNamespacePrefix() = command.namespacePrefix)                            //extension, use namespace bindings of current item, if it is not statically known
+                 or (newnode.getNamespaceURL(command.namespacePrefix) = newnode.getNamespaceURL()) then
+              newSequenceSeq.add(xqvalue(newnode));
+              newnode := getNextQueriedNode(newnode, nodeCondition);
+            end;
+            if command.typ = qcPrecedingSibling then
+              newSequenceSeq.revert;
+          end;
+          pvkObject, pvkArray: begin
+            if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extension are disabled');
+            if (command.namespacePrefix <> '') or (command.requiredType <> nil)
+               or not (command.typ in [qcDirectChild, qcDescendant, qcSameNode])
+               or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespace, qmCheckOnSingleChild] <> [qmElement, qmValue]))
+               or ((command.typ = qcSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
+               then
+                 raise EXQEvaluationException.create('pxp:JSON', 'too complex query for JSON object');
+            if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
+            else newSequence := nil;
+            case command.typ of
+              qcDirectChild: begin
+                //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
+                if tempKind = pvkObject then begin
+                  tempProp := n.getProperty(command.value);
+                  xqvalueSeqAdd(newSequence, tempProp);
+                end else begin
+                  newSequenceSeq := (n as TXQValueJSONArray).seq;
+                  for j := 0 to newSequenceSeq.Count - 1 do
+                    xqvalueSeqAdd(newSequence, newSequenceSeq[j].getProperty(command.value));
+                end;
+              end;
+              qcDescendant:
+                jsoniqDescendants(n as TXQValue, command.value);
+              qcSameNode:
+                newSequence := n;
+            end;
 
-    if newSequence is TXQValueSequence then begin
-      newSequenceSeq := (newSequence as TXQValueSequence).seq;
-      if (command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling]) then
-        newSequenceSeq.revert;
+          end;
+          else continue;
+        end;
+      end;
 
-      for j := 0 to newSequenceSeq.Count-1 do
-        add(newSequenceSeq[j]);
-    end else add(newSequence);
+      filterSequence(newSequence, command.filters, context);
+
+      if (newSequence = nil) or (newSequence.getSequenceCount = 0) then
+        continue;
+
+      if newSequence is TXQValueSequence then begin
+        newSequenceSeq := (newSequence as TXQValueSequence).seq;
+        if (command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling]) then
+          newSequenceSeq.revert;
+
+        for j := 0 to newSequenceSeq.Count-1 do
+          add(newSequenceSeq[j]);
+      end else add(newSequence);
+    end;
+
+  except
+    resultSeq.free;
+    raise;
   end;
 
   result := resultSeq;
@@ -5074,7 +5160,7 @@ begin
       filterSequence(result, query.filters, context);
     end
     else begin
-      if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then result := context.SeqValue
+      if (context.SeqValue <> nil) and (context.SeqValue.kind in [pvkNode, pvkObject]) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
       else if context.staticContext.sender.ParentElement <> nil then result := xqvalue(context.staticContext.sender.ParentElement)
       else if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'Context item is undefined')

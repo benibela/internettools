@@ -2263,6 +2263,7 @@ begin
   t('$te.mp := "b"', 'b');
   t('$a.$te.mp', '17');
 
+
   ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   t('$a.b', '17');
   t('$a.b.c', '');
@@ -2273,6 +2274,28 @@ begin
   t('$obj := {}', '');
   t('$obj("x.y.z") := 17', '17');
   t('$obj("x.y.z")', '17');
+
+  t('$a / b', '17');
+  t('$a // b', '17');
+  t('[$a] / b', '17');
+  t('[$a] // b', '17');
+  t('($seq := ({"a": 1, "b": 2, "c": 3}, {"b": 4, "c": 5, "d": 6, "e": [{"a": 10, "b": 11}], "f": {"a": 20, "b": 21}}))[2]', '');
+  t('join($seq / a)', '1');
+  t('join($seq / b)', '2 4');
+  t('join([$seq] / b)', '2 4');
+  t('join($seq / (b, c, d))', '2 3 4 5 6');
+  t('join($seq // b)', '2 4 11 21');
+  f('join($seq // (a, b) )','pxp:JSON'); //todo: , '1 2 4 10 11 20 21'); ?
+  t('join($seq / (.//a, .//b) )', '1 2 10 20 4 11 21');
+  t('join( ( $seq // a, $seq // b) )', '1 10 20 2 4 11 21');
+  t('join($seq / . / a )', '1');
+  t('join($seq / . / b )', '2 4');
+  t('join($seq / . / f / a )', '20');
+  t('join($seq / . / f / . / b )', '21');
+  f('join($seq / . / e () / a )', 'err:XPST0017'); //it thinks "e()" is a function
+  t('join($seq / . / e / .() / a )', '10');
+  t('join($seq / . / e / a )', '10');
+  t('join([{"a": 1}, {"a": 2}, {"a": 3}] / a)', '1 2 3');
 
   //Json tests
   t('json(''{"a": 123}'').a', '123');

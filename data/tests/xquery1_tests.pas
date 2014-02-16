@@ -1605,6 +1605,8 @@ begin
   t('let $obj := {"hallo": 123, "foobar": 456, "xyz": 789} return $obj.foobar + $obj.hallo + $obj.xyz', '1368');
   t('for $obj in ({"a": 123}, {"a": 1000}, {}, {"a": 10000}) return $obj.a', '123 1000 10000');
   t('let $obj := {"nest": {"ing": "birdy"}} return $obj.nest.ing', 'birdy');
+  t('let $obj := {"nest": {"ing": "birdy"}} return $obj/nest/ing', 'birdy');
+  f('declare option pxp:extended-json "off"; let $obj := {"nest": {"ing": "birdy"}} return $obj/nest/ing', 'pxp:JSON');
 
   m('declare namespace p="http://www.w3.org/2001/XMLSchema"; p:integer(1)', '1');
   m('<x xmlns:p="http://www.w3.org/2005/xpath-functions">{p:concat(1,2,3)}</x>', '123');

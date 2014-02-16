@@ -1706,6 +1706,7 @@ begin
                 'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
                 'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
                 'pure-json-objects': readBoolean(staticContext.objectsRestrictedToJSONTypes, temp);
+                'extended-json': readBoolean(staticContext.jsonPXPExtensions, temp);
                 'string-entities':
                   case temp of
                     'off': options.StringEntities:=xqseIgnoreLikeXPath;
