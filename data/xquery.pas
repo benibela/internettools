@@ -5022,7 +5022,7 @@ var
   cachedNamespace: INamespace;
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
-  tempProp: IXQValue;
+  tempProp: TXQValue;
 
   procedure add(const v: IXQValue); inline;
   begin
@@ -5106,12 +5106,15 @@ begin
               qcDirectChild: begin
                 //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
                 if tempKind = pvkObject then begin
-                  tempProp := n.getProperty(command.value);
-                  xqvalueSeqAdd(newSequence, tempProp);
+                  if (n as TXQValueObject).hasProperty(command.value, @tempProp) then
+                    xqvalueSeqAdd(newSequence, tempProp);
                 end else begin
                   newSequenceSeq := (n as TXQValueJSONArray).seq;
                   for j := 0 to newSequenceSeq.Count - 1 do
-                    xqvalueSeqAdd(newSequence, newSequenceSeq[j].getProperty(command.value));
+                    if not (newSequenceSeq[j] is TXQValueObject) then
+                      raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+newSequenceSeq[j].debugAsStringWithTypeAnnotation()+'"')
+                    else if (newSequenceSeq[j] as TXQValueObject).hasProperty(command.value, @tempProp) then
+                      xqvalueSeqAdd(newSequence, tempProp);
                 end;
               end;
               qcDescendant:
