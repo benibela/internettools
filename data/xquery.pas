@@ -5098,7 +5098,7 @@ begin
               newSequenceSeq.revert;
           end;
           pvkObject, pvkArray: begin
-            if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extension are disabled');
+            if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extensions are disabled');
             if (command.namespacePrefix <> '') or (command.requiredType <> nil)
                or not (command.typ in [qcDirectChild, qcDescendant, qcSameNode])
                or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespace, qmCheckOnSingleChild, qmValue, qmAttribute] <> [qmElement]))
