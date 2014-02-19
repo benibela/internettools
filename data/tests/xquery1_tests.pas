@@ -26,6 +26,12 @@ type
   procedure ImportModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
+procedure equal(const s1, s2, testname: string);
+begin
+  if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
+end;
+
+
 procedure unittests(testerrors: boolean);
 var
   count: integer;
@@ -1817,6 +1823,14 @@ begin
   //XQuery/XPath 3 syntax tests which must fail in the old version
   f('"a" || "b"', 'err:XPST0003');
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
+
+  //interface tests
+  t('. + <x>1</x>', '2', '<t>1</t>');
+  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  equal(ps.evaluateXQuery1('"&quot;"').toString, '"', 'evaluateXQuery1 failed');
+  equal(ps.evaluateXQuery1('<a>2</a>*.', xqvalue(7)).toString, '14', 'evaluateXQuery1(ixqvalue) failed');
+  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  equal(TXQueryEngine.evaluateStaticXQuery1('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
 
   writeln('XQuery: ', count, ' completed');
 

@@ -1484,7 +1484,7 @@ type
   IXQuery = interface
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
-    function evaluate(const SeqValue: IXQValue): IXQValue;
+    function evaluate(const contextItem: IXQValue): IXQValue;
 
     function getTerm: TXQTerm;
     procedure setTerm(aterm: TXQTerm);
@@ -1497,7 +1497,7 @@ type
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
-    function evaluate(const SeqValue: IXQValue): IXQValue;
+    function evaluate(const contextItem: IXQValue): IXQValue;
 
     destructor Destroy; override;
 
@@ -1837,24 +1837,41 @@ type
     //** Parses a new expression and stores it in tokenized form.
     function parseQuery(s:string; model: TXQParsingModel; sharedContext: TXQStaticContext = nil): IXQuery;
 
-    function evaluate(tree:TTreeNode = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as TXQValue
+    function evaluate(const contextItem: IXQValue): IXQValue; //**< Evaluates a previously parsed query and returns its value as IXQValue
+    function evaluate(tree:TTreeNode = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as IXQValue
 
     constructor create;
     destructor Destroy; override;
 
+protected
+    function evaluate(expression: string; model: TXQParsingModel; tree:TTreeNode = nil): IXQValue;
+    function evaluate(expression: string; model: TXQParsingModel; const contextItem: IXQValue): IXQValue;
+public
     //** Evaluates an XPath 2.0 expression with a certain tree element as current node.
     function evaluateXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
+    function evaluateXPath2(expression: string; const contextItem: IXQValue): IXQValue;
     //** Evaluates an XQuery 1.0 expression with a certain tree element as current node.
     function evaluateXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
+    function evaluateXQuery1(expression: string; const contextItem: IXQValue): IXQValue;
     //** Evaluates an XPath 3.0 expression with a certain tree element as current node. Work in progress, only a small set of 3.0 statements is supported
     function evaluateXPath3(expression: string; tree:TTreeNode = nil): IXQValue;
+    function evaluateXPath3(expression: string; const contextItem: IXQValue): IXQValue;
     //** Evaluates an XQuery 3.0 expression with a certain tree element as current node. Work in progress, only a small set of 3.0 statements is supported
     function evaluateXQuery3(expression: string; tree:TTreeNode = nil): IXQValue;
+    function evaluateXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
     //** Evaluates an CSS 3 Selector expression with a certain tree element as current node.
     function evaluateCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
+    function evaluateCSS3(expression: string; const contextItem: IXQValue): IXQValue;
 
     //** Evaluates an expression with a certain tree element as current node.
     class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
+    class function evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue;
+    class function evaluateStaticXPath3(expression: string; tree:TTreeNode = nil): IXQValue;
+    class function evaluateStaticXPath3(expression: string; const contextItem: IXQValue): IXQValue;
+    class function evaluateStaticXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
+    class function evaluateStaticXQuery1(expression: string; const contextItem: IXQValue): IXQValue;
+    class function evaluateStaticXQuery3(expression: string; tree:TTreeNode = nil): IXQValue;
+    class function evaluateStaticXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
     //** Evaluates an expression with a certain tree element as current node.
     class function evaluateStaticCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
 
@@ -1880,7 +1897,7 @@ type
   protected
     DefaultParser: TTreeParser; //used by fn:doc if no context node is there
 
-    function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
+    function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext = nil): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
     function parseXStringNullTerminated(str: string): TXQuery;
 
@@ -3034,14 +3051,14 @@ begin
   result := fterm.evaluate(tempcontext);
 end;
 
-function TXQuery.evaluate(const SeqValue: IXQValue): IXQValue;
+function TXQuery.evaluate(const contextItem: IXQValue): IXQValue;
 var context: TXQEvaluationContext;
 begin
   if fterm = nil then exit(xqvalue());
   context := staticContext.sender.getEvaluationContext(staticContext);
   context.SeqIndex := 1;
   context.SeqLength := 1;
-  context.SeqValue := SeqValue;
+  context.SeqValue := contextItem;
   result := evaluate(context);
 end;
 
@@ -4290,6 +4307,12 @@ begin
   result := FLastQuery;
 end;
 
+function TXQueryEngine.evaluate(const contextItem: IXQValue): IXQValue;
+begin
+  if FLastQuery = nil then exit(xqvalue())
+  else exit(FLastQuery.evaluate(contextItem));
+end;
+
 function TXQueryEngine.evaluate(tree: TTreeNode): IXQValue;
 begin
   if FLastQuery = nil then exit(xqvalue())
@@ -4357,40 +4380,68 @@ begin
   inherited Destroy;
 end;
 
-function TXQueryEngine.evaluateXPath2(expression: string; tree: TTreeNode): IXQValue;
+function TXQueryEngine.evaluate(expression: string; model: TXQParsingModel; tree: TTreeNode): IXQValue;
 var
-  temp: IXQuery;
+  term: TXQuery;
 begin
-  temp := FLastQuery;
-  result := parseXPath2(expression).evaluate(tree);
-  FLastQuery := temp;
+  term := parseTerm(expression, model);
+  try
+    result := term.evaluate(tree);
+  finally
+    term.free;
+  end;
+end;
+
+function TXQueryEngine.evaluate(expression: string; model: TXQParsingModel; const contextItem: IXQValue): IXQValue;
+var
+  term: TXQuery;
+begin
+  term := parseTerm(expression, model);
+  try
+    result := term.evaluate(contextItem);
+  finally
+    term.free;
+  end;
+end;
+
+function TXQueryEngine.evaluateXPath2(expression: string; tree: TTreeNode): IXQValue;
+begin
+  result := evaluate(expression, xqpmXPath2, tree);
+end;
+
+function TXQueryEngine.evaluateXPath2(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := evaluate(expression, xqpmXPath2, contextItem);
 end;
 
 function TXQueryEngine.evaluateXQuery1(expression: string; tree: TTreeNode): IXQValue;
-var
-  temp: IXQuery;
 begin
-  temp := FLastQuery;
-  result := parseXQuery1(expression).evaluate(tree);
-  FLastQuery := temp;
+  result := evaluate(expression, xqpmXQuery1, tree);
+end;
+
+function TXQueryEngine.evaluateXQuery1(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := evaluate(expression, xqpmXQuery1, contextItem);
 end;
 
 function TXQueryEngine.evaluateXPath3(expression: string; tree: TTreeNode): IXQValue;
-var
-  temp: IXQuery;
 begin
-  temp := FLastQuery;
-  result := parseXPath3(expression).evaluate(tree);
-  FLastQuery := temp;
+  result := evaluate(expression, xqpmXPath3, tree);
+end;
+
+function TXQueryEngine.evaluateXPath3(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := evaluate(expression, xqpmXPath3, contextItem);
 end;
 
 function TXQueryEngine.evaluateXQuery3(expression: string; tree: TTreeNode): IXQValue;
-var
-  temp: IXQuery;
 begin
-  temp := FLastQuery;
-  result := parseXQuery3(expression).evaluate(tree);
-  FLastQuery := temp;
+  result := evaluate(expression, xqpmXQuery3, tree);
+end;
+
+function TXQueryEngine.evaluateXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := evaluate(expression, xqpmXQuery3, contextItem);
 end;
 
 function TXQueryEngine.evaluateCSS3(expression: string; tree: TTreeNode): IXQValue;
@@ -4402,15 +4453,83 @@ begin
   FLastQuery := temp;
 end;
 
-class function TXQueryEngine.evaluateStaticXPath2(expression: string; tree: TTreeNode): IXQValue;
+function TXQueryEngine.evaluateCSS3(expression: string; const contextItem: IXQValue): IXQValue;
+var
+  temp: IXQuery;
+begin
+  temp := FLastQuery;
+  result := parseCSS3(expression).evaluate(contextItem);
+  FLastQuery := temp;
+end;
+
+
+function staticallyEval(const expression: string; model: TXQParsingModel; tree: TTreeNode): IXQValue; overload;
 var engine: TXQueryEngine;
+  term: TXQuery;
 begin
   engine := TXQueryEngine.create;
+  term := nil;
   try
-    result := engine.parseXPath2(expression).evaluate(tree);
+    term  := engine.parseTerm(expression, model);
+    result := term.evaluate(tree);
   finally
+    term.free;
     engine.Free;
   end;
+end;
+function staticallyEval(const expression: string; model: TXQParsingModel; const contextItem: IXQValue): IXQValue; overload;
+var engine: TXQueryEngine;
+  term: TXQuery;
+begin
+  engine := TXQueryEngine.create;
+  term := nil;
+  try
+    term := engine.parseTerm(expression, model);
+    result := term.evaluate(contextItem);
+  finally
+    term.free;
+    engine.Free;
+  end;
+end;
+
+class function TXQueryEngine.evaluateStaticXPath2(expression: string; tree: TTreeNode): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXPath2, tree);
+end;
+
+class function TXQueryEngine.evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXPath2, contextItem);
+end;
+
+class function TXQueryEngine.evaluateStaticXPath3(expression: string; tree: TTreeNode): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXPath3, tree);
+end;
+
+class function TXQueryEngine.evaluateStaticXPath3(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXPath3, contextItem);
+end;
+
+class function TXQueryEngine.evaluateStaticXQuery1(expression: string; tree: TTreeNode): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXQuery1, tree);
+end;
+
+class function TXQueryEngine.evaluateStaticXQuery1(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXQuery1, contextItem);
+end;
+
+class function TXQueryEngine.evaluateStaticXQuery3(expression: string; tree: TTreeNode): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXQuery3, tree);
+end;
+
+class function TXQueryEngine.evaluateStaticXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := staticallyEval(expression, xqpmXQuery3, contextItem);
 end;
 
 class function TXQueryEngine.evaluateStaticCSS3(expression: string; tree: TTreeNode): IXQValue;
@@ -4526,6 +4645,7 @@ begin
     raise;
   end;
 end;
+
 
 
 

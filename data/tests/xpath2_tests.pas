@@ -15,6 +15,10 @@ implementation
 
 uses xquery, simplehtmltreeparser, bbutils, xquery_json;
 
+procedure equal(const s1, s2, testname: string);
+begin
+  if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
+end;
 
 procedure unittests(TestErrors:boolean);
 var
@@ -3849,7 +3853,11 @@ begin
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
-  if ps.LastQuery.evaluate(xqvalue(100)).toString <> '101' then raise Exception.Create('evaluate(seqvalue) failed');
+  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  equal(ps.evaluateXPath2('"&quot;"').toString, '&quot;', 'evaluateXPath2 failed');
+  equal(ps.evaluateXPath2('2*.', xqvalue(7)).toString, '14', 'evaluateXPath2(ixqvalue) failed');
+  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  equal(TXQueryEngine.evaluateStaticXPath2('1 + 1 + 1').toString, '3', 'evaluateStaticXPath2 a failed');
 
   writeln('XPath 2: ', i, ' completed');
 
