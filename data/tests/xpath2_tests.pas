@@ -2688,7 +2688,7 @@ begin
   t('abs(int("0"))', '0', '');
   t('abs(negativeInteger(-3))', '3', '');
   t('type-of(number(-3))', 'double', '');
-  t('"" / number()', 'NaN', '');
+  t('number("")', 'NaN', '');
   t('number()', '123', '<x>123</x>');
   t('number()', 'NaN', '<x>foo</x>');
   t('fn:number(xs:float("-3.4028235E38")) eq xs:float("-3.4028235E38")', 'true');
@@ -3847,6 +3847,9 @@ begin
   f('(1,2) ! 7', 'err:XPST0003');
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
 
+  //interface tests
+  t('. + 1', '2', '<t>1</t>');
+  if ps.LastQuery.evaluate(xqvalue(100)).toString <> '101' then raise Exception.Create('evaluate(seqvalue) failed');
 
   writeln('XPath 2: ', i, ' completed');
 

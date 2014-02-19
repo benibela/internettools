@@ -1484,6 +1484,7 @@ type
   IXQuery = interface
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
+    function evaluate(const SeqValue: IXQValue): IXQValue;
 
     function getTerm: TXQTerm;
     procedure setTerm(aterm: TXQTerm);
@@ -1496,6 +1497,7 @@ type
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
+    function evaluate(const SeqValue: IXQValue): IXQValue;
 
     destructor Destroy; override;
 
@@ -3030,6 +3032,17 @@ begin
       ((staticContext.importedModules.Objects[i] as TXQuery).fterm as TXQTermModule).initializeVariables(tempcontext, (staticContext.importedModules.Objects[i] as TXQuery).staticContext);
   if fterm is TXQTermModule then TXQTermModule(fterm).initializeVariables(tempcontext, staticContext);
   result := fterm.evaluate(tempcontext);
+end;
+
+function TXQuery.evaluate(const SeqValue: IXQValue): IXQValue;
+var context: TXQEvaluationContext;
+begin
+  if fterm = nil then exit(xqvalue());
+  context := staticContext.sender.getEvaluationContext(staticContext);
+  context.SeqIndex := 1;
+  context.SeqLength := 1;
+  context.SeqValue := SeqValue;
+  result := evaluate(context);
 end;
 
 destructor TXQuery.Destroy;
@@ -5065,7 +5078,7 @@ begin
     onlyNodes := false;
     for n in previous do begin
       if command.typ = qcFunctionSpecialCase then begin
-        if n.kind <> pvkNode then
+        if not (n.kind in [pvkNode, pvkObject, pvkArray]) then
           raise EXQEvaluationException.create('err:XPTY0020', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
         if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
         else newSequence := nil;
