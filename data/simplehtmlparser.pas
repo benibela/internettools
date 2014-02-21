@@ -168,7 +168,8 @@ begin
             //read properties
             while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
             while (pos<=htmlEnd)
-                   and  not (pos^ in ['>','/'])
+                   and (pos^ <> '>')
+                   and ((pos^ <> '/') or ((pos+1)^ <> '>'))
                    and ((marker^ <> '?') or (pos^ <> '?') or ((pos+1)^ <> '>') )
                    do begin
               if pos>htmlEnd then exit;
@@ -177,7 +178,7 @@ begin
               with properties[high(properties)] do begin
                 //search start of name
                 name:=pos;
-                while (pos<=htmlEnd) and not (pos^ in (WHITE_SPACE + ['=','/','>'])) do inc(pos);
+                while (pos<=htmlEnd) and not (pos^ in (WHITE_SPACE + ['=','>'])) and ((pos^ <> '/') or ((pos+1)^ <> '>'))  do inc(pos);
                 nameLen:=pos-name;
                 //find value start
                 while (pos<=htmlEnd) and (pos^ in (WHITE_SPACE)) do inc(pos);

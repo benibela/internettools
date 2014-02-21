@@ -1846,8 +1846,10 @@ begin
   if new.value = '' then
     if parsingModel = pmStrict then raise ETreeParseException.Create('Invalid node with empty name: '+strFromPchar(tagName, tagNameLen))
     else begin
-      new.value:= '<' +  strFromPchar(tagName, tagNameLen);
-      new.typ :=tetText;
+      new.value:= 'x';// '<' +  strFromPchar(tagName, tagNameLen);
+      //new.typ :=tetText;
+      if pos(':', strFromPchar(tagName, tagNameLen)) > 0 then
+        new.value:=strFromPchar(tagName, tagNameLen);
     end;
 
   new.initialized;
