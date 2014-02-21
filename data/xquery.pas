@@ -2329,6 +2329,14 @@ procedure ignore(const intentionallyUnusedParameter: bigDecimal); inline; begin 
 procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
 
+function arrayToXQValueArray(a: array of IXQValue): TXQVArray;
+var
+  i: Integer;
+begin
+  setlength(result, length(a));
+  for i := 0 to high(a) do Result[i] := a[i];
+end;
+
 {$I disableRangeOverflowChecks.inc}
 
 
@@ -5856,6 +5864,7 @@ pxp.registerFunction('inner-xml',@xqFunctionInner_XML, []);
 pxp.registerFunction('outer-html',@xqFunctionOuter_HTML, []);
 pxp.registerFunction('inner-html',@xqFunctionInner_HTML, []);
 pxp.registerFunction('form',@xqFunctionForm, []);
+pxp.registerFunction('resolve-html',@xqFunctionResolve_Html, []);
 pxp.registerFunction('eval',@xqFunctionEval, []);
 pxp.registerFunction('css',@xqFunctionCSS, []);
 pxp.registerFunction('get',@xqFunctionGet, ['($name as xs:string)','($name as xs:string, $def as item()*)'], [xqcdContextVariables]);

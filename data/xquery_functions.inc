@@ -1459,6 +1459,74 @@ begin
   result := (args[0] as TXQValueObject).setImmutable(propName, xqFunctionUri_combine(context, temp));
 end;
 
+function xqFunctionResolve_Html(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var res: IXQValue;
+    baseUri: String;
+
+  procedure addString(const s: string);
+  begin
+    xqvalueSeqAdd(res, xqvalue(strResolveURI(s, baseUri)));
+  end;
+
+  procedure resolve(const seq: IXQValue);
+  var iv: IXQValue;
+    n: TTreeNode;
+    tempv: IXQValue;
+    resolvedUri: RawByteString;
+    tempobj: TXQValueObject;
+  begin
+    for iv in seq do
+      case iv.kind of
+        pvkUndefined: ;
+        pvkNode: begin
+          n := iv.toNode;
+          if n = nil then continue;
+          if n.typ <> tetOpen then addString(n.toString())
+          else if SameText(n.value, 'a') then addString(n['href'])
+          else if SameText(n.value, 'frame') or SameText(n.value, 'iframe') or SameText(n.value, 'img') then addString(n['src'])
+          else if SameText(n.value, 'form') then resolve(xqFunctionForm(context, arrayToXQValueArray([iv])))
+          else addString(n.deepNodeText());
+        end;
+        pvkObject: begin
+          tempv := iv.getProperty('url');
+          if not tempv.isUndefined then begin
+            resolvedUri := strResolveURI(tempv.toString, baseUri);
+            if resolvedUri <> tempv.toString then begin
+              tempobj := TXQValueObject.create();
+              tempobj.prototype := iv;
+              tempobj.values.add('url', resolvedUri);
+              xqvalueSeqAdd(res, tempobj);
+            end else xqvalueSeqAdd(res, tempv);
+          end else xqvalueSeqAdd(res, tempv);
+        end;
+        else addString(iv.toString);
+      end;
+
+  end;
+
+var iv: IXQValue;
+  n: TTreeNode;
+  tempv: IXQValue;
+begin
+  requiredArgCount(args, 1, 2);
+
+  baseUri := '';
+  if length(args) > 1 then begin
+    tempv := args[1].getChild(1);
+    case tempv.kind of
+      pvkNode: begin
+        n := tempv.toNode;
+        if n <> nil then baseUri := n.getDocument().baseURI;
+      end;
+      else baseUri := tempv.toString;
+    end;
+  end;
+
+  res := nil;
+  resolve(args[0]);
+  result := res;
+end;
+
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
 var temp: string;
  v: IXQValue;
