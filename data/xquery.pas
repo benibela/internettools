@@ -5117,7 +5117,7 @@ var
   seq: TXQVList;
   obj: TXQValueObject;
   temp: TXQValue;
-  tempsl: TStringList;
+  tempprop: TXQProperty;
   tempvi: IXQValue;
   i: Integer;
 begin
@@ -5129,26 +5129,12 @@ begin
     end;
     pvkObject: begin
       obj := (node as TXQValueObject);
-      if (obj.prototype = nil) then begin
-        if searchedProperty <> '' then begin
-          if obj.hasProperty(searchedProperty, @temp) then xqvalueSeqAdd(newSequence, temp);
-        end else xqvalueSeqAdd(newSequence, obj.enumerateValues);
-        for i := 0 to obj.values.count - 1 do
-          jsoniqDescendants(obj.values[i], searchedProperty);
-        exit;
-      end;
+      if searchedProperty <> '' then begin
+        if obj.hasProperty(searchedProperty, @temp) then xqvalueSeqAdd(newSequence, temp);
+      end else xqvalueSeqAdd(newSequence, obj.enumerateValues);
 
-      tempsl := TStringList.Create;
-      try  //todo: optimize
-        obj.enumerateKeys(tempsl);
-        if searchedProperty <> '' then begin
-          if tempsl.IndexOf(searchedProperty) >= 0 then xqvalueSeqAdd(newSequence, obj.getProperty(searchedProperty));
-        end else xqvalueSeqAdd(newSequence, obj.enumerateValues);
-        for i := 0 to tempsl.Count - 1 do
-          jsoniqDescendants(obj.getProperty(tempsl[i]), searchedProperty);
-      finally
-        tempsl.free;
-      end;
+      for tempprop in obj.getPropertyEnumerator do
+        jsoniqDescendants(tempprop.Value, searchedProperty);
     end;
     pvkSequence:
       for tempvi in node do
