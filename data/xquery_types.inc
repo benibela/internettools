@@ -178,6 +178,11 @@ begin
   result := xqvalue();
 end;
 
+function TXQValue.getPropertyEnumerator: TXQValuePropertyEnumerator;
+begin
+  raise EXQEvaluationException.create('pxp:JSON', 'Attempted to read property of non-object');
+end;
+
 function TXQValue.GetEnumerator: TXQValueEnumerator;
 begin
   result.FCurrent := self;
@@ -1309,6 +1314,79 @@ begin
 end;
 
 
+
+{ TXQProperty }
+
+function TXQProperty.GetName: string;
+begin
+  with enum do
+    result := vars.getName(idx);
+end;
+
+function TXQProperty.GetValue: IXQValue;
+begin
+  with enum do
+    result := vars.get(idx);
+end;
+
+{ TXQValuePropertyEnumerator }
+
+function TXQValuePropertyEnumerator.GetCurrent: TXQProperty;
+begin
+  result := prop;
+end;
+
+function TXQValuePropertyEnumerator.MoveNext: Boolean;
+begin
+  if visitedProperties = nil then begin
+    inc(idx);
+    result := idx < vars.count;
+    exit;
+  end;
+
+  inc(idx);
+  while true do begin
+    while (idx < vars.count) and (visitedProperties.IndexOf(vars.getName(idx)) >= 0) do
+      inc(idx);
+    if idx < vars.count then break;
+    tempobj := tempobj.prototype as TXQValueObject;
+    if tempobj = nil then exit(false);
+    idx := 0;
+    vars := tempobj.values;
+  end;
+//  if tempobj = nil then exit(false);
+  result := true;
+  visitedProperties.Add(vars.getName(idx));
+end;
+
+function TXQValuePropertyEnumerator.GetEnumerator: TXQValuePropertyEnumerator;
+begin
+  result := self;
+end;
+
+constructor TXQValuePropertyEnumerator.create(obj: TXQValueObject);
+begin
+  prop := TXQProperty.Create;
+  prop.enum := self;
+  vars := obj.values;
+  tempobj := obj;
+  if tempobj.prototype <> nil then begin
+    visitedProperties := TStringList.Create; //todo: get a hashmap
+    visitedProperties.Sorted:=true;
+  end;
+  idx := -1;
+end;
+
+destructor TXQValuePropertyEnumerator.destroy;
+begin
+  prop.Free;
+  visitedProperties.Free;
+  inherited destroy;
+end;
+
+
+
+
 { TXQValueObject }
 
 constructor TXQValueObject.create();
@@ -1474,37 +1552,34 @@ end;
 
 function TXQValueObject.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
 var
-  temp: TXQValueObject;
-  i: Integer;
-  tempi: IXQValue;
+  prop: TXQProperty;
+  first: Boolean;
 begin
   result := '{';
-  tempi := self.clone; //keep reference in scope
-  temp := (tempi as TXQValueObject);
-  if temp.values.count > 0 then begin
-    result += jsonStrEscape(temp.values.getName(0))+': '+temp.values.get(0).jsonSerialize(nodeFormat);
-    for i:=1 to temp.values.count-1 do
-      result += ', '+jsonStrEscape(temp.values.getName(i))+': '+temp.values.get(i).jsonSerialize(nodeFormat);
-  end;
+  first := true;
+  for prop in getPropertyEnumerator do
+    if first then begin
+      result += jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
+      first := false;
+    end else result += ', ' + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
   result += '}';
 end;
 
 function TXQValueObject.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
 var
-  temp: TXQValueObject;
-  i: Integer;
-  tempi: IXQValue;
+  first: Boolean;
+  prop: TXQProperty;
 begin
-  tempi := self.clone; //keep reference in scope
-  temp := (tempi as TXQValueObject);
-  if temp.values.count = 0 then result := '<'+objectTag+'/>'
-  else begin
-    result :=  '<'+objectTag+'>';
-    result +=  '<'+temp.values.Names[0]+'>'+temp.values.get(0).xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[0]+'>';
-    for i:=1 to temp.values.count-1 do
-      result +=  '<'+temp.values.Names[i]+'>'+temp.values.get(i).xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+temp.values.Names[i]+'>';
-    result +=  '</'+objectTag+'>';
+  first := true;
+  for prop in getPropertyEnumerator do begin
+    if first then begin
+      result :=  '<'+objectTag+'>';
+      first := false;
+    end;
+    result +=  '<'+prop.name+'>'+prop.Value.xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+prop.Name+'>';
   end;
+  if first then exit('<'+objectTag+'/>'); //no properties
+  result +=  '</'+objectTag+'>';
 end;
 
 function TXQValueObject.getProperty(const name: string): IXQValue;
@@ -1517,11 +1592,9 @@ begin
   result := temp;
 end;
 
-function TXQValueObject.getEnumeratorOrderedProperties: TXQValueObjectPropertyEnumerator;
+function TXQValueObject.getPropertyEnumerator: TXQValuePropertyEnumerator;
 begin
-  result.tempobj := clone;
-  result.vars := (result.tempobj as TXQValueObject).values;
-  result.idx:=-1;
+  result := TXQValuePropertyEnumerator.Create(self);
 end;
 
 

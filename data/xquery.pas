@@ -68,6 +68,7 @@ type
   TXQuery = class;
   IXQuery = interface;
   TXQNativeModule = class;
+  TXQValuePropertyEnumerator = class;
 
   float = record end;
   xqfloat = double;
@@ -243,6 +244,7 @@ type
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function getChild(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
+    function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
@@ -290,6 +292,7 @@ type
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function getChild(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
+    function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; virtual;
@@ -601,26 +604,42 @@ type
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
   end;
 
-  { TXQValueNode }
-
-  TXQSimpleVariable = record
-    name: string;
-    value: IXQValue;
-  end;
-
-  { TXQValueObjectPropertyEnumerator }
-
-  TXQValueObjectPropertyEnumerator = record
-  private
-    tempobj: IXQValue;
+  TXQPropertyEnumeratorInternal = class
     vars: TXQVariableChangeLog;
     idx: integer;
-    function GetCurrent: TXQSimpleVariable;
+  end;
+
+  { TXQProperty }
+
+  TXQProperty = class
+  private
+    enum: TXQPropertyEnumeratorInternal;
+    function GetName: string; inline;
+    function GetValue: IXQValue; inline;
+  public
+    property Name: string read GetName;
+    property Value: IXQValue read GetValue;
+  end;
+
+  { TXQValuePropertyEnumerator }
+
+  TXQValueObject = class;
+  TXQValuePropertyEnumerator = class(TXQPropertyEnumeratorInternal)
+  private
+    tempobj: TXQValueObject;
+    prop: TXQProperty;
+    visitedProperties: TStringList;
+    function GetCurrent: TXQProperty;
   public
     function MoveNext: Boolean;
-    property Current: TXQSimpleVariable read GetCurrent;
-    function GetEnumerator: TXQValueObjectPropertyEnumerator;
+    property Current: TXQProperty read GetCurrent;
+
+    function GetEnumerator: TXQValuePropertyEnumerator;
+
+    constructor create(obj: TXQValueObject);
+    destructor destroy; override;
   end;
+
 
   //** Type corresponding to jsoniq json-item()
   TXQValueJSONIQItem = class (TXQValueJSONIQStructuredItem)
@@ -646,7 +665,8 @@ type
 
     function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
-    function getEnumeratorOrderedProperties(): TXQValueObjectPropertyEnumerator;
+    function getPropertyEnumerator: TXQValuePropertyEnumerator; override;
+
 
     procedure setMutable(const name: string; const v: IXQValue); //**< Changes a property
     function setImmutable(const name: string; const v: IXQValue): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it
@@ -2221,7 +2241,6 @@ var
 
 
 
-
 { TXQInterpretedFunctionInfo }
 
 procedure TXQInterpretedFunctionInfo.initialize();
@@ -2591,26 +2610,6 @@ end;
 
 function xqvalueAtomize(const v: IXQValue): IXQValue; forward;
 
-
-
-{ TXQValueObjectPropertyEnumerator }
-
-function TXQValueObjectPropertyEnumerator.GetCurrent: TXQSimpleVariable;
-begin
-  result.name:=vars.vars[idx].name;
-  result.value:=vars.vars[idx].value;
-end;
-
-function TXQValueObjectPropertyEnumerator.MoveNext: Boolean;
-begin
-  idx += 1;
-  Result := idx < length(vars.vars);
-end;
-
-function TXQValueObjectPropertyEnumerator.GetEnumerator: TXQValueObjectPropertyEnumerator;
-begin
-  result := self;
-end;
 
 
 { TXQStaticContext }

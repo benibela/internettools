@@ -2053,23 +2053,33 @@ begin
   t('(object(("x", "y")), object(("u", "v")))[2].u', 'v', '');
 
   t('obj := {"b": {"c": {"d": 1}}}', '');
+  t('serialize-json($obj)', '{"b": {"c": {"d": 1}}}');
   t('$obj.b.c.d', '1');
   t('x := $obj', '');
+  t('serialize-json($x)', '{"b": {"c": {"d": 1}}}');
   t('$x.b.c.d := 2', '2');
   t('$x.b.c.d', '2');
   t('$obj.b.c.d', '1');
+  t('serialize-json($obj)', '{"b": {"c": {"d": 1}}}');
+  t('serialize-json($x)', '{"b": {"c": {"d": 2}}}');
   t('x.b.c.d := 3', '3');
+  t('serialize-json($x)', '{"b": {"c": {"d": 3}}}');
   t('$x.b.c.d', '3');
   t('$obj.b.c.d', '1');
   t('$x.b("c").d := 4', '4');
   t('$x.b.c.d', '4');
+  t('serialize-json($x)', '{"b": {"c": {"d": 4}}}');
   t('$x("b")("c")("d") := 5', '5');
   t('$x.b.c.d', '5');
+  t('serialize-json($x)', '{"b": {"c": {"d": 5}}}');
   t('$x("b")("c").d := 6', '6');
   t('$x.b.c.d', '6');
+  t('serialize-json($x)', '{"b": {"c": {"d": 6}}}');
   t('$x("b").c := {"y": 123}', '');
   t('$x.b.c.d', '');
   t('$x.b.c.y', '123');
+  t('serialize-json($x)', '{"b": {"c": {"y": 123}}}');
+
 
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")).a return $i, "|")', 'x', '');
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return $i.a, "|")', 'x', '');
@@ -2278,6 +2288,7 @@ begin
   t('$obj := {}', '');
   t('$obj("x.y.z") := 17', '17');
   t('$obj("x.y.z")', '17');
+  t('serialize-json($obj)', '{"x.y.z": 17}');
 
   t('$a / b', '17');
   t('$a // b', '17');
@@ -3733,8 +3744,9 @@ begin
   t('outer-html(/)', '<table><TR><TD>1</TD><td>2</td><TD>3</TD></TR></table>', '<table><TR><TD>1<td>2<TD>3</TR></table>');
 
   t('outer-html(/)', '<table><tr><td><br></td><td>'+{firefox: </br>}'</td></tr></table>', '<table><tr><td><br></td><td></br></td></tr></table>');
-  t('outer-html(/)', '<body>some text&lt;http:/some-text&gt; some text</body>','<body>some text <http://some-text> some text</body>'); //this does not make much sense. not removing the last slash from http:// would be better. firefox turns it into an element: <http: some-text=""> some text</http:>
-
+  t('outer-html(/)', '<body>some texta<http: //some-textb="">some textc</http:></body>','<body>some texta <http://some-textb> some textc</body>'); //this does not make much sense. not removing the last slash from http:// would be better. firefox turns it into an element: <http: some-text=""> some text</http:>
+  t('outer-html(/)', '<body><a a="1" /="" b="2"></a><a a="1" /b="2"></a><a a="1" //="" b="2"></a><a a="1" /="" <="" b="2"></a><a a="1" /="">b="2"/&gt;</a></body>', '<body><a a="1" / b="2"/><a a="1" /b="2"/><a a="1" // b="2"/><a a="1" /     < b="2"/><a a="1" /     > b="2"/></body>'); //not exactly what firefox does, but similar enough
+  t('outer-html(/)', '<INPUT TYPE="CHECKBOX" VALUE="item:IN=M02 149 507 0;AT=Luk" janenko,="" Sergej="" V./Der="" falsche="" Spiegel''="" NAME="855439" ID="R855439">', '<INPUT TYPE=CHECKBOX VALUE=''item:IN=M02 149 507 0;AT=Luk''janenko, Sergej V./Der falsche Spiegel'' NAME=''855439'' ID=''R855439''>'); //close enough
 
   xml.repairMissingStartTags:=true;
   t('outer-html(/)', '<html><head></head><body><table></table></body></html>', '<table></table>');

@@ -68,8 +68,9 @@ begin
     for i := 0 to high(args) do
       for v in args[i] do begin
         if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.debugAsStringWithTypeAnnotation());
-        if resobj.prototype = nil then resobj.prototype := v
-        else merge(v as TXQValueObject);
+        {if resobj.prototype = nil then resobj.prototype := v //that would be faster, but then it serializes the properties of the first object at the end
+        else}
+        merge(v as TXQValueObject);
       end;
   except
     on EXQEvaluationException do begin resobj.free; raise; end
