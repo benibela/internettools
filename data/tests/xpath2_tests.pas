@@ -2324,6 +2324,16 @@ begin
   f('join([{"a": 1}, {"a": 2}, {"a": 3}, [{"a": 4}] ] / a)', 'pxp:JSON');
   t('join([{"a": 1}, {"a": 2}, {"a": 3}, 80, 90] // a)', '1 2 3');
 
+  t('(obj := {"a": 123}).a', '123');
+  t('join($obj / a)', '123');
+  t('$obj.a := 456', '456');
+  t('join($obj / a)', '456');
+  t('$obj.a := {"b": 7}', '');
+  t('serialize-json($obj / a)', '{"b": 7}');
+  t('serialize-json($obj // b)', '7');
+  t('$obj.a := 8', '8');
+  t('serialize-json($obj / a)', '8');
+  t('serialize-json($obj // b)', 'null');
 
   //Json tests
   t('json(''{"a": 123}'').a', '123');
