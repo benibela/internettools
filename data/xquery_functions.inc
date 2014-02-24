@@ -1482,10 +1482,36 @@ var res: IXQValue;
           n := iv.toNode;
           if n = nil then continue;
           if n.typ <> tetOpen then addString(n.toString())
-          else if SameText(n.value, 'a') then addString(n['href'])
-          else if SameText(n.value, 'frame') or SameText(n.value, 'iframe') or SameText(n.value, 'img') then addString(n['src'])
-          else if SameText(n.value, 'form') then resolve(xqFunctionForm(context, arrayToXQValueArray([iv])))
-          else addString(n.deepNodeText());
+          else case LowerCase(n.value) of
+            'a', 'area', 'link':
+               addString(n['href']);
+            'frame', 'iframe', 'img',
+            'video', 'audio', 'source', 'track',
+            'embed':
+               addString(n['src']);
+            'script': if n.hasAttribute('src') then
+               addString(n['src'])
+             else
+               addString(n.deepNodeText());
+            'meta': if SameText(n['http-equiv'], 'refresh') then begin
+              resolvedUri := trim(n['content']);
+              if strIndexOf(resolvedUri, ';') > 0 then
+                resolvedUri := trim(strCopyFrom(resolvedUri,  strIndexOf(resolvedUri, ';') + 1))
+               else begin
+                 while (resolvedUri <> '') and (resolvedUri[1] in ['0'..'9']) do delete(resolvedUri, 1, 1);
+                 resolvedUri := trim(resolvedUri);
+               end;
+              if striBeginsWith(resolvedUri, 'url=') then
+                resolvedUri := trim(strCopyFrom(resolvedUri, 5));
+              addString(resolvedUri);
+            end else
+              addString(n.deepNodeText()); //pointless fallback
+            'object':
+              addString(n['data']);
+            'form':
+              resolve(xqFunctionForm(context, arrayToXQValueArray([iv])))
+            else addString(n.deepNodeText());
+          end;
         end;
         pvkObject: begin
           tempv := iv.getProperty('url');
@@ -1504,7 +1530,7 @@ var res: IXQValue;
 
   end;
 
-var iv: IXQValue;
+var
   n: TTreeNode;
   tempv: IXQValue;
 begin
