@@ -632,6 +632,7 @@ var
   j: Integer;
   tempvalue: TXQValue;
   curmethod: String;
+  tempvi: IXQValue;
 begin
   if condition <> '' then begin
     cachedCondition := reader.parser.parseQuery(condition); //TODO: long term cache
@@ -650,12 +651,13 @@ begin
   if cururl <> '' then begin
     if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
     else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
-       reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), @tempvalue) then begin
-      if tempvalue is TXQValueObject then begin
-        cururl := tempvalue.getProperty('url').toString;
-        curmethod := tempvalue.getProperty('method').toString;
-        post := tempvalue.getProperty('post').toString;
-      end else cururl := tempvalue.toString;
+      reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), @tempvalue) then begin
+      tempvi := reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., $url)', tempvalue).getChild(1);
+      if tempvi.kind = pvkObject then begin
+        cururl := tempvi.getProperty('url').toString;
+        curmethod := tempvi.getProperty('method').toString;
+        post := tempvi.getProperty('post').toString;
+      end else cururl := tempvi.toString;
     end else cururl := reader.parser.replaceEnclosedExpressions(url);
     if cururl = '' then exit;
   end else begin

@@ -68,7 +68,7 @@ function httpRequest(url: string; postdata: TStringList): string;
 //**node: if a link (a), download @@href. If a resource (img, frame), download @@src. Otherwise download the text@br.
 //**object: Download obj.url, possibly sending obj.post as postdata.
 //**else: Download the string value.
-function httpRequest(const dest: xquery.IXQValue): string;
+function httpRequest(const destination: xquery.IXQValue): string;
 
 (***
 Processes data with a certain query.@br@br
@@ -278,23 +278,21 @@ begin
   result := httpRequest(url, TInternetAccess.urlEncodeData(postdata));
 end;
 
-function httpRequest(const dest: xquery.IXQValue): string;
-var n: TTreeNode;
+function httpRequest(const destination: xquery.IXQValue): string;
+var dest: IXQValue;
 begin
+  if destination.kind = pvkSequence then dest := destination.getChild(1)
+  else dest := destination;
+  dest := pxpParser.evaluateXPath3('pxp:resolve-html(.)', dest);
+  if dest.kind = pvkSequence then dest := dest.getChild(1);
+
   case dest.kind of
-    pvkUndefined: exit;
-    pvkNode: begin
-      n := dest.toNode;
-      if n = nil then exit;
-      if n.typ <> tetOpen then result := httpRequest(dest.toString)
-      else if SameText(n.value, 'a') then result := httpRequest(n['href'])
-      else if SameText(n.value, 'frame') or SameText(n.value, 'iframe') or SameText(n.value, 'img') then result := httpRequest(n['src'])
-      else result := httpRequest(n.deepNodeText());
-    end;
+    pvkUndefined: exit('');
+    pvkNode: raise EXQEvaluationException.Create('pxp:ASSERT', 'Got '+dest.debugAsStringWithTypeAnnotation()+', but expected resolved url');
     pvkObject:
       if dest.getProperty('method').toString <> 'GET' then result := httpRequest(dest.getProperty('url').toString, dest.getProperty('post').toString)
       else result := httpRequest(dest.getProperty('url').toString);
-    pvkSequence: result := httpRequest(dest.getChild(1));
+    pvkSequence: raise EXQEvaluationException.Create('pxp:ASSERT', 'Impossible (nested) sequence');
     else result := httpRequest(dest.toString);
   end;
 end;
