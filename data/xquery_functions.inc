@@ -1525,6 +1525,7 @@ begin
   res := nil;
   resolve(args[0]);
   result := res;
+  if res = nil then exit(xqvalue);
 end;
 
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
