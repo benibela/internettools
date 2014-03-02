@@ -1805,7 +1805,7 @@ begin
   t('serialize-json(resolve-html(({ "foo": "bar"}, {"x": 1}), "http://example.org"))', '[{"foo": "bar"}, {"x": 1}]');
   t('resolve-html((<video src="abc"/>, <area href="def"/>, <track href="def" src="ghi"/>, <script src="jkl"/>, <link href="mno"/>), "http://example.org")', 'http://example.org/abc http://example.org/def http://example.org/ghi http://example.org/jkl http://example.org/mno');
   t('resolve-html((<meta http-equiv="refresh" content="1"/>, <meta http-equiv="refresh" content="ab"/>, <meta http-equiv="refresh" content="1; url=cd"/>, <meta http-equiv="refresh" content="  url=ef  "/>), "http://example.org/atom/")', 'http://example.org/atom/ http://example.org/atom/ab http://example.org/atom/cd http://example.org/atom/ef');
-
+  t('resolve-html((<a href="abc"/>, <a href="def"/> / @href, attribute src {"ghi"}), "http://example.org/atom/")', 'http://example.org/atom/abc http://example.org/atom/def http://example.org/atom/ghi');
 
 
   m('declare function members2($x) { typeswitch ($x) case array() return jn:members($x) default return $x }; string-join(members2([1,2,3]), " ")', '1 2 3');

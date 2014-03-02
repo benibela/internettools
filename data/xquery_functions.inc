@@ -1481,7 +1481,7 @@ var res: IXQValue;
         pvkNode: begin
           n := iv.toNode;
           if n = nil then continue;
-          if n.typ <> tetOpen then addString(n.toString())
+          if n.typ <> tetOpen then addString(iv.toString())
           else case LowerCase(n.value) of
             'a', 'area', 'link':
                addString(n['href']);
