@@ -75,9 +75,9 @@ begin
   if not CheckBoxEntities.Checked then htmlparser.OutputEncoding:=eUnknown;
   try
     htmlparser.AllowVeryShortNotation:=CheckBoxShortnotatin.Checked;
-    if CheckBoxObjects.Checked then htmlparser.QueryEngine.AllowPropertyDotNotation := xqpdnAllowFullDotNotation
-    else htmlparser.QueryEngine.AllowPropertyDotNotation := xqpdnDisallowDotNotation;
-    htmlparser.QueryEngine.AllowJSON:=CheckBoxJSON.Checked;
+    if CheckBoxObjects.Checked then htmlparser.QueryEngine.ParsingOptions.AllowPropertyDotNotation := xqpdnAllowFullDotNotation
+    else htmlparser.QueryEngine.ParsingOptions.AllowPropertyDotNotation := xqpdnDisallowDotNotation;
+    htmlparser.QueryEngine.ParsingOptions.AllowJSON:=CheckBoxJSON.Checked;
     htmlparser.parseTemplate(memo1.Lines.Text);
     htmlparser.trimTextNodes:=TTrimTextNodes(trimming.ItemIndex);
     memo3.Clear;
@@ -118,10 +118,10 @@ begin
   ppath := TXQueryEngine.Create;
   tp := TTreeParser.Create;
   try
-    ppath.AllowExtendedStrings:=CheckBoxVarsInStrs.Checked;
-    if CheckBoxObjects.Checked then ppath.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation
-    else ppath.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
-    ppath.AllowJSON:=CheckBoxJSON.Checked;
+    ppath.ParsingOptions.AllowExtendedStrings:=CheckBoxVarsInStrs.Checked;
+    if CheckBoxObjects.Checked then ppath.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation
+    else ppath.ParsingOptions.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+    ppath.ParsingOptions.AllowJSON:=CheckBoxJSON.Checked;
 
     if (sender as tbutton).tag = 1 then ppath.parseXQuery1(memo1.lines.Text)
     else ppath.parseXPath2(memo1.Lines.text);
