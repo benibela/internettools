@@ -605,6 +605,12 @@ begin
   f('xs:string()', 'err:XPST0017');
 
 
+  //strange tests
+  t('(xs:int(4) + xs:int(2)) instance of xs:int', 'false');
+  t('abs(xs:byte(0)) instance of xs:byte', 'false');
+  t('ceiling(xs:unsignedInt(0)) instance of xs:unsignedInt', 'false'); //zorba returns true, but spec says " If the type of $arg is a type derived from one of the numeric types, the result is an instance of the base numeric type."
+
+
   t('type-of(xs:decimal("6.5"))', 'decimal', '');
   t('type-of(xs:string("6.5"))', 'string', '');
   t('type-of(xs:string("MEMLEAK6"))', 'string', '');
