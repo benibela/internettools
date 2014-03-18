@@ -203,9 +203,11 @@ constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
   function checkAssignable(t: TXQTerm): boolean;
   begin
     while t <> nil do begin
-      if (t is TXQTermNodeMatcher) or (t is TXQTermVariable) then
-        exit(true);
-      if (t is TXQTermReadObjectProperty) or (t is TXQTermDynamicFunctionCall) then
+      if (t is TXQTermSequence) and (length(TXQTermSequence(t).children) = 1) then
+         t := TXQTermSequence(t).children[0]
+      else if (t is TXQTermNodeMatcher) or (t is TXQTermVariable) then
+        exit(true)
+      else if (t is TXQTermReadObjectProperty) or (t is TXQTermDynamicFunctionCall) then
         t := t.children[0]
       else
         exit(false);
@@ -233,7 +235,11 @@ begin
 
   v := variable;
   while true do begin
-    if v is TXQTermNodeMatcher then begin
+    if v is TXQTermSequence then begin
+      if length(TXQTermSequence(v).children) > 1 then raiseEvaluationError('pxp:VAR', 'Only one variable can be assigned to');
+      if length(TXQTermSequence(v).children) = 0 then raiseEvaluationError('pxp:VAR', 'Cannot assign to empty sequence');
+      v := TXQTermSequence(v).children[0];
+    end else if v is TXQTermNodeMatcher then begin
       raiseEvaluationError('pxp:VAR', 'node matcher term as variable name in assignment has been deprecated. (but this error should never occur, since the term type is changed during parsing time)');
       //varname:=TXQTermNodeMatcher(v).select;
       //break;
@@ -245,6 +251,7 @@ begin
       arrayPrepend(properties, TXQTermReadObjectProperty(v).propname);
       v := v.children[0];
     end else if v is TXQTermDynamicFunctionCall then begin
+      if length(TXQTermDynamicFunctionCall(v).children) <> 2 then raiseEvaluationError('pxp:VAR', 'invalid argument count for object property assignment');
       arrayPrepend(properties, TXQTermDynamicFunctionCall(v).children[1].evaluate(context).toString);
       v := v.children[0];
     end

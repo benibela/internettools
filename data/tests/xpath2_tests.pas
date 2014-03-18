@@ -2170,6 +2170,15 @@ begin
 
   t('serialize-json({$indirect: $x.$indirect})', '{"foo": "bar"}');
 
+  t('($x).foo := "mouse"', 'mouse');
+  t('($x).foo', 'mouse');
+  t('($x)("foo") := "mice"', 'mice');
+  t('($x)("foo")', 'mice');
+  t('($x)(("foo")) := "more mice"', 'more mice');
+  t('($x)(("foo"))', 'more mice');
+
+
+
   t('{"foo": 123}.foo', '123');
   t('{"foo": 123}.$indirect', '123');
   t('{"foo": 123}. "foo"', '123');
