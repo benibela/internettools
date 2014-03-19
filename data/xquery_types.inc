@@ -1631,7 +1631,7 @@ var
   idx: Integer;
 begin
   idx := StrToInt(properties[startIndex]);
-  if idx < 1 then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to non-positive array index');
+  if idx < 0 then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
 
   if (startIndex = high(properties)) then
     newValue := v
@@ -1645,6 +1645,7 @@ begin
 
 
   result := TXQValueJSONArray.create(seq.Count);
+  if idx = 0 then result.seq.add(newValue);
   idx -= 1;
   for i := 0 to seq.Count - 1 do
     if i <> idx  then result.seq.add(seq[i])

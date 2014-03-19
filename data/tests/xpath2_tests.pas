@@ -2203,13 +2203,16 @@ begin
   t('join($optest)', '19 17 18 16 222');
   t('$optest[1][] := 18.5', '18.5');
   t('join($optest)', '19 18.5 17 18 16 222');
-  //t('$optest[0] := "prepend"', 'prepend');
-  //t('join($optest)', 'prepend 19 18.5 17 18 16 222');
+  t('$optest[0] := "prepend"', 'prepend');
+  t('join($optest)', 'prepend 19 18.5 17 18 16 222');
+  f('$optest[-1] := "prepend"', 'pxp:VAR');
 
   t('$optest2[1] := 0', '0');
   t('join($optest2)', '0');
   t('$optest2[1] := 3', '3');
   t('join($optest2)', '3');
+  t('$optest2[0][] := 2', '2');
+  t('join($optest2)', '2 3');
 
   //():= operator for json arrays + objects
   t('serialize-json($artest := [])', '[]');
@@ -2225,6 +2228,7 @@ begin
   t('serialize-json(($artest(2) := (), $artest))', '[111, 3]');
   t('serialize-json(($artest(1)[] := 123, $artest))', '[123, [111, 123, 3]]');
   t('serialize-json(($artest(1) := (), $artest))', '[123, 3]');
+  t('serialize-json(($artest(0) := -1, $artest))', '[-1, [-1, 123, 3]]');
 
   t('serialize-json($artest := {"a": []})', '{"a": []}');
   t('serialize-json(($artest("a")(2) := 1, $artest))', '[1, {"a": [1]}]');
@@ -2234,6 +2238,9 @@ begin
   t('serialize-json(($artest("a")(2)[] := 100, $artest))', '[100, {"a": [-1, 22, 100, 333]}]');
   t('serialize-json((($artest).a(1) := (), $artest))', '{"a": [22, 100, 333]}');
   t('serialize-json(($artest("a")(2) := (), $artest))', '{"a": [22, 333]}');
+  t('serialize-json(($artest("a")(0) := -2, $artest))', '[-2, {"a": [-2, 22, 333]}]');
+  t('serialize-json(($artest("a")(1)[0] := -10, $artest))', '[-10, {"a": [-10, -2, 22, 333]}]');
+  t('serialize-json(($artest("a")(3)[0] := 11, $artest))', '[11, {"a": [-10, -2, 11, 22, 333]}]');
 
   t('serialize-json($artest := {"a": [{"b": "1"}, {"c": "2"}]})', '{"a": [{"b": "1"}, {"c": "2"}]}');
   t('serialize-json((($artest).a(2).c := 222, $artest))', '[222, {"a": [{"b": "1"}, {"c": 222}]}]');

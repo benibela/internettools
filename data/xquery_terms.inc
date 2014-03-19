@@ -245,8 +245,8 @@ var varname: string;
           pvkArray: begin
             temp := value as TXQValueJSONArray;
             j := StrToInt(properties[i]);
-            if j < 1 then raiseEvaluationError('pxp:VAR', 'Negative array elements cannot be assigned to');
-            if j > temp.seq.Count then value := xqvalue()
+            if j < 0 then raiseEvaluationError('pxp:VAR', 'Negative array elements cannot be assigned to');
+            if (j = 0) or (j > temp.seq.Count) then value := xqvalue()
             else value := temp.seq.get(j - 1);
           end;
           else begin
@@ -287,7 +287,7 @@ begin
       if not (assignmentMode in [amOverride, amArrayAppend]) or (length(properties) > 0) then raiseEvaluationError('pxp:VAR', 'Array assignment cannot be followed by property assignment');
       if length(TXQTermFilterSequence(v).children) = 2 then begin
         arrayIndex := TXQTermFilterSequence(v).children[1].evaluate(context).toInt64;
-        if arrayIndex < 1 then raiseEvaluationError('pxp:VAR', 'Cannot assign to non positive array index');
+        if arrayIndex < 0 then raiseEvaluationError('pxp:VAR', 'Cannot assign to negative array index');
         if assignmentMode <> amArrayAppend then assignmentMode := amArrayOverride
         else assignmentMode := amArrayInsert; //due to automatical flattening, appending to element i, is equal to insertion after element i
       end else assignmentMode := amArrayAppend;
@@ -304,6 +304,7 @@ begin
       else if arrayIndex > value.getSequenceCount then xqvalueSeqAdd(value, result)
       else begin
         seq := TXQValueSequence.create(max(arrayIndex, value.getSequenceCount));
+        if arrayIndex = 0 then seq.seq.add(result);
         for temp in value do begin
           dec(arrayIndex);
           if arrayIndex <> 0 then seq.seq.add(temp)
