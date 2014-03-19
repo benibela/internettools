@@ -690,6 +690,9 @@ type
 
 
   //** Experimental type for a JSON array of other IXQValue
+
+  { TXQValueJSONArray }
+
   TXQValueJSONArray = class (TXQValueJSONIQItem)
     seq: TXQVList;
 
@@ -704,6 +707,8 @@ type
     function toBooleanEffective: boolean; override;
 
     function clone: IXQValue; override;
+
+    function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueJSONArray;
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
@@ -1648,7 +1653,12 @@ type
 
     @unorderedList(
     @item(@code(x"something{$var}{1+2+3}...") @br If a string is prefixed with an x, all expressions within {..}-parenthesis are evaluated and concattenated to the raw text, similarily to the value of a xquery direct attribute constructor. (option: extended-strings))
-    @item(@code(var:=value) @br This assigns the value @code(value) to the global variable @code(var) and returns @code(value) @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code(a) with the value @code(2) )
+    @item(@code(var:=value) @br This assigns the value @code(value) to the global variable @code(var) and returns @code(value)
+                            @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code($a) with the value @code(2)
+                            @br @code($a := 2) is also allowed
+                            @br Can also be used to change object properties, array elements and sequences.
+                                @code($a("property")(1)("foo")[] := 17)) appends 17 to @code({"property": [{"foo": THIS }]}). (but remember that everything is immutable! so it makes a copy (except objects which are shared) )
+                            )
     @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
           unless you use collations.)
     @item(The default type system is weaker typed, most values are automatically converted if necessary, e.g. "1" + 2 returns 3. @br
@@ -3814,6 +3824,7 @@ end;
 procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespace: INamespace; properties: TStringArray);
 var
   oldObj: TXQValue;
+  newValue: IXQValue;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
   if length(properties) = 0 then begin
@@ -3823,12 +3834,17 @@ begin
 
   if not hasVariable(variable, @oldObj, namespace) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(properties, '.')+')');
-  if not (oldObj is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object, but '+oldObj.debugAsStringWithTypeAnnotation()+LineEnding+'(when changing properites: '+strJoin(properties, '.')+')');
+
+
+  if not (oldObj is TXQValueObject) then begin
+    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.debugAsStringWithTypeAnnotation()+LineEnding+'(when changing properites: '+strJoin(properties, '.')+')');
+    newValue := (oldObj as TXQValueJSONArray).setImmutable(properties, value);
+  end else newValue := (oldObj as TXQValueObject).setImmutable(properties, value);
 
   SetLength(vars, length(vars)+1);
   vars[high(vars)].namespace := namespace;
   vars[high(vars)].name:=variable;
-  vars[high(vars)].value:=(oldObj as TXQValueObject).setImmutable(properties, value);
+  vars[high(vars)].value:=newValue;
 
   vars[high(vars)].propertyChange:=true;
 end;

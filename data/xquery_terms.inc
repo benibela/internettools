@@ -148,7 +148,7 @@ end;
 constructor TXQTermFilterSequence.create(seq: TXQTerm; filter: TXQTerm);
 begin
   push(seq);
-  push(filter);
+  if filter <> nil then push(filter);
 end;
 
 function TXQTermFilterSequence.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -202,6 +202,8 @@ end;
 constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
   function checkAssignable(t: TXQTerm): boolean;
   begin
+    if (t is TXQTermFilterSequence) and (length(t.children) = 1) then t := t.children[0];
+    if t is TXQTermFilterSequence then t := t.children[0];
     while t <> nil do begin
       if (t is TXQTermSequence) and (length(TXQTermSequence(t).children) = 1) then
          t := TXQTermSequence(t).children[0]
@@ -224,14 +226,41 @@ end;
 function TXQTermDefineVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 var varname: string;
     varnamespace: INamespace;
-    properties: TStringArray;
+    properties: TStringArray; //properties or array elements
     v: TXQTerm;
+    assignmentMode: (amOverride, amArrayOverride, amArrayInsert, amArrayAppend);
+    arrayIndex: integer;
+    value, temp: IXQValue;
 
+    seq: TXQValueSequence;
+
+    procedure applyProperties;
+    var i: Integer;
+      temp: TXQValueJSONArray;
+      j: Integer;
+    begin
+      for i := 0 to high(properties) do
+        case value.kind of
+          pvkObject: value := value.getProperty(properties[i]);
+          pvkArray: begin
+            temp := value as TXQValueJSONArray;
+            j := StrToInt(properties[i]);
+            if j < 1 then raiseEvaluationError('pxp:VAR', 'Negative array elements cannot be assigned to');
+            if j > temp.seq.Count then value := xqvalue()
+            else value := temp.seq.get(j - 1);
+          end;
+          else begin
+            value := xqvalue();
+            exit;
+          end;
+        end;
+    end;
 begin
   if length(children) = 0 then raiseEvaluationError('XPST0003', 'Value missing');
   if length(children) > 1 then raiseEvaluationError('XPST0003', 'Only one value can be assigned to a variable');
   result := children[0].evaluate(context);
   properties := nil;
+  assignmentMode := amOverride;
 
   v := variable;
   while true do begin
@@ -254,14 +283,53 @@ begin
       if length(TXQTermDynamicFunctionCall(v).children) <> 2 then raiseEvaluationError('pxp:VAR', 'invalid argument count for object property assignment');
       arrayPrepend(properties, TXQTermDynamicFunctionCall(v).children[1].evaluate(context).toString);
       v := v.children[0];
-    end
-    else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v.debugTermToString);
+    end else if v is TXQTermFilterSequence then begin
+      if not (assignmentMode in [amOverride, amArrayAppend]) or (length(properties) > 0) then raiseEvaluationError('pxp:VAR', 'Array assignment cannot be followed by property assignment');
+      if length(TXQTermFilterSequence(v).children) = 2 then begin
+        arrayIndex := TXQTermFilterSequence(v).children[1].evaluate(context).toInt64;
+        if arrayIndex < 1 then raiseEvaluationError('pxp:VAR', 'Cannot assign to non positive array index');
+        if assignmentMode <> amArrayAppend then assignmentMode := amArrayOverride
+        else assignmentMode := amArrayInsert; //due to automatical flattening, appending to element i, is equal to insertion after element i
+      end else assignmentMode := amArrayAppend;
+      v := v.children[0];
+    end else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v.debugTermToString);
+  end;
+
+  case assignmentMode of
+    amOverride: value := Result;
+    amArrayOverride, amArrayInsert: begin
+      if not context.hasVariable(varname, value, varnamespace) then value := xqvalue;
+      applyProperties;
+      if (arrayIndex = 1) and (value.getSequenceCount <= 1) then value := result
+      else if arrayIndex > value.getSequenceCount then xqvalueSeqAdd(value, result)
+      else begin
+        seq := TXQValueSequence.create(max(arrayIndex, value.getSequenceCount));
+        for temp in value do begin
+          dec(arrayIndex);
+          if arrayIndex <> 0 then seq.seq.add(temp)
+          else begin
+            if assignmentMode = amArrayInsert then
+              seq.seq.add(temp);
+            seq.seq.add(result);
+          end;
+        end;
+        if arrayIndex > 0 then seq.seq.add(result);
+        value := seq;
+      end;
+    end;
+    amArrayAppend:
+      if not context.hasVariable(varname, value, varnamespace) then
+        value := Result
+      else begin
+       applyProperties;
+       xqvalueSeqAdd(value, result);
+     end;
   end;
 
   if length(properties) = 0 then //test is unnessesary, as it should work with only the last branch. But being explicit looks better
-    context.staticContext.sender.VariableChangelog.add(varname, result, varnamespace)
+    context.staticContext.sender.VariableChangelog.add(varname, value, varnamespace)
    else
-    context.staticContext.sender.VariableChangelog.addObjectModification(varname, result, varnamespace, properties)
+    context.staticContext.sender.VariableChangelog.addObjectModification(varname, value, varnamespace, properties)
 
 
   (*exit;

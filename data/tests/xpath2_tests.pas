@@ -2177,7 +2177,70 @@ begin
   t('($x)(("foo")) := "more mice"', 'more mice');
   t('($x)(("foo"))', 'more mice');
 
+  // []:= operator
+  t('($x).foo []:= "tap"', 'tap');
+  t('join(($x).foo)', 'more mice tap');
+  t('($x).foo [] := "top"', 'top');
+  t('join(($x).foo)', 'more mice tap top');
+  t('$optest [] := 1', '1');
+  t('join($optest)', '1');
+  t('$optest [] := 2', '2');
+  t('join($optest)', '1 2');
+  t('$optest [] := 3', '3');
+  t('join($optest)', '1 2 3');
+  f('optest [] := 3', 'pxp:VAR'); //do not allow relaxed var name
+  t('$optest[1] := 17', '17');
+  t('join($optest)', '17 2 3');
+  t('$optest[2] := 18', '18');
+  t('join($optest)', '17 18 3');
+  t('$optest[6] := 222', '222');
+  t('join($optest)', '17 18 3 222');
+  t('$optest[3] := ()', '');
+  t('join($optest)', '17 18 222');
+  t('$optest[2] := (18, 16)', '18');
+  t('join($optest)', '17 18 16 222');
+  t('$optest[1] := (19, 17)', '19');
+  t('join($optest)', '19 17 18 16 222');
+  t('$optest[1][] := 18.5', '18.5');
+  t('join($optest)', '19 18.5 17 18 16 222');
+  //t('$optest[0] := "prepend"', 'prepend');
+  //t('join($optest)', 'prepend 19 18.5 17 18 16 222');
 
+  t('$optest2[1] := 0', '0');
+  t('join($optest2)', '0');
+  t('$optest2[1] := 3', '3');
+  t('join($optest2)', '3');
+
+  //():= operator for json arrays + objects
+  t('serialize-json($artest := [])', '[]');
+  t('serialize-json($artest(1) := 100)', '100');
+  t('serialize-json($artest)', '[100]');
+  t('$artest(1) := 111', '111');
+  t('serialize-json($artest)', '[111]');
+  t('$artest(10) := 22', '22');
+  t('serialize-json($artest)', '[111, 22]');
+  t('$artest(10) := 3', '3');
+  t('serialize-json($artest)', '[111, 22, 3]');
+  t('serialize-json(($artest(2) := 8, $artest))', '[8, [111, 8, 3]]');
+  t('serialize-json(($artest(2) := (), $artest))', '[111, 3]');
+  t('serialize-json(($artest(1)[] := 123, $artest))', '[123, [111, 123, 3]]');
+  t('serialize-json(($artest(1) := (), $artest))', '[123, 3]');
+
+  t('serialize-json($artest := {"a": []})', '{"a": []}');
+  t('serialize-json(($artest("a")(2) := 1, $artest))', '[1, {"a": [1]}]');
+  t('serialize-json(($artest("a")(2) := 22, $artest))', '[22, {"a": [1, 22]}]');
+  t('serialize-json(($artest("a")(3) := 333, $artest))', '[333, {"a": [1, 22, 333]}]');
+  t('serialize-json(($artest("a")(1) := -1, $artest))', '[-1, {"a": [-1, 22, 333]}]');
+  t('serialize-json(($artest("a")(2)[] := 100, $artest))', '[100, {"a": [-1, 22, 100, 333]}]');
+  t('serialize-json((($artest).a(1) := (), $artest))', '{"a": [22, 100, 333]}');
+  t('serialize-json(($artest("a")(2) := (), $artest))', '{"a": [22, 333]}');
+
+  t('serialize-json($artest := {"a": [{"b": "1"}, {"c": "2"}]})', '{"a": [{"b": "1"}, {"c": "2"}]}');
+  t('serialize-json((($artest).a(2).c := 222, $artest))', '[222, {"a": [{"b": "1"}, {"c": 222}]}]');
+  t('serialize-json((($artest).a(2).c[] := 3, $artest))', '[3, {"a": [{"b": "1"}, {"c": [222, 3]}]}]');
+  //f('($artest).a(2).c(1) := (1, 2)', 'pxp:OBJECT'); //assignment doe not work, because it is a sequence, not an array
+  t('serialize-json((($artest).a(2).c[1] := (1, 2), $artest))', '[1, 2, {"a": [{"b": "1"}, {"c": [1, 2, 3]}]}]');
+  t('serialize-json((($artest).a(2).c[1][] := 1.5, $artest))', '[1.5, {"a": [{"b": "1"}, {"c": [1, 1.5, 2, 3]}]}]');
 
   t('{"foo": 123}.foo', '123');
   t('{"foo": 123}.$indirect', '123');

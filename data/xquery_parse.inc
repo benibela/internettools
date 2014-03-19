@@ -1320,8 +1320,10 @@ begin
           exit(astroot);
         '[': begin
           expect('[');
+          skipWhitespaceAndComment();
           replace := ripBinOpApart(@astroot, 10000);
-          replace^ := TXQTermFilterSequence.Create(replace^, parse());
+          if pos^ <> ']' then replace^ := TXQTermFilterSequence.Create(replace^, parse())
+          else                replace^ := TXQTermFilterSequence.Create(replace^); //stupid hack to allow $var [] :=
           expect(']');
         end;
         '(': begin
