@@ -1455,19 +1455,19 @@ end;
 function TXQValueObject.setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
 var
   oldValue: TXQValue;
+  newValue: IXQValue;
 begin
   if startIndex = high(properties) then
     exit(setImmutable(properties[high(properties)], v));
 
-  result := cloneLinked;
-
   if not hasProperty(properties[startIndex], @oldValue) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+properties[startIndex]+' not found, when assigning to '+strJoin(properties, '.'));
-  if (oldValue is TXQValueObject) then
-    result.values.add(properties[startIndex], TXQValueObject(oldValue).setImmutable(properties, v, startIndex+1) )
-  else if (oldValue is TXQValueJSONArray) then
-    result.values.add(properties[startIndex], TXQValueJSONArray(oldValue).setImmutable(properties, v, startIndex+1) )
+  if (oldValue is TXQValueObject) then newValue := TXQValueObject(oldValue).setImmutable(properties, v, startIndex+1)
+  else if (oldValue is TXQValueJSONArray) then newValue := TXQValueJSONArray(oldValue).setImmutable(properties, v, startIndex+1)
   else raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+properties[startIndex]+' to assign to '+strJoin(properties, '.'));
+
+  result := cloneLinked;
+  result.values.add(properties[startIndex],  newValue);
 end;
 
 procedure TXQValueObject.enumerateKeys(sl: TStringList);

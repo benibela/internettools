@@ -2238,7 +2238,7 @@ begin
   t('serialize-json($artest := {"a": [{"b": "1"}, {"c": "2"}]})', '{"a": [{"b": "1"}, {"c": "2"}]}');
   t('serialize-json((($artest).a(2).c := 222, $artest))', '[222, {"a": [{"b": "1"}, {"c": 222}]}]');
   t('serialize-json((($artest).a(2).c[] := 3, $artest))', '[3, {"a": [{"b": "1"}, {"c": [222, 3]}]}]');
-  //f('($artest).a(2).c(1) := (1, 2)', 'pxp:OBJECT'); //assignment doe not work, because it is a sequence, not an array
+  f('($artest).a(2).c(1) := (1, 2)', 'pxp:OBJECT'); //assignment does not work, because it is a sequence, not an array
   t('serialize-json((($artest).a(2).c[1] := (1, 2), $artest))', '[1, 2, {"a": [{"b": "1"}, {"c": [1, 2, 3]}]}]');
   t('serialize-json((($artest).a(2).c[1][] := 1.5, $artest))', '[1.5, {"a": [{"b": "1"}, {"c": [1, 1.5, 2, 3]}]}]');
 
