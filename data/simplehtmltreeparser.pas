@@ -352,7 +352,6 @@ public
   destructor destroy;override;
   procedure clearTrees;
   //** Creates a new tree from a html document contained in html. @br
-  //** The uri parameter is just stored and returned for you by baseURI, not actually used within this class. @br
   //** contentType is used to detect the encoding
   function parseTree(html: string; uri: string = ''; contentType: string = ''): TTreeDocument; virtual;
   function parseTreeFromFile(filename: string): TTreeDocument; virtual;
@@ -1838,6 +1837,8 @@ begin
     for attrib in new.attributes do
       if pos(':', attrib.value) > 0 then
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
+    if (FParsingModel = pmHTML) and (striEqual(tag, 'base')) and (FCurrentTree.baseURI = '') and new.hasAttribute('href') then
+      FCurrentTree.baseURI := strResolveURI(new.getAttribute('href'), FCurrentTree.documentURI);
   end;
   if (pos(':', new.value) > 0) then begin
     new.namespace := findNamespace(strSplitGet(':', new.value))
