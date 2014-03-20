@@ -1537,7 +1537,13 @@ begin
   requiredArgCount(args, 1, 2);
 
   baseUri := '';
-  if length(args) > 1 then begin
+  for tempv in args[0] do
+    if (tempv.kind = pvkNode) and (tempv.toNode <> nil) and (tempv.toNode.hasDocument()) then begin
+      baseUri := tempv.toNode.getDocument().baseURI;
+      break;
+    end;
+
+  if (length(args) > 1) and (baseUri = '') then begin //use 2nd parameter only as fallback uri, if 1st parameter does not have one. (it would be nicer to have a way to override the url, but checking if there is a url, is too much caller overhead)
     tempv := args[1].getChild(1);
     case tempv.kind of
       pvkNode: begin

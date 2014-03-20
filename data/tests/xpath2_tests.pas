@@ -3926,6 +3926,11 @@ begin
   t('outer-html(/)', '<html><head></head><body><table><tbody><tr><td>1</td></tr></tbody></table></body></html>', '<table><tr><td>1</td></tr></table>');
   t('outer-html(/)', '<html><head></head><body><table><colgroup><col></colgroup><tbody><tr>17</tr></tbody></table></body></html>' , '<table><col><tr>17</table>');
 
+  t('resolve-html(//a)', 'abc', '<html><head></head><body><a href="abc"/></body></html>');
+  t('resolve-html(//a)', 'http://example.org/abc', '<html><head><base href="http://example.org"/></head><body><a href="abc"/></body></html>');
+  t('resolve-html(//a, "http://foobar.org")', 'http://example.org/def', '<html><head><base target="xx"/><base href="http://example.org"/><base href="http://www.google.de"/></head><body><a href="def"/></body></html>');
+  t('resolve-html(//form, "http://foobar.org").url', 'http://example.org/def?b=a', '<html><head><base target="xx"/><base href="http://example.org"/><base href="http://www.google.de"/></head><body><form action="def"><input value="a" name="b"></body></html>');
+  t('form(//form).url', 'http://example.org/def?b=a');
 
   //error tests
   t('() and true()', 'false');
