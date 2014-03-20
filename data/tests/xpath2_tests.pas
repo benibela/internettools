@@ -3907,6 +3907,8 @@ begin
   t('outer-html(/)', '<html><script>ä</script></html>', '<html><script>&auml;</script></html>');
   t('outer-html(/)', '<html><script>&auml;</script></html>', '<html><script><![CDATA[&auml;]]></script></html>');
   t('outer-xml(/)', '<html><script>&amp;auml;</script></html>', '<html><script><![CDATA[&auml;]]></script></html>');
+  t('outer-xml(/)', '<xml>'#10'</xml>', '<xml><![CDATA['#13']]></xml>');
+  t('outer-xml(/)', '<xml>'#10'</xml>', '<xml><![CDATA['#13#10']]></xml>');
 
   t('outer-xml(/)', '<foo xmlns:abc="123" abc:def="456"/>', '<foo abc:def="456" xmlns:abc="123"/>');
 
