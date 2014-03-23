@@ -762,10 +762,16 @@ begin
 end;}
 
 procedure TTreeNode.deleteAll();
+var cur: TTreeNode;
+  cnext: TTreeNode;
 begin
-  if next <> nil then next.deleteAll();
-  next:=nil;
-  Free;
+  cur := self;
+  while cur <> nil do begin
+    cnext := cur.next;
+    cur.next := nil;
+    cur.free;
+    cur := cnext;
+  end;
 end;
 
 procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
