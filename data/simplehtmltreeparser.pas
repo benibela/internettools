@@ -2228,7 +2228,7 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
 var
   el: TTreeNode;
   attrib: TTreeAttribute;
-  encMeta, encHeader: TEncoding;
+  encMeta, encHeader, encBOM: TEncoding;
 begin
   FTemplateCount:=0;
   FElementStack.Clear;
@@ -2262,7 +2262,8 @@ begin
   flastbody := nil;
   flasthtml := nil;
 
-  FXmlHeaderEncoding := strEncodingFromBOMRemove(FCurrentFile);
+  encBOM := strEncodingFromBOMRemove(FCurrentFile);
+  FXmlHeaderEncoding := encBOM;
   if not (FXmlHeaderEncoding in [eUTF8, eUnknown]) then begin
     html := strConvertToUtf8(html, FXmlHeaderEncoding);
     FXmlHeaderEncoding:=eUTF8;
@@ -2279,8 +2280,11 @@ begin
 
   if FAutoDetectHTMLEncoding  then begin
     FCurrentTree.FEncoding:=eUnknown;
-    encHeader := encodingFromContentType(contentType);
-    if parsingModel = pmHTML then
+    if encBOM = eUnknown then
+      encHeader := encodingFromContentType(contentType)
+     else
+      encHeader := encBOM;
+    if (encHeader = eUnknown) and (parsingModel = pmHTML) then
       encMeta := encodingFromContentType(TXQueryEngine.evaluateStaticXPath2('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree).toString)
      else
       encMeta := encHeader;
