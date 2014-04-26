@@ -1934,6 +1934,18 @@ begin
 
 end;
 
+function xqFunctionRandom(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 0);
+  result := xqvalue(xqfloat(Random));
+end;
+
+function xqFunctionSleep(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 1);
+  sleep(args[0].toInt64);
+  result := xqvalue;
+end;
 
 function xqFunctionEval(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin

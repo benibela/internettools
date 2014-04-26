@@ -5866,6 +5866,8 @@ pxp.registerFunction('outer-html',@xqFunctionOuter_HTML, []);
 pxp.registerFunction('inner-html',@xqFunctionInner_HTML, []);
 pxp.registerFunction('form',@xqFunctionForm, []);
 pxp.registerFunction('resolve-html',@xqFunctionResolve_Html, []);
+pxp.registerFunction('random',@xqFunctionRandom, []);
+pxp.registerFunction('sleep',@xqFunctionSleep, []);
 pxp.registerFunction('eval',@xqFunctionEval, []);
 pxp.registerFunction('css',@xqFunctionCSS, []);
 pxp.registerFunction('get',@xqFunctionGet, ['($name as xs:string)','($name as xs:string, $def as item()*)'], [xqcdContextVariables]);
