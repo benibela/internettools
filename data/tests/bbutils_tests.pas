@@ -702,6 +702,33 @@ begin
   if strLengthUtf8('hallo'#$C3#$84'<<') <> 8 then raise Exception.Create('strLengthUtf8 failed, 2');
   if strGetUnicodeCharacter($C4) <> #$C3#$84 then raise Exception.Create('strGetUnicodeCharacter failed, 1');
 
+
+  test(strCompareClever('1000', '100'), 1);
+  test(strCompareClever('1000', '1001'), -1);
+  test(strCompareClever('1000', '1000'), 0);
+  test(strCompareClever('1000', ''), 1);
+  test(strCompareClever('', '100'), -1);
+  test(strCompareClever('', ''), 0);
+  test(strCompareClever('abc 123', 'abc 22'), 1);
+  test(strCompareClever('abc 123', 'abc 022'), 1);
+  test(strCompareClever('abc 123', 'abc 0000022'), 1);
+  test(strCompareClever('abc 22', 'abc 123' ), -1);
+  test(strCompareClever('abc 022', 'abc 123'), -1);
+  test(strCompareClever('abc 0000022', 'abc 123'), -1);
+  test(strCompareClever('abc 00123 def 10', 'abc 0123 def 7'), 1);
+  test(strCompareClever('abc 00123 def 10', 'abc 0123 def 70'), -1);
+  test(strCompareClever('abc #0 def 10', 'abc #0 def 9'), 1);
+  test(strCompareClever('abc #0 def 10', 'abc #0 def 70'), -1);
+  //completely ignore leading zeros, unless everything else is identically
+  test(strCompareClever('a00b000c', 'a000b00c'), -1);
+  test(strCompareClever('a00b000c', 'a00b000c'), 0);
+  test(strCompareClever('a00b000c', 'a0b0000c'), 1);
+  test(strCompareClever('a00b000c1000', 'a000b00c100'), 1);
+  test(strCompareClever('a00b000c1000', 'a00b000c1000'), 0);
+  test(strCompareClever('a00b000c1000', 'a0b0000c10000'), -1);
+  test(strCompareClever('a00b000c1000', 'a000b00c2'), 1);
+  test(strCompareClever('a00b000c2', 'a0b0000c1000'), -1);
+
   //string conversion
   if strConvertToUtf8('a?=ßä'#$DF,eUTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
   if strConvertFromUtf8('a?=ßä'#$DF,eUTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');

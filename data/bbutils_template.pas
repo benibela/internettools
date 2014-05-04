@@ -2301,33 +2301,33 @@ end;
 function strCompareClever(const s1, s2: RawByteString): integer;
 var t1,t2:RawByteString; //lowercase text
     i,j,ib,jb,p: longint;
+    iz, jz: longint;
 begin
+  result:=0;
   t1 := s1;
   t2 := s2;
   i:=1;
   j:=1;
   while (i<=length(t1)) and (j<=length(t2)) do begin
     if (t1[i] in ['0'..'9']) and (t2[j] in ['0'..'9']) then begin
+      iz := i;
+      jz := j;
+      while t1[i] = '0' do inc(i);
+      while t2[j] = '0' do inc(j);
       ib:=i;
       jb:=j;
       while (i<=length(t1)) and (t1[i] in ['0'..'9']) do inc(i);
       while (j<=length(t2)) and (t2[j] in ['0'..'9']) do inc(j);
-      if i-ib<j-jb then begin
-        result:=-1; //find longer number
-        exit;
-      end;
-      if i-ib>j-jb then begin
-        result:=1;
+      if i-ib<>j-jb then begin
+        result:=sign(i-ib - (j-jb)); //find longer number
         exit;
       end;
       for p:=0 to i-ib-1 do //numerical == lexical
-        if t1[ib+p]<t2[jb+p] then begin
-          result:=-1;
-          exit;
-        end else if t1[ib+p]>t2[jb+p] then begin
-          result:=1;
+        if t1[ib+p]<>t2[jb+p] then begin
+          result:=sign(ord(t1[ib+p]) - ord(t2[jb+p]));
           exit;
         end;
+      if result = 0 then result := sign ( i - iz - (j - jz) );
     end else begin
       if t1[i]<t2[j] then begin
         result:=-1;
@@ -2341,15 +2341,8 @@ begin
       inc(j);
     end;
   end;
-  if length(t1)<length(t2) then begin
-    result:=-1;
-    exit;
-  end;
-  if length(t1)>length(t2) then begin
-    result:=1;
-    exit;
-  end;
-  result:=0;
+  if length(t1)<>length(t2) then
+    result:=sign(length(t1) - length(t2));
 end;
 
 function striCompareClever(const s1, s2: RawByteString): integer;
