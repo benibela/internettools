@@ -727,7 +727,9 @@ begin
   test(strCompareClever('a00b000c1000', 'a00b000c1000'), 0);
   test(strCompareClever('a00b000c1000', 'a0b0000c10000'), -1);
   test(strCompareClever('a00b000c1000', 'a000b00c2'), 1);
-  test(strCompareClever('a00b000c2', 'a0b0000c1000'), -1);
+  test(strCompareClever('a00b000c', 'a0b000000c'), 1);
+  test(strCompareClever('a00b000c2', 'a000b0000c1000'), -1);
+  test(strCompareClever('a00b000c', 'a0b0000c'), 1);
 
   //string conversion
   if strConvertToUtf8('a?=ßä'#$DF,eUTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');

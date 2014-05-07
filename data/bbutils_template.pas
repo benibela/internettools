@@ -2329,19 +2329,15 @@ begin
         end;
       if result = 0 then result := sign ( i - iz - (j - jz) );
     end else begin
-      if t1[i]<t2[j] then begin
-        result:=-1;
-        exit;
-      end;
-      if t1[i]>t2[j] then begin
-        result:=1;
+      if t1[i]<>t2[j] then begin
+        result:=sign(ord(t1[i]) - ord(t2[j]));
         exit;
       end;
       inc(i);
       inc(j);
     end;
   end;
-  if length(t1)<>length(t2) then
+  if result = 0 then
     result:=sign(length(t1) - length(t2));
 end;
 
