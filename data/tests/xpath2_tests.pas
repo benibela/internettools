@@ -20,6 +20,7 @@ begin
   if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
 end;
 
+
 procedure unittests(TestErrors:boolean);
 var
   i: Integer;
@@ -83,6 +84,7 @@ var tempb: Boolean;
   tt: String;
   j: Integer;
 begin
+  i := 0;
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
 
