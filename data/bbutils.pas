@@ -3999,8 +3999,8 @@ begin
     if (t1[i] in ['0'..'9']) and (t2[j] in ['0'..'9']) then begin
       iz := i;
       jz := j;
-      while t1[i] = '0' do inc(i);
-      while t2[j] = '0' do inc(j);
+      while (i<=length(t1)) and (t1[i] = '0') do inc(i);
+      while (j<=length(t2)) and (t2[j] = '0') do inc(j);
       ib:=i;
       jb:=j;
       while (i<=length(t1)) and (t1[i] in ['0'..'9']) do inc(i);

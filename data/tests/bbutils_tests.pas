@@ -709,6 +709,9 @@ begin
   test(strCompareClever('1000', ''), 1);
   test(strCompareClever('', '100'), -1);
   test(strCompareClever('', ''), 0);
+  test(strCompareClever('', '000'), -1);
+  test(strCompareClever('0', '000'), -1);
+  test(strCompareClever('000', ''), 1);
   test(strCompareClever('abc 123', 'abc 22'), 1);
   test(strCompareClever('abc 123', 'abc 022'), 1);
   test(strCompareClever('abc 123', 'abc 0000022'), 1);
