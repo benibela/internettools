@@ -4727,8 +4727,8 @@ begin
         end else begin //am/pm special case
           if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then inc(mp, 5)
           else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then inc(mp, 3)
-          else if (ip > length(input)) and (input[ip] <> 'a') then begin result := false; exit; end
-          else continue;
+          else if (ip > length(input)) or (input[ip] <> 'a') then begin result := false; exit; end
+          else begin inc(mp); inc(ip); continue; end;
         end;
 
         index := -1;

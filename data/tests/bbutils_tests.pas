@@ -600,6 +600,7 @@ begin
   timeParseParts('pm5','am/pmh', @y, @m, @d, @ms); test(y, 17);
   timeParseParts('a4','a/ph', @y, @m, @d, @ms); test(y, 4);
   timeParseParts('p6','a/ph', @y, @m, @d, @ms); test(y, 18);
+  timeParseParts('a12','ah', @y, @m, @d, @ms); test(y, 12);
   dateParseParts('12M10D', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 12); test(d, 10);
   dateParseParts('08M', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 08); test(d, high(integer));
   dateParseParts('09D', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, 9);
