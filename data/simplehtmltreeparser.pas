@@ -2222,13 +2222,19 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
        (pos('charset=latin1',encoding) > 0) or
        (pos('charset=iso-8859-1',encoding) > 0) then //also -15
         exit(eWindows1252);
+    if (pos('charset=utf-16le',encoding) > 0) then exit(eUTF16LE);
+    if (pos('charset=utf-16be',encoding) > 0) then exit(eUTF16BE);
+    if (pos('charset=utf-16',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+    if (pos('charset=utf-32le',encoding) > 0) then exit(eUTF32LE);
+    if (pos('charset=utf-32be',encoding) > 0) then exit(eUTF32BE);
+    if (pos('charset=utf-32',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF});
     exit(eUnknown);
   end;
 
 var
   el: TTreeNode;
   attrib: TTreeAttribute;
-  encMeta, encHeader, encBOM: TEncoding;
+  encMeta, encBOM: TEncoding;
 begin
   FTemplateCount:=0;
   FElementStack.Clear;
@@ -2263,11 +2269,13 @@ begin
   flasthtml := nil;
 
   encBOM := strEncodingFromBOMRemove(FCurrentFile);
-  FXmlHeaderEncoding := encBOM;
-  if not (FXmlHeaderEncoding in [eUTF8, eUnknown]) then begin
-    html := strConvertToUtf8(html, FXmlHeaderEncoding);
-    FXmlHeaderEncoding:=eUTF8;
+  if encBOM = eUnknown then
+    encBOM := encodingFromContentType(contentType);
+  if not (encBOM in [eUTF8, eWindows1252, eUnknown]) then begin
+    FCurrentFile := strConvertToUtf8(FCurrentFile, encBOM);
+    encBOM := eUTF8;
   end;
+  FXmlHeaderEncoding := encBOM;
 
 
 
@@ -2280,20 +2288,16 @@ begin
 
   if FAutoDetectHTMLEncoding  then begin
     FCurrentTree.FEncoding:=eUnknown;
-    if encBOM = eUnknown then
-      encHeader := encodingFromContentType(contentType)
-     else
-      encHeader := encBOM;
-    if (encHeader = eUnknown) and (parsingModel = pmHTML) then
+    if (encBOM = eUnknown) and (parsingModel = pmHTML) then
       encMeta := encodingFromContentType(TXQueryEngine.evaluateStaticXPath2('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree).toString)
      else
-      encMeta := encHeader;
+      encMeta := encBOM;
 
-    if encHeader = eUnknown then encHeader := FXmlHeaderEncoding;
-    if encHeader = eUnknown then encHeader := encMeta;
-    if encMeta  = eUnknown then encMeta := encHeader;
-    if FXmlHeaderEncoding = eUnknown then FXmlHeaderEncoding := encHeader;
-    if (encMeta = encHeader) and (encMeta = FXmlHeaderEncoding) and (encMeta <> eUnknown) then
+    if encBOM = eUnknown then encBOM := FXmlHeaderEncoding;
+    if encBOM = eUnknown then encBOM := encMeta;
+    if encMeta  = eUnknown then encMeta := encBOM;
+    if FXmlHeaderEncoding = eUnknown then FXmlHeaderEncoding := encBOM;
+    if (encMeta = encBOM) and (encMeta = FXmlHeaderEncoding) and (encMeta <> eUnknown) then
       FCurrentTree.FEncoding := encMeta
     else begin //if in doubt, detect encoding and ignore meta/header data
       FCurrentTree.FEncoding:=eUTF8;
