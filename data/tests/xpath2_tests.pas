@@ -152,6 +152,7 @@ begin
   t('get("test")', 'tset');
   t('get("unknown")', '');
   t('get("unknown", 42)', '42');
+  t('concat(test :=123, get("test"))', '123123');
 
   //more extended strings
   t('x"123"', '123');

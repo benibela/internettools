@@ -1962,7 +1962,7 @@ end;
 function xqFunctionGet(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1, 2);
-  if not context.hasVariable(args[0].toString, result, context.findNamespace('', xqdnkAny)) then
+  if not context.hasVariable(args[0].toString, result, context.findNamespace('', xqdnkUnknown)) then
     if length(args) = 2 then exit(args[1])
     else exit(xqvalue());
 end;
