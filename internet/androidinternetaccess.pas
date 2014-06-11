@@ -383,7 +383,7 @@ begin
             jHeaderIterator := j.CallObjectMethod(jResponse,  jmHttpMessageHeaderIterator);
             while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
               jHeader := j.CallObjectMethod(jHeaderIterator,  jmHeaderIteratorNextHeader);
-              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + '='+
+              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + ':'+
                                   j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetValue)));
               j.DeleteLocalRef(jHeader);
             end;
