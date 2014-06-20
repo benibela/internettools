@@ -167,7 +167,7 @@ begin
 
   if url.protocol = 'https' then
     if (not IsSSLloaded) then //check if ssl is actually loaded
-       raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: install also the dev packages on Debian)');
+       raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: Also install the dev packages of openssl. Called libssl-dev on Debian/Ubunutu, openssl-devel on Fedora/CentOS, ...)');
 
   url.prepareSelfForRequest(lastConnectedUrl);
 
