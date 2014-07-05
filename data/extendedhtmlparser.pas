@@ -533,19 +533,21 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         @br If no child can be matched at the current position in the html file, the matching will be tried again at the next position (different to case 1).
        )
       ))
-      @item(@code(<template:switch-prioritized> ... </template:switch-prioritized>)
+      @item(@code(<template:switch prioritized="true"> ... </template:switch>)
         Another version of a case 2 switch statement that only may contain normal html tags. @br
         The switch-prioritized prefers earlier child element to later child elements, while the normal switch match alls child elements equally. So a normal switch containing <a> and <b>, will match <a> or <b>, whichever appears first in the html file.
         The switch-prioritized contrastingly would match <a>, if there is any <a>, and <b> only iff there is no <a> in the html file. @br
         Therefore @code(<template:switch-prioritized [value="??"]> <a>..</a> <b>..</b> .. </template:switch-prioritized>) is identical to
-        @code(<a template:optional="true">..<t:s>found:=true()</t:s></a> <b template:optional="true" template:test="not($found)">..<t:s>found:=true()</t:s></b> ...). (and this command is kind of redunant, so it might be removed in later versions)
+        @code(<a template:optional="true">..<t:s>found:=true()</t:s></a> <b template:optional="true" template:test="not($found)">..<t:s>found:=true()</t:s></b> ...).@br
+        (this used to be called @code(<template:switch-prioritized>), which is still supported, but will be removed in future versions)
       )
-      @item(@code(<template:match-text [regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [is=".."] [case-sensitive=".."] [list-contains=".."]/>)@br
+      @item(@code(<template:match-text [matches=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [eq=".."] [case-sensitive=".."] [list-contains=".."]/>)@br
         Matches a text node and is more versatile than just including the text in the template.@br
-        regex matches an arbitrary regular expression against the text node.@br
-        starts-with/ends-with/contains/is check the text verbatim against the text node, in the obvious way.@br
+        @code(matches) matches an arbitrary regular expression against the text node. @br
+        @code(starts-with/ends-with/contains/eq) check the text verbatim against the text node, in the obvious way.@br
         list-contains treats the text of the node as a comma separated list and tests if that list contains the attribute value .@br
-        case-sensitive enables case-sensitive comparisons.
+        case-sensitive enables case-sensitive comparisons.@br
+        (older versions used regex/is instead matches/eq, which is now deprecated and will be removed in future versions)
       )
       @item(@code(<template:meta [default-text-matching="??"] [default-case-sensitive="??"]/>) @br
         Specifies meta information to change the template semantic:@br
@@ -734,6 +736,15 @@ begin
   end;
 end;
 
+function nodeToCommand(n: TTreeNode): TTemplateElementType; inline;
+begin
+  with n do begin
+    result := strToCommand(getNamespaceURL(), value, typ);
+    if (result = tetCommandSwitchOpen) and striEqual(getAttribute('prioritized'), 'true') then
+      result := tetCommandSwitchPrioritizedOpen;
+  end;
+end;
+
 procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
 
 { EHTMLParseMatchingException }
@@ -793,7 +804,7 @@ begin
       if attributes.Items[i].getNamespaceURL() = XMLNamespaceUrl_XMLNS then
         attributes.delete(i);
 
-  templateType:=strToCommand(getNamespaceURL(), value, typ);
+  templateType:=nodeToCommand(self);
 
   if attributes <> nil then
     for i := attributes.Count - 1 downto 0 do begin
@@ -919,12 +930,13 @@ begin
   ignoreSelfTest := cachePXP('ignore-self-test');
 
   if (templateType = tetMatchText) then begin
-    //[regex=".."] [starts-with=".."] [ends-with=".."] [contains=".."] [case-sensitive=".."] [list-contains=".."]
-    cacheRegExpr('regex', '', '', false);
+    cacheRegExpr('matches', '', '', false);
+    cacheRegExpr('regex', '', '', false); //deprecated
     cacheRegExpr('starts-with', '^', '.*$', true);
     cacheRegExpr('ends-with', '^.*', '$', true);
     cacheRegExpr('contains', '', '', true);
-    cacheRegExpr('is', '^', '$', true);
+    cacheRegExpr('eq', '^', '$', true);
+    cacheRegExpr('is', '^', '$', true); //deprecated
     cacheRegExpr('list-contains', '(^|,) *', ' *(,|$)', true);
   end else if (templateType = tetCommandRead) then begin
     cacheRegExpr('regex', '', '', false);
@@ -1074,7 +1086,7 @@ begin
         exit(false);
     end else begin
       strategy := FAttributeMatching.ValueFromIndex[strategyi];
-      if strategy = 'is' then begin
+      if (strategy = 'eq') or (strategy = 'is' {deprecated}) then begin
         if not striequal(html.getAttribute(name), attrib.realvalue) then
           exit(false);
       end else if strategy = 'list-contains' then begin
@@ -1086,7 +1098,7 @@ begin
           if not found then exit(false);
         end;
       end else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind', self);
-      {todo: cacheRegExpr('regex', '', '', false);
+      {todo: cacheRegExpr('matches', '', '', false);
       cacheRegExpr('starts-with', '^', '.*$', true);
       cacheRegExpr('ends-with', '^.*', '$', true);
       cacheRegExpr('contains', '', '', true);

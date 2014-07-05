@@ -15,7 +15,7 @@ uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser;
 
 
 procedure unitTests(testerrors: boolean);
-var data: array[1..285] of array[1..3] of string = (
+var data: array[1..290] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
  ('<a><b><template:read source="text()" var="test"/></b></a>',
@@ -534,14 +534,17 @@ var data: array[1..285] of array[1..3] of string = (
       ,('<a><t:match-text contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abcd')
       ,('<a><t:match-text contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a></m>', 'x=XXABC')
       ,('<a><t:match-text contains="."/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a></m>', 'x=xx.xx')
+      ,('<a><t:match-text matches="."/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=XXABC')
+      ,('<a><t:match-text matches="^.$"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=t')
       ,('<a><t:match-text regex="."/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=XXABC')
-      ,('<a><t:match-text regex="^.$"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=t')
-      ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=abc')
+      ,('<a><t:match-text regex="^.$"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=t') //deprecated
+      ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=abc') //deprecated
       ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC,abc</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=XXABC,abc')
       ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>XXABC  ,   abc  , foobar</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=XXABC  ,   abc  , foobar')
       ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a> abc  , foobar</a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=abc  , foobar')
       ,('<a><t:match-text list-contains="abc"/><t:s>x:=text()</t:s></a>', '<m><a>   abc  </a><a>abc</a><a>abcd</a><a>xx.xx</a><a>t</a></m>', 'x=abc')
-      ,('<a><t:match-text is="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text eq="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc')
+      ,('<a><t:match-text is="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abc</a><a>abcd</a></m>', 'x=abc') //deprecated
       ,('<a><t:match-text starts-with="abc" condition="@foo=''bar''"/><t:s>x:=text()</t:s></a>', '<m><a>abc</a><a>abc</a><a foo="bar">abcd</a></m>', 'x=abcd')
       ,('<a><t:match-text starts-with="abc" ends-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcd</a><a>abc</a></m>', 'x=abc')
       ,('<a><t:match-text starts-with="abc" ends-with="abc"/><t:s>x:=text()</t:s></a>', '<m><a>ab</a><a>abcdabc</a><a>abc</a></m>', 'x=abcdabc')
@@ -616,6 +619,8 @@ var data: array[1..285] of array[1..3] of string = (
       ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><a>1</a><b>2</b></xx>', 'a=1')
       ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><b>2</b></xx>', 'b=2')
       ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><b>2</b><a>1</a></xx>', 'a=1')
+      ,('<xx><t:switch prioritized="true"><a>{a:=text()}</a><b>{b:=text()}</b></t:switch></xx>', '<xx><b>8</b><a>9</a></xx>', 'a=9')
+      ,('<xx><t:switch pRioritized="tRue"><a>{a:=text()}</a><b>{b:=text()}</b></t:switch></xx>', '<xx><b>8</b><a>9</a></xx>', 'a=9')
       //+fillings
       ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx>....<t>...<a>1</a>aas</t>assa<u>fdas<b>2</b>asdasd</u></xx>', 'a=1')
       ,('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><h>ass</h>assa<b>2</b>asdas</xx>', 'b=2')
