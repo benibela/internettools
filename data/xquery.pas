@@ -5876,7 +5876,9 @@ pxp.registerFunction('type-of',@xqFunctionType_of, []);
 pxp.registerFunction('get-property',@xqFunctionGet_Property, []);
 pxp.registerFunction('object',@xqFunctionObject,[]); //deprecated
 pxp.registerFunction('join',@xqFunctionJoin,[]);
-
+pxp.registerFunction('binary-to-string',@xqFunctionBinary_To_String,['($data as xs:hexBinary) as xs:string', '($data as xs:base64Binary) as xs:string','($data as xs:hexBinary, $encoding as xs:string) as xs:string', '($data as xs:base64Binary, $encoding as xs:string) as xs:string']);
+pxp.registerFunction('string-to-hexBinary',@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
+pxp.registerFunction('string-to-base64Binary',@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
 
 pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
 pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);

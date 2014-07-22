@@ -1591,6 +1591,42 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+function xqFunctionBinary_To_String(const args: TXQVArray): IXQValue;
+var
+  raw: RawByteString;
+begin
+  //(binary, encoding?) => string
+  requiredArgCount(args, 1, 2);
+  if args[0].typeAnnotation.derivedFrom(baseSchema.hexBinary) then raw := strDecodeHex(args[0].toString)
+  else if args[0].typeAnnotation.derivedFrom(baseSchema.base64Binary) then raw := base64.DecodeStringBase64(args[0].toString)
+  else raise EXQEvaluationException.create('pxp:binary', 'Unknown binary type: '+args[0].typeAnnotation.name);
+
+  if length(args) > 1 then
+    exit(xqvalue(strChangeEncoding(raw, strEncodingFromName(args[1].toString), eUTF8)));
+
+  result := xqvalue(raw);
+end;
+function xqFunctionString_To_hexBinary(const args: TXQVArray): IXQValue;
+var
+  data: RawByteString;
+begin
+  //(string, encoding?) => binary
+  requiredArgCount(args, 1, 2);
+  data := args[0].toString;
+  if length(args) > 1 then data := strChangeEncoding(data, eUTF8, strEncodingFromName(args[1].toString));
+  result := TXQValueString.create(baseSchema.hexBinary, strEncodeHex(data));
+end;
+function xqFunctionString_To_base64Binary(const args: TXQVArray): IXQValue;
+var
+  data: RawByteString;
+begin
+  //(string, encoding?) => binary
+  requiredArgCount(args, 1, 2);
+  data := args[0].toString;
+  if length(args) > 1 then data := strChangeEncoding(data, eUTF8, strEncodingFromName(args[1].toString));
+  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
+end;
+
 procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
 begin

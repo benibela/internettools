@@ -2006,6 +2006,17 @@ begin
   t('uri-combine({"x": "++", "y&": 123}, {"x": 0, "y": 456})', 'x=0&y%26=123&y=456');
   t('uri-combine({"x": "++", "y&": 123}, {"y": "456", "x": 0})', 'x=0&y%26=123&y=456');
 
+  t('binary-to-string(xs:hexBinary("1234567890ABCDEF"))',#$12#$34#$56#$78#$90#$AB#$CD#$EF);
+  t('binary-to-string(xs:hexBinary("C3A4"))','ä');
+  t('binary-to-string(xs:hexBinary("C3A4"), "latin1")','Ã¤');
+  t('binary-to-string(xs:base64Binary("aGFsbG8gd2VsdA=="))','hallo welt');
+  t('string-to-hexBinary("abc")', '616263');
+  t('string-to-hexBinary("abcä")', '616263C3A4');
+  t('string-to-hexBinary("abcä", "latin1")', '616263E4');
+  t('string-to-base64Binary("abc")', 'YWJj');
+  t('string-to-base64Binary("abcä")', 'YWJjw6Q=');
+  t('string-to-base64Binary("abcä", "latin1")', 'YWJj5A==');
+
   ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
 
                //Objects extension
