@@ -524,6 +524,7 @@ begin
   test(strEscapeToHex('abcbc', ['b','c'], '%'), 'a%62%63%62%63');
   test(strUnescapeHex('a%62%63%62%63', '%'), 'abcbc');
   test(strEscapeToHex('abcbc+', ['b','c', '+'], ''), 'a626362632B');
+  test(strUnescapeHex('\xFF'), #$FF);
 
 
 end;

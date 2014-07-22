@@ -2194,8 +2194,8 @@ function charDecodeDigit(c: char): integer;
 begin
   case c of
     '0'..'9': result := ord(c) - ord('0');
-    'a'..'z': result := ord(c) - ord('a');
-    'A'..'Z': result := ord(c) - ord('A');
+    'a'..'z': result := ord(c) - ord('a') + 10;
+    'A'..'Z': result := ord(c) - ord('A') + 10;
     else raise Exception.Create('Character '+c+' is not a valid digit');
   end;
 end;
@@ -2204,8 +2204,8 @@ function charDecodeHexDigit(c: char): integer;
 begin
   case c of
     '0'..'9': result := ord(c) - ord('0');
-    'a'..'f': result := ord(c) - ord('a');
-    'A'..'F': result := ord(c) - ord('A');
+    'a'..'f': result := ord(c) - ord('a') + 10;
+    'A'..'F': result := ord(c) - ord('A') + 10;
     else raise Exception.Create('Character '+c+' is not a valid hex digit');
   end;
 end;
@@ -5700,4 +5700,4 @@ end;
 
 
 end.
-
+
