@@ -41,17 +41,13 @@ var
   function performUnitTest(s1,s2,s3: string): string;
   var rooted: Boolean;
   begin
-    if s3 <> '' then begin
-      xml.parseTree(s3);
-      ps.RootElement := xml.getLastTree;
-    end;
+    if s3 <> '' then xml.parseTree(s3);
     ps.parseXQuery1(s1);
   //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
-    ps.ParentElement := xml.getLastTree;
   //    writeln(s1);
   //    writeln('??');
   //    writeln(ps.debugtermToString(ps.FCurTerm));
-    result := ps.evaluate().toString;
+    result := ps.evaluate(xml.getLastTree).toString;
   end;
 
   procedure t(a,b: string; c: string = '');
@@ -129,13 +125,9 @@ var
     i: Integer;
     got: string;
   begin
-    if s3 <> '' then begin
-      xml.parseTree(s3);
-      ps.RootElement := xml.getLastTree;
-    end;
+    if s3 <> '' then xml.parseTree(s3);
     ps.parseXQuery1(s1);
   //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
-    ps.ParentElement := xml.getLastTree;
   //    writeln(s1);
   //    writeln('??');
   //    writeln(ps.debugtermToString(ps.FCurTerm));
@@ -143,7 +135,7 @@ var
     writeln(stderr, 'Timing '+s1+': ');
     for i := 1 to 200 do ps.evaluate(); //.toString;
     writeln('   => ', (now - starttime) * MSecsPerDay:5:5  );
-    got := ps.evaluate().toString;
+    got := ps.evaluate(xml.getLastTree).toString;
     if got<>s2 then
        raise Exception.Create('XPath Test failed: '+IntToStr(count)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'"');
   end;

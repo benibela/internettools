@@ -979,6 +979,7 @@ begin
   q('"abc"', 'abc');
   q('outer-xml(<a>b</a>)', '<a>b</a>');
 
+  //test matching function
   q('match(<a>{{.}}</a>, <r><a>123</a></r>)', '123');
   q('match(<a>{{.}}</a>, <a>123456</a>)', '123456');
   q('string-join(match(<a>{{.}}</a>, (<a>1</a>, <a>2</a>)), " ")', '1 2');
@@ -1023,6 +1024,13 @@ begin
   q('declare function x(){17}; match(<a id="{x()}">{{concat(., x())}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', 'B17');
   q('declare function x($arg){concat(17, $arg)}; match(<a id="{x("")}">{{x(.)}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', '17B');
   q('declare variable $v := 1000; declare function x($arg){concat(17, $arg)}; match(<a id="{x("")}">{{concat(x(.), $v)}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', '17B1000');
+
+  //test syntax extensions
+  q( 'typeswitch (<a>123</a>) case <a>{$abc}</a> return $abc default return "oh?"', '123');
+  q( 'typeswitch (<abc>123</abc>) case <a>{$abc}</a> return $abc default return "oh?"', 'oh?');
+  q( 'typeswitch (<x><a>1</a><a>2</a></x>) case <a>{$abc}</a>+ return join($abc) default return "oh?"', '1 2');
+
+
 
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := concat(., $abc, .)}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=XXX123XXX');

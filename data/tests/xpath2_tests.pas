@@ -30,22 +30,24 @@ var
   procedure performUnitTest(s1,s2,s3: string);
   var got: string;
     rooted: Boolean;
+    context: TXQEvaluationContext;
   begin
     i+=1;
+    context := ps.getEvaluationContext();
     if s3 <> '' then begin
       rooted := s3[1] = '!';
       if rooted then s3[1] := ' ';
       xml.parseTree(s3);
-      if rooted then ps.RootElement := xml.getLastTree
-      else ps.RootElement:=nil;
+      if rooted then context.RootElement := xml.getLastTree
+      else context.RootElement:=nil;
     end;
     ps.parseXPath2(s1);
 //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
-    ps.ParentElement := xml.getLastTree;
+    context.ParentElement := xml.getLastTree;
 //    writeln(s1);
 //    writeln('??');
 //    writeln(ps.debugtermToString(ps.FCurTerm));
-    got := ps.evaluate().toString;
+    got := ps.evaluate(context).toString;
     if got<>s2 then
         raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'". Parsed query: '+ps.LastQuery.Term.debugTermToString);
   end;

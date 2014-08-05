@@ -173,6 +173,7 @@ function process(data: string; query: string): xquery.IXQValue;
 var dataFileName: string;
   datain: String;
   tempVars: TXQVariableChangeLog;
+  context: TXQEvaluationContext;
 begin
   result := xqvalue();
   if query = '' then exit();
@@ -207,9 +208,10 @@ begin
     pxpparser.StaticContext.baseURI:=dataFileName;
     if strBeginsWith(query, 'xquery') then pxpParser.parseXQuery1(query)
     else pxpParser.parseXPath2(query);
-    pxpparser.ParentElement := tree.getLastTree;
-    pxpparser.RootElement := tree.getLastTree;
-    result := pxpParser.evaluate();
+    context := pxpParser.getEvaluationContext();
+    context.ParentElement := tree.getLastTree;
+    context.RootElement := tree.getLastTree;
+    result := pxpParser.evaluate(context);
   end;
 end;
 

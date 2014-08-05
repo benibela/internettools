@@ -374,6 +374,8 @@ published
   property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
   property TargetEncoding: TEncoding read FTargetEncoding write FTargetEncoding;
+  //trees owned/created by this object (which will be destroyed, when it is freed) (mostly for internal use)
+  property OwnedTrees: TList read FTrees;
 end;
 
 

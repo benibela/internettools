@@ -54,6 +54,7 @@ type
 
   function parseSequenceLike(target: TXQTerm; closingChar: char = ')'): TXQTerm;
   function parseSequenceType(): TXQTermSequenceType;
+  function parsePatternMatcher(): TXQTermTemporaryNode;
   function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
@@ -337,6 +338,27 @@ begin
   end;
 end;
 
+function TXQParsingContext.parsePatternMatcher: TXQTermTemporaryNode;
+var
+  curpos: PChar;
+  temp: TXQTermConstructor;
+begin
+  if patternMatcherParse = nil then raiseParsingError('pxp:PATT0', 'No pattern matcher loaded ()');
+  curpos := pos;
+  expect('<');
+  temp := parseDirectConstructor('???');
+  temp.free;
+  case pos^ of
+    '+', '*', '?': inc(pos);
+    '{': begin
+      while not (pos^ in ['}', #0]) do inc(pos);
+      expect('}');
+    end;
+  end;
+  result := TXQTermTemporaryNode.create();
+  result.node := (patternMatcherParse(strFromPchar(curpos, pos-curpos)));
+end;
+
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
   procedure parseVariableName(out name: string; out namespace: INamespace);
   begin
@@ -500,8 +522,12 @@ begin
   while word = 'case' do begin
     skipWhitespaceAndComment();
     result.push(TXQTermSequence.Create);
-    if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
-    result.children[high(result.children)].push(parseSequenceType());
+    if pos^ = '<' then begin
+      result.children[high(result.children)].push(parsePatternMatcher());
+    end else begin
+      if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
+      result.children[high(result.children)].push(parseSequenceType());
+    end;
     expect('return');
     result.children[high(result.children)].push(parse());
     word := nextToken();

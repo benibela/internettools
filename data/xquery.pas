@@ -106,6 +106,10 @@ type
 
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   TXQStaticContext = class
+  private
+    FNodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
+    function getNodeCollation: TXQCollation;
+  public
     sender: TXQueryEngine; //**< Engine this context belongs to
 
     //The following values map directly to XQuery options declarable in a prolog
@@ -129,7 +133,6 @@ type
 
     //extensions
     defaultTypeNamespace: INamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
-    nodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
     stringEncoding: TEncoding;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
@@ -147,6 +150,9 @@ type
 
     function resolveDocURI(url: string): string;
     function retrieveFromURI(url: string; out contenttype: string): string;
+
+  property
+    NodeCollation: TXQCollation read getNodeCollation write FNodeCollation;
   end;
 
   { TXQEvaluationContext }
@@ -157,8 +163,10 @@ type
   Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
   *)
   TXQEvaluationContext = record
+    //important note to myself: when adding fields update getEvaluationContext
     RootElement: TTreeNode;   //**< associated tree (returned by @code( / ) within an expression)
     ParentElement: TTreeNode; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
+    TextElement: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
 
     SeqValue: IXQValue; //**<Context item / value of @code( . ),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
@@ -179,6 +187,9 @@ type
 
     function hasVariable(const name: string; out value: IXQValue; const ns: INamespace): boolean;
     function getVariable(const name: string; const ns: INamespace): IXQValue;
+
+    procedure beginSubContextWithVariables;
+    procedure endSubContextWithVariables(const oldContext: TXQEvaluationContext);
   end;
 
 
@@ -1230,12 +1241,19 @@ type
 
   { TXQTermNumber }
 
-  TXQTermNumber = class(TXQTerm)
+  TXQTermNumber = class(TXQTerm) //todo merge with string and rename to termliteral
     value: IXQValue;
     constructor create(const avalue: string);
     constructor create(const avalue: IXQValue);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+  end;
+
+  { TXQTermTemporaryNode }
+
+  TXQTermTemporaryNode = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
+    node: TTreeNode;
+    destructor destroy; override;
   end;
 
   { TXQTermSequence }
@@ -1501,6 +1519,10 @@ type
   end;
 
 
+  TXQInternalPatternMatcherParse = function (data: string): TTreeNode;
+  TXQInternalPatternMatcherMatch = function (template, data: TTreeNode; const context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
+
+
 
 
 
@@ -1594,7 +1616,6 @@ type
     AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
     StringEntities: (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery); //**< XQuery is almost a super set of XPath, except for the fact that they parse string entities differenty. This option lets you change the parsing behaviour.
   end;
-
 
 
 
@@ -1826,9 +1847,9 @@ type
   public
     Schemas: TList;
 
-    RootElement: TTreeNode; //**< Root element
-    ParentElement: TTreeNode; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
-    TextElement: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
+    //RootElement: TTreeNode; //**< Root element
+    //ParentElement: TTreeNode; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
+    //TextElement: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
 
@@ -1867,6 +1888,7 @@ type
     //** Parses a new expression and stores it in tokenized form.
     function parseQuery(s:string; model: TXQParsingModel; sharedContext: TXQStaticContext = nil): IXQuery;
 
+    function evaluate(const context: TXQEvaluationContext): IXQValue;
     function evaluate(const contextItem: IXQValue): IXQValue; //**< Evaluates a previously parsed query and returns its value as IXQValue
     function evaluate(tree:TTreeNode = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as IXQValue
 
@@ -1931,9 +1953,6 @@ public
     function parseCSSTerm(css:string): TXQTerm;
     function parseXStringNullTerminated(str: string): TXQuery;
 
-    function getEvaluationContext(staticContextOverride: TXQStaticContext): TXQEvaluationContext;
-
-
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: TXQTerm; const context: TXQEvaluationContext);
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
@@ -1956,6 +1975,8 @@ public
     class procedure registerNativeModule(const module: TXQNativeModule);
     class function collationsInternal: TStringList;
     property ExternalDocumentsCacheInternal: TStringList read FExternalDocuments write FExternalDocuments;
+
+    function getEvaluationContext(staticContextOverride: TXQStaticContext = nil): TXQEvaluationContext;
 
     //** Last parsed query
     property LastQuery: IXQuery read FLastQuery;
@@ -2144,13 +2165,14 @@ private
   fequal, fcontains, fstartsWith, fendsWith: TXQCollationBoolFunction;
 end;
 
-  //var curUnitTest: integer;
+//var curUnitTest: integer;
 
 //**If XQGlobalTrimNodes is true, the result of every node->string conversion is trimmed. This trimming occurs after and not during the conversion.@br
 //**E.g. If it is true, @code(text()) and @code(deep-text()) for @code(<a> a </a>) return 'a', and deep-text() for @code(<x><a> a </a><a> b </a></x>) returns 'a b'. @br
 //**(This variable should actually be a property of TXQueryEngine, but that is not possible in the current design,
 //**since the values convert themself, and don't know their corresponding parser)
 var XQGlobalTrimNodes: boolean = true;
+
 
 type
 
@@ -2217,6 +2239,8 @@ var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are k
     baseSchema: TJSONiqOverrideSchema;
     baseJSONiqSchema: TJSONiqAdditionSchema;
 
+    patternMatcherParse: TXQInternalPatternMatcherParse;
+    patternMatcherMatch: TXQInternalPatternMatcherMatch;
 implementation
 uses base64, strutils;
 
@@ -2248,6 +2272,7 @@ var
   interpretedFunctionSynchronization: TRTLCriticalSection;
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+
 
 
 
@@ -2624,6 +2649,12 @@ function xqvalueAtomize(const v: IXQValue): IXQValue; forward;
 
 { TXQStaticContext }
 
+function TXQStaticContext.getNodeCollation: TXQCollation;
+begin
+  if FNodeCollation = nil then result :=collation
+  else result := FNodeCollation;
+end;
+
 function TXQStaticContext.clone: TXQStaticContext;
 var
   i: Integer;
@@ -2649,7 +2680,7 @@ begin
   result.importedSchemas := importedSchemas;
   if result.importedSchemas <> nil then result.importedSchemas := importedSchemas.clone;
   result.collation := collation;
-  result.nodeCollation := nodeCollation;
+  result.fnodeCollation := fnodeCollation;
   result.emptyorderspec := emptyorderspec;
   result.defaultFunctionNamespace := defaultFunctionNamespace;
   result.defaultElementTypeNamespace := defaultElementTypeNamespace;
@@ -2970,8 +3001,6 @@ begin
   end;
   if ParentElement <> nil then exit(ParentElement.getRootHighest)
   else if RootElement <> nil then exit(RootElement)
-  else if staticContext.sender.ParentElement <> nil then exit(staticContext.sender.ParentElement.getRootHighest)
-  else if staticContext.sender.RootElement <> nil then exit(staticContext.sender.RootElement)
   else raise EXQEvaluationException.Create('XPDY0002', 'no root element');
 end;
 
@@ -3028,6 +3057,18 @@ begin
   if result = nil then result := xqvalue();
 end;
 
+procedure TXQEvaluationContext.beginSubContextWithVariables;
+begin
+  if temporaryVariables = nil then temporaryVariables := TXQVariableChangeLog.create();
+  temporaryVariables.pushAll;
+end;
+
+procedure TXQEvaluationContext.endSubContextWithVariables(const oldContext: TXQEvaluationContext);
+begin
+  temporaryVariables.popAll();
+  if oldContext.temporaryVariables = nil then FreeAndNil(temporaryVariables);
+end;
+
 { TXQuery }
 
 constructor TXQuery.Create(asStaticContext: TXQStaticContext; aterm: TXQTerm);
@@ -3055,8 +3096,11 @@ var tempcontext: TXQEvaluationContext;
   i: Integer;
 begin
   if fterm = nil then exit(xqvalue());
+  if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
+    exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
+
   tempcontext:=context;
-  tempcontext.staticContext:=staticContext;
+  tempcontext.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
   initializeStaticContext(tempcontext);
   //reevaluate module variables ()
 //  if (staticContext.moduleVariables <> nil) and (staticContext.moduleVariables.count > 0) then
@@ -4319,7 +4363,6 @@ var
   sc: TXQStaticContext;
 begin
   sc := StaticContext.clone();
-  if sc.nodeCollation = nil then sc.nodeCollation := sc.collation;
   FLastQuery := TXQuery.Create(sc, parseCSSTerm(s));
   result := FLastQuery;
 end;
@@ -4328,6 +4371,12 @@ function TXQueryEngine.parseQuery(s: string; model: TXQParsingModel; sharedConte
 begin
   FLastQuery:=parseTerm(s, model, sharedContext);
   result := FLastQuery;
+end;
+
+function TXQueryEngine.evaluate(const context: TXQEvaluationContext): IXQValue;
+begin
+  if FLastQuery = nil then exit(xqvalue())
+  else exit(FLastQuery.evaluate(context));
 end;
 
 function TXQueryEngine.evaluate(const contextItem: IXQValue): IXQValue;
@@ -4346,14 +4395,10 @@ end;
 
 function TXQueryEngine.getEvaluationContext(staticContextOverride: TXQStaticContext): TXQEvaluationContext;
 begin
+  FillChar(result, sizeof(result), 0);
   if staticContextOverride = nil then result.staticContext:=StaticContext
   else result.staticContext := staticContextOverride;
-  result.ParentElement := ParentElement;
-  result.RootElement := RootElement;
-  result.SeqValue:=nil;
   result.SeqIndex:=-1;
-  result.temporaryVariables:=nil;
-  Result.namespaces := nil;
 end;
 
 constructor TXQueryEngine.create;
@@ -4624,7 +4669,6 @@ begin
       result.staticContextShared := staticContextShared;
       cxt.resultquery := result;
       result.fterm := cxt.parseModule();
-      if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
       if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
     finally
       cxt.free;
@@ -4658,7 +4702,6 @@ begin
       cxt.pos := @cxt.str[1];
       result := TXQuery.Create(cxt.staticContext);
       result.fterm := cxt.parseXString(true);
-      if result.staticContext.nodeCollation = nil then result.staticContext.nodeCollation := result.staticContext.collation;
       if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
     finally
       cxt.free;
@@ -5326,7 +5369,6 @@ begin
     else begin
       if (context.SeqValue <> nil) and (context.SeqValue.kind in [pvkNode, pvkObject]) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
-      else if context.staticContext.sender.ParentElement <> nil then result := xqvalue(context.staticContext.sender.ParentElement)
       else if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'Context item is undefined')
       else raise EXQEvaluationException.Create('XPTY0020', 'Context item is not a node');
       result := expandSequence(result,query, context);

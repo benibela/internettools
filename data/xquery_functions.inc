@@ -719,8 +719,6 @@ begin
   if context.ParentElement <> nil then exit(context.ParentElement);
   if context.RootElement <> nil then exit(context.RootElement);
   if context.staticContext.sender = nil then raise EXQEvaluationException.Create('XPTY0020', 'Context sender is nil');
-  if context.staticContext.sender.ParentElement <> nil then exit(context.staticContext.sender.ParentElement);
-  if context.staticContext.sender.RootElement <> nil then exit(context.staticContext.sender.RootElement);
   result := nil;
 end;
 
@@ -1984,15 +1982,22 @@ begin
 end;
 
 function xqFunctionEval(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var term: TXQuery;
 begin
   requiredArgCount(args, 1);
-  result := context.staticContext.sender.evaluateXPath2(args[0].toString);
+  //result := context.staticContext.sender.evaluateXPath2(args[0].toString);
+  term := context.staticContext.sender.parseTerm(args[0].toString, xqpmXPath2);
+  try
+    result := term.evaluate(context);
+  finally
+    term.free;
+  end;
 end;
 
 function xqFunctionCSS(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
-  result := context.staticContext.sender.evaluateCSS3(args[0].toString);
+  result := context.staticContext.sender.evaluateCSS3(args[0].toString, context.ParentElement);
 end;
 
 function xqFunctionGet(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

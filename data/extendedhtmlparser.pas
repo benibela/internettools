@@ -628,6 +628,7 @@ THtmlTemplateParser=class
     FTemplate, FHTML: TTreeParser;
     FHtmlTree: TTreeNode;
     FQueryEngine: TXQueryEngine;
+    FQueryContext: TXQEvaluationContext;
 
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TXQVariableChangeLog;
     FParsingExceptions, FSingleQueryModule: boolean;
@@ -985,7 +986,7 @@ var
 begin
   if expression = '' then raise ETemplateParseException.Create('no expression given');
   context := nil;
-  if FSingleQueryModule then context := QueryEngine.StaticContext;
+  if FSingleQueryModule then context := fQueryEngine.StaticContext;
   result := FQueryEngine.parseXQuery3(expression, context);
 end;
 
@@ -1071,6 +1072,7 @@ var
   htmlList: TStringArray;
   found: Boolean;
   attrib: TTreeAttribute;
+  tempContext: TXQEvaluationContext;
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
@@ -1107,9 +1109,10 @@ begin
   end;
   if template.templateAttributes = nil then exit(true);
   if template.condition = nil then exit(true);
-  FQueryEngine.ParentElement := html;
-  FQueryEngine.TextElement := nil;
-  result := template.condition.evaluate().toBoolean;
+  tempContext := FQueryContext;
+  tempContext.ParentElement := html;
+  tempContext.TextElement := nil;
+  result := template.condition.evaluate(tempContext).toBoolean;
 end;
 
 function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeNode; templateStart, templateEnd: TTemplateElement
@@ -1118,11 +1121,14 @@ function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: T
 var xpathText: TTreeNode;
 
   function performPXPEvaluation(const pxp: IXQuery): IXQValue;
+  var
+    tempContext: TXQEvaluationContext;
   begin
     if pxp = nil then exit(xqvalue());
-    FQueryEngine.ParentElement := htmlParent;
-    FQueryEngine.TextElement := xpathText;
-    result := pxp.evaluate;
+    tempContext := FQueryContext;
+    tempContext.ParentElement := htmlParent;
+    tempContext.TextElement := xpathText;
+    result := pxp.evaluate(tempContext);
   end;
 
   procedure HandleMatchText;
@@ -1467,6 +1473,11 @@ begin
   FHTML.TargetEncoding := OutputEncoding;
   FHtmlTree := FHTML.parseTree(html, (uri), contenttype);
 
+  FQueryContext := FQueryEngine.getEvaluationContext(FQueryEngine.StaticContext);
+  FQueryContext.RootElement := FHtmlTree;
+  if FHtmlTree.document is TTreeDocument then
+    FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI; //todo: what was this for?
+
   if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
     FHTML.removeEmptyTextNodes(true);
 end;
@@ -1488,6 +1499,7 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
   FreeAndNil(FVariableLogCondensed);
+  FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
 
   oldFunctionCount := length(FQueryEngine.StaticContext.functions);
 
@@ -1521,11 +1533,6 @@ begin
       cur := cur.templateNext;
     end;
   end;
-
-  FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
-  FQueryEngine.RootElement := FHtmlTree;
-  if FHtmlTree.document is TTreeDocument then
-    FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI;
 
   temp := FHtmlTree;
   if temp is TTreeDocument then temp := temp.next;
@@ -1900,13 +1907,53 @@ begin
   if result = nil then result := xqvalue;
 end;
 
+function patternMatcherParse(data: string): TTreeNode;
+var temp: THtmlTemplateParser;
+begin
+  temp := THtmlTemplateParser.create;
+  if data[length(data)] in ['*','?','+','}'] then data := '<t:if>'+data+'</t:if>'; //allow count specifier at the end
+  temp.parseTemplate(data);
+  result := temp.TemplateTree;
+  temp.FTemplate.OwnedTrees.Clear;
+  temp.free;
+end;
+
+function patternMatcherMatch(template, data: TTreeNode; const context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
+var temp: THtmlTemplateParser;
+  oldEngine: TXQueryEngine;
+  queryVarLog: TXQVariableChangeLog;
+begin
+  temp := THtmlTemplateParser.create;
+  oldEngine := temp.FQueryEngine;
+  queryVarLog := context.staticContext.sender.VariableChangelog;
+  context.staticContext.sender.VariableChangelog := oldEngine.VariableChangelog;
+  temp.FQueryEngine := context.staticContext.sender;
+  temp.FQueryContext := context;
+  temp.ParsingExceptions := throwExceptions;
+  temp.FTemplate.OwnedTrees.Add(template);
+  temp.FHTML.OwnedTrees.Add(data);
+  temp.FHtmlTree := data; //todo: why is that not read from fhtml?
+  if not temp.matchLastTrees then result := nil
+  else begin
+    result := temp.variableChangeLog;
+    temp.FVariableLog := nil;
+    oldEngine.VariableChangelog := nil;
+  end;
+  context.staticContext.sender.VariableChangelog := queryVarLog;
+  temp.FTemplate.OwnedTrees.Clear;
+  temp.FHTML.OwnedTrees.Clear;
+  temp.FQueryEngine := oldengine;
+  temp.free;
+end;
+
 var module: TXQNativeModule;
 
 initialization
 
 module := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
 module.registerFunction('match', @xqFunctionMatches, []);
-
+xquery.patternMatcherParse:=@patternMatcherParse;
+xquery.patternMatcherMatch:=@patternMatcherMatch;
 
 end.
 

@@ -1153,8 +1153,8 @@ end;
 function TXQTermNodeMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue
-  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.staticContext.sender.TextElement<>nil) then
-    result := xqvalue(context.staticContext.sender.TextElement)
+  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.TextElement<>nil) then
+    result := xqvalue(context.TextElement)
   else begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
@@ -1255,6 +1255,14 @@ end;
 function TXQTermNumber.getContextDependencies: TXQContextDependencies;
 begin
   Result:=[];
+end;
+
+{ TXQTermTemporaryNode }
+
+destructor TXQTermTemporaryNode.destroy;
+begin
+  node.deleteAll();
+  inherited destroy;
 end;
 
 { TXQTermReadAttribute }
@@ -1400,26 +1408,39 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
   begin
     tempContext := context;
     if vari is TXQTermVariable then begin
-      if tempContext.temporaryVariables = nil then tempContext.temporaryVariables := TXQVariableChangeLog.create();
-      tempContext.temporaryVariables.pushAll;
+      tempContext.beginSubContextWithVariables;
       tempContext.temporaryVariables.add(TXQTermVariable(vari).value, value);
     end;
     result := eval.evaluate(tempContext);
-    if vari is TXQTermVariable then begin
-      tempContext.temporaryVariables.popAll();
-      if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables);
-    end;
+    if vari is TXQTermVariable then tempContext.endSubContextWithVariables(context);
+  end;
+  function evaluateWithChangedVariableLog(eval: TXQTerm; vars: TXQVariableChangeLog): IXQValue;
+  var
+    tempContext: TXQEvaluationContext;
+  begin
+    tempContext := context;
+    tempContext.temporaryVariables := vars.collected;
+    tempContext.temporaryVariables.parentLog := context.temporaryVariables;
+    result := eval.evaluate(tempContext);
+    tempContext.temporaryVariables.Free;
+    vars.Free;
   end;
 
 var
   v: IXQValue;
   start: integer;
   i, j: Integer;
+  log: TXQVariableChangeLog;
 begin
   v := children[0].evaluate(context);
   for i:=1 to high(children) - 1 do begin
     if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
-    if children[i].children[0] is TXQTermVariable then start := 1
+    if (children[i].children[0] is TXQTermTemporaryNode) and (v.toNode <> nil) then begin
+      log := patternMatcherMatch(TXQTermTemporaryNode(children[i].children[0]).node, v.toNode, context);
+      if log <> nil then exit(evaluateWithChangedVariableLog(children[i].children[high(children[i].children)], log));
+      continue;
+    end
+    else if children[i].children[0] is TXQTermVariable then start := 1
     else start := 0;
     for j := start to high(children[i].children) - 1 do
       if (children[i].children[j] as TXQTermSequenceType).instanceOf(v, context) then
