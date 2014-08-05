@@ -1417,13 +1417,23 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
   function evaluateWithChangedVariableLog(eval: TXQTerm; vars: TXQVariableChangeLog): IXQValue;
   var
     tempContext: TXQEvaluationContext;
+    value: TXQValue;
   begin
     tempContext := context;
     tempContext.temporaryVariables := vars.collected;
-    tempContext.temporaryVariables.parentLog := context.temporaryVariables;
-    result := eval.evaluate(tempContext);
-    tempContext.temporaryVariables.Free;
-    vars.Free;
+    try
+      if tempContext.temporaryVariables.hasVariable('$', @value) then begin
+        if value.getSequenceCount > 1 then raiseEvaluationError('pxp:PATTERN1', 'Cannot assign sequence to context item');
+        tempContext.SeqIndex:=1;
+        tempContext.SeqLength:=1;
+        tempContext.SeqValue := value;
+      end;
+      tempContext.temporaryVariables.parentLog := context.temporaryVariables;
+      result := eval.evaluate(tempContext);
+    finally
+      tempContext.temporaryVariables.Free;
+      vars.Free;
+    end;
   end;
 
 var

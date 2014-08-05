@@ -1927,6 +1927,7 @@ begin
   oldEngine := temp.FQueryEngine;
   queryVarLog := context.staticContext.sender.VariableChangelog;
   context.staticContext.sender.VariableChangelog := oldEngine.VariableChangelog;
+  temp.UnnamedVariableName := '$';
   temp.FQueryEngine := context.staticContext.sender;
   temp.FQueryContext := context;
   temp.ParsingExceptions := throwExceptions;

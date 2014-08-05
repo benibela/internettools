@@ -754,7 +754,7 @@ var previoushtml: string;
       if extParser.replaceEnclosedExpressions(inp) <> exp then raise Exception.Create('#0-Xstring test failed: got: '+extParser.replaceEnclosedExpressions(inp)+' expected ' + exp);
     end;
 
-    procedure q(const template, expected: string; html: string = '');
+    procedure q(const template, expected: string);
     var
       query: IXQuery;
       got: String;
@@ -764,6 +764,24 @@ var previoushtml: string;
       got := query.evaluate(extParser.HTMLTree).toString;
       if got <> expected then
         raise Exception.Create('Test failed got '+got+ ' expected '+expected);
+    end;
+
+    procedure qf(const template, expectederr: string);
+    var
+      query: IXQuery;
+      got: String;
+      err: String;
+    begin
+      if not testerrors then exit;
+      err := '';
+      try
+        query := extParser.QueryEngine.parseXQuery1(template);
+        got := query.evaluate(extParser.HTMLTree).toString;
+      except
+        on e: EXQEvaluationException do err := e.namespace.getPrefix +':'+ e.errorCode;
+        on e: EXQParsingException do err := e.namespace.getPrefix +':'+e.errorCode;
+      end;
+      if err <> expectederr then raise Exception.Create('Err code '+err+' <> '+expectederr + ' eval res: '+got);
     end;
 
    procedure cmp(a,b: string);
@@ -1029,6 +1047,9 @@ begin
   q( 'typeswitch (<a>123</a>) case <a>{$abc}</a> return $abc default return "oh?"', '123');
   q( 'typeswitch (<abc>123</abc>) case <a>{$abc}</a> return $abc default return "oh?"', 'oh?');
   q( 'typeswitch (<x><a>1</a><a>2</a></x>) case <a>{$abc}</a>+ return join($abc) default return "oh?"', '1 2');
+  q( 'typeswitch (<abc>foobar</abc>) case <abc>{.}</abc> return . default return "oh??"', 'foobar');
+  qf('typeswitch (<x><a>1</a><a>2</a></x>) case <a>{.}</a>+ return join(.) default return "oh?"', 'pxp:PATTERN1');
+  q( 'typeswitch (<abc>foobar</abc>) case <def>..</def> return 123 case <abc>{.}</abc> return . default return "oh??"', 'foobar');
 
 
 
