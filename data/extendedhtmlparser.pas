@@ -1880,12 +1880,12 @@ begin
     for template in args[0] do begin
       if template is TXQValueString then temp.parseTemplate(template.toString)
       else if template is TXQValueNode then temp.parseTemplate(template.toNode.outerXML())
-      else raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Invalid type for template. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
+      else raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for patter. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
       for html in args[1] do begin
         if not (html is TXQValueNode) then
-          raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
+          raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
         temp.FHtmlTree := html.toNode;
-        if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match template to html');
+        if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match pattern to html');
         cols := temp.VariableChangeLogCondensed.collected;
         try
           if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
@@ -1930,21 +1930,27 @@ begin
   temp.UnnamedVariableName := '$';
   temp.FQueryEngine := context.staticContext.sender;
   temp.FQueryContext := context;
-  temp.ParsingExceptions := throwExceptions;
+  temp.ParsingExceptions := false;
   temp.FTemplate.OwnedTrees.Add(template);
   temp.FHTML.OwnedTrees.Add(data);
   temp.FHtmlTree := data; //todo: why is that not read from fhtml?
-  if not temp.matchLastTrees then result := nil
-  else begin
-    result := temp.variableChangeLog;
-    temp.FVariableLog := nil;
-    oldEngine.VariableChangelog := nil;
+  try
+    if temp.matchLastTrees then begin
+      result := temp.variableChangeLog;
+      temp.variableChangeLog.parentLog := nil;
+      temp.FVariableLog := nil;
+      oldEngine.VariableChangelog := nil;
+    end else begin
+      if throwExceptions then raise EXQEvaluationException.Create('pxp:PATTERN', 'Failed to match pattern to data');;
+      result := nil;
+    end;
+  finally
+    context.staticContext.sender.VariableChangelog := queryVarLog;
+    temp.FTemplate.OwnedTrees.Clear;
+    temp.FHTML.OwnedTrees.Clear;
+    temp.FQueryEngine := oldengine;
+    temp.free;
   end;
-  context.staticContext.sender.VariableChangelog := queryVarLog;
-  temp.FTemplate.OwnedTrees.Clear;
-  temp.FHTML.OwnedTrees.Clear;
-  temp.FQueryEngine := oldengine;
-  temp.free;
 end;
 
 var module: TXQNativeModule;

@@ -1414,6 +1414,7 @@ type
     kind: (xqfkFor, xqfkLet);
     namespace: INamespace;
     varname: string;
+    pattern: TXQTermTemporaryNode;
     sequenceTyp: TXQTermSequenceType;
     //allowingEmpty: boolean;
     positionVarNamespace: INamespace;

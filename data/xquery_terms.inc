@@ -642,7 +642,7 @@ var
     procedure continueWithValue(v: IXQValue; index: integer = 1);
     begin
       if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, context)) then
-        raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.toString);
+        raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.debugAsStringWithTypeAnnotation());
 
       tempContext.temporaryVariables.pushAll;
       tempContext.temporaryVariables.add(vars[pos].varname, v, vars[pos].namespace);
@@ -653,7 +653,89 @@ var
 
     end;
 
-   var tempSeq: IXQValue;
+    procedure continueWithValues(log: TXQVariableChangeLog; index: integer = 1);
+    var oldContextItem: IXQValue;
+        oldVars: TXQVariableChangeLog;
+        contextValue: TXQValue;
+        oldSeqIndex: Integer;
+        oldSeqLength: Integer;
+        oldLog: TXQVariableChangeLog;
+        i: Integer;
+
+        procedure pushContextItem;
+        begin
+          oldContextItem := tempContext.SeqValue;
+          oldSeqIndex := tempContext.SeqIndex;
+          oldSeqLength := tempContext.SeqLength;
+        end;
+        procedure popContextItem;
+        begin
+          tempContext.SeqValue := oldContextItem;
+          tempContext.SeqIndex := oldSeqIndex;
+          tempContext.SeqLength:= oldSeqLength;
+        end;
+        procedure replaceContextItem(const newItem: IXQValue);
+        begin
+          tempContext.SeqValue := newItem;
+          tempContext.SeqIndex := 1;
+          tempContext.SeqLength:= 1;
+        end;
+
+    begin
+      try
+        if vars[pos].kind = xqfkLet then begin
+          oldLog := log;   log := log.collected;  oldLog.free;
+          if (vars[pos].sequenceTyp <> nil) then
+            for i := 0 to log.count - 1 do
+              if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
+                raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
+          contextValue := nil;
+          if log.hasVariable('$', @contextValue) then begin
+            if contextValue.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Only singletons can be assigned to .');
+            replaceContextItem(contextValue);
+            pushContextItem;
+          end;
+          oldLog := tempContext.temporaryVariables;
+          log.parentLog := tempContext.temporaryVariables;
+          tempContext.temporaryVariables := log;
+          try
+            evaluateForLoop(pos+1);
+          finally
+            tempContext.temporaryVariables := oldLog;
+            if contextValue <> nil then
+              popContextItem;
+          end;
+
+        end else begin // for
+          if (vars[pos].sequenceTyp <> nil) then
+            for i := 0 to log.count - 1 do
+              if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
+                raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
+
+            if vars[pos].positionVarname <> '' then raiseEvaluationError('err:XPST0003', 'at and pattern cannot be combined');
+               //tempContext.temporaryVariables.add(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
+
+            pushContextItem;
+            for i := 0 to log.count - 1 do begin;
+              if log.getName(i) = '$' then begin
+                replaceContextItem(log[i]);
+                evaluateForLoop(pos+1);
+                popContextItem;
+              end
+              else begin
+                tempContext.temporaryVariables.pushAll;
+                tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespace);
+                evaluateForLoop(pos+1);
+                tempContext.temporaryVariables.popAll();
+              end;
+            end;
+        end;
+      finally
+        log.free;
+      end;
+    end;
+
+   var tempSeq, temp: IXQValue;
        i:integer;
        tuple: TOrderedTuple;
    begin
@@ -677,14 +759,24 @@ var
 
      tempSeq:=vars[pos].expr.evaluate(tempContext);
 
-     if vars[pos].kind = xqfkLet then
-       continueWithValue(tempSeq)
+     if vars[pos].pattern = nil then begin
+       if vars[pos].kind = xqfkLet then
+         continueWithValue(tempSeq)
+       else case tempSeq.kind of
+         pvkUndefined:;
+         pvkSequence:
+           for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
+             continueWithValue((tempSeq as TXQValueSequence).seq[i], i + 1);
+         else continueWithValue(tempSeq);
+       end;
+     end else if vars[pos].kind = xqfkLet then
+       continueWithValues(patternMatcherMatch(vars[pos].pattern.node, tempSeq.toNode, context, true))
      else case tempSeq.kind of
        pvkUndefined:;
        pvkSequence:
          for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
-           continueWithValue((tempSeq as TXQValueSequence).seq[i], i + 1);
-       else continueWithValue(tempSeq);
+           continueWithValues(patternMatcherMatch(vars[pos].pattern.node, (tempSeq as TXQValueSequence).seq[i].toNode, context, true), i + 1);
+       else continueWithValues(patternMatcherMatch(vars[pos].pattern.node, tempSeq.toNode, context, true));
      end;
    end;
 var i: Integer;
@@ -759,6 +851,7 @@ begin
   for i:=0 to high(vars) do begin
     vars[i].expr.Free;
     vars[i].sequenceTyp.Free;
+    vars[i].pattern.Free;
   end;
   for i:= 0 to high(orders) do
     orders[i].expr.Free;

@@ -1050,6 +1050,27 @@ begin
   q( 'typeswitch (<abc>foobar</abc>) case <abc>{.}</abc> return . default return "oh??"', 'foobar');
   qf('typeswitch (<x><a>1</a><a>2</a></x>) case <a>{.}</a>+ return join(.) default return "oh?"', 'pxp:PATTERN1');
   q( 'typeswitch (<abc>foobar</abc>) case <def>..</def> return 123 case <abc>{.}</abc> return . default return "oh??"', 'foobar');
+  q( 'typeswitch (<html><b>foobar</b></html>)   case <a>{.}</a> return concat("a link to ", @href )  case <b>{$v}</b> return concat("bold text: ", $v)  default return "unknown element" ', 'bold text: foobar');
+
+  q( 'let <a>{$abc}</a> := <a>123</a> return $abc', '123');
+  qf( 'let <a>{$abc}</a> := <abc>123</abc> return $abc', 'pxp:PATTERN');
+  q( 'let <a>{$abc}</a>+ := <x><a>1</a><a>2</a></x> return join($abc)', '1 2');
+  q( 'let <abc>{.}</abc> := <abc>foobar</abc> return .', 'foobar');
+  qf('let <a>{.}</a>+ := <x><a>1</a><a>2</a></x> return join(.)', 'pxp:PATTERN1');
+  q( ' let  <html><h2>section 1</h2> <p>{$var}</p>+ <h2>section 2</h2></html> := <html><h2>section 1</h2> <p>a</p>  <p>b</p>         <h2>section 2</h2>           <p>c</p></html>  return join($var / string())', 'a b');
+
+  q( 'for <a>{$abc}</a> in <a>123</a> return $abc', '123');
+  qf( 'for <a>{$abc}</a> in <abc>123</abc> return $abc', 'pxp:PATTERN');
+  q( 'join(for <a>{$abc}</a>+ in <x><a>1</a><a>2</a></x> return join($abc), ",")', '1,2');
+  q( 'for <abc>{.}</abc> in <abc>foobar</abc> return .', 'foobar');
+  q('join(for <a>{.}</a>+ in <x><a>1</a><a>2</a></x> return join(.), ",")', '1,2');
+  q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  </ul> return concat("li: ", .), "; ")', 'li: 1; li: 2');
+
+  q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> where . mod 2 = 0 return ., "; ")', '2; 6');
+  q('let <a>{$a}</a> := <a>1</a>, <b>{$b}</b> := <b>3</b> let <c>{$c}</c> := <c>5</c> return join(($a,$b,$c))', '1 3 5');
+//  q('for $a in (1,2,3) where $a mod 2 = 0 let $c :=$a return $c', '2'); is this xquery 3?
+  q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> let <x>{$abc}</x> := <x>{.}</x> where . mod 2 ne 0 return $abc, "; ")', '1; 3');
+
 
 
 

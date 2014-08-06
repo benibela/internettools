@@ -378,7 +378,10 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
       if (kind = xqfkLet) and (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
 
-      parseVariableName(varname, namespace);
+      skipWhitespaceAndComment();
+      if pos^ = '<' then
+        pattern := parsePatternMatcher
+      else parseVariableName(varname, namespace);
 
       temp := nextToken;
       if temp = 'as' then begin
@@ -1196,7 +1199,7 @@ begin
       end;
 
 
-      if (wordlookahead<>'') and (wordlookahead[1]='$') then begin
+      if (wordlookahead<>'') and (wordlookahead[1] in ['$', '<']) then begin
         if (word = 'for') or (word = 'let') then
           exit(parseFlower(word));
 
