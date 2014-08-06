@@ -1047,6 +1047,7 @@ begin
   q( 'typeswitch (<a>123</a>) case <a>{$abc}</a> return $abc default return "oh?"', '123');
   q( 'typeswitch (<abc>123</abc>) case <a>{$abc}</a> return $abc default return "oh?"', 'oh?');
   q( 'typeswitch (<x><a>1</a><a>2</a></x>) case <a>{$abc}</a>+ return join($abc) default return "oh?"', '1 2');
+  q( 'typeswitch (<x></x>) case <a>{$abc}</a>* return count($abc) default return "oh?"', '0');
   q( 'typeswitch (<abc>foobar</abc>) case <abc>{.}</abc> return . default return "oh??"', 'foobar');
   qf('typeswitch (<x><a>1</a><a>2</a></x>) case <a>{.}</a>+ return join(.) default return "oh?"', 'pxp:PATTERN1');
   q( 'typeswitch (<abc>foobar</abc>) case <def>..</def> return 123 case <abc>{.}</abc> return . default return "oh??"', 'foobar');
@@ -1058,6 +1059,8 @@ begin
   q( 'let <abc>{.}</abc> := <abc>foobar</abc> return .', 'foobar');
   qf('let <a>{.}</a>+ := <x><a>1</a><a>2</a></x> return join(.)', 'pxp:PATTERN1');
   q( ' let  <html><h2>section 1</h2> <p>{$var}</p>+ <h2>section 2</h2></html> := <html><h2>section 1</h2> <p>a</p>  <p>b</p>         <h2>section 2</h2>           <p>c</p></html>  return join($var / string())', 'a b');
+  q('let <r>{$a}<b>{$b}</b>?</r> := <r>x<b>y</b></r>  return concat(count($a),count($b))', '11');
+  q('let <r>{$a}<b>{$b}</b>?</r> := <r>x</r>  return concat(count($a),count($b))', '10');
 
   q( 'for <a>{$abc}</a> in <a>123</a> return $abc', '123');
   qf( 'for <a>{$abc}</a> in <abc>123</abc> return $abc', 'pxp:PATTERN');
@@ -1070,6 +1073,10 @@ begin
   q('let <a>{$a}</a> := <a>1</a>, <b>{$b}</b> := <b>3</b> let <c>{$c}</c> := <c>5</c> return join(($a,$b,$c))', '1 3 5');
 //  q('for $a in (1,2,3) where $a mod 2 = 0 let $c :=$a return $c', '2'); is this xquery 3?
   q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> let <x>{$abc}</x> := <x>{.}</x> where . mod 2 ne 0 return $abc, "; ")', '1; 3');
+  q('join(for    <ul>  <li>{.}</li>*  </ul> in   <ul>  </ul> return count(.), "; ")', '');
+  q('join(for    <ul>  <li>{$abc}</li>*  </ul> in   <ul>  </ul> return count($abc), "; ")', '');
+  q('join(for    <ul> <t:loop><x>{$x}</x><y>{$y}</y></t:loop> </ul> in  <ul>  <x>1</x><y>2</y><x>3</x><y>4</y><x>5</x> </ul> return concat($x," ",$y), ";")', '1 ; 2;3 ; 4');
+  q('let $x := "V", $y := "U" return join(for    <ul> <t:loop><x>{$x}</x><y>{$y}</y></t:loop> </ul> in  <ul>  <x>1</x><y>2</y><x>3</x><y>4</y><x>5</x> </ul> return concat($x," ",$y), ";")', '1 ; 2;3 ; 4');
 
 
 

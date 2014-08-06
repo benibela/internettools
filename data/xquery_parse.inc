@@ -54,7 +54,7 @@ type
 
   function parseSequenceLike(target: TXQTerm; closingChar: char = ')'): TXQTerm;
   function parseSequenceType(): TXQTermSequenceType;
-  function parsePatternMatcher(): TXQTermTemporaryNode;
+  function parsePatternMatcher(): TXQTermPatternMatcher;
   function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
@@ -338,7 +338,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parsePatternMatcher: TXQTermTemporaryNode;
+function TXQParsingContext.parsePatternMatcher: TXQTermPatternMatcher;
 var
   curpos: PChar;
   temp: TXQTermConstructor;
@@ -355,8 +355,9 @@ begin
       expect('}');
     end;
   end;
-  result := TXQTermTemporaryNode.create();
-  result.node := (patternMatcherParse(strFromPchar(curpos, pos-curpos)));
+  //result := TXQTermTemporaryNode.create();
+  //result.node := (patternMatcherParse(strFromPchar(curpos, pos-curpos)));
+  Result := patternMatcherParse(staticContext.sender, strFromPchar(curpos, pos-curpos));
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;

@@ -1251,8 +1251,9 @@ type
 
   { TXQTermTemporaryNode }
 
-  TXQTermTemporaryNode = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
+  TXQTermPatternMatcher = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
     node: TTreeNode;
+    vars: TStringArray;
     destructor destroy; override;
   end;
 
@@ -1414,7 +1415,7 @@ type
     kind: (xqfkFor, xqfkLet);
     namespace: INamespace;
     varname: string;
-    pattern: TXQTermTemporaryNode;
+    pattern: TXQTermPatternMatcher;
     sequenceTyp: TXQTermSequenceType;
     //allowingEmpty: boolean;
     positionVarNamespace: INamespace;
@@ -1520,7 +1521,7 @@ type
   end;
 
 
-  TXQInternalPatternMatcherParse = function (data: string): TTreeNode;
+  TXQInternalPatternMatcherParse = function (engine: TXQueryEngine; data: string): TXQTermPatternMatcher;
   TXQInternalPatternMatcherMatch = function (template, data: TTreeNode; const context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
 
 

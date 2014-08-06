@@ -680,9 +680,14 @@ var
           tempContext.SeqIndex := 1;
           tempContext.SeqLength:= 1;
         end;
+        procedure addMissingVars;
+        var i: Integer;
+        begin
+        end;
 
     begin
       try
+
         if vars[pos].kind = xqfkLet then begin
           oldLog := log;   log := log.collected;  oldLog.free;
           if (vars[pos].sequenceTyp <> nil) then
@@ -698,6 +703,9 @@ var
           oldLog := tempContext.temporaryVariables;
           log.parentLog := tempContext.temporaryVariables;
           tempContext.temporaryVariables := log;
+          for i := 0 to high(vars[pos].pattern.vars) do
+            if not log.hasVariable(vars[pos].pattern.vars[i], nil) then
+              tempContext.temporaryVariables.add(vars[pos].pattern.vars[i], xqvalue());
           try
             evaluateForLoop(pos+1);
           finally
@@ -712,23 +720,27 @@ var
               if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
                 raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
 
-            if vars[pos].positionVarname <> '' then raiseEvaluationError('err:XPST0003', 'at and pattern cannot be combined');
+          if vars[pos].positionVarname <> '' then raiseEvaluationError('err:XPST0003', 'at and pattern cannot be combined');
                //tempContext.temporaryVariables.add(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
+          pushContextItem;
+          tempContext.temporaryVariables.pushAll;
+          for i := 0 to high(vars[pos].pattern.vars) do
+            tempContext.temporaryVariables.add(vars[pos].pattern.vars[i], xqvalue());
 
-            pushContextItem;
-            for i := 0 to log.count - 1 do begin;
-              if log.getName(i) = '$' then begin
-                replaceContextItem(log[i]);
-                evaluateForLoop(pos+1);
-                popContextItem;
-              end
-              else begin
-                tempContext.temporaryVariables.pushAll;
-                tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespace);
-                evaluateForLoop(pos+1);
-                tempContext.temporaryVariables.popAll();
-              end;
+          for i := 0 to log.count - 1 do begin
+            if log.getName(i) = '$' then begin
+              replaceContextItem(log[i]);
+              evaluateForLoop(pos+1);
+              popContextItem;
+            end
+            else begin
+              tempContext.temporaryVariables.pushAll;
+              tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespace);
+              evaluateForLoop(pos+1);
+              tempContext.temporaryVariables.popAll();
             end;
+          end;
+          tempContext.temporaryVariables.popAll;
         end;
       finally
         log.free;
@@ -1352,7 +1364,7 @@ end;
 
 { TXQTermTemporaryNode }
 
-destructor TXQTermTemporaryNode.destroy;
+destructor TXQTermPatternMatcher.destroy;
 begin
   node.deleteAll();
   inherited destroy;
@@ -1507,25 +1519,33 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
     result := eval.evaluate(tempContext);
     if vari is TXQTermVariable then tempContext.endSubContextWithVariables(context);
   end;
-  function evaluateWithChangedVariableLog(eval: TXQTerm; vars: TXQVariableChangeLog): IXQValue;
+  function evaluateWithChangedVariableLog(eval: TXQTerm; log: TXQVariableChangeLog; const vars: TStringArray): IXQValue;
   var
     tempContext: TXQEvaluationContext;
     value: TXQValue;
+    truecount: Integer;
+    i: Integer;
   begin
     tempContext := context;
-    tempContext.temporaryVariables := vars.collected;
+    tempContext.temporaryVariables := log.collected;
     try
+      truecount := tempContext.temporaryVariables.count;
       if tempContext.temporaryVariables.hasVariable('$', @value) then begin
-        if value.getSequenceCount > 1 then raiseEvaluationError('pxp:PATTERN1', 'Cannot assign sequence to context item');
+        if value.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Can only assign singleton to context item');
         tempContext.SeqIndex:=1;
         tempContext.SeqLength:=1;
         tempContext.SeqValue := value;
+        truecount -= 1;
       end;
+      if truecount <> length(vars) then
+        for i := 0 to high(vars) do
+          if not tempContext.temporaryVariables.hasVariable(vars[i], nil) then
+            tempContext.temporaryVariables.add(vars[i], xqvalue());
       tempContext.temporaryVariables.parentLog := context.temporaryVariables;
       result := eval.evaluate(tempContext);
     finally
       tempContext.temporaryVariables.Free;
-      vars.Free;
+      log.Free;
     end;
   end;
 
@@ -1538,9 +1558,9 @@ begin
   v := children[0].evaluate(context);
   for i:=1 to high(children) - 1 do begin
     if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
-    if (children[i].children[0] is TXQTermTemporaryNode) and (v.toNode <> nil) then begin
-      log := patternMatcherMatch(TXQTermTemporaryNode(children[i].children[0]).node, v.toNode, context);
-      if log <> nil then exit(evaluateWithChangedVariableLog(children[i].children[high(children[i].children)], log));
+    if (children[i].children[0] is TXQTermPatternMatcher) and (v.toNode <> nil) then begin
+      log := patternMatcherMatch(TXQTermPatternMatcher(children[i].children[0]).node, v.toNode, context);
+      if log <> nil then exit(evaluateWithChangedVariableLog(children[i].children[high(children[i].children)], log, TXQTermPatternMatcher(children[i].children[0]).vars));
       continue;
     end
     else if children[i].children[0] is TXQTermVariable then start := 1

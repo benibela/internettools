@@ -641,6 +641,7 @@ THtmlTemplateParser=class
     function getTemplateTree: TTreeNode;
     function GetTemplateNamespace: TNamespaceList;
     function GetTemplateHasRealVariableDefinitions: boolean;
+    function GetTemplateRealVariableDefinitions: TStringArray;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -656,6 +657,7 @@ THtmlTemplateParser=class
     function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeNode; templateStart, templateEnd: TTemplateElement): boolean;
 
     procedure parseHTMLSimple(html, uri, contenttype: string);
+    procedure initializeCaches;
     function matchLastTrees: Boolean;
   public
     constructor create;
@@ -1009,6 +1011,28 @@ var
   cur: TTemplateElement;
 begin
   result := false;
+  cur := TTemplateElement(FTemplate.getLastTree.next);
+  while cur <> nil do begin
+    if cur.source <> nil then stest(cur.source.Term);
+    cur := cur.templateNext;
+  end;
+end;
+
+function THtmlTemplateParser.GetTemplateRealVariableDefinitions: TStringArray;
+  procedure stest(const t: TXQTerm);
+  var
+    i: Integer;
+  begin
+    if not assigned(t) then exit;
+    if (t is TXQTermDefineVariable) and (TXQTermDefineVariable(t).variable is TXQTermVariable) and
+        (arrayIndexOf(result, TXQTermVariable(TXQTermDefineVariable(t).variable).value) < 0) then
+        arrayAdd(result, TXQTermVariable(TXQTermDefineVariable(t).variable).value);
+    for i := 0 to high(t.children) do
+      stest(t.children[i]);
+  end;
+var
+  cur: TTemplateElement;
+begin
   cur := TTemplateElement(FTemplate.getLastTree.next);
   while cur <> nil do begin
     if cur.source <> nil then stest(cur.source.Term);
@@ -1482,6 +1506,31 @@ begin
     FHTML.removeEmptyTextNodes(true);
 end;
 
+procedure THtmlTemplateParser.initializeCaches;
+var
+  cur: TTemplateElement;
+begin
+  if FTemplate.getLastTree <> nil then begin
+    if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
+      cur := TTemplateElement(FTemplate.getLastTree.next);
+      while cur <> nil do begin
+        if (cur.templateAttributes<>nil) then
+          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
+        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+          cur.initializeCaches(self,true);
+        cur := cur.templateNext;
+      end;
+    end else begin
+      cur := TTemplateElement(FTemplate.getLastTree.next);
+      while cur <> nil do begin
+        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+          cur.initializeCaches(self,lastTrimTextNodes <> FTrimTextNodes);
+        cur := cur.templateNext;
+      end;
+    end;
+  end;
+end;
+
 function THtmlTemplateParser.matchLastTrees: Boolean;
 var cur,last,realLast:TTemplateElement;
     temp: TTreeNode;
@@ -1503,25 +1552,7 @@ begin
 
   oldFunctionCount := length(FQueryEngine.StaticContext.functions);
 
-  if FTemplate.getLastTree <> nil then begin
-    if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
-      cur := TTemplateElement(FTemplate.getLastTree.next);
-      while cur <> nil do begin
-        if (cur.templateAttributes<>nil) then
-          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
-        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
-          cur.initializeCaches(self,true);
-        cur := cur.templateNext;
-      end;
-    end else begin
-      cur := TTemplateElement(FTemplate.getLastTree.next);
-      while cur <> nil do begin
-        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
-          cur.initializeCaches(self,lastTrimTextNodes <> FTrimTextNodes);
-        cur := cur.templateNext;
-      end;
-    end;
-  end;
+  initializeCaches;
   FTemplate.getLastTree.setEncoding(outputEncoding,true,false); //todo: check this for &amp; in templates!
   lastTrimTextNodes := FTrimTextNodes;
 
@@ -1907,14 +1938,20 @@ begin
   if result = nil then result := xqvalue;
 end;
 
-function patternMatcherParse(data: string): TTreeNode;
+function patternMatcherParse(engine: TXQueryEngine;data: string): TXQTermPatternMatcher;
 var temp: THtmlTemplateParser;
 begin
   temp := THtmlTemplateParser.create;
   if data[length(data)] in ['*','?','+','}'] then data := '<t:if>'+data+'</t:if>'; //allow count specifier at the end
   temp.parseTemplate(data);
-  result := temp.TemplateTree;
+  temp.QueryEngine.Free;
+  temp.fQueryEngine := engine;
+  temp.initializeCaches;
+  result := TXQTermPatternMatcher.Create;
+  result.node := temp.TemplateTree;
+  result.vars := temp.GetTemplateRealVariableDefinitions;
   temp.FTemplate.OwnedTrees.Clear;
+  temp.FQueryEngine := nil;
   temp.free;
 end;
 
