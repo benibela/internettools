@@ -39,7 +39,8 @@ type
 //**@value tetHTMLOpen normal html opening tag, searched in the processed document
 //**@value tetHTMLClose normal html closing tag, searched in the processed document
 //**@value tetHTMLText text node, , searched in the processed document
-//**@value tetCommandMeta <template:meta> command to specify how strings are compared (e.g. regex, substring, equal)
+//**@value tetCommandMeta <template:meta> command to specify how strings are compared
+//**@value tetCommandMetaAttribute <template:meta-attribute> command to specify how attributes are compared
 //**@value tetCommandRead <template:read> command to set a variable
 //**@value tetCommandShortRead <template:s> command to execute a xq expression
 //**@value tetCommandLoopOpen <template:loop> command to repeat something as long as possible
@@ -52,7 +53,7 @@ TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose,
                       tetHTMLText,
                       tetMatchText,
-                      tetCommandMeta, tetCommandRead, tetCommandShortRead,
+                      tetCommandMeta, tetCommandMetaAttribute, tetCommandRead, tetCommandShortRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
                       tetCommandIfOpen, tetCommandIfClose,
                       tetCommandElseOpen, tetCommandElseClose,
@@ -549,11 +550,16 @@ TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
         case-sensitive enables case-sensitive comparisons.@br
         (older versions used regex/is instead matches/eq, which is now deprecated and will be removed in future versions)
       )
-      @item(@code(<template:meta [default-text-matching="??"] [default-case-sensitive="??"]/>) @br
+      @item(@code(<template:meta [text-matching="??"] [case-sensitive="??"] [attribute-text-matching="??"] [attribute-case-sensitive="??"]/>) @br
         Specifies meta information to change the template semantic:@br
-        @code(default-text-matching): specifies how text node in the template are matched against html text nodes. You can set it to the allowed attributes of match-text. (default is "starts-with") @br
-        @code(default-text-case-sensitive): specifies if text nodes are matched case sensitive.
-    )
+        @code(text-matching): specifies how text node in the template are matched against html text nodes. You can set it to the allowed attributes of match-text. (default is "starts-with") @br
+        @code(text-case-sensitive): specifies if text nodes are matched case sensitive. @br
+        @code(attribute-matching): like @code(text-matching) for the values of attribute nodes (note that is currently affecting all attributes in the template. future versions will only change it for following elements) @br
+        @code(attribute-case-sensitive): like @code(text-case-sensitive) for the values of attribute nodes (note that is currently affecting all attributes in the template. future versions will only change it for following elements) @br
+      )
+      @item(@code(<template:meta-attribute [name="??"] [text-matching="??"]  [case-sensitive="??"]) @br
+        Like meta for all attributes with a certain name.
+      )
     )@br
     These template attributes can be used on any template element:
     @unorderedList(
@@ -633,6 +639,8 @@ THtmlTemplateParser=class
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TXQVariableChangeLog;
     FParsingExceptions, FSingleQueryModule: boolean;
 
+    FAttributeDefaultCaseSensitive: boolean;
+    FAttributeDefaultMatching: string;
     FAttributeMatching: TStringList;
 
     function GetVariableLogCondensed: TXQVariableChangeLog;
@@ -654,6 +662,7 @@ THtmlTemplateParser=class
     //function getTemplateElementDebugInfo(element: TTemplateElement): string;
 
     function templateElementFitHTMLOpen(html:TTreeNode; template: TTemplateElement): Boolean;
+    procedure resetAttributeMatching;
     function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeNode; templateStart, templateEnd: TTemplateElement): boolean;
 
     procedure parseHTMLSimple(html, uri, contenttype: string);
@@ -712,8 +721,8 @@ uses math;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchText;
-      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of longint=(0,0,0,0,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
-      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of string=('match-text','meta','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized');
+      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of longint=(0,0,0,0,0,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of string=('match-text','meta','meta-attribute','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized');
 
 
 { TTemplateElement }
@@ -1097,6 +1106,15 @@ var
   found: Boolean;
   attrib: TTreeAttribute;
   tempContext: TXQEvaluationContext;
+  regexp: TRegExpr;
+  caseSensitive: Boolean;
+
+  function fi(cs, csi: TXQCollationBoolFunction): TXQCollationBoolFunction;inline;
+  begin
+    if caseSensitive then result := cs
+    else result := csi;
+  end;
+
 begin
   if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
      not striequal(html.value, template.value) then
@@ -1106,29 +1124,40 @@ begin
   for attrib in template.attributes do begin
     name := attrib.value;
     if html.attributes = nil then exit(false);
+    caseSensitive := FAttributeDefaultCaseSensitive;
+    strategy := FAttributeDefaultMatching;
     strategyi := FAttributeMatching.IndexOfName(attrib.value);
-    if strategyi = -1 then begin
-      if not striequal(html.getAttribute(name), attrib.realvalue) then
-        exit(false);
-    end else begin
-      strategy := FAttributeMatching.ValueFromIndex[strategyi];
-      if (strategy = 'eq') or (strategy = 'is' {deprecated}) then begin
-        if not striequal(html.getAttribute(name), attrib.realvalue) then
+    if strategyi <> -1 then begin
+      if FAttributeMatching.ValueFromIndex[strategyi] <> '' then strategy := FAttributeMatching.ValueFromIndex[strategyi];
+      if FAttributeMatching.Objects[strategyi] <> nil then caseSensitive := integer(pointer(FAttributeMatching.Objects[strategyi])) = -1;
+    end;
+    case strategy of
+      'eq', 'is' {is is deprecated}:
+        if not fi(@strEqual, @striEqual)(html.getAttribute(name), attrib.realvalue) then
           exit(false);
-      end else if strategy = 'list-contains' then begin
+      'list-contains': begin
         templateList := strSplit(attrib.realvalue, ' ', false);
         htmlList := strSplit(html.getAttribute(name), ' ', false);
         for j:=0 to high(templateList) do begin
           found := false;
-          for k:= 0 to high(htmlList) do if striEqual(templateList[j], htmlList[k]) then begin found := true; break; end;
+          for k:= 0 to high(htmlList) do if fi(@strEqual, @striEqual)(templateList[j], htmlList[k]) then begin found := true; break; end;
           if not found then exit(false);
         end;
-      end else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind', self);
-      {todo: cacheRegExpr('matches', '', '', false);
-      cacheRegExpr('starts-with', '^', '.*$', true);
-      cacheRegExpr('ends-with', '^.*', '$', true);
-      cacheRegExpr('contains', '', '', true);
-      cacheRegExpr('is', '^', '$', true);}
+      end;
+      'starts-with': if not fi(@strBeginsWith, @striBeginsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
+      'ends-with':   if not fi(@strEndsWith, @striEndsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
+      'contains':    if not fi(@strContains, @striContains)(html.getAttribute(name), attrib.realvalue) then exit(false);
+      'matches':     begin
+        regexp:=TRegExpr.Create;
+        try
+          regexp.Expression:=attrib.realvalue; //todo cache
+          regexp.ModifierI := not caseSensitive;
+          if not regexp.Exec(html.getAttribute(name)) then exit(false);
+        finally
+          regexp.free;
+        end;
+      end;
+      else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind', self);
     end;
   end;
   if template.templateAttributes = nil then exit(true);
@@ -1137,6 +1166,55 @@ begin
   tempContext.ParentElement := html;
   tempContext.TextElement := nil;
   result := template.condition.evaluate(tempContext).toBoolean;
+end;
+
+procedure THtmlTemplateParser.resetAttributeMatching;
+var
+  el: TTemplateElement;
+  i: Integer;
+  temps: String;
+begin
+  FAttributeDefaultMatching := 'eq';
+  FAttributeDefaultCaseSensitive := false;
+  FAttributeMatching.Clear;
+  FAttributeMatching.Values['class'] := 'list-contains';
+
+
+  el := TTemplateElement(FTemplate.getLastTree.next);
+  while el <> nil do begin
+    if (el.templateType = tetCommandMeta) and (el.templateAttributes<>nil) then begin
+      if el.templateAttributes.IndexOfName('attribute-matching') >= 0 then
+        FAttributeDefaultMatching := el.templateAttributes.Values['attribute-matching'];
+      //if el.templateAttributes.IndexOfName('attribute-collation') >= 0 then
+      //  FAttributeDefaultCollation := el.templateAttributes.Values['attribute-collation'];
+      if el.templateAttributes.IndexOfName('attribute-case-sensitive') >= 0 then
+        case el.templateAttributes.Values['attribute-case-sensitive'] of
+          '':;//ignore
+          'false', 'case-insensitive', 'insensitive': FAttributeDefaultCaseSensitive := false;
+          else FAttributeDefaultCaseSensitive := true;
+        end;
+
+    end else if (el.templateType = tetCommandMetaAttribute) and (el.templateAttributes<>nil) then begin
+      if el.templateAttributes.Values['name'] = '' then
+        raise EHTMLParseException.Create('Need attribute name on meta-attribute element');
+      i := FAttributeMatching.IndexOfName(el.templateAttributes.Values['name']);
+      temps := el.templateAttributes.Values['matching'];
+      if i >= 0 then begin
+        FAttributeMatching.ValueFromIndex[i] := temps;
+        if temps = '' then i := -1; //fpc, lol
+      end;
+      if i < 0 then begin
+        FAttributeMatching.Add(el.templateAttributes.Values['name'] + '=' + temps);
+        i := FAttributeMatching.count - 1;
+      end;
+      case el.templateAttributes.Values['case-sensitive'] of
+        '':;//ignore
+        'false', 'case-insensitive', 'insensitive': FAttributeMatching.Objects[i] := Tobject(1);
+        else FAttributeMatching.Objects[i] := Tobject(-1);
+      end;
+    end;
+    el := el.templateNext;
+  end;
 end;
 
 function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: TTreeNode; templateStart, templateEnd: TTemplateElement
@@ -1476,7 +1554,7 @@ begin
               tetCommandSwitchOpen: HandleCommandSwitch(false);
               tetCommandSwitchPrioritizedOpen: HandleCommandSwitch(true);
 
-              tetIgnore, tetCommandMeta, tetCommandIfOpen, tetCommandSwitchClose: templateStart := templateStart.templateNext;
+              tetIgnore, tetCommandMeta, tetCommandMetaAttribute, tetCommandIfOpen, tetCommandSwitchClose: templateStart := templateStart.templateNext;
 
               tetCommandIfClose, tetCommandElseClose: SkipFollowingElses;
 
@@ -1628,7 +1706,6 @@ begin
   FSingleQueryModule := true;
 
   FAttributeMatching := TStringList.Create;
-  FAttributeMatching.Values['class'] := 'list-contains';
 
   FQueryEngine := TXQueryEngine.create;
   FQueryEngine.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
@@ -1674,6 +1751,7 @@ var el: TTemplateElement;
     i: Integer;
     looper: TTemplateElement;
     temp: TTemplateElement;
+    temps: string;
 begin
    //read template
   FTemplate.parseTree(template, templateName);
@@ -1699,9 +1777,12 @@ begin
     if (el.templateType = tetCommandMeta) and (el.templateAttributes<>nil) then begin
       if el.templateAttributes.Values['encoding'] <> '' then
         raise EHTMLParseException.Create('The meta encoding attribute is deprecated');
-      if el.templateAttributes.Values['default-text-matching'] <> '' then
+      if el.templateAttributes.Values['text-matching'] <> '' then
+        defaultTextMatching := el.templateAttributes.Values['text-matching']
+      else if el.templateAttributes.Values['default-text-matching'] <> '' then {deprecated}
         defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
-      i := el.templateAttributes.IndexOfName('default-text-case-sensitive');
+      i := el.templateAttributes.IndexOfName('text-case-sensitive');
+      if i < 0 then i := el.templateAttributes.IndexOfName('default-text-case-sensitive'); {deprecated}
       if i >= 0 then begin
         defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i];
         if defaultCaseSensitive = '' then defaultCaseSensitive := 'true';
@@ -1748,7 +1829,10 @@ begin
     end;
     el := el.templateNext;
   end;
+
+  resetAttributeMatching;
 end;
+
 
 procedure THtmlTemplateParser.parseTemplateFile(templatefilename: string);
 begin
@@ -1972,6 +2056,7 @@ begin
   temp.FHTML.OwnedTrees.Add(data);
   temp.FHtmlTree := data; //todo: why is that not read from fhtml?
   try
+    temp.resetAttributeMatching;
     if temp.matchLastTrees then begin
       result := temp.variableChangeLog;
       temp.variableChangeLog.parentLog := nil;

@@ -1100,6 +1100,40 @@ begin
   t( '<r><a><t:read var="u" source="."/></a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 'u=1'#10'u=2'#10'u=3'#10'u=4');
   t( '<r><a><t:read var="u{.}" source="."/></a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 'u1=1'#10'u2=2'#10'u3=3'#10'u4=4');
 
+  t('<r><t:meta attribute-case-sensitive="true"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=2');
+  t('<r><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=1');
+  t('<r><t:meta attribute-case-sensitive="false"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=1');
+  t('<r><t:meta attribute-case-sensitive="true" attribute-matching="eq"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=2');
+  t('<r><t:meta attribute-case-sensitive="false" attribute-matching="eq"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=1');
+  t('<r><t:meta attribute-case-sensitive="true" attribute-matching="matches"/><a x="X.Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a><a x="X.Y">3</a></r>', '_result=2');
+  t('<r><t:meta attribute-case-sensitive="false" attribute-matching="matches"/><a x="X.Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a><a x="X.Y">3</a></r>', '_result=1');
+  t('<r><t:meta attribute-case-sensitive="true" attribute-matching="starts-with"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=2');
+  t('<r><t:meta attribute-case-sensitive="false" attribute-matching="starts-with"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=1');
+  t('<r><t:meta attribute-case-sensitive="true" attribute-matching="ends-with"/><a x="Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=2');
+  t('<r><t:meta attribute-case-sensitive="false" attribute-matching="ends-with"/><a x="Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=1');
+  t('<r><t:meta attribute-case-sensitive="true" attribute-matching="contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=2');
+  t('<r><t:meta attribute-case-sensitive="false" attribute-matching="contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=1');
+  t('<r><t:meta attribute-case-sensitive="true" attribute-matching="list-contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="x y">2</a><a x="X Y">3</a></r>', '_result=3');
+  t('<r><t:meta attribute-case-sensitive="false" attribute-matching="list-contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="x y">2</a><a x="X Y">3</a></r>', '_result=2');
+
+  t('<r><t:meta-attribute name="x" case-sensitive="true"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=2');
+  t('<r><t:meta-attribute name="x" case-sensitive="false"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=1');
+  t('<r><t:meta-attribute name="x" case-sensitive="true" matching="eq"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=2');
+  t('<r><t:meta-attribute name="x" case-sensitive="false" matching="eq"/><a x="X">{.}</a></r>','<r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r>', '_result=1');
+  t('<r><t:meta-attribute name="x" case-sensitive="true" matching="matches"/><a x="X.Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a><a x="X.Y">3</a></r>', '_result=2');
+  t('<r><t:meta-attribute name="x" case-sensitive="false" matching="matches"/><a x="X.Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a><a x="X.Y">3</a></r>', '_result=1');
+  t('<r><t:meta-attribute name="x" case-sensitive="true" matching="starts-with"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=2');
+  t('<r><t:meta-attribute name="x" case-sensitive="false" matching="starts-with"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=1');
+  t('<r><t:meta-attribute name="x" case-sensitive="true" matching="ends-with"/><a x="Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=2');
+  t('<r><t:meta-attribute name="x" case-sensitive="false" matching="ends-with"/><a x="Y">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=1');
+  t('<r><t:meta-attribute name="x" case-sensitive="true" matching="contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=2');
+  t('<r><t:meta-attribute name="x" case-sensitive="false" matching="contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="XaY">2</a></r>', '_result=1');
+  t('<r><t:meta-attribute name="x" case-sensitive="true" matching="list-contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="x y">2</a><a x="X Y">3</a></r>', '_result=3');
+  t('<r><t:meta-attribute name="x" case-sensitive="false" matching="list-contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="x y">2</a><a x="X Y">3</a></r>', '_result=2');
+
+
+  q('let <r><t:meta-attribute name="x" case-sensitive="true"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '2');
+  q('let <r><t:meta-attribute name="x" case-sensitive="false"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '1');
 
   xstring('hallo"''"''world', 'hallo"''"''world');
   xstring('foo{1+2}bar', 'foo3bar');
