@@ -2129,6 +2129,7 @@ type
     procedure takeFrom(other: TXQVariableChangeLog); //**< Adds all variables from other to self, and clears other
     function condensed: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
     function collected: TXQVariableChangeLog; //**< Collects multiple assignments to single sequence assignment. (i.e. @code(a := 123, a := 456, a := 789) collected is equivalent to @code(a := (123, 456, 789))) (creates a new variable log that has to be freed)
+    function condensedCollected: TXQVariableChangeLog; //**< Same as condensed.collected
 
     //function evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean; //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
     //procedure defineVariable(sender: TObject; const variable: string; const value: IXQValue); //**< Sets @code(variable) to the @code(value)@br This is used as callback by the XQuery-Engine
@@ -4136,6 +4137,15 @@ begin
       xqvalueSeqAdd(result.vars[oldid].value, vars[i].value);
     end;
   end;
+end;
+
+function TXQVariableChangeLog.condensedCollected: TXQVariableChangeLog;
+var
+  temp: TXQVariableChangeLog;
+begin
+  temp := condensed;
+  result := temp.collected;
+  temp.free;
 end;
 
 procedure TXQVariableChangeLog.takeFrom(other: TXQVariableChangeLog);

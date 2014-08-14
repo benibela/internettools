@@ -766,6 +766,18 @@ var previoushtml: string;
         raise Exception.Create('Test failed got '+got+ ' expected '+expected);
     end;
 
+    procedure q3(const template, expected: string);
+    var
+      query: IXQuery;
+      got: String;
+    begin
+      query := extParser.QueryEngine.parseXQuery3(template);
+      //if html <> '' then extParser.parseh;
+      got := query.evaluate(extParser.HTMLTree).toString;
+      if got <> expected then
+        raise Exception.Create('Test failed got '+got+ ' expected '+expected);
+    end;
+
     procedure qf(const template, expectederr: string);
     var
       query: IXQuery;
@@ -1078,7 +1090,25 @@ begin
   q('join(for    <ul> <t:loop><x>{$x}</x><y>{$y}</y></t:loop> </ul> in  <ul>  <x>1</x><y>2</y><x>3</x><y>4</y><x>5</x> </ul> return concat($x," ",$y), ";")', '1 ; 2;3 ; 4');
   q('let $x := "V", $y := "U" return join(for    <ul> <t:loop><x>{$x}</x><y>{$y}</y></t:loop> </ul> in  <ul>  <x>1</x><y>2</y><x>3</x><y>4</y><x>5</x> </ul> return concat($x," ",$y), ";")', '1 ; 2;3 ; 4');
 
+  q('join(let <x>{$obj := {}, $obj.a := .}</x> := <root><x>1</x></root> return $obj.a)', '1');
+  q('join(let <x>{$obj := {}, $obj.a := ., $obj.b := .}</x> := <root><x>1</x></root> return $obj.a)', '1');
+  q('join(let <x>{$obj := {}, $obj.a := ., $obj.b := .}</x> := <root><x>1</x></root> return concat($obj.a, $obj.b))', '11');
+  q('join(let <x>{$obj := {}, $obj.a := .}</x>+ := <root><x>1</x><x>2</x></root> return $obj.a)', '1 2');
+  q('join(let <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ := <root><x>1</x><x>2</x></root> return $obj.a)', '1 2');
+  qf('join(let <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ := <root><x>1</x><x>2</x></root> return $obj ! ((.).a, (.).b))', 'err:XPST0003');
+  q3('join(let <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ := <root><x>1</x><x>2</x></root> return $obj ! concat((.).a, (.).b))', '11 22');
 
+  q('join(typeswitch (<root><x>1</x></root>) case <x>{$obj := {}, $obj.a := .}</x> return $obj.a default return "???")', '1');
+  q('join(typeswitch ( <root><x>1</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x> return $obj.a default return "???")', '1');
+  q('join(typeswitch (<root><x>1</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>  return concat($obj.a, $obj.b) default return "???")', '11');
+  q('join(typeswitch (<root><x>1</x><x>2</x></root> ) case <x>{$obj := {}, $obj.a := .}</x>+ return $obj.a default return "???")', '1 2');
+  q('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj.a default return "???")', '1 2');
+ // qf('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj ! ((.).a, (.).b) default return "???")', 'err:XPST0003');
+ // q3('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj ! concat((.).a, (.).b) default return "???")', '11 22');
+
+  q('join(for <x>{$obj := {}, $obj.a := .}</x>+ in <root><x>1</x><x>2</x></root> return $obj.a)', '1 2');
+  q('join(for <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ in <root><x>1</x><x>2</x></root> return $obj.a)', '1 2');
+  q('join(for <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ in <root><x>1</x><x>2</x></root> return concat($obj.a, $obj.b))', '11 22');
 
 
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');

@@ -689,7 +689,7 @@ var
       try
 
         if vars[pos].kind = xqfkLet then begin
-          oldLog := log;   log := log.collected;  oldLog.free;
+          oldLog := log;   log := log.condensedCollected;  oldLog.free;
           if (vars[pos].sequenceTyp <> nil) then
             for i := 0 to log.count - 1 do
               if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
@@ -715,6 +715,7 @@ var
           end;
 
         end else begin // for
+          oldLog := log;   log := log.condensed;  oldLog.free;
           if (vars[pos].sequenceTyp <> nil) then
             for i := 0 to log.count - 1 do
               if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
@@ -1527,7 +1528,7 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
     i: Integer;
   begin
     tempContext := context;
-    tempContext.temporaryVariables := log.collected;
+    tempContext.temporaryVariables := log.condensedCollected;
     try
       truecount := tempContext.temporaryVariables.count;
       if tempContext.temporaryVariables.hasVariable('$', @value) then begin
