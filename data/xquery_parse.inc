@@ -357,7 +357,7 @@ begin
   end;
   //result := TXQTermTemporaryNode.create();
   //result.node := (patternMatcherParse(strFromPchar(curpos, pos-curpos)));
-  Result := patternMatcherParse(staticContext.sender, strFromPchar(curpos, pos-curpos));
+  Result := patternMatcherParse(staticContext, strFromPchar(curpos, pos-curpos));
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;

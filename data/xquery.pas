@@ -1249,14 +1249,6 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-  { TXQTermTemporaryNode }
-
-  TXQTermPatternMatcher = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
-    node: TTreeNode;
-    vars: TStringArray;
-    destructor destroy; override;
-  end;
-
   { TXQTermSequence }
 
   TXQTermSequence = class(TXQTerm)
@@ -1366,6 +1358,14 @@ type
     constructor create(avalue: string; func: boolean = false);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+  end;
+
+  { TXQTermPatternMatcher }
+
+  TXQTermPatternMatcher = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
+    node: TTreeNode;
+    vars: array of TXQTermVariable;
+    destructor destroy; override;
   end;
 
   TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown);
@@ -1521,7 +1521,7 @@ type
   end;
 
 
-  TXQInternalPatternMatcherParse = function (engine: TXQueryEngine; data: string): TXQTermPatternMatcher;
+  TXQInternalPatternMatcherParse = function (const context: TXQStaticContext;  data: string): TXQTermPatternMatcher;
   TXQInternalPatternMatcherMatch = function (template, data: TTreeNode; const context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
 
 

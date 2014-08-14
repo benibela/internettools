@@ -785,7 +785,7 @@ var previoushtml: string;
       err: String;
     begin
       if not testerrors then exit;
-      err := '';
+      err := '<no error>';
       try
         query := extParser.QueryEngine.parseXQuery1(template);
         got := query.evaluate(extParser.HTMLTree).toString;

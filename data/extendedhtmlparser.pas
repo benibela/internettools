@@ -129,6 +129,8 @@ TTrimTextNodes = (ttnNever, ttnForMatching, ttnWhenLoadingEmptyOnly, ttnWhenLoad
 //** In every case all node variables are converted to strings (because the nodes point to elements of the previous document, but the previous document will be deleted)
 TKeepPreviousVariables = (kpvForget, kpvKeepValues, kpvKeepInNewChangeLog);
 
+TXQTermVariableArray = array of TXQTermVariable;
+
 { THtmlTemplateParser }
 
 (***
@@ -649,7 +651,7 @@ THtmlTemplateParser=class
     function getTemplateTree: TTreeNode;
     function GetTemplateNamespace: TNamespaceList;
     function GetTemplateHasRealVariableDefinitions: boolean;
-    function GetTemplateRealVariableDefinitions: TStringArray;
+    procedure GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray);
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -917,7 +919,7 @@ begin
   if templateType = tetCommandShortRead then begin
     source := parser.parseQuery(deepNodeText()); //todo: use correct encoding
     term := source.Term;
-    if isVariableName(term) then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.'))
+    if isVariableName(term) then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.')) //replace $xx with $xx := .
     else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
             and (source.term.children[0] is TXQTermReadAttribute) and (source.Term.children[1] is TXQTermSequence)
             and (length(source.term.children[1].children) = 1) and isVariableName(source.term.children[1].children[0]) then begin
@@ -997,7 +999,7 @@ var
 begin
   if expression = '' then raise ETemplateParseException.Create('no expression given');
   context := nil;
-  if FSingleQueryModule then context := fQueryEngine.StaticContext;
+  if FSingleQueryModule then context := FQueryContext.StaticContext;
   result := FQueryEngine.parseXQuery3(expression, context);
 end;
 
@@ -1027,15 +1029,29 @@ begin
   end;
 end;
 
-function THtmlTemplateParser.GetTemplateRealVariableDefinitions: TStringArray;
+procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray);
+  function arrayContains(t: TXQTermVariable): boolean;
+  var
+    i: Integer;
+  begin
+    for i:=0 to high(vars) do
+      if vars[i] = t then exit(true);
+    for i:=0 to high(vars) do
+      if (vars[i].value = t.value) and (equalNamespaces(vars[i].namespace, t.namespace)) then
+        exit(true);
+    result := false;
+  end;
+
   procedure stest(const t: TXQTerm);
   var
     i: Integer;
   begin
     if not assigned(t) then exit;
     if (t is TXQTermDefineVariable) and (TXQTermDefineVariable(t).variable is TXQTermVariable) and
-        (arrayIndexOf(result, TXQTermVariable(TXQTermDefineVariable(t).variable).value) < 0) then
-        arrayAdd(result, TXQTermVariable(TXQTermDefineVariable(t).variable).value);
+        (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t).variable))) then begin
+          SetLength(vars, length(vars) + 1);
+          vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t).variable);
+        end;
     for i := 0 to high(t.children) do
       stest(t.children[i]);
   end;
@@ -2022,18 +2038,19 @@ begin
   if result = nil then result := xqvalue;
 end;
 
-function patternMatcherParse(engine: TXQueryEngine;data: string): TXQTermPatternMatcher;
+function patternMatcherParse(const context: TXQStaticContext; data: string): TXQTermPatternMatcher;
 var temp: THtmlTemplateParser;
 begin
   temp := THtmlTemplateParser.create;
   if data[length(data)] in ['*','?','+','}'] then data := '<t:if>'+data+'</t:if>'; //allow count specifier at the end
   temp.parseTemplate(data);
   temp.QueryEngine.Free;
-  temp.fQueryEngine := engine;
+  temp.fQueryEngine := context.sender;
+  temp.FQueryContext.staticContext := context;
   temp.initializeCaches;
   result := TXQTermPatternMatcher.Create;
   result.node := temp.TemplateTree;
-  result.vars := temp.GetTemplateRealVariableDefinitions;
+  temp.GetTemplateRealVariableDefinitions(result.vars);
   temp.FTemplate.OwnedTrees.Clear;
   temp.FQueryEngine := nil;
   temp.free;

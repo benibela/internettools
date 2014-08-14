@@ -704,8 +704,8 @@ var
           log.parentLog := tempContext.temporaryVariables;
           tempContext.temporaryVariables := log;
           for i := 0 to high(vars[pos].pattern.vars) do
-            if not log.hasVariable(vars[pos].pattern.vars[i], nil) then
-              tempContext.temporaryVariables.add(vars[pos].pattern.vars[i], xqvalue());
+            if not log.hasVariable(vars[pos].pattern.vars[i].value, nil, vars[pos].pattern.vars[i].namespace) then
+              tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespace);
           try
             evaluateForLoop(pos+1);
           finally
@@ -726,7 +726,7 @@ var
           pushContextItem;
           tempContext.temporaryVariables.pushAll;
           for i := 0 to high(vars[pos].pattern.vars) do
-            tempContext.temporaryVariables.add(vars[pos].pattern.vars[i], xqvalue());
+            tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespace);
 
           for i := 0 to log.count - 1 do begin
             if log.getName(i) = '$' then begin
@@ -1520,7 +1520,7 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
     result := eval.evaluate(tempContext);
     if vari is TXQTermVariable then tempContext.endSubContextWithVariables(context);
   end;
-  function evaluateWithChangedVariableLog(eval: TXQTerm; log: TXQVariableChangeLog; const vars: TStringArray): IXQValue;
+  function evaluateWithChangedVariableLog(eval: TXQTerm; log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
   var
     tempContext: TXQEvaluationContext;
     value: TXQValue;
@@ -1540,8 +1540,8 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
       end;
       if truecount <> length(vars) then
         for i := 0 to high(vars) do
-          if not tempContext.temporaryVariables.hasVariable(vars[i], nil) then
-            tempContext.temporaryVariables.add(vars[i], xqvalue());
+          if not tempContext.temporaryVariables.hasVariable(vars[i].value, nil, vars[i].namespace) then
+            tempContext.temporaryVariables.add(vars[i].value, xqvalue(), vars[i].namespace);
       tempContext.temporaryVariables.parentLog := context.temporaryVariables;
       result := eval.evaluate(tempContext);
     finally
