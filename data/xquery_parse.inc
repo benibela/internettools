@@ -519,29 +519,34 @@ var
 begin
   requireXQuery('for typeswitch statement');
   result := TXQTermTypeSwitch.Create;
-  result.push(parsePrimaryLevel());
-  expect(')');
+  try
+    result.push(parsePrimaryLevel());
+    expect(')');
 
-  word := nextToken();
-  while word = 'case' do begin
+    word := nextToken();
+    while word = 'case' do begin
+      skipWhitespaceAndComment();
+      result.push(TXQTermSequence.Create);
+      if pos^ = '<' then begin
+        result.children[high(result.children)].push(parsePatternMatcher());
+      end else begin
+        if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
+        result.children[high(result.children)].push(parseSequenceType());
+      end;
+      expect('return');
+      result.children[high(result.children)].push(parse());
+      word := nextToken();
+    end;
+    if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
     skipWhitespaceAndComment();
     result.push(TXQTermSequence.Create);
-    if pos^ = '<' then begin
-      result.children[high(result.children)].push(parsePatternMatcher());
-    end else begin
-      if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
-      result.children[high(result.children)].push(parseSequenceType());
-    end;
+    if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
     expect('return');
     result.children[high(result.children)].push(parse());
-    word := nextToken();
+  except
+    result.free;
+    raise;
   end;
-  if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
-  skipWhitespaceAndComment();
-  result.push(TXQTermSequence.Create);
-  if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
-  expect('return');
-  result.children[high(result.children)].push(parse());
 end;
 
 function TXQParsingContext.parseSwitch: TXQTermSwitch;

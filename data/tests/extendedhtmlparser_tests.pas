@@ -1103,8 +1103,8 @@ begin
   q('join(typeswitch (<root><x>1</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>  return concat($obj.a, $obj.b) default return "???")', '11');
   q('join(typeswitch (<root><x>1</x><x>2</x></root> ) case <x>{$obj := {}, $obj.a := .}</x>+ return $obj.a default return "???")', '1 2');
   q('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj.a default return "???")', '1 2');
- // qf('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj ! ((.).a, (.).b) default return "???")', 'err:XPST0003');
- // q3('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj ! concat((.).a, (.).b) default return "???")', '11 22');
+  qf('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj ! ((.).a, (.).b) default return "???")', 'err:XPST0003');
+  q3('join(typeswitch (<root><x>1</x><x>2</x></root>) case <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+  return $obj ! concat((.).a, (.).b) default return "???")', '11 22');
 
   q('join(for <x>{$obj := {}, $obj.a := .}</x>+ in <root><x>1</x><x>2</x></root> return $obj.a)', '1 2');
   q('join(for <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ in <root><x>1</x><x>2</x></root> return $obj.a)', '1 2');
