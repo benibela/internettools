@@ -159,6 +159,8 @@ function arrayIndexOf(const a: array of string; const e: string; slice1: integer
 function arrayIndexOfSmallest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer; overload;
+//**Tests if element e exists in the array/slice (see above)
+function arrayContains(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TStringArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -216,6 +218,8 @@ function arrayIndexOf(const a: array of longint; const e: longint; slice1: integ
 function arrayIndexOfSmallest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer; overload;
+//**Tests if element e exists in the array/slice (see above)
+function arrayContains(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongintArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -273,6 +277,8 @@ function arrayIndexOf(const a: array of longword; const e: longword; slice1: int
 function arrayIndexOfSmallest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer; overload;
+//**Tests if element e exists in the array/slice (see above)
+function arrayContains(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongwordArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -330,6 +336,8 @@ function arrayIndexOf(const a: array of int64; const e: int64; slice1: integer =
 function arrayIndexOfSmallest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer; overload;
+//**Tests if element e exists in the array/slice (see above)
+function arrayContains(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TInt64Array; slice1: integer = -1;slice2: integer = -1);overload;
@@ -387,6 +395,8 @@ function arrayIndexOf(const a: array of float; const e: float; slice1: integer =
 function arrayIndexOfSmallest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer; overload;
+//**Tests if element e exists in the array/slice (see above)
+function arrayContains(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TFloatArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -876,8 +886,9 @@ type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**Only the > 0 and <= 0 return values are discerned. (i.e. you can safely use a comparison function that e.g. only returns +7 and 0)  @br
 //**Currently it uses a combination of merge and insert sort. Merge requires the allocation of additional memory.
 procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
-//**general stable sort function (using merge + insert sort in the moment)
-procedure stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil); overload;
+//**general stable sort functions for arrays (modifying the array inline and returning it)
+function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil): TLongintArray; overload;
+function stableSort(strArray: TStringArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TStringArray; overload;
 
 
 type TBinarySearchChoosen = (bsAny, bsFirst, bsLast);
@@ -1122,6 +1133,11 @@ begin
        Result:=i;
 end;
 
+function arrayContains(const a: array of string; const e: string; slice1: integer; slice2: integer): boolean;
+begin
+  result := arrayIndexOf(a, e) >= 0;
+end;
+
 procedure arrayInvert(a: TStringArray; slice1: integer; slice2: integer);
 var temp: string;
  i: Integer;
@@ -1338,6 +1354,11 @@ begin
   for i:=slice1+1 to slice2 do
      if a[i] > a[result] then
        Result:=i;
+end;
+
+function arrayContains(const a: array of longint; const e: longint; slice1: integer; slice2: integer): boolean;
+begin
+  result := arrayIndexOf(a, e) >= 0;
 end;
 
 procedure arrayInvert(a: TLongintArray; slice1: integer; slice2: integer);
@@ -1558,6 +1579,11 @@ begin
        Result:=i;
 end;
 
+function arrayContains(const a: array of longword; const e: longword; slice1: integer; slice2: integer): boolean;
+begin
+  result := arrayIndexOf(a, e) >= 0;
+end;
+
 procedure arrayInvert(a: TLongwordArray; slice1: integer; slice2: integer);
 var temp: longword;
  i: Integer;
@@ -1776,6 +1802,11 @@ begin
        Result:=i;
 end;
 
+function arrayContains(const a: array of int64; const e: int64; slice1: integer; slice2: integer): boolean;
+begin
+  result := arrayIndexOf(a, e) >= 0;
+end;
+
 procedure arrayInvert(a: TInt64Array; slice1: integer; slice2: integer);
 var temp: int64;
  i: Integer;
@@ -1992,6 +2023,11 @@ begin
   for i:=slice1+1 to slice2 do
      if a[i] > a[result] then
        Result:=i;
+end;
+
+function arrayContains(const a: array of float; const e: float; slice1: integer; slice2: integer): boolean;
+begin
+  result := arrayIndexOf(a, e) >= 0;
 end;
 
 procedure arrayInvert(a: TFloatArray; slice1: integer; slice2: integer);
@@ -3984,7 +4020,7 @@ begin
     result := strDup('0', (displayLength) - length(Result)) + result;
 end;
 
-//incase-sensitive, intelligent string compare (splits in text, number parts)
+//case-sensitive, intelligent string compare (splits in text, number parts)
 function strCompareClever(const s1, s2: RawByteString): integer;
 var t1,t2:RawByteString; //lowercase text
     i,j,ib,jb,p: longint;
@@ -5451,11 +5487,25 @@ begin
 
 end;
 
-procedure stableSort(intArray: TLongintArray;
-  compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
+function stableSort(intArray: TLongintArray;
+  compareFunction: TPointerCompareFunction; compareFunctionData: TObject): TLongintArray;
 begin
+  result := intArray;
   if length(intArray)<=1  then exit;
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
+end;
+
+function compareString(c:TObject; a, b:pointer):longint;
+begin
+  result := striCompareClever(PString(a)^, PString(b)^);
+end;
+
+function stableSort(strArray: TStringArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject): TStringArray;
+begin
+  result := strArray;
+  if length(strArray)<=1  then exit;
+  if compareFunction <> nil then stableSort(@strArray[0],@strArray[high(strArray)],sizeof(strArray[0]),compareFunction,compareFunctionData)
+  else stableSort(@strArray[0],@strArray[high(strArray)],sizeof(strArray[0]),@compareString,nil);
 end;
 
 {$IFNDEF HASSIGN}
@@ -5700,4 +5750,4 @@ end;
 
 
 end.
-
+
