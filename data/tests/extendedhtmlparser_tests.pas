@@ -1059,6 +1059,7 @@ begin
   q( 'typeswitch (<a>123</a>) case <a>{$abc}</a> return $abc default return "oh?"', '123');
   q( 'typeswitch (<abc>123</abc>) case <a>{$abc}</a> return $abc default return "oh?"', 'oh?');
   q( 'typeswitch (<x><a>1</a><a>2</a></x>) case <a>{$abc}</a>+ return join($abc) default return "oh?"', '1 2');
+  q( 'let $abc := 1000 return typeswitch (<x></x>) case <a>{$abc}</a>* return $abc default return "oh?"', '');
   q( 'typeswitch (<x></x>) case <a>{$abc}</a>* return count($abc) default return "oh?"', '0');
   q( 'typeswitch (<abc>foobar</abc>) case <abc>{.}</abc> return . default return "oh??"', 'foobar');
   qf('typeswitch (<x><a>1</a><a>2</a></x>) case <a>{.}</a>+ return join(.) default return "oh?"', 'pxp:PATTERN1');
