@@ -5382,7 +5382,7 @@ begin
       if (context.SeqValue <> nil) and (context.SeqValue.kind in [pvkNode, pvkObject]) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
       else if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'Context item is undefined')
-      else raise EXQEvaluationException.Create('XPTY0020', 'Context item is not a node');
+      else raise EXQEvaluationException.Create('XPTY0020', 'Expected node as context item, got: '+context.SeqValue.debugAsStringWithTypeAnnotation());
       result := expandSequence(result,query, context);
     end;
   end;

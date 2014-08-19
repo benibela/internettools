@@ -1111,6 +1111,19 @@ begin
   q('join(for <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ in <root><x>1</x><x>2</x></root> return $obj.a)', '1 2');
   q('join(for <x>{$obj := {}, $obj.a := ., $obj.b := .}</x>+ in <root><x>1</x><x>2</x></root> return concat($obj.a, $obj.b))', '11 22');
 
+  q('declare namespace foo = "barbar"; let <x>{$foo:bar}</x> := <x>1</x> return $foo:bar', '1');
+  q('declare namespace foo = "barbar"; let $bar := "huh?", <x>{$foo:bar}</x> := <x>1</x> return $bar', 'huh?');
+  qf('declare namespace foo = "barbar"; let <x>{$foo:bar}</x> := <x>1</x> return $bar', 'err:XPST0008');
+  qf('declare namespace foo = "barbar"; let <x>{$bar}</x> := <x>1</x> return $foo:bar', 'err:XPST0008');
+  q('declare namespace foo = "barbar"; for <x>{$foo:bar}</x> in <x>1</x> return $foo:bar', '1');
+  q('declare namespace foo = "barbar"; let $bar := "huh?" return for <x>{$foo:bar}</x> in <x>1</x> return $bar', 'huh?');
+  qf('declare namespace foo = "barbar"; for <x>{$foo:bar}</x> in <x>1</x> return $bar', 'err:XPST0008');
+  qf('declare namespace foo = "barbar"; for <x>{$bar}</x> in <x>1</x> return $foo:bar', 'err:XPST0008');
+  q('declare namespace foo = "barbar"; typeswitch ( <x>1</x>) case <x>{$foo:bar}</x> return $foo:bar default return 1234', '1');
+  q('declare namespace foo = "barbar"; let $bar := "huh?" return typeswitch (<x>1</x>) case <x>{$foo:bar}</x> return $bar default return 1234', 'huh?');
+  qf('declare namespace foo = "barbar"; typeswitch(<x>1</x>) case <x>{$foo:bar}</x>  return $bar default return 1234', 'err:XPST0008');
+  qf('declare namespace foo = "barbar"; typeswitch(<x>1</x> ) case <x>{$bar}</x> return $foo:bar default return 1234', 'err:XPST0008');
+
 
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := concat(., $abc, .)}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=XXX123XXX');
