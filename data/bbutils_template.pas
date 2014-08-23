@@ -177,7 +177,7 @@ function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: intege
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: T__ArrayType__; slice1: integer = -1;slice2: integer = -1);overload;
@@ -683,6 +683,16 @@ function arrayBinarySearch(a: T__ArrayType__; value: T__ElementType__; choosen: 
 implementation
 
 const MinsPerDay = 24 * 60;
+
+{$IFNDEF HASSIGN}
+function Sign(a: integer): TValueSign;
+begin
+  if a < 0 then result := -1
+  else if a > 0 then result := 1
+  else result := 0;
+end;
+
+{$ENDIF}
 
 //========================array functions========================
 
@@ -1821,7 +1831,10 @@ end;
 function strConvertFromUtf8(str: RawByteString; toe: TEncoding): RawByteString;
 var len, reslen, i, pos: longint;
 begin
-  if str = '' then exit;
+  if str = '' then begin
+    result := '';
+    exit;
+  end;
   case toe of
     eUnknown, eUTF8: result:=str;
     eWindows1252: begin //actually latin-1
@@ -2060,9 +2073,15 @@ var
   start: Integer;
   last: Integer;
 begin
-  if escape = '' then exit(strDecodeHex(s));
+  if escape = '' then begin
+    result := strDecodeHex(s);
+    exit;
+  end;
   start := pos(escape, s);
-  if start <= 0 then exit(s);
+  if start <= 0 then begin
+    result := s;
+    exit;
+  end;
   SetLength(result, length(s));
   move(s[1], result[1], start-1);
   f := start;
@@ -2681,6 +2700,7 @@ end;
 
 
 //========================mathematical functions========================
+
 function factorial(i: longint): float;
 var j:longint;
 begin
@@ -3749,19 +3769,10 @@ function stableSort(strArray: TStringArray; compareFunction: TPointerCompareFunc
 begin
   result := strArray;
   if length(strArray)<=1  then exit;
-  if compareFunction <> nil then stableSort(@strArray[0],@strArray[high(strArray)],sizeof(strArray[0]),compareFunction,compareFunctionData)
+  if assigned(compareFunction) then stableSort(@strArray[0],@strArray[high(strArray)],sizeof(strArray[0]),compareFunction,compareFunctionData)
   else stableSort(@strArray[0],@strArray[high(strArray)],sizeof(strArray[0]),@compareString,nil);
 end;
 
-{$IFNDEF HASSIGN}
-function Sign(a: integer): TValueSign;
-begin
-  if a < 0 then result := -1
-  else if a > 0 then result := 1
-  else result := 0;
-end;
-
-{$ENDIF}
 
 function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
 var temp: PAnsiChar;
@@ -3917,4 +3928,4 @@ end;
 
 
 end.
-
+
