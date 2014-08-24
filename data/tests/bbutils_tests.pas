@@ -36,12 +36,10 @@ begin
   else if pint64(a)^>pint64(b)^ then result := 1
   else result := 0
 end;
-{$ifdef fpc}
 function stringCompareReverseFunction(c:TObject; a,b:pointer):longint;
 begin
   result := - CompareText(PString(a)^,PString(b)^);
 end;
-{$endif}
 procedure test(condition: boolean; name: string='');overload;
 begin
   if not condition then raise Exception.Create('test: '+name);
