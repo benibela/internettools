@@ -476,6 +476,8 @@ begin
 
   t('every $x in (for $i in (1 to 100) return let $a := <a/>, $b := <b/> return ((($a << $b) or ($a >> $b))) and not((($a << $b) and ($a >> $b))))  satisfies $x', 'true');
 
+  t('outer-xml(<animal>{ for $a in "black"return (1,<b/>)}</animal>)', '<animal>1<b/></animal>');
+
   //some examples from wikibooks
   t('let $doc := <doc><books>  <book><title>HHGTTG</title><price>42</price></book>  <book><title>Mistborn</title><price>123</price></book>  <book><title>Das Kapital</title><price>0</price></book>  <book><title>Pinguin</title><price>57</price></book> </books></doc> '+
      'for $book in $doc/books/book let $title := $book/title/text() let $price := $book/price/text() where xs:decimal($price) gt 50.00  order by $title '+
