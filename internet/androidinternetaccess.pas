@@ -457,6 +457,7 @@ var args:array[0..1] of jvalue;
     javaEnvRef: PJNIEnv;
 begin
   additionalHeaders := TStringList.Create;
+  additionalHeaders.nameValueSeparator := ':';
   FLastHTTPHeaders := TStringList.Create;
 
   javaEnvRef:=needJ.env; //todo, use j. directl
