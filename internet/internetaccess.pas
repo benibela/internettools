@@ -295,13 +295,13 @@ begin
   trimmed:=TrimLeft(data);
   if trimmed = '' then exit(rtEmpty);
 
-  if strBeginsWith(trimmed, 'http://') or strBeginsWith(trimmed, 'https://') then
+  if striBeginsWith(trimmed, 'http://') or striBeginsWith(trimmed, 'https://') then
     exit(rtRemoteURL);
 
-  if strBeginsWith(trimmed, 'file://') then
+  if striBeginsWith(trimmed, 'file://') then
     exit(rtFile);
 
-  if strBeginsWith(trimmed, '<') then
+  if striBeginsWith(trimmed, '<') then
     exit(rtXML);
 
   exit(rtFile);

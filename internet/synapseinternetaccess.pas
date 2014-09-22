@@ -141,7 +141,11 @@ function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; d
     i: Integer;
   begin
    connection.Clear;
-   connection.AddPortNumberToHost:=false;
+   //Some servers fail without port in host, some with. This behaviour mirrors Firefox:
+   connection.AddPortNumberToHost:=(url.port <> '')
+                                    and ( (striEqual(url.protocol, 'http') and (url.port <> '80'))
+                                          or (striEqual(url.protocol, 'https') and (url.port <> '443'))
+                                         );
    if data <> '' then begin
      WriteStrToStream(connection.Document, data);
      connection.MimeType := 'application/x-www-form-urlencoded';

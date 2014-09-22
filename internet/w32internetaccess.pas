@@ -316,10 +316,10 @@ begin
      or (lastConnectedUrl.username <> decoded.username) or (lastConnectedUrl.password <> decoded.password) then begin
     if hLastConnection<>nil then
       InternetCloseHandle(hLastConnection);
-    if decoded.protocol='http' then begin
+    if striequal(decoded.protocol, 'http') then begin
       tempPort:=80;
       temp:=INTERNET_SERVICE_HTTP;
-    end else if decoded.protocol='https' then begin
+    end else if striequal(decoded.protocol, 'https') then begin
       tempPort:=443;
       temp:=INTERNET_SERVICE_HTTP;
     end;
@@ -334,7 +334,7 @@ begin
     lastConnectedUrl := decoded;
   end;
 
-  if decoded.protocol='https' then begin
+  if striequal(decoded.protocol, 'https') then begin
     if internetConfig^.checkSSLCertificates then
       hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
      else
