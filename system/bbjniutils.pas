@@ -15,6 +15,7 @@ type
 
 { TJavaEnv }
 
+ TStringConversionMode = (scmAssumeMUTF8, scmConvertValidUTF8ToMUTF8, scmConvertAndRepairUTF8ToMUTF8);
  TJavaEnv = record
   env: PJNIEnv;
 
@@ -80,7 +81,7 @@ type
   procedure deleteGlobalRef(obj: jobject);
 
   function NewStringUTF8(s: string): jobject;
-  function stringToJString(s: string): jobject; //deprecated
+  function stringToJString(s: string; conversionMode: TStringConversionMode = scmConvertAndRepairUTF8ToMUTF8): jobject; //deprecated
   function jStringToStringAndDelete(s: jobject): string;
 
   function arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
@@ -131,7 +132,7 @@ procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); cdecl;
 
 implementation
 
-uses bbutils {$IFDEF CD_Android}, customdrawnint{$endif};
+uses bbutils, math {$IFDEF CD_Android}, customdrawnint{$endif};
 
 function needJ: TJavaEnv;
 var attachArgs: JavaVMAttachArgs;
@@ -453,9 +454,126 @@ begin
   result := env^^.NewStringUTF(env, pchar(s));
 end;
 
-function TJavaEnv.stringToJString(s: string): jobject;
+const INVALID_UTF8 = 1;
+const INVALID_MUTF8 = 2;
+function isContinuationByte(const s: string; i: integer): boolean; inline;
 begin
-  result := env^^.NewStringUTF(env, pchar(s));
+  result := (i <= length(s)) and (ord(s[i]) and $C0 = $80);
+end;
+function isValidModifiedUTF8(const s: string; conversionMode: TStringConversionMode): integer;
+var i: integer;
+begin
+  //if conversionMode is scmConvertAndRepairUTF8ToMUTF8 then we check if it is valid modified utf-8 (and valid utf-8)
+  //if conversionMode is scmConvertValidUTF8ToMUTF8 then we check if it is valid utf-8 (do not abort after discovering it is invalid modified utf-8)
+  result := 0;
+  i := 1;
+  while i <= length(s) do begin
+    if s[i] = #00 then begin
+      result := INVALID_MUTF8;
+      if conversionMode = scmConvertAndRepairUTF8ToMUTF8 then exit;
+    end else if (s[i] in [#01..#$7f]) then //ok
+    else if (ord(s[i]) and $E0) = $C0 then begin
+      inc(i);
+      if not isContinuationByte(s, i) then exit(INVALID_UTF8);
+    end else if (ord(s[i]) and $F0) = $E0 then begin
+      inc(i);
+      if not isContinuationByte(s, i) then exit(INVALID_UTF8);
+      inc(i);
+      if not isContinuationByte(s, i) then exit(INVALID_UTF8);
+    end else  if (ord(s[i]) and $F8) = $F0 then begin
+      inc(i);
+      if not isContinuationByte(s, i) then exit(INVALID_UTF8);
+      inc(i);
+      if not isContinuationByte(s, i) then exit(INVALID_UTF8);
+      inc(i);
+      if not isContinuationByte(s, i) then exit(INVALID_UTF8);
+      result := INVALID_MUTF8; //no 4-byte sequences allowed
+      if conversionMode = scmConvertAndRepairUTF8ToMUTF8 then exit;
+    end else exit(INVALID_UTF8);
+    inc(i);
+  end;
+end;
+{1000 - 8
+1100 - C
+1110 - E
+1111 - F }
+function repairModifiedUTF8(const s: string): string; //valid utf is converted, invalid characters are removed
+var res: string;
+    p: integer;
+  procedure needLength(d: integer);
+  begin
+    if p + d - 1 > length(res) then
+      setlength(res, max(p + d - 1, length(res) + length(res) div 4));
+  end;
+var i, t, lead, trail: integer;
+begin
+  setlength(res, length(s));
+  p := 1;
+  i := 1;
+  while i <= length(s) do begin
+    if s[i] = #00 then begin
+      needLength(2);
+      res[p] := #$C0;
+      res[p+1] := #$80;
+      inc(p, 2);
+      inc(i);
+    end else if (s[i] in [#01..#$7f]) then begin
+      needLength(1);
+      res[p] := s[i];
+      inc(p); inc(i);
+    end else if (ord(s[i]) and $E0) = $C0 then begin
+      if isContinuationByte(s, i + 1) then begin
+        needLength(2);
+        res[p] := s[i]; res[p+1] := s[i+1];
+        inc(p, 2);
+        inc(i, 2);
+      end else inc(i);
+    end else if (ord(s[i]) and $F0) = $E0 then begin
+      if isContinuationByte(s, i + 1) and isContinuationByte(s, i + 2) then begin
+        needLength(3);
+        res[p] := s[i]; res[p+1] := s[i+1]; res[p+2] := s[i+2];
+        inc(p, 3);
+        inc(i, 3);
+      end else inc(i);
+    end else  if (ord(s[i]) and $F8) = $F0 then begin
+      if isContinuationByte(s, i + 1) and isContinuationByte(s, i + 2) and isContinuationByte(s, i + 3) then begin
+        t := strDecodeUTF8Character(s, i); //incs i
+        if t > 0 then begin
+          t := t - $010000;
+          lead := $D800 + ((t shr 10) and $3FF);   //probably do not need the ands here
+          trail := $DC00 + (t and $3FF);
+          needLength(6);
+          //lead in 0xD800..0xDBFF = 11011xxx yyzzzzzz => utf-8 11101101 101xxxyy 10zzzzzz
+          res[p] := #$ED;
+          res[p+1] := chr($A0 or ((lead shr 6) and $3F));
+          res[p+2] := chr($80 or (lead and $3F));
+
+          //trail in 0xDC00..0xDFFF = 110111xx yyzzzzzz
+          res[p+3] := #$ED;
+          res[p+4] := chr($B0 or ((trail shr $6) and $3F));
+          res[p+5] := chr($80 or (trail and $3F));
+
+          inc(p, 6);
+        end;
+      end else inc(i);
+    end else inc(i);
+  end;
+  if length(res) <> p - 1 then
+    setlength(res, p - 1);
+end;
+
+function TJavaEnv.stringToJString(s: string; conversionMode: TStringConversionMode = scmConvertAndRepairUTF8ToMUTF8): jobject;
+var ok: integer;
+begin
+  if (conversionMode = scmAssumeMUTF8) then
+    exit(env^^.NewStringUTF(env, pchar(s)));
+  ok := isValidModifiedUTF8(s, conversionMode);
+  if ok = 0 then
+    exit(env^^.NewStringUTF(env, pchar(s)));
+  if (ok = INVALID_UTF8) and (conversionMode = scmConvertValidUTF8ToMUTF8) then
+    raise EAndroidInterfaceException.create('String is invalid utf-8: '+strFromPtr(pointer(s))+':'+inttostr(length(s)));
+  exit(env^^.NewStringUTF(env, pchar(repairModifiedUTF8(s))));
+  //nothing works to catch it RethrowJavaExceptionIfThereIsOne; if result = nil then raise EAndroidInterfaceException.create('Failed to create string from '+strFromPtr(pointer(s))+':'+inttostr(length(s)));
 end;
 
 function TJavaEnv.jStringToStringAndDelete(s: jobject): string;
