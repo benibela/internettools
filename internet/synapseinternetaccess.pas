@@ -169,7 +169,7 @@ begin
   contentLength:=-1;
   lastProgressLength:=-1;
 
-  if url.protocol = 'https' then
+  if striequal(url.protocol, 'https') then
     if (not IsSSLloaded) then //check if ssl is actually loaded
        raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: Also install the dev packages of openssl. Called libssl-dev on Debian/Ubunutu, openssl-devel on Fedora/CentOS, ...)');
 
