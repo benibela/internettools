@@ -271,8 +271,8 @@ var jRequest: jobject;
   begin
     //jRequest.addHeader(n, v)
     with classInfos do begin
-      args[0].l := j.NewStringUTF8(n);
-      args[1].l := j.NewStringUTF8(v);
+      args[0].l := j.stringToJString(n);
+      args[1].l := j.stringToJString(v);
       j.CallVoidMethod(jRequest,  jmHttpMessageAddHeader, @args[0]);;
       j.DeleteLocalRef(args[0].l);
       j.DeleteLocalRef(args[1].l);
@@ -294,7 +294,7 @@ var jRequest: jobject;
       jentity.l := j.env^^.NewObjectA(j.env, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
       //entity.setContentType(..)
       if additionalHeaders.IndexOfName('Content-Type') < 0 then begin
-        temp.l := j.NewStringUTF8('application/x-www-form-urlencoded');
+        temp.l := j.NewStringUTF('application/x-www-form-urlencoded');
         j.CallVoidMethod(jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
         j.DeleteLocalRef(temp.l);
       end;
@@ -340,7 +340,7 @@ begin
   try
     with classInfos do begin;
       //HttpGet httpget = new HttpGet(url);
-      jUrl := j.NewStringUTF8(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
+      jUrl := j.stringToJString(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
       jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
       j.RethrowJavaExceptionIfThereIsOne(EInternetException);
       j.DeleteLocalRef(jUrl);
@@ -479,13 +479,13 @@ begin
       jparams := javaEnvRef^^.CallObjectMethod(javaEnvRef, jhttpclient, jmDefaultHttpClientGetParams);
 
       args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, 'http.useragent');
-      args[1].l  := javaEnvRef^^.NewStringUTF(javaEnvRef, pchar(defaultInternetConfiguration.userAgent));
+      args[1].l  := j.stringToJString(defaultInternetConfiguration.userAgent);
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, javaEnvRef^^.CallObjectMethodA(javaEnvRef, jparams, jmHttpParamsSetParameter, @args));
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[1].l);
 
       if defaultInternetConfiguration.useProxy then begin
-        args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, pchar(internetConfig^.proxyHTTPName));
+        args[0].l := j.stringToJString(internetConfig^.proxyHTTPName);
         args[1].i := StrToIntDef(internetConfig^.proxyHTTPPort, 8080);
         temp := javaEnvRef^^.NewObjectA(javaEnvRef, jcHttpHost, jmHttpHostConstructor, @args);
         javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
@@ -553,10 +553,10 @@ begin
     jmUsernamePasswordCredentialsConstructor := getmethod(jcUsernamePasswordCredentials, '<init>', '(Ljava/lang/String;Ljava/lang/String;)V');
 
     try
-      if host <> '' then jhost := NewStringUTF8(host)
+      if host <> '' then jhost := stringToJString(host)
       else jhost := nil; //httpclient documentation says we can use null to set if for all hosts. But this this DOES NOT WORK and raises an illegalargumentexception.
-      jusername := NewStringUTF8(username);
-      jpassword := NewStringUTF8(password);
+      jusername := stringToJString(username);
+      jpassword := stringToJString(password);
 
       try
         tempargs[0].l := jhost;
