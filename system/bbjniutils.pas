@@ -26,6 +26,8 @@ type
   function getfield(classname: pchar; n, sig: pchar): jfieldID;
   function getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
   function getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
+  function getstaticfield(c: jclass; n, sig: pchar): jfieldID;
+  function getstaticfield(classname: pchar; n, sig: pchar): jfieldID;
 
   function getObjectField(obj: jobject; id: jfieldID): jobject;
   function getStringField(obj: jobject; id: jfieldID): string;
@@ -206,6 +208,16 @@ end;
 function TJavaEnv.getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
 begin
   result := getstaticmethod(getclass(classname), n, sig);
+end;
+
+function TJavaEnv.getstaticfield(c: jclass; n, sig: pchar): jfieldID;
+begin
+  result := j.env^^.GetStaticFieldID(env, c, n, sig);
+end;
+
+function TJavaEnv.getstaticfield(classname: pchar; n, sig: pchar): jfieldID;
+begin
+  result := getstaticfield(getclass(classname), n, sig);
 end;
 
 function TJavaEnv.getObjectField(obj: jobject; id: jfieldID): jobject;
