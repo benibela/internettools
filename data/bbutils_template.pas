@@ -1984,11 +1984,17 @@ end;
 
 function strEncodingFromName(str: RawByteString): TEncoding;
 begin
-  str:=UpperCase(str);
-  if (str='UTF-8') or (str='UTF8' {fehlerkorrigierend}) then result:=eUTF8
-  else if (str='CP1252') or (str='ISO-8859-1') or (str='LATIN1')  or (str='ISO-8859-15') then Result:=eWindows1252
-  else result:=eUnknown;
-
+  case UpperCase(str) of
+    'UTF-8', 'UTF8' {error preventive}: result:=eUTF8;
+    'CP1252', 'ISO-8859-1', 'LATIN1', 'ISO-8859-15': Result:=eWindows1252;
+    'UTF-16': result := {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF};
+    'UTF-16LE': result := eUTF16LE;
+    'UTF-16BE': result := eUTF16BE;
+    'UTF-32': result := {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF};
+    'UTF-32LE': result := eUTF32LE;
+    'UTF-32BE': result := eUTF32BE;
+    else result:=eUnknown;
+  end;
 end;
 
 function strEncodingFromBOMRemove(var str: RawByteString): TEncoding;
@@ -3928,4 +3934,4 @@ end;
 
 
 end.
-
+

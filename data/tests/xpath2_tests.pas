@@ -2018,6 +2018,8 @@ begin
   t('string-to-base64Binary("abc")', 'YWJj');
   t('string-to-base64Binary("abcä")', 'YWJjw6Q=');
   t('string-to-base64Binary("abcä", "latin1")', 'YWJj5A==');
+  t('string-to-codepoints(binary-to-string(xs:hexBinary("4904"), "UTF-16LE"))', '1097');
+  t('string-to-codepoints(binary-to-string(xs:hexBinary("49040000"), "UTF-32LE"))', '1097');
 
   ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
 
