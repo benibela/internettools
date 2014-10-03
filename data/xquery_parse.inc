@@ -50,6 +50,7 @@ type
   function nextTokenNCName(): string; inline; //returns a NCName (todo: raise an error if not an NCName)
   function nextTokenMaybeQName(): string; inline; //returns a QName, if there is one, or the same as nextToken otherwise
   function nextTokenQName(allowWildcards: boolean=false): string; inline; //returns a QName (todo: raise an error if not a QName)
+  function parseQNameWithType(out typ: TXQTermSequenceType): string;
 
 
   function parseSequenceLike(target: TXQTerm; closingChar: char = ')'): TXQTerm;
@@ -71,6 +72,8 @@ type
   function parseComputedConstructor(name: string): TXQTermConstructor;
   function parseExtension: TXQTerm;
   function parseVariable: TXQTerm;
+  function parseAnnotations: TXQAnnotations;
+  function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false; skipFunctionParenTokens: boolean = false): TXQTermDefineFunction;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -164,7 +167,7 @@ begin
 end;
 
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
-const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', ':', '@', '$'];
+const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', ':', '@', '$', '%'];
 const START_SYMBOLS = ['-'];
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
 var start:pchar;
@@ -245,6 +248,15 @@ begin
   //todo check that it is really a QName
   if result = '' then raiseParsingError('XPST0003', 'Expected QName');
   if (not allowWildcards) and ((result[1] = '*') or (result[length(result)] = '*')) then raiseParsingError('XPST0003', 'Expected QName, got: *');
+end;
+
+function TXQParsingContext.parseQNameWithType(out typ: TXQTermSequenceType): string;
+begin
+  result := nextTokenQName();
+  if nextToken(true) = 'as' then begin
+    expect('as');
+    typ := parseSequenceType();
+  end else typ := nil;
 end;
 
 function TXQParsingContext.parseSequenceLike(target: TXQTerm; closingChar: char ): TXQTerm;
@@ -874,6 +886,112 @@ begin
     end;
   end;
 end;
+
+function TXQParsingContext.parseAnnotations: TXQAnnotations;
+var
+  i: Integer;
+  j: Integer;
+begin
+  requireXQuery3('Annotations need XQuery 3');
+  try
+    setlength(result, 1);
+    while true do begin
+      with result[high(result)] do begin
+        name := nextTokenQName();
+        staticContext.splitRawQName(namespace, name, xqdnkUnknown);
+        if namespace = nil then namespace := XMLNamespace_XQuery;
+        if equalNamespaces(namespace, XMLNamespace_XQuery) then begin
+          if not ((name = 'private') or (name = 'public')) then raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+namespace.getURL);
+          if (length(result) > 1) {and ((name = 'private') or (name = 'public')) }  then
+            for i := 0 to high(result) - 1 do
+              if ((result[i].name = 'private') or (result[i].name = 'public')) and equalNamespaces(result[i].namespace, XMLNamespace_XQuery) then
+                while true do
+                  case nextToken() of
+                    'function': raiseParsingError('XQST0106', '%private/%public has to be unique');
+                    'variable': raiseParsingError('XQST0116', '%private/%public has to be unique');
+                    '': raiseParsingError('XPST0003', 'expected variable/function');
+                  end;
+        end else case namespace.getURL of
+          XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance,
+          XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath: raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+namespace.getURL);
+        end;
+
+        if nextToken(true) = '(' then begin
+          expect('(');
+          while true do begin
+            SetLength(params, length(params) + 1);
+            params[high(params)] := parseValue;
+            if not (params[high(params)] is TXQTermString) and
+               not (params[high(params)] is TXQTermNumber) then raiseParsingError('XPST0003', 'Only literals allowed as annotation arguments');
+            if nextToken(true) <> ',' then break;
+            expect(',');
+          end;
+          expect(')')
+        end;
+      end;
+      if nextToken(true) <> '%' then break;
+      expect('%');
+      setlength(result, length(result)+1);
+    end;
+  except
+    for i := 0 to high(result) do for j := 0 to high(result[i].params) do
+      result[i].params[j].free;
+    raise;
+  end;
+end;
+
+function TXQParsingContext.parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean; skipFunctionParenTokens: boolean): TXQTermDefineFunction;
+var
+  tempType: TXQTermSequenceType;
+  tempVar: TXQTermDefineVariable;
+begin
+
+  result := TXQTermDefineFunction.create();
+  result.annotations := annotations;
+  try
+    if not anonymous then begin
+      result.funcname := nextTokenQName();
+      staticContext.splitRawQName(result.namespace, result.funcname, xqdnkFunction);
+    end;
+    expect('(');
+    skipWhitespaceAndComment();
+    while nextToken(true) <> ')' do begin
+      expect('$');
+      tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType), nil);
+      staticContext.splitRawQName((tempVar.variable as TXQTermVariable).namespace, (tempVar.variable as TXQTermVariable).value, xqdnkUnknown);
+      if tempType <> nil then tempVar.push(tempType);
+      result.push(tempVar);
+      skipWhitespaceAndComment();
+      if not (pos^ in [',', ')']) then raiseParsingError('XPST0003', 'Missing , or )');
+      if pos^ = ',' then pos+=1;
+    end;
+    pos+=1;
+    result.parameterCount:=length(result.children);
+    if nextToken(true) = 'as' then begin
+      expect('as');
+      result.push(parseSequenceType());
+    end;
+    case nextToken() of
+      '{': begin
+        result.push(parsePrimaryLevel);
+        expect('}');
+      end;
+      'external': ;
+    end;
+    if result.namespace = nil then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.funcname);
+    case result.namespace.getURL of
+      XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
+        raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.namespace.getURL);
+      XMLNamespaceURL_XPathFunctionsMath, XMLNamespaceURL_XQuery:
+        if parsingModel = xqpmXQuery3 then
+          raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.namespace.getURL);
+    end;
+  except
+    result.free;
+    raise;
+  end;
+end;
+
 
 function TXQParsingContext.replaceEntities(s: string): string;
 var
@@ -1536,22 +1654,14 @@ function TXQParsingContext.parseModule(): TXQTerm;
     staticContext.importedModules.AddObject(moduleName, module);
   end;
 
-  function parseQNameWithType(out typ: TXQTermSequenceType): string;
-  begin
-    result := nextTokenQName();
-    if nextToken(true) = 'as' then begin
-      expect('as');
-      typ := parseSequenceType();
-    end else typ := nil;
-  end;
-
-  procedure declareVariable;
+  procedure declareVariable(annotations: TXQAnnotations);
   var vari: TXQTermDefineVariable;
     tempTyp: TXQTermSequenceType;
   begin
     requireModule;
     expect('$');
     vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp), nil);
+    vari.annotations := annotations;
     staticContext.splitRawQName((vari.variable as TXQTermVariable).namespace, (vari.variable as TXQTermVariable).value, xqdnkUnknown);
     result.push(vari);
     if tempTyp <> nil then vari.push(tempTyp);
@@ -1562,49 +1672,6 @@ function TXQParsingContext.parseModule(): TXQTerm;
     end;
 
   end;
-
-  procedure declareFunction;
-  var
-    funcTerm: TXQTermDefineFunction;
-    tempType: TXQTermSequenceType;
-    tempVar: TXQTermDefineVariable;
-  begin
-    funcTerm := TXQTermDefineFunction.create(nextTokenQName());
-    result.push(funcTerm);
-    staticContext.splitRawQName(funcTerm.namespace, funcTerm.funcname, xqdnkFunction);
-    expect('(');
-    skipWhitespaceAndComment();
-    while nextToken(true) <> ')' do begin
-      expect('$');
-      tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType), nil);
-      staticContext.splitRawQName((tempVar.variable as TXQTermVariable).namespace, (tempVar.variable as TXQTermVariable).value, xqdnkUnknown);
-      if tempType <> nil then tempVar.push(tempType);
-      funcTerm.push(tempVar);
-      skipWhitespaceAndComment();
-      if not (pos^ in [',', ')']) then raiseParsingError('XPST0003', 'Missing , or )');
-      if pos^ = ',' then pos+=1;
-    end;
-    pos+=1;
-    funcTerm.parameterCount:=length(funcTerm.children);
-    if nextToken(true) = 'as' then begin
-      expect('as');
-      funcTerm.push(parseSequenceType());
-    end;
-    case nextToken() of
-      '{': begin
-        funcTerm.push(parsePrimaryLevel);
-        expect('}');
-      end;
-      'external': ;
-    end;
-    if funcTerm.namespace = nil then raiseParsingError('XQST0060', 'No namespace for declared function: '+funcTerm.funcname);
-    if (funcTerm.namespace.getURL = 'http://www.w3.org/XML/1998/namespace') or
-       (funcTerm.namespace.getURL = 'http://www.w3.org/2001/XMLSchema') or
-       (funcTerm.namespace.getURL = 'http://www.w3.org/2001/XMLSchema-instance') or
-       (funcTerm.namespace.getURL = 'http://www.w3.org/2005/xpath-functions') then raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+funcTerm.namespace.getURL);
-  end;
-
-
 
   procedure readBoolean(var b: boolean; const v: string);
   begin
@@ -1622,6 +1689,7 @@ var
   nameSpaceURL: String;
   temp: String;
   namespace: INamespace;
+  annotations: TXQAnnotations;
 begin
   result := nil;
   try
@@ -1721,8 +1789,16 @@ begin
            if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
            staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
         end;
-        'variable': declareVariable();
-        'function': declareFunction;
+        'variable': declareVariable(nil);
+        'function': result.push(parseFunctionDeclaration(nil));
+        '%': begin
+          annotations := parseAnnotations;
+          case nextToken() of
+            'variable': declareVariable(annotations);
+            'function': result.push(parseFunctionDeclaration(annotations));
+            else raiseParsingError('XPST0003', 'Only variables and functions can have annotations');
+          end;
+        end;
         'option': begin
           token := nextTokenQName();
           temp := parseStringLiteral;

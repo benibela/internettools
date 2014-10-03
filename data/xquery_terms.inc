@@ -352,7 +352,12 @@ begin
 end;
 
 destructor TXQTermDefineVariable.destroy;
+var
+  i: Integer;
+  j: Integer;
 begin
+  for i := 0 to high(annotations) do for j := 0 to high(annotations[i].params) do
+    FreeAndNil(annotations[i].params[j]);
   variable.Free;
   inherited destroy;
 end;
@@ -989,7 +994,12 @@ begin
               vfunc := sc.functions[i];
               break;
             end;
-        if vfunc = nil then begin
+        if vfunc <> nil then begin
+          if sc <> context.staticContext {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
+            for i := 0 to high(vfunc.annotations) do
+              if (vfunc.annotations[i].name = 'private') and (equalNamespaces(vfunc.annotations[i].namespace, XMLNamespace_XQuery)) then
+                raiseParsingError('XPST0017', vfunc.name + ' is private');
+        end else begin
           findKindIndex(namespace, funcname, kind, func);
           if kind <> xqfkUnknown then exit(evaluate(context));
           //if namespace <> nil then raiseEvaluationError('XPST0017', 'Function {'+ namespace.geturl+'}'+namespace.getPrefix+':'+funcname+' not found')
@@ -1483,6 +1493,7 @@ begin
   for prop in strSplit(name, '.') do
     result := TXQTermReadObjectProperty.create(prop).push([result]);
 end;
+
 
 { TXQTermString }
 
@@ -1988,11 +1999,6 @@ end;
 
 { TXQTermDefineFunction }
 
-constructor TXQTermDefineFunction.create(aname: string);
-begin
-  funcname:=aname;
-end;
-
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   raiseEvaluationError('pxp:INTERNAL', 'Dead branch called');
@@ -2008,6 +2014,7 @@ begin
   result := TXQValueFunction.create();
   result.namespace := namespace;
   result.name:=funcname;
+  result.annotations := annotations;
   setlength(result.parameters, parameterCount);
   for i := 0 to high(result.parameters) do begin
     v := ((children[i] as TXQTermDefineVariable).variable as TXQTermVariable);
@@ -2030,5 +2037,13 @@ end;
 function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;
 begin
   result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusDocument, xqcdFocusOther];
+end;
+
+destructor TXQTermDefineFunction.destroy;
+var i,j: integer;
+begin
+  for i := 0 to high(annotations) do for j := 0 to high(annotations[i].params) do
+    FreeAndNil(annotations[i].params[j]);
+  inherited destroy;
 end;
 

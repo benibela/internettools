@@ -1585,6 +1585,9 @@ begin
   m('declare function local:foo($x as node()*) {$x [. = "456"]} ; outer-xml(local:foo((<a>123</a>,<b>456</b>)))', '<b>456</b>');
   m('declare function local:foo($x as node()*) {$x [. = max($x)]} ; outer-xml(local:foo((<a>123</a>,<b>456</b>)))', '<b>456</b>');
 
+  f('declare %private function local:foo($x as node()) {type-of($x)}; local:foo(<a>123</a>)', 'err:XPST0003');
+  f('declare %public function local:foo($x as node()) {type-of($x)}; local:foo(<a>123</a>)', 'err:XPST0003');
+
   m('declare base-uri "http://www.w3.org/2005/xpath-functions/"; starts-with("ABC", "abc")','true');
   m('declare base-uri "http://www.w3.org/2005/xpath-functions/"; starts-with("ABC", "abc", "collation/codepoint")','false');
   m('declare base-uri "http://www.w3.org"; starts-with("ABC", "abc", "/2005/xpath-functions/collation/codepoint")','false');

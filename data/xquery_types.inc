@@ -1749,6 +1749,7 @@ begin
   f := TXQValueFunction.create(body);
   f.name := name;
   f.namespace := namespace;
+  f.annotations := annotations;
   f.parameters := parameters;
   SetLength(f.parameters, length(f.parameters));
   f.resulttype := resulttype;

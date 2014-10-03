@@ -751,6 +751,13 @@ type
     seqtype: TXQTermSequenceType;
   end;
 
+  TXQAnnotation = record
+    namespace: INamespace;
+    name: string;
+    params: array of TXQTerm;
+  end;
+  TXQAnnotations = array of TXQAnnotation;
+
   //** A function. Also used to store type information
   TXQValueFunction = class(TXQValue)
     name: string;
@@ -759,6 +766,7 @@ type
     resulttype: txqtermsequencetype;
     body: TXQTerm;
     context: TXQEvaluationContext;
+    annotations: TXQAnnotations;
 
     constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
 
@@ -1306,6 +1314,7 @@ type
 
   TXQTermDefineVariable = class(TXQTerm)
     variable: TXQTerm;
+    annotations: TXQAnnotations;
     constructor create(avarname: string; anamespace: INamespace);
     constructor create(vari: TXQTerm; value: TXQTerm = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
@@ -1313,7 +1322,6 @@ type
     destructor destroy; override;
   end;
 
-  { TXQTermDefineVariable }
 
   { TXQTermDefineFunction }
 
@@ -1321,10 +1329,11 @@ type
     namespace: INamespace;
     funcname: string;
     parameterCount: integer;
-    constructor create(aname: string);
+    annotations: TXQAnnotations;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function define(): TXQValueFunction;
     function getContextDependencies: TXQContextDependencies; override;
+    destructor destroy; override;
   end;
 
   { TXQTermNodeMatcher }
@@ -2230,12 +2239,15 @@ function xqvalueComparableTypes(const a, b: IXQValue): boolean; //internally use
 
   const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
   const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
+        XMLNamespaceURL_XPathFunctionsMath = 'http://www.w3.org/2005/xpath-functions/math';
         XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
         XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
         XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
         XMLNamespaceURL_XQTErrors = 'http://www.w3.org/2005/xqt-errors';
         XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
         XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
+        XMLNamespaceURL_XQuery = 'http://www.w3.org/2012/xquery';
+
 
 var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are known in all XPath/XQuery expressions, even if they are not declared there
     AllowJSONDefaultInternal: boolean = false; //**< Default setting for JSON (internally used).
@@ -2369,7 +2381,7 @@ var collations: TStringList;
 
 
 
-var   XMLNamespace_XPathFunctions, XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_MyExtensions, XMLNamespace_MyExtensionOperators: INamespace;
+var   XMLNamespace_XPathFunctions, XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_MyExtensions, XMLNamespace_MyExtensionOperators, XMLNamespace_XQuery: INamespace;
 
 
 
@@ -2842,6 +2854,8 @@ var
   hasTypeDeclaration: Boolean;
   hasExpression: Boolean;
   tempValue: IXQValue;
+  priv: Boolean;
+  j: Integer;
 begin
   targetStaticContext := context.staticContext;
   context.staticContext := ownStaticContext;
@@ -2851,6 +2865,11 @@ begin
   for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineVariable then begin
       tempDefVar := TXQTermDefineVariable(children[i]);
+      priv := false;
+      for j := 0 to high(tempDefVar.annotations) do
+        if (tempDefVar.annotations[j].name = 'private') and (equalNamespaces(tempDefVar.annotations[j].namespace, XMLNamespace_XQuery)) then
+          priv := true;
+      if priv then continue;
 
       ns := (tempDefVar.variable as TXQTermVariable).namespace;
       name := (tempDefVar.variable as TXQTermVariable).value;
@@ -2880,8 +2899,13 @@ var
   hasExpression: Boolean;
   name: String;
   ns: INamespace;
+  i: Integer;
 begin
   if context.staticContext <> ownStaticContext then begin
+    for i := 0 to high(declaration.annotations) do
+      if (declaration.annotations[i].name = 'private') and equalNamespaces(declaration.annotations[i].namespace, XMLNamespace_XQuery) then
+        raiseEvaluationError('XPST0008', 'Variable is private');
+
     tempcontext := context;
     tempcontext.staticContext := ownStaticContext;
     exit(getVariableValue(declaration, tempcontext, ownStaticContext));
@@ -3026,7 +3050,7 @@ begin
   end;
   module := findModule(ns);
   if (module <> nil) then begin
-    if (module.staticContext.moduleVariables <> nil) then begin
+    if (module.staticContext.moduleVariables <> nil) then begin //what is the point of this?? unit tests work without and it might expose private variables. todo: remove if it is not needed for XQTS
       result := module.staticContext.moduleVariables.hasVariable(name, @temp, ns);
       value := temp;
       exit;
@@ -3865,7 +3889,7 @@ begin
   vars[high(vars)].namespace := namespace;
   vars[high(vars)].name:=name;
   vars[high(vars)].value:=value;
-  vars[high(vars)].propertyChange:=false;
+//  vars[high(vars)].propertyChange:=false;
 end;
 
 procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespace: INamespace; properties: TStringArray);
@@ -5889,6 +5913,7 @@ XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInsta
 XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocalFunctions, 'local');
 XMLNamespace_MyExtensions:=TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
 XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
+XMLNamespace_XQuery := TNamespace.create(XMLNamespaceURL_XQuery, '');
 
 fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions);
 TXQueryEngine.registerNativeModule(fn);
