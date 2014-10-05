@@ -83,10 +83,13 @@ type
   function parse: TXQTerm;             //ExprSingle
   function parsePrimaryLevel: TXQTerm; //Expr
   function parseModule(): TXQTerm;
-
-  procedure postProcessJSONLiterals(var t: TXQTerm);
 end;
 
+ { TJSONLiteralReplaceVisitor }
+
+ TJSONLiteralReplaceVisitor = class(TXQTerm_Visitor)
+   function visit(t: PXQTerm): TXQTerm_VisitAction; override;
+ end;
 
 
 procedure TXQParsingContext.raiseParsingError(errcode, s: string);
@@ -373,11 +376,10 @@ begin
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
-  procedure parseVariableName(out name: string; out namespace: INamespace);
+  function parseVariableName: TXQTermVariable;
   begin
     if nextToken() <> '$' then raiseParsingError('XPST0003', 'Expected variable name');
-    name := nextTokenQName();
-    staticContext.splitRawQName(namespace, name, xqdnkUnknown);
+    result := TXQTermVariable.Create(nextTokenQName(), staticContext);
   end;
 
   procedure parseVarBinding;
@@ -394,7 +396,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
       skipWhitespaceAndComment();
       if pos^ = '<' then
         pattern := parsePatternMatcher
-      else parseVariableName(varname, namespace);
+      else loopvar := parseVariableName;
 
       temp := nextToken;
       if temp = 'as' then begin
@@ -413,7 +415,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
         if temp = 'at' then begin
           requireXQuery;
-          parseVariableName(positionVarname, positionVarNamespace);
+          positionvar := parseVariableName;
           temp := nextToken;
         end;
 
@@ -1378,7 +1380,6 @@ begin
 end;
 
 
-type PXQTerm = ^TXQTerm;
 
 //searchs the term to split
 //e.g.
@@ -1859,38 +1860,32 @@ begin
 
   if result <> nil then begin
     if options.AllowJSONLiterals then
-      postprocessJSONLiterals(result);
+      result.visit(TJSONLiteralReplaceVisitor);
   end;
 end;
 
-procedure TXQParsingContext.postProcessJSONLiterals(var t: TXQTerm);
+
+{ TJSONLiteralReplaceVisitor }
+
+function TJSONLiteralReplaceVisitor.visit(t: PXQTerm): TXQTerm_VisitAction;
 var
   i: Integer;
 begin
-  if t = nil then exit;
-  if (length(t.children) = 0) and (t is TXQTermNodeMatcher) and not (t as TXQTermNodeMatcher).hadNamespace then begin
-    case (t as TXQTermNodeMatcher).select of
-      'true': begin t.free; t := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'true'); end;
-      'false': begin t.free; t := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'false'); end;
-      'null': if GlobalStaticNamespaces.namespaces['jn'] <> nil then begin t.free; t := TXQTermNamedFunction.create(GlobalStaticNamespaces.namespaces['jn'], 'null'); end;
+  result := xqtvaContinue;
+  if (length(t^.children) = 0) and (t^ is TXQTermNodeMatcher) and not (t^ as TXQTermNodeMatcher).hadNamespace then begin
+    case TXQTermNodeMatcher(t^).select of
+      'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'true'); end;
+      'false': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'false'); end;
+      'null': if GlobalStaticNamespaces.namespaces['jn'] <> nil then begin t^.free; t^ := TXQTermNamedFunction.create(GlobalStaticNamespaces.namespaces['jn'], 'null'); end;
     end;
-    exit;
+    exit(xqtvaNoRecursion);
   end;
-  if t is TXQTermBinaryOp then begin
-    if (TXQTermBinaryOp(t).op.name = '/') or (TXQTermBinaryOp(t).op.name = '//') then begin
-      for i := 0 to high(t.children) do
-        if not (t.children[i] is TXQTermNodeMatcher) then postProcessJSONLiterals(t.children[i]);
-      exit;
+  if t^ is TXQTermBinaryOp then begin
+    if (TXQTermBinaryOp(t^).op.name = '/') or (TXQTermBinaryOp(t^).op.name = '//') then begin
+      for i := 0 to high(t^.children) do
+        if not (t^.children[i] is TXQTermNodeMatcher) then self.simpleTermVisit(@t^.children[i], t^);
+      exit(xqtvaNoRecursion);
     end;
   end;
-  if t is TXQTermFlower then begin
-    for i := 0 to high(TXQTermFlower(t).vars) do postProcessJSONLiterals(TXQTermFlower(t).vars[i].expr);
-    for i := 0 to high(TXQTermFlower(t).orders) do postProcessJSONLiterals(TXQTermFlower(t).orders[i].expr);
-    postProcessJSONLiterals(TXQTermFlower(t).returned);
-    if TXQTermFlower(t).where <> nil then postProcessJSONLiterals(TXQTermFlower(t).where);
-  end else if t is TXQTermDefineVariable then begin
-    for i := 0 to high(t.children) do postProcessJSONLiterals(t.children[i]);
-  end else if t <> nil then
-    for i := 0 to high(t.children) do postProcessJSONLiterals(t.children[i]);
 end;
 

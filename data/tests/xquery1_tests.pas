@@ -1743,6 +1743,8 @@ begin
   ps.ParsingOptions.AllowJSONLiterals:=true;
   t('let $a := true return $a', 'true');
   t('for $a in (true, false, null) return $a', 'true false null');
+  t('let $a := false, $b := true, $c as xs:boolean := false where(exists(true)) return ($a,$b,$c)', 'false true false');
+  t('for $i in (17, true, "#") return typeswitch ($i) case xs:integer return true case $foo as xs:string return concat($foo,false,$foo) default return false', 'true false #false#');
   ps.ParsingOptions.AllowJSONLiterals:=false;
 
   t('serialize-json(<r><a>AA</a><b>BB</b></r> / {(a): b})', '{"AA": "<b>BB</b>"}');

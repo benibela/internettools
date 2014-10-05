@@ -98,6 +98,78 @@ begin
   path[high(path)] := toQueryCommand;
 end;
 
+function TXQTerm.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i: Integer;
+begin
+  if length(children) = 0 then exit(xqtvaContinue);
+  for i := 0 to high(children) do begin
+    result := visitor.simpleTermVisit(@children[i], self);
+    case result of xqtvaAbort: exit; end;
+  end;
+end;
+
+function TXQTerm.visit(visitor: TXQTerm_VisitorClass): TXQTerm_VisitAction;
+var
+  tempVisitor: TXQTerm_Visitor;
+begin
+  tempVisitor := visitor.Create;
+  result := tempVisitor.simpleTermVisit(@self, nil);
+  tempVisitor.free;
+end;
+
+
+{ TXQTerm_Visitor }
+
+procedure TXQTerm_Visitor.declare(v: PXQTermVariable);
+begin
+
+end;
+
+procedure TXQTerm_Visitor.undeclare(v: PXQTermVariable);
+begin
+
+end;
+
+function TXQTerm_Visitor.visit(term: PXQTerm): TXQTerm_VisitAction;
+begin
+  result := xqtvaContinue;
+end;
+
+function TXQTerm_Visitor.leave(term: PXQTerm): TXQTerm_VisitAction;
+begin
+  Result := xqtvaContinue;
+end;
+
+function TXQTerm_Visitor.simpleTermVisit(term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction;
+begin
+  parent := theparent;
+  result := visit(term);
+  case result of
+    xqtvaAbort: exit;
+    xqtvaNoRecursion: ;
+    else result := term^.visitchildren(self);
+  end;
+  //case result of xqtvaAbort: exit; end;
+
+  parent := theparent;
+  result := leave(term);
+  //case result of xqtvaAbort: exit; end;
+end;
+
+procedure TXQTerm_Visitor.declare(v: PXQTermVariable; theparent: TXQTerm);
+begin
+  parent := theparent;
+  declare(v);
+end;
+
+procedure TXQTerm_Visitor.undeclare(v: PXQTermVariable; theparent: TXQTerm);
+begin
+  parent := theparent;
+  undeclare(v);
+end;
+
+
 
 
 { TXQTermReadProperty }
@@ -576,6 +648,30 @@ begin
   result := getChildrenContextDependencies;
 end;
 
+function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+  function visitSomeEvery(pos:integer): TXQTerm_VisitAction;
+  var v: IXQValue;
+      typeDelta: integer;
+  begin
+    if pos = high(children) then
+      exit(visitor.simpleTermVisit(@children[pos], self));
+    if children[pos + 1] is TXQTermSequenceType then typeDelta:=1
+    else typeDelta:=0;
+
+    result := visitor.simpleTermVisit(@children[pos+1+typeDelta], self);
+    case result of xqtvaAbort: exit; end;
+
+    visitor.declare(@children[pos], self);
+
+    result := visitSomeEvery(pos+2+typeDelta);
+    case result of xqtvaAbort: exit; end;
+
+    visitor.undeclare(@children[pos], self);
+  end;
+begin
+  result := visitSomeEvery(0);
+end;
+
 { TXQTermFor }
 
 type TOrderedTuple = class
@@ -650,9 +746,9 @@ var
         raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.debugAsStringWithTypeAnnotation());
 
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.add(vars[pos].varname, v, vars[pos].namespace);
-      if vars[pos].positionVarname <> '' then
-        tempContext.temporaryVariables.add(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
+      tempContext.temporaryVariables.add(vars[pos].loopvar.value, v, vars[pos].loopvar.namespace);
+      if vars[pos].positionVar <> nil then
+        tempContext.temporaryVariables.add(vars[pos].positionVar.value, xqvalue(index), vars[pos].positionVar.namespace);
       evaluateForLoop(pos+1);
       tempContext.temporaryVariables.popAll();
 
@@ -726,7 +822,7 @@ var
               if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
                 raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
 
-          if vars[pos].positionVarname <> '' then raiseEvaluationError('err:XPST0003', 'at and pattern cannot be combined');
+          if vars[pos].positionVar <> nil then raiseEvaluationError('err:XPST0003', 'at and pattern cannot be combined');
                //tempContext.temporaryVariables.add(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
           pushContextItem;
           tempContext.temporaryVariables.pushAll;
@@ -862,6 +958,44 @@ begin
     result += orders[i].expr.getContextDependencies;
 end;
 
+function TXQTermFlower.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i, j: Integer;
+begin
+  for i := 0 to high(vars) do begin
+    result := visitor.simpleTermVisit(@vars[i].expr, self);
+    case result of xqtvaAbort: exit; end;
+
+    visitor.parent := self;
+    if vars[i].pattern = nil then begin
+      visitor.declare(@vars[i].loopvar);
+      if vars[i].positionVar <> nil then
+        visitor.declare(@vars[i].positionVar);
+    end else for j := 0 to high(vars[i].pattern.vars) do
+      visitor.declare(@vars[i].pattern.vars[j]);
+  end;
+  if where <> nil then begin
+    result := visitor.simpleTermVisit(@where, self);
+    case result of xqtvaAbort: exit; end;
+  end;
+  for i := 0 to high(orders) do begin
+    result := visitor.simpleTermVisit(@orders[i].expr, self);
+    case result of xqtvaAbort: exit; end;
+  end;
+  result := visitor.simpleTermVisit(@returned,self);
+  case result of xqtvaAbort: exit; end;
+
+  visitor.parent := self;
+  for i := high(vars) downto 0 do begin
+    if vars[i].pattern = nil then begin
+      visitor.undeclare(@vars[i].loopvar);
+      if vars[i].positionVar <> nil then
+        visitor.undeclare(@vars[i].positionVar);
+    end else for j := 0 to high(vars[i].pattern.vars) do
+      visitor.undeclare(@vars[i].pattern.vars[j]);
+  end;
+end;
+
 destructor TXQTermFlower.destroy;
 var
   i: Integer;
@@ -870,6 +1004,8 @@ begin
     vars[i].expr.Free;
     vars[i].sequenceTyp.Free;
     vars[i].pattern.Free;
+    vars[i].loopvar.free;
+    vars[i].positionVar.free;
   end;
   for i:= 0 to high(orders) do
     orders[i].expr.Free;
@@ -1590,6 +1726,36 @@ begin
   Result:=getChildrenContextDependencies;
 end;
 
+function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i: Integer;
+  j: Integer;
+begin
+  result := visitor.simpleTermVisit(@children[0], self);
+  case result of xqtvaAbort: exit; end;
+  for i:=1 to high(children) - 1 do begin
+    if (children[i].children[0] is TXQTermPatternMatcher) then begin
+      visitor.parent := self;
+      with TXQTermPatternMatcher(children[i].children[0]) do
+        for j := 0 to high(vars) do
+          visitor.declare(@vars[j]);
+    end else if children[i].children[0] is TXQTermVariable then
+      visitor.declare(@children[i].children[0], self);
+    result := visitor.simpleTermVisit(@children[i].children[high(children[i].children)], self);
+    case result of xqtvaAbort: exit; end;
+    if (children[i].children[0] is TXQTermPatternMatcher) then begin
+      visitor.parent := self;
+      with TXQTermPatternMatcher(children[i].children[0]) do
+        for j := 0 to high(vars) do
+          visitor.undeclare(@vars[j]);
+    end else if children[i].children[0] is TXQTermVariable then
+      visitor.undeclare(@children[i].children[0], self);
+  end;
+
+  result := visitor.simpleTermVisit(@children[high(children)], self);
+  case result of xqtvaAbort: exit; end;
+end;
+
 { TXQTermSwitch }
 
 function TXQTermSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -1616,6 +1782,8 @@ function TXQTermSwitch.getContextDependencies: TXQContextDependencies;
 begin
   Result:=getChildrenContextDependencies;
 end;
+
+
 { TXQTermConstructor }
 
 constructor TXQTermConstructor.create(atype: TTreeNodeType; aname: txqterm = nil);
@@ -2001,9 +2169,7 @@ end;
 
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
-  raiseEvaluationError('pxp:INTERNAL', 'Dead branch called');
-  ignore(context);
-  result := nil;
+  result := define;
 end;
 
 function TXQTermDefineFunction.define(): TXQValueFunction;
@@ -2037,6 +2203,20 @@ end;
 function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;
 begin
   result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusDocument, xqcdFocusOther];
+end;
+
+function TXQTermDefineFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i: Integer;
+begin
+  visitor.parent := self;
+  for i := 0 to parameterCount - 1 do
+    visitor.declare(@((children[i] as TXQTermDefineVariable).variable));
+  if not (children[high(children)] is TXQTermSequenceType) then
+    visitor.simpleTermVisit(@children[high(children)], self);
+  visitor.parent := self;
+  for i := parameterCount - 1 downto 0 do
+    visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
 end;
 
 destructor TXQTermDefineFunction.destroy;

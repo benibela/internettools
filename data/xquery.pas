@@ -1208,13 +1208,25 @@ type
 
   //============================XQUERY AST TERMS==========================
 
+  TXQTermVariable = class;
+  PXQTerm = ^TXQTerm;
+  PXQTermVariable = ^TXQTerm;
+  TXQTerm_VisitAction = (xqtvaContinue, xqtvaAbort, xqtvaNoRecursion);//xqtvaNothing, xqtvaDeleteWithChildren, xqtvaDeleteLonely);
 
-  {TXQTerm_VisitAction = (xqtvaNothing, xqtvaDeleteWithChildren, xqtvaDeleteLonely);
+  { TXQTerm_Visitor }
+
   TXQTerm_Visitor = class
-    function visit(var term: TXQTerm): TXQTerm_VisitAction; virtual; abstract;
-    function leave(var term: TXQTerm): TXQTerm_VisitAction; virtual; abstract;
-  end;}
-
+    parent: TXQTerm;
+    procedure declare(v: PXQTermVariable); virtual;
+    procedure undeclare(v: PXQTermVariable); virtual;
+    function visit (term: PXQTerm): TXQTerm_VisitAction; virtual;
+    function leave (term: PXQTerm): TXQTerm_VisitAction; virtual;
+  private
+    function simpleTermVisit (term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction;
+    procedure declare(v: PXQTermVariable; theparent: TXQTerm); inline;
+    procedure undeclare(v: PXQTermVariable; theparent: TXQTerm); inline;
+  end;
+  TXQTerm_VisitorClass = class of TXQTerm_Visitor;
   //**@abstract Internally used xpath term
 
   { TXQTerm }
@@ -1235,7 +1247,8 @@ type
     function toQueryCommand: TXQPathMatchingStep; virtual;
     procedure addToQueryList(var path: TXQPathMatching); virtual;
 
-//    procedure visit(visitor: TXQTerm_Visitor); virtual;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
+    function visit(visitor: TXQTerm_VisitorClass): TXQTerm_VisitAction;
   end;
 
   { TXQTermString }
@@ -1333,6 +1346,7 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function define(): TXQValueFunction;
     function getContextDependencies: TXQContextDependencies; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     destructor destroy; override;
   end;
 
@@ -1423,12 +1437,11 @@ type
   TXQTermFlowerVariable = record
     kind: (xqfkFor, xqfkLet);
     namespace: INamespace;
-    varname: string;
+    loopvar: TXQTermVariable;
     pattern: TXQTermPatternMatcher;
     sequenceTyp: TXQTermSequenceType;
     //allowingEmpty: boolean;
-    positionVarNamespace: INamespace;
-    positionVarname: string;
+    positionVar: TXQTermVariable;
     expr: TXQTerm;
   end;
   TXQTermFlowerOrder = record
@@ -1446,10 +1459,8 @@ type
     returned: TXQTerm;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     destructor destroy; override;
-
-  protected
-//    procedure visit(visitor: TXQTerm_Visitor); override;
   end;
 
 
@@ -1460,6 +1471,7 @@ type
     constructor create(every: boolean);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
   end;
 
   { TXQTermIf }
@@ -1474,6 +1486,7 @@ type
   TXQTermTypeSwitch = class(TXQTerm)
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
   end;
 
   { TXQTermSwitch }
@@ -1506,7 +1519,7 @@ type
     destructor destroy; override;
 
   protected
-//    procedure visit(visitor: TXQTerm_Visitor); override;
+//    procedure visitchildren(visitor: TXQTerm_Visitor); override;
   end;
 
   { TXQTermConstructor }
@@ -2287,7 +2300,6 @@ var
   interpretedFunctionSynchronization: TRTLCriticalSection;
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
-
 
 
 
@@ -4945,7 +4957,7 @@ var pos: pchar;
         result := TXQTermFlower.Create();
         setlength(TXQTermFlower(result).vars, 1);
         TXQTermFlower(result).vars[0].kind:=xqfkFor;
-        TXQTermFlower(result).vars[0].varname := '__csstemp';
+        TXQTermFlower(result).vars[0].loopvar := TXQTermVariable.create('__csstemp');
         TXQTermFlower(result).vars[0].sequenceTyp := nil;
         TXQTermFlower(result).vars[0].expr := newFunction('name', [TXQTermNodeMatcher.Create('.')]);
 

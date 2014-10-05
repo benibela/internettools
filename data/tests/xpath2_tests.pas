@@ -2546,6 +2546,12 @@ begin
     t('jn:size([(), (), ()])', '0');
     t('for $a in true return true', 'true');
     t('for $a in false return false', 'false');
+    t('for $a in true return $a', 'true');
+    t('for $a in false return $a', 'false');
+    t('for $a in false return $a', 'false');
+    t('some $x in (true, false), $y in (true, false) satisfies $x eq $y', 'true');
+    t('every $x in (true, true), $y in (true, true) satisfies $x eq $y', 'true');
+
     t('serialize-json([1 to 3, 4 to 6])', '[1, 2, 3, 4, 5, 6]');
     t('serialize-json([[1 to 3], [4 to 6]])', '[[1, 2, 3], [4, 5, 6]]');
 
