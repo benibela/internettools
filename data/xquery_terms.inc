@@ -119,10 +119,13 @@ begin
 end;
 
 function TXQTerm.clone: TXQTerm;
+var
+  i: Integer;
 begin
-  result := TXQTerm(ClassType.Create);
-  result.children := children;
+  result := TXQTerm(newinstance);
   SetLength(result.children, length(children));
+  for i := 0 to high(children) do
+    result.children[i] := children[i].clone;
 end;
 
 
@@ -1217,14 +1220,7 @@ begin
         sc := context.staticContext;
       end;
 
-      tempcontext := context;
-      tempcontext.temporaryVariables := TXQVariableChangeLog.create();
-      tempcontext.staticContext := sc;
-      for j := 0 to high(vfunc.parameters) do
-        tempcontext.temporaryVariables.add(vfunc.parameters[j].name, TXQAbstractFunctionInfo.convertType(evilkids[j], vfunc.parameters[j].seqtype, context), vfunc.parameters[j].namespace);
-      result := vfunc.body.evaluate(tempcontext);
-      result := TXQAbstractFunctionInfo.convertType(result, vfunc.resulttype, context);
-      tempcontext.temporaryVariables.free;
+      result := vfunc.evaluate(context, evilkids, sc);
     end;
   end;
 end;
@@ -1317,6 +1313,7 @@ var
   ara: TXQValueJSONArray;
   i: Integer;
   sl: TStringList;
+  evilkids: TXQVArray;
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -1324,8 +1321,10 @@ begin
   if (func is TXQValueSequence) and (func.getSequenceCount = 1) then func := func.getChild(0);
 
   if func is TXQValueFunction then begin
-    raiseEvaluationError('XPST0003', 'Dynamic function call is not yet implemented');
-    //TODO
+    setlength(evilkids, length(children)-1);
+    for i:=1 to high(children) do
+      evilkids[i-1] := children[i].evaluate(context);
+    exit((func as TXQValueFunction).evaluate(context, evilkids, context.staticContext));
   end;
 
   if length(children) = 1 then begin
@@ -2319,8 +2318,13 @@ end;
 { TXQTermDefineFunction }
 
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  temp: TXQValueFunction;
 begin
-  result := define;
+  temp := define;
+  temp.body := temp.body.clone;
+  temp.ownedBody := true;
+  result := temp;
 end;
 
 function TXQTermDefineFunction.define(): TXQValueFunction;

@@ -954,8 +954,8 @@ begin
     if not anonymous then begin
       result.funcname := nextTokenQName();
       staticContext.splitRawQName(result.namespace, result.funcname, xqdnkFunction);
-    end;
-    expect('(');
+      expect('(');
+    end else require3('Anonymous functions need XPath/XQuery 3');
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
       expect('$');
@@ -980,13 +980,15 @@ begin
       end;
       'external': ;
     end;
-    if result.namespace = nil then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.funcname);
-    case result.namespace.getURL of
-      XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
-        raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.namespace.getURL);
-      XMLNamespaceURL_XPathFunctionsMath, XMLNamespaceURL_XQuery:
-        if parsingModel = xqpmXQuery3 then
+    if not anonymous then begin
+      if result.namespace = nil then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.funcname);
+      case result.namespace.getURL of
+        XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
           raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.namespace.getURL);
+        XMLNamespaceURL_XPathFunctionsMath, XMLNamespaceURL_XQuery:
+          if parsingModel = xqpmXQuery3 then
+            raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.namespace.getURL);
+      end;
     end;
   except
     result.free;
@@ -1277,20 +1279,20 @@ begin
 
       if wordlookahead = '(' then begin
         expect('(');
-        if word = 'if' then begin
-          result := TXQTermIf.Create();
-          result.push(parsePrimaryLevel);
-          expect(')'); expect('then');
-          result.push(parse());
-          expect('else');
-          result.push(parse());
-          exit;
+        case word of
+          'if': begin
+            result := TXQTermIf.Create();
+            result.push(parsePrimaryLevel);
+            expect(')'); expect('then');
+            result.push(parse());
+            expect('else');
+            result.push(parse());
+            exit;
+          end;
+          'typeswitch': exit(parseTypeSwitch);
+          'switch': exit(parseSwitch);
+          'function': exit(parseFunctionDeclaration(nil, true));
         end;
-
-        if word = 'typeswitch' then
-          exit(parseTypeSwitch);
-        if word = 'switch' then
-          exit(parseSwitch);
 
         if (isKindTestFunction(word)
            or (strContains(word, '::') and (isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2))))) then begin
@@ -1483,11 +1485,8 @@ begin
         '(': begin
           expect('('); skipWhitespaceAndComment();
           replace := ripBinOpApart(@astroot, 10000); //TODO: check
-          if pos^ <> ')' then
-            replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseSomething())
-           else
-            replace^ := TXQTermDynamicFunctionCall.Create(replace^);
-          expect(')');
+          replace^ := TXQTermDynamicFunctionCall.Create(replace^);
+          parseSequenceLike(replace^, ')')
         end;
         ':=': begin
           expect(':=');

@@ -104,8 +104,17 @@ begin
   t('$seq ! (.//a, .//b) ', '1 2 10 20 4 11 21');
 
 
+
   //Anonymous functions
-//  t('let $f := function ($x) { $x * 2 } return $f(10)', '20');
+  t('let $f := function ($x) { $x * 2 } return $f(10)', '20');
+  t('let $f := function ($x as xs:integer) as xs:integer { $x * 2 } return $f(10)', '20');
+  t('(function() as xs:integer+ { 2, 3, 5, 7, 11, 13 })()', '2 3 5 7 11 13'); //4 tests from standard
+  t('(function($a as xs:double, $b as xs:double) as xs:double { $a * $b })(10,7)', '70');
+  t('(function($a) { $a })(12345)', '12345');
+  //t('collection()/(let $a := . return function() { $a })');
+
+  t('let $f := function ($g, $n) { if ($n <= 1) then 1 else $n * $g($g, $n - 1)  } return $f($f, 10) ', '3628800');
+
 
 
   //interface tests

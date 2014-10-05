@@ -765,14 +765,18 @@ type
     parameters: array of TXQFunctionParameter;
     resulttype: txqtermsequencetype;
     body: TXQTerm;
+    ownedBody: boolean;
     context: TXQEvaluationContext;
     annotations: TXQAnnotations;
 
     constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
+    destructor Destroy; override;
 
     class function classKind: TXQValueKind; override;
 
     function toBooleanEffective: boolean; override;
+
+    function evaluate(const newcontext: TXQEvaluationContext; const args: TXQVArray; staticContext: TXQStaticContext {necessary?}): IXQValue;
 
     function directClone: TXQValue;
     function clone: IXQValue; override;

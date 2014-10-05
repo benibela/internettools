@@ -1748,6 +1748,21 @@ begin
   result := false;
 end;
 
+function TXQValueFunction.evaluate(const newcontext: TXQEvaluationContext; const args: TXQVArray; staticContext: TXQStaticContext): IXQValue;
+var
+  tempcontext: TXQEvaluationContext;
+  j: Integer;
+begin
+  tempcontext := newcontext;
+  tempcontext.temporaryVariables := TXQVariableChangeLog.create();
+  tempcontext.staticContext := staticContext;
+  for j := 0 to high(parameters) do
+    tempcontext.temporaryVariables.add(parameters[j].name, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context), parameters[j].namespace);
+  result := body.evaluate(tempcontext);
+  result := TXQAbstractFunctionInfo.convertType(result, resulttype, context);
+  tempcontext.temporaryVariables.free;
+end;
+
 function TXQValueFunction.directClone: TXQValue;
 var
   f: TXQValueFunction;
@@ -1761,6 +1776,7 @@ begin
   f.resulttype := resulttype;
   f.context := context;
   f.ownedBody := ownedBody;
+  if ownedBody then f.body := f.body.clone;
   result := f;
 end;
 
