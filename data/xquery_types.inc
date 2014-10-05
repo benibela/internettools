@@ -1731,6 +1731,12 @@ begin
   body := aterm;
 end;
 
+destructor TXQValueFunction.Destroy;
+begin
+  if ownedBody then body.free;
+  inherited Destroy;
+end;
+
 class function TXQValueFunction.classKind: TXQValueKind;
 begin
   Result:=pvkFunction;
@@ -1754,6 +1760,7 @@ begin
   SetLength(f.parameters, length(f.parameters));
   f.resulttype := resulttype;
   f.context := context;
+  f.ownedBody := ownedBody;
   result := f;
 end;
 

@@ -1249,6 +1249,7 @@ type
 
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
     function visit(visitor: TXQTerm_VisitorClass): TXQTerm_VisitAction;
+    function clone: TXQTerm; virtual;
   end;
 
   { TXQTermString }
@@ -1258,6 +1259,7 @@ type
     constructor create(avalue: string = '');
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermNumber }
@@ -1268,6 +1270,7 @@ type
     constructor create(const avalue: IXQValue);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermSequence }
@@ -1309,6 +1312,7 @@ type
     function castableAs(v: IXQValue): boolean;
     function instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
     function instanceOf(const ta: IXQValue): boolean;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermVariable }
@@ -1321,6 +1325,7 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     class function splitForDotNotation(v: TXQTermVariable): TXQTerm;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermDefineVariable }
@@ -1332,6 +1337,7 @@ type
     constructor create(vari: TXQTerm; value: TXQTerm = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
     destructor destroy; override;
   end;
 
@@ -1347,6 +1353,7 @@ type
     function define(): TXQValueFunction;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+    function clone: TXQTerm; override;
     destructor destroy; override;
   end;
 
@@ -1359,6 +1366,7 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
+    function clone: TXQTerm; override;
   protected
     function toQueryCommand: TXQPathMatchingStep; override;
   end;
@@ -1381,6 +1389,7 @@ type
     constructor create(avalue: string; func: boolean = false);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermPatternMatcher }
@@ -1388,6 +1397,7 @@ type
   TXQTermPatternMatcher = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
     node: TTreeNode;
     vars: array of TXQTermVariable;
+    function clone: TXQTerm; override;
     destructor destroy; override;
   end;
 
@@ -1406,6 +1416,7 @@ type
     class function createIfExists(const name: string; const sc: TXQStaticContext): TXQTermNamedFunction;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   private
     class function findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
   end;
@@ -1429,6 +1440,7 @@ type
     constructor create(opinfo: TXQOperatorInfo);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   protected
     procedure addToQueryList(var path: TXQPathMatching); override;
   end;
@@ -1460,6 +1472,7 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+    function clone: TXQTerm; override;
     destructor destroy; override;
   end;
 
@@ -1472,6 +1485,7 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermIf }
@@ -1503,6 +1517,7 @@ type
     constructor create(apropname: string);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermConstructor }
@@ -1516,6 +1531,7 @@ type
     function evaluate(const context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function isNamespaceConstructor: boolean;
+    function clone: TXQTerm; override;
     destructor destroy; override;
 
   protected

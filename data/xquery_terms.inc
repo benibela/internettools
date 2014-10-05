@@ -118,6 +118,13 @@ begin
   tempVisitor.free;
 end;
 
+function TXQTerm.clone: TXQTerm;
+begin
+  result := TXQTerm(ClassType.Create);
+  result.children := children;
+  SetLength(result.children, length(children));
+end;
+
 
 { TXQTerm_Visitor }
 
@@ -199,6 +206,12 @@ end;
 function TXQTermReadObjectProperty.getContextDependencies: TXQContextDependencies;
 begin
   Result:=children[0].getContextDependencies;
+end;
+
+function TXQTermReadObjectProperty.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermReadObjectProperty(result).propname := propname;
 end;
 
 { TXQTermIf }
@@ -423,6 +436,17 @@ begin
   result += [xqcdContextVariables];
 end;
 
+function TXQTermDefineVariable.clone: TXQTerm;
+var
+  other: TXQTermDefineVariable;
+begin
+  Result:=inherited clone;
+  other := TXQTermDefineVariable(result);
+  other.variable:=variable.clone;
+  other.annotations := annotations;
+  //SetLength(other.annotations, length(other.annotations)); assumed to be immutable
+end;
+
 destructor TXQTermDefineVariable.destroy;
 var
   i: Integer;
@@ -544,6 +568,20 @@ var temp: TXQEvaluationContext;
 begin
   temp.staticContext := nil;
   result := instanceOf(ta, temp);
+end;
+
+function TXQTermSequenceType.clone: TXQTerm;
+var
+  other: TXQTermSequenceType;
+begin
+  result := inherited clone;
+  other := TXQTermSequenceType(result);
+  other.name := name;
+  other.allowNone := allowNone;
+  other.allowMultiple := allowMultiple;
+  other.kind := kind;
+  other.atomicTypeInfo := atomicTypeInfo;
+  other.nodeMatching := nodeMatching;
 end;
 
 { TXQTermSequence }
@@ -670,6 +708,12 @@ function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Visit
   end;
 begin
   result := visitSomeEvery(0);
+end;
+
+function TXQTermSomeEvery.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermSomeEvery(result).isEvery:=isEvery;
 end;
 
 { TXQTermFor }
@@ -996,6 +1040,30 @@ begin
   end;
 end;
 
+function TXQTermFlower.clone: TXQTerm;
+var
+  i: Integer;
+begin
+  Result:=inherited clone;
+  with TXQTermFlower(result) do begin
+    vars := self.vars;
+    setlength(vars, length(vars));
+    for i := 0 to high(vars) do
+      with vars[i] do begin
+        if loopvar <> nil then loopvar := TXQTermVariable(loopvar.clone);
+        if pattern <> nil then pattern := TXQTermPatternMatcher(pattern.clone);
+        if positionVar <> nil then positionVar := TXQTermVariable(positionVar.clone);
+        if expr <> nil then expr := expr.clone;
+      end;
+    if self.where <> nil then where := self.where.clone;
+    orders := self.orders;
+    SetLength(orders, length(orders));
+    for i := 0 to high(orders) do
+      orders[i].expr := orders[i].expr.clone;
+    returned := self.returned.clone;
+  end;
+end;
+
 destructor TXQTermFlower.destroy;
 var
   i: Integer;
@@ -1171,6 +1239,17 @@ begin
     xqfkNativeInterpreted: result := getChildrenContextDependencies + TXQInterpretedFunctionInfo(func).contextDependencies;
     xqfkTypeConstructor:   result := getChildrenContextDependencies;
     else                   Result := ALL_CONTEXT_DEPENDENCIES;
+  end;
+end;
+
+function TXQTermNamedFunction.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  with TXQTermNamedFunction(result) do begin
+    namespace:=self.namespace;
+    kind:=self.kind;
+    func:=self.func;
+    funcname:=self.funcname;
   end;
 end;
 
@@ -1360,6 +1439,12 @@ begin
     result := op.contextDependencies + getChildrenContextDependencies;
 end;
 
+function TXQTermBinaryOp.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermBinaryOp(result).op := op;
+end;
+
 procedure TXQTermBinaryOp.addToQueryList(var path: TXQPathMatching);
 var
   isDoubleSlash: Boolean;
@@ -1424,6 +1509,19 @@ begin
   if axis <> '' then result += axis + '::';
   if namespace <> '' then result += namespace + ':';
   result += select;
+end;
+
+function TXQTermNodeMatcher.clone: TXQTerm;
+var
+  other: TXQTermNodeMatcher;
+begin
+  Result:=inherited clone;
+  other := TXQTermNodeMatcher(result);
+  other.axis := axis;
+  other.namespace := namespace;
+  other.select := select;
+  other.hadNamespace := hadNamespace;
+  other.func := func;
 end;
 
 function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
@@ -1509,7 +1607,23 @@ begin
   Result:=[];
 end;
 
+function TXQTermNumber.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermNumber(result).value := value; //do not clone since most values are treated as immutable
+end;
+
 { TXQTermTemporaryNode }
+
+function TXQTermPatternMatcher.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  with TXQTermPatternMatcher(result) do begin
+    node := self.node;
+    vars := self.vars;
+    setlength(vars, length(vars));
+  end;
+end;
 
 destructor TXQTermPatternMatcher.destroy;
 begin
@@ -1591,6 +1705,15 @@ begin
     result := ALL_CONTEXT_DEPENDENCIES - [xqcdContextTime, xqcdContextVariables];
 end;
 
+function TXQTermReadAttribute.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  with TXQTermReadAttribute(result) do begin
+    attribName :=  self.attribName;
+    namespace := self.namespace;
+  end;
+end;
+
 { TXQTermVariable }
 
 constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
@@ -1630,6 +1753,16 @@ begin
     result := TXQTermReadObjectProperty.create(prop).push([result]);
 end;
 
+function TXQTermVariable.clone: TXQTerm;
+var
+  other: TXQTermVariable;
+begin
+  Result:=inherited clone;
+  other := TXQTermVariable(result);
+  other.namespace := namespace;
+  other.value := value;
+end;
+
 
 { TXQTermString }
 
@@ -1647,6 +1780,12 @@ end;
 function TXQTermString.getContextDependencies: TXQContextDependencies;
 begin
   result := [];
+end;
+
+function TXQTermString.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermString(result).value := value;
 end;
 
 
@@ -2120,6 +2259,18 @@ begin
             and ((TXQTermString(nameValue).value = 'xmlns') or strBeginsWith(TXQTermString(nameValue).value, 'xmlns:'));
 end;
 
+function TXQTermConstructor.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  with TXQTermConstructor(result) do begin
+    typ := self.typ;
+    if self.nameValue <> nil then
+      nameValue := self.nameValue.clone;
+    if implicitNamespaces <> nil then
+      implicitNamespaces := Self.implicitNamespaces.clone;
+  end;
+end;
+
 destructor TXQTermConstructor.destroy;
 begin
   nameValue.Free;
@@ -2217,6 +2368,18 @@ begin
   visitor.parent := self;
   for i := parameterCount - 1 downto 0 do
     visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
+end;
+
+function TXQTermDefineFunction.clone: TXQTerm;
+var
+  other: TXQTermDefineFunction;
+begin
+  Result:=inherited clone;
+  other := TXQTermDefineFunction(result);
+  other.namespace := namespace;
+  other.funcname := funcname;
+  other.parameterCount := parameterCount;
+  other.annotations := annotations;
 end;
 
 destructor TXQTermDefineFunction.destroy;
