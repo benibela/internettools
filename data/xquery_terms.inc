@@ -18,44 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
-
-{ TXQTerm }
-
-function TXQTerm.getContextDependencies: TXQContextDependencies;
-begin
-  result := ALL_CONTEXT_DEPENDENCIES;
-end;
-
 function TXQTerm.debugTermToString: string;
-var
-  i: Integer;
 begin
-  result := '(' + ClassName;
-  if length(children) >= 1 then result += ': '+children[0].debugTermToString();
-  for i:= 1 to high(children) do result += ', '+children[1].debugTermToString();
-  result += ')';
-end;
-
-destructor TXQTerm.destroy;
-var
-  i: Integer;
-begin
-  for i := 0 to high(children) do children[i].free;
-  inherited destroy;
-end;
-
-procedure TXQTerm.push(t: TXQTerm);
-begin
-  SetLength(children, length(children) + 1);
-  children[high(children)] := t;
-end;
-
-function TXQTerm.push(t: array of TXQTerm): TXQTerm;
-var
-  i: Integer;
-begin
-  for i := 0 to high(t) do push(t[i]);
-  result := self;
+  result := '(' + ClassName + ')';
 end;
 
 procedure TXQTerm.raiseParsingError(const errcode, s: string);
@@ -66,24 +31,6 @@ end;
 procedure TXQTerm.raiseEvaluationError(const errcode, s: string);
 begin
   raise EXQEvaluationException.Create(errcode, s);
-end;
-
-procedure TXQTerm.evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
-var
-  i: Integer;
-begin
-  setlength(results, length(children));
-  for i:=0 to high(children) do
-    results[i] := children[i].evaluate(context);
-end;
-
-function TXQTerm.getChildrenContextDependencies: TXQContextDependencies;
-var
-  i: Integer;
-begin
-  result := [];
-  for i := 0 to high(children) do
-    result += children[i].getContextDependencies;
 end;
 
 function TXQTerm.toQueryCommand: TXQPathMatchingStep;
@@ -99,14 +46,8 @@ begin
 end;
 
 function TXQTerm.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
-var
-  i: Integer;
 begin
-  if length(children) = 0 then exit(xqtvaContinue);
-  for i := 0 to high(children) do begin
-    result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
-  end;
+
 end;
 
 function TXQTerm.visit(visitor: TXQTerm_VisitorClass): TXQTerm_VisitAction;
@@ -119,13 +60,89 @@ begin
 end;
 
 function TXQTerm.clone: TXQTerm;
+begin
+  result := txqterm(newinstance);
+end;
+
+{ TXQTerm }
+
+function TXQTermWithChildren.getContextDependencies: TXQContextDependencies;
+begin
+  result := ALL_CONTEXT_DEPENDENCIES;
+end;
+
+function TXQTermWithChildren.debugTermToString: string;
 var
   i: Integer;
 begin
-  result := TXQTerm(newinstance);
-  SetLength(result.children, length(children));
+  result := '(' + ClassName;
+  if length(children) >= 1 then result += ': '+children[0].debugTermToString();
+  for i:= 1 to high(children) do result += ', '+children[1].debugTermToString();
+  result += ')';
+end;
+
+destructor TXQTermWithChildren.destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to high(children) do children[i].free;
+  inherited destroy;
+end;
+
+procedure TXQTermWithChildren.push(t: TXQTerm);
+begin
+  SetLength(children, length(children) + 1);
+  children[high(children)] := t;
+end;
+
+function TXQTermWithChildren.push(t: array of TXQTerm): TXQTerm;
+var
+  i: Integer;
+begin
+  for i := 0 to high(t) do push(t[i]);
+  result := self;
+end;
+
+procedure TXQTermWithChildren.evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
+var
+  i: Integer;
+begin
+  setlength(results, length(children));
+  for i:=0 to high(children) do
+    results[i] := children[i].evaluate(context);
+end;
+
+function TXQTermWithChildren.getChildrenContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
   for i := 0 to high(children) do
-    result.children[i] := children[i].clone;
+    result += children[i].getContextDependencies;
+end;
+
+
+function TXQTermWithChildren.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i: Integer;
+begin
+  if length(children) = 0 then exit(xqtvaContinue);
+  for i := 0 to high(children) do begin
+    result := visitor.simpleTermVisit(@children[i], self);
+    case result of xqtvaAbort: exit; end;
+  end;
+end;
+
+function TXQTermWithChildren.clone: TXQTerm;
+var
+  i: Integer;
+  tr: TXQTermWithChildren;
+begin
+  result := TXQTermWithChildren(newinstance);
+  tr := TXQTermWithChildren(result);
+  SetLength(tr.children, length(children));
+  for i := 0 to high(children) do
+    tr.children[i] := children[i].clone;
 end;
 
 
@@ -296,15 +313,15 @@ end;
 constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
   function checkAssignable(t: TXQTerm): boolean;
   begin
-    if (t is TXQTermFilterSequence) and (length(t.children) = 1) then t := t.children[0];
-    if t is TXQTermFilterSequence then t := t.children[0];
+    if (t is TXQTermFilterSequence) and (length(TXQTermFilterSequence(t).children) = 1) then t := TXQTermFilterSequence(t).children[0];
+    if t is TXQTermFilterSequence then t := TXQTermFilterSequence(t).children[0];
     while t <> nil do begin
       if (t is TXQTermSequence) and (length(TXQTermSequence(t).children) = 1) then
          t := TXQTermSequence(t).children[0]
       else if (t is TXQTermNodeMatcher) or (t is TXQTermVariable) then
         exit(true)
       else if (t is TXQTermReadObjectProperty) or (t is TXQTermDynamicFunctionCall) then
-        t := t.children[0]
+        t := TXQTermReadObjectProperty(t).children[0]
       else
         exit(false);
     end;
@@ -372,11 +389,11 @@ begin
       break;
     end else if v is TXQTermReadObjectProperty then begin
       arrayPrepend(properties, TXQTermReadObjectProperty(v).propname);
-      v := v.children[0];
+      v := TXQTermReadObjectProperty(v).children[0];
     end else if v is TXQTermDynamicFunctionCall then begin
       if length(TXQTermDynamicFunctionCall(v).children) <> 2 then raiseEvaluationError('pxp:VAR', 'invalid argument count for object property assignment');
       arrayPrepend(properties, TXQTermDynamicFunctionCall(v).children[1].evaluate(context).toString);
-      v := v.children[0];
+      v := TXQTermDynamicFunctionCall(v).children[0];
     end else if v is TXQTermFilterSequence then begin
       if not (assignmentMode in [amOverride, amArrayAppend]) or (length(properties) > 0) then raiseEvaluationError('pxp:VAR', 'Array assignment cannot be followed by property assignment');
       if length(TXQTermFilterSequence(v).children) = 2 then begin
@@ -385,7 +402,7 @@ begin
         if assignmentMode <> amArrayAppend then assignmentMode := amArrayOverride
         else assignmentMode := amArrayInsert; //due to automatical flattening, appending to element i, is equal to insertion after element i
       end else assignmentMode := amArrayAppend;
-      v := v.children[0];
+      v := TXQTermFilterSequence(v).children[0];
     end else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v.debugTermToString);
   end;
 
@@ -1859,23 +1876,27 @@ var
   start: integer;
   i, j: Integer;
   log: TXQVariableChangeLog;
+  seq: TXQTermSequence;
 begin
   v := children[0].evaluate(context);
   for i:=1 to high(children) - 1 do begin
     if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
-    if (children[i].children[0] is TXQTermPatternMatcher) and (v.toNode <> nil) then begin
-      log := patternMatcherMatch(TXQTermPatternMatcher(children[i].children[0]).node, v.toNode, context);
-      if log <> nil then exit(evaluateWithChangedVariableLog(children[i].children[high(children[i].children)], log, TXQTermPatternMatcher(children[i].children[0]).vars));
+    seq := TXQTermSequence(children[i]);
+    if (seq.children[0] is TXQTermPatternMatcher) and (v.toNode <> nil) then begin
+      log := patternMatcherMatch(TXQTermPatternMatcher(seq.children[0]).node, v.toNode, context);
+      if log <> nil then exit(evaluateWithChangedVariableLog(seq.children[high(seq.children)], log, TXQTermPatternMatcher(seq.children[0]).vars));
       continue;
     end
-    else if children[i].children[0] is TXQTermVariable then start := 1
+    else if seq.children[0] is TXQTermVariable then start := 1
     else start := 0;
-    for j := start to high(children[i].children) - 1 do
-      if (children[i].children[j] as TXQTermSequenceType).instanceOf(v, context) then
-        exit(evaluateWithChangedVariable(children[i].children[high(children[i].children)], children[i].children[0], v));
+    for j := start to high(seq.children) - 1 do
+      if (seq.children[j] as TXQTermSequenceType).instanceOf(v, context) then
+        exit(evaluateWithChangedVariable(seq.children[high(seq.children)], seq.children[0], v));
   end;
   i := high(children);
-  result := evaluateWithChangedVariable(children[i].children[high(children[i].children)], children[i].children[0], v);
+  if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
+  seq := TXQTermSequence(children[i]);
+  result := evaluateWithChangedVariable(seq.children[high(seq.children)], seq.children[0], v);
 end;
 
 function TXQTermTypeSwitch.getContextDependencies: TXQContextDependencies;
@@ -1887,27 +1908,29 @@ function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Visi
 var
   i: Integer;
   j: Integer;
+  seq: TXQTermSequence;
 begin
   result := visitor.simpleTermVisit(@children[0], self);
   case result of xqtvaAbort: exit; end;
   for i:=1 to high(children) - 1 do begin
-    if (children[i].children[0] is TXQTermPatternMatcher) then begin
+    seq := TXQTermSequence(children[i]);
+    if (seq.children[0] is TXQTermPatternMatcher) then begin
       visitor.parent := self;
-      with TXQTermPatternMatcher(children[i].children[0]) do
+      with TXQTermPatternMatcher(seq.children[0]) do
         for j := 0 to high(vars) do
           visitor.declare(@vars[j]);
-      visitor.simpleTermVisit(@children[i].children[0], self);
-    end else if children[i].children[0] is TXQTermVariable then
-      visitor.declare(@children[i].children[0], self);
-    result := visitor.simpleTermVisit(@children[i].children[high(children[i].children)], self);
+      visitor.simpleTermVisit(@seq.children[0], self);
+    end else if seq.children[0] is TXQTermVariable then
+      visitor.declare(@seq.children[0], self);
+    result := visitor.simpleTermVisit(@seq.children[high(seq.children)], self);
     case result of xqtvaAbort: exit; end;
-    if (children[i].children[0] is TXQTermPatternMatcher) then begin
+    if (seq.children[0] is TXQTermPatternMatcher) then begin
       visitor.parent := self;
-      with TXQTermPatternMatcher(children[i].children[0]) do
+      with TXQTermPatternMatcher(seq.children[0]) do
         for j := 0 to high(vars) do
           visitor.undeclare(@vars[j]);
-    end else if children[i].children[0] is TXQTermVariable then
-      visitor.undeclare(@children[i].children[0], self);
+    end else if seq.children[0] is TXQTermVariable then
+      visitor.undeclare(@seq.children[0], self);
   end;
 
   result := visitor.simpleTermVisit(@children[high(children)], self);
@@ -1921,15 +1944,17 @@ var
   v: IXQValue;
   i, j: Integer;
   operand: IXQValue;
+  seq: TXQTermSequence;
 begin
   v := children[0].evaluate(context);
   for i:=1 to high(children) - 1 do begin
     if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
-    for j := 0 to high(children[i].children) - 1 do begin
-      operand := xqvalueAtomize(children[i].children[j].evaluate(context));
+    seq := TXQTermSequence(children[i]);
+    for j := 0 to high(seq.children) - 1 do begin
+      operand := xqvalueAtomize(seq.children[j].evaluate(context));
       if operand.getSequenceCount > 1 then raiseEvaluationError('XPTY0004', 'Sequences are not allowed as case operands in a switch statement');
       if xqvalueDeep_equal(context, v, operand, context.staticContext.collation) then
-        exit(children[i].children[high(children[i].children)].evaluate(context));
+        exit(seq.children[high(seq.children)].evaluate(context));
     end;
   end;
   i := high(children);

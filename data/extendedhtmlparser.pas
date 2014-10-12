@@ -937,7 +937,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
 
   function isVariableName(t: TXQTerm): boolean;
   begin
-    while ((t is TXQTermBinaryOp) and (TXQTermBinaryOp(t).op.name = '.')) or (t is TXQTermReadObjectProperty) do t := t.children[0];
+    while ((t is TXQTermBinaryOp) and (TXQTermBinaryOp(t).op.name = '.')) or (t is TXQTermReadObjectProperty) do t := TXQTermWithChildren(t).children[0];
     result := t is TXQTermVariable;
   end;
 
@@ -955,14 +955,14 @@ begin
     term := source.Term;
     if isVariableName(term) then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.')) //replace $xx with $xx := .
     else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
-            and (source.term.children[0] is TXQTermReadAttribute) and (source.Term.children[1] is TXQTermSequence)
-            and (length(source.term.children[1].children) = 1) and isVariableName(source.term.children[1].children[0]) then begin
+            and (TXQTermBinaryOp(source.term).children[0] is TXQTermReadAttribute) and (TXQTermBinaryOp(source.Term).children[1] is TXQTermSequence)
+            and (TXQTermBinaryOp(source.term).children[1] is TXQTermWithChildren) and (length(TXQTermWithChildren(TXQTermBinaryOp(source.term).children[1]).children) = 1) and isVariableName(TXQTermWithChildren(TXQTermBinaryOp(source.term).children[1]).children[0]) then begin
       //replace    @foobar / ( $xyz ) by $xyz := @foobar
-      source.term := TXQTermDefineVariable.create(Term.children[1].children[0],  Term.children[0]);
+      source.term := TXQTermDefineVariable.create(TXQTermWithChildren(TXQTermWithChildren(Term).children[1]).children[0],  TXQTermWithChildren(Term).children[0]);
       //free terms
-      setlength(term.children[1].children, 0);
-      term.children[1].free;
-      setlength(term.children, 0);
+      setlength(TXQTermWithChildren(TXQTermWithChildren(term).children[1]).children, 0);
+      TXQTermWithChildren(term).children[1].free;
+      setlength(TXQTermWithChildren(term).children, 0);
       term.free;
     end;
   end else
@@ -1049,8 +1049,9 @@ function THtmlTemplateParser.GetTemplateHasRealVariableDefinitions: boolean;
   begin
     if result or not assigned(t) then exit;
     if t is TXQTermDefineVariable then result := true;
-    for i := 0 to high(t.children) do
-      stest(t.children[i]);
+    if t is TXQTermWithChildren then
+      for i := 0 to high(TXQTermWithChildren(t).children) do
+        stest(TXQTermWithChildren(t).children[i]);
   end;
 var
   cur: TTemplateElement;
@@ -1086,8 +1087,9 @@ procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTe
           SetLength(vars, length(vars) + 1);
           vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t).variable);
         end;
-    for i := 0 to high(t.children) do
-      stest(t.children[i]);
+    if t is TXQTermWithChildren then
+      for i := 0 to high(TXQTermWithChildren(t).children) do
+        stest(TXQTermWithChildren(t).children[i]);
   end;
 var
   cur: TTemplateElement;

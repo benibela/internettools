@@ -53,14 +53,14 @@ type
   function parseQNameWithType(out typ: TXQTermSequenceType): string;
 
 
-  function parseSequenceLike(target: TXQTerm; closingChar: char = ')'): TXQTerm;
+  function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'): TXQTermWithChildren;
   function parseSequenceType(): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
   function replaceEntities(s: string): string;
   function parseString(const w: string): TXQTerm;
   function parseStringLiteral: string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
-  function parseJSONLikeObjectConstructor(): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
+  function parseJSONLikeObjectConstructor(): TXQTermWithChildren; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(): TXQTermJSONArray;
 
 
@@ -262,7 +262,7 @@ begin
   end else typ := nil;
 end;
 
-function TXQParsingContext.parseSequenceLike(target: TXQTerm; closingChar: char ): TXQTerm;
+function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char ): TXQTermWithChildren;
 var
   t: String;
 begin
@@ -530,6 +530,7 @@ end;
 function TXQParsingContext.parseTypeSwitch: TXQTermTypeSwitch;
 var
   word: String;
+  tempSeq: TXQTermSequence;
 begin
   requireXQuery('for typeswitch statement');
   result := TXQTermTypeSwitch.Create;
@@ -540,23 +541,25 @@ begin
     word := nextToken();
     while word = 'case' do begin
       skipWhitespaceAndComment();
-      result.push(TXQTermSequence.Create);
+      tempSeq := TXQTermSequence.Create;
+      result.push(tempSeq);
       if pos^ = '<' then begin
-        result.children[high(result.children)].push(parsePatternMatcher());
+        tempSeq.push(parsePatternMatcher());
       end else begin
-        if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
-        result.children[high(result.children)].push(parseSequenceType());
+        if pos^ = '$' then begin expect('$'); tempSeq.push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
+        tempSeq.push(parseSequenceType());
       end;
       expect('return');
-      result.children[high(result.children)].push(parse());
+      tempSeq.push(parse());
       word := nextToken();
     end;
     if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
     skipWhitespaceAndComment();
-    result.push(TXQTermSequence.Create);
-    if pos^ = '$' then begin expect('$'); result.children[high(result.children)].push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
+    tempSeq := TXQTermSequence.Create;
+    result.push(tempSeq);
+    if pos^ = '$' then begin expect('$'); tempSeq.push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
     expect('return');
-    result.children[high(result.children)].push(parse());
+    tempSeq.push(parse());
   except
     result.free;
     raise;
@@ -566,6 +569,7 @@ end;
 function TXQParsingContext.parseSwitch: TXQTermSwitch;
 var
   word: String;
+  tempSeq: TXQTermSequence;
 begin
   requireXQuery3('for switch statement');
   result := TXQTermSwitch.Create;
@@ -575,13 +579,14 @@ begin
   word := nextToken();
   while word = 'case' do begin
     skipWhitespaceAndComment();
-    result.push(TXQTermSequence.Create);
+    tempSeq := TXQTermSequence.Create;
+    result.push(tempSeq);
     while word = 'case' do begin
-      result.children[high(result.children)].push(parse());
+      tempSeq.push(parse());
       word := nextToken();
     end;
     if word <> 'return' then raiseParsingError('XPST0003', 'expected return');
-    result.children[high(result.children)].push(parse());
+    tempSeq.push(parse());
     word := nextToken();
   end;
   if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
@@ -821,14 +826,14 @@ begin
       tempSeq := parsePrimaryLevel;
       if tempSeq is TXQTermSequence then begin
         onlyConstructors := true;
-        for i:= 0 to high(tempseq.children) do
-          if not (tempSeq.children[i] is TXQTermConstructor) then begin
+        for i:= 0 to high(TXQTermSequence(tempseq).children) do
+          if not (TXQTermSequence(tempSeq).children[i] is TXQTermConstructor) then begin
             onlyConstructors:=false;
             break;
           end;
         if onlyConstructors then begin
-          result.children := tempseq.children;
-          tempseq.children := nil;
+          result.children := TXQTermSequence(tempseq).children;
+          TXQTermSequence(tempseq).children := nil;
           tempSeq.free;
         end else result.push(tempSeq); //that's really slow for nodes because it makes a deep copy of them if they are taken from a subsequence. But if it's mixing atomic/nodes flattening the sequences makes the separator spaces wrong
       end else result.push(tempSeq);
@@ -882,7 +887,7 @@ begin
   end;
   if operatorMode then begin
     result := TXQTermDynamicFunctionCall.create(result, parseValue());
-    if result.children[1] is TXQTermNodeMatcher then begin
+    if TXQTermDynamicFunctionCall(result).children[1] is TXQTermNodeMatcher then begin
       result.free;
       raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
     end;
@@ -1067,7 +1072,7 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
     else if result = nil then
       result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'concat', [t])
     else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result)) then
-      result.push(t)
+      TXQTermNamedFunction(result).push(t)
     else
      result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'concat', [result, t]);
   end;
@@ -1130,7 +1135,7 @@ begin
   if result = nil then result := TXQTermString.create('');
 end;
 
-function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTerm;
+function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTermWithChildren;
 var
   token: String;
   jn: TXQNativeModule;
@@ -1170,7 +1175,7 @@ begin
   result := parseSequenceLike(TXQTermJSONArray.Create, ']') as TXQTermJSONArray;
 end;
 
-function staticallyCastQNameAndNotation(term: TXQTerm; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false): txqterm;
+function staticallyCastQNameAndNotation(term: TXQTermWithChildren; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false): txqterm;
 var
   name: String;
   namespace: INamespace;
@@ -1282,11 +1287,13 @@ begin
         case word of
           'if': begin
             result := TXQTermIf.Create();
-            result.push(parsePrimaryLevel);
-            expect(')'); expect('then');
-            result.push(parse());
-            expect('else');
-            result.push(parse());
+            with TXQTermIf(result) do begin
+              push(parsePrimaryLevel);
+              expect(')'); expect('then');
+              push(parse());
+              expect('else');
+              push(parse());
+            end;
             exit;
           end;
           'typeswitch': exit(parseTypeSwitch);
@@ -1297,18 +1304,17 @@ begin
         if (isKindTestFunction(word)
            or (strContains(word, '::') and (isKindTestFunction(strCopyFrom(word, strIndexOf(word, '::') + 2))))) then begin
           if strContains(word, 'attribute') then begin
-            result := TXQTermReadAttribute.create(word, true);
-            exit(parseSequenceLike(result));
+            exit(parseSequenceLike(TXQTermReadAttribute.create(word, true)));
           end else begin
             result := TXQTermNodeMatcher.Create(word, true);
             skipWhitespaceAndComment();
             if pos^ <> ')' then begin
-              result.push(parseValue());   skipWhitespaceAndComment();
+              TXQTermNodeMatcher(result).push(parseValue());   skipWhitespaceAndComment();
               if pos^ = ',' then begin
                 if (word <> 'element') and (word <> 'attribute') then
                   raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
                 expect(',');
-                result.push(parseSequenceType());
+                TXQTermNodeMatcher(result).push(parseSequenceType());
               end;
             end;
             expect(')');
@@ -1318,10 +1324,11 @@ begin
         end else begin
           result := TXQTermNamedFunction.createIfExists(word, staticContext);
           if result = nil then raiseParsingError('XPST0003', 'unknown function: '+word);
-          result := parseSequenceLike(result);
+          result := parseSequenceLike(TXQTermNamedFunction(result));
 
-          if (TXQTermNamedFunction(result).kind = xqfkTypeConstructor) and (length(result.children) = 1) then
-            result := staticallyCastQNameAndNotation(result, TXSType(TObject(TXQTermNamedFunction(result).func)), staticContext);
+          with TXQTermNamedFunction(result) do
+            if (kind = xqfkTypeConstructor) and (length(children) = 1) then
+              result := staticallyCastQNameAndNotation(TXQTermNamedFunction(result), TXSType(TObject(func)), staticContext);
           exit;
         end;
       end;
@@ -1393,7 +1400,7 @@ end;
 function ripBinOpApart(term: pxqterm; const prio: integer): PXQTerm;
 begin
   if not (term^ is TXQTermBinaryOp) or (TXQTermBinaryOp(term^).op.priority >= prio) then result := term
-  else result := ripBinOpApart(@term^.children[1], prio);
+  else result := ripBinOpApart(@TXQTermBinaryOp(term^).children[1], prio);
 end;
 
 function TXQParsingContext.parse: TXQTerm;
@@ -1457,7 +1464,7 @@ var astroot: TXQTerm;
            end;
          if (word = '') or (strEndsWith(word, '.')) then begin
            replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseValue);
-           if replace^.children[1] is TXQTermNodeMatcher then
+           if TXQTermDynamicFunctionCall(replace^).children[1] is TXQTermNodeMatcher then
              raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
          end;
      end else begin
@@ -1486,7 +1493,7 @@ begin
           expect('('); skipWhitespaceAndComment();
           replace := ripBinOpApart(@astroot, 10000); //TODO: check
           replace^ := TXQTermDynamicFunctionCall.Create(replace^);
-          parseSequenceLike(replace^, ')')
+          parseSequenceLike(TXQTermDynamicFunctionCall(replace^), ')')
         end;
         ':=': begin
           expect(':=');
@@ -1565,7 +1572,7 @@ begin
       result := TXQTermSequence.Create.push([result]);
       while nextToken(true) = ',' do begin
         expect(',');
-        result.push(parse);
+        TXQTermSequence(result).push(parse);
       end;
     end;
   except
@@ -1663,7 +1670,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp), nil);
     vari.annotations := annotations;
     staticContext.splitRawQName((vari.variable as TXQTermVariable).namespace, (vari.variable as TXQTermVariable).value, xqdnkUnknown);
-    result.push(vari);
+    TXQTermModule(result).push(vari);
     if tempTyp <> nil then vari.push(tempTyp);
     case nextToken() of
       ':=': vari.push(parse());
@@ -1790,12 +1797,12 @@ begin
            staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
         end;
         'variable': declareVariable(nil);
-        'function': result.push(parseFunctionDeclaration(nil));
+        'function': TXQTermModule(result).push(parseFunctionDeclaration(nil));
         '%': begin
           annotations := parseAnnotations;
           case nextToken() of
             'variable': declareVariable(annotations);
-            'function': result.push(parseFunctionDeclaration(annotations));
+            'function': TXQTermModule(result).push(parseFunctionDeclaration(annotations));
             else raiseParsingError('XPST0003', 'Only variables and functions can have annotations');
           end;
         end;
@@ -1846,7 +1853,7 @@ begin
       if token = ';' then expect(';');
       token := nextToken(true);
     end;
-    if result <> nil then result.push(parsePrimaryLevel)
+    if result <> nil then TXQTermModule(result).push(parsePrimaryLevel)
     else result := parsePrimaryLevel();
   except
     result.free;
@@ -1871,7 +1878,7 @@ var
   i: Integer;
 begin
   result := xqtvaContinue;
-  if (length(t^.children) = 0) and (t^ is TXQTermNodeMatcher) and not (t^ as TXQTermNodeMatcher).hadNamespace then begin
+  if (t^ is TXQTermNodeMatcher) and (length(TXQTermNodeMatcher(t^).children) = 0) and not TXQTermNodeMatcher(t^).hadNamespace then begin
     case TXQTermNodeMatcher(t^).select of
       'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'true'); end;
       'false': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'false'); end;
@@ -1881,8 +1888,8 @@ begin
   end;
   if t^ is TXQTermBinaryOp then begin
     if (TXQTermBinaryOp(t^).op.name = '/') or (TXQTermBinaryOp(t^).op.name = '//') then begin
-      for i := 0 to high(t^.children) do
-        if not (t^.children[i] is TXQTermNodeMatcher) then self.simpleTermVisit(@t^.children[i], t^);
+      for i := 0 to high(TXQTermNodeMatcher(t^).children) do
+        if not (TXQTermNodeMatcher(t^).children[i] is TXQTermNodeMatcher) then self.simpleTermVisit(@TXQTermNodeMatcher(t^).children[i], t^);
       exit(xqtvaNoRecursion);
     end;
   end;
