@@ -1616,6 +1616,11 @@ begin
   else value := baseSchema.integer.createValue(avalue);
 end;
 
+constructor TXQTermConstant.create(const avalue: string);
+begin
+  value := xqvalue(avalue)
+end;
+
 constructor TXQTermConstant.create(const avalue: IXQValue);
 begin
   value := avalue;
@@ -1796,31 +1801,6 @@ begin
   other := TXQTermVariable(result);
   other.namespace := namespace;
   other.value := value;
-end;
-
-
-{ TXQTermString }
-
-constructor TXQTermString.create(avalue: string);
-begin
-  value := avalue;
-end;
-
-function TXQTermString.evaluate(const context: TXQEvaluationContext): IXQValue;
-begin
-  ignore(context);
-  Result := xqvalue(value);
-end;
-
-function TXQTermString.getContextDependencies: TXQContextDependencies;
-begin
-  result := [];
-end;
-
-function TXQTermString.clone: TXQTerm;
-begin
-  Result:=inherited clone;
-  TXQTermString(result).value := value;
 end;
 
 
@@ -2299,8 +2279,8 @@ end;
 function TXQTermConstructor.isNamespaceConstructor: boolean;
 begin
   result := (typ = tetAttribute)
-            and (nameValue is TXQTermString)
-            and ((TXQTermString(nameValue).value = 'xmlns') or strBeginsWith(TXQTermString(nameValue).value, 'xmlns:'));
+            and (nameValue is TXQTermConstant)
+            and ((TXQTermConstant(nameValue).value.toString = 'xmlns') or strBeginsWith(TXQTermConstant(nameValue).value.toString, 'xmlns:'));
 end;
 
 function TXQTermConstructor.clone: TXQTerm;

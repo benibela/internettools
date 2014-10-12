@@ -1871,7 +1871,7 @@ end;
 
 constructor THelper.create;
 begin
-  func1 := TXQTermString.create('func-result');
+  func1 := TXQTermConstant.create('func-result');
   func2 := TXQTermBinaryOp.create('*', TXQTermVariable.Create('a'), TXQTermVariable.Create('b'));;
   func3 := TTermExtension.Create;
 end;

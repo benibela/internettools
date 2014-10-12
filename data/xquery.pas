@@ -1269,21 +1269,14 @@ type
     function clone: TXQTerm; override;
   end;
 
-  { TXQTermString }
-
-  TXQTermString = class(TXQTerm)
-    value: string;
-    constructor create(avalue: string = '');
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function getContextDependencies: TXQContextDependencies; override;
-    function clone: TXQTerm; override;
-  end;
-
   { TXQTermNumber }
+
+  { TXQTermConstant }
 
   TXQTermConstant = class(TXQTerm)
     value: IXQValue;
     constructor createNumber(const avalue: string);
+    constructor create(const avalue: string);
     constructor create(const avalue: IXQValue);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
@@ -3421,8 +3414,8 @@ begin
     if children[0] is TXQTermNodeMatcher then begin;
       if TXQTermNodeMatcher(children[0]).axis <> '' then raise EXQEvaluationException.Create('XPST0003', 'axis within element test is not allowed');
       result.value := TXQTermNodeMatcher(children[0]).select;
-    end else if children[0] is TXQTermString then
-      result.value:=strTrimAndNormalize(TXQTermString(children[0]).value)
+    end else if children[0] is TXQTermConstant then
+      result.value:=strTrimAndNormalize(TXQTermConstant(children[0]).value.toString)
     else raise EXQEvaluationException.Create('XPST0003', 'Invalid parameter for processing-instruction kind test: '+children[0].ToString);
     include(result.matching, qmValue) ;
   end else if (select = 'element') or (select = 'attribute') or (select = 'schema-element')or (select = 'schema-attribute')  then begin
@@ -4860,7 +4853,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
 
   function newString(s: string): TXQTerm;
   begin
-    result := TXQTermString.Create(s);
+    result := TXQTermConstant.Create(s);
   end;
 
   function newBinOp(left: TXQTerm; op: string; right: TXQTerm): TXQTerm;

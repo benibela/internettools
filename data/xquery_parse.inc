@@ -57,8 +57,8 @@ type
   function parseSequenceType(): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
   function replaceEntities(s: string): string;
-  function parseString(const w: string): TXQTerm;
-  function parseStringLiteral: string;
+  function parseString: string;
+  function parseString(const w: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
   function parseJSONLikeObjectConstructor(): TXQTermWithChildren; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(): TXQTermJSONArray;
@@ -599,10 +599,12 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
     procedure pushElementContent(s: string);
     begin
       if length(s) = 0 then exit;
-      if (length(parent.children) > 0) and (parent.children[high(parent.children)] is TXQTermString) then
-        (parent.children[high(parent.children)] as TXQTermString).value += s
+      if (length(parent.children) > 0)
+         and (parent.children[high(parent.children)] is TXQTermConstant)
+         and (TXQTermConstant(parent.children[high(parent.children)]).value is TXQValueString) then
+        (TXQTermConstant(parent.children[high(parent.children)]).value as TXQValueString).str += s
       else
-        parent.push(TXQTermString.create(s));
+        parent.push(TXQTermConstant.create(xqvalue(s)));
     end;
     function strIsWhitespace(p: pchar; l: longint): boolean;
     begin
@@ -675,11 +677,11 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
   function parsePIConstructor: TXQTermConstructor;
   var marker: PChar;
   begin
-    result := TXQTermConstructor.create(tetProcessingInstruction, txqtermstring.create(nextTokenQName()));
+    result := TXQTermConstructor.create(tetProcessingInstruction, TXQTermConstant.create(xqvalue(nextTokenQName())));
     skipWhitespace();
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do pos+=1;
-    result.push(txqtermstring.create(strFromPchar(marker, pos - marker)));
+    result.push(TXQTermConstant.create(xqvalue(strFromPchar(marker, pos - marker))));
     if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
     expect('?>');
   end;
@@ -691,7 +693,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '-') or ((pos+1)^ <> '-')) do pos+=1;
     if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
-    result := TXQTermConstructor.create(tetComment, txqtermstring.create(strFromPchar(marker, pos - marker)));
+    result := TXQTermConstructor.create(tetComment, TXQTermConstant.create(strFromPchar(marker, pos - marker)));
     expect('-->');
   end;
 
@@ -706,25 +708,26 @@ begin
   name := nextTokenMaybeQName();
   if name = '!' then exit(parseCommentConstructor)
   else if name = '?' then exit(parsePIConstructor);
-  result := TXQTermConstructor.create(tetOpen, TXQTermString.create(name));
+  result := TXQTermConstructor.create(tetOpen, TXQTermConstant.create(name));
   token := nextTokenMaybeQName();
   while (token <> '>') and (token <> '/') and (token <> '') do begin
-    attribute := TXQTermConstructor.create(tetAttribute, TXQTermString.create(token));
+    attribute := TXQTermConstructor.create(tetAttribute, TXQTermConstant.create(token));
     expect('=');
     skipWhitespaceAndComment();
     if not (pos^ in ['''', '"']) then raiseParsingError('XPST0003', 'Expected attribute value');
     marker := pos;
     pos+=1;
     parseCommonContent(attribute, marker^, false);
-    if strBeginsWith(TXQTermString(attribute.nameValue).value, 'xmlns:') or (TXQTermString(attribute.nameValue).value = 'xmlns') then begin
+    if strBeginsWith(token, 'xmlns:') or (token = 'xmlns') then begin
       token := '';
       if length(attribute.children) > 0 then begin
-        if not (attribute.children[0] is TXQTermString) then raiseParsingError('XQST0022', 'Namespace url is not a literal string');
-        token := TXQTermString(attribute.children[0]).value;
+        if not (attribute.children[0] is TXQTermConstant) or
+           not (TXQTermConstant(attribute.children[0]).value is TXQValueString) then raiseParsingError('XQST0022', 'Namespace url is not a literal string');
+        token := TXQTermConstant(attribute.children[0]).value.toString;
       end; //else namespace undeclaration
       if result.implicitNamespaces = nil then result.implicitNamespaces := TNamespaceList.Create;
-      if TXQTermString(attribute.nameValue).value = 'xmlns' then result.implicitNamespaces.add(TNamespace.create(token, ''))
-      else result.implicitNamespaces.add(TNamespace.create(token, strCopyFrom(TXQTermString(attribute.nameValue).value, length('xmlns:')+1)));
+      if TXQTermConstant(attribute.nameValue).value.toString = 'xmlns' then result.implicitNamespaces.add(TNamespace.create(token, ''))
+      else result.implicitNamespaces.add(TNamespace.create(token, strCopyFrom(TXQTermConstant(attribute.nameValue).value.toString, length('xmlns:')+1)));
       attribute.Free;
     end else result.push(attribute);
     expect(marker^);
@@ -775,7 +778,7 @@ begin
           marker := pos;
           while (pos^ <> #0) and not strBeginsWith(pos, ']]>') do pos+=1;
           if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
-          result.push(TXQTermString.create(strFromPchar(marker, pos - marker)));
+          result.push(TXQTermConstant.create(strFromPchar(marker, pos - marker)));
           pos+=3;
         end else if strBeginsWith(pos, '!--') then begin
           pos += 1;
@@ -815,7 +818,7 @@ begin
       result.nameValue := parsePrimaryLevel;
       expect('}');
     end else begin
-      result.nameValue := TXQTermString.create(token);
+      result.nameValue := TXQTermConstant.create(token);
       if (token = '') or not (token[1] in ['a'..'z','A'..'Z']) then raiseParsingError('XPST0003', 'Expected qname, got '+token);
     end;
   end;
@@ -928,8 +931,7 @@ begin
           while true do begin
             SetLength(params, length(params) + 1);
             params[high(params)] := parseValue;
-            if not (params[high(params)] is TXQTermString) and
-               not (params[high(params)] is TXQTermConstant) then raiseParsingError('XPST0003', 'Only literals allowed as annotation arguments');
+            if not (params[high(params)] is TXQTermConstant) then raiseParsingError('XPST0003', 'Only literals allowed as annotation arguments');
             if nextToken(true) <> ',' then break;
             expect(',');
           end;
@@ -1034,26 +1036,22 @@ begin
   result += strcopyfrom(s, p);
 end;
 
-function TXQParsingContext.parseString(const w: string): TXQTerm;
+function TXQParsingContext.parseString(const w: string): string;
 var s: string;
 begin
   s := StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]);
   if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
     s := replaceEntities(s);
-  exit(TXQTermString.create(s));
+  result := s;
 end;
 
-function TXQParsingContext.parseStringLiteral: string;
+function TXQParsingContext.parseString: string;
 var
   temp: TXQTerm;
 begin
-  temp := parseValue;
-  try
-    if not (temp is TXQTermString) then raiseParsingError('XPST0003', 'Expected string');
-    result := TXQTermString(temp).value;
-  finally
-    temp.free;
-  end;
+  skipWhitespaceAndComment();
+  if not (pos^ in ['''', '"']) then raiseParsingError('XPST0003', 'Expected string');
+  result := parseString(nextToken());
 end;
 
 function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
@@ -1065,9 +1063,9 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
 
   procedure pushTerm(t: TXQTerm);
   begin
-    if not (t is TXQTermString) then
+    if not (t is TXQTermConstant) then
       t := TXQTermNamedFunction.create(XMLNamespace_MyExtensions, 'join', [t]);
-    if (result = nil) and (t is TXQTermString) then
+    if (result = nil) and (t is TXQTermConstant) then
       result := t
     else if result = nil then
       result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'concat', [t])
@@ -1086,12 +1084,15 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
     if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
       v := replaceEntities(v);
     if result <> nil then begin
-      if result is TXQTermString then TXQTermString(result).value += v
+      if (result is TXQTermConstant) and (TXQTermConstant(result).value is TXQValueString) then
+        (TXQTermConstant(result).value as TXQValueString).str += v
       else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result))
-              and (TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)] is TXQTermString) then
-        TXQTermString(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value += v
-      else pushTerm(TXQTermString.create(v));
-    end else pushTerm(TXQTermString.create(v));
+              and (TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)] is TXQTermConstant)
+              and (TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value is TXQValueString )
+              then
+        (TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value as TXQValueString).str += v
+      else pushTerm(TXQTermConstant.create(v));
+    end else pushTerm(TXQTermConstant.create(v));
   end;
 var
   strsymb: Char;
@@ -1132,7 +1133,9 @@ begin
   except
     on EXQParsingException do begin result.free; raise; end;
   end;
-  if result = nil then result := TXQTermString.create('');
+  if result = nil then result := TXQTermConstant.create('')
+  else if (result is TXQTermConstant) and not (TXQTermConstant(result).value is TXQValueString) then
+    result := TXQTermNamedFunction.create(XMLNamespace_XPathFunctions, 'string', [result]);
 end;
 
 function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTermWithChildren;
@@ -1184,11 +1187,11 @@ begin
   result := term;
   if typ.derivedFrom([baseSchema.QName, baseSchema.NOTATION]) then begin
     castAllowed := (typ <> baseSchema.NOTATION)
-                   and (term.children[0] is TXQTermString)
-                   and (baseSchema.QName.qnameRegex.Exec(trim(TXQTermString(term.children[0]).value)));
+                   and (term.children[0] is TXQTermConstant)
+                   and (baseSchema.QName.qnameRegex.Exec(trim(TXQTermConstant(term.children[0]).value.toString)));
     if not castAllowed then exit;
     if not castable then begin
-      name := trim(TXQTermString(term.children[0]).value);
+      name := trim(TXQTermConstant(term.children[0]).value.toString);
       staticContext.splitRawQName(namespace, name, xqdnkElementType);
       result := TXQTermConstant.create(TXQValueQName.create(typ, namespace, name));
     end else
@@ -1210,7 +1213,7 @@ begin
   word:=nextToken();
   if word='' then exit();
   case word[1] of
-    '''', '"':  exit(parseString(word));
+    '''', '"':  exit(TXQTermConstant.create(parseString(word)));
     '$': begin
       if word <> '$' then raiseParsingError('XPST0003', 'Invalid characters after $');
       exit(parseVariable());
@@ -1599,12 +1602,12 @@ function TXQParsingContext.parseModule(): TXQTerm;
       'default': begin
         expect('element');
         expect('namespace');
-        url := parseStringLiteral();
+        url := parseString();
       end;
       'namespace': begin
         prefix := nextTokenNCName();
         expect('=');
-        url := parseStringLiteral();
+        url := parseString();
       end
       else begin
         if (url = '') or not (url[1] in ['''', '"']) then raiseParsingError('XPST0003', 'Invalid schema import');
@@ -1616,8 +1619,8 @@ function TXQParsingContext.parseModule(): TXQTerm;
     staticContext.importedSchemas.add(TNamespace.Create(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
     if nextToken(true) = 'at' then begin
       //discard schema addresses
-      parseStringLiteral;
-      while nextToken(true) = ',' do begin expect(','); parseStringLiteral; end;
+      parseString;
+      while nextToken(true) = ',' do begin expect(','); parseString(); end;
     end;
   end;
   procedure importModule; //has read import module
@@ -1633,12 +1636,12 @@ function TXQParsingContext.parseModule(): TXQTerm;
     if pos^ = 'n' then begin
       expect('namespace'); moduleName:=nextTokenNCName(); expect('=');
     end;
-    moduleURL := parseStringLiteral;
+    moduleURL := parseString;
     at := nil;
     if nextToken(true) = 'at' then begin
       expect('at');
-      arrayAdd(at, parseStringLiteral);
-      while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseStringLiteral); end;
+      arrayAdd(at, parseString);
+      while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseString); end;
     end;
 
     module := engine.findModule(moduleURL);
@@ -1704,11 +1707,11 @@ begin
     if token = 'xquery' then begin
       requireXQuery();
       expect(token); expect('version');
-      if parseStringLiteral <> '1.0' then raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0');
+      if parseString <> '1.0' then raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0');
       token := nextToken(true);
       if token = 'encoding' then begin
         expect(token);
-        encoding := strEncodingFromName(parseStringLiteral);
+        encoding := strEncodingFromName(parseString);
         expect(';');
         token := nextToken(true);
       end else if token = ';' then begin expect(token); token := nextToken(true); end
@@ -1720,7 +1723,7 @@ begin
       expect(token); expect('namespace');
       staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
       expect('=');
-      (staticContext.moduleNamespace as TNamespace).url := parseStringLiteral;
+      (staticContext.moduleNamespace as TNamespace).url := parseString;
       expect(';');
       token := nextToken(true);
       if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
@@ -1747,7 +1750,7 @@ begin
         'default': begin
           token := nextToken();
           case token of
-            'collation': staticContext.collation := staticContext.sender.getCollation(parseStringLiteral, staticContext.baseURI);
+            'collation': staticContext.collation := staticContext.sender.getCollation(parseString, staticContext.baseURI);
             'order': begin
               expect('empty');
               case nextToken() of
@@ -1757,13 +1760,13 @@ begin
             end;
             'element', 'function': begin
               expect('namespace');
-              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseStringLiteral, '')
-              else staticContext.defaultFunctionNamespace := TNamespace.Create(parseStringLiteral, '')
+              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseString, '')
+              else staticContext.defaultFunctionNamespace := TNamespace.Create(parseString, '')
             end;
             else raiseParsingError('XPST0003', 'Unknown default value');
           end;
         end;
-        'base-uri': staticContext.baseUri := parseStringLiteral;
+        'base-uri': staticContext.baseUri := parseString;
         'construction':
           case nextToken() of
             'strip': staticContext.constructionPreserve := false;
@@ -1792,7 +1795,7 @@ begin
         'namespace': begin
            nameSpaceName := nextTokenNCName();
            expect('=');
-           nameSpaceURL := parseStringLiteral;
+           nameSpaceURL := parseString;
            if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
            staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
         end;
@@ -1808,7 +1811,7 @@ begin
         end;
         'option': begin
           token := nextTokenQName();
-          temp := parseStringLiteral;
+          temp := parseString;
           namespace := staticContext.findNamespace(strSplitGet(':', token), xqdnkUnknown);
           if namespace <> nil then begin
             if (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
