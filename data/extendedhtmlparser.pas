@@ -98,7 +98,7 @@ TTemplateElement=class(TTreeNode)
   match: TTreeNode; //this is only for template debugging issues (it will be nil iff the element was never matched, or the iff condition never satisfied)
 
   //"caches"
-  test, condition, valuepxp, source, min, max, varname, ignoreSelfTest: IXQuery;
+  test, condition, valuepxp, source, min, max, varname, ignoreSelfTest: IXQuery; //when adding, remember to update all the references
   textRegexs: array of TRegExpr;
 
   function templateReverse: TTemplateElement; inline;
@@ -106,9 +106,10 @@ TTemplateElement=class(TTreeNode)
 
   procedure setTemplateAttribute(name, avalue: string);
 
-  constructor create;
+  constructor create; override;
   constructor create(attyp: TTemplateElementType);
   procedure postprocess(parser: THtmlTemplateParser);
+  procedure assign(asource: TTreeNode); override;
   procedure initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   procedure freeCaches;
   destructor destroy;override;
@@ -864,6 +865,39 @@ begin
       TTemplateElement(curChild).flags+=[tefSwitchChild];
       curChild := curChild.getNextSibling();
     end;
+  end;
+end;
+
+procedure TTemplateElement.assign(asource: TTreeNode);
+var
+  s: TTemplateElement;
+  i: Integer;
+begin
+  inherited assign(asource);
+  if asource is TTemplateElement then begin
+    s := TTemplateElement(asource);
+    templateType := s.templateType;
+    flags := s.flags;
+    if s.templateAttributes <> nil then begin
+      templateAttributes := TStringAttributeList.Create;
+      templateAttributes.Assign(s.templateAttributes);
+    end;
+
+    contentRepetitions:=s.contentRepetitions;
+    match:=s.match;
+
+    if s.test <> nil then test := s.test.clone;
+    if s.condition <> nil then condition := s.condition.clone;
+    if s.valuepxp <> nil then valuepxp := s.valuepxp.clone;
+    if s.source <> nil then source := s.source.clone;
+    if s.min <> nil then min := s.min.clone;
+    if s.max <> nil then max := s.max.clone;
+    if s.varname <> nil then varname := s.varname.clone;
+    if s.ignoreSelfTest <> nil then ignoreSelfTest := s.ignoreSelfTest.clone;
+
+    setlength(textRegexs, length(s.textRegexs));
+    for i := 0 to high(textRegexs) do
+      textRegexs[i] := TRegExpr.Create(textRegexs[i].Expression);
   end;
 end;
 
@@ -2092,6 +2126,28 @@ begin
   end;
 end;
 
+function patternMatcherVisit(const template: TXQTermPatternMatcher; visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  t: TTemplateElement;
+begin
+  if template.node is TTreeDocument then t := template.node.next as TTemplateElement
+  else t := template.node as TTemplateElement;
+  while t <> nil do begin
+    with t do begin
+      if test <> nil then test.visit(visitor, template);
+      if condition <> nil then condition.visit(visitor, template);
+      if valuepxp <> nil then valuepxp.visit(visitor, template);
+      if source <> nil then source.visit(visitor, template);
+      if min <> nil then min.visit(visitor, template);
+      if max <> nil then max.visit(visitor, template);
+      if varname <> nil then varname.visit(visitor, template);
+      if ignoreSelfTest <> nil then ignoreSelfTest.visit(visitor, template);
+    end;
+    t := t.templateNext;
+  end;
+end;
+
+
 var module: TXQNativeModule;
 
 initialization
@@ -2100,6 +2156,7 @@ module := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
 module.registerFunction('match', @xqFunctionMatches, []);
 xquery.patternMatcherParse:=@patternMatcherParse;
 xquery.patternMatcherMatch:=@patternMatcherMatch;
+xquery.patternMatcherVisit:=@patternMatcherVisit;
 
 end.
 
