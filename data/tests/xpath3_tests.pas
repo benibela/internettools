@@ -115,7 +115,33 @@ begin
 
   t('let $f := function ($g, $n) { if ($n <= 1) then 1 else $n * $g($g, $n - 1)  } return $f($f, 10) ', '3628800');
 
-
+  //closures
+  t('(let $x := 17, $f := function ($y) { $x} return $f)(10)', '17');
+  t('(let $x := 17, $f := function ($y) { $y } return $f)(10)', '10');
+  t('(let $x := 17, $f := function ($y) { $x * 2 } return $f)(10)', '34');
+  t('(let $x := 17, $f := function ($x) { $x * 2 } return $f)(10)', '20');
+  t('(let $x := 17, $f := function ($y) { $x + $y } return $f)(100)', '117');
+  f('(let $g := function ($n) { if ($n <= 1) then 1 else $n * $g($g, $n - 1)  } return $g)(10) ', 'err:XPST0008');
+  t('(let $x := 17, $f := function ($y) { (function ($x) { $x * 2 }) (11) } return $f)(10)', '22');
+  t('let $x := (10,20,30), $f := function ($y) { $x[$y] } return join(($f(2), $f(1), $f(3)))', '20 10 30');
+  t('(let $x := (1,3,5), $f := function ($y) { $x[$x[$y]] } return $f)(2)', '5');
+  t('(let $x := 1, $f := function() { some $y in 2 satisfies $x eq 1 } return $f)()', 'true');
+  t('(let $x := 1, $f := function() { some $x in 2 satisfies $x eq 1 } return $f)()', 'false');
+  t('(let $x := 1, $f := function() { some $y in $x satisfies $y eq 1 } return $f)()', 'true');
+  t('(let $x := 1, $f := function() { some $x in $x satisfies $x eq 1 } return $f)()', 'true');
+  t('(let $x := 1, $f := function() { every $y in 2 satisfies $x eq 1 } return $f)()', 'true');
+  t('(let $x := 1, $f := function() { every $x in 2 satisfies $x eq 1 } return $f)()', 'false');
+  t('(let $x := 1, $f := function() { every $y in 2, $z in $x satisfies $y eq ($z + 1) } return $f)()', 'true');
+  t('(let $x := 1, $f := function() { some $y in 2, $z in $x satisfies $y eq ($x + 1) } return $f)()', 'true');
+  t('(let $x := 1, $f := function() { every $x in 2, $z in $x satisfies $x eq ($z + 1) } return $f)()', 'false');
+  t('(let $x := 1, $f := function() { some $y in 2, $x in 2 satisfies $y eq $x } return $f)()', 'true');
+  t('(let $x := 1, $f := function() { let $a := $x, $x := 2, $b := $x return ($a, $x, $b) } return $f)()', '1 2 2');
+  t('(let $x := 1, $f := function() { for $a in $x, $x in 2, $b in $x return ($a, $x, $b) } return $f)()', '1 2 2');
+  t('(let $x := 1, $f := function($y) { if ($x eq $y) then $x + 10 else $y } return $f) ! (.(1), .(3) ) ', '11 3');
+  t('let $x := 1, $f := function($y,$z) { if ($x eq $y) then $x + 10 else $x+$z } return ($f(1,9), $f(3,9)) ', '11 10');
+  t('(let $x := 1, $f := function($y) { {"x": $x, "y": $y, $x: $y, $y: $x} } return $f) ! (serialize-json(.(2))) ', '{"x": 1, "y": 2, "1": 2, "2": 1}');
+  t('(for $a in (1,2,3), $b in ("a", "b") return function(){ $b || ":" || $a }) ! .()', 'a:1 b:1 a:2 b:2 a:3 b:3');
+  t('let $x := 1, $f := function() { ( $foobar := concat($x, "23"), get("foobar")) } return  ($f(), x">{$foobar}<")', '123 123 >123<'); //how do we plan to handle side effects?
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');

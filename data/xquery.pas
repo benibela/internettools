@@ -1606,7 +1606,6 @@ type
     function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 
     destructor Destroy; override;
-
   private
     fterm: txqterm;
     staticContextInitialized, staticContextShared: boolean;
@@ -2176,6 +2175,7 @@ type
     function pushAll: integer; //**< Marks the current state of the variables (in O(1))
     procedure popAll(level: integer = -1); //**< Reverts all variables to the latest marked state
 
+
     procedure stringifyNodes;
     //class function splitName(const variable: string; out base, varname: string): boolean; static;
 
@@ -2196,6 +2196,7 @@ type
     shared: boolean;
     vars: array of TXQVariable;
     history: array of integer;
+    procedure removeLast;
   end;
 
 
@@ -4159,6 +4160,12 @@ begin
             (vars[i].value as TXQValueSequence).seq[j] := xqvalue((vars[i].value as TXQValueSequence).seq[j].toString);
       end;
     end
+end;
+
+procedure TXQVariableChangeLog.removeLast;
+begin
+  SetLength(vars, high(vars));
+
 end;
 
 {class function TXQVariableChangeLog.splitName(const variable: string; out base, varname: string): boolean;

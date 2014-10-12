@@ -1756,6 +1756,7 @@ begin
   tempcontext := newcontext;
   tempcontext.temporaryVariables := TXQVariableChangeLog.create();
   tempcontext.staticContext := staticContext;
+  if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
   for j := 0 to high(parameters) do
     tempcontext.temporaryVariables.add(parameters[j].name, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context), parameters[j].namespace);
   result := body.evaluate(tempcontext);

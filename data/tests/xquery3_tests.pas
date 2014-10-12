@@ -158,6 +158,21 @@ begin
   m('import module namespace rename = "pseudo://test-module"; rename:internalrevf()', '12 34 fi');
 
 
+  //closures
+  t('(let $x := 1, $f := function($y) { typeswitch ($y) case xs:integer return $x case $x as xs:string return $x default return ($x||":"||$y) } return $f) ! (.(7), .("foo"), .(7.4)) ', '1 foo 1:7.4');
+  t('(let $x := 1, $f := function($y) { switch ($x) case $y return $x + $y default return 999 } return $f) ! (.(1), .(2)) ', '2 999');
+  t('let $x := 1, $f := function($y) { switch ($y) case $x return $x + $y default return 999 } return ($f(1), $f(2)) ', '2 999');
+  t('let $x := 1, $f := function($y) { switch ($x) case $x return $x + $y default return 999 } return ($f(1), $f(2)) ', '2 3');
+  t('(let $x := 1, $f := function() { for $a at $p in $x, $x in 2 let $b := $x return ($a, $p, $x, $b) } return $f)()', '1 1 2 2');
+  t('(let $x := 10, $f := function() { for $a at $x in (1, $x, 4) return ($a, $x) } return $f)()', '1 1 10 2 4 3');
+  t('(let $x := 10, $f := function() { for $a at $x in (1, $x, 4) where $a eq $x return ($a, $x) } return $f)()', '1 1');
+  t('(let $x := 10, $f := function() { for $a at $p in (1, $x, 4) where $a eq $x order by $x return ($a, $p) } return $f)()', '10 2');
+  t('let $x := 1, $y := 2, $f := function($p) { <foo x="{$x}" p="{$p}">{$y}</foo> } return (outer-xml($f(())), outer-xml($f(123)))', '<foo x="1" p="">2</foo> <foo x="1" p="123">2</foo>');
+  t('let $x := 1, $y := 2, $f := function($p) { <foo x="{$x}" p="{$p}">{$y}</foo> / @*[. eq $x] / node-name(.) } return ($f(1), "s", $f(2))', 'x p s x');
+  t('let $g := let $x := 1, $f := function($y) { typeswitch ($y) case xs:integer return $x case $x as xs:string return $x default return ($x||":"||$y) } return $f return ($g(7), $g("foo"), $g(7.4)) ', '1 foo 1:7.4');
+
+
+
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');

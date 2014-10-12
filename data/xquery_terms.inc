@@ -2330,16 +2330,81 @@ begin
 end;
 
 
+type
+  PXQEvaluationContext = ^TXQEvaluationContext;
+
+  TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
+    overridenVariables: {set of string} TXQVariableChangeLog;
+    tempValue: IXQValue;
+    constructor create;
+    destructor Destroy; override;
+
+    procedure declare(v: PXQTermVariable); override;
+    procedure undeclare(v: PXQTermVariable); override;
+  end;
+
+  { TXQTerm_VisitorReplaceKnownVariables }
+
+  TXQTerm_VisitorReplaceKnownVariables = class(TXQTerm_VisitorTrackKnownVariables)
+    context: PXQEvaluationContext;
+    function visit(term: PXQTerm): TXQTerm_VisitAction; override;
+  end;
+
+
+constructor TXQTerm_VisitorTrackKnownVariables.create;
+begin
+  overridenVariables := TXQVariableChangeLog.create();
+  tempValue := xqvalue();
+end;
+
+destructor TXQTerm_VisitorTrackKnownVariables.Destroy;
+begin
+  overridenVariables.Free;
+  inherited Destroy;
+end;
+
+procedure TXQTerm_VisitorTrackKnownVariables.declare(v: PXQTermVariable);
+begin
+  overridenVariables.add(v^.value, tempValue, v^.namespace);
+end;
+
+procedure TXQTerm_VisitorTrackKnownVariables.undeclare(v: PXQTermVariable);
+begin
+  Assert((overridenVariables.vars[overridenVariables.count-1].name = v^.value) and
+         equalNamespaces(overridenVariables.vars[overridenVariables.count-1].namespace, v^.namespace));
+  overridenVariables.removeLast;
+end;
+
+function TXQTerm_VisitorReplaceKnownVariables.visit(term: PXQTerm): TXQTerm_VisitAction;
+var
+  temp: TXQValue;
+begin
+  if (term^ is TXQTermVariable) and not overridenVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
+    replace(term, TXQTermNumber.create(context^.getVariable(TXQTermVariable(term^).value, TXQTermVariable(term^).namespace)));
+  result := xqtvaContinue;
+end;
+
 { TXQTermDefineFunction }
 
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   temp: TXQValueFunction;
+  tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
+  i: Integer;
 begin
   temp := define;
-  temp.body := temp.body.clone;
+  temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
   temp.ownedBody := true;
   result := temp;
+  tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
+  try
+    for i := 0 to parameterCount - 1 do
+      tempVisitor.declare(@((children[i] as TXQTermDefineVariable).variable));
+    tempVisitor.context := @context;
+    tempVisitor.simpleTermVisit(@temp.body, nil);
+  finally
+    tempVisitor.free;
+  end;
 end;
 
 function TXQTermDefineFunction.define(): TXQValueFunction;

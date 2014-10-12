@@ -1124,6 +1124,11 @@ begin
   qf('declare namespace foo = "barbar"; typeswitch(<x>1</x>) case <x>{$foo:bar}</x>  return $bar default return 1234', 'err:XPST0008');
   qf('declare namespace foo = "barbar"; typeswitch(<x>1</x> ) case <x>{$bar}</x> return $foo:bar default return 1234', 'err:XPST0008');
 
+  q3('(let $o := ":", $f := function(){ typeswitch (<x><a>1</a><a>2</a></x>) case <a>{$abc := (., $o)}</a>+ return join($abc) default return "oh?" } return $f) ()', '1 : 2 :');
+  q3('join( (let $o := ":", $f := function(){ let <a>{$abc := (., $o)}</a>+  := <x><a>1</a><a>2</a></x> return $abc } return $f) () )', '1 : 2 :');
+  q3('join( (let $o := ":", $f := function(){ for <a>{$abc := (., $o)}</a>+  in <x><a>1</a><a>2</a></x> return "(" || join($abc) || ")" } return $f) () )', '(1 :) (2 :)');
+  //q3('(let $abc := "0", $f := function(){ typeswitch (<x><a>1</a><a>2</a></x>) case <a>{$abc := ($abc, .)}</a>+ return join($abc) default return "oh?" } return $f) ()', '0 1 2');
+
 
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := concat(., $abc, .)}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=XXX123XXX');

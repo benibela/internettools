@@ -15,12 +15,12 @@ var
 begin
 
   start := now;
-  bigdecimal_tests.unittests;
+ // bigdecimal_tests.unittests;
   bbutils_tests.unitTests;
   internetaccess_tests.unittests;
-  testerrors := true; //disabled since they drive the lazarus debugger mad
+  testerrors := true; //better disable since they drive the lazarus debugger mad
   parsertests.unittests(testerrors);
-  xpath2_tests.unittests(testerrors);
+ // xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
   xpath3_tests.unittests(testerrors);
   xquery3_tests.unittests(testerrors);
