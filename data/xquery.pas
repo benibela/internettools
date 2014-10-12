@@ -64,6 +64,7 @@ type
   TXQCollation=class;
   TXQVariableChangeLog=class;
   TXQTerm=class;
+  TXQTermVariable = class;
   TXQTermSequenceType = class;
   TXQuery = class;
   IXQuery = interface;
@@ -187,6 +188,7 @@ type
 
     function hasVariable(const name: string; out value: IXQValue; const ns: INamespace): boolean;
     function getVariable(const name: string; const ns: INamespace): IXQValue;
+    function getVariable(const v: TXQTermVariable): IXQValue; inline;
 
     procedure beginSubContextWithVariables;
     procedure endSubContextWithVariables(const oldContext: TXQEvaluationContext);
@@ -1212,7 +1214,6 @@ type
 
   //============================XQUERY AST TERMS==========================
 
-  TXQTermVariable = class;
   PXQTerm = ^TXQTerm;
   PXQTermVariable = ^TXQTermVariable;
   TXQTerm_VisitAction = (xqtvaContinue, xqtvaAbort, xqtvaNoRecursion);//xqtvaNothing, xqtvaDeleteWithChildren, xqtvaDeleteLonely);
@@ -1328,6 +1329,7 @@ type
     value: string;
     constructor create(const avalue: string; staticContext: TXQStaticContext);
     constructor create(const avalue: string; const anamespace: INamespace = nil);
+    function equalsVariable(v: TXQTermVariable): boolean;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     class function splitForDotNotation(v: TXQTermVariable): TXQTerm;
@@ -1455,7 +1457,7 @@ type
   { TXQTermFlower }
   TXQTermFlowerVariable = record
     kind: (xqfkFor, xqfkLet);
-    namespace: INamespace;
+    //namespace: INamespace;
     loopvar: TXQTermVariable;
     pattern: TXQTermPatternMatcher;
     sequenceTyp: TXQTermSequenceType;
@@ -3131,6 +3133,11 @@ begin
     else raise EXQEvaluationException.Create('XPST0008', 'Variable '+name+' not found');
   end;
   if result = nil then result := xqvalue();
+end;
+
+function TXQEvaluationContext.getVariable(const v: TXQTermVariable): IXQValue;
+begin
+  result := getVariable(v.value, v.namespace);
 end;
 
 procedure TXQEvaluationContext.beginSubContextWithVariables;

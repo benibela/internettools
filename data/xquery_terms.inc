@@ -1744,6 +1744,11 @@ begin
   namespace := anamespace;
 end;
 
+function TXQTermVariable.equalsVariable(v: TXQTermVariable): boolean;
+begin
+  result := (v.value = value) and equalNamespaces(namespace, v.namespace);
+end;
+
 function TXQTermVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   result := context.getVariable(value, namespace);
@@ -2347,7 +2352,11 @@ type
 
   TXQTerm_VisitorReplaceKnownVariables = class(TXQTerm_VisitorTrackKnownVariables)
     context: PXQEvaluationContext;
+    uncertainVariables: TXQVariableChangeLog; //pattern variables cannot be are not know statically
+    patterns: array of TXQTermPatternMatcher;
     function visit(term: PXQTerm): TXQTerm_VisitAction; override;
+    function leave(term: PXQTerm): TXQTerm_VisitAction; override;
+    destructor Destroy; override;
   end;
 
 
@@ -2378,10 +2387,39 @@ end;
 function TXQTerm_VisitorReplaceKnownVariables.visit(term: PXQTerm): TXQTerm_VisitAction;
 var
   temp: TXQValue;
+  selfdefined: Boolean;
+  i: Integer;
 begin
-  if (term^ is TXQTermVariable) and not overridenVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
-    replace(term, TXQTermNumber.create(context^.getVariable(TXQTermVariable(term^).value, TXQTermVariable(term^).namespace)));
+  if term^ is TXQTermVariable then begin
+    if not overridenVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
+      replace(term, TXQTermNumber.create(context^.getVariable(TXQTermVariable(term^).value, TXQTermVariable(term^).namespace)))
+    else if length(patterns) > 0 then begin
+      selfdefined := false;
+      with patterns[high(patterns)] do
+        for i := 0 to high(vars) do
+          if vars[i].equalsVariable(TXQTermVariable(term^)) then
+            selfdefined := true;
+      if uncertainVariables = nil then uncertainVariables := TXQVariableChangeLog.create();
+      if not uncertainVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
+        uncertainVariables.add(TXQTermVariable(term^).value, tempValue, TXQTermVariable(term^).namespace);
+    end;
+  end else if term^ is TXQTermPatternMatcher then begin
+    SetLength(patterns, length(patterns) + 1);
+    patterns[high(patterns)] := TXQTermPatternMatcher(term^);
+  end;
   result := xqtvaContinue;
+end;
+
+function TXQTerm_VisitorReplaceKnownVariables.leave(term: PXQTerm): TXQTerm_VisitAction;
+begin
+  if (length(patterns) > 0) and (patterns[high(patterns)] = term^) then
+    setlength(patterns, high(patterns));
+end;
+
+destructor TXQTerm_VisitorReplaceKnownVariables.Destroy;
+begin
+  uncertainVariables.Free;
+  inherited Destroy;
 end;
 
 { TXQTermDefineFunction }
@@ -2391,6 +2429,7 @@ var
   temp: TXQValueFunction;
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
   i: Integer;
+  tempterm: TXQTermFlower;
 begin
   temp := define;
   temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
@@ -2402,6 +2441,17 @@ begin
       tempVisitor.declare(@((children[i] as TXQTermDefineVariable).variable));
     tempVisitor.context := @context;
     tempVisitor.simpleTermVisit(@temp.body, nil);
+    if tempVisitor.uncertainVariables <> nil then begin
+      tempterm := TXQTermFlower.Create;
+      tempterm.returned := temp.body;
+      temp.body := tempterm;
+      setlength(tempterm.vars, tempVisitor.uncertainVariables.count);
+      for i := 0 to tempVisitor.uncertainVariables.count - 1 do begin
+        tempterm.vars[i].kind := xqfkLet;
+        tempterm.vars[i].loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.vars[i].name, tempVisitor.uncertainVariables.vars[i].namespace);
+        tempterm.vars[i].expr := TXQTermNumber.Create(context.getVariable(tempterm.vars[i].loopvar));
+      end;
+    end;
   finally
     tempVisitor.free;
   end;

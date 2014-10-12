@@ -46,7 +46,7 @@
         <PackageName Value="internettools"/>
       </Item3>
     </RequiredPackages>
-    <Units Count="10">
+    <Units Count="11">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -97,6 +97,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="parsertests"/>
       </Unit9>
+      <Unit10>
+        <Filename Value="extendedhtmlparser_tests.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="extendedhtmlparser_tests"/>
+      </Unit10>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
