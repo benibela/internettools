@@ -223,11 +223,12 @@ TTreeNode = class
   procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
   function deleteElementFromDoubleLinkedList: TTreeNode; //removes the element from the double linked list (only updates previous/next), frees it and returns next  (mostly useful for attribute nodes)
 
-  function clone: TTreeNode;
+  function clone: TTreeNode; virtual;
 protected
   function serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
   function serializeHTML(nodeSelf: boolean; insertLineBreaks: boolean): string;
-  function cloneShallow: TTreeNode;
+  function cloneShallow(): TTreeNode;
+  procedure assign(source: TTreeNode); virtual;
 
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
   procedure removeElementKeepChildren; //**< removes/frees the current element, but keeps the children (i.e. removes self and possible self.reverse. Will not remove the opening tag, if called on a closing tag)
@@ -237,8 +238,8 @@ public
   function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
   function toString(includeText: boolean; includeAttributes: array of string): string; reintroduce; //**< converts the element to a string (not recursive)
 
-  constructor create();
-  constructor create(atyp: TTreeNodeType; avalue: string = '');
+  constructor create(); virtual;
+  constructor create(atyp: TTreeNodeType; avalue: string = ''); virtual;
   class function createElementPair(anodename: string): TTreeNode;
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
@@ -248,6 +249,8 @@ public
 
   class function compareInDocumentOrder(const a,b: TTreeNode): integer; static;
 end;
+
+
 TTreeNodeClass = class of TTreeNode;
 
 { TTreeAttribute }
@@ -1399,7 +1402,7 @@ begin
   result := serializationWrapper(self, nodeSelf, insertLineBreaks, true);
 end;
 
-function TTreeNode.cloneShallow: TTreeNode;
+function TTreeNode.cloneShallow(): TTreeNode;
 begin
   case typ of
     tetAttribute: begin
@@ -1411,18 +1414,32 @@ begin
       TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
       TTreeDocument(result).FDocumentURI:=TTreeDocument(self).FDocumentURI;
     end
-    else result := TTreeNode.create();
+    else begin
+      result := TTreeNode(newinstance);
+      result.create();
+    end;
   end;
-  result.typ := typ;
-  result.value := value;
-  result.attributes := attributes;
-  result.next := nil;
-  result.previous := nil;
-  result.parent := nil;
-  result.reverse := nil;
-  result.namespace := namespace;
-  result.offset := offset;
+  result.Assign(self);
 end;
+
+procedure TTreeNode.assign(source: TTreeNode);
+var
+  result: TTreeNode;
+begin
+  result := self;
+  with source do begin
+    result.typ := typ;
+    result.value := value;
+    result.attributes := attributes;
+    result.next := nil;
+    result.previous := nil;
+    result.parent := nil;
+    result.reverse := nil;
+    result.namespace := namespace;
+    result.offset := offset;
+  end;
+end;
+
 
 function TTreeNode.clone: TTreeNode;
 var
