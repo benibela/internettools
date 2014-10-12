@@ -143,6 +143,10 @@ begin
   t('(for $a in (1,2,3), $b in ("a", "b") return function(){ $b || ":" || $a }) ! .()', 'a:1 b:1 a:2 b:2 a:3 b:3');
   t('let $x := 1, $f := function() { ( $foobar := concat($x, "23"), get("foobar")) } return  ($f(), x">{$foobar}<")', '123 123 >123<'); //how do we plan to handle side effects?
 
+  //Named Function References
+  t('(let $f := concat#3 return $f)("a","b","c")', 'abc');
+  t('(let $f := abs#1 return $f)(-1234)', '1234');
+
   //interface tests
   t('. + 1', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');

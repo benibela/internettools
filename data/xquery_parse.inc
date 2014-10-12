@@ -1373,6 +1373,12 @@ begin
         end;
       end;
 
+      if wordlookahead = '#' then begin
+        require3('Named Function Reference');
+        expect('#');
+        exit(TXQTermDefineFunction.CreateReference(word, StrToInt(nextToken()), staticContext));
+      end;
+
       if (word = 'validate') and ((wordlookahead = 'lax') or (wordlookahead = 'strict') or (wordlookahead = '{')) then begin
         requireXQuery('for schema validation');
         if wordlookahead <> '{' then

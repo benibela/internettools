@@ -1360,6 +1360,7 @@ type
     funcname: string;
     parameterCount: integer;
     annotations: TXQAnnotations;
+    constructor createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function define(): TXQValueFunction;
     function getContextDependencies: TXQContextDependencies; override;

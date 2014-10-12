@@ -2429,6 +2429,22 @@ end;
 
 { TXQTermDefineFunction }
 
+constructor TXQTermDefineFunction.createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
+var
+  anamespace: INamespace;
+  call: TXQTermNamedFunction;
+  i: Integer;
+begin
+  parameterCount := arity;
+  staticContext.splitRawQName(anamespace, qname, xqdnkFunction);
+  call := TXQTermNamedFunction.create(anamespace,qname);
+  for i := 1 to arity do begin
+    push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
+    call.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
+  end;
+  push(call);
+end;
+
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   temp: TXQValueFunction;
