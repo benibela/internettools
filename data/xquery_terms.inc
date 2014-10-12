@@ -151,6 +151,12 @@ begin
   Result := xqtvaContinue;
 end;
 
+procedure TXQTerm_Visitor.replace(term: PXQTerm; newterm: TXQTerm);
+begin
+  term^.free;
+  term^ := newterm;
+end;
+
 function TXQTerm_Visitor.simpleTermVisit(term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction;
 begin
   parent := theparent;
@@ -1018,8 +1024,11 @@ begin
       visitor.declare(@vars[i].loopvar);
       if vars[i].positionVar <> nil then
         visitor.declare(@vars[i].positionVar);
-    end else for j := 0 to high(vars[i].pattern.vars) do
-      visitor.declare(@vars[i].pattern.vars[j]);
+    end else begin
+      for j := 0 to high(vars[i].pattern.vars) do
+        visitor.declare(@vars[i].pattern.vars[j]);
+      visitor.simpleTermVisit(@vars[i].pattern, self);
+    end;
   end;
   if where <> nil then begin
     result := visitor.simpleTermVisit(@where, self);
@@ -1035,10 +1044,10 @@ begin
   visitor.parent := self;
   for i := high(vars) downto 0 do begin
     if vars[i].pattern = nil then begin
-      visitor.undeclare(@vars[i].loopvar);
       if vars[i].positionVar <> nil then
         visitor.undeclare(@vars[i].positionVar);
-    end else for j := 0 to high(vars[i].pattern.vars) do
+      visitor.undeclare(@vars[i].loopvar);
+    end else for j := high(vars[i].pattern.vars) downto 0 do
       visitor.undeclare(@vars[i].pattern.vars[j]);
   end;
 end;
@@ -1618,10 +1627,15 @@ function TXQTermPatternMatcher.clone: TXQTerm;
 begin
   Result:=inherited clone;
   with TXQTermPatternMatcher(result) do begin
-    node := self.node;
+    node := self.node.clone;
     vars := self.vars;
     setlength(vars, length(vars));
   end;
+end;
+
+function TXQTermPatternMatcher.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  Result:=patternMatcherVisit(self, visitor);
 end;
 
 destructor TXQTermPatternMatcher.destroy;
@@ -1877,6 +1891,7 @@ begin
       with TXQTermPatternMatcher(children[i].children[0]) do
         for j := 0 to high(vars) do
           visitor.declare(@vars[j]);
+      visitor.simpleTermVisit(@children[i].children[0], self);
     end else if children[i].children[0] is TXQTermVariable then
       visitor.declare(@children[i].children[0], self);
     result := visitor.simpleTermVisit(@children[i].children[high(children[i].children)], self);

@@ -1214,7 +1214,7 @@ type
 
   TXQTermVariable = class;
   PXQTerm = ^TXQTerm;
-  PXQTermVariable = ^TXQTerm;
+  PXQTermVariable = ^TXQTermVariable;
   TXQTerm_VisitAction = (xqtvaContinue, xqtvaAbort, xqtvaNoRecursion);//xqtvaNothing, xqtvaDeleteWithChildren, xqtvaDeleteLonely);
 
   { TXQTerm_Visitor }
@@ -1225,6 +1225,8 @@ type
     procedure undeclare(v: PXQTermVariable); virtual;
     function visit (term: PXQTerm): TXQTerm_VisitAction; virtual;
     function leave (term: PXQTerm): TXQTerm_VisitAction; virtual;
+  protected
+    procedure replace(term: PXQTerm; newterm: TXQTerm); inline;
   private
     function simpleTermVisit (term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction;
     procedure declare(v: PXQTermVariable; theparent: TXQTerm); inline;
@@ -1402,6 +1404,7 @@ type
     node: TTreeNode;
     vars: array of TXQTermVariable;
     function clone: TXQTerm; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     destructor destroy; override;
   end;
 
@@ -1565,12 +1568,15 @@ type
 
   TXQInternalPatternMatcherParse = function (const context: TXQStaticContext;  data: string): TXQTermPatternMatcher;
   TXQInternalPatternMatcherMatch = function (template, data: TTreeNode; const context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
+  TXQInternalPatternMatcherVisit = function (const template: TXQTermPatternMatcher; visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 
 
 
 
 
   //============================XQUERY QUERY HOLDER==========================
+
+  { IXQuery }
 
   IXQuery = interface
     function evaluate(const tree: TTreeNode = nil): IXQValue;
@@ -1580,6 +1586,11 @@ type
     function getTerm: TXQTerm;
     procedure setTerm(aterm: TXQTerm);
     property Term: TXQTerm read getTerm write setTerm;
+
+    function clone: IXQuery;
+    function visit(visitor: TXQTerm_VisitorClass; parent: TXQTerm = nil): TXQTerm_VisitAction;
+    function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
+
   end;
 
   { TXQuery }
@@ -1589,6 +1600,10 @@ type
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue;
     function evaluate(const contextItem: IXQValue): IXQValue;
+
+    function clone: IXQuery;
+    function visit(visitor: TXQTerm_VisitorClass; parent: TXQTerm = nil): TXQTerm_VisitAction;
+    function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 
     destructor Destroy; override;
 
@@ -2289,6 +2304,7 @@ var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are k
 
     patternMatcherParse: TXQInternalPatternMatcherParse;
     patternMatcherMatch: TXQInternalPatternMatcherMatch;
+    patternMatcherVisit: TXQInternalPatternMatcherVisit;
 implementation
 uses base64, strutils;
 
@@ -3180,6 +3196,31 @@ begin
   context.SeqLength := 1;
   context.SeqValue := contextItem;
   result := evaluate(context);
+end;
+
+function TXQuery.clone: IXQuery;
+var
+  q: TXQuery;
+begin
+  q := TXQuery.Create(staticContext, fterm.clone);
+  q.staticContextInitialized := staticContextInitialized;
+  q.staticContextShared := staticContextShared;
+  if not q.staticContextShared then q.staticContext := staticContext.clone();
+  result := q;
+end;
+
+function TXQuery.visit(visitor: TXQTerm_VisitorClass; parent: TXQTerm = nil): TXQTerm_VisitAction;
+var
+  tempVisitor: TXQTerm_Visitor;
+begin
+  tempVisitor := visitor.Create;
+  tempVisitor.simpleTermVisit(@fterm, parent);
+  tempVisitor.Free;
+end;
+
+function TXQuery.visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
+begin
+  visitor.simpleTermVisit(@fterm, parent);
 end;
 
 destructor TXQuery.Destroy;
