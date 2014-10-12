@@ -1281,9 +1281,9 @@ type
 
   { TXQTermNumber }
 
-  TXQTermNumber = class(TXQTerm) //todo merge with string and rename to termliteral
+  TXQTermConstant = class(TXQTerm)
     value: IXQValue;
-    constructor create(const avalue: string);
+    constructor createNumber(const avalue: string);
     constructor create(const avalue: IXQValue);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
@@ -4875,7 +4875,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
 
   function newOne: TXQTerm;
   begin
-    result := TXQTermNumber.create('1');
+    result := TXQTermConstant.create(xqvalue(1));
   end;
 
   function newReadAttrib(name: string): txqterm;
@@ -5024,9 +5024,9 @@ var pos: pchar;
     function isNth(index: TXQTerm; a, b: integer): TXQTerm;
     begin
       if a = 0 then begin
-        result := newBinOp(index, '=', TXQTermNumber.Create(IntToStr(b)));
+        result := newBinOp(index, '=', TXQTermConstant.create(xqvalue(b)));
       end else begin
-        result := newFunction('is-nth', [index, TXQTermNumber.Create(IntToStr(a)), TXQTermNumber.Create(IntToStr(b))]);
+        result := newFunction('is-nth', [index, TXQTermConstant.create(xqvalue(a)), TXQTermConstant.Create(xqvalue(b))]);
       end;
     end;
 
@@ -5203,8 +5203,8 @@ var pos: pchar;
           ':': filter := pseudoOrNegation(elementName);
           else raiseParsingError('impossible')
         end;
-        if not (result is TXQTermFilterSequence) or (filter is TXQTermNumber) or
-           (TXQTermFilterSequence(result).children[1] is TXQTermNumber) then
+        if not (result is TXQTermFilterSequence) or (filter is TXQTermConstant) or
+           (TXQTermFilterSequence(result).children[1] is TXQTermConstant) then
           result := TXQTermFilterSequence.Create(result, filter)
          else
           TXQTermFilterSequence(result).children[1] := newBinOp(TXQTermFilterSequence(result).children[1], 'and', filter);

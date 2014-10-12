@@ -929,7 +929,7 @@ begin
             SetLength(params, length(params) + 1);
             params[high(params)] := parseValue;
             if not (params[high(params)] is TXQTermString) and
-               not (params[high(params)] is TXQTermNumber) then raiseParsingError('XPST0003', 'Only literals allowed as annotation arguments');
+               not (params[high(params)] is TXQTermConstant) then raiseParsingError('XPST0003', 'Only literals allowed as annotation arguments');
             if nextToken(true) <> ',' then break;
             expect(',');
           end;
@@ -1190,9 +1190,9 @@ begin
     if not castable then begin
       name := trim(TXQTermString(term.children[0]).value);
       staticContext.splitRawQName(namespace, name, xqdnkElementType);
-      result := TXQTermNumber.create(TXQValueQName.create(typ, namespace, name));
+      result := TXQTermConstant.create(TXQValueQName.create(typ, namespace, name));
     end else
-      result := TXQTermNumber.create(xqvalue(castAllowed));
+      result := TXQTermConstant.create(xqvalue(castAllowed));
     term.free;
   end;
 end;
@@ -1222,9 +1222,9 @@ begin
            ((wordlookahead[1] in ['0'..'9'])
              or ((length(wordlookahead) > 2) and (wordlookahead[1] = '.') and (wordlookahead[2] in ['0'..'9']))) then begin
         expect(wordlookahead);
-        exit(TXQTermNumber.Create('-' + wordlookahead));
+        exit(TXQTermConstant.createNumber('-' + wordlookahead));
       end else
-        exit(TXQTermBinaryOp.create(word, TXQTermNumber.create( '0'), parseValue()));
+        exit(TXQTermBinaryOp.create(word, TXQTermConstant.create(xqvalue(0)), parseValue()));
     end;
 
     '(': begin
@@ -1245,9 +1245,9 @@ begin
       else exit(TXQTermBinaryOp.Create(word, TXQTermNodeMatcher.Create('/'), parseValue()));
     end;
 
-    '0'..'9': exit(TXQTermNumber.Create(word));
+    '0'..'9': exit(TXQTermConstant.createNumber(word));
     '.': if (word = '.') or (word = '..') then exit(TXQTermNodeMatcher.Create(word))
-         else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermNumber.Create(word))
+         else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermConstant.createNumber(word))
          else raiseParsingError('XPST0003', 'Unknown term: '+word);
 
     '<': begin

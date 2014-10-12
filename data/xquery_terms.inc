@@ -1609,33 +1609,33 @@ end;
 
 { TXQTermNumber }
 
-constructor TXQTermNumber.create(const avalue: string);
+constructor TXQTermConstant.createNumber(const avalue: string);
 begin
   if strContains(avalue,'e') or strContains(avalue,'E') then value := baseSchema.double.createValue(avalue)
   else if strContains(avalue,'.') then value := baseSchema.decimal.createValue(avalue)
   else value := baseSchema.integer.createValue(avalue);
 end;
 
-constructor TXQTermNumber.create(const avalue: IXQValue);
+constructor TXQTermConstant.create(const avalue: IXQValue);
 begin
   value := avalue;
 end;
 
-function TXQTermNumber.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermConstant.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   result := value;
 end;
 
-function TXQTermNumber.getContextDependencies: TXQContextDependencies;
+function TXQTermConstant.getContextDependencies: TXQContextDependencies;
 begin
   Result:=[];
 end;
 
-function TXQTermNumber.clone: TXQTerm;
+function TXQTermConstant.clone: TXQTerm;
 begin
   Result:=inherited clone;
-  TXQTermNumber(result).value := value; //do not clone since most values are treated as immutable
+  TXQTermConstant(result).value := value; //do not clone since most values are treated as immutable
 end;
 
 { TXQTermTemporaryNode }
@@ -2417,7 +2417,7 @@ var
 begin
   if term^ is TXQTermVariable then begin
     if not overridenVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
-      replace(term, TXQTermNumber.create(context^.getVariable(TXQTermVariable(term^).value, TXQTermVariable(term^).namespace)))
+      replace(term, TXQTermConstant.create(context^.getVariable(TXQTermVariable(term^).value, TXQTermVariable(term^).namespace)))
     else if length(patterns) > 0 then begin
       selfdefined := false;
       with patterns[high(patterns)] do
@@ -2474,7 +2474,7 @@ begin
       for i := 0 to tempVisitor.uncertainVariables.count - 1 do begin
         tempterm.vars[i].kind := xqfkLet;
         tempterm.vars[i].loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.vars[i].name, tempVisitor.uncertainVariables.vars[i].namespace);
-        tempterm.vars[i].expr := TXQTermNumber.Create(context.getVariable(tempterm.vars[i].loopvar));
+        tempterm.vars[i].expr := TXQTermConstant.Create(context.getVariable(tempterm.vars[i].loopvar));
       end;
     end;
   finally
