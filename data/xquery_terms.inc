@@ -50,14 +50,6 @@ begin
 
 end;
 
-function TXQTerm.visit(visitor: TXQTerm_VisitorClass): TXQTerm_VisitAction;
-var
-  tempVisitor: TXQTerm_Visitor;
-begin
-  tempVisitor := visitor.Create;
-  result := tempVisitor.simpleTermVisit(@self, nil);
-  tempVisitor.free;
-end;
 
 function TXQTerm.clone: TXQTerm;
 begin
@@ -166,6 +158,15 @@ end;
 function TXQTerm_Visitor.leave(term: PXQTerm): TXQTerm_VisitAction;
 begin
   Result := xqtvaContinue;
+end;
+
+class function TXQTerm_Visitor.startVisiting(term: PXQTerm): TXQTerm_VisitAction;
+var
+  tempVisitor: TXQTerm_Visitor;
+begin
+  tempVisitor := ClassType.Create as TXQTerm_Visitor;
+  result := tempVisitor.simpleTermVisit(term, nil);
+  tempVisitor.free;
 end;
 
 procedure TXQTerm_Visitor.replace(term: PXQTerm; newterm: TXQTerm);

@@ -1228,6 +1228,8 @@ type
     procedure undeclare(v: PXQTermVariable); virtual;
     function visit (term: PXQTerm): TXQTerm_VisitAction; virtual;
     function leave (term: PXQTerm): TXQTerm_VisitAction; virtual;
+
+    class function startVisiting(term: PXQTerm): TXQTerm_VisitAction;
   protected
     procedure replace(term: PXQTerm; newterm: TXQTerm); inline;
   private
@@ -1250,7 +1252,6 @@ type
     procedure addToQueryList(var path: TXQPathMatching); virtual;
 
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
-    function visit(visitor: TXQTerm_VisitorClass): TXQTerm_VisitAction;
     function clone: TXQTerm; virtual;
   end;
 

@@ -1899,7 +1899,7 @@ begin
 
   if result <> nil then begin
     if options.AllowJSONLiterals then
-      result.visit(TJSONLiteralReplaceVisitor);
+      TJSONLiteralReplaceVisitor.startVisiting(@result);
   end;
 end;
 
