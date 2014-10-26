@@ -962,10 +962,11 @@ begin
   end;
 end;
 
-function xqFunctionData(const args: TXQVArray): IXQValue;
+function xqFunctionData(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
-  requiredArgCount(args, 1, 1);
-  result := xqvalueAtomize(args[0]);
+  requiredArgCount(args, 0, 1);
+  if length(args) = 0 then result := xqvalueAtomize(context.SeqValue)
+  else result := xqvalueAtomize(args[0]);
 end;
 
 //Number functions
