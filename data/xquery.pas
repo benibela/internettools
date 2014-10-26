@@ -1300,7 +1300,7 @@ type
   { TXQTermType }
 
   type
-  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikElementTest);
+  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikFunctionTest, tikElementTest);
 
   { TXQTermSequenceType }
 
@@ -1310,19 +1310,25 @@ type
     kind: TXQTypeInformationKind;
     atomicTypeInfo: TXSType; //only for tikAtomic
     nodeMatching: TXQPathMatchingStep; //only for tikElementTest
+    arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 
     constructor create();
+    destructor destroy; override;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function serialize: string;
   protected
+    function clone: TXQTerm; override;
+
     function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
     function castableAsBase(v: IXQValue): boolean;
     function castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
     function castableAs(v: IXQValue): boolean;
     function instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
     function instanceOf(const ta: IXQValue): boolean;
-    function clone: TXQTerm; override;
+    function subtypeOf(tb: TXQTermSequenceType): boolean;
+  private
+    function subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
   end;
 
   { TXQTermVariable }
@@ -3389,11 +3395,11 @@ begin
   end;
 end;
 
+const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];
 
 function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
 begin
-  if select = 'node' then
-    exit([qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument])
+  if select = 'node' then  exit(MATCH_ALL_NODES)
   else if select = 'text' then exit([qmText])
   else if select = 'comment' then exit([qmComment])
   else if select = 'element' then exit([qmElement])

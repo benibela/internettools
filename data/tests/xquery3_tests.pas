@@ -174,6 +174,60 @@ begin
   //named function references
   m('declare function wntc($a, $b) { concat(">",$a,$b,"<") }; (let $f := wntc#2 return $f)("foo","bar")', '>foobar<');
 
+  //function tests
+  t('(function (){()}, 123) ! (typeswitch(.) case function (*) return "function(*)" default return "int")', 'function(*) int');
+  t('(function ($as as xs:int) as xs:float{()}, function ($as as xs:decimal) as xs:float{()}, function ($as as xs:float) as xs:int{()},'+
+     'function ($as as xs:int) as xs:int{()}, function ($as as xs:decimal) as xs:int{()}, function ($as as xs:int) as xs:decimal{()},'+
+     'function ($as as xs:int) as xs:byte{()}, function ($as as xs:byte) as xs:int{()}, function ($as as xs:decimal) as xs:byte{()}, '+
+     'function ($as as xs:int, $ab as xs:int) as xs:int{()},function ($as as xs:int) {456}, 123) !'+
+      '(typeswitch(.) case function (int) as int return "int=>int" '+
+                     'case %local:foobar function(float) as int return "float=>int" '+
+                     'case %local:abc %local:pointless function(int) as float return "int=>float" '+
+                     'case function(int,int)as int return "int=>int=>int"' +
+                     'default return "?")',
+     'int=>float int=>float float=>int int=>int int=>int ? int=>int ? int=>int int=>int=>int ? ?');
+  t('(function ($as as empty-sequence()) as xs:int{()} , function ($as as xs:int?) as xs:int{()}, function ($as as xs:int*) as xs:int{()}, function ($as as xs:int) as xs:int{()}, function ($as as xs:int+) as xs:int{()})'+
+  '! ( concat( (typeswitch(.) case function (empty-sequence()) as int return "T" default return "F"), '+
+              '(typeswitch(.) case function (int?) as int return "T" default return "F"), '+
+              '(typeswitch(.) case function (int*) as int return "T" default return "F"), '+
+              '(typeswitch(.) case function (int) as int return "T" default return "F"), '+
+              '(typeswitch(.) case function (int+) as int return "T" default return "F") ) )',
+  'TFFFF TTFTF TTTTT FFFTF FFFTT');
+  t('(function ($as as item()) as int{()}, function ($as as node()) as int{()}, '+
+  'function ($as as comment()) as int{()}, function ($as as text()) as int{()}, '+
+  'function ($as as processing-instruction()) as int{()}, function ($as as processing-instruction(foobar)) as int{()}, '+
+  'function ($as as document-node()) as int{()}, function ($as as document-node(element(foobar))) as int{()}, function ($as as document-node(element(xyz))) as int{()}, '+
+  'function ($as as element()) as int{()}, function ($as as element(foobar)) as int{()}, function ($as as element(xyz)) as int{()}, '+
+  'function ($as as attribute()) as int{()}, function ($as as attribute(foobar)) as int{()}, function ($as as attribute(xyz)) as int{()} '+
+  ') ! ( concat( (typeswitch(.) case function (int) as int return "I" default return "-"), '+
+                '(typeswitch(.) case function (comment()) as int return "C" default return "-"), '+
+                '(typeswitch(.) case function (text()) as int return "T" default return "-"), '+
+                '(typeswitch(.) case function (processing-instruction(foobar)) as int return "P" default return "-"), '+
+                '(typeswitch(.) case function (document-node(element(foobar))) as int return "D" default return "-"), '+
+                '(typeswitch(.) case function (element(*)) as int return "E" default return "-"), '+
+                '(typeswitch(.) case function (element(foobar)) as int return "F" default return "-"), '+
+                '(typeswitch(.) case function (attribute(*)) as int return "A" default return "-"), '+
+                '(typeswitch(.) case function (attribute(foobar)) as int return "B" default return "-"))) ',
+  'ICTPDEFAB -CTPDEFAB -C------- --T------ ---P----- ---P----- ----D---- ----D---- --------- -----EF-- ------F-- --------- -------AB --------B ---------');
+  //we do not have namespace nodes   t('typeswitch(function ($as as namespace-node())) case function (namespace-node()) as int return 1 default return 2 ', '1');
+  //(schema-attribute, schema-element??)
+  t('(function ($as as element()) as int{()}, function ($as as element(foobar, xs:anyType?)) as int{()}, '+
+     'function ($as as element(xyz, xs:float)) as int{()}, '+
+     'function ($as as element(foobar, xs:float)) as int{()}, '+
+     'function ($as as element(foobar, xs:float?)) as int{()}, '+
+     'function ($as as element(*, xs:float)) as int{()}, '+
+     'function ($as as element(*, xs:float?)) as int{()}, '+
+     'function ($as as element(foobar, xs:decimal)) as int{()}, '+
+     'function ($as as element(foobar, xs:decimal?)) as int{()}, '+
+     'function ($as as element(*, xs:decimal)) as int{()}, '+
+     'function ($as as element(*, xs:decimal?)) as int{()}'+
+    ') ! ( concat( (typeswitch(.) case function (element()) as int return "*" default return "-"), '+
+                  '(typeswitch(.) case function (element(foobar)) as int return "F" default return "-"), '+
+                  '(typeswitch(.) case function (element(foobar, xs:int)) as int return "G" default return "-"), '+
+                  '(typeswitch(.) case function (element(*, xs:int)) as int return "I" default return "-"), '+
+                  '(typeswitch(.) case function (element(*, xs:int?)) as int return "J" default return "-"))) ',
+  '*FGIJ -FG--'{actually the spec says -F--- but see w3 bug 27175}+' ----- ----- ----- ----- ----- --G-- --G-- --GI- --GIJ');
+
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');

@@ -20,7 +20,7 @@ begin
   internetaccess_tests.unittests;
   testerrors := true; //better disable since they drive the lazarus debugger mad
   parsertests.unittests(testerrors);
- // xpath2_tests.unittests(testerrors);
+  xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
   xpath3_tests.unittests(testerrors);
   xquery3_tests.unittests(testerrors);

@@ -329,7 +329,31 @@ begin
         'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
         else raiseParsingError('XPST0003', 'WTF??');
       end;
-    end else begin;
+    end else if (word = 'function') or (word = '%') then begin
+      require3('function test');
+      if word = '%' then begin
+        parseAnnotations; //we do need this nonsense
+        expect('function');
+      end;
+      result.kind:=tikFunctionTest;
+      expect('(');
+      skipWhitespaceAndComment();
+      if pos^ = '*' then begin
+        expect('*');
+        expect(')');
+      end else begin
+        while pos^ <> ')' do begin
+          SetLength(result.arguments, length(result.arguments) + 1);
+          result.arguments[high(result.arguments)] := parseSequenceType();
+          skipWhitespaceAndComment();
+          if pos^ <> ')' then expect(',');
+        end;
+        expect(')');
+        expect('as');
+        SetLength(result.arguments, length(result.arguments) + 1);
+        result.arguments[high(result.arguments)] := parseSequenceType();
+      end;
+    end else begin
       staticContext.splitRawQName(namespace, word, xqdnkType);
       if (namespace = nil) then raiseParsingError('XPST0008', 'No schemas loaded for type '+word);
       result.kind:=tikAtomic;

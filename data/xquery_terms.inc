@@ -490,6 +490,14 @@ constructor TXQTermSequenceType.create();
 begin
 end;
 
+destructor TXQTermSequenceType.destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to high(arguments) do arguments[i].free;
+  inherited destroy;
+end;
+
 
 function TXQTermSequenceType.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
@@ -548,6 +556,8 @@ var nodeCondition: TXQPathNodeCondition;
   function instanceOfSingleType(sub: IXQValue): boolean;
   var
     t: TXSType;
+    fun: TXQValueFunction;
+    i: Integer;
   begin
     case kind of
       //tikAny, tikNone: ; //handled before
@@ -558,6 +568,15 @@ var nodeCondition: TXQPathNodeCondition;
         exit(false);
       end;
       tikElementTest: result  := TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, sub.toNode);
+      tikFunctionTest: begin
+        if not (sub is TXQValueFunction) then exit(false);
+        if length(arguments) = 0 then exit(true);
+        fun := sub as TXQValueFunction;
+        if (length(arguments) <> length(fun.parameters) + 1) or (fun.resulttype = nil) then exit(false);
+        for i := 0 to high(fun.parameters) do
+          if not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
+        result := fun.resulttype.subtypeOf(arguments[high(arguments)]);
+      end;
     end;
   end;
 var
@@ -594,6 +613,60 @@ var temp: TXQEvaluationContext;
 begin
   temp.staticContext := nil;
   result := instanceOf(ta, temp);
+end;
+
+function TXQTermSequenceType.subtypeOf(tb: TXQTermSequenceType): boolean;
+begin
+  if kind = tikNone then exit((tb.kind = tikNone) or tb.allowNone);
+  if tb.kind = tikNone then exit(false);
+  if (allowNone and not tb.allowNone) or (allowMultiple and not tb.allowMultiple) then exit(false);
+  result := subtypeItemTypeOf(tb);
+end;
+
+function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
+  function subtypeItemTypeAtomic(xsa, xsb: TXSType): boolean;
+  var
+    i: Integer;
+  begin
+    if xsa.derivedFrom(xsb) then exit(true);
+    result := false;
+    if xsa is TXSUnionType then begin
+      //should test for "Ai is a pure union type, and every type t in the transitive membership of Ai satisfies subtype-itemType(t, Bi)."
+      //does it work???
+      result := true;
+      for i := 0 to high(TXSUnionType(atomicTypeInfo).members) do
+        if not subtypeItemTypeAtomic(TXSUnionType(atomicTypeInfo).members[i], xsb) then
+          exit(false);
+    end;
+  end;
+var
+  temp: Boolean;
+  i: Integer;
+begin
+  if (kind = tikAtomic) and (tb.kind = tikAtomic) and subtypeItemTypeAtomic(atomicTypeInfo, tb.atomicTypeInfo) then
+    exit(true);
+  if tb.kind = tikAny then exit(true);
+  if (kind = tikElementTest) and (tb.kind = tikElementTest) then begin
+    if tb.nodeMatching.matching  = MATCH_ALL_NODES then exit(true);
+    if nodeMatching.matching * MATCH_ALL_NODES <> tb.nodeMatching.matching * MATCH_ALL_NODES then exit(false);
+    if (qmValue in tb.nodeMatching.matching) and (not (qmValue in nodeMatching.matching) or (tb.nodeMatching.value <> nodeMatching.value))  then exit(false);
+    if (qmCheckNamespace in tb.nodeMatching.matching) and (not (qmCheckNamespace in nodeMatching.matching) or (tb.nodeMatching.namespacePrefix <> nodeMatching.namespacePrefix))  then exit(false);
+    if (tb.nodeMatching.requiredType <> nil)
+        and ((tb.nodeMatching.requiredType.kind <> tikAtomic) or (tb.nodeMatching.requiredType.atomicTypeInfo.name <> 'anyType') or (tb.nodeMatching.requiredType.atomicTypeInfo.base <> nil)) then
+      exit((nodeMatching.requiredType <> nil) and (nodeMatching.requiredType.subtypeOf(tb.nodeMatching.requiredType)));
+    exit(true);
+  end;
+  if (kind = tikFunctionTest) and (tb.kind = tikFunctionTest) then begin
+    if length(tb.arguments) > 0 then begin
+      if length(arguments) <> length(tb.arguments) then exit(false);
+      for i := 0 to high(arguments) - 1 do
+        if not tb.arguments[i].subtypeOf(arguments[i]) then exit(false);
+      if not arguments[high(arguments)].subtypeOf(tb.arguments[high(tb.arguments)]) then exit(false);
+    end;
+    //subtype-assertions(AnnotationsA, AnnotationsB) is not defined (??)
+    exit(true);
+  end;
+  exit(false);
 end;
 
 function TXQTermSequenceType.clone: TXQTerm;
