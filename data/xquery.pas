@@ -750,8 +750,7 @@ type
 
   { TXQValueFunction }
   TXQFunctionParameter = record
-    namespace: INamespace;
-    name: string;
+    variable: TXQTermVariable;
     seqtype: TXQTermSequenceType;
   end;
 
@@ -1144,16 +1143,16 @@ type
     func: TXQComplexFunction;
     contextDependencies: TXQContextDependencies;
   end;
+  TXQTermDefineFunction = class;
   //**Information about a complex xquery function (interpreted => the function is defined as XQuery function)
 
   { TXQInterpretedFunctionInfo }
 
   TXQInterpretedFunctionInfo = class(TXQAbstractFunctionInfo)
     namespace: INamespace;
-    funcBody: string;
-    parameterNames: array of string;
+    source: string;
     contextDependencies: TXQContextDependencies;
-    term: TXQTerm;
+    definition: TXQTermDefineFunction;
     func: TXQValueFunction;
     procedure initialize();
     destructor Destroy; override;
@@ -1314,6 +1313,7 @@ type
     arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 
     constructor create();
+    constructor create(atomic: TXSType);
     destructor destroy; override;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
@@ -1374,6 +1374,9 @@ type
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
+  private
+    initialized: boolean;
+    procedure initNamedFunctionReference(const context: TXQEvaluationContext);
   end;
 
   { TXQTermNodeMatcher }
@@ -1438,7 +1441,10 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
   private
+    interpretedFunction: TXQValueFunction;
+    functionStaticContext: TXQStaticContext;
     class function findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+    procedure init(const context: TXQEvaluationContext);
   end;
 
   { TXQDynamicFunctionCall }
@@ -2161,6 +2167,7 @@ type
     procedure add(const name: string; const value: boolean; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: TDateTime; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(const name: string; const value: TTreeNode; const namespace: INamespace = nil); //**< Add a variable (@code(value) is converted to a IXQValue)
+    procedure add(variable: TXQTermVariable; const value: IXQValue); inline; //**< Add a variable
 
     function get(const name: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
     function get(const name: string; const namespace: INamespace): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
@@ -2361,28 +2368,22 @@ var
   tempQuery: TXQuery;
   i: Integer;
 begin
-  if term <> nil then exit;
-  if term = nil then begin
+  if definition <> nil then exit;
+  if definition = nil then begin
    EnterCriticalsection(interpretedFunctionSynchronization);
    try
      temp := TXQueryEngine.create;
      try
        if namespace <> nil then temp.GlobalNamespaces.add(namespace);
-       tempQuery := temp.parseTerm(funcBody, xqpmXQuery1, temp.StaticContext);
-       term := tempQuery.fterm;
+       tempQuery := temp.parseTerm(source, xqpmXQuery3, temp.StaticContext);
+       definition := tempQuery.fterm as TXQTermDefineFunction;
+       func := tempQuery.evaluate() as TXQValueFunction;
+       func._AddRef;
        tempQuery.fTerm := nil;
        tempQuery.Free;
      finally
        temp.free;
      end;
-     func := TXQValueFunction.create;
-     setlength(func.parameters, length(versions[0].types));
-     for i:= 0 to high(func.parameters) do begin
-       func.parameters[i].seqtype := versions[0].types[i];
-       func.parameters[i].name := parameterNames[i];
-     end;
-     func.resulttype := versions[0].returnType;
-     func.body := term;
    finally
      LeaveCriticalsection(interpretedFunctionSynchronization);
    end;
@@ -2391,8 +2392,8 @@ end;
 
 destructor TXQInterpretedFunctionInfo.Destroy;
 begin
-  func.free;
-  term.Free;
+  definition.free;
+  func._Release;
   inherited Destroy;
 end;
 
@@ -4050,6 +4051,11 @@ end;
 procedure TXQVariableChangeLog.add(const name: string; const value: TTreeNode; const namespace: INamespace = nil);
 begin
   add(name, xqvalue(value), namespace);
+end;
+
+procedure TXQVariableChangeLog.add(variable: TXQTermVariable; const value: IXQValue);
+begin
+  add(variable.value, value, variable.namespace);
 end;
 
 function TXQVariableChangeLog.get(const name: string): IXQValue;
@@ -5891,18 +5897,11 @@ var
 begin
   temp := TXQInterpretedFunctionInfo.Create;
   temp.namespace := namespace;
-  temp.funcBody:=func;
+  temp.source:='function ' + typeDeclaration + '{' +  func + '}';
   temp.contextDependencies:=contextDependencies;
   interpretedFunctions.AddObject(name, temp);
   parseTypeChecking(temp, [typeDeclaration]);
   temp.versions[0].name:=name; //just for error printing
-
-  decl := typeDeclaration;
-  setlength(temp.parameterNames, length(temp.versions[0].types));
-  for i := 0 to high(temp.parameterNames) do begin
-    strSplitGet('$', decl);
-    temp.parameterNames[i] := strSplitGet(' ', decl); //hack
-  end;
 end;
 
 function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;

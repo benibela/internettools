@@ -491,6 +491,12 @@ constructor TXQTermSequenceType.create();
 begin
 end;
 
+constructor TXQTermSequenceType.create(atomic: TXSType);
+begin
+  kind := tikAtomic;
+  atomicTypeInfo := atomic;
+end;
+
 destructor TXQTermSequenceType.destroy;
 var
   i: Integer;
@@ -1228,31 +1234,6 @@ begin
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
-  function suggestions: string;
-  function strSimilar(const s, ref: string): boolean;
-  begin
-    result := strContains(s, ref) or strContains(ref, s)
-              or (strSimilarity(funcname, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
-  end;
-  var
-    module: TXQNativeModule;
-    i: Integer;
-  begin
-    result := '';
-    if namespace = nil then exit();
-    module := TXQueryEngine.findNativeModule(namespace.getURL);
-    while module <> nil do begin
-      for  i := 0 to module.basicFunctions.Count - 1 do
-        if strSimilar(funcname, module.basicFunctions[i]) then
-          result += module.basicFunctions[i]+' ';
-      for i := 0 to module.complexFunctions.Count - 1 do
-        if strSimilar(funcname, module.complexFunctions[i]) then
-          result += module.complexFunctions[i]+' ';
-      module := module.parent;
-    end;
-    if result <> '' then result := LineEnding +'Did you mean: '+ result;
-  end;
-
 var
   evilkids: TXQVArray;
   tempcontext: TXQEvaluationContext;
@@ -1289,38 +1270,8 @@ begin
       end;
     end;
     xqfkUnknown, xqfkNativeInterpreted: begin
-      if kind <> xqfkNativeInterpreted then begin
-        vfunc := nil;
-        ns := namespace;
-        sc := context.findModuleStaticContext(ns);
-        if sc <> nil then
-          for i := 0 to high(sc.functions) do
-            if (sc.functions[i].name = funcname)
-               and  (length(sc.functions[i].parameters) = length(children))
-               and ((sc.functions[i].namespace = ns) or ((ns <> nil) and (sc.functions[i].namespace <> nil) and (sc.functions[i].namespace.getURL = ns.getURL))) then begin
-              vfunc := sc.functions[i];
-              break;
-            end;
-        if vfunc <> nil then begin
-          if sc <> context.staticContext {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
-            for i := 0 to high(vfunc.annotations) do
-              if (vfunc.annotations[i].name = 'private') and (equalNamespaces(vfunc.annotations[i].namespace, XMLNamespace_XQuery)) then
-                raiseParsingError('XPST0017', vfunc.name + ' is private');
-        end else begin
-          findKindIndex(namespace, funcname, kind, func);
-          if kind <> xqfkUnknown then exit(evaluate(context));
-          //if namespace <> nil then raiseEvaluationError('XPST0017', 'Function {'+ namespace.geturl+'}'+namespace.getPrefix+':'+funcname+' not found')
-          //else }
-          raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found. '+suggestions);
-        end;
-      end else begin
-        if TXQInterpretedFunctionInfo(func).func = nil then
-          TXQInterpretedFunctionInfo(func).initialize();
-        vfunc :=  TXQInterpretedFunctionInfo(func).func;
-        sc := context.staticContext;
-      end;
-
-      result := vfunc.evaluate(context, evilkids, sc);
+      init(context);
+      result := interpretedFunction.evaluate(context, evilkids, functionStaticContext);
     end;
   end;
 end;
@@ -1394,6 +1345,72 @@ begin
   end;
 
   exit(false);
+end;
+
+procedure TXQTermNamedFunction.init(const context: TXQEvaluationContext);
+  function suggestions: string;
+  function strSimilar(const s, ref: string): boolean;
+  begin
+    result := strContains(s, ref) or strContains(ref, s)
+              or (strSimilarity(funcname, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
+  end;
+  var
+    module: TXQNativeModule;
+    i: Integer;
+  begin
+    result := '';
+    if namespace = nil then exit();
+    module := TXQueryEngine.findNativeModule(namespace.getURL);
+    while module <> nil do begin
+      for  i := 0 to module.basicFunctions.Count - 1 do
+        if strSimilar(funcname, module.basicFunctions[i]) then
+          result += module.basicFunctions[i]+' ';
+      for i := 0 to module.complexFunctions.Count - 1 do
+        if strSimilar(funcname, module.complexFunctions[i]) then
+          result += module.complexFunctions[i]+' ';
+      module := module.parent;
+    end;
+    if result <> '' then result := LineEnding +'Did you mean: '+ result;
+  end;
+var
+  ns: INamespace;
+  i: Integer;
+  f: TXQValueFunction;
+begin
+  if not (kind in [xqfkNativeInterpreted, xqfkUnknown]) or (interpretedFunction <> nil) then exit;
+  case kind of
+    xqfkUnknown: begin
+      ns := namespace;
+      functionStaticContext := context.findModuleStaticContext(ns);
+      if functionStaticContext <> nil then
+        for i := 0 to high(functionStaticContext.functions) do begin
+          f :=  functionStaticContext.functions[i];
+          if (f.name = funcname)
+             and  (length(f.parameters) = length(children))
+             and ((f.namespace = ns) or ((ns <> nil) and (f.namespace <> nil) and (f.namespace.getURL = ns.getURL))) then begin
+            interpretedFunction := f;
+            break;
+          end;
+        end;
+      if interpretedFunction <> nil then begin
+        if functionStaticContext <> context.staticContext {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
+          for i := 0 to high(interpretedFunction.annotations) do
+            if (interpretedFunction.annotations[i].name = 'private') and (equalNamespaces(interpretedFunction.annotations[i].namespace, XMLNamespace_XQuery)) then
+              raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
+      end else begin
+        findKindIndex(namespace, funcname, kind, func);
+        if kind <> xqfkUnknown then exit();
+        if namespace <> nil then raiseEvaluationError('XPST0017', 'Function '+ namespace.getPrefix+':'+funcname+' not found. '+suggestions)
+        else raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found. '+suggestions);
+      end;
+    end;
+    xqfkNativeInterpreted: begin
+      if TXQInterpretedFunctionInfo(func).func = nil then
+        TXQInterpretedFunctionInfo(func).initialize();
+      interpretedFunction :=  TXQInterpretedFunctionInfo(func).func;
+      functionStaticContext := context.staticContext;
+    end;
+  end;
 end;
 
 { TXQDynamicFunctionCall }
@@ -2510,6 +2527,7 @@ var
   i: Integer;
 begin
   parameterCount := arity;
+  funcname:=qname;
   staticContext.splitRawQName(anamespace, qname, xqdnkFunction);
   call := TXQTermNamedFunction.create(anamespace,qname);
   for i := 1 to arity do begin
@@ -2525,15 +2543,24 @@ var
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
   i: Integer;
   tempterm: TXQTermFlower;
+  namedFunctionReference: Boolean;
 begin
-  temp := define;
-  temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
-  temp.ownedBody := true;
+  namedFunctionReference := (funcname <> '') and (children[high(children)] is TXQTermNamedFunction);
+  if namedFunctionReference then begin
+    initNamedFunctionReference(context);
+    if TXQTermNamedFunction(children[high(children)]).kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
+      temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
+    end else temp := define;
+  end else temp := define;
+  if not temp.ownedBody then begin
+    temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
+    temp.ownedBody := true;
+  end;
   result := temp;
   tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
   try
-    for i := 0 to parameterCount - 1 do
-      tempVisitor.declare(@((children[i] as TXQTermDefineVariable).variable));
+    for i := 0 to high(temp.parameters) do
+      tempVisitor.declare(@temp.parameters[i].variable);
     tempVisitor.context := @context;
     tempVisitor.simpleTermVisit(@temp.body, nil);
     if tempVisitor.uncertainVariables <> nil then begin
@@ -2564,8 +2591,7 @@ begin
   setlength(result.parameters, parameterCount);
   for i := 0 to high(result.parameters) do begin
     v := ((children[i] as TXQTermDefineVariable).variable as TXQTermVariable);
-    result.parameters[i].namespace:=v.namespace;
-    result.parameters[i].name:=v.value;
+    result.parameters[i].variable := v;
     if length((children[i] as TXQTermDefineVariable).children) > 0 then
       result.parameters[i].seqtype:=(children[i] as TXQTermDefineVariable).children[0] as TXQTermSequenceType
      else
@@ -2617,5 +2643,59 @@ begin
   for i := 0 to high(annotations) do for j := 0 to high(annotations[i].params) do
     FreeAndNil(annotations[i].params[j]);
   inherited destroy;
+end;
+
+procedure TXQTermDefineFunction.initNamedFunctionReference(const context: TXQEvaluationContext);
+  function typetransform(t: TXQTermSequenceType): TXQTermSequenceType;
+  begin
+    result := TXQTermSequenceType(t.clone);
+    if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
+      result.atomicTypeInfo := baseSchema.anyAtomicType;
+  end;
+
+var
+  namedFunctionReference: Boolean;
+  nc: array of TXQTerm;
+  version: ^TXQFunctionParameterTypes;
+  resulttype: TXQTermSequenceType;
+  f: TXQTermNamedFunction;
+  i: Integer;
+begin
+  namedFunctionReference := (funcname <> '') and (children[high(children)] is TXQTermNamedFunction);
+  if (not namedFunctionReference) or initialized then exit;
+
+  f := TXQTermNamedFunction(children[high(children)]);
+  if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then
+    f.init(context);
+
+  version := nil;
+  resulttype := nil;
+  case f.kind  of
+    xqfkBasic, xqfkComplex:
+      for i := 0 to high(f.func.versions) do
+        if length(f.func.versions[i].types) = parameterCount then begin
+          version := @f.func.versions[i];
+          break;
+        end;
+  end;
+
+  if version <> nil then begin
+    for i := 0 to parameterCount-1 do
+      (children[i] as TXQTermDefineVariable).push(typetransform(version^.types[i]));
+    resulttype := typetransform(version^.returnType);
+  end else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
+    for i := 0 to parameterCount-1 do
+      (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.string_));
+    resulttype := TXQTermSequenceType.create(baseSchema.string_);
+  end;
+
+  if resulttype <> nil then begin
+    nc := children;
+    SetLength(nc, length(nc) + 1);
+    nc[high(nc)] := nc[high(nc)-1];
+    nc[high(nc)-1] := resulttype;
+    children := nc;
+  end;
+  initialized := true;
 end;
 

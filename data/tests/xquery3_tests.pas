@@ -172,7 +172,11 @@ begin
   t('let $g := let $x := 1, $f := function($y) { typeswitch ($y) case xs:integer return $x case $x as xs:string return $x default return ($x||":"||$y) } return $f return ($g(7), $g("foo"), $g(7.4)) ', '1 foo 1:7.4');
 
   //named function references
+  t('let $d := data#0 return <a>2</a> ! $d()', '2');
+  t('let $d := data#1 return <a>2</a> ! $d(.)', '2');
+  m('declare function local:double($x) { 2 * $x }; join( (abs#1, boolean#1, local:double#1, floor#1) ! (.(-17.5)) ) ', '17.5 true -35 -18');
   m('declare function wntc($a, $b) { concat(">",$a,$b,"<") }; (let $f := wntc#2 return $f)("foo","bar")', '>foobar<');
+  m('declare namespace libjn = "http://jsoniq.org/function-library"; let $d := libjn:descendant-pairs#1 return join($d([{"a": 1, "b": 2}]) ! serialize-json(.))', '{"a": 1} {"b": 2}');
 
   //function tests
   t('(function (){()}, 123) ! (typeswitch(.) case function (*) return "function(*)" default return "int")', 'function(*) int');
@@ -227,6 +231,11 @@ begin
                   '(typeswitch(.) case function (element(*, xs:int)) as int return "I" default return "-"), '+
                   '(typeswitch(.) case function (element(*, xs:int?)) as int return "J" default return "-"))) ',
   '*FGIJ -FG--'{actually the spec says -F--- but see w3 bug 27175}+' ----- ----- ----- ----- ----- --G-- --G-- --GI- --GIJ');
+
+  t('typeswitch (boolean#1) case function (item()*) as xs:boolean return "T" default return "F"', 'T');
+  t('concat#4 ! (typeswitch (.) case function (string,string,string,string) as xs:string return "T" default return "F", typeswitch (.) case function (item(),item(),item(),item()) as xs:string return "T" default return "F")', 'T F');
+  t('abs#1 ! (typeswitch (.) case function (anyAtomicType?) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (item()) as anyAtomicType? return "T" default return "F")', 'T F');
+  m('declare function wntc($a as xs:int, $b as xs:string) as xs:float { concat(">",$a,$b,"<") }; typeswitch (wntc#2) case function (int, string) as xs:float return "T" default return "F"', 'T');
 
 
   //interface tests
