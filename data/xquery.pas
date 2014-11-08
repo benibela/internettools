@@ -2393,7 +2393,7 @@ end;
 destructor TXQInterpretedFunctionInfo.Destroy;
 begin
   definition.free;
-  func._Release;
+  if func <> nil then func._Release;
   inherited Destroy;
 end;
 
