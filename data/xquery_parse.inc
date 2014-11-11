@@ -1886,8 +1886,11 @@ begin
       if token = ';' then expect(';');
       token := nextToken(true);
     end;
-    if result <> nil then TXQTermModule(result).push(parsePrimaryLevel)
-    else result := parsePrimaryLevel();
+    if result <> nil then begin
+      TXQTermModule(result).push(parsePrimaryLevel);
+      if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
+        SetLength(TXQTermModule(result).children, high(TXQTermModule(result).children));
+    end else result := parsePrimaryLevel();
   except
     result.free;
     raise;
