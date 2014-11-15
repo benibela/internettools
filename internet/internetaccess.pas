@@ -172,7 +172,8 @@ type
 
 //procedure decodeURL(const totalURL: string; out protocol, host, url: string);
 //** Splits a url into parts
-function decodeURL(const totalURL: string): TDecodedUrl;
+//** normalize performs some normalizations (e.g. foo//bar -> foo/bar)
+function decodeURL(const totalURL: string; normalize: boolean = true): TDecodedUrl;
 
 type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
 
@@ -222,7 +223,7 @@ begin
   if url = '' then url := '/';
 end;      *)
 
-function decodeURL(const totalURL: string): TDecodedUrl;
+function decodeURL(const totalURL: string; normalize: boolean): TDecodedUrl;
 var url: String;
     userPos: SizeInt;
     slashPos: SizeInt;
@@ -287,6 +288,13 @@ begin
     result.path := strSplitGet('#', url);
     result.linktarget:='#'+url;
   end else result.path := url;
+
+  if normalize then begin
+    p := 2;
+    while (p <= length(result.path)) do
+      if (result.path[p] = '/') and (result.path[p-1] = '/') then delete(result.path, p, 1)
+      else p += 1;
+  end;
 end;
 
 function guessType(const data: string): TRetrieveType;

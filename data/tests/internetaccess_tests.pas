@@ -21,12 +21,13 @@ begin
     raise Exception.Create('test: '+name+': '+a+' <> '+b);
 end;
 
-procedure testurl(fullUrl: string; protocol, username, password, host, port, path, params, linktarget: string);
+procedure testurl(fullUrl: string; protocol, username, password, host, port, path, params, linktarget: string; combined: string = '');
 var
   decoded: TDecodedUrl;
 begin
   decoded := decodeURL(fullUrl);
-  test(decoded.combined, fullUrl);
+  if combined = '' then test(decoded.combined, fullUrl)
+  else test(decoded.combined, combined);
   test(decoded.protocol, protocol, fullUrl);
   test(decoded.username, username, fullUrl);
   test(decoded.password, password, fullUrl);
@@ -1078,6 +1079,7 @@ begin
 
 
   testurl('https://ssl.muenchen.de/aDISWeb/app?service=direct/0/Home/$DirectLink&sp=SOPAC', 'https', '', '', 'ssl.muenchen.de', '', '/aDISWeb/app', '?service=direct/0/Home/$DirectLink&sp=SOPAC', '');
+  testurl('https://ssl.muenchen.de//////aDISWeb///////app?service=direct//0///Home////$DirectLink&sp=SOPAC', 'https', '', '', 'ssl.muenchen.de', '', '/aDISWeb/app', '?service=direct//0///Home////$DirectLink&sp=SOPAC', '', 'https://ssl.muenchen.de/aDISWeb/app?service=direct//0///Home////$DirectLink&sp=SOPAC');
 
 end;
 
