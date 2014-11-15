@@ -2862,7 +2862,6 @@ end;
 function TXQTermModule.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if context.staticContext.moduleNamespace <> nil then raiseEvaluationError('', 'A module cannot be evaluated');
-  if children[high(children)] = nil then raiseEvaluationError('', 'A XQuery expression that does not return a value cannot be evaluated.');
   result := children[high(children)].evaluate(context);
 end;
 
@@ -2879,20 +2878,17 @@ var
   functions: array of TXQValueFunction;
   functionCount: Integer;
   vars: TXQVariableChangeLog;
-  truechildcount: Integer;
-
+  truechildrenhigh: integer;
 begin
-  truechildcount := length(children);
-  if context.staticContext.moduleNamespace <> nil then truechildcount-=1;
-
   functionCount := 0;
-  for i:=0 to truechildcount - 1 do
+  truechildrenhigh := high(children) -  ifthen(context.staticContext.moduleNamespace = nil, 1,0);
+  for i:=0 to truechildrenhigh do
     if children[i] is TXQTermDefineFunction then
       functionCount += 1;
   setlength(context.staticContext.functions, length(context.staticContext.functions) + functionCount);
   functions := context.staticContext.functions;
   functionCount := length(context.staticContext.functions) - functionCount;
-  for i:=0 to high(children) - 1 do
+  for i:=0 to truechildrenhigh do
     if children[i] is TXQTermDefineFunction then begin
       functions[functionCount] := TXQTermDefineFunction(children[i]).define();
       functions[functionCount].context := context;
@@ -2925,7 +2921,7 @@ begin
 
   if targetStaticContext.moduleVariables = nil then targetStaticContext.moduleVariables := TXQVariableChangeLog.create();
   vars := targetStaticContext.moduleVariables;
-  for i:=0 to high(children) - 1 do
+  for i:=0 to high(children) - ifthen(context.staticContext.moduleNamespace = nil, 1,0) do
     if children[i] is TXQTermDefineVariable then begin
       tempDefVar := TXQTermDefineVariable(children[i]);
       priv := false;

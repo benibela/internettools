@@ -1886,11 +1886,15 @@ begin
       if token = ';' then expect(';');
       token := nextToken(true);
     end;
-    if result <> nil then begin
-      TXQTermModule(result).push(parsePrimaryLevel);
-      if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
-        SetLength(TXQTermModule(result).children, high(TXQTermModule(result).children));
-    end else result := parsePrimaryLevel();
+    if result = nil then result := parsePrimaryLevel()
+    else if staticContext.moduleNamespace = nil then begin //main module
+        TXQTermModule(result).push(parsePrimaryLevel);
+        if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
+          raiseParsingError('XPST0003', 'A main module must have a query body, it cannot only declare functions/variables (add ; ())');
+    end else begin
+      if nextToken(true) <> '' then
+        raiseParsingError('XPST0003', 'Module should have ended, but input query did not');
+    end;
   except
     result.free;
     raise;
