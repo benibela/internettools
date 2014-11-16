@@ -109,16 +109,22 @@ function xqFunctionParseJson(const args: TXQVArray): IXQValue;
 var
   scanner: TJSONScanner;
 
-  function nextToken: TJSONToken;
-  begin
-    while scanner.FetchToken = tkWhitespace do ;
-    result := scanner.CurToken;
-  end;
-
   procedure raiseError(message: string);
   begin
     raise EXQEvaluationException.create('jerr:JNDY0021', message+' at ' + scanner.CurTokenString + ' in '+scanner.CurLine);
   end;
+
+  function nextToken: TJSONToken;
+  begin
+    try
+      while scanner.FetchToken = tkWhitespace do ;
+    except
+      on e: EScannerError do
+        raiseError('Failed to parse JSON: '+ e.Message);
+    end;
+    result := scanner.CurToken;
+  end;
+
 
   function parse(repeatCurToken: boolean = false): IXQValue;
 
