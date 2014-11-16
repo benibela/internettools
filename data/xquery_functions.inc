@@ -965,8 +965,10 @@ end;
 function xqFunctionData(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0, 1);
-  if length(args) = 0 then result := xqvalueAtomize(context.SeqValue)
-  else result := xqvalueAtomize(args[0]);
+  if length(args) = 0 then begin
+    if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'fn:data() cannot be used without context item');
+    result := xqvalueAtomize(context.SeqValue)
+  end else result := xqvalueAtomize(args[0]);
 end;
 
 //Number functions

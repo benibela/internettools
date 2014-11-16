@@ -172,7 +172,7 @@ begin
   t('let $g := let $x := 1, $f := function($y) { typeswitch ($y) case xs:integer return $x case $x as xs:string return $x default return ($x||":"||$y) } return $f return ($g(7), $g("foo"), $g(7.4)) ', '1 foo 1:7.4');
 
   //named function references
-  t('let $d := data#0 return <a>2</a> ! $d()', '2');
+  f('let $d := data#0 return <a>2</a> ! $d()', 'err:XPDY0002');
   t('let $d := data#1 return <a>2</a> ! $d(.)', '2');
   m('declare function local:double($x) { 2 * $x }; join( (abs#1, boolean#1, local:double#1, floor#1) ! (.(-17.5)) ) ', '17.5 true -35 -18');
   m('declare function wntc($a, $b) { concat(">",$a,$b,"<") }; (let $f := wntc#2 return $f)("foo","bar")', '>foobar<');
