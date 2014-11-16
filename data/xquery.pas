@@ -784,6 +784,7 @@ type
     function toBooleanEffective: boolean; override;
 
     function evaluate(const newcontext: TXQEvaluationContext; const args: TXQVArray; staticContext: TXQStaticContext {necessary?}): IXQValue;
+    function evaluate(const args: TXQVArray): IXQValue;
 
     function directClone: TXQValue;
     function clone: IXQValue; override;

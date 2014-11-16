@@ -1442,7 +1442,7 @@ begin
     setlength(evilkids, length(children)-1);
     for i:=1 to high(children) do
       evilkids[i-1] := children[i].evaluate(context);
-    exit((func as TXQValueFunction).evaluate(context, evilkids, context.staticContext));
+    exit((func as TXQValueFunction).evaluate(evilkids));
   end;
 
   if length(children) = 1 then begin
@@ -2557,6 +2557,7 @@ begin
     temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
     temp.ownedBody := true;
   end;
+  temp.context := context; //??
   result := temp;
   tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
   try

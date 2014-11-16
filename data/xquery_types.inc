@@ -1764,6 +1764,11 @@ begin
   tempcontext.temporaryVariables.free;
 end;
 
+function TXQValueFunction.evaluate(const args: TXQVArray): IXQValue;
+begin
+  result := evaluate(context, args, context.staticContext);
+end;
+
 function TXQValueFunction.directClone: TXQValue;
 var
   f: TXQValueFunction;
