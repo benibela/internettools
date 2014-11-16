@@ -6220,6 +6220,13 @@ fn.registerFunction('idref', @xqFunctionId, ['($arg as xs:string*) as node()*', 
 fn.registerFunction('element-with-id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
 
 
+fn3.registerInterpretedFunction('for-each', '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
+fn3.registerInterpretedFunction('filter', '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
+fn3.registerFunction('fold-left', @xqFunctionFoldLeft, ['($seq as item()*, $zero as item()*, $f as function(item()*, item()) as item()*) as item()*']);
+fn3.registerFunction('fold-right', @xqFunctionFoldRight, ['($seq as item()*, $zero 	 as item()*, $f 	 as function(item()*, item()) as item()*) as item()*']);
+fn3.registerFunction('for-each-pair', @xqFunctionForEachPair, ['($seq1 as item()*, $seq2 as item()*, $f as function(item(), item()) as item()*) as item()*']);
+
+
 //Operators
 //The type information are just the function declarations of the up-backing functions
 //However, ? were added, since the operators accept empty sequences

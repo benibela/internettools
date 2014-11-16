@@ -115,6 +115,8 @@ begin
 
   t('let $f := function ($g, $n) { if ($n <= 1) then 1 else $n * $g($g, $n - 1)  } return $f($f, 10) ', '3628800');
 
+  t('for $f in ((1,2,3) ! function(){.}) return "a" ! $f()', '1 2 3');
+
   //closures
   t('(let $x := 17, $f := function ($y) { $x} return $f)(10)', '17');
   t('(let $x := 17, $f := function ($y) { $y } return $f)(10)', '10');
@@ -146,6 +148,23 @@ begin
   //Named Function References
   t('(let $f := concat#3 return $f)("a","b","c")', 'abc');
   t('(let $f := abs#1 return $f)(-1234)', '1234');
+
+  //higher order functions
+  t('join(for-each((1,2,3), function($x) {$x * 10}))', '10 20 30');
+  t('join(fn:filter(1 to 3, function($x) {$x ne 2}))', '1 3');
+  //standard test cases
+  t('fn:fold-left(1 to 5, 0, function($a, $b) { $a + $b })', '15');
+  t('fold-left((2,3,5,7), 1, function($a, $b) { $a * $b })', '210');
+  t('fold-left((true(), false(), false()), false(), function($a, $b) { $a or $b })', 'true');
+  t('fn:fold-left((true(), false(), false()), false(), function($a, $b) { $a and $b })', 'false');
+  t('fn:fold-left(1 to 5, (), function($a, $b) {($b, $a)})', '5 4 3 2 1');
+//  t('fold-left(1 to 5, "", fn:concat(?, ".", ?))', '.1.2.3.4.5');
+//  t('fold-left(1 to 5, "$zero", fn:concat("$f(", ?, ", ", ?, ")")', '$f($f($f($f($f($zero, 1), 2), 3), 4), 5)');
+  t('fold-right(1 to 5, 0, function($a, $b) { $a + $b })', '15');
+//  t('fold-right(1 to 5, "", fn:concat(?, ".", ?))', '1.2.3.4.5.');
+//  t('fold-right(1 to 5, "$zero", concat("$f(", ?, ", ", ?, ")"))', '$f(1, $f(2, $f(3, $f(4, $f(5, $zero)))))');
+  t('for-each-pair(1 to 5, 1 to 5, function($a, $b){10*$a + $b})', '11 22 33 44 55');
+  t('fn:for-each-pair(("a", "b", "c"), ("x", "y", "z"), concat#2)', 'ax by cz');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
