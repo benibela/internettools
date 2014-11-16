@@ -1172,7 +1172,7 @@ begin
     expect('|');
     jn := TXQueryEngine.findNativeModule('http://jsoniq.org/functions');
     if jn = nil then raiseParsingError('pxp:JSONIQ', 'The {| .. |} syntax can only be used, if the json unit is loaded.');
-    result := TXQTermNamedFunction.create(xqfkBasic, jn.findBasicFunction('object'));
+    result := TXQTermNamedFunction.create(xqfkBasic, jn.findBasicFunction('object', xqpmXPath2));
     result := parseSequenceLike(result, '|');
     expect('}');
     exit;
@@ -1349,8 +1349,8 @@ begin
           end;
 
         end else begin
-          result := TXQTermNamedFunction.createIfExists(word, staticContext);
-          if result = nil then raiseParsingError('XPST0003', 'unknown function: '+word);
+          result := TXQTermNamedFunction.createIfExists(word, staticContext, parsingModel);
+          if result = nil then raiseParsingError('XPST0017', 'unknown function: '+word);
           result := parseSequenceLike(TXQTermNamedFunction(result));
 
           with TXQTermNamedFunction(result) do

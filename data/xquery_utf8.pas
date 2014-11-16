@@ -125,10 +125,10 @@ end;
 var fn: TXQNativeModule;
 initialization
   fn := TXQueryEngine.findNativeModule(XMLNamespaceURL_XPathFunctions);
-  fn.findComplexFunction('string-length').func:=@xqFunctionString_length;
-  fn.findBasicFunction('translate').func:=@xqFunctionTranslate;
-  fn.findBasicFunction('substring').func:=@xqFunctionSubstring;
-  fn.findBasicFunction('string-to-codepoints').func:=@xqFunctionString_to_codepoints;
+  fn.findComplexFunction('string-length', xqpmXPath2).func:=@xqFunctionString_length;
+  fn.findBasicFunction('translate', xqpmXPath2).func:=@xqFunctionTranslate;
+  fn.findBasicFunction('substring', xqpmXPath2).func:=@xqFunctionSubstring;
+  fn.findBasicFunction('string-to-codepoints', xqpmXPath2).func:=@xqFunctionString_to_codepoints;
   fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode, ['($arg as xs:string?) as xs:string', '($arg as string?, $normalizationForm as xs:string) as xs:string']);
 end.
 

@@ -3795,7 +3795,7 @@ begin
   t('xs:decimal(1e18)', '1000000000000000000');
 
 
-  if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode') <> nil then begin
+  if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode', xqpmXPath2) <> nil then begin
     t('translate("Hallö", "aö", "äo")', 'Hällo');
     t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
     t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);
@@ -3988,6 +3988,7 @@ begin
   f('"a" || "b"', 'err:XPST0003');
   f('(1,2) ! 7', 'err:XPST0003');
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
+  f('fn:map(1,2)', 'err:XPST0017');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');

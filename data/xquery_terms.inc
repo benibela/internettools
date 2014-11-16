@@ -1200,22 +1200,22 @@ begin
   func := afunc;
 end;
 
-constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string);
+constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string; const model: TXQParsingModel);
 begin
-  if not findKindIndex(ns, name, kind, func) then begin
+  if not findKindIndex(ns, name, model, kind, func) then begin
     kind := xqfkUnknown;
     funcname:=name;
     namespace := ns;
   end;
 end;
 
-constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string; args: array of TXQTerm);
+constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string; args: array of TXQTerm; const model: TXQParsingModel);
 begin
-  create(ns, name);
+  create(ns, name, model);
   push(args);
 end;
 
-class function TXQTermNamedFunction.createIfExists(const name: string; const sc: TXQStaticContext): TXQTermNamedFunction;
+class function TXQTermNamedFunction.createIfExists(const name: string; const sc: TXQStaticContext; const model: TXQParsingModel): TXQTermNamedFunction;
 var akind: TXQTermNamedFunctionKind;
     afunc: TXQAbstractFunctionInfo;
     localName: string;
@@ -1223,14 +1223,15 @@ var akind: TXQTermNamedFunctionKind;
 begin
   localName:=name;
   sc.splitRawQName(ns, localName, xqdnkFunction);
-  if findKindIndex(ns, localName, akind, afunc) then exit(TXQTermNamedFunction.Create(akind, afunc))
+  if findKindIndex(ns, localName, model, akind, afunc) then exit(TXQTermNamedFunction.Create(akind, afunc))
   else if pos(':', name) = 0 then begin
      if sc.defaultElementTypeNamespace <> nil then begin
-       if findKindIndex(sc.defaultElementTypeNamespace, localName, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc))
+       if findKindIndex(sc.defaultElementTypeNamespace, localName, model, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc))
      end else if sc.defaultTypeNamespace <> nil then
-       if findKindIndex(sc.defaultTypeNamespace, localName, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc));
+       if findKindIndex(sc.defaultTypeNamespace, localName, model, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc));
   end;
-  result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet
+  if equalNamespaces(ns, XMLNamespace_XPathFunctions) then exit(nil);
+  result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet. XQuery can have mutually recursive functions, but this is called during the function declaration (i.e. before the 2nd function has been parsed)
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -1300,7 +1301,7 @@ begin
   end;
 end;
 
-class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
   aindex: Integer;
   module: TXQNativeModule;
@@ -1312,19 +1313,19 @@ begin
 
   if (module = nil) then exit(false);
 
-  afunc := module.findBasicFunction(name);
+  afunc := module.findBasicFunction(name, model);
   if afunc <> nil then begin
     akind:=xqfkBasic;
     exit(true);
   end;
 
-  afunc := module.findComplexFunction(name);
+  afunc := module.findComplexFunction(name, model);
   if afunc <> nil then begin
     akind:=xqfkComplex;
     exit(true);
   end;
 
-  afunc := module.findInterpretedFunction(name);
+  afunc := module.findInterpretedFunction(name, model);
   if afunc <> nil then begin
     akind:=xqfkNativeInterpreted;
     exit(true);
@@ -1398,7 +1399,7 @@ begin
             if (interpretedFunction.annotations[i].name = 'private') and (equalNamespaces(interpretedFunction.annotations[i].namespace, XMLNamespace_XQuery)) then
               raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
-        findKindIndex(namespace, funcname, kind, func);
+        findKindIndex(namespace, funcname, context.staticContext.model, kind, func);
         if kind <> xqfkUnknown then exit();
         if namespace <> nil then raiseEvaluationError('XPST0017', 'Function '+ namespace.getPrefix+':'+funcname+' not found. '+suggestions)
         else raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found. '+suggestions);

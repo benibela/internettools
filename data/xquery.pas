@@ -103,6 +103,8 @@ type
 
   TTreeNodeSerialization = (tnsText, tnsXML, tnsHTML);
 
+  TXQParsingModel = (xqpmXPath2, xqpmXQuery1, xqpmXPath3, xqpmXQuery3);
+
   //============================XQUERY CONTEXTS==========================
 
   { TXQStaticContext }
@@ -141,6 +143,8 @@ type
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
     objectsRestrictedToJSONTypes: boolean; //**< When false, all values can be stored in object properties; when true all property values are JSON values (e.g. sequences become arrays, () becomes null, xml is serialized, ...)
     jsonPXPExtensions: boolean; //**< Allows further json extensions, going beyond jsoniq (especially child and descendant axis test matching object properties) (for dot operator, see TXQParsingOptions) (default is true)
+
+    model: TXQParsingModel;
 
     //ignored
     ordering: boolean;  //**< unused
@@ -1108,7 +1112,6 @@ type
   *)
   TXQBinaryOp = function (const cxt: TXQEvaluationContext; const a,b: IXQValue): IXQValue;
 
-  TXQParsingModel = (xqpmXPath2, xqpmXQuery1, xqpmXPath3, xqpmXQuery3);
 
 
   { TXQParsingContext }
@@ -1434,16 +1437,16 @@ type
     func: TXQAbstractFunctionInfo;
     funcname: string;
     constructor create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
-    constructor create(const ns: INamespace; const name: string);
-    constructor create(const ns: INamespace; const name: string; args: array of TXQTerm);
-    class function createIfExists(const name: string; const sc: TXQStaticContext): TXQTermNamedFunction;
+    constructor create(const ns: INamespace; const name: string; const model: TXQParsingModel = xqpmXPath2);
+    constructor create(const ns: INamespace; const name: string; args: array of TXQTerm; const model: TXQParsingModel = xqpmXPath2);
+    class function createIfExists(const name: string; const sc: TXQStaticContext; const model: TXQParsingModel): TXQTermNamedFunction;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
   private
     interpretedFunction: TXQValueFunction;
     functionStaticContext: TXQStaticContext;
-    class function findKindIndex(const ns: INamespace; const name: string; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+    class function findKindIndex(const ns: INamespace; const name: string; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
     procedure init(const context: TXQEvaluationContext);
   end;
 
@@ -2269,6 +2272,7 @@ type
 
  {** A native XQuery module. Each native module has a certain namespace and declares functions, types and operators *}
  TXQNativeModule = class
+  acceptedModels: set of TXQParsingModel;
   namespace: INamespace;
   parent: TXQNativeModule;
   constructor create(const anamespace: INamespace; const aparentModule: TXQNativeModule=nil);
@@ -2286,9 +2290,9 @@ type
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 
-  function findBasicFunction(const name: string): TXQBasicFunctionInfo;
-  function findComplexFunction(const name: string): TXQComplexFunctionInfo;
-  function findInterpretedFunction(const name: string): TXQInterpretedFunctionInfo;
+  function findBasicFunction(const name: string; model: TXQParsingModel): TXQBasicFunctionInfo;
+  function findComplexFunction(const name: string; model: TXQParsingModel): TXQComplexFunctionInfo;
+  function findInterpretedFunction(const name: string; model: TXQParsingModel): TXQInterpretedFunctionInfo;
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TStringList;
   binaryOpLists: TStringList;
@@ -3595,6 +3599,7 @@ function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for
 {$I xquery_schemas.inc}
 {$I xquery_functions.inc}
 {$I xquery_functions_generated.inc}
+{$I xquery_functions3.inc}
 
 
 function sequenceFilterConditionSatisfied(evaluatedCondition: IXQValue; const index: integer): boolean;
@@ -4795,6 +4800,7 @@ begin
   cxt.encoding:=eUTF8;
   cxt.options := ParsingOptions;
   cxt.staticContext := context;
+  context.model := model;
   cxt.parsingModel:=model;
   cxt.engine := self;
   try
@@ -5845,6 +5851,8 @@ begin
   binaryOpFunctions:=TStringList.Create;
   binaryOpFunctions.Sorted := true;
   parent := aparentModule;
+
+  acceptedModels := [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3];
 end;
 
 destructor TXQNativeModule.Destroy;
@@ -5930,33 +5938,39 @@ begin
     binaryOpFunctions.AddObject(result.versions[i].name, TObject(result));
 end;
 
-function TXQNativeModule.findBasicFunction(const name: string): TXQBasicFunctionInfo;
+function TXQNativeModule.findBasicFunction(const name: string; model: TXQParsingModel): TXQBasicFunctionInfo;
 var
   i: Integer;
 begin
-  i := basicFunctions.IndexOf(name);
-  if i >= 0 then exit(TXQBasicFunctionInfo(basicFunctions.Objects[i]));
-  if parent <> nil then exit(parent.findBasicFunction(name));
+  if model in acceptedModels then begin
+    i := basicFunctions.IndexOf(name);
+    if i >= 0 then exit(TXQBasicFunctionInfo(basicFunctions.Objects[i]));
+  end;
+  if parent <> nil then exit(parent.findBasicFunction(name, model));
   result := nil;
 end;
 
-function TXQNativeModule.findComplexFunction(const name: string): TXQComplexFunctionInfo;
+function TXQNativeModule.findComplexFunction(const name: string; model: TXQParsingModel): TXQComplexFunctionInfo;
 var
   i: Integer;
 begin
-  i := complexFunctions.IndexOf(name);
-  if i >= 0 then exit(TXQComplexFunctionInfo(complexFunctions.Objects[i]));
-  if parent <> nil then exit(parent.findComplexFunction(name));
+  if model in acceptedModels then begin
+    i := complexFunctions.IndexOf(name);
+    if i >= 0 then exit(TXQComplexFunctionInfo(complexFunctions.Objects[i]));
+  end;
+  if parent <> nil then exit(parent.findComplexFunction(name, model));
   result := nil;
 end;
 
-function TXQNativeModule.findInterpretedFunction(const name: string): TXQInterpretedFunctionInfo;
+function TXQNativeModule.findInterpretedFunction(const name: string; model: TXQParsingModel): TXQInterpretedFunctionInfo;
 var
   i: Integer;
 begin
-  i := interpretedFunctions.IndexOf(name);
-  if i >= 0 then exit(TXQInterpretedFunctionInfo(interpretedFunctions.Objects[i]));
-  if parent <> nil then exit(parent.findInterpretedFunction(name));
+  if model in acceptedModels then begin
+    i := interpretedFunctions.IndexOf(name);
+    if i >= 0 then exit(TXQInterpretedFunctionInfo(interpretedFunctions.Objects[i]));
+  end;
+  if parent <> nil then exit(parent.findInterpretedFunction(name, model));
   result := nil;
 end;
 
@@ -5977,9 +5991,16 @@ begin
       expect('(');
       skipWhitespaceAndComment();
       if pos^ <> ')' then begin
-        SetLength(info.versions[i].types, strCount(str, ',') + 1);
+        SetLength(info.versions[i].types, strCount(str, ',') + 1); //guess for parameter count (does not work for function types)
         for j := 0 to high(info.versions[i].types) do begin
-          if j <> 0 then expect(',');
+          skipWhitespaceAndComment();
+          case pos^ of
+            ')': begin
+              SetLength(info.versions[i].types, j);
+              break;
+            end;
+            ',': expect(',');
+          end;
           expect('$'); nextTokenNCName(); expect('as');
           info.versions[i].types[j] := parseSequenceType();
         end;
@@ -5990,12 +6011,13 @@ begin
     end;
 end;
 
-var fn, pxp, op, xs: TXQNativeModule;
+var fn3, fn, pxp, op, xs: TXQNativeModule;
 initialization
 collations:=TStringList.Create;
 collations.OwnsObjects:=true;
 nativeModules := TStringList.Create;
 globalTypeParsingContext := TXQParsingContext.Create;
+globalTypeParsingContext.parsingModel := xqpmXQuery3;
 globalTypeParsingContext.staticContext := TXQStaticContext.Create;
 globalTypeParsingContext.options.AllowJSON:=true;
 //namespaces
@@ -6008,7 +6030,9 @@ XMLNamespace_MyExtensions:=TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp'
 XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
 XMLNamespace_XQuery := TNamespace.create(XMLNamespaceURL_XQuery, '');
 
-fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions);
+fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions);
+fn3.acceptedModels := [xqpmXPath3, xqpmXQuery3];
+fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions, fn3);
 TXQueryEngine.registerNativeModule(fn);
 xs := TXQNativeModule.Create(XMLNamespace_XMLSchema);
 TXQueryEngine.registerNativeModule(xs);
@@ -6268,6 +6292,7 @@ DoneCriticalsection(interpretedFunctionSynchronization);
 xs.free;
 pxp.free;
 fn.free;
+fn3.free;
 op.free;
 collations.Clear;
 collations.Free;
