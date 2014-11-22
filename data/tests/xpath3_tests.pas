@@ -115,7 +115,7 @@ begin
 
   t('let $f := function ($g, $n) { if ($n <= 1) then 1 else $n * $g($g, $n - 1)  } return $f($f, 10) ', '3628800');
 
-  t('for $f in ((1,2,3) ! function(){.}) return "a" ! $f()', '1 2 3');
+  f('for $f in ((1,2,3) ! function(){.}) return "a" ! $f()', 'err:XPDY0002');
 
   //closures
   t('(let $x := 17, $f := function ($y) { $x} return $f)(10)', '17');

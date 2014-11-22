@@ -2289,7 +2289,7 @@ begin
   if root = nil then root := tree;
   tree.document := root;
   if baseOffset = 0 then begin
-      if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot create new nodes without a xquery engine (e.g. from an interpreted function in a native module)');
+      if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot create new nodespxp:eval without a xquery engine (e.g. from an interpreted function in a native module)');
     if context.staticContext.sender.FInternalDocuments = nil then context.staticContext.sender.FInternalDocuments := TFPList.Create;
     context.staticContext.sender.FInternalDocuments.Add(tree);
   end;
@@ -2553,13 +2553,12 @@ begin
     initNamedFunctionReference(context);
     if TXQTermNamedFunction(children[high(children)]).kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
       temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
-    end else temp := define;
-  end else temp := define;
+    end else temp := define(context);
+  end else temp := define(context);
   if not temp.ownedBody then begin
     temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
     temp.ownedBody := true;
   end;
-  temp.context := context; //??
   result := temp;
   tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
   try
@@ -2583,7 +2582,7 @@ begin
   end;
 end;
 
-function TXQTermDefineFunction.define(): TXQValueFunction;
+function TXQTermDefineFunction.define(const context: TXQEvaluationContext): TXQValueFunction;
 var
   i: Integer;
   v: TXQTermVariable;
@@ -2608,6 +2607,13 @@ begin
     if not (children[high(children)] is TXQTermSequenceType) then
       result.body := children[high(children)];
   end;
+  result.context := context;
+  result.context.ParentElement := nil;
+  result.context.RootElement := nil;
+  result.context.TextElement := nil;
+  result.context.SeqValue := nil;
+  result.context.SeqIndex := 0;
+  result.context.SeqLength := 0;
 end;
 
 function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;

@@ -1071,6 +1071,8 @@ begin
   m('declare function f($a as xs:decimal+) { $a }; string-join(for $i in f((1, 1.0, xs:short(7))) return ($i instance of xs:double), " ")', 'false false false');
   m('declare function f($a as xs:decimal+) as xs:double+ { $a }; string-join(for $i in f((1, 1.0, xs:short(7), text { " 8 " })) return ($i instance of xs:double), " ")', 'true true true true');
 
+  f('declare function cnx() { . }; <foo/> / cnx()', 'err:XPDY0002');
+
   t('outer-xml(<a xmlns="foobar"><b xmlns="xyz"/></a>/*:b)', '<b xmlns="xyz"/>');
   t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>/b)', '<b/>');
   t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>)', '<a xmlns="foobar"><b xmlns=""/></a>');

@@ -785,7 +785,6 @@ type
 
     function toBooleanEffective: boolean; override;
 
-    function evaluate(const newcontext: TXQEvaluationContext; const args: TXQVArray; staticContext: TXQStaticContext {necessary?}): IXQValue;
     function evaluate(const args: TXQVArray): IXQValue;
 
     function directClone: TXQValue;
@@ -1375,7 +1374,7 @@ type
     annotations: TXQAnnotations;
     constructor createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function define(): TXQValueFunction;
+    function define(const context: TXQEvaluationContext): TXQValueFunction;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -2915,8 +2914,7 @@ begin
   functionCount := length(context.staticContext.functions) - functionCount;
   for i:=0 to truechildrenhigh do
     if children[i] is TXQTermDefineFunction then begin
-      functions[functionCount] := TXQTermDefineFunction(children[i]).define();
-      functions[functionCount].context := context;
+      functions[functionCount] := TXQTermDefineFunction(children[i]).define(context);
       if functions[functionCount].body = nil then begin
         if not assigned(context.staticContext.sender.OnDeclareExternalFunction) then raiseParsingError('XPDY0002', 'External function declared, but no callback registered to OnDeclareExternalFunction.');
         context.staticContext.sender.OnDeclareExternalFunction(context.staticContext.sender, context.staticContext, TXQTermDefineFunction(children[i]).namespace, TXQTermDefineFunction(children[i]).funcname, functions[functionCount]);
