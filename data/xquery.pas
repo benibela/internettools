@@ -158,6 +158,8 @@ type
     function resolveDocURI(url: string): string;
     function retrieveFromURI(url: string; out contenttype: string): string;
 
+    function ImplicitTimezone: TDateTime; inline;
+    function CurrentDateTime: TDateTime; inline;
   property
     NodeCollation: TXQCollation read getNodeCollation write FNodeCollation;
   end;
@@ -2324,6 +2326,7 @@ function xqvalueComparableTypes(const a, b: IXQValue): boolean; //internally use
 
 
 var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are known in all XPath/XQuery expressions, even if they are not declared there
+    GlobalInterpretedNativeFunctionStaticContext: TXQStaticContext;
     AllowJSONDefaultInternal: boolean = false; //**< Default setting for JSON (internally used).
     baseSchema: TJSONiqOverrideSchema;
     baseJSONiqSchema: TJSONiqAdditionSchema;
@@ -2380,12 +2383,17 @@ begin
      temp := TXQueryEngine.create;
      try
        if namespace <> nil then temp.GlobalNamespaces.add(namespace);
+       temp.StaticContext.free;
+       GlobalInterpretedNativeFunctionStaticContext.sender := temp;
+       temp.StaticContext := GlobalInterpretedNativeFunctionStaticContext;
        tempQuery := temp.parseTerm(source, xqpmXQuery3, temp.StaticContext);
        definition := tempQuery.fterm as TXQTermDefineFunction;
        func := tempQuery.evaluate() as TXQValueFunction;
        func._AddRef;
        tempQuery.fTerm := nil;
        tempQuery.Free;
+       temp.StaticContext := nil;
+       GlobalInterpretedNativeFunctionStaticContext.sender := nil;
      finally
        temp.free;
      end;
@@ -2861,6 +2869,18 @@ begin
   contenttype := sender.FInternet.getLastHTTPHeader('Content-Type');
 end;
 
+function TXQStaticContext.ImplicitTimezone: TDateTime;
+begin
+  if sender <> nil then result := sender.ImplicitTimezone
+  else result := nan;
+end;
+
+function TXQStaticContext.CurrentDateTime: TDateTime;
+begin
+  if sender <> nil then result := sender.CurrentDateTime
+  else result := nan;
+end;
+
 { TXQTermModule }
 
 
@@ -2979,7 +2999,7 @@ begin
   result := nil;
   if hasExpression then result := declaration.children[high(declaration.children)].evaluate(context)
   else begin
-    if not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
+    if (context.staticContext.sender = nil) or not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
     name := (declaration.variable as TXQTermVariable).value;
     ns := (declaration.variable as TXQTermVariable).namespace;
     context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, ns, name, result);
@@ -3029,7 +3049,7 @@ end;
 
 function TXQEvaluationContext.compareAtomicBase(const a, b: IXQValue): integer;
 begin
-  result := xqvalueCompareAtomicBase(a, b, staticContext.collation, staticContext.sender.ImplicitTimezone);
+  result := xqvalueCompareAtomicBase(a, b, staticContext.collation, staticContext.ImplicitTimezone);
 end;
 
 function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
@@ -3129,7 +3149,7 @@ begin
   else if name = 'line-ending' then begin result := true; value := xqvalue(LineEnding); end //default $line-ending; as #13#10
   else result := false;
 
-  if staticContext.sender.VariableChangelog.hasVariable(name, @temp, ns) then begin
+  if (staticContext.sender <> nil) and staticContext.sender.VariableChangelog.hasVariable(name, @temp, ns) then begin
     result := true;
     if temp <> nil then //safety check. todo: necessary?
       value := temp;
@@ -6031,6 +6051,22 @@ XMLNamespace_MyExtensions:=TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp'
 XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
 XMLNamespace_XQuery := TNamespace.create(XMLNamespaceURL_XQuery, '');
 
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-insensitive-clever', @striCompareClever, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-sensitive-clever', @strCompareClever, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
+TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/codepoint', @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
+TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
+
+GlobalInterpretedNativeFunctionStaticContext:=TXQStaticContext.Create;
+GlobalInterpretedNativeFunctionStaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensions;
+GlobalInterpretedNativeFunctionStaticContext.collation := TXQCollation(collations.Objects[0]);
+GlobalInterpretedNativeFunctionStaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
+GlobalInterpretedNativeFunctionStaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
+GlobalInterpretedNativeFunctionStaticContext.copyNamespaceInherit:=true;
+GlobalInterpretedNativeFunctionStaticContext.copyNamespacePreserve:=true;
+GlobalInterpretedNativeFunctionStaticContext.stringEncoding:=eUTF8;
+GlobalInterpretedNativeFunctionStaticContext.jsonPXPExtensions:=true;
+
 fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions);
 fn3.acceptedModels := [xqpmXPath3, xqpmXQuery3];
 fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions, fn3);
@@ -6284,12 +6320,6 @@ op.registerBinaryOp('and',@xqvalueAnd,40,[]);
 
 op.registerBinaryOp('or',@xqvalueOr,30,[]);
 
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-insensitive-clever', @striCompareClever, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-sensitive-clever', @strCompareClever, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
-TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/codepoint', @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
-
 commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped);
 commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
@@ -6309,6 +6339,7 @@ globalTypeParsingContext.staticContext.Free;
 globalTypeParsingContext.free;
 baseSchema.free;
 baseJSONiqSchema.free;
+GlobalInterpretedNativeFunctionStaticContext.Free;
 GlobalStaticNamespaces.Free;
 end.
 

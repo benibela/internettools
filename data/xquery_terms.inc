@@ -370,6 +370,7 @@ var varname: string;
 begin
   if length(children) = 0 then raiseEvaluationError('XPST0003', 'Value missing');
   if length(children) > 1 then raiseEvaluationError('XPST0003', 'Only one value can be assigned to a variable');
+  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot assign global variables without a xquery engine (e.g. from an interpreted function in a native module)');
   result := children[0].evaluate(context);
   properties := nil;
   assignmentMode := amOverride;
@@ -1272,7 +1273,7 @@ begin
     end;
     xqfkUnknown, xqfkNativeInterpreted: begin
       init(context);
-      result := interpretedFunction.evaluate(context, evilkids, functionStaticContext);
+      result := interpretedFunction.evaluate(evilkids);
     end;
   end;
 end;
@@ -2288,6 +2289,7 @@ begin
   if root = nil then root := tree;
   tree.document := root;
   if baseOffset = 0 then begin
+      if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot create new nodes without a xquery engine (e.g. from an interpreted function in a native module)');
     if context.staticContext.sender.FInternalDocuments = nil then context.staticContext.sender.FInternalDocuments := TFPList.Create;
     context.staticContext.sender.FInternalDocuments.Add(tree);
   end;

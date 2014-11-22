@@ -526,7 +526,7 @@ end;
 
 function xqvalueCompareAtomicBase(const cxt: TXQEvaluationContext; a, b: IXQValue): integer; inline;
 begin
-  result := xqvalueCompareAtomicBase(a,b,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
+  result := xqvalueCompareAtomicBase(a,b,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
 end;
 
 function xqvalueEqualAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
@@ -590,7 +590,7 @@ end;
 function xqvalueEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
+    result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.ImplicitTimezone))
   else
     result := xqvalue();
 end;
@@ -598,7 +598,7 @@ end;
 function xqvalueUnequalAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.sender.ImplicitTimezone))
+    result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.ImplicitTimezone))
   else
     result := xqvalue;
 end;
@@ -617,22 +617,22 @@ end;
 function xqvalueLessThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,-1,9999,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,-1,9999,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
 end;
 function xqvalueGreaterThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,1,9999,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,1,9999,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
 end;
 function xqvalueLessEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,-1,0,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,-1,0,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
 end;
 function xqvalueGreaterEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,1,0,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone);
+  xqvalueCompareAtomic(a,b,result,1,0,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
 end;
 
 function xqvalueCompareGenericBase(a, b: TXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
@@ -680,7 +680,7 @@ end;
 
 procedure xqvalueCompareGeneric(const cxt: TXQEvaluationContext; a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
 begin
-  result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.staticContext.collation,cxt.staticContext.sender.ImplicitTimezone));
+  result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone));
 end;
 
 function xqvalueEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -1989,6 +1989,7 @@ var term: TXQuery;
 begin
   requiredArgCount(args, 1);
   //result := context.staticContext.sender.evaluateXPath2(args[0].toString);
+  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:eval without a xquery engine (e.g. from an interpreted function in a native module)');
   term := context.staticContext.sender.parseTerm(args[0].toString, xqpmXPath2);
   try
     result := term.evaluate(context);
@@ -2000,6 +2001,7 @@ end;
 function xqFunctionCSS(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
+  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:css without a xquery engine (e.g. from an interpreted function in a native module)');
   result := context.staticContext.sender.evaluateCSS3(args[0].toString, context.ParentElement);
 end;
 
@@ -2196,7 +2198,7 @@ begin
       if not args[1].instanceOf(baseSchema.duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: '+args[1].toString + ', when conerting '+args[0].toString);
       tz := (args[1] as TXQValueDateTime).toDayTime() / SecsPerDay;
     end;
-  end else tz := context.staticContext.sender.implicitTimezone;
+  end else tz := context.staticContext.ImplicitTimezone;
 
   if args[0].isUndefined then exit(xqvalue);
   if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('XPTY0004', 'Expected datetime, got: '+args[0].toString);
@@ -2215,16 +2217,16 @@ end;
 function xqFunctionImplicit_Timezone(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0);
-  if isnan(context.staticContext.sender.ImplicitTimezone) then exit(xqvalue);
+  if isnan(context.staticContext.ImplicitTimezone) then exit(xqvalue);
   result := TXQValueDateTime.create(baseSchema.dayTimeDuration);
-  (result as TXQValueDateTime).value.sec:=round(context.staticContext.sender.ImplicitTimezone * SecsPerDay);
+  (result as TXQValueDateTime).value.sec:=round(context.staticContext.ImplicitTimezone * SecsPerDay);
 end;
 
 function xqFunctionCurrent_Datetime(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0);
-  result := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.sender.CurrentDateTime); //stable during evaluation
-  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.sender.ImplicitTimezone;
+  result := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //stable during evaluation
+  if not IsNan(context.staticContext.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezone;
 end;
 
 function xqFunctionCurrent_Date(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2232,9 +2234,9 @@ var
   temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.sender.currentDateTime); //force auto free
+  temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //force auto free
   result := baseSchema.Date.createValue(temp);
-  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.sender.ImplicitTimezone;
+  if not IsNan(context.staticContext.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezone;
 end;
 
 function xqFunctionCurrent_Time(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2242,16 +2244,16 @@ var
   temp: IXQValue;
 begin
   requiredArgCount(args, 0);
-  temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.sender.currentDateTime); //force auto free
+  temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //force auto free
   result := baseSchema.Time.createValue(temp);
-  if not IsNan(context.staticContext.sender.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.sender.ImplicitTimezone;
+  if not IsNan(context.staticContext.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezone;
 end;
 
 function xqFunctionTrace(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,2);
   result := args[0];
-  if assigned(context.staticContext.sender.OnTrace) then context.staticContext.sender.OnTrace(context.staticContext.sender, args[0], args[1]);
+  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnTrace) then context.staticContext.sender.OnTrace(context.staticContext.sender, args[0], args[1]);
 end;
 
 
@@ -2528,6 +2530,7 @@ begin
   {$ifndef ALLOW_EXTERNAL_DOC_DOWNLOAD}
   raise EXQEvaluationException.Create('pxp:CONFIG', 'Using fn:doc is not allowed');
   {$endif}
+  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:doc without a xquery engine (e.g. from an interpreted function in a native module)');
 
   //if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('FODC0005', 'Invalid url: '+url);
 
@@ -2588,7 +2591,7 @@ begin
   if (length(args) = 0) or (args[0].isUndefined) then url := ''
   else url := strResolveURI(args[0].toString, context.staticContext.baseURI);
   result := xqvalue();
-  if assigned(context.staticContext.sender.OnCollection) then context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
+  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnCollection) then context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
 end;
 
 function xqFunctionConcatenate(const args: TXQVArray): IXQValue;
@@ -2611,14 +2614,14 @@ begin
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   if args[0].kind <> pvkSequence then begin
-    if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.staticContext.sender.ImplicitTimezone) then result := xqvalue(1)
+    if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.staticContext.ImplicitTimezone) then result := xqvalue(1)
     else result := xqvalue();
   end else begin
     i := 0;
     result := nil;
     for v in args[0] do begin
       i += 1;
-      if xqvalueComparableTypes(v, args[1]) and xqvalueEqualAtomicBase(v, args[1], collation, context.staticContext.sender.ImplicitTimezone) then
+      if xqvalueComparableTypes(v, args[1]) and xqvalueEqualAtomicBase(v, args[1], collation, context.staticContext.ImplicitTimezone) then
         xqvalueSeqAdd(result, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
@@ -2671,6 +2674,7 @@ var
  collation: TXQCollation;
  found: Boolean;
  atom: IXQValue;
+ ImplicitTimezone: TDateTime;
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
@@ -2679,10 +2683,11 @@ begin
   if atom.kind <> pvkSequence then
     exit(xqvalueAtomize(atom));
   resseq := TXQValueSequence.create(atom.getSequenceCount);
+  ImplicitTimezone := context.staticContext.ImplicitTimezone;
   for v in atom do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if xqvalueComparableTypes(resseq.seq[i], v) and xqvalueEqualAtomicBase(resseq.seq[i], v, collation, context.staticContext.sender.ImplicitTimezone,true) then begin
+      if xqvalueComparableTypes(resseq.seq[i], v) and xqvalueEqualAtomicBase(resseq.seq[i], v, collation, ImplicitTimezone,true) then begin
         found := true;
         break;
       end;
@@ -2823,7 +2828,7 @@ begin
     if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
       if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
          or not xqvalueComparableTypes(enum1.Current, enum2.Current)
-         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.sender.ImplicitTimezone,true) then //todo:   nodes?
+         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.ImplicitTimezone,true) then //todo:   nodes?
         exit(false);
     end else begin
       if context.staticContext.nodeCollation <> nil then
