@@ -2733,6 +2733,11 @@ begin
   if minc = maxc then raise EXQEvaluationException.Create('XPST0017', IntToStr(length(args)) + ' arguments passed, need exactly '+IntToStr(minc))
   else raise EXQEvaluationException.Create('XPST0017', IntToStr(length(args)) + ' arguments passed, need between '+IntToStr(minc)+ ' and ' + inttostr(maxc));
 end;
+procedure requiredArgType(const v: IXQValue; typ: TXSType);
+begin
+  if not (v.instanceOf(typ)) then
+    raise EXQEvaluationException.create('XPTY0004', 'Expected '+typ.name+', got: '+v.debugAsStringWithTypeAnnotation());
+end;
 
 
 function xqvalueAtomize(const v: IXQValue): IXQValue; forward;

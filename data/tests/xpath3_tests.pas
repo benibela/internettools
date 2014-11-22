@@ -168,6 +168,12 @@ begin
   t('for-each-pair(1 to 5, 1 to 5, function($a, $b){10*$a + $b})', '11 22 33 44 55');
   t('fn:for-each-pair(("a", "b", "c"), ("x", "y", "z"), concat#2)', 'ax by cz');
 
+  t('fn:function-name(fn:substring#2) ! (namespace-uri-from-QName(.), .)', 'http://www.w3.org/2005/xpath-functions fn:substring');
+  t('exists(fn:function-name(function($node){count($node/*)}))', 'false');
+  t('fn:function-arity(fn:substring#2)', '2');
+  t('fn:function-arity(function($node){name($node)})', '1');
+  //t('let $initial := fn:substring(?, 1, 1) return fn:function-arity($initial)', '1');
+
   //interface tests
   t('. + 1', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');

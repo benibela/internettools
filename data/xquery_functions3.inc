@@ -7,7 +7,7 @@ var
   i: Integer;
 begin
   requiredArgCount(args, 2);
-  if not (args[0] is TXQValueQName) then raise EXQEvaluationException.create('XPTY0004', 'Expected QName, got: '+args[0].debugAsStringWithTypeAnnotation());
+  requiredArgType(args[0], baseSchema.QName);
   qname := args[0] as TXQValueQName;
   temp := TXQTermDefineFunction.createReference(TNamespace.create(qname.url, qname.prefix), qname.local, args[1].toInt64);
   try
@@ -46,15 +46,24 @@ begin
 end;
 
 function xqFunctionFunction_name(const args: TXQVArray): IXQValue;
+var
+  f: TXQValueFunction;
 begin
   requiredArgCount(args, 1);
-  //todo
+  if not (args[0] is TXQValueFunction) then raise EXQEvaluationException.create('XPTY0004', 'Expected function, got: '+args[0].debugAsStringWithTypeAnnotation());
+  f := args[0] as TXQValueFunction;
+  if f.name = '' then exit(xqvalue);
+  result := TXQValueQName.create(f.namespace, f.name);
 end;
 
 function xqFunctionFunction_arity(const args: TXQVArray): IXQValue;
+var
+  f: TXQValueFunction;
 begin
   requiredArgCount(args, 1);
-  //todo
+  if not (args[0] is TXQValueFunction) then raise EXQEvaluationException.create('XPTY0004', 'Expected function, got: '+args[0].debugAsStringWithTypeAnnotation());
+  f := args[0] as TXQValueFunction;
+  result := xqvalue(length(f.parameters));
 end;
 
 
