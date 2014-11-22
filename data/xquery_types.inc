@@ -1755,14 +1755,16 @@ var
   j: Integer;
 begin
   tempcontext := context;
-  tempcontext.temporaryVariables := TXQVariableChangeLog.create();
-  //tempcontext.staticContext := staticContext;
   if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
-  for j := 0 to high(parameters) do
-    tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context));
-  result := body.evaluate(tempcontext);
-  result := TXQAbstractFunctionInfo.convertType(result, resulttype, context);
-  tempcontext.temporaryVariables.free;
+  tempcontext.temporaryVariables := TXQVariableChangeLog.create();
+  try
+    for j := 0 to high(parameters) do
+      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context));
+    result := body.evaluate(tempcontext);
+    result := TXQAbstractFunctionInfo.convertType(result, resulttype, context);
+  finally
+    tempcontext.temporaryVariables.free;
+  end;
 end;
 
 function TXQValueFunction.directClone: TXQValue;
