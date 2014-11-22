@@ -1,3 +1,63 @@
+function xqFunctionFunction_lookup(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  qname: TXQValueQName;
+  temp: TXQTermDefineFunction;
+  //funcbody: TXQTermNamedFunction;
+  resfunc: TXQValueFunction;
+  i: Integer;
+begin
+  requiredArgCount(args, 2);
+  if not (args[0] is TXQValueQName) then raise EXQEvaluationException.create('XPTY0004', 'Expected QName, got: '+args[0].debugAsStringWithTypeAnnotation());
+  qname := args[0] as TXQValueQName;
+  temp := TXQTermDefineFunction.createReference(TNamespace.create(qname.url, qname.prefix), qname.local, args[1].toInt64);
+  try
+    result := temp.evaluate(context);
+  except
+    on e: EXQEvaluationException do
+      if e.errorCode = 'XPST0017' then result := xqvalue() //todo: do not use exceptions for control flow
+      else raise;
+  end;
+  if result.getSequenceCount > 0 then begin
+    resfunc := (result as TXQValueFunction);
+    if pointer(resfunc.name) = pointer(qname.local) {
+        if the pointer is the same, it is the name we passed to createReference, and the function was created by temp: TXQTermDefineFunction;
+        If it is not the same, the name of the function comes from somewhere else, i.e. the entire function comes from somewhere else
+        In former case the function signature (types) have to be freed by our return value, in latter case it is freed by the original source.
+        }
+    then begin
+      include(resfunc.owningFlags, xqfofSignature);
+      {it is already init? funcbody := resfunc.body as TXQTermNamedFunction;
+      try
+        funcbody.init(context);
+      except
+        on e: EXQEvaluationException do
+          if e.errorCode = 'XPST0017' then result := xqvalue() //todo: do not use exceptions for control flow
+          else raise;
+      end;}
+      for i := 0 to temp.parameterCount - 1 do begin
+        TXQTermDefineVariable(temp.children[i]).variable := nil;
+        setlength(TXQTermDefineVariable(temp.children[i]).children, 0);
+      end;
+      if (length(temp.children) > 0) and (temp.children[high(temp.children)-1] is TXQTermSequenceType) then
+        temp.children[high(temp.children)-1] := nil;
+    end;
+  end;
+  temp.free;
+end;
+
+function xqFunctionFunction_name(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 1);
+  //todo
+end;
+
+function xqFunctionFunction_arity(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 1);
+  //todo
+end;
+
+
 
 function xqFunctionFold(left: boolean; const args: TXQVArray): IXQValue;
 var
@@ -33,18 +93,18 @@ begin
 end;
 
 
-function xqFunctionFoldLeft(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionFold_left(const args: TXQVArray): IXQValue;
 begin
   result := xqFunctionFold(true, args);
 end;
 
-function xqFunctionFoldRight(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionFold_right(const args: TXQVArray): IXQValue;
 begin
   result := xqFunctionFold(true, args);
 end;
 
 
-function xqFunctionForEachPair(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionFor_each_pair(const args: TXQVArray): IXQValue;
 var
   seq1: TXQValue;
   seq2: TXQValue;

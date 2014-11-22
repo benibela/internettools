@@ -2523,21 +2523,27 @@ end;
 
 { TXQTermDefineFunction }
 
-constructor TXQTermDefineFunction.createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
+constructor TXQTermDefineFunction.createReference(anamespace: INamespace; aname: string; arity: integer);
 var
-  anamespace: INamespace;
   call: TXQTermNamedFunction;
   i: Integer;
 begin
   parameterCount := arity;
-  funcname:=qname;
-  staticContext.splitRawQName(anamespace, qname, xqdnkFunction);
-  call := TXQTermNamedFunction.create(anamespace,qname);
+  funcname:=aname;
+  namespace := anamespace;
+  call := TXQTermNamedFunction.create(anamespace, aname);
   for i := 1 to arity do begin
     push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
     call.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
   end;
   push(call);
+end;
+
+constructor TXQTermDefineFunction.createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
+var anamespace: INamespace;
+begin
+  staticContext.splitRawQName(anamespace, qname, xqdnkFunction);
+  createReference(anamespace, qname, arity);
 end;
 
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -2553,11 +2559,11 @@ begin
     initNamedFunctionReference(context);
     if TXQTermNamedFunction(children[high(children)]).kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
       temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
-    end else temp := define(context);
-  end else temp := define(context);
-  if not temp.ownedBody then begin
+    end else temp := define(context, false); //can this branch even occur?
+  end else temp := define(context, true);
+  if not (xqfofBody in temp.owningFlags) then begin
     temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
-    temp.ownedBody := true;
+    include(temp.owningFlags, xqfofBody);
   end;
   result := temp;
   tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
@@ -2582,7 +2588,7 @@ begin
   end;
 end;
 
-function TXQTermDefineFunction.define(const context: TXQEvaluationContext): TXQValueFunction;
+function TXQTermDefineFunction.define(const context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
 var
   i: Integer;
   v: TXQTermVariable;
@@ -2608,12 +2614,14 @@ begin
       result.body := children[high(children)];
   end;
   result.context := context;
-  result.context.ParentElement := nil;
-  result.context.RootElement := nil;
-  result.context.TextElement := nil;
-  result.context.SeqValue := nil;
-  result.context.SeqIndex := 0;
-  result.context.SeqLength := 0;
+  if clearFocus then begin
+    result.context.ParentElement := nil;
+    result.context.RootElement := nil;
+    result.context.TextElement := nil;
+    result.context.SeqValue := nil;
+    result.context.SeqIndex := 0;
+    result.context.SeqLength := 0;
+  end;
 end;
 
 function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;

@@ -148,6 +148,8 @@ begin
   //Named Function References
   t('(let $f := concat#3 return $f)("a","b","c")', 'abc');
   t('(let $f := abs#1 return $f)(-1234)', '1234');
+  t('(let $f := function-lookup(xs:QName("fn:concat"), 3) return $f)("a","b","c")', 'abc');
+  t('(let $f := function-lookup(xs:QName("fn:abs"), 1) return $f)(-12.3)', '12.3');
 
   //higher order functions
   t('join(for-each((1,2,3), function($x) {$x * 10}))', '10 20 30');

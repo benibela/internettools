@@ -1732,8 +1732,17 @@ begin
 end;
 
 destructor TXQValueFunction.Destroy;
+var
+  i: Integer;
 begin
-  if ownedBody then body.free;
+  if xqfofBody in  owningFlags then body.free;
+  if xqfofSignature in owningFlags then begin
+    for i := 0 to high(parameters) do begin
+      parameters[i].seqtype.Free;
+      parameters[i].variable.Free;
+    end;
+    resulttype.free;
+  end;
   inherited Destroy;
 end;
 
@@ -1770,6 +1779,7 @@ end;
 function TXQValueFunction.directClone: TXQValue;
 var
   f: TXQValueFunction;
+  i: Integer;
 begin
   f := TXQValueFunction.create(body);
   f.name := name;
@@ -1779,8 +1789,15 @@ begin
   SetLength(f.parameters, length(f.parameters));
   f.resulttype := resulttype;
   f.context := context;
-  f.ownedBody := ownedBody;
-  if ownedBody then f.body := f.body.clone;
+  f.owningFlags := owningFlags;
+  if xqfofBody in  owningFlags then f.body := f.body.clone;
+  if xqfofSignature in owningFlags then begin
+    for i := 0 to high(parameters) do begin
+      if f.parameters[i].seqtype <> nil then f.parameters[i].seqtype := parameters[i].seqtype.clone as TXQTermSequenceType;
+      if f.parameters[i].variable <> nil then f.parameters[i].variable := parameters[i].variable.clone as TXQTermVariable;
+    end;
+    if resulttype <> nil then f.resulttype := resulttype.clone as TXQTermSequenceType;
+  end;
   result := f;
 end;
 

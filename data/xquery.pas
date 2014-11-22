@@ -767,6 +767,7 @@ type
   end;
   TXQAnnotations = array of TXQAnnotation;
 
+  TXQValueFunctionOwningFlags = set of (xqfofBody, xqfofSignature);
   //** A function. Also used to store type information
   TXQValueFunction = class(TXQValue)
     name: string;
@@ -774,7 +775,7 @@ type
     parameters: array of TXQFunctionParameter;
     resulttype: txqtermsequencetype;
     body: TXQTerm;
-    ownedBody: boolean;
+    owningFlags: TXQValueFunctionOwningFlags;
     context: TXQEvaluationContext;
     annotations: TXQAnnotations;
 
@@ -1372,9 +1373,10 @@ type
     funcname: string;
     parameterCount: integer;
     annotations: TXQAnnotations;
+    constructor createReference(anamespace: INamespace; aname: string; arity: integer);
     constructor createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function define(const context: TXQEvaluationContext): TXQValueFunction;
+    function define(const context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -2914,7 +2916,7 @@ begin
   functionCount := length(context.staticContext.functions) - functionCount;
   for i:=0 to truechildrenhigh do
     if children[i] is TXQTermDefineFunction then begin
-      functions[functionCount] := TXQTermDefineFunction(children[i]).define(context);
+      functions[functionCount] := TXQTermDefineFunction(children[i]).define(context, true);
       if functions[functionCount].body = nil then begin
         if not assigned(context.staticContext.sender.OnDeclareExternalFunction) then raiseParsingError('XPDY0002', 'External function declared, but no callback registered to OnDeclareExternalFunction.');
         context.staticContext.sender.OnDeclareExternalFunction(context.staticContext.sender, context.staticContext, TXQTermDefineFunction(children[i]).namespace, TXQTermDefineFunction(children[i]).funcname, functions[functionCount]);
@@ -6254,11 +6256,15 @@ fn.registerFunction('idref', @xqFunctionId, ['($arg as xs:string*) as node()*', 
 fn.registerFunction('element-with-id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
 
 
+fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, ['($name as xs:QName, $arity as xs:integer) as function(*)?']);
+fn3.registerFunction('function-name', @xqFunctionFunction_Name, ['($func as function(*)) as xs:QName?']);
+fn3.registerFunction('function-arity', @xqFunctionFunction_Arity, ['($func as function(*)) as xs:integer']);
+
 fn3.registerInterpretedFunction('for-each', '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
 fn3.registerInterpretedFunction('filter', '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
-fn3.registerFunction('fold-left', @xqFunctionFoldLeft, ['($seq as item()*, $zero as item()*, $f as function(item()*, item()) as item()*) as item()*']);
-fn3.registerFunction('fold-right', @xqFunctionFoldRight, ['($seq as item()*, $zero 	 as item()*, $f 	 as function(item()*, item()) as item()*) as item()*']);
-fn3.registerFunction('for-each-pair', @xqFunctionForEachPair, ['($seq1 as item()*, $seq2 as item()*, $f as function(item(), item()) as item()*) as item()*']);
+fn3.registerFunction('fold-left', @xqFunctionFold_left, ['($seq as item()*, $zero as item()*, $f as function(item()*, item()) as item()*) as item()*']);
+fn3.registerFunction('fold-right', @xqFunctionFold_right, ['($seq as item()*, $zero 	 as item()*, $f 	 as function(item()*, item()) as item()*) as item()*']);
+fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, ['($seq1 as item()*, $seq2 as item()*, $f as function(item(), item()) as item()*) as item()*']);
 
 
 //Operators

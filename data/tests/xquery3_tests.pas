@@ -172,11 +172,19 @@ begin
   t('let $g := let $x := 1, $f := function($y) { typeswitch ($y) case xs:integer return $x case $x as xs:string return $x default return ($x||":"||$y) } return $f return ($g(7), $g("foo"), $g(7.4)) ', '1 foo 1:7.4');
 
   //named function references
-  f('let $d := data#0 return <a>2</a> ! $d()', 'err:XPDY0002');
-  t('let $d := data#1 return <a>2</a> ! $d(.)', '2');
+  m('let $d := <x>17</x> ! data#0 return <a>2</a> ! $d()', '17');
+  m('let $d := data#1 return <a>2</a> ! $d(.)', '2');
+  m('let $d := <x>17</x> ! function-lookup(xs:QName("fn:data"), 0) return <a>2</a> ! $d()', '17');
+  m('let $d := function-lookup(xs:QName("fn:data"), 1) return <a>2</a> ! $d(.)', '2');
   m('declare function local:double($x) { 2 * $x }; join( (abs#1, boolean#1, local:double#1, floor#1) ! (.(-17.5)) ) ', '17.5 true -35 -18');
+  m('declare function local:double($x) { 2 * $x }; join( (function-lookup(xs:QName("fn:abs"), 1), function-lookup(xs:QName("fn:boolean"), 1), function-lookup(xs:QName("local:double"), 1), function-lookup(xs:QName("fn:floor"), 1) ) ! (.(-17.5)) ) ', '17.5 true -35 -18');
   m('declare function wntc($a, $b) { concat(">",$a,$b,"<") }; (let $f := wntc#2 return $f)("foo","bar")', '>foobar<');
   m('declare namespace libjn = "http://jsoniq.org/function-library"; let $d := libjn:descendant-pairs#1 return join($d([{"a": 1, "b": 2}]) ! serialize-json(.))', '{"a": 1} {"b": 2}');
+  m('declare namespace libjn = "http://jsoniq.org/function-library"; let $d := function-lookup(xs:QName("libjn:descendant-pairs"), 1) return join($d([{"a": 1, "b": 2}]) ! serialize-json(.))', '{"a": 1} {"b": 2}');
+  m('fn:function-lookup(xs:QName("fn:substring"), 2)("abcd", 2)', 'bcd');
+  m('exists(fn:function-lookup(xs:QName("local:unknown"), 17))', 'false');
+  m('type-of((fn:function-lookup(xs:QName("xs:dateTimeStamp"), 1), xs:dateTime#1)[1] ("2011-11-11T11:11:11Z"))', 'dateTimeStamp');
+  m('', '');
 
   //function tests
   t('(function (){()}, 123) ! (typeswitch(.) case function (*) return "function(*)" default return "int")', 'function(*) int');
