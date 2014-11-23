@@ -157,6 +157,8 @@ begin
   f('import module namespace rename = "pseudo://test-module"; $rename:varI', 'err:XPST0008');
   m('import module namespace rename = "pseudo://test-module"; rename:internalrevf()', '12 34 fi');
 
+  m('%local:a %local:b %local:sas("ass", 232, "as") function () { 1 } ! .()', '1');
+  f('%public function () { 1 } ! .()', 'err:XQST0125');
 
   //closures
   t('(let $x := 1, $f := function($y) { typeswitch ($y) case xs:integer return $x case $x as xs:string return $x default return ($x||":"||$y) } return $f) ! (.(7), .("foo"), .(7.4)) ', '1 foo 1:7.4');
@@ -187,6 +189,7 @@ begin
   m('declare function local:test(){17}; let $f := function-lookup(xs:QName("local:test"), 0) return if (exists($f)) then $f() else "fail"', '17');
   m('let $f := function-lookup(xs:QName("local:test"), 0) return if (exists($f)) then $f() else "fail"', 'fail');
   m('declare function local:test($a as xs:integer) as xs:byte { $a + 1 }; typeswitch (local:test#1) case function (item()) as xs:byte return 1 case function (xs:integer) as xs:byte return 2 default return 3 ', '2');
+  m('declare %local:annotation(1,2,3) function local:test($a as xs:integer) { $a + 1 }; (local:test#1)(100) ', '101');
 
   //partial function application
   m('let $f := abs(?) return $f(-12)', '12');
@@ -200,6 +203,8 @@ begin
   m('function ($a, $b) { $a + $b } ! .(?, 10) ! .(17)', '27');
   m('floor(?)(?)(?)(?)(234.7)', '234');
   m('function-name((fn:round#1)(?)(?))', 'fn:round');
+  m('declare %local:annotation(1,2,3) function local:test($a as xs:integer) { $a + 1 }; (local:test#1)(?)(?)(10) ', '11');
+  m('%local:annotation(1,2,3) function ($a, $b, $c, $d) { $a + $b } ! .(?, ?, 0, 0) ! .(10, 2)', '12');
 
 
   //function tests

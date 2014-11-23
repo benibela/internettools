@@ -74,7 +74,7 @@ type
   function parseExtension: TXQTerm;
   function parseVariable: TXQTerm;
   function parseAnnotations: TXQAnnotations;
-  function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false; skipFunctionParenTokens: boolean = false): TXQTermDefineFunction;
+  function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -367,7 +367,7 @@ begin
     end else if (word = 'function') or (word = '%') then begin
       require3('function test');
       if word = '%' then begin
-        parseAnnotations; //we do need this nonsense
+        parseAnnotations; //we do not need this nonsense
         expect('function');
       end;
       result.kind:=tikFunctionTest;
@@ -1008,12 +1008,17 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean; skipFunctionParenTokens: boolean): TXQTermDefineFunction;
+function TXQParsingContext.parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean): TXQTermDefineFunction;
 var
   tempType: TXQTermSequenceType;
   tempVar: TXQTermDefineVariable;
+  i: Integer;
 begin
-
+  if anonymous and (length(annotations) > 0) then
+    for i := 0 to high(annotations) do
+      with annotations[i] do
+        if equalNamespaces(namespace, XMLNamespace_XQuery) and ((name = 'private') or (name = 'public')) then
+          raiseParsingError('XQST0125', 'anonymous functions cannot be public or private');
   result := TXQTermDefineFunction.create();
   result.annotations := annotations;
   try
@@ -1267,6 +1272,7 @@ var
   wordlookahead: String;
   temp: PChar;
   constr: Boolean;
+  annotations: TXQAnnotations;
 begin
   result := nil;
   word:=nextToken();
@@ -1324,9 +1330,12 @@ begin
     '[': begin
       if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension, to create a json like array) ');
       exit(parseJSONLikeArray());
+    end;
+    '%': begin
+      annotations := parseAnnotations;
+      expect('function'); expect('(');
+      result := parseFunctionDeclaration(annotations, true);
     end
-
-
     else if (word = 'x') and (pos^ in ['"', '''']) then begin
       if not options.AllowExtendedStrings then raiseParsingError('err:XPST0003', 'Extended string syntax was disabled');
       exit(parseXString());
