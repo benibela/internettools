@@ -1781,7 +1781,10 @@ begin
     if token = 'xquery' then begin
       requireXQuery();
       expect(token); expect('version');
-      if parseString <> '1.0' then raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0');
+      temp := parseString();
+      if temp = '3.0' then requireXQuery3('XQuery 3 parsing model is not enabled')
+      else if temp = '1.0' then parsingModel := xqpmXQuery1
+      else raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 or 3.0');
       token := nextToken(true);
       if token = 'encoding' then begin
         expect(token);
