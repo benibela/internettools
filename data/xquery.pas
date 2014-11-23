@@ -2300,9 +2300,9 @@ type
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 
-  function findBasicFunction(const name: string; model: TXQParsingModel): TXQBasicFunctionInfo;
-  function findComplexFunction(const name: string; model: TXQParsingModel): TXQComplexFunctionInfo;
-  function findInterpretedFunction(const name: string; model: TXQParsingModel): TXQInterpretedFunctionInfo;
+  function findBasicFunction(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQBasicFunctionInfo;
+  function findComplexFunction(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQComplexFunctionInfo;
+  function findInterpretedFunction(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQInterpretedFunctionInfo;
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TStringList;
   binaryOpLists: TStringList;
