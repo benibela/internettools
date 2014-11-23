@@ -184,7 +184,23 @@ begin
   m('fn:function-lookup(xs:QName("fn:substring"), 2)("abcd", 2)', 'bcd');
   m('exists(fn:function-lookup(xs:QName("local:unknown"), 17))', 'false');
   m('type-of((fn:function-lookup(xs:QName("xs:dateTimeStamp"), 1), xs:dateTime#1)[1] ("2011-11-11T11:11:11Z"))', 'dateTimeStamp');
-  m('', '');
+  m('declare function local:test(){17}; let $f := function-lookup(xs:QName("local:test"), 0) return if (exists($f)) then $f() else "fail"', '17');
+  m('let $f := function-lookup(xs:QName("local:test"), 0) return if (exists($f)) then $f() else "fail"', 'fail');
+  m('declare function local:test($a as xs:integer) as xs:byte { $a + 1 }; typeswitch (local:test#1) case function (item()) as xs:byte return 1 case function (xs:integer) as xs:byte return 2 default return 3 ', '2');
+
+  //partial function application
+  m('let $f := abs(?) return $f(-12)', '12');
+  t('let $f := starts-with("a", "A", ?) return ($f("http://www.benibela.de/2012/pxp/case-insensitive-clever"), $f("http://www.w3.org/2005/xpath-functions/collation/codepoint")) ', 'true false');
+  t('substring(?, 2, ?) ! (.("foobar", 3), .("xyz", 1))', 'oob y');
+  m('typeswitch (substring(?, 1)) case function(item()) as xs:string return 1 case function(xs:string) as xs:string return 2 default return 3', '2');
+  m('typeswitch (substring(?, 1, ?)) case function(item(), item()) as xs:string return 1 case function(string, item()) as xs:string return 1 case function(item(), xs:double) as xs:string return 1 case function(xs:string, xs:double) as xs:string return 2 default return 3', '2');
+  m('declare function local:test($a, $b) { $a * $b }; join(for-each( (1 to 5), local:test(?, 10) ) )', '10 20 30 40 50');
+  m('declare function local:test($a as xs:integer, $b as xs:double) as xs:byte { $a * $b }; typeswitch (local:test(?, 10)) case function (item()) as xs:byte return 1 case function (xs:integer) as xs:byte return 2 default return 3 ', '2');
+
+  m('function ($a, $b) { $a + $b } ! .(?, 10) ! .(17)', '27');
+  m('floor(?)(?)(?)(?)(234.7)', '234');
+  m('function-name((fn:round#1)(?)(?))', 'fn:round');
+
 
   //function tests
   t('(function (){()}, 123) ! (typeswitch(.) case function (*) return "function(*)" default return "int")', 'function(*) int');
@@ -241,7 +257,7 @@ begin
   '*FGIJ -FG--'{actually the spec says -F--- but see w3 bug 27175}+' ----- ----- ----- ----- ----- --G-- --G-- --GI- --GIJ');
 
   t('typeswitch (boolean#1) case function (item()*) as xs:boolean return "T" default return "F"', 'T');
-  t('concat#4 ! (typeswitch (.) case function (string,string,string,string) as xs:string return "T" default return "F", typeswitch (.) case function (item(),item(),item(),item()) as xs:string return "T" default return "F")', 'T F');
+  t('concat#4 ! (typeswitch (.) case function (string,string,string,string) as xs:string return "T" default return "F", typeswitch (.) case function (item(),item(),item(),item()) as xs:string return "T" default return "F")', 'T T');
   t('abs#1 ! (typeswitch (.) case function (anyAtomicType?) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (item()) as anyAtomicType? return "T" default return "F")', 'T F');
   m('declare function wntc($a as xs:int, $b as xs:string) as xs:float { concat(">",$a,$b,"<") }; typeswitch (wntc#2) case function (int, string) as xs:float return "T" default return "F"', 'T');
 

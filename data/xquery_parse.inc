@@ -53,7 +53,8 @@ type
   function parseQNameWithType(out typ: TXQTermSequenceType): string;
 
 
-  function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'): TXQTermWithChildren;
+  function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
+  function parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
   function parseSequenceType(): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
   function replaceEntities(s: string): string;
@@ -262,20 +263,54 @@ begin
   end else typ := nil;
 end;
 
-function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char ): TXQTermWithChildren;
+function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char; allowPartialApplication: boolean
+  ): TXQTermWithChildren;
+var partialApplications: integer;
+  procedure nextValue;
+  begin
+    if allowPartialApplication then begin;
+      skipWhitespaceAndComment();
+      if pos^ = '?' then begin
+        inc(pos);
+        inc(partialApplications);
+        result.push(TXQTermVariable.create(inttostr(partialApplications)+'.', XMLNamespace_MyExtensions));
+        exit;
+      end;
+    end;
+    result.push(parse());
+  end;
+
 var
   t: String;
+  df: TXQTermDefineFunction;
+  i: Integer;
 begin
+  partialApplications := 0;
   result := target;
   skipWhitespaceAndComment();
   if pos^ = closingChar then begin expect(closingChar); exit(); end;
-  result.push(parse());
+  nextValue;
   t := nextToken();
   while t = ',' do begin
-    result.push(parse());
+    nextValue;
     t := nextToken();
   end;
   if t <> closingChar then raiseParsingError('XPST0003', 'Expected closing parenthesis: '+ closingChar);
+  if partialApplications > 0 then begin
+    df := TXQTermDefineFunction.create;
+    if result is TXQTermNamedFunction then df.kind := xqtdfStaticPartialApplication
+    else df.kind := xqtdfDynamicPartialApplication;
+    df.parameterCount := partialApplications;
+    {for i := 1 to partialApplications do
+      df.push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));}
+    df.push(result);
+    result := df;
+  end;
+end;
+
+function TXQParsingContext.parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
+begin
+  parseSequenceLike(target, ')', parsingModel in [xqpmXPath3, xqpmXQuery3]);
 end;
 
 function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
@@ -1351,11 +1386,11 @@ begin
         end else begin
           result := TXQTermNamedFunction.createIfExists(word, staticContext, parsingModel);
           if result = nil then raiseParsingError('XPST0017', 'unknown function: '+word);
-          result := parseSequenceLike(TXQTermNamedFunction(result));
-
-          with TXQTermNamedFunction(result) do
-            if (kind = xqfkTypeConstructor) and (length(children) = 1) then
-              result := staticallyCastQNameAndNotation(TXQTermNamedFunction(result), TXSType(TObject(func)), staticContext);
+          result := parseFunctionCall(TXQTermNamedFunction(result));
+          if result is TXQTermNamedFunction then
+            with TXQTermNamedFunction(result) do
+              if (kind = xqfkTypeConstructor) and (length(children) = 1) then
+                result := staticallyCastQNameAndNotation(TXQTermNamedFunction(result), TXSType(TObject(func)), staticContext);
           exit;
         end;
       end;
@@ -1526,7 +1561,7 @@ begin
           expect('('); skipWhitespaceAndComment();
           replace := ripBinOpApart(@astroot, 10000); //TODO: check
           replace^ := TXQTermDynamicFunctionCall.Create(replace^);
-          parseSequenceLike(TXQTermDynamicFunctionCall(replace^), ')')
+          replace^ := parseFunctionCall(TXQTermDynamicFunctionCall(replace^))
         end;
         ':=': begin
           expect(':=');

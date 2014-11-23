@@ -516,6 +516,15 @@ end;
 function TXQTermSequenceType.serialize: string;
 begin
   result := name;
+  if Result = '' then
+    case kind of
+      tikNone: result := 'empty-sequence()';
+      tikAny: result := 'item()*';
+      tikAtomic: result := 'xs:'+atomicTypeInfo.name;
+      tikFunctionTest: result := 'function';
+      tikElementTest: result := 'node()';
+    end;
+  //incomplete
 end;
 
 function TXQTermSequenceType.getContextDependencies: TXQContextDependencies;
@@ -1291,15 +1300,19 @@ begin
   end;
 end;
 
+procedure TXQTermNamedFunction.assignWithoutChildren(source: TXQTermNamedFunction);
+begin
+  namespace:=source.namespace;
+  kind:=source.kind;
+  func:=source.func;
+  funcname:=source.funcname;
+  //todo: also clone interpretedFunction?
+end;
+
 function TXQTermNamedFunction.clone: TXQTerm;
 begin
   Result:=inherited clone;
-  with TXQTermNamedFunction(result) do begin
-    namespace:=self.namespace;
-    kind:=self.kind;
-    func:=self.func;
-    funcname:=self.funcname;
-  end;
+  TXQTermNamedFunction(result).assignWithoutChildren(self);
 end;
 
 class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
@@ -2537,6 +2550,7 @@ begin
     call.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
   end;
   push(call);
+  kind := xqtdfNamedReference;
 end;
 
 constructor TXQTermDefineFunction.createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
@@ -2552,20 +2566,34 @@ var
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
   i: Integer;
   tempterm: TXQTermFlower;
-  namedFunctionReference: Boolean;
+  dfv: IXQValue;
 begin
-  namedFunctionReference := (funcname <> '') and (children[high(children)] is TXQTermNamedFunction);
-  if namedFunctionReference then begin
-    initNamedFunctionReference(context);
-    if TXQTermNamedFunction(children[high(children)]).kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
-      temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
-    end else temp := define(context, false); //can this branch even occur?
-  end else temp := define(context, true);
+
+  case kind of
+    xqtdfUserDefined: temp := define(context, true);
+    xqtdfNamedReference: begin
+      initNamedFunctionReference(context);
+      if (children[high(children)] is TXQTermNamedFunction)
+         and (TXQTermNamedFunction(children[high(children)]).kind in [xqfkUnknown, xqfkNativeInterpreted])
+         and (length(TXQTermNamedFunction(children[high(children)]).interpretedFunction.parameters) = parameterCount)
+         then begin
+        temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
+      end else temp := define(context, false);
+    end;
+    xqtdfStaticPartialApplication: temp := defineStaticPartialApplication(context);
+    xqtdfDynamicPartialApplication: begin
+      assert(children[0] is TXQTermDynamicFunctionCall);
+      dfv := TXQTermDynamicFunctionCall(children[0]).children[0].evaluate(context);
+      if not (dfv is TXQValueFunction) then raiseEvaluationError('XPTY0004', 'Need function for partial application, got: '+dfv.debugAsStringWithTypeAnnotation());
+      temp := defineDynamicPartialApplication(context, dfv as TXQValueFunction);
+    end;
+  end;
   if not (xqfofBody in temp.owningFlags) then begin
     temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
     include(temp.owningFlags, xqfofBody);
   end;
   result := temp;
+  if kind <> xqtdfUserDefined then exit;
   tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
   try
     for i := 0 to high(temp.parameters) do
@@ -2653,6 +2681,7 @@ begin
   other.funcname := funcname;
   other.parameterCount := parameterCount;
   other.annotations := annotations;
+  other.kind := kind;
 end;
 
 destructor TXQTermDefineFunction.destroy;
@@ -2663,13 +2692,40 @@ begin
   inherited destroy;
 end;
 
-procedure TXQTermDefineFunction.initNamedFunctionReference(const context: TXQEvaluationContext);
-  function typetransform(t: TXQTermSequenceType): TXQTermSequenceType;
-  begin
-    result := TXQTermSequenceType(t.clone);
-    if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
-      result.atomicTypeInfo := baseSchema.anyAtomicType;
+function TXQTermDefineFunction.findNamedFunctionVersion(const context: TXQEvaluationContext): PXQFunctionParameterTypes;
+var
+  f: TXQTermNamedFunction;
+  i: Integer;
+begin
+  f := TXQTermNamedFunction(children[high(children)]);
+  if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then
+    f.init(context);
+
+  result := nil;
+  case f.kind  of
+    xqfkBasic, xqfkComplex:
+      for i := 0 to high(f.func.versions) do
+        if length(f.func.versions[i].types) = length(f.children) then begin
+          Result := @f.func.versions[i];
+          break;
+        end;
   end;
+end;
+
+function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;
+begin
+ result := TXQTermSequenceType(t.clone);
+ if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
+   result.atomicTypeInfo := baseSchema.anyAtomicType;
+end;
+
+function isPseudoVariable(v: TXQTerm): boolean; inline;
+begin
+  result := (v is TXQTermVariable) and (TXQTermVariable(v).value[1] in ['0'..'9']);
+end;
+
+procedure TXQTermDefineFunction.initNamedFunctionReference(const context: TXQEvaluationContext);
+
 
 var
   namedFunctionReference: Boolean;
@@ -2678,42 +2734,122 @@ var
   resulttype: TXQTermSequenceType;
   f: TXQTermNamedFunction;
   i: Integer;
+  temp: TXQTermSequenceType;
 begin
-  namedFunctionReference := (funcname <> '') and (children[high(children)] is TXQTermNamedFunction);
-  if (not namedFunctionReference) or initialized then exit;
+  if (kind <> xqtdfNamedReference) or initialized then exit;
 
-  f := TXQTermNamedFunction(children[high(children)]);
-  if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then
-    f.init(context);
+  if (children[high(children)] is TXQTermNamedFunction) then begin
+    version := findNamedFunctionVersion(context);
+    f := TXQTermNamedFunction(children[high(children)]);
 
-  version := nil;
-  resulttype := nil;
-  case f.kind  of
-    xqfkBasic, xqfkComplex:
-      for i := 0 to high(f.func.versions) do
-        if length(f.func.versions[i].types) = parameterCount then begin
-          version := @f.func.versions[i];
-          break;
-        end;
-  end;
+    resulttype := nil;
+    if version <> nil then begin
+      for i := 0 to parameterCount-1 do
+        (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(version^.types[i]));
+      resulttype := nativeMetaTypeToActualType(version^.returnType);
+    end else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
+      for i := 0 to parameterCount-1 do begin
+        temp := TXQTermSequenceType.create;
+        temp.kind := tikAny;
+        temp.allowNone := true;
+        (children[i] as TXQTermDefineVariable).push(temp);
+      end;
+      resulttype := TXQTermSequenceType.create(baseSchema.string_);
+    end;
 
-  if version <> nil then begin
-    for i := 0 to parameterCount-1 do
-      (children[i] as TXQTermDefineVariable).push(typetransform(version^.types[i]));
-    resulttype := typetransform(version^.returnType);
-  end else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
-    for i := 0 to parameterCount-1 do
-      (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.string_));
-    resulttype := TXQTermSequenceType.create(baseSchema.string_);
-  end;
+    if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then begin
+      annotations := f.interpretedFunction.annotations;
+    end;
 
-  if resulttype <> nil then begin
-    nc := children;
-    SetLength(nc, length(nc) + 1);
-    nc[high(nc)] := nc[high(nc)-1];
-    nc[high(nc)-1] := resulttype;
-    children := nc;
+    if resulttype <> nil then begin
+      nc := children;
+      SetLength(nc, length(nc) + 1);
+      nc[high(nc)] := nc[high(nc)-1];
+      nc[high(nc)-1] := resulttype;
+      children := nc;
+    end;
   end;
   initialized := true;
 end;
+
+function TXQTermDefineFunction.defineStaticPartialApplication(const context: TXQEvaluationContext): TXQValueFunction;
+var
+  f: TXQTermNamedFunction;
+  version: PXQFunctionParameterTypes;
+  j: Integer;
+  i: Integer;
+begin
+  version := findNamedFunctionVersion(context);
+  f := TXQTermNamedFunction(children[high(children)]);
+
+  result := TXQValueFunction.create();
+  result.namespace := f.namespace;
+  result.name:=f.funcname;
+  if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
+    result.annotations := f.interpretedFunction.annotations;
+  result.body := TXQTermNamedFunction.create(xqfkBasic,nil);
+  TXQTermNamedFunction(result.body).assignWithoutChildren(f);
+
+  setlength(result.parameters, parameterCount);
+  j := 0;
+  for i := 0 to high(f.children) do
+    if isPseudoVariable(f.children[i]) then begin
+      TXQTermNamedFunction(result.body).push(f.children[i].clone);
+      result.parameters[j].variable := TXQTermVariable(f.children[i].clone);
+      if version <> nil then
+        result.parameters[j].seqtype := nativeMetaTypeToActualType(version^.types[i])
+       else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
+        result.parameters[j].seqtype := TXQTermSequenceType.create();
+        with result.parameters[j].seqtype do begin
+          kind := tikAny;
+          allowNone := true;
+        end;
+       end else if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
+        if f.interpretedFunction.parameters[i].seqtype <> nil then
+          result.parameters[j].seqtype := TXQTermSequenceType(f.interpretedFunction.parameters[i].seqtype.clone);
+       end;
+      inc(j);
+     end else
+      TXQTermNamedFunction(result.body).push(TXQTermConstant.create(f.children[i].evaluate(context)));
+  assert(j = parameterCount);
+  result.owningFlags := [xqfofBody, xqfofSignature];
+  if version <> nil then
+    result.resulttype := nativeMetaTypeToActualType(version^.returnType)
+  else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then
+    result.resulttype := TXQTermSequenceType.create(baseSchema.string_)
+  else if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (f.interpretedFunction.resulttype <> nil)  then
+    result.resulttype := TXQTermSequenceType(f.interpretedFunction.resulttype.clone);
+  result.context := context;
+end;
+
+function TXQTermDefineFunction.defineDynamicPartialApplication(const context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
+var
+  j: Integer;
+  i: Integer;
+  ch: array of TXQTerm;
+begin
+  ch := (children[0] as TXQTermWithChildren).children;
+  result := TXQValueFunction.create();
+  result.namespace := f.namespace;
+  result.name:=f.name;
+  result.annotations := f.annotations;
+  result.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
+  setlength(result.parameters, parameterCount);
+  j := 0;
+  for i := 0 to high(f.parameters) do begin
+    if isPseudoVariable(ch[i+1]) then begin
+      TXQTermDynamicFunctionCall(result.body).push(ch[i+1].clone);
+      result.parameters[j].variable := TXQTermDynamicFunctionCall(result.body).children[i+1] as TXQTermVariable;
+      result.parameters[j].seqtype := f.parameters[i].seqtype;
+      inc(j);
+     end else
+      TXQTermDynamicFunctionCall(result.body).push(TXQTermConstant.create(ch[i+1].evaluate(context)));
+  end;
+  assert(j = parameterCount);
+  result.owningFlags := [xqfofBody];
+  result.resulttype := f.resulttype; //since the body contains a reference to f, f will not be freed before result and the type remain valid
+  result.context := f.context;
+end;
+
+
 

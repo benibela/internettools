@@ -1123,6 +1123,7 @@ type
     types: array of TXQTermSequenceType;
     returnType: TXQTermSequenceType;
   end;
+  PXQFunctionParameterTypes = ^TXQFunctionParameterTypes;
 
   //**The dynamic/static context values a query depends on (internal used for optimizations)
   //**xqcdFocusDocument: context item/node
@@ -1367,12 +1368,13 @@ type
 
 
   { TXQTermDefineFunction }
-
+  TXQTermDefineFunctionKind = (xqtdfUserDefined, xqtdfNamedReference, xqtdfStaticPartialApplication, xqtdfDynamicPartialApplication);
   TXQTermDefineFunction = class(TXQTermWithChildren)
     namespace: INamespace;
     funcname: string;
     parameterCount: integer;
     annotations: TXQAnnotations;
+    kind: TXQTermDefineFunctionKind;
     constructor createReference(anamespace: INamespace; aname: string; arity: integer);
     constructor createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
@@ -1383,7 +1385,10 @@ type
     destructor destroy; override;
   private
     initialized: boolean;
+    function findNamedFunctionVersion(const context: TXQEvaluationContext): PXQFunctionParameterTypes;
     procedure initNamedFunctionReference(const context: TXQEvaluationContext);
+    function defineStaticPartialApplication(const context: TXQEvaluationContext): TXQValueFunction;
+    function defineDynamicPartialApplication(const context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
   end;
 
   { TXQTermNodeMatcher }
@@ -1446,6 +1451,7 @@ type
     class function createIfExists(const name: string; const sc: TXQStaticContext; const model: TXQParsingModel): TXQTermNamedFunction;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    procedure assignWithoutChildren(source: TXQTermNamedFunction);
     function clone: TXQTerm; override;
   private
     interpretedFunction: TXQValueFunction;

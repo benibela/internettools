@@ -151,20 +151,25 @@ begin
   t('(let $f := function-lookup(xs:QName("fn:concat"), 3) return $f)("a","b","c")', 'abc');
   t('(let $f := function-lookup(xs:QName("fn:abs"), 1) return $f)(-12.3)', '12.3');
 
+
   //higher order functions
   t('join(for-each((1,2,3), function($x) {$x * 10}))', '10 20 30');
   t('join(fn:filter(1 to 3, function($x) {$x ne 2}))', '1 3');
   //standard test cases
+  t('fn:for-each(1 to 5, function($a) { $a * $a })', '1 4 9 16 25');
+  t('fn:for-each(("john", "jane"), fn:string-to-codepoints#1)', '106 111 104 110 106 97 110 101');
+  t('fn:for-each(("23", "29"), xs:int#1)', '23 29');
+  t('fn:filter(1 to 10, function($a) {$a mod 2 = 0})', '2 4 6 8 10');
   t('fn:fold-left(1 to 5, 0, function($a, $b) { $a + $b })', '15');
   t('fold-left((2,3,5,7), 1, function($a, $b) { $a * $b })', '210');
   t('fold-left((true(), false(), false()), false(), function($a, $b) { $a or $b })', 'true');
   t('fn:fold-left((true(), false(), false()), false(), function($a, $b) { $a and $b })', 'false');
   t('fn:fold-left(1 to 5, (), function($a, $b) {($b, $a)})', '5 4 3 2 1');
-//  t('fold-left(1 to 5, "", fn:concat(?, ".", ?))', '.1.2.3.4.5');
-//  t('fold-left(1 to 5, "$zero", fn:concat("$f(", ?, ", ", ?, ")")', '$f($f($f($f($f($zero, 1), 2), 3), 4), 5)');
+  t('fold-left(1 to 5, "", fn:concat(?, ".", ?))', '.1.2.3.4.5');
+  t('fold-left(1 to 5, "$zero", fn:concat("$f(", ?, ", ", ?, ")"))', '$f($f($f($f($f($zero, 1), 2), 3), 4), 5)');
   t('fold-right(1 to 5, 0, function($a, $b) { $a + $b })', '15');
-//  t('fold-right(1 to 5, "", fn:concat(?, ".", ?))', '1.2.3.4.5.');
-//  t('fold-right(1 to 5, "$zero", concat("$f(", ?, ", ", ?, ")"))', '$f(1, $f(2, $f(3, $f(4, $f(5, $zero)))))');
+  t('fold-right(1 to 5, "", fn:concat(?, ".", ?))', '1.2.3.4.5.');
+  t('fold-right(1 to 5, "$zero", concat("$f(", ?, ", ", ?, ")"))', '$f(1, $f(2, $f(3, $f(4, $f(5, $zero)))))');
   t('for-each-pair(1 to 5, 1 to 5, function($a, $b){10*$a + $b})', '11 22 33 44 55');
   t('fn:for-each-pair(("a", "b", "c"), ("x", "y", "z"), concat#2)', 'ax by cz');
 
@@ -172,7 +177,7 @@ begin
   t('exists(fn:function-name(function($node){count($node/*)}))', 'false');
   t('fn:function-arity(fn:substring#2)', '2');
   t('fn:function-arity(function($node){name($node)})', '1');
-  //t('let $initial := fn:substring(?, 1, 1) return fn:function-arity($initial)', '1');
+  t('let $initial := fn:substring(?, 1, 1) return fn:function-arity($initial)', '1');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
