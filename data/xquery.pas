@@ -767,7 +767,6 @@ type
   end;
   TXQAnnotations = array of TXQAnnotation;
 
-  TXQValueFunctionOwningFlags = set of (xqfofBody, xqfofSignature);
   //** A function. Also used to store type information
   TXQValueFunction = class(TXQValue)
     name: string;
@@ -775,7 +774,7 @@ type
     parameters: array of TXQFunctionParameter;
     resulttype: txqtermsequencetype;
     body: TXQTerm;
-    owningFlags: TXQValueFunctionOwningFlags;
+    ownsTerms: boolean;
     context: TXQEvaluationContext;
     annotations: TXQAnnotations;
 
@@ -790,6 +789,8 @@ type
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
+  private
+    procedure assignCopiedTerms(const func: TXQValueFunction);
   end;
 
 

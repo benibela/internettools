@@ -1733,14 +1733,17 @@ end;
 
 destructor TXQValueFunction.Destroy;
 var
-  i: Integer;
+  i, j: Integer;
 begin
-  if xqfofBody in  owningFlags then body.free;
-  if xqfofSignature in owningFlags then begin
+  if ownsTerms then begin
+    body.free;
     for i := 0 to high(parameters) do begin
       parameters[i].seqtype.Free;
       parameters[i].variable.Free;
     end;
+    for i := 0 to high(annotations) do
+      for j := 0 to high(annotations[i].params) do
+        annotations[i].params[j].free;
     resulttype.free;
   end;
   inherited Destroy;
@@ -1789,20 +1792,28 @@ begin
   SetLength(f.parameters, length(f.parameters));
   f.resulttype := resulttype;
   f.context := context;
-  f.owningFlags := owningFlags;
-  if xqfofBody in  owningFlags then f.body := f.body.clone;
-  if xqfofSignature in owningFlags then begin
-    for i := 0 to high(parameters) do begin
-      if f.parameters[i].seqtype <> nil then f.parameters[i].seqtype := parameters[i].seqtype.clone as TXQTermSequenceType;
-      if f.parameters[i].variable <> nil then f.parameters[i].variable := parameters[i].variable.clone as TXQTermVariable;
-    end;
-    if resulttype <> nil then f.resulttype := resulttype.clone as TXQTermSequenceType;
-  end;
+  if ownsTerms then f.assignCopiedTerms(self);
   result := f;
 end;
 
 function TXQValueFunction.clone: IXQValue;
 begin
   result := directClone;
+end;
+
+
+procedure TXQValueFunction.assignCopiedTerms(const func: TXQValueFunction);
+var
+  i: Integer;
+begin
+  body := func.body.clone;
+  SetLength(parameters, length(func.parameters));
+  for i := 0 to high(func.parameters) do begin
+    if func.parameters[i].seqtype <> nil then parameters[i].seqtype := func.parameters[i].seqtype.clone as TXQTermSequenceType;
+    if func.parameters[i].variable <> nil then parameters[i].variable := func.parameters[i].variable.clone as TXQTermVariable;
+  end;
+  if func.resulttype <> nil then resulttype := func.resulttype.clone as TXQTermSequenceType;
+  copyAnnotations(annotations, func.annotations);
+  ownsTerms := true;
 end;
 

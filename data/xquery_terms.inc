@@ -18,6 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
+procedure copyAnnotations(var target: TXQAnnotations; const source: TXQAnnotations);
+var
+  i: Integer;
+  j: Integer;
+begin
+  target:= source;
+  SetLength(target, length(target));
+  for i := 0 to high(target) do
+    with target[i] do begin
+      SetLength(params, length(params));
+      for j := 0 to high(params) do
+        params[j] := params[j].clone;
+    end;
+end;
+
 function TXQTerm.debugTermToString: string;
 begin
   result := '(' + ClassName + ')';
@@ -471,8 +486,7 @@ begin
   Result:=inherited clone;
   other := TXQTermDefineVariable(result);
   other.variable:=variable.clone;
-  other.annotations := annotations;
-  //SetLength(other.annotations, length(other.annotations)); assumed to be immutable
+  copyAnnotations(other.annotations, annotations);
 end;
 
 destructor TXQTermDefineVariable.destroy;
@@ -2588,10 +2602,8 @@ begin
       temp := defineDynamicPartialApplication(context, dfv as TXQValueFunction);
     end;
   end;
-  if not (xqfofBody in temp.owningFlags) then begin
-    temp.body := temp.body.clone;  //order of these lines is important, so the new term is freed if the visitors causes an exception
-    include(temp.owningFlags, xqfofBody);
-  end;
+  if not temp.ownsTerms then
+    temp.assignCopiedTerms(temp);
   result := temp;
   if kind <> xqtdfUserDefined then exit;
   tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
@@ -2657,18 +2669,47 @@ begin
   result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusDocument, xqcdFocusOther];
 end;
 
+function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;
+begin
+ result := TXQTermSequenceType(t.clone);
+ if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
+   result.atomicTypeInfo := baseSchema.anyAtomicType;
+end;
+
+function isPseudoVariable(v: TXQTerm): boolean; inline;
+begin
+  result := (v is TXQTermVariable) and (TXQTermVariable(v).value[1] in ['0'..'9']);
+end;
+
 function TXQTermDefineFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   i: Integer;
+  subchildren: array of txqterm;
 begin
   visitor.parent := self;
-  for i := 0 to parameterCount - 1 do
-    visitor.declare(@((children[i] as TXQTermDefineVariable).variable));
-  if not (children[high(children)] is TXQTermSequenceType) then
-    visitor.simpleTermVisit(@children[high(children)], self);
-  visitor.parent := self;
-  for i := parameterCount - 1 downto 0 do
-    visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
+  case kind of
+    xqtdfUserDefined, xqtdfNamedReference: begin
+      for i := 0 to parameterCount - 1 do
+        visitor.declare(@((children[i] as TXQTermDefineVariable).variable));
+      if not (children[high(children)] is TXQTermSequenceType) then
+        visitor.simpleTermVisit(@children[high(children)], self);
+      visitor.parent := self;
+      for i := parameterCount - 1 downto 0 do
+        visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
+    end;
+    xqtdfStaticPartialApplication, xqtdfDynamicPartialApplication: begin
+      subchildren := (children[0] as TXQTermWithChildren).children;
+      for i := 0 to high(subchildren) do
+        if isPseudoVariable(subchildren[i]) then
+          visitor.declare(@subchildren[i]);
+      visitor.simpleTermVisit(@children[0], self);
+      visitor.parent := self;
+      for i := high(subchildren) downto 0 do
+        if isPseudoVariable(subchildren[i]) then
+          visitor.undeclare(@subchildren[i]);
+    end;
+  end;
+
 end;
 
 function TXQTermDefineFunction.clone: TXQTerm;
@@ -2680,7 +2721,7 @@ begin
   other.namespace := namespace;
   other.funcname := funcname;
   other.parameterCount := parameterCount;
-  other.annotations := annotations;
+  copyAnnotations(other.annotations, annotations);
   other.kind := kind;
 end;
 
@@ -2710,18 +2751,6 @@ begin
           break;
         end;
   end;
-end;
-
-function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;
-begin
- result := TXQTermSequenceType(t.clone);
- if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
-   result.atomicTypeInfo := baseSchema.anyAtomicType;
-end;
-
-function isPseudoVariable(v: TXQTerm): boolean; inline;
-begin
-  result := (v is TXQTermVariable) and (TXQTermVariable(v).value[1] in ['0'..'9']);
 end;
 
 procedure TXQTermDefineFunction.initNamedFunctionReference(const context: TXQEvaluationContext);
@@ -2757,9 +2786,8 @@ begin
       resulttype := TXQTermSequenceType.create(baseSchema.string_);
     end;
 
-    if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then begin
-      annotations := f.interpretedFunction.annotations;
-    end;
+    if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
+      copyAnnotations(annotations, f.interpretedFunction.annotations);
 
     if resulttype <> nil then begin
       nc := children;
@@ -2786,7 +2814,7 @@ begin
   result.namespace := f.namespace;
   result.name:=f.funcname;
   if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
-    result.annotations := f.interpretedFunction.annotations;
+    copyAnnotations(result.annotations, f.interpretedFunction.annotations);
   result.body := TXQTermNamedFunction.create(xqfkBasic,nil);
   TXQTermNamedFunction(result.body).assignWithoutChildren(f);
 
@@ -2812,7 +2840,7 @@ begin
      end else
       TXQTermNamedFunction(result.body).push(TXQTermConstant.create(f.children[i].evaluate(context)));
   assert(j = parameterCount);
-  result.owningFlags := [xqfofBody, xqfofSignature];
+  result.ownsTerms := true;
   if version <> nil then
     result.resulttype := nativeMetaTypeToActualType(version^.returnType)
   else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then
@@ -2832,22 +2860,27 @@ begin
   result := TXQValueFunction.create();
   result.namespace := f.namespace;
   result.name:=f.name;
-  result.annotations := f.annotations;
+  copyAnnotations(result.annotations, f.annotations);
   result.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
   setlength(result.parameters, parameterCount);
   j := 0;
   for i := 0 to high(f.parameters) do begin
     if isPseudoVariable(ch[i+1]) then begin
       TXQTermDynamicFunctionCall(result.body).push(ch[i+1].clone);
-      result.parameters[j].variable := TXQTermDynamicFunctionCall(result.body).children[i+1] as TXQTermVariable;
-      result.parameters[j].seqtype := f.parameters[i].seqtype;
+      result.parameters[j].variable := TXQTermVariable(ch[i+1].clone); //TXQTermDynamicFunctionCall(result.body).children[i+1] as TXQTermVariable;
+      if f.parameters[i].seqtype <> nil then
+        result.parameters[j].seqtype := TXQTermSequenceType(f.parameters[i].seqtype.clone);
       inc(j);
      end else
       TXQTermDynamicFunctionCall(result.body).push(TXQTermConstant.create(ch[i+1].evaluate(context)));
   end;
   assert(j = parameterCount);
-  result.owningFlags := [xqfofBody];
-  result.resulttype := f.resulttype; //since the body contains a reference to f, f will not be freed before result and the type remain valid
+  result.ownsTerms := true;
+  //it should be possible to change this to share the type instead cloning it
+  //since the body contains a reference to f, so f will not be freed before result and the type remain valid
+  //(same for the parameters)
+  //but it is tricky to get right
+  if f.resulttype <> nil then result.resulttype := TXQTermSequenceType(f.resulttype.clone);
   result.context := f.context;
 end;
 

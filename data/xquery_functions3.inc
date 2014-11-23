@@ -39,31 +39,6 @@ begin
       if e.errorCode = 'XPST0017' then result := xqvalue() //todo: do not use exceptions for control flow
       else raise;
   end;
-  if result.getSequenceCount > 0 then begin
-    resfunc := (result as TXQValueFunction);
-    if pointer(resfunc.name) = pointer(qname.local) {
-        if the pointer is the same, it is the name we passed to createReference, and the function was created by temp: TXQTermDefineFunction;
-        If it is not the same, the name of the function comes from somewhere else, i.e. the entire function comes from somewhere else
-        In former case the function signature (types) have to be freed by our return value, in latter case it is freed by the original source.
-        }
-    then begin
-      include(resfunc.owningFlags, xqfofSignature);
-      {it is already init? funcbody := resfunc.body as TXQTermNamedFunction;
-      try
-        funcbody.init(context);
-      except
-        on e: EXQEvaluationException do
-          if e.errorCode = 'XPST0017' then result := xqvalue() //todo: do not use exceptions for control flow
-          else raise;
-      end;}
-      for i := 0 to temp.parameterCount - 1 do begin
-        TXQTermDefineVariable(temp.children[i]).variable := nil;
-        setlength(TXQTermDefineVariable(temp.children[i]).children, 0);
-      end;
-      if (length(temp.children) > 0) and (temp.children[high(temp.children)-1] is TXQTermSequenceType) then
-        temp.children[high(temp.children)-1] := nil;
-    end;
-  end;
   temp.free;
 end;
 
