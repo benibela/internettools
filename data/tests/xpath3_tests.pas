@@ -95,6 +95,13 @@ begin
   //Xquery 3 only
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
 
+  t('head(1 to 5)', '1');
+  t('head(("a", "b", "c"))', 'a');
+  t('count(head(()))', '0');
+  t('tail(1 to 5)', '2 3 4 5');
+  t('tail(("a", "b", "c"))', 'b c');
+  t('tail("a")', '');
+  t('count(tail(()))', '0');
 
   //Jsoniq pxp extensions
   ps.ParsingOptions.AllowJSON:=true;

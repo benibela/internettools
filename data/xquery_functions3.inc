@@ -1,3 +1,25 @@
+function xqFunctionHead(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 1);
+  result := args[0].getChild(1);
+end;
+
+function xqFunctionTail(const args: TXQVArray): IXQValue;
+var
+  len: Integer;
+  seq: TXQValueSequence;
+  i: Integer;
+begin
+  requiredArgCount(args, 1);
+  len := args[0].getSequenceCount;
+  if len < 2 then exit(xqvalue);
+  if len = 2 then exit(args[0].getChild(2));
+  seq := TXQValueSequence.create(len-1);
+  for i := 2 to len do
+    seq.seq.add(args[0].getChild(i));
+  result := seq;
+end;
+
 function xqFunctionFunction_lookup(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   qname: TXQValueQName;
