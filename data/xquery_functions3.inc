@@ -109,7 +109,7 @@ end;
 
 function xqFunctionFold_right(const args: TXQVArray): IXQValue;
 begin
-  result := xqFunctionFold(true, args);
+  result := xqFunctionFold(false, args);
 end;
 
 
