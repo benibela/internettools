@@ -125,13 +125,16 @@ procedure parseXML(xml:string; enterTag: TEnterTagEvent; leaveTag: TLeaveTagEven
 var handler: THTMLEventHandler;
 begin
   handler:=THTMLEventHandler.Create;
-  handler.outputEncoding:=outputEncoding;
-  handler.fileEncoding:=eUnknown;
-  handler.enterTag:=enterTag;
-  handler.leaveTag:=leaveTag;
-  handler.textRead:=textRead;
-  parseHTML(xml,@handler.enterTagEvent,@handler.leaveTagEvent,@handler.textEvent);
-  handler.free;
+  try
+    handler.outputEncoding:=outputEncoding;
+    handler.fileEncoding:=eUnknown;
+    handler.enterTag:=enterTag;
+    handler.leaveTag:=leaveTag;
+    handler.textRead:=textRead;
+    parseHTML(xml,@handler.enterTagEvent,@handler.leaveTagEvent,@handler.textEvent);
+  finally
+    handler.free;
+  end;
 end;
 
 

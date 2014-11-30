@@ -951,13 +951,16 @@ begin
 
 
   tree := TTreeParser.Create;
-  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
-  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
-  tree.TargetEncoding:=eUTF8;
-  readTree(tree.parseTree(loadSomething(_dataPath+'template'), 'template'));
-  loadTemplates(baseActions);
-  setTemplateNames(baseActions);
-  tree.free;
+  try
+    tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
+    tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
+    tree.TargetEncoding:=eUTF8;
+    readTree(tree.parseTree(loadSomething(_dataPath+'template'), 'template'));
+    loadTemplates(baseActions);
+    setTemplateNames(baseActions);
+  finally
+    tree.free;
+  end;
 end;
 
 
@@ -1007,6 +1010,7 @@ end;
 function TMultiPageTemplate.clone: TMultiPageTemplate;
 begin
   result := TMultiPageTemplate.create();
+  result.baseActions.free;
   result.path:=path;
   result.name:=name;
   result.baseActions:=baseActions.clone;
