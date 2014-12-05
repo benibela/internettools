@@ -188,6 +188,12 @@ begin
   t('fn:function-arity(function($node){name($node)})', '1');
   t('let $initial := fn:substring(?, 1, 1) return fn:function-arity($initial)', '1');
 
+  t('let $fibhf := function($fibhf, $i) { if ($i <= 2) then 1 else $fibhf($fibhf, $i - 2) + $fibhf($fibhf, $i - 1) }, $fib := $fibhf($fibhf, ?) return for-each(1 to 5, $fib)', '1 1 2 3 5');
+  t('let $fibhf := function($fibhf, $count, $prevprev, $prev) { if ($count eq 0) then ($prevprev) else $fibhf($fibhf, $count - 1, $prev, $prevprev + $prev)  }, $fib := $fibhf($fibhf, ?, 0, 1) return for-each(1 to 10, $fib)', '1 1 2 3 5 8 13 21 34 55');
+
+
+
+
   //interface tests
   t('. + 1', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
