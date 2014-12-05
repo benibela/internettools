@@ -206,8 +206,8 @@ begin
     tree.parseTree(data, dataFileName);
     if pxpParser = nil then pxpParser := TXQueryEngine.create;
     pxpparser.StaticContext.baseURI:=dataFileName;
-    if strBeginsWith(query, 'xquery') then pxpParser.parseXQuery1(query)
-    else pxpParser.parseXPath2(query);
+    if strBeginsWith(query, 'xquery') then pxpParser.parseXQuery3(query, pxpParser.StaticContext)
+    else pxpParser.parseXPath3(query, pxpParser.StaticContext);
     context := pxpParser.getEvaluationContext();
     context.ParentElement := tree.getLastTree;
     context.RootElement := tree.getLastTree;

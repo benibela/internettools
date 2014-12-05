@@ -1844,6 +1844,12 @@ begin
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
   equal(TXQueryEngine.evaluateStaticXQuery1('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
 
+
+  equal(ps.evaluateXQuery1('declare function local:foobar(){123}; 0').toString, '0', 'interface test failed');
+  equal(ps.evaluateXQuery1('declare function local:foobar2(){456}; local:foobar()').toString, '123', 'interface test failed');
+  equal(ps.evaluateXQuery1('declare function local:foobar3(){1000}; local:foobar() + local:foobar2()').toString, '579', 'interface test failed');
+  equal(ps.evaluateXQuery1('declare function local:foobar(){111}; local:foobar() + local:foobar3()').toString, '1111', 'interface test foverride failed');
+
   writeln('XQuery: ', count, ' completed');
 
   helper.free;

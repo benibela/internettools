@@ -206,7 +206,7 @@ begin
   m('declare %local:annotation(1,2,3) function local:test($a as xs:integer) { $a + 1 }; (local:test#1)(?)(?)(10) ', '11');
   m('%local:annotation(1,2,3) function ($a, $b, $c, $d) { $a + $b } ! .(?, ?, 0, 0) ! .(10, 2)', '12');
   m('function () { function ($a, $b) { function ($t) { function ($x, $y) { $a + $x + $y } ($t, $b) } } (1000, 100) (10) } () ', '1110');
-//  m('function () { function ($a, $b) { function ($x, $y) { $a + $x + $y } (?, $b) } (1000, 100) (10) } () ', '1110');
+  m('function () { function ($a, $b) { %local:annotation(1,2,3) function ($x as xs:integer, $y) as xs:float { $a + $x + $y } (?, $b) } (1000, 100) (10) } () ', '1110');
 
   //function tests
   t('(function (){()}, 123) ! (typeswitch(.) case function (*) return "function(*)" default return "int")', 'function(*) int');
@@ -266,7 +266,7 @@ begin
   t('concat#4 ! (typeswitch (.) case function (string,string,string,string) as xs:string return "T" default return "F", typeswitch (.) case function (item(),item(),item(),item()) as xs:string return "T" default return "F")', 'T T');
   t('abs#1 ! (typeswitch (.) case function (anyAtomicType?) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (item()) as anyAtomicType? return "T" default return "F")', 'T F');
   m('declare function wntc($a as xs:int, $b as xs:string) as xs:float { concat(">",$a,$b,"<") }; typeswitch (wntc#2) case function (int, string) as xs:float return "T" default return "F"', 'T');
-
+  m('typeswitch ( function () { function () { function ($a as xs:integer, $b as xs:integer ) as xs:integer { a + b } (?, 10) } } () () ) case function (xs:decimal) as xs:integer return 1 case function (xs:integer) as xs:int return 2 case function (xs:integer) as xs:integer return 3 default return 4 ', '3');
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');

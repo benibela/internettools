@@ -1590,7 +1590,7 @@ type
   { TXQTermModule }
 
   TXQTermModule = class(TXQTermWithChildren)
-    procedure initializeStaticContext(const context: TXQEvaluationContext); //will change context.staticContext^, just const so it is not copied
+    procedure initializeFunctions(const context: TXQEvaluationContext; cloneFunctionTerms: boolean ); //will change context.staticContext^, just const so it is not copied
     procedure initializeVariables(var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext);
     function getVariableValue(declaration: TXQTermDefineVariable; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
     function getVariableValue(const name: string; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
@@ -2909,23 +2909,25 @@ begin
   Result:=children[high(children)].getContextDependencies;
 end;
 
-procedure TXQTermModule.initializeStaticContext(const context: TXQEvaluationContext);
+procedure TXQTermModule.initializeFunctions(const context: TXQEvaluationContext; cloneFunctionTerms: boolean );
 var
-  i: Integer;
+  i,j: Integer;
   tempDefVar: TXQTermDefineVariable;
   functions: array of TXQValueFunction;
   functionCount: Integer;
   vars: TXQVariableChangeLog;
   truechildrenhigh: integer;
+  oldFunctionCount: Integer;
 begin
   functionCount := 0;
   truechildrenhigh := high(children) -  ifthen(context.staticContext.moduleNamespace = nil, 1,0);
   for i:=0 to truechildrenhigh do
     if children[i] is TXQTermDefineFunction then
       functionCount += 1;
-  setlength(context.staticContext.functions, length(context.staticContext.functions) + functionCount);
+  oldFunctionCount := length(context.staticContext.functions);
+  setlength(context.staticContext.functions, oldFunctionCount + functionCount);
   functions := context.staticContext.functions;
-  functionCount := length(context.staticContext.functions) - functionCount;
+  functionCount := oldFunctionCount;
   for i:=0 to truechildrenhigh do
     if children[i] is TXQTermDefineFunction then begin
       functions[functionCount] := TXQTermDefineFunction(children[i]).define(context, true);
@@ -2934,9 +2936,20 @@ begin
         context.staticContext.sender.OnDeclareExternalFunction(context.staticContext.sender, context.staticContext, TXQTermDefineFunction(children[i]).namespace, TXQTermDefineFunction(children[i]).funcname, functions[functionCount]);
         if functions[functionCount].body = nil then raiseEvaluationError('XPDY0002','No function for external function ' + TXQTermDefineFunction(children[i]).funcname + ' given.');
       end;
+      if cloneFunctionTerms then
+        functions[functionCount].assignCopiedTerms(functions[functionCount]);
+      for j := 0 to oldFunctionCount - 1 do
+        if (functions[j].name = functions[functionCount].name) and equalNamespaces(functions[j].namespace, functions[functionCount].namespace) then begin
+          functions[j].free;
+          functions[j] := functions[functionCount];
+          functionCount -= 1;
+          break;
+        end;
+
       functionCount+=1;
     end;
-
+  if functionCount <> length(functions) then
+    SetLength(context.staticContext.functions, functionCount); //happens, if a function was overridden
 end;
 
 procedure TXQTermModule.initializeVariables(var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext);
@@ -3299,7 +3312,7 @@ begin
   if staticContextInitialized then exit;
   staticContextInitialized:=true;
   if fterm is TXQTermModule then
-    TXQTermModule(fterm).initializeStaticContext(context);
+    TXQTermModule(fterm).initializeFunctions(context, staticContextShared);
 end;
 
 
@@ -4626,7 +4639,7 @@ function TXQueryEngine.evaluate(expression: string; model: TXQParsingModel; tree
 var
   term: TXQuery;
 begin
-  term := parseTerm(expression, model);
+  term := parseTerm(expression, model, StaticContext);
   try
     result := term.evaluate(tree);
   finally
@@ -4638,7 +4651,7 @@ function TXQueryEngine.evaluate(expression: string; model: TXQParsingModel; cons
 var
   term: TXQuery;
 begin
-  term := parseTerm(expression, model);
+  term := parseTerm(expression, model, StaticContext);
   try
     result := term.evaluate(contextItem);
   finally
