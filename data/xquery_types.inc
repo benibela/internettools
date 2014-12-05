@@ -94,6 +94,7 @@ end;
 
 function TXQValue.toJoinedString(const sep: string): string;
 begin
+  ignore(sep);
   result := toString;
 end;
 
@@ -180,6 +181,7 @@ end;
 
 function TXQValue.getPropertyEnumerator: TXQValuePropertyEnumerator;
 begin
+  result := nil;
   raise EXQEvaluationException.create('pxp:JSON', 'Attempted to read property of non-object');
 end;
 
@@ -1625,7 +1627,6 @@ end;
 
 function TXQValueJSONArray.setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer): TXQValueJSONArray;
 var
-  oldValue: TXQValue;
   newValue: IXQValue;
   i: Integer;
   idx: Integer;
@@ -1782,7 +1783,6 @@ end;
 function TXQValueFunction.directClone: TXQValue;
 var
   f: TXQValueFunction;
-  i: Integer;
 begin
   f := TXQValueFunction.create(body);
   f.name := name;

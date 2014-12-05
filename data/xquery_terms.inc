@@ -60,9 +60,9 @@ begin
   path[high(path)] := toQueryCommand;
 end;
 
-function TXQTerm.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+function TXQTerm.visitchildren(intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
-
+  result := xqtvaContinue;
 end;
 
 
@@ -155,22 +155,22 @@ end;
 
 { TXQTerm_Visitor }
 
-procedure TXQTerm_Visitor.declare(v: PXQTermVariable);
+procedure TXQTerm_Visitor.declare(intentionallyUnusedParameter: PXQTermVariable);
 begin
 
 end;
 
-procedure TXQTerm_Visitor.undeclare(v: PXQTermVariable);
+procedure TXQTerm_Visitor.undeclare(intentionallyUnusedParameter: PXQTermVariable);
 begin
 
 end;
 
-function TXQTerm_Visitor.visit(term: PXQTerm): TXQTerm_VisitAction;
+function TXQTerm_Visitor.visit(intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction;
 begin
   result := xqtvaContinue;
 end;
 
-function TXQTerm_Visitor.leave(term: PXQTerm): TXQTerm_VisitAction;
+function TXQTerm_Visitor.leave(intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction;
 begin
   Result := xqtvaContinue;
 end;
@@ -671,7 +671,6 @@ function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean
     end;
   end;
 var
-  temp: Boolean;
   i: Integer;
 begin
   if (kind = tikAtomic) and (tb.kind = tikAtomic) and subtypeItemTypeAtomic(atomicTypeInfo, tb.atomicTypeInfo) then
@@ -818,8 +817,7 @@ end;
 
 function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
   function visitSomeEvery(pos:integer): TXQTerm_VisitAction;
-  var v: IXQValue;
-      typeDelta: integer;
+  var typeDelta: integer;
   begin
     if pos = high(children) then
       exit(visitor.simpleTermVisit(@children[pos], self));
@@ -928,9 +926,8 @@ var
 
     end;
 
-    procedure continueWithValues(log: TXQVariableChangeLog; index: integer = 1);
+    procedure continueWithValues(log: TXQVariableChangeLog);
     var oldContextItem: IXQValue;
-        oldVars: TXQVariableChangeLog;
         contextValue: TXQValue;
         oldSeqIndex: Integer;
         oldSeqLength: Integer;
@@ -954,10 +951,6 @@ var
           tempContext.SeqValue := newItem;
           tempContext.SeqIndex := 1;
           tempContext.SeqLength:= 1;
-        end;
-        procedure addMissingVars;
-        var i: Integer;
-        begin
         end;
 
     begin
@@ -1023,7 +1016,7 @@ var
       end;
     end;
 
-   var tempSeq, temp: IXQValue;
+   var tempSeq: IXQValue;
        i:integer;
        tuple: TOrderedTuple;
    begin
@@ -1063,7 +1056,7 @@ var
        pvkUndefined:;
        pvkSequence:
          for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
-           continueWithValues(patternMatcherMatch(vars[pos].pattern.node, (tempSeq as TXQValueSequence).seq[i].toNode, context, true), i + 1);
+           continueWithValues(patternMatcherMatch(vars[pos].pattern.node, (tempSeq as TXQValueSequence).seq[i].toNode, context, true){, i + 1});
        else continueWithValues(patternMatcherMatch(vars[pos].pattern.node, tempSeq.toNode, context, true));
      end;
    end;
@@ -1261,12 +1254,6 @@ end;
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   evilkids: TXQVArray;
-  tempcontext: TXQEvaluationContext;
-  i: Integer;
-  j: Integer;
-  vfunc: TXQValueFunction;
-  sc: TXQStaticContext;
-  ns: INamespace;
 begin
   evaluateChildren(context, evilkids);
 
@@ -2513,18 +2500,18 @@ end;
 function TXQTerm_VisitorReplaceKnownVariables.visit(term: PXQTerm): TXQTerm_VisitAction;
 var
   temp: TXQValue;
-  selfdefined: Boolean;
-  i: Integer;
+  //selfdefined: Boolean;
 begin
   if term^ is TXQTermVariable then begin
     if not overridenVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
       replace(term, TXQTermConstant.create(context^.getVariable(TXQTermVariable(term^).value, TXQTermVariable(term^).namespace)))
     else if length(patterns) > 0 then begin
+      {not sure what to do with these
       selfdefined := false;
       with patterns[high(patterns)] do
         for i := 0 to high(vars) do
           if vars[i].equalsVariable(TXQTermVariable(term^)) then
-            selfdefined := true;
+            selfdefined := true;}
       if uncertainVariables = nil then uncertainVariables := TXQVariableChangeLog.create();
       if not uncertainVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
         uncertainVariables.add(TXQTermVariable(term^).value, tempValue, TXQTermVariable(term^).namespace);
@@ -2540,6 +2527,7 @@ function TXQTerm_VisitorReplaceKnownVariables.leave(term: PXQTerm): TXQTerm_Visi
 begin
   if (length(patterns) > 0) and (patterns[high(patterns)] = term^) then
     setlength(patterns, high(patterns));
+  result := xqtvaContinue;
 end;
 
 destructor TXQTerm_VisitorReplaceKnownVariables.Destroy;
@@ -2692,7 +2680,7 @@ begin
       for i := 0 to parameterCount - 1 do
         visitor.declare(@((children[i] as TXQTermDefineVariable).variable));
       if not (children[high(children)] is TXQTermSequenceType) then
-        visitor.simpleTermVisit(@children[high(children)], self);
+        result := visitor.simpleTermVisit(@children[high(children)], self);
       visitor.parent := self;
       for i := parameterCount - 1 downto 0 do
         visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
@@ -2702,7 +2690,7 @@ begin
       for i := 0 to high(subchildren) do
         if isPseudoVariable(subchildren[i]) then
           visitor.declare(@subchildren[i]);
-      visitor.simpleTermVisit(@children[0], self);
+      result := visitor.simpleTermVisit(@children[0], self);
       visitor.parent := self;
       for i := high(subchildren) downto 0 do
         if isPseudoVariable(subchildren[i]) then
@@ -2757,7 +2745,6 @@ procedure TXQTermDefineFunction.initNamedFunctionReference(const context: TXQEva
 
 
 var
-  namedFunctionReference: Boolean;
   nc: array of TXQTerm;
   version: ^TXQFunctionParameterTypes;
   resulttype: TXQTermSequenceType;

@@ -1973,11 +1973,12 @@ end;
 
 function xqFunctionRandom(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
+  ignore(context);
   requiredArgCount(args, 0);
   result := xqvalue(xqfloat(Random));
 end;
 
-function xqFunctionSleep(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionSleep(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   sleep(args[0].toInt64);

@@ -283,7 +283,6 @@ var partialApplications: integer;
 var
   t: String;
   df: TXQTermDefineFunction;
-  i: Integer;
 begin
   partialApplications := 0;
   result := target;
@@ -310,7 +309,7 @@ end;
 
 function TXQParsingContext.parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
 begin
-  parseSequenceLike(target, ')', parsingModel in [xqpmXPath3, xqpmXQuery3]);
+  result := parseSequenceLike(target, ')', parsingModel in [xqpmXPath3, xqpmXQuery3]);
 end;
 
 function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
@@ -1110,8 +1109,6 @@ begin
 end;
 
 function TXQParsingContext.parseString: string;
-var
-  temp: TXQTerm;
 begin
   skipWhitespaceAndComment();
   if not (pos^ in ['''', '"']) then raiseParsingError('XPST0003', 'Expected string');

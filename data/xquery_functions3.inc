@@ -25,8 +25,6 @@ var
   qname: TXQValueQName;
   temp: TXQTermDefineFunction;
   //funcbody: TXQTermNamedFunction;
-  resfunc: TXQValueFunction;
-  i: Integer;
 begin
   requiredArgCount(args, 2);
   requiredArgType(args[0], baseSchema.QName);
@@ -67,7 +65,6 @@ end;
 
 function xqFunctionFold(left: boolean; const args: TXQVArray): IXQValue;
 var
-  baseType: TXSType;
   func: TXQValueFunction;
   newargs: TXQVArray;
   count: Integer;
@@ -88,7 +85,7 @@ begin
     end;
     result := newargs[0];
   end else begin
-    //$f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
+    // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
     newargs[1] := args[1];
     for i := count downto 1 do begin
       newargs[0] := args[0].getChild(i);

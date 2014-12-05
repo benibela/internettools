@@ -1231,10 +1231,10 @@ type
 
   TXQTerm_Visitor = class
     parent: TXQTerm;
-    procedure declare(v: PXQTermVariable); virtual;
-    procedure undeclare(v: PXQTermVariable); virtual;
-    function visit (term: PXQTerm): TXQTerm_VisitAction; virtual;
-    function leave (term: PXQTerm): TXQTerm_VisitAction; virtual;
+    procedure declare(intentionallyUnusedParameter: PXQTermVariable); virtual;
+    procedure undeclare(intentionallyUnusedParameter: PXQTermVariable); virtual;
+    function visit (intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction; virtual;
+    function leave (intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction; virtual;
 
     class function startVisiting(term: PXQTerm): TXQTerm_VisitAction;
   protected
@@ -1258,7 +1258,7 @@ type
     function toQueryCommand: TXQPathMatchingStep; virtual;
     procedure addToQueryList(var path: TXQPathMatching); virtual;
 
-    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
+    function visitchildren(intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
     function clone: TXQTerm; virtual;
   end;
 
@@ -2382,7 +2382,6 @@ procedure TXQInterpretedFunctionInfo.initialize();
 var
   temp: TXQueryEngine;
   tempQuery: TXQuery;
-  i: Integer;
 begin
   if definition <> nil then exit;
   if definition = nil then begin
@@ -2912,10 +2911,8 @@ end;
 procedure TXQTermModule.initializeFunctions(const context: TXQEvaluationContext; cloneFunctionTerms: boolean );
 var
   i,j: Integer;
-  tempDefVar: TXQTermDefineVariable;
   functions: array of TXQValueFunction;
   functionCount: Integer;
-  vars: TXQVariableChangeLog;
   truechildrenhigh: integer;
   oldFunctionCount: Integer;
 begin
@@ -2961,7 +2958,6 @@ var
   ns: INamespace;
   name: String;
   hasTypeDeclaration: Boolean;
-  hasExpression: Boolean;
   tempValue: IXQValue;
   priv: Boolean;
   j: Integer;
@@ -2988,7 +2984,6 @@ begin
          raiseEvaluationError('XQST0048', 'Invalid namespace for variable: '+ns.getPrefix+ ':'+name);
 
       hasTypeDeclaration := (length(tempDefVar.children) > 0) and (tempDefVar.children[0] is TXQTermSequenceType);
-      hasExpression := (length(tempDefVar.children) > 0) and not (tempDefVar.children[high(tempDefVar.children)] is TXQTermSequenceType);
 
       tempValue := getVariableValue(tempDefVar, context, ownStaticContext);
       vars.add(name, tempValue, ns);
@@ -3280,13 +3275,13 @@ var
   tempVisitor: TXQTerm_Visitor;
 begin
   tempVisitor := visitor.Create;
-  tempVisitor.simpleTermVisit(@fterm, parent);
+  result := tempVisitor.simpleTermVisit(@fterm, parent);
   tempVisitor.Free;
 end;
 
 function TXQuery.visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 begin
-  visitor.simpleTermVisit(@fterm, parent);
+  result := visitor.simpleTermVisit(@fterm, parent);
 end;
 
 destructor TXQuery.Destroy;
@@ -5942,8 +5937,6 @@ end;
 procedure TXQNativeModule.registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
 var
   temp: TXQInterpretedFunctionInfo;
-  decl: String;
-  i: Integer;
 begin
   temp := TXQInterpretedFunctionInfo.Create;
   temp.namespace := namespace;
