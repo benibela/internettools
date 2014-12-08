@@ -352,7 +352,7 @@ end;
 
 function TXQTermDefineVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 var varname: string;
-    varnamespace: INamespace;
+    varnamespace: string;
     properties: TStringArray; //properties or array elements
     v: TXQTerm;
     assignmentMode: (amOverride, amArrayOverride, amArrayInsert, amArrayAppend);
@@ -402,7 +402,7 @@ begin
       //break;
     end else if v is TXQTermVariable then begin
       varname := TXQTermVariable(v).value;
-      varnamespace := TXQTermVariable(v).namespace;
+      varnamespace := TXQTermVariable(v).namespaceURL;
       break;
     end else if v is TXQTermReadObjectProperty then begin
       arrayPrepend(properties, TXQTermReadObjectProperty(v).propname);
@@ -627,9 +627,11 @@ begin
     exit(true);
   if kind = tikElementTest then begin
     TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
-    if xqpncCheckNamespace in nodeCondition.options then
+    if qmCheckNamespacePrefix in self.nodeMatching.matching then begin
+      include(nodeCondition.options, xqpncCheckNamespace);
       if qmAttribute in nodeMatching.matching then nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkUnknown)
       else nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkElementType);
+    end;
     nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
   end;
   result := true;
@@ -680,7 +682,8 @@ begin
     if tb.nodeMatching.matching  = MATCH_ALL_NODES then exit(true);
     if nodeMatching.matching * MATCH_ALL_NODES <> tb.nodeMatching.matching * MATCH_ALL_NODES then exit(false);
     if (qmValue in tb.nodeMatching.matching) and (not (qmValue in nodeMatching.matching) or (tb.nodeMatching.value <> nodeMatching.value))  then exit(false);
-    if (qmCheckNamespace in tb.nodeMatching.matching) and (not (qmCheckNamespace in nodeMatching.matching) or (tb.nodeMatching.namespacePrefix <> nodeMatching.namespacePrefix))  then exit(false);
+    if (qmCheckNamespaceURL in tb.nodeMatching.matching) and (not (qmCheckNamespaceURL in nodeMatching.matching) or (tb.nodeMatching.namespaceURLOrPrefix <> nodeMatching.namespaceURLOrPrefix))  then exit(false);
+    if (qmCheckNamespacePrefix in tb.nodeMatching.matching) and (not (qmCheckNamespacePrefix in nodeMatching.matching) or (tb.nodeMatching.namespaceURLOrPrefix <> nodeMatching.namespaceURLOrPrefix))  then exit(false);
     if (tb.nodeMatching.requiredType <> nil)
         and ((tb.nodeMatching.requiredType.kind <> tikAtomic) or (tb.nodeMatching.requiredType.atomicTypeInfo.name <> 'anyType') or (tb.nodeMatching.requiredType.atomicTypeInfo.base <> nil)) then
       exit((nodeMatching.requiredType <> nil) and (nodeMatching.requiredType.subtypeOf(tb.nodeMatching.requiredType)));
@@ -787,7 +790,7 @@ var tempContext:TXQEvaluationContext;
         if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v, context) then
           raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
+      tempContext.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespaceURL);
       if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then begin
         tempContext.temporaryVariables.popAll;
         result := not isEvery;
@@ -918,9 +921,9 @@ var
         raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.debugAsStringWithTypeAnnotation());
 
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.add(vars[pos].loopvar.value, v, vars[pos].loopvar.namespace);
+      tempContext.temporaryVariables.add(vars[pos].loopvar.value, v, vars[pos].loopvar.namespaceURL);
       if vars[pos].positionVar <> nil then
-        tempContext.temporaryVariables.add(vars[pos].positionVar.value, xqvalue(index), vars[pos].positionVar.namespace);
+        tempContext.temporaryVariables.add(vars[pos].positionVar.value, xqvalue(index), vars[pos].positionVar.namespaceURL);
       evaluateForLoop(pos+1);
       tempContext.temporaryVariables.popAll();
 
@@ -972,8 +975,8 @@ var
           log.parentLog := tempContext.temporaryVariables;
           tempContext.temporaryVariables := log;
           for i := 0 to high(vars[pos].pattern.vars) do
-            if not log.hasVariable(vars[pos].pattern.vars[i].value, nil, vars[pos].pattern.vars[i].namespace) then
-              tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespace);
+            if not log.hasVariable(vars[pos].pattern.vars[i].value, nil, vars[pos].pattern.vars[i].namespaceURL) then
+              tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespaceURL);
           try
             evaluateForLoop(pos+1);
           finally
@@ -994,7 +997,7 @@ var
           pushContextItem;
           tempContext.temporaryVariables.pushAll;
           for i := 0 to high(vars[pos].pattern.vars) do
-            tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespace);
+            tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespaceURL);
 
           for i := 0 to log.count - 1 do begin
             if log.getName(i) = '$' then begin
@@ -1004,7 +1007,7 @@ var
             end
             else begin
               tempContext.temporaryVariables.pushAll;
-              tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespace);
+              tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
               evaluateForLoop(pos+1);
               tempContext.temporaryVariables.popAll();
             end;
@@ -1217,38 +1220,19 @@ begin
   func := afunc;
 end;
 
-constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string; const model: TXQParsingModel);
+constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; const model: TXQParsingModel);
 begin
-  if not findKindIndex(ns, name, model, kind, func) then begin
+  if not findKindIndex(anamespace, alocalname, model, kind, func) then begin
     kind := xqfkUnknown;
-    funcname:=name;
-    namespace := ns;
+    funcname:=alocalname;
+    namespaceUrl := anamespace;
   end;
 end;
 
-constructor TXQTermNamedFunction.create(const ns: INamespace; const name: string; args: array of TXQTerm; const model: TXQParsingModel);
+constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; args: array of TXQTerm; const model: TXQParsingModel);
 begin
-  create(ns, name, model);
+  create(anamespace, alocalname, model);
   push(args);
-end;
-
-class function TXQTermNamedFunction.createIfExists(const name: string; const sc: TXQStaticContext; const model: TXQParsingModel): TXQTermNamedFunction;
-var akind: TXQTermNamedFunctionKind;
-    afunc: TXQAbstractFunctionInfo;
-    localName: string;
-    ns: INamespace;
-begin
-  localName:=name;
-  sc.splitRawQName(ns, localName, xqdnkFunction);
-  if findKindIndex(ns, localName, model, akind, afunc) then exit(TXQTermNamedFunction.Create(akind, afunc))
-  else if pos(':', name) = 0 then begin
-     if sc.defaultElementTypeNamespace <> nil then begin
-       if findKindIndex(sc.defaultElementTypeNamespace, localName, model, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc))
-     end else if sc.defaultTypeNamespace <> nil then
-       if findKindIndex(sc.defaultTypeNamespace, localName, model, akind, afunc) then exit(TXQTermNamedFunction.create(akind, afunc));
-  end;
-  if equalNamespaces(ns, XMLNamespace_XPathFunctions) then exit(nil);
-  result := TXQTermNamedFunction.create(ns, localName); //cannot know if the function is valid yet. XQuery can have mutually recursive functions, but this is called during the function declaration (i.e. before the 2nd function has been parsed)
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -1303,7 +1287,7 @@ end;
 
 procedure TXQTermNamedFunction.assignWithoutChildren(source: TXQTermNamedFunction);
 begin
-  namespace:=source.namespace;
+  namespaceUrl:=source.namespaceUrl;
   kind:=source.kind;
   func:=source.func;
   funcname:=source.funcname;
@@ -1316,44 +1300,42 @@ begin
   TXQTermNamedFunction(result).assignWithoutChildren(self);
 end;
 
-class function TXQTermNamedFunction.findKindIndex(const ns: INamespace; const name: string; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
   aindex: Integer;
   module: TXQNativeModule;
   t: TXSType;
 begin
-  if (ns = nil) then exit(false);
-
-  module := TXQueryEngine.findNativeModule(ns.getURL);
+  module := TXQueryEngine.findNativeModule(anamespace);
 
   if (module = nil) then exit(false);
 
-  afunc := module.findBasicFunction(name, model);
+  afunc := module.findBasicFunction(alocalname, model);
   if afunc <> nil then begin
     akind:=xqfkBasic;
     exit(true);
   end;
 
-  afunc := module.findComplexFunction(name, model);
+  afunc := module.findComplexFunction(alocalname, model);
   if afunc <> nil then begin
     akind:=xqfkComplex;
     exit(true);
   end;
 
-  afunc := module.findInterpretedFunction(name, model);
+  afunc := module.findInterpretedFunction(alocalname, model);
   if afunc <> nil then begin
     akind:=xqfkNativeInterpreted;
     exit(true);
   end;
 
-  aindex := module.binaryOpFunctions.IndexOf(name);
+  aindex := module.binaryOpFunctions.IndexOf(alocalname);
   if aindex >= 0 then begin
     afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
     akind := xqfkWrappedOperator;
     exit;
   end;
 
-  t:=baseSchema.findType(name);
+  t:=baseSchema.findType(alocalname);
   if t <> nil then begin
     akind:=xqfkTypeConstructor;
     afunc := TXQAbstractFunctionInfo(TObject(t));
@@ -1375,8 +1357,7 @@ procedure TXQTermNamedFunction.init(const context: TXQEvaluationContext);
     i: Integer;
   begin
     result := '';
-    if namespace = nil then exit();
-    module := TXQueryEngine.findNativeModule(namespace.getURL);
+    module := TXQueryEngine.findNativeModule(namespaceUrl);
     while module <> nil do begin
       for  i := 0 to module.basicFunctions.Count - 1 do
         if strSimilar(funcname, module.basicFunctions[i]) then
@@ -1389,21 +1370,19 @@ procedure TXQTermNamedFunction.init(const context: TXQEvaluationContext);
     if result <> '' then result := LineEnding +'Did you mean: '+ result;
   end;
 var
-  ns: INamespace;
   i: Integer;
   f: TXQValueFunction;
 begin
   if not (kind in [xqfkNativeInterpreted, xqfkUnknown]) or (interpretedFunction <> nil) then exit;
   case kind of
     xqfkUnknown: begin
-      ns := namespace;
-      functionStaticContext := context.findModuleStaticContext(ns);
+      functionStaticContext := context.findModuleStaticContext(namespaceUrl);
       if functionStaticContext <> nil then
         for i := 0 to high(functionStaticContext.functions) do begin
           f :=  functionStaticContext.functions[i];
           if (f.name = funcname)
-             and  (length(f.parameters) = length(children))
-             and ((f.namespace = ns) or ((ns <> nil) and (f.namespace <> nil) and (f.namespace.getURL = ns.getURL))) then begin
+             and (length(f.parameters) = length(children))
+             and equalNamespaces(namespaceGetURL(f.namespace), namespaceUrl) then begin
             interpretedFunction := f;
             break;
           end;
@@ -1414,10 +1393,9 @@ begin
             if (interpretedFunction.annotations[i].name = 'private') and (equalNamespaces(interpretedFunction.annotations[i].namespace, XMLNamespace_XQuery)) then
               raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
-        findKindIndex(namespace, funcname, context.staticContext.model, kind, func);
+        findKindIndex(namespaceUrl, funcname, context.staticContext.model, kind, func);
         if kind <> xqfkUnknown then exit();
-        if namespace <> nil then raiseEvaluationError('XPST0017', 'Function '+ namespace.getPrefix+':'+funcname+' not found. '+suggestions)
-        else raiseEvaluationError('XPST0017', 'Function '+ funcname+' not found. '+suggestions);
+        raiseEvaluationError('XPST0017', 'Function Q{'+namespaceUrl+'}'+ funcname+' not found. '+suggestions);
       end;
     end;
     xqfkNativeInterpreted: begin
@@ -1609,13 +1587,21 @@ end;
 
 { TXQTermNodeMatcher }
 
+constructor TXQTermNodeMatcher.Create;
+begin
+
+end;
+
 constructor TXQTermNodeMatcher.Create(const avalue: string; asfunction: boolean);
 begin
-  axis := '';
   select := avalue;
   if strContains(select,'::') then axis:=strSplitGet('::',select);
-  hadNamespace := strContains(select,':');
-  if hadNamespace then  namespace:=strSplitGet(':',select);
+  if strContains(select,':') then begin
+    namespaceURLOrPrefix:=strSplitGet(':',select);
+    if namespaceURLOrPrefix = '*' then namespaceCheck := xqtnmnNone
+    else namespaceCheck := xqtnmnPrefix;
+  end else if select <> '*' then namespaceCheck := xqtnmnPrefix
+  else namespaceCheck := xqtnmnNone;
   func := asfunction;
 end;
 
@@ -1639,7 +1625,11 @@ function TXQTermNodeMatcher.debugTermToString: string;
 begin
   result := '';
   if axis <> '' then result += axis + '::';
-  if namespace <> '' then result += namespace + ':';
+  case namespaceCheck of
+    xqtnmnNone: result += '*:';
+    xqtnmnPrefix: result += namespaceURLOrPrefix + ':';
+    xqtnmnURL: result += 'Q{'+namespaceURLOrPrefix+'}';
+  end;
   result += select;
 end;
 
@@ -1650,9 +1640,9 @@ begin
   Result:=inherited clone;
   other := TXQTermNodeMatcher(result);
   other.axis := axis;
-  other.namespace := namespace;
+  other.namespaceURLOrPrefix := namespaceURLOrPrefix;
   other.select := select;
-  other.hadNamespace := hadNamespace;
+  other.namespaceCheck := namespaceCheck;
   other.func := func;
 end;
 
@@ -1697,19 +1687,24 @@ begin
     '*': begin
       result.typ:=getAxis(axis); //any child /*/
       result.matching:=[qmElement,qmAttribute];
-      if (hadNamespace) and (namespace <> '*') then begin
-        Include(Result.matching, qmCheckNamespace);
-        result.namespacePrefix:=namespace;
-      end;
+      assignNamespaceToMatchingStep(result);
     end;
     else begin
       result.typ := getAxis(axis);
       result.matching := [qmValue,qmElement];
       result.value:=select;
-      if (namespace <> '*') then begin
-        Include(Result.matching, qmCheckNamespace);
-        result.namespacePrefix:=namespace;
-      end;
+      assignNamespaceToMatchingStep(result);
+    end;
+  end;
+end;
+
+procedure TXQTermNodeMatcher.assignNamespaceToMatchingStep(var step: TXQPathMatchingStep);
+begin
+  if namespaceCheck <> xqtnmnNone then begin
+    step.namespaceURLOrPrefix:=namespaceURLOrPrefix;
+    case namespaceCheck of
+      xqtnmnPrefix: Include(step.matching, qmCheckNamespacePrefix);
+      xqtnmnURL: Include(step.matching, qmCheckNamespaceURL);
     end;
   end;
 end;
@@ -1775,16 +1770,27 @@ end;
 
 { TXQTermReadAttribute }
 
+constructor TXQTermReadAttribute.create;
+begin
+
+end;
+
 constructor TXQTermReadAttribute.create(avalue: string; func: boolean);
 begin
   if func then begin
     if pos('::', avalue) > 0 then if strSplitGet('::', avalue) <> 'attribute' then raiseParsingError('XPST0003', 'Invalid axis for attribute test');
     if (avalue <> 'attribute') and (avalue <> 'node') then raiseParsingError('XPST0003', 'invalid attribute test: '+avalue);
     attribName := '*';
-  end else begin
-    if pos(':', avalue) > 0 then namespace := strSplitGet(':', avalue);
-    attribName := avalue;
+    exit;
   end;
+
+  attribName:=avalue;
+  if strContains(attribName,':') then begin
+    namespaceURLOrPrefix:=strSplitGet(':',attribName);
+    if namespaceURLOrPrefix = '*' then namespaceCheck := xqtnmnNone
+    else namespaceCheck := xqtnmnPrefix;
+  end else if attribName <> '*' then namespaceCheck := xqtnmnPrefix
+  else namespaceCheck := xqtnmnNone;
 end;
 
 function TXQTermReadAttribute.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -1797,6 +1803,7 @@ var
   temp: INamespace;
   i: Integer;
   attrib: TTreeAttribute;
+  nsCheck: TXQTermNodeMatcherNamespace;
 begin
   tempEl := nil;
   if context.SeqValue <> nil then begin
@@ -1805,39 +1812,41 @@ begin
   else raise EXQEvaluationException.create('XPDY0002', 'Need context item to read attributes');
   if tempEl = nil then
     raise EXQEvaluationException.create('XPTY0020', 'Need node as context item to read attributes');
-  if tempEl.typ = tetProcessingInstruction then
+  if (tempEl.typ = tetProcessingInstruction) or (tempel.attributes = nil) then
     exit(xqvalue);
 
-  readvalue := attribName;
-  readnamespace := namespace;
   if length(children) > 0 then begin
     if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('XPST0003', 'Invalid subtype');
     readvalue := TXQTermNodeMatcher(children[0]).select;
-    readnamespace := TXQTermNodeMatcher(children[0]).namespace;
+    nsCheck := TXQTermNodeMatcher(children[0]).namespaceCheck;
+    readnamespace := TXQTermNodeMatcher(children[0]).namespaceURLOrPrefix;
+  end else begin
+    readvalue := attribName;
+    nsCheck := namespaceCheck;
+    readnamespace := namespaceURLOrPrefix;
   end;
+  if nsCheck = xqtnmnPrefix then begin
+    nsCheck := xqtnmnURL;
+    temp := context.findNamespace(readnamespace, xqdnkUnknown);
+    if temp <> nil then readnamespace:=temp.getURL
+    else if readnamespace <> '' then begin
+      if not context.staticContext.useLocalNamespaces then raiseEvaluationError('XPST0081', 'Unknown namespace prefix: '+readnamespace+' for reading attribute: '+readvalue);
+      if (context.SeqValue<>nil) and (context.SeqValue.toNode <> nil) then readnamespace:=context.SeqValue.toNode.getNamespaceURL(readnamespace)
+      else readnamespace:='';
+      if readnamespace = '' then exit(xqvalue); //do not raise an exception if the namespace is unknown and the local namespace extension is enabled (so you can use unknown namespaces in css)
+    end;
+end;
 
   result := nil;
-  if tempEl.attributes <> nil then begin
-    testValue := readvalue <> '*';
-    testNS := (readnamespace <> '*') and (testValue or (readnamespace <> ''));
-    if testNS then begin
-      temp := context.findNamespace(readnamespace, xqdnkUnknown);
-      if temp <> nil then readnamespace:=temp.getURL
-      else if readnamespace <> '' then begin
-        if not context.staticContext.useLocalNamespaces then raiseEvaluationError('XPST0081', 'Unknown namespace prefix: '+readnamespace+' for reading attribute: '+readvalue);
-        if context.SeqValue.toNode <> nil then readnamespace:=context.SeqValue.toNode.getNamespaceURL(readnamespace)
-        else readnamespace:='';
-        if readnamespace = '' then exit(xqvalue); //do not raise an exception if the namespace is unknown and the local namespace extension is enabled (so you can use unknown namespaces in css)
-      end;
-    end;
-    for i := 0 to tempel.attributes.Count - 1 do begin
-      attrib := tempel.attributes.items[i];
-      if      (not testValue or striEqual(attrib.value, readvalue))
-          and (not testNS or ( attrib.getNamespaceURL() = readnamespace))
-          and not attrib.isNamespaceNode
-          then
-        xqvalueSeqAdd(result, xqvalue(tempEl.attributes.Items[i]));
-    end;
+
+  testValue := readvalue <> '*';
+  for i := 0 to tempel.attributes.Count - 1 do begin
+    attrib := tempel.attributes.items[i];
+    if      (not testValue or striEqual(attrib.value, readvalue))
+        and ((nsCheck <> xqtnmnURL) or ( attrib.getNamespaceURL() = readnamespace))
+        and not attrib.isNamespaceNode
+        then
+      xqvalueSeqAdd(result, xqvalue(tempEl.attributes.Items[i]));
   end;
   if result = nil then result:=xqvalue();
 end;
@@ -1852,7 +1861,8 @@ begin
   Result:=inherited clone;
   with TXQTermReadAttribute(result) do begin
     attribName :=  self.attribName;
-    namespace := self.namespace;
+    namespaceURLOrPrefix := self.namespaceURLOrPrefix;
+    namespaceCheck:=self.namespaceCheck;
   end;
 end;
 
@@ -1864,23 +1874,29 @@ begin
   if value = '' then raiseEvaluationError('XPST0003', 'variable with empty name');
   //if value[1] = '$' then raiseEvaluationError('variable name starts with a double $:  ' + value);
   if value[length(value)] = ';' then delete(value, length(value), 1);
-  if staticContext <> nil then staticContext.splitRawQName(namespace, value, xqdnkUnknown);
+  if staticContext <> nil then staticContext.splitRawQName(namespaceURL, value, xqdnkUnknown);
 end;
 
 constructor TXQTermVariable.create(const avalue: string; const anamespace: INamespace);
 begin
   value := avalue;
-  namespace := anamespace;
+  namespaceURL := namespaceGetURL(anamespace);
+end;
+
+constructor TXQTermVariable.create(const alocalname: string; const anamespace: string);
+begin
+  value := alocalname;
+  namespaceURL:= anamespace;
 end;
 
 function TXQTermVariable.equalsVariable(v: TXQTermVariable): boolean;
 begin
-  result := (v.value = value) and equalNamespaces(namespace, v.namespace);
+  result := (v.value = value) and equalNamespaces(namespaceURL, v.namespaceURL);
 end;
 
 function TXQTermVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
-  result := context.getVariable(value, namespace);
+  result := context.getVariable(value, namespaceURL);
 end;
 
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;
@@ -1906,7 +1922,7 @@ var
 begin
   Result:=inherited clone;
   other := TXQTermVariable(result);
-  other.namespace := namespace;
+  other.namespaceURL := namespaceURL;
   other.value := value;
 end;
 
@@ -1948,8 +1964,8 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
       end;
       if truecount <> length(vars) then
         for i := 0 to high(vars) do
-          if not tempContext.temporaryVariables.hasVariable(vars[i].value, nil, vars[i].namespace) then
-            tempContext.temporaryVariables.add(vars[i].value, xqvalue(), vars[i].namespace);
+          if not tempContext.temporaryVariables.hasVariable(vars[i], nil) then
+            tempContext.temporaryVariables.add(vars[i], xqvalue());
       tempContext.temporaryVariables.parentLog := context.temporaryVariables;
       result := eval.evaluate(tempContext);
     finally
@@ -2487,13 +2503,13 @@ end;
 
 procedure TXQTerm_VisitorTrackKnownVariables.declare(v: PXQTermVariable);
 begin
-  overridenVariables.add(v^.value, tempValue, v^.namespace);
+  overridenVariables.add(v^.value, tempValue, v^.namespaceURL);
 end;
 
 procedure TXQTerm_VisitorTrackKnownVariables.undeclare(v: PXQTermVariable);
 begin
   Assert((overridenVariables.vars[overridenVariables.count-1].name = v^.value) and
-         equalNamespaces(overridenVariables.vars[overridenVariables.count-1].namespace, v^.namespace));
+         equalNamespaces(overridenVariables.vars[overridenVariables.count-1].namespaceURL, v^.namespaceURL));
   overridenVariables.removeLast;
 end;
 
@@ -2503,8 +2519,8 @@ var
   //selfdefined: Boolean;
 begin
   if term^ is TXQTermVariable then begin
-    if not overridenVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
-      replace(term, TXQTermConstant.create(context^.getVariable(TXQTermVariable(term^).value, TXQTermVariable(term^).namespace)))
+    if not overridenVariables.hasVariable(TXQTermVariable(term^), @temp) then
+      replace(term, TXQTermConstant.create(context^. getVariable(TXQTermVariable(term^))))
     else if length(patterns) > 0 then begin
       {not sure what to do with these
       selfdefined := false;
@@ -2513,8 +2529,8 @@ begin
           if vars[i].equalsVariable(TXQTermVariable(term^)) then
             selfdefined := true;}
       if uncertainVariables = nil then uncertainVariables := TXQVariableChangeLog.create();
-      if not uncertainVariables.hasVariable(TXQTermVariable(term^).value, @temp, TXQTermVariable(term^).namespace) then
-        uncertainVariables.add(TXQTermVariable(term^).value, tempValue, TXQTermVariable(term^).namespace);
+      if not uncertainVariables.hasVariable(TXQTermVariable(term^), @temp) then
+        uncertainVariables.add(TXQTermVariable(term^), tempValue);
     end;
   end else if term^ is TXQTermPatternMatcher then begin
     SetLength(patterns, length(patterns) + 1);
@@ -2538,7 +2554,7 @@ end;
 
 { TXQTermDefineFunction }
 
-constructor TXQTermDefineFunction.createReference(anamespace: INamespace; aname: string; arity: integer);
+constructor TXQTermDefineFunction.createReference(const anamespace: INamespace; aname: string; arity: integer);
 var
   call: TXQTermNamedFunction;
   i: Integer;
@@ -2546,7 +2562,7 @@ begin
   parameterCount := arity;
   funcname:=aname;
   namespace := anamespace;
-  call := TXQTermNamedFunction.create(anamespace, aname);
+  call := TXQTermNamedFunction.create(anamespace.getURL, aname);
   for i := 1 to arity do begin
     push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
     call.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
@@ -2555,11 +2571,9 @@ begin
   kind := xqtdfNamedReference;
 end;
 
-constructor TXQTermDefineFunction.createReference(qname: string; arity: integer; staticContext: TXQStaticContext);
-var anamespace: INamespace;
+constructor TXQTermDefineFunction.createReference(anamespaceUrl: string; aname: string; arity: integer);
 begin
-  staticContext.splitRawQName(anamespace, qname, xqdnkFunction);
-  createReference(anamespace, qname, arity);
+  createReference(TNamespace.create(anamespaceUrl, 'prf'), aname, arity);
 end;
 
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -2607,7 +2621,7 @@ begin
       setlength(tempterm.vars, tempVisitor.uncertainVariables.count);
       for i := 0 to tempVisitor.uncertainVariables.count - 1 do begin
         tempterm.vars[i].kind := xqfkLet;
-        tempterm.vars[i].loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.vars[i].name, tempVisitor.uncertainVariables.vars[i].namespace);
+        tempterm.vars[i].loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.vars[i].name, tempVisitor.uncertainVariables.vars[i].namespaceURL);
         tempterm.vars[i].expr := TXQTermConstant.Create(context.getVariable(tempterm.vars[i].loopvar));
       end;
     end;
@@ -2798,7 +2812,7 @@ begin
   f := TXQTermNamedFunction(children[high(children)]);
 
   result := TXQValueFunction.create();
-  result.namespace := f.namespace;
+  result.namespace := namespaceReverseLookup(f.namespaceUrl);
   result.name:=f.funcname;
   if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
     copyAnnotations(result.annotations, f.interpretedFunction.annotations);

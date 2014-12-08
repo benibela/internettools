@@ -393,6 +393,8 @@ var
    XMLNamespace_XMLNS, XMLNamespace_XML: INamespace;
 
 function equalNamespaces(const ans, bns: INamespace): boolean; inline;
+function equalNamespaces(const ans, bns: string): boolean; inline;
+function namespaceGetURL(const n: INamespace): string; inline;
 implementation
 uses xquery;
 
@@ -2485,6 +2487,17 @@ end;
 function equalNamespaces(const ans, bns: INamespace): boolean;
 begin
   result := (ans = bns) or ((ans <> nil) and (bns <> nil) and (ans.getURL = bns.getURL));
+end;
+
+function equalNamespaces(const ans, bns: string): boolean;
+begin
+  result := ans = bns;
+end;
+
+function namespaceGetURL(const n: INamespace): string;
+begin
+  if n = nil then result := ''
+  else result := n.getURL;
 end;
 
 initialization

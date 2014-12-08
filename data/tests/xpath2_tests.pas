@@ -3684,7 +3684,10 @@ begin
   t('string-join(css("b|*"), ",")', 'hallo');
 
   t('/r', 'test', '!<r>test</r>');
-  t('/r', '', '!<r xmlns="foobar">test</r>');
+  ps.StaticContext.useLocalNamespaces:=true;
+  t('/r', 'test', '!<r xmlns="foobar">test</r>');
+  ps.StaticContext.useLocalNamespaces:=false;
+  t('/r', '', '');
   ps.StaticContext.defaultElementTypeNamespace := TNamespace.create('foobar', '');
   t('/r', 'test');
   ps.StaticContext.defaultElementTypeNamespace := nil;

@@ -21,8 +21,8 @@ type
   ps: TXQueryEngine;
   constructor create;
   destructor Destroy; override;
-  procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue);
-  procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const functionName: string; var value: TXQValueFunction);
+  procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;  const variable: string; var value: IXQValue);
+  procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;  const functionName: string; var value: TXQValueFunction);
   procedure ImportModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
@@ -1892,19 +1892,19 @@ begin
   inherited Destroy;
 end;
 
-procedure THelper.DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;
+procedure THelper.DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;
   const variable: string; var value: IXQValue);
 begin
   case variable of
   'test-import1': value := xqvalue(42);
   'test-import2': value := xqvalue('hallo');
   'test-importNS':
-    if namespace = nil then value := xqvalue()
-    else value := xqvalue(namespace.getURL);
+    if namespace = '' then value := xqvalue()
+    else value := xqvalue(namespace);
   end;
 end;
 
-procedure THelper.DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;
+procedure THelper.DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;
   const functionName: string; var value: TXQValueFunction);
 begin
   case functionName of

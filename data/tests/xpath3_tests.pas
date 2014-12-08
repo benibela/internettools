@@ -183,6 +183,7 @@ begin
   t('fn:for-each-pair(("a", "b", "c"), ("x", "y", "z"), concat#2)', 'ax by cz');
 
   t('fn:function-name(fn:substring#2) ! (namespace-uri-from-QName(.), .)', 'http://www.w3.org/2005/xpath-functions fn:substring');
+  //t('fn:function-name(fn:substring#2) ! (namespace-uri-from-QName(.), .)', 'http://www.benibela.de/2012/pxp/extensions pxp:substring');
   t('exists(fn:function-name(function($node){count($node/*)}))', 'false');
   t('fn:function-arity(fn:substring#2)', '2');
   t('fn:function-arity(function($node){name($node)})', '1');

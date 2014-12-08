@@ -1072,7 +1072,7 @@ procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTe
     for i:=0 to high(vars) do
       if vars[i] = t then exit(true);
     for i:=0 to high(vars) do
-      if (vars[i].value = t.value) and (equalNamespaces(vars[i].namespace, t.namespace)) then
+      if (vars[i].value = t.value) and (equalNamespaces(vars[i].namespaceURL, t.namespaceURL)) then
         exit(true);
     result := false;
   end;
@@ -1367,9 +1367,9 @@ var xpathText: TTreeNode;
       name := Trim(performPXPEvaluation(templateStart.varname).toString);
       props := strSplit(name, '.');
       if length(props) > 0 then name := arrayDelete(props, 0);
-      FVariableLog.addObjectModification(name, value, nil, props);
+      FVariableLog.addObjectModification(name, value, '', props);
     end else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
-      FVariableLog.add(FUnnamedVariableName, value, nil);
+      FVariableLog.add(FUnnamedVariableName, value);
 
     templateStart := templateStart.templateReverse;
   end;
