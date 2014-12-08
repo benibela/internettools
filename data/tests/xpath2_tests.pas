@@ -3663,9 +3663,9 @@ begin
   t('//((text))', 'T1');
   t('//document', 'D1aA1D1bC1PI1');
   t('//((document))', 'D1aA1D1bC1PI1');
-  t('string-join(for $a in element return $a / document / comment, ":")', 'C1');
-  t('string-join(for $a in element return $a / document / processing-instruction, ":")', 'PI1');
-  t('string-join(for $a in element return $a / document / (comment | processing-instruction), ":")', 'C1:PI1');
+  t('join(for $a in element return $a / document / comment, ":")', 'C1');
+  t('join(for $a in element return $a / document / processing-instruction, ":")', 'PI1');
+  t('join(for $a in element return $a / document / (comment | processing-instruction), ":")', 'C1:PI1');
 
   f('if (1,2,3) then 5 else 6', 'err:FORG0006');
   t('if (/a,2,3) then 5 else 6',  '5', '!<a>..</a>');
@@ -3796,6 +3796,13 @@ begin
   t('xs:float(1e7)', '1.0E7');
   t('xs:double(1e18)', '1.0E18');
   t('xs:decimal(1e18)', '1000000000000000000');
+  t('abs(xs:untypedAtomic("-12.3"))', '12.3');
+  t('floor(xs:untypedAtomic("12.3"))', '12');
+  t('years-from-duration(xs:untypedAtomic("P35M"))', '2');
+  t('month-from-date(xs:untypedAtomic("2004-07-09"))', '7');
+  t('month-from-dateTime(xs:untypedAtomic("2004-07-09T00:00:00"))', '7');
+  t('hours-from-time(xs:untypedAtomic("17:12:34"))', '17');
+  t('hours-from-dateTime(xs:untypedAtomic("2004-07-09T12:18:34"))', '12');
 
 
   if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode', xqpmXPath2) <> nil then begin
@@ -3803,7 +3810,7 @@ begin
     t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
     t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);
     t('normalize-unicode("e'#$CC#$81'", "")', 'e'#$CC#$81);
-    t('string-join(string-to-codepoints("XÄY"), " ")', '88 196 89');
+    t('join(string-to-codepoints("XÄY"), " ")', '88 196 89');
   //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
   //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
   end;
@@ -3815,10 +3822,10 @@ begin
   t('local-name(html/svg:*)', 'abc');
   t('local-name(html/svg2:*)', 'abc');
   t('local-name(html/svg3:*)', '');
-  t('string-join(for $i in html/svg:abc/* return local-name($i), " ")', 'a b c');
-  t('string-join(for $i in html/svg:abc/svg:* return local-name($i), " ")', 'a b'); //svg and svg2 have the same ns url, so they are both returned
-  t('string-join(for $i in html/svg:abc/svg2:* return local-name($i), " ")', 'a b');
-  t('string-join(for $i in html/svg:abc/svg3:* return local-name($i), " ")', 'c');
+  t('join(for $i in html/svg:abc/* return local-name($i), " ")', 'a b c');
+  t('join(for $i in html/svg:abc/svg:* return local-name($i), " ")', 'a b'); //svg and svg2 have the same ns url, so they are both returned
+  t('join(for $i in html/svg:abc/svg2:* return local-name($i), " ")', 'a b');
+  t('join(for $i in html/svg:abc/svg3:* return local-name($i), " ")', 'c');
 
   t('', '',  '<html xmlns="foobar"><svg:abc xmlns:svg="svgNS"> foobar </svg:abc> <svg2:def xmlns:svg2="svgNS"> foobar </svg2:def> <svg:xyz xmlns:svg="NS2"> 123 </svg:xyz>  </html>');
   t('string-join(for $i in html/svg:* return local-name($i), " ")', 'abc xyz');
@@ -3992,6 +3999,7 @@ begin
   f('(1,2) ! 7', 'err:XPST0003');
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
   f('fn:map(1,2)', 'err:XPST0017');
+  f('1 instance of (xs:integer)', 'err:XPST0003');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
