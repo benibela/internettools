@@ -46,7 +46,7 @@
         <PackageName Value="internettools"/>
       </Item3>
     </RequiredPackages>
-    <Units Count="11">
+    <Units Count="12">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -102,6 +102,10 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="extendedhtmlparser_tests"/>
       </Unit10>
+      <Unit11>
+        <Filename Value="../xquery_functions3.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit11>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
