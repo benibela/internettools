@@ -335,7 +335,16 @@ end;
 function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
 var word: string;
   namespace: INamespace;
+  parens: Integer;
 begin
+  skipWhitespaceAndComment();
+  parens := 0;
+  while pos^ = '(' do begin
+    inc(pos);
+    skipWhitespaceAndComment();
+    parens += 1;
+  end;
+  if parens > 0 then require3('for parentheses around types');
   word := nextTokenQName();
 
   result := TXQTermSequenceType.Create();
@@ -359,7 +368,7 @@ begin
 
       if (word = 'empty-sequence') then begin
         result.kind:=tikNone;
-        if length(result.children) <> 0 then raiseParsingError('XPST0003', 'invalid sequence type');
+        if (length(result.children) <> 0) or (parens > 0) then raiseParsingError('XPST0003', 'invalid sequence type');
         exit
       end else if word = 'item' then begin
         result.kind:=tikAny;
@@ -409,6 +418,7 @@ begin
       if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: {'+namespace.getURL+'}:'+word);
     end;
 
+    while parens > 0 do begin expect(')'); parens -= 1; end;
 
     word := nextToken(true);
     if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin

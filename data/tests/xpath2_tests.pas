@@ -3653,7 +3653,7 @@ begin
     t('string-join("a b c d" cast as xs:IDREFS, "|")', 'a|b|c|d');
     t('string-join("a b c d" cast as xs:NMTOKENS, "|")', 'a|b|c|d');
   end;
-  ps.StaticContext.strictTypeChecking:=false;
+  ps.StaticContext.strictTypeChecking:=true;
 
   t('element', 'E1aT1E1bD1aA1D1bC1PI1E1c', '!<element>E1a<text>T1</text>E1b<document>D1a<attribute>A1</attribute>D1b<comment>C1</comment><processing-instruction>PI1</processing-instruction></document>E1c</element>');
   t('string-join(for $a in element return $a / text(), ":")', 'E1a:E1b:E1c');

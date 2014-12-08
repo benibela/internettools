@@ -267,6 +267,7 @@ begin
   t('abs#1 ! (typeswitch (.) case function (anyAtomicType?) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (item()) as anyAtomicType? return "T" default return "F")', 'T F');
   m('declare function wntc($a as xs:int, $b as xs:string) as xs:float { concat(">",$a,$b,"<") }; typeswitch (wntc#2) case function (int, string) as xs:float return "T" default return "F"', 'T');
   m('typeswitch ( function () { function () { function ($a as xs:integer, $b as xs:integer ) as xs:integer { a + b } (?, 10) } } () () ) case function (xs:decimal) as xs:integer return 1 case function (xs:integer) as xs:int return 2 case function (xs:integer) as xs:integer return 3 default return 4 ', '3');
+  t('for $f as function(item()*, xs:integer) as xs:float in let $f as function(item()*, xs:integer) as xs:float := function($foo, $bar as xs:integer) as xs:float { 1.0 } return $f return $f(2,3)', '1');
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');

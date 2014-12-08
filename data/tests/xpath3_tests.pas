@@ -192,6 +192,15 @@ begin
   t('let $fibhf := function($fibhf, $i) { if ($i <= 2) then 1 else $fibhf($fibhf, $i - 2) + $fibhf($fibhf, $i - 1) }, $fib := $fibhf($fibhf, ?) return for-each(1 to 5, $fib)', '1 1 2 3 5');
   t('let $fibhf := function($fibhf, $count, $prevprev, $prev) { if ($count eq 0) then ($prevprev) else $fibhf($fibhf, $count - 1, $prev, $prevprev + $prev)  }, $fib := $fibhf($fibhf, ?, 0, 1) return for-each(1 to 10, $fib)', '1 1 2 3 5 8 13 21 34 55');
 
+  t('boolean#1 instance of function (item()*) as xs:boolean', 'true');
+  f('boolean#1 castable as function (item()*) as xs:boolean', 'err:XPST0003');
+  f('boolean#1 cast as function (item()*) as xs:boolean', 'err:XPST0003');
+
+  t('function($foo, $bar as xs:integer) { 1.0 } instance of function(item()*, xs:integer) as item()*', 'true');
+  t('function($foo, $bar as xs:integer) as xs:float { 1.0 } instance of function(item()*, xs:integer) as xs:float', 'true');
+  t('function($foo, $bar as (((xs:integer)))) as ((xs:float)) { 1.0 } instance of ((((function(((item()))*, (xs:integer)) as xs:float*))))*', 'true');
+  t('function($foo, $bar as xs:integer) as xs:float { 1.0 } instance of function(item()*, xs:decimal) as xs:float', 'false');
+
 
 
 

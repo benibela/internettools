@@ -1031,7 +1031,7 @@ type
     untypedAtomic: TXSSimpleType;
     node: TXSType;
 
-    sequence: TXSType;
+    sequence, function_: TXSType;
     numericPseudoType, trueNumericPseudoType: TXSUnionType;
 
     constructor Create;

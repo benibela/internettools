@@ -1730,6 +1730,7 @@ end;
 constructor TXQValueFunction.create(aterm: TXQTerm);
 begin
   body := aterm;
+  ftypeAnnotation := baseSchema.function_;
 end;
 
 destructor TXQValueFunction.Destroy;

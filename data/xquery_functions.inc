@@ -949,6 +949,7 @@ begin
     exit
   end;
   if v.instanceOf(baseSchema.AnyAtomicType) then exit(v);
+  if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0012', 'Function values cannot be atomized.');
   if not (v is TXQValueNode) then
     raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
   case v.toNode.typ of
@@ -1013,8 +1014,7 @@ begin
   case args[0].kind of
     pvkInt64:      result := baseType.createValue(abs(args[0].toInt64));
     pvkBigDecimal: result := baseType.createValue(abs(args[0].toDecimal));
-    pvkFloat:      result := baseType.createValue(abs(args[0].toFloat));
-    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:abs: ' + args[0].debugAsStringWithTypeAnnotation());
+    else           result := baseType.createValue(abs(args[0].toFloat));
   end;
 end;
 
@@ -1029,13 +1029,12 @@ begin
   case args[0].kind of
     pvkInt64:      result := baseType.createValue(args[0].toInt64);
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmCeil));
-    pvkFloat: begin
+    else begin
       v := args[0].toFloat;
       if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
       if frac(v) > 0 then result := baseType.createValue(v - frac(v) + 1)
       else result := baseType.createValue(v - frac(v));
     end
-    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:ceiling: ' + args[0].debugAsStringWithTypeAnnotation());
   end;
 end;
 
@@ -1051,13 +1050,12 @@ begin
   case args[0].kind of
     pvkInt64:      result := baseType.createValue(args[0].toInt64);
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmFloor));
-    pvkFloat: begin
+    else begin
       v := args[0].toFloat;
       if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
       if frac(v) < 0 then result := baseType.createValue(v - frac(v) - 1)
       else result := baseType.createValue(v - frac(v));
     end
-    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:floor: ' + args[0].debugAsStringWithTypeAnnotation());
   end;
 end;
 
@@ -1084,8 +1082,7 @@ begin
   case args[0].kind of
     pvkInt64:      result := baseType.createValue(args[0].toInt64);
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmRoundHalfUp));
-    pvkFloat:      result := baseType.createValue(xqfloatRounded(args[0].toFloat));
-    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:rounded: ' + args[0].debugAsStringWithTypeAnnotation());
+    else           result := baseType.createValue(xqfloatRounded(args[0].toFloat));
   end;
 end;
 
@@ -1148,7 +1145,7 @@ begin
        if prec > high(integer) then prec := high(integer) else if prec < low(integer) then prec := low(integer);
        exit(baseType.createValue(round(args[0].toDecimal, prec, bfrmRoundHalfToEven)));
      end;
-    pvkFloat: begin
+    else begin
       f := args[0].toFloat;
       if IsNan(f) or IsInfinite(f) then exit(baseType.createValue(f));
 
@@ -1166,7 +1163,6 @@ begin
         end;
       end;
     end
-    else raise EXQEvaluationException.create('XPTY0004', 'Invalid type for fn:round-half-to-even: ' + args[0].debugAsStringWithTypeAnnotation());
   end;
 
 end;
@@ -2142,27 +2138,29 @@ function xqFunctionYear_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0].instanceOf(baseSchema.duration)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
-  result := xqvalue((args[0] as TXQValueDateTime).toMonths() div 12);
+  if args[0] is TXQValueDateTime then result := xqvalue((args[0] as TXQValueDateTime).toMonths() div 12)
+  else result := xqvalue((baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() div 12);
 end;
 
 function xqFunctionMonth_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if not (args[0].instanceOf(baseSchema.duration)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: ' + args[0].toString);
-  result := xqvalue((args[0] as TXQValueDateTime).toMonths() mod 12);
+  if args[0] is TXQValueDateTime then result := xqvalue((args[0] as TXQValueDateTime).toMonths() mod 12)
+  else result := xqvalue((baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() mod 12);
 end;
 
 function getCanonicalValueFromDayTimeDuration(v: integer; args: TXQVArray): IXQValue;
 var
   tempValue: TXQValueDateTimeData;
+  xqv: IXQValue;
 begin
   requiredArgCount(args, 1);
-  if args[0].isUndefined then exit(xqvalue);
-  if not (args[0].instanceOf(baseSchema.duration)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration time, got: ' + args[0].toString);
-  tempValue := (args[0] as TXQValueDateTime).value;
-  TXQValueDateTime.setDayTime(tempValue, (args[0] as TXQValueDateTime).toDayTime());
+  xqv := args[0];
+  if xqv.isUndefined then exit(xqvalue);
+  if not (xqv.instanceOf(baseSchema.duration)) then xqv := baseSchema.duration.createValue(xqv);
+  tempValue := (xqv as TXQValueDateTime).value;
+  TXQValueDateTime.setDayTime(tempValue, (xqv as TXQValueDateTime).toDayTime());
   if v <> 6 then result := xqvalue(tempValue.values[v])
   else  result := xqvalue(roundto(tempValue.values[v]  + xqfloat(tempValue.secfraction), -6));
 end;
@@ -2195,18 +2193,15 @@ begin
   requiredArgCount(args, 1, 2);
   if length(args) = 2 then begin
     if args[1].isUndefined then tz := getNaN
-    else begin
-      if not args[1].instanceOf(baseSchema.duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected duration, got: '+args[1].toString + ', when conerting '+args[0].toString);
-      tz := (args[1] as TXQValueDateTime).toDayTime() / SecsPerDay;
-    end;
+    else if args[1] is TXQValueDateTime then tz := (args[1] as TXQValueDateTime).toDayTime() / SecsPerDay
+    else tz := (baseSchema.duration.createValue(args[1]) as TXQValueDateTime).toDayTime() / SecsPerDay;
   end else tz := context.staticContext.ImplicitTimezone;
 
-  if args[0].isUndefined then exit(xqvalue);
-  if not (args[0] is TXQValueDateTime) then raise EXQEvaluationException.Create('XPTY0004', 'Expected datetime, got: '+args[0].toString);
-
-  if (IsNan(tz) and isnan((args[0] as TXQValueDateTime).value.timezone)) then exit(args[0]);
   result := args[0].clone;
+  if result.isUndefined then exit();
+  if not (result is TXQValueDateTime) then result := baseSchema.duration.createValue(result);
   resdt := Result as TXQValueDateTime;
+  if (IsNan(tz) and isnan((resdt as TXQValueDateTime).value.timezone)) then exit();
   if isNan(tz) or isnan(resdt.value.timezone)  then
     resdt.value.timezone := tz
   else if resdt.value.timezone <> tz  then begin

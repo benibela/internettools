@@ -603,10 +603,11 @@ var nodeCondition: TXQPathNodeCondition;
         if not (sub is TXQValueFunction) then exit(false);
         if length(arguments) = 0 then exit(true);
         fun := sub as TXQValueFunction;
-        if (length(arguments) <> length(fun.parameters) + 1) or (fun.resulttype = nil) then exit(false);
+        if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
         for i := 0 to high(fun.parameters) do
-          if not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
-        result := fun.resulttype.subtypeOf(arguments[high(arguments)]);
+          if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
+        if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
+        else with arguments[high(arguments)] do result := allowMultiple and allowNone and (kind = tikAny);
       end;
     end;
   end;
