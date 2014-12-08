@@ -627,7 +627,7 @@ begin
   put('feature', 'moduleImport', false); //todo
 
   put('feature', 'serialization', false);
-  put('feature', 'higherOrderFunctions', false);
+  put('feature', 'higherOrderFunctions', true);
   put('feature', 'typedData', false);
   put('feature', 'schemaValidation', false);
   put('feature', 'schemaImport', false);
@@ -732,6 +732,7 @@ begin
   for i := 0 to testCases.Count - 1 do begin
     tc := TTestCase(testCases[i]);
     write(tc.name,': ');//,TTest(tc.tests[0]).test);
+    resultValue.error:= '????';
     resultValue := tc.run;
     res := resultValue.result;
     case res of
@@ -1004,13 +1005,14 @@ begin
   xq :=  TXQueryEngine.create;
   xq.ImplicitTimezone:=-5 / HoursPerDay;
   xq.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
-  xq.AllowExtendedStrings := false;
-  xq.AllowJSON:=false;
-  xq.AllowJSONLiterals:=false;
-  xq.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+  xq.ParsingOptions.AllowExtendedStrings  := false;
+  xq.ParsingOptions.AllowJSON:=false;
+  xq.ParsingOptions.AllowJSONLiterals:=false;
+  xq.ParsingOptions.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
   xq.StaticContext.collation := xq.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
+  xq.StaticContext.defaultFunctionNamespace := TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
   xq.AutomaticallyRegisterParsedModules := true;
   defaultInternetAccessClass := TMockInternetAccess;
 
