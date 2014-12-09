@@ -79,6 +79,9 @@ begin
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
 
+  ps.StaticContext.strictTypeChecking := true;
+
+
   t('"a" || "b"', 'ab');
   t('10 || ''/'' || 6', '10/6');
 
@@ -200,6 +203,10 @@ begin
   t('function($foo, $bar as xs:integer) as xs:float { 1.0 } instance of function(item()*, xs:integer) as xs:float', 'true');
   t('function($foo, $bar as (((xs:integer)))) as ((xs:float)) { 1.0 } instance of ((((function(((item()))*, (xs:integer)) as xs:float*))))*', 'true');
   t('function($foo, $bar as xs:integer) as xs:float { 1.0 } instance of function(item()*, xs:decimal) as xs:float', 'false');
+  f('function($a, $b, $c, $d) { 17 } (?,?) ', 'err:XPTY0004');
+  f('function($a, $b, $c, $d) { 17 } (4,5) ', 'err:XPTY0004');
+  f('contains() ', 'err:XPST0017');
+  f('contains#0 ', 'err:XPST0017');
 
 
 

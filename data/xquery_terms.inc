@@ -2747,13 +2747,15 @@ begin
 
   result := nil;
   case f.kind  of
-    xqfkBasic, xqfkComplex:
+    xqfkBasic, xqfkComplex, xqfkWrappedOperator:
       for i := 0 to high(f.func.versions) do
-        if length(f.func.versions[i].types) = length(f.children) then begin
-          Result := @f.func.versions[i];
-          break;
-        end;
+        if length(f.func.versions[i].types) = length(f.children) then
+          exit(@f.func.versions[i]);
+    xqfkNativeInterpreted: exit;
   end;
+
+  if (result = nil) and context.staticContext.strictTypeChecking and ((f.kind <> xqfkBasic) or (TXQBasicFunctionInfo(f.func).func <> @xqFunctionConcat)) then
+    raiseParsingError('XPST0017', 'Failed to find function (mismatch arg count?)');
 end;
 
 procedure TXQTermDefineFunction.initNamedFunctionReference(const context: TXQEvaluationContext);
@@ -2859,6 +2861,7 @@ var
   ch: array of TXQTerm;
 begin
   ch := (children[0] as TXQTermWithChildren).children;
+  if length(ch) <> length(f.parameters) + 1 then raiseParsingError('XPTY0004', 'Invalid argument count');
   result := TXQValueFunction.create();
   result.namespace := f.namespace;
   result.name:=f.name;
