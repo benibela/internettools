@@ -2801,6 +2801,7 @@ begin
       for i := 0 to high(f.func.versions) do
         if length(f.func.versions[i].types) = length(f.children) then
           exit(@f.func.versions[i]);
+    xqfkTypeConstructor: if length(f.children) = 1 then exit;
     xqfkNativeInterpreted: exit;
   end;
 
