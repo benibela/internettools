@@ -1141,7 +1141,7 @@ type
     versions: array of TXQFunctionParameterTypes;
     class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): IXQValue; static;
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
-    function checkTypes(const values: TXQVArray; const context:TXQEvaluationContext): boolean;
+    function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext): boolean;
     destructor Destroy; override;
   end;
   //**Information about a basic xquery function   (basic => function is pure/independent of current context)
@@ -1341,6 +1341,8 @@ type
     function subtypeOf(tb: TXQTermSequenceType): boolean;
   private
     function subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
+    function functionCoercion(const v: IXQValue): IXQValue;
+    function isItemStar(): boolean;
   end;
 
   { TXQTermVariable }
@@ -3579,15 +3581,20 @@ var
 begin
   result := v;
   if typ = nil then exit;
-  if typ.instanceOf(result, context) then exit;
-  if typ.kind = tikAtomic then begin
-    if not (result is TXQValueSequence) then
-      exit(conversionSingle(result));
-    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then
-      raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
-    if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.');
-    for i := 0 to result.getSequenceCount - 1 do
-      (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
+  if typ.kind <> tikFunctionTest then begin
+    if typ.instanceOf(result, context) then exit;
+    if typ.kind = tikAtomic then begin
+      if not (result is TXQValueSequence) then
+        exit(conversionSingle(result));
+      if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then
+        raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+      if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.');
+      for i := 0 to result.getSequenceCount - 1 do
+        (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
+    end;
+  end else begin
+    if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.debugAsStringWithTypeAnnotation());
+    if context.staticContext.strictTypeChecking then result := typ.functionCoercion(v);
   end;
 end;
 
@@ -3628,19 +3635,32 @@ begin
 end;
 
 
-function TXQAbstractFunctionInfo.checkTypes(const values: TXQVArray; const context: TXQEvaluationContext): boolean;
+function TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext): boolean;
 var
   i, j: Integer;
+  countMatch: Boolean;
 begin
   if length(versions) = 0 then exit(true);
+  countMatch := false;
   for i:= 0 to high(versions) do begin
     if length(values) <> length(versions[i].types) then continue;
     result := true;
     for j := 0 to high(values) do
-      if not checkType(values[j], versions[i].types[j], context) then begin result := false; break; end;
-    if result then exit;
+      if (versions[i].types[j].kind <> tikFunctionTest) and not checkType(values[j], versions[i].types[j], context) then begin
+       result := false;
+       break;
+      end;
+    if result then begin
+     for j := 0 to high(values) do
+       if versions[i].types[j].kind = tikFunctionTest then
+         values[j] := convertType(values[j], versions[i].types[j], context);
+      exit;
+    end;
+    countMatch := true;
   end;
   result := false;
+  if not countMatch then
+    raise EXQEvaluationException.create('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
 end;
 
 destructor TXQAbstractFunctionInfo.Destroy;

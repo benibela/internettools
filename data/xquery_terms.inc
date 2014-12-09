@@ -607,7 +607,7 @@ var nodeCondition: TXQPathNodeCondition;
         for i := 0 to high(fun.parameters) do
           if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
         if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
-        else with arguments[high(arguments)] do result := allowMultiple and allowNone and (kind = tikAny);
+        else result := arguments[high(arguments)].isItemStar();
       end;
     end;
   end;
@@ -701,6 +701,56 @@ begin
     exit(true);
   end;
   exit(false);
+end;
+
+function TXQTermSequenceType.functionCoercion(const v: IXQValue): IXQValue;
+var
+  fun: TXQValueFunction;
+  needCoercion: Boolean;
+  f: TXQValueFunction;
+  i: Integer;
+  fresult: TXQValueFunction;
+begin
+  //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
+  //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.debugAsStringWithTypeAnnotation());
+  if length(arguments) = 0 then exit(v);
+  fun := v as TXQValueFunction;
+  if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
+  needCoercion := false;
+  for i := 0 to high(fun.parameters) do
+    if (not arguments[i].isItemStar)
+       and ((fun.parameters[i].seqtype = nil) or not fun.parameters[i].seqtype.subtypeOf(arguments[i])) then begin
+      needCoercion:=true;
+      break;
+    end;
+  if not needCoercion then
+    if (not arguments[high(arguments)].isItemStar) and (((fun.resulttype = nil) or not fun.resulttype.subtypeOf(arguments[i])))
+        then
+          needCoercion := true;
+  if not needCoercion then exit(v);
+
+  //see TXQTermDefineFunction.defineDynamicPartialApplication
+  f := fun;
+  fresult := TXQValueFunction.create();
+  fresult.namespace := f.namespace;
+  fresult.name:=f.name;
+  copyAnnotations(fresult.annotations, f.annotations);
+  fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
+  setlength(fresult.parameters, length(arguments) - 1);
+  for i := 0 to high(f.parameters) do begin
+    TXQTermDynamicFunctionCall(fresult.body).push(TXQTermVariable.create(IntToStr(i)+'.'));
+    fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);
+    fresult.parameters[i].seqtype := TXQTermSequenceType(arguments[i].clone);
+  end;
+  fresult.ownsTerms := true;
+  fresult.resulttype := TXQTermSequenceType(arguments[high(arguments)].clone);
+  fresult.context := f.context;
+  result := fresult;
+end;
+
+function TXQTermSequenceType.isItemStar: boolean;
+begin
+  result := (kind = tikAny) and allowMultiple and allowNone;
 end;
 
 function TXQTermSequenceType.clone: TXQTerm;
@@ -1245,7 +1295,7 @@ begin
   assert((kind = xqfkUnknown) or (func <> nil));
 
   if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
-    if not func.checkTypes(evilkids, context) then
+    if not func.checkOrConvertTypes(evilkids, context) then
       raiseEvaluationError('XPTY0004', 'Invalid types for function call: '+func.versions[0].name);
 
 
@@ -1539,7 +1589,7 @@ begin
     result := op.func(context, children[0].evaluate(context), children[1].evaluate(context))
   else begin
     evaluateChildren(context, evilkids);
-    if not op.checkTypes(evilkids, context) then
+    if not op.checkOrConvertTypes(evilkids, context) then
       raiseEvaluationError('XPTY0004', 'Invalid types for binary operator: '+op.name+ ' '+op.followedBy);
     result := op.func(context, evilkids[0], evilkids[1]);
   end;
