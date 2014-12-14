@@ -2802,7 +2802,7 @@ begin
         if length(f.func.versions[i].types) = length(f.children) then
           exit(@f.func.versions[i]);
     xqfkTypeConstructor: if length(f.children) = 1 then exit;
-    xqfkNativeInterpreted: exit;
+    xqfkUnknown, xqfkNativeInterpreted: exit;
   end;
 
   if (result = nil) and context.staticContext.strictTypeChecking and ((f.kind <> xqfkBasic) or (TXQBasicFunctionInfo(f.func).func <> @xqFunctionConcat)) then
