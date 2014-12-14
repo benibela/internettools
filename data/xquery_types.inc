@@ -1802,6 +1802,19 @@ begin
   result := directClone;
 end;
 
+function TXQValueFunction.debugAsStringWithTypeAnnotation(textOnly: boolean): string;
+var
+  i: Integer;
+begin
+  result := 'function (';
+  for i := 0 to high(parameters) do begin
+    if i <> 0 then result += ', ';
+    result += parameters[i].toString;
+  end;
+  result += ')';
+  if resulttype <> nil then result += ' as ' + resulttype.debugTermToString;
+end;
+
 
 procedure TXQValueFunction.assignCopiedTerms(const func: TXQValueFunction);
 var

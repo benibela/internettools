@@ -757,9 +757,13 @@ type
   end;
 
   { TXQValueFunction }
+
+  { TXQFunctionParameter }
+
   TXQFunctionParameter = record
     variable: TXQTermVariable;
     seqtype: TXQTermSequenceType;
+    function toString(def: string = '?'): string;
   end;
 
   TXQAnnotation = record
@@ -791,6 +795,7 @@ type
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
+    function debugAsStringWithTypeAnnotation(textOnly: boolean=true): string;
   private
     procedure assignCopiedTerms(const func: TXQValueFunction);
   end;
@@ -1358,6 +1363,7 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     class function splitForDotNotation(v: TXQTermVariable): TXQTerm;
     function clone: TXQTerm; override;
+    function ToString: ansistring; override;
   end;
 
   { TXQTermDefineVariable }
@@ -1448,7 +1454,7 @@ type
     destructor destroy; override;
   end;
 
-  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown);
+  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown); //"unknown" means unitialized or user-defined
 
   { TXQTermNamedFunction }
 
@@ -2386,6 +2392,16 @@ var
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+{ TXQFunctionParameter }
+
+function TXQFunctionParameter.toString(def: string): string;
+begin
+  if variable = nil then exit(def);
+  result += variable.ToString;
+  if seqtype <> nil then
+    result += ' as ' + seqtype.debugTermToString;
+end;
 
 
 { TXQInterpretedFunctionInfo }
@@ -3562,6 +3578,12 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
     t: TXSType;
   begin
     result := w;
+    if typ.kind = tikFunctionTest then begin
+      if w.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.debugAsStringWithTypeAnnotation());
+      if context.staticContext.strictTypeChecking then result := typ.functionCoercion(w);
+      exit;
+    end;
+
     t := result.typeAnnotation;
     if t.derivedFrom(baseSchema.node) then begin
       result := xqvalueAtomize(result);
@@ -3581,20 +3603,15 @@ var
 begin
   result := v;
   if typ = nil then exit;
-  if typ.kind <> tikFunctionTest then begin
-    if typ.instanceOf(result, context) then exit;
-    if typ.kind = tikAtomic then begin
-      if not (result is TXQValueSequence) then
-        exit(conversionSingle(result));
-      if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then
-        raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
-      if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.');
-      for i := 0 to result.getSequenceCount - 1 do
-        (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
-    end;
-  end else begin
-    if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.debugAsStringWithTypeAnnotation());
-    if context.staticContext.strictTypeChecking then result := typ.functionCoercion(v);
+  if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
+  if typ.kind in [tikAtomic, tikFunctionTest] then begin
+    if not (result is TXQValueSequence) then
+      exit(conversionSingle(result));
+    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then
+      raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+    if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.');
+    for i := 0 to result.getSequenceCount - 1 do
+      (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
   end;
 end;
 

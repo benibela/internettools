@@ -98,6 +98,7 @@ begin
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.ImplicitTimezone:=-5 / HoursPerDay;
+  ps.StaticContext.strictTypeChecking := true;
   //ps.OnEvaluateVariable:=@vars.evaluateVariable;
   //ps.OnDefineVariable:=@vars.defineVariable;
   ps.ParsingOptions.AllowJSONLiterals:=false;
@@ -170,7 +171,7 @@ begin
   t('(let $x := 10, $f := function() { for $a at $x in (1, $x, 4) where $a eq $x return ($a, $x) } return $f)()', '1 1');
   t('(let $x := 10, $f := function() { for $a at $p in (1, $x, 4) where $a eq $x order by $x return ($a, $p) } return $f)()', '10 2');
   t('let $x := 1, $y := 2, $f := function($p) { <foo x="{$x}" p="{$p}">{$y}</foo> } return (outer-xml($f(())), outer-xml($f(123)))', '<foo x="1" p="">2</foo> <foo x="1" p="123">2</foo>');
-  t('let $x := 1, $y := 2, $f := function($p) { <foo x="{$x}" p="{$p}">{$y}</foo> / @*[. eq $x] / node-name(.) } return ($f(1), "s", $f(2))', 'x p s x');
+  t('let $x := 1, $y := 2, $f := function($p) { <foo x="{$x}" p="{$p}">{$y}</foo> / @*[. = $x] / node-name(.) } return ($f(1), "s", $f(2))', 'x p s x');
   t('let $g := let $x := 1, $f := function($y) { typeswitch ($y) case xs:integer return $x case $x as xs:string return $x default return ($x||":"||$y) } return $f return ($g(7), $g("foo"), $g(7.4)) ', '1 foo 1:7.4');
 
   //named function references
