@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 
-
 function xqvalueF(const v: xqfloat; const typeRef1, typeRef2: IXQValue): IXQValue;
 var
   t: TXSType;
@@ -949,7 +948,7 @@ begin
     exit
   end;
   if v.instanceOf(baseSchema.AnyAtomicType) then exit(v);
-  if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0012', 'Function values cannot be atomized.');
+  if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
   if not (v is TXQValueNode) then
     raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
   case v.toNode.typ of
@@ -967,7 +966,7 @@ function xqFunctionData(const context: TXQEvaluationContext; const args: TXQVArr
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
-    if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'fn:data() cannot be used without context item');
+    if context.SeqValue = nil then raiseXPDY0002ContextItemAbsent;
     result := xqvalueAtomize(context.SeqValue)
   end else result := xqvalueAtomize(args[0]);
 end;
@@ -1173,9 +1172,11 @@ begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
     if context.SeqValue <> nil then result := xqvalue(context.SeqValue.toString)
-    else result := xqvalue(treeElementAsString(context.ParentElement));
-  end;
-  if length(args) = 1 then result := xqvalue(args[0].toString);
+    else if context.ParentElement <> nil then result := xqvalue(treeElementAsString(context.ParentElement))
+    else raiseXPDY0002ContextItemAbsent;
+  end else if length(args) = 1 then
+    if args[0].kind = pvkFunction then raise EXQEvaluationException.create('FOTY0014', 'Cannot pass function item to fn:string')
+    else result := xqvalue(args[0].toString);
 end;
 
 function xqFunctionDeep_Node_Text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2321,7 +2322,7 @@ begin
   requiredArgCount(args,1, 2);
   if length(args) = 2 then node := args[1].toNode
   else node := xqvalueContextNode(context);
-  if node = nil then raise EXQEvaluationException.Create('XPDY0002', 'No context item node');
+  if node = nil then raiseXPDY0002ContextItemAbsent;
 
 
   testlang := lowercase(args[0].toString);
@@ -3176,7 +3177,7 @@ begin
   requiredArgCount(args,0,0);
   if context.SeqValue <> nil then result := xqvalue(context.SeqIndex)
   else if context.ParentElement <> nil then result := xqvalue(1)
-  else raise EXQEvaluationException.Create('XPDY0002', 'position() called but no sequence available');
+  else raiseXPDY0002ContextItemAbsent;
 
 end;
 
@@ -3185,7 +3186,7 @@ begin
   requiredArgCount(args,0,0);
   if context.SeqValue <> nil then result := xqvalue(context.SeqLength)
   else if context.ParentElement <> nil then result := xqvalue(1)
-  else raise EXQEvaluationException.Create('XPDY0002', 'last() called but no sequence available');
+  else raiseXPDY0002ContextItemAbsent;
 end;
 
 function xqFunctionId(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

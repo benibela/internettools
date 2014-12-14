@@ -3693,6 +3693,11 @@ begin
   inherited Destroy;
 end;
 
+procedure raiseXPDY0002ContextItemAbsent;
+begin
+  raise EXQEvaluationException.create('XPDY0002', 'Context item (.) is not set');
+end;
+
 function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings
 
 {$I xquery_parse.inc}
