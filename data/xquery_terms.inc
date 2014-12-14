@@ -1977,6 +1977,13 @@ begin
   other.value := value;
 end;
 
+function TXQTermVariable.ToString: ansistring;
+begin
+  result := '$';
+  if namespaceURL <> '' then result += 'Q{'+namespaceURL+'}';
+  result += value;
+end;
+
 
 
 
