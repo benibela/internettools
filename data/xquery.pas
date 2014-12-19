@@ -202,6 +202,8 @@ type
 
     procedure beginSubContextWithVariables;
     procedure endSubContextWithVariables(const oldContext: TXQEvaluationContext);
+  private
+    function contextNode(mustExists: boolean = true): TTreeNode;
   end;
 
 
@@ -2783,6 +2785,11 @@ end;
 
 function xqvalueAtomize(const v: IXQValue): IXQValue; forward;
 
+procedure raiseXPDY0002ContextItemAbsent;
+begin
+  raise EXQEvaluationException.create('XPDY0002', 'Context item (.) is not set');
+end;
+
 
 
 { TXQStaticContext }
@@ -3250,6 +3257,22 @@ begin
   if oldContext.temporaryVariables = nil then FreeAndNil(temporaryVariables);
 end;
 
+function TXQEvaluationContext.contextNode(mustExists: boolean): TTreeNode;
+begin
+  if SeqValue <> nil then begin //tests pass without this branch. Why???
+    result := SeqValue.toNode;
+    if result = nil then raise EXQEvaluationException.create('XPTY0004', 'Context item is not a node');
+    exit;
+  end;
+  if ParentElement <> nil then exit(ParentElement);
+  if RootElement <> nil then exit(RootElement);
+  if staticContext.sender = nil then raise EXQEvaluationException.Create('XPTY0020', 'Context sender is nil');
+  if mustExists then raiseXPDY0002ContextItemAbsent;
+
+  result := nil;
+end;
+
+
 { TXQuery }
 
 constructor TXQuery.Create(asStaticContext: TXQStaticContext; aterm: TXQTerm);
@@ -3691,11 +3714,6 @@ begin
   end;
   versions := nil;
   inherited Destroy;
-end;
-
-procedure raiseXPDY0002ContextItemAbsent;
-begin
-  raise EXQEvaluationException.create('XPDY0002', 'Context item (.) is not set');
 end;
 
 function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings

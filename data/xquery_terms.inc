@@ -1479,7 +1479,9 @@ var
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
-  if func.isUndefined then exit(xqvalue());
+  if func.isUndefined then
+    if AllowJSONDefaultInternal then exit(xqvalue())
+    else raise EXQEvaluationException.create('XPTY0004', 'Cannot use an empty sequence as function, if JSONiq is disabled');
   if (func is TXQValueSequence) and (func.getSequenceCount = 1) then func := func.getChild(0);
 
   if func is TXQValueFunction then begin
@@ -1497,12 +1499,11 @@ begin
         (v as TXQValueObject).enumerateKeys(sl);
         xqvalueSeqAdd(result, xqvalue(sl));
         sl.free;
-      end;
-      if v is TXQValueJSONArray then begin
+      end else if v is TXQValueJSONArray then begin
         ara := v as TXQValueJSONArray;;
         for i := 0 to ara.seq.Count-1 do
           xqvalueSeqAdd(result, ara.seq[i]);
-      end;
+      end else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v.debugAsStringWithTypeAnnotation());
     end;
     if result = nil then result := xqvalue();
     exit;
@@ -1517,11 +1518,13 @@ begin
       xqvalueSeqAdd(result, (v as TXQValueJSONArray).seq[index.toInt64-1]);
     end else if v is TXQValueObject then begin
       xqvalueSeqAdd(result, v.getProperty(index.ToString));
-    end;
-    //end else raiseEvaluationError('XPST003', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation()); no error since JSONiq 1.0.1
+    end else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
+    //end else
+      raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
   end;
   //this returns a sequence of a single value instead that value, if func is a sequence with multiple values (from which only one has that property). Does it matter?
   if result = nil then result := xqvalue();
+
 end;
 
 function TXQTermDynamicFunctionCall.getContextDependencies: TXQContextDependencies;
@@ -2305,7 +2308,8 @@ var
           else if not (x is TXQValueString) then firstAtomic := false
           else {if  (x.toString <> '')  then }firstAtomic:=false;
         end;
-      end
+      end;
+      pvkFunction: raiseEvaluationError('XQTY0105', 'Functions passed to element constructor')
       else if (lastKid = nil) or (lastKid.typ <> tetText) then begin
         kid := TTreeNode.create(tetText);
         if firstAtomic then kid.value:=v.toString
@@ -2330,6 +2334,7 @@ var
     result := '';
     for x in v do begin
       if not first then result += ' ';
+      if x.kind = pvkFunction then raiseEvaluationError('FOTY0013', 'Cannot serialize function');
       result += x.toString;
       first := false;
     end;

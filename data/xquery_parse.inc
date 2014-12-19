@@ -1057,6 +1057,9 @@ begin
       staticContext.splitRawQName((tempVar.variable as TXQTermVariable).namespaceURL, (tempVar.variable as TXQTermVariable).value, xqdnkUnknown);
       if tempType <> nil then tempVar.push(tempType);
       result.push(tempVar);
+      for i := 0 to high(Result.children) - 1 do
+        if TXQTermVariable(TXQTermDefineVariable(Result.children[i]).variable).equalsVariable(TXQTermVariable(tempVar.variable)) then
+          raiseParsingError('XQST0039', 'Duplicate variable name: '+tempVar.ToString);
       skipWhitespaceAndComment();
       if not (pos^ in [',', ')']) then raiseParsingError('XPST0003', 'Missing , or )');
       if pos^ = ',' then pos+=1;

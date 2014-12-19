@@ -713,14 +713,6 @@ begin
   xqvalueCompareGeneric(cxt,a,b,result,1,0);
 end;
 
-function xqvalueContextNode(const context: TXQEvaluationContext): TTreeNode;
-begin
-  if context.ParentElement <> nil then exit(context.ParentElement);
-  if context.RootElement <> nil then exit(context.RootElement);
-  if context.staticContext.sender = nil then raise EXQEvaluationException.Create('XPTY0020', 'Context sender is nil');
-  result := nil;
-end;
-
 function xqvalueToSingleNode(v: IXQValue): TTreeNode;
 var
   k: TXQValueKind;
@@ -1196,7 +1188,7 @@ var node: TTreeNode;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then node := args[0].toNode
-  else node := xqvalueContextNode(context);
+  else node := context.contextNode();
   result := xqvalue(node.outerXML())
 end;
 
@@ -1205,7 +1197,7 @@ var node: TTreeNode;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then node := args[0].toNode
-  else node := xqvalueContextNode(context);
+  else node := context.contextNode();
   result := xqvalue(node.innerXML())
 end;
 
@@ -1214,7 +1206,7 @@ var node: TTreeNode;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then node := args[0].toNode
-  else node := xqvalueContextNode(context);
+  else node := context.contextNode();
   result := xqvalue(node.outerHTML())
 end;
 
@@ -1223,10 +1215,9 @@ var node: TTreeNode;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then node := args[0].toNode
-  else node := xqvalueContextNode(context);
+  else node := context.contextNode();
   result := xqvalue(node.innerHTML())
 end;
-
 
 
 
@@ -2268,7 +2259,7 @@ var uri: string;
   last: TTreeNode;
 begin
   requiredArgCount(args,0, 1);
-  if length(args) = 0 then node := xqvalueContextNode(context)
+  if length(args) = 0 then node := context.contextNode()
   else if args[0].isUndefined then exit(xqvalue)
   else node := xqvalueToSingleNode(args[0]);
   uri := '';
@@ -2321,7 +2312,7 @@ var
 begin
   requiredArgCount(args,1, 2);
   if length(args) = 2 then node := args[1].toNode
-  else node := xqvalueContextNode(context);
+  else node := context.contextNode();
   if node = nil then raiseXPDY0002ContextItemAbsent;
 
 
@@ -2544,7 +2535,7 @@ begin
     node := nil;
     context.staticContext.sender.onParseDoc(context.staticContext.sender, data, url, contenttype, node);
   end else begin
-    node := xqvalueContextNode(context);
+    node := context.contextNode(false);
     parser := nil;
     if (node <> nil) and (node.document is TTreeDocument) then parser := node.getDocument().getCreator;
     if parser = nil then parser := context.staticContext.sender.defaultParser;
@@ -2811,7 +2802,11 @@ begin
 end;
 
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;
-//contract: always return TXQValueBoolean
+  procedure raiseFOTY0015(const v: IXQValue);
+  begin
+    raise EXQEvaluationException.create('FOTY0015', 'Function item ' + v.debugAsStringWithTypeAnnotation() + ' passed to deep-equal')
+  end;
+
 var i:integer;
     enum1, enum2: TXQValueEnumerator;
 begin
@@ -2821,6 +2816,7 @@ begin
   enum1 := a.GetEnumerator; enum1.MoveNext;
   enum2 := b.GetEnumerator; enum2.MoveNext;
   for i := 0 to a.getSequenceCount - 1 do begin
+    if enum2.Current.kind = pvkFunction then raiseFOTY0015(enum2.Current);
 
     if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
       if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
@@ -2828,6 +2824,7 @@ begin
          or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.ImplicitTimezone,true) then //todo:   nodes?
         exit(false);
     end else begin
+      if enum1.Current.kind = pvkFunction then raiseFOTY0015(enum1.Current);
       if context.staticContext.nodeCollation <> nil then
         collation := context.staticContext.nodeCollation; //?? do not want to use string collation for nodes?
       if (enum2.Current.instanceOf(baseSchema.anyAtomicType)) or
@@ -3132,7 +3129,7 @@ end;
 function simpleNode(const context: TXQEvaluationContext; args: TXQVArray): TTreeNode;
 begin
   requiredArgCount(args,0, 1);
-  if length(args) = 0 then exit(xqvalueContextNode(context))
+  if length(args) = 0 then exit(context.contextNode())
   else if args[0].isUndefined then exit(nil)
   else exit(xqvalueToSingleNode(args[0]));
 end;
@@ -3232,7 +3229,7 @@ begin
 
   try
     if length(args) = 2 then node := xqvalueToSingleNode(args[1])
-    else node := xqvalueContextNode(context);
+    else node := context.contextNode();
 
     if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
 
