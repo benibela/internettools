@@ -207,7 +207,7 @@ begin
   f('function($a, $b, $c, $d) { 17 } (4,5) ', 'err:XPTY0004');
   f('contains() ', 'err:XPST0017');
   f('contains#0 ', 'err:XPST0017');
-  t('function ($x as function(*)*) as function(*)* { $x } ( ( function () { 1 }, function() { 2 } ) ) ! .()', '1 2');
+  t('let $id := function ($x as function(*)*) as function(*)* { $x } return ($id ( ( function () { 1 }, function() { 2 } ) ), $id(())) ! .()', '1 2');
 
 
 

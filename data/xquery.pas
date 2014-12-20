@@ -3623,18 +3623,24 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
 
 var
   i: Integer;
+  seq: TXQVList;
 begin
   result := v;
   if typ = nil then exit;
   if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
+  case result.getSequenceCount of
+    0:  if not typ.allowNone then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.')
+        else exit;
+    1: ; //later
+    else if (not typ.allowMultiple) then
+      raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+  end;
   if typ.kind in [tikAtomic, tikFunctionTest] then begin
     if not (result is TXQValueSequence) then
       exit(conversionSingle(result));
-    if ((not typ.allowMultiple) and (result.getSequenceCount > 1)) then
-      raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
-    if ((not typ.allowNone) and (result.getSequenceCount = 0)) then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.');
-    for i := 0 to result.getSequenceCount - 1 do
-      (result as TXQValueSequence).seq[i] := conversionSingle((result as TXQValueSequence).seq[i]);
+    seq := (result as TXQValueSequence).seq;
+    for i := 0 to seq.Count - 1 do
+      seq[i] := conversionSingle(seq[i]);
   end;
 end;
 
