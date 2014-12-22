@@ -209,7 +209,10 @@ begin
   f('contains#0 ', 'err:XPST0017');
   t('let $id := function ($x as function(*)*) as function(*)* { $x } return ($id ( ( function () { 1 }, function() { 2 } ) ), $id(())) ! .()', '1 2');
 
-
+  //URL Qualified names
+  t('()', '', '<root xmlns="base"><a xmlns="n1">a1</a><a xmlns="n2">a2</a><p:a xmlns:p="n3" p:attrib="AT3">a3</p:a></root>');
+  t('(/*:root/Q{n1}a,"|",(Q{base}root!(Q{n3}a, "|", Q{n2}a)))', 'a1 | a3 | a2');
+  t('(/Q{base}root//@Q{n3}attrib, //attribute::Q{n3}attrib)', 'AT3 AT3');
 
 
   //interface tests

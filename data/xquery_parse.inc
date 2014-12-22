@@ -50,7 +50,13 @@ type
   function nextTokenNCName(): string; inline; //returns a NCName (todo: raise an error if not an NCName)
   function nextTokenMaybeQName(): string; inline; //returns a QName, if there is one, or the same as nextToken otherwise
   function nextTokenQName(allowWildcards: boolean=false): string; inline; //returns a QName (todo: raise an error if not a QName)
-  procedure nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean=false); //returns a splitted EQName (todo: raise an error if not a QName)
+  { $foo       -> ('', '', 'foo',    xqnmPrefix)
+    $*:foo     -> ('', '*', 'foo',   xqnmNone)
+    $prf:foo   -> ('', 'prf', 'foo', xqnmPrefix)
+    $Q{}foo    -> ('', 'Q', 'foo',   xqnmURL)
+    $Q{ns}foo  -> ('ns', 'Q', 'foo', xqnmURL)
+  }
+  function nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean=false): TXQNamespaceMode; //returns a splitted EQName (todo: raise an error if not a QName)
   function parseQNameWithType(out typ: TXQTermSequenceType): string;
 
 
@@ -58,7 +64,8 @@ type
   function parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
   function parseSequenceType(): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
-  function replaceEntities(s: string): string;
+  function replaceEntitiesAlways(s: string): string;
+  function replaceEntitiesIfNeeded(const s: string): string; inline;
   function parseString: string;
   function parseString(const w: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
@@ -255,17 +262,35 @@ begin
   if (not allowWildcards) and ((result[1] = '*') or (result[length(result)] = '*')) then raiseParsingError('XPST0003', 'Expected QName, got: *');
 end;
 
-procedure TXQParsingContext.nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean);
+function TXQParsingContext.nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
+const NONCNAME = (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']);
+var
+  marker: PChar;
 begin
   skipWhitespaceAndComment();
   localpart:=nextToken();
-  if (pos^ = ':') and not ((pos+1)^ in (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*'])) then begin //same check in parseValue for matchers
+  result := xqnmPrefix;
+  if (localpart = 'Q') and (pos^ = '{') then begin
+    if ((pos-1)^ <> 'Q') then raiseParsingError('err:XPST0003', 'Q{ must not be separated by whitespace');
+    require3('Q{..} namespace urls');
+    prefix := localpart;
+    inc(pos);
+    marker := pos;
+    while not (pos^ in ['}', #0]) do inc(pos);
+    url := strFromPchar(marker, pos - marker);
+    if parsingModel in [xqpmXQuery1,xqpmXQuery3] then url := replaceEntitiesIfNeeded(url);
+    inc(pos);
+    if (pos^ in WHITE_SPACE + SYMBOLS) then raiseParsingError('err:XPST0003', 'Q{..}localname must not be separated by whitespace');
+    localpart := nextTokenNCName();
+    result := xqnmURL;
+  end else if (pos^ = ':') and not ((pos+1)^ in NONCNAME) then begin //same check in parseValue for matchers
     expect(':');
     prefix := localpart;
-    localpart := nextToken();
-  end else prefix:='';
-  url := ''; //todo
-  if (not allowWildcards) and ((prefix = '*') or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
+    localpart := nextTokenNCName();
+    if prefix = '*' then
+      result := xqnmNone;
+  end else url := '';
+  if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
 end;
 
 function TXQParsingContext.parseQNameWithType(out typ: TXQTermSequenceType): string;
@@ -749,7 +774,7 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
           while not (pos^ in [#0, ';']) do pos += 1;
           if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
           pos += 1;
-          pushElementContent(replaceEntities(strFromPchar(marker, pos - marker)));
+          pushElementContent(replaceEntitiesAlways(strFromPchar(marker, pos - marker)));
           atBoundary:=false;
         end;
       end;
@@ -1094,7 +1119,7 @@ begin
 end;
 
 
-function TXQParsingContext.replaceEntities(s: string): string;
+function TXQParsingContext.replaceEntitiesAlways(s: string): string;
 var
   n, p: Integer;
   temp: string;
@@ -1126,13 +1151,17 @@ begin
   result += strcopyfrom(s, p);
 end;
 
-function TXQParsingContext.parseString(const w: string): string;
-var s: string;
+function TXQParsingContext.replaceEntitiesIfNeeded(const s: string): string;
 begin
-  s := StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]);
-  if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
-    s := replaceEntities(s);
   result := s;
+  if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
+    Result := replaceEntitiesAlways(Result);
+end;
+
+
+function TXQParsingContext.parseString(const w: string): string;
+begin
+  result := replaceEntitiesIfNeeded(StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll]));
 end;
 
 function TXQParsingContext.parseString: string;
@@ -1167,9 +1196,7 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
     v: String;
   begin
     if too < from then exit;
-    v := strFromPchar(from, too - from + 1);
-    if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
-      v := replaceEntities(v);
+    v := replaceEntitiesIfNeeded(strFromPchar(from, too - from + 1));
     if result <> nil then begin
       if (result is TXQTermConstant) and (TXQTermConstant(result).value is TXQValueString) then
         (TXQTermConstant(result).value as TXQValueString).str += v
@@ -1299,6 +1326,7 @@ var
   namespaceURL: String;
   namespacePrefix: String;
   axis: String;
+  namespaceMode: TXQNamespaceMode;
 
   function lookupNamedFunction: TXQTermNamedFunction;
   var
@@ -1331,10 +1359,6 @@ begin
       expect('$');
       exit(parseVariable());
     end;
-    '@': begin
-      expect('@'); //todo
-      exit(TXQTermReadAttribute.create(nextTokenQName(true)));
-    end;
     '+', '-': begin
       word := nextToken();
       wordlookahead:=nextToken(true);
@@ -1353,11 +1377,7 @@ begin
       exit(parseSequenceLike(TXQTermSequence.Create)); //only sequence or priority brackets
     end;
 
-    {'*': if pos^ <> ':' then exit(TXQTermNodeMatcher.Create(word))
-         else begin
-           expect(':');
-           exit(TXQTermNodeMatcher.Create(word + ':' + nextTokenNCName()))
-         end;     }
+
     '/': begin
       word := nextToken();
       if pos^ = '/' then begin expect('/'); word+='/';end;
@@ -1417,7 +1437,7 @@ begin
       word := nextToken();
     end;
     if (word = 'Q') and (pos^ = '{') then begin
-      if ((pos-1)^ <> 'Q') then raiseParsingError('err:XPST0003', 'Q{ must not contain whitespace');
+      if ((pos-1)^ <> 'Q') then raiseParsingError('err:XPST0003', 'Q{ must not be separated by whitespace');
       pos -= 1;
       nextTokenEQName(namespaceURL, namespacePrefix, word, true);
     end else if (pos^ = ':') and not (((pos+1)^ in (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']))) then begin
@@ -1425,12 +1445,6 @@ begin
       expect(':');
       word := nextToken(); //* or NCName
     end;
-    {if (wordlookahead = ':') and (pos^ = ':') and not (((pos+1)^ in (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']))) then begin
-      expect(':');
-      if pos^ = '*' then word += ':' + nextToken() will add :*
-      else word += ':' + nextTokenNCName();
-      wordlookahead := nextToken(true);
-    end;      }
 
     skipWhitespaceAndComment();
     case pos^ of
@@ -1455,26 +1469,22 @@ begin
           end;
 
           if isKindTestFunction(word) then begin
-            if strContains(word, 'attribute') then
-              exit(parseSequenceLike(TXQTermReadAttribute.create(word, true)))
-            else if axis = 'attribute' then
-              exit(parseSequenceLike(TXQTermReadAttribute.create(axis + '::' + word, true)))
-            else begin
-              result := TXQTermNodeMatcher.Create(word, true);
-              TXQTermNodeMatcher(result).axis:=axis;
-              skipWhitespaceAndComment();
-              if pos^ <> ')' then begin
-                TXQTermNodeMatcher(result).push(parseValue());   skipWhitespaceAndComment();
-                if pos^ = ',' then begin
-                  if (word <> 'element') and (word <> 'attribute') then
-                    raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
-                  expect(',');
-                  TXQTermNodeMatcher(result).push(parseSequenceType());
-                end;
+            if strContains(word, 'attribute') then axis := 'attribute';
+            result := TXQTermNodeMatcher.Create(word, true);
+            TXQTermNodeMatcher(result).namespaceCheck := xqnmNone;
+            TXQTermNodeMatcher(result).axis:=axis;
+            skipWhitespaceAndComment();
+            if pos^ <> ')' then begin
+              TXQTermNodeMatcher(result).push(parseValue());   skipWhitespaceAndComment();
+              if pos^ = ',' then begin
+                if (word <> 'element') and (word <> 'attribute') then
+                  raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
+                expect(',');
+                TXQTermNodeMatcher(result).push(parseSequenceType());
               end;
-              expect(')');
-              exit;
             end;
+            expect(')');
+            exit;
           end;
         end;
 
@@ -1543,27 +1553,21 @@ begin
 
     //if (not staticContext.useLocalNamespaces) and (namespacePrefix <> '*') and ((namespacePrefix <> '') or (word <> '*'))  then
     //  namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
-    if axis <> 'attribute' then begin
-      result := TXQTermNodeMatcher.Create();
-      TXQTermNodeMatcher(result).select := word;
-      if (namespacePrefix <> '*') and ((namespacePrefix <> '') or (word <> '*')) then begin
-        if not staticContext.useLocalNamespaces then begin
-          TXQTermNodeMatcher(result).namespaceCheck := xqtnmnURL;
-          TXQTermNodeMatcher(result).namespaceURLOrPrefix := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
-        end else begin
-          TXQTermNodeMatcher(result).namespaceURLOrPrefix := namespacePrefix;
-          TXQTermNodeMatcher(result).namespaceCheck := xqtnmnPrefix;
-        end;
-      end;
-      TXQTermNodeMatcher(result).axis:=axis;
-    end else begin
-      result := TXQTermReadAttribute.Create();
-      TXQTermReadAttribute(result).attribName := word;
-      if (namespacePrefix <> '*') and ((namespacePrefix <> '') or (word <> '*')) then begin
-        TXQTermReadAttribute(result).namespaceURLOrPrefix := namespacePrefix;
-        TXQTermReadAttribute(result).namespaceCheck := xqtnmnPrefix;
+    result := TXQTermNodeMatcher.Create();
+    TXQTermNodeMatcher(result).select := word;
+    if namespaceURL <> '' then begin
+      TXQTermNodeMatcher(result).namespaceCheck := xqnmURL;
+      TXQTermNodeMatcher(result).namespaceURLOrPrefix := namespaceURL;
+    end else if (namespacePrefix <> '*') and ((namespacePrefix <> '') or (word <> '*')) then begin
+      if not staticContext.useLocalNamespaces then begin
+        TXQTermNodeMatcher(result).namespaceCheck := xqnmURL;
+        TXQTermNodeMatcher(result).namespaceURLOrPrefix := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
+      end else begin
+        TXQTermNodeMatcher(result).namespaceURLOrPrefix := namespacePrefix;
+        TXQTermNodeMatcher(result).namespaceCheck := xqnmPrefix;
       end;
     end;
+    TXQTermNodeMatcher(result).axis:=axis;
   except
     result.free;
     raise;
@@ -1682,9 +1686,9 @@ begin
           result := astroot;
           if result is TXQTermNodeMatcher then begin
             case TXQTermNodeMatcher(astroot).namespaceCheck of
-              xqtnmnNone: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select);
-              xqtnmnPrefix: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).namespaceURLOrPrefix + ':' + TXQTermNodeMatcher(astroot).select, staticContext);
-              xqtnmnURL: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).namespaceURLOrPrefix);
+              xqnmNone: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select);
+              xqnmPrefix: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).namespaceURLOrPrefix + ':' + TXQTermNodeMatcher(astroot).select, staticContext);
+              xqnmURL: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).namespaceURLOrPrefix);
             end;
             FreeAndNil(astroot);
             astroot := result; //only astroot should contain allocated objects that need to be freed in case of a subsequent parsing error
@@ -2075,7 +2079,7 @@ var
 begin
   result := xqtvaContinue;
   if (t^ is TXQTermNodeMatcher) and (length(TXQTermNodeMatcher(t^).children) = 0)
-     and ((TXQTermNodeMatcher(t^).namespaceCheck <> xqtnmnNone {this would be *:true}) and (TXQTermNodeMatcher(t^).namespaceURLOrPrefix = '')) then begin
+     and ((TXQTermNodeMatcher(t^).namespaceCheck <> xqnmNone {this would be *:true}) and (TXQTermNodeMatcher(t^).namespaceURLOrPrefix = '')) then begin
     case TXQTermNodeMatcher(t^).select of
       'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'true'); end;
       'false': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'false'); end;

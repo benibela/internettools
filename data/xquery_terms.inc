@@ -1652,11 +1652,19 @@ begin
   if strContains(select,'::') then axis:=strSplitGet('::',select);
   if strContains(select,':') then begin
     namespaceURLOrPrefix:=strSplitGet(':',select);
-    if namespaceURLOrPrefix = '*' then namespaceCheck := xqtnmnNone
-    else namespaceCheck := xqtnmnPrefix;
-  end else if select <> '*' then namespaceCheck := xqtnmnPrefix
-  else namespaceCheck := xqtnmnNone;
+    if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
+    else namespaceCheck := xqnmPrefix;
+  end else if select <> '*' then namespaceCheck := xqnmPrefix
+  else namespaceCheck := xqnmNone;
   func := asfunction;
+end;
+
+constructor TXQTermNodeMatcher.Create(const aaxis: string; const anamespaceMode: TXQNamespaceMode; const anamespaceUrlOrPrefix, aLocalPart: string);
+begin
+  axis := aaxis;
+  namespaceCheck := anamespaceMode;
+  namespaceURLOrPrefix := anamespaceUrlOrPrefix;
+  select := aLocalPart;
 end;
 
 function TXQTermNodeMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -1664,11 +1672,72 @@ begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue
   else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.TextElement<>nil) then
     result := xqvalue(context.TextElement)
-  else begin
+  else if axis <> 'attribute' then begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
-  end;
+  end else result := evaluateAttribute(context);
 end;
+
+function TXQTermNodeMatcher.evaluateAttribute(const context: TXQEvaluationContext): IXQValue;
+var
+  tempEl: TTreeNode;
+  testValue: Boolean;
+  testNS: Boolean;
+  readvalue: String;
+  readnamespace: String;
+  temp: INamespace;
+  i: Integer;
+  attrib: TTreeAttribute;
+  nsCheck: TXQNamespaceMode;
+  tempStep: TXQPathMatchingStep;
+begin
+  tempEl := nil;
+  if context.SeqValue <> nil then begin
+    if context.SeqValue is TXQValueNode then tempEl := context.SeqValue.toNode
+  end else if context.ParentElement <> nil then tempEl := context.ParentElement
+  else raise EXQEvaluationException.create('XPDY0002', 'Need context item to read attributes');
+  if tempEl = nil then
+    raise EXQEvaluationException.create('XPTY0020', 'Need node as context item to read attributes');
+  if (tempEl.typ = tetProcessingInstruction) or (tempel.attributes = nil) then
+    exit(xqvalue);
+
+  if length(children) > 0 then begin
+    if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('XPST0003', 'Invalid subtype');
+    readvalue := TXQTermNodeMatcher(children[0]).select;
+    nsCheck := TXQTermNodeMatcher(children[0]).namespaceCheck;
+    readnamespace := TXQTermNodeMatcher(children[0]).namespaceURLOrPrefix;
+  end else begin
+    if func then readvalue := '*'
+    else readvalue := select;
+    nsCheck := namespaceCheck;
+    readnamespace := namespaceURLOrPrefix;
+  end;
+  if nsCheck = xqnmPrefix then begin
+    nsCheck := xqnmURL;
+    temp := context.findNamespace(readnamespace, xqdnkUnknown);
+    if temp <> nil then readnamespace:=temp.getURL
+    else if readnamespace <> '' then begin
+      if not context.staticContext.useLocalNamespaces then raiseEvaluationError('XPST0081', 'Unknown namespace prefix: '+readnamespace+' for reading attribute: '+readvalue);
+      if (context.SeqValue<>nil) and (context.SeqValue.toNode <> nil) then readnamespace:=context.SeqValue.toNode.getNamespaceURL(readnamespace)
+      else readnamespace:='';
+      if readnamespace = '' then exit(xqvalue); //do not raise an exception if the namespace is unknown and the local namespace extension is enabled (so you can use unknown namespaces in css)
+    end;
+  end;
+
+  result := nil;
+
+  testValue := readvalue <> '*';
+  for i := 0 to tempel.attributes.Count - 1 do begin
+    attrib := tempel.attributes.items[i];
+    if      (not testValue or striEqual(attrib.value, readvalue))
+        and ((nsCheck <> xqnmURL) or ( attrib.getNamespaceURL() = readnamespace))
+        and not attrib.isNamespaceNode
+        then
+      xqvalueSeqAdd(result, xqvalue(tempEl.attributes.Items[i]));
+  end;
+  if result = nil then result:=xqvalue();
+end;
+
 
 function TXQTermNodeMatcher.getContextDependencies: TXQContextDependencies;
 begin
@@ -1680,9 +1749,9 @@ begin
   result := '';
   if axis <> '' then result += axis + '::';
   case namespaceCheck of
-    xqtnmnNone: result += '*:';
-    xqtnmnPrefix: result += namespaceURLOrPrefix + ':';
-    xqtnmnURL: result += 'Q{'+namespaceURLOrPrefix+'}';
+    xqnmNone: result += '*:';
+    xqnmPrefix: result += namespaceURLOrPrefix + ':';
+    xqnmURL: result += 'Q{'+namespaceURLOrPrefix+'}';
   end;
   result += select;
 end;
@@ -1722,6 +1791,7 @@ function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
   end;
 
 begin
+  if axis = 'attribute' then exit(inherited);
   if func then begin
     result := convertElementTestToPathMatchingStep(select, children);
     result.typ:=getAxis(axis);
@@ -1754,11 +1824,11 @@ end;
 
 procedure TXQTermNodeMatcher.assignNamespaceToMatchingStep(var step: TXQPathMatchingStep);
 begin
-  if namespaceCheck <> xqtnmnNone then begin
+  if namespaceCheck <> xqnmNone then begin
     step.namespaceURLOrPrefix:=namespaceURLOrPrefix;
     case namespaceCheck of
-      xqtnmnPrefix: Include(step.matching, qmCheckNamespacePrefix);
-      xqtnmnURL: Include(step.matching, qmCheckNamespaceURL);
+      xqnmPrefix: Include(step.matching, qmCheckNamespacePrefix);
+      xqnmURL: Include(step.matching, qmCheckNamespaceURL);
     end;
   end;
 end;
@@ -1820,104 +1890,6 @@ destructor TXQTermPatternMatcher.destroy;
 begin
   node.deleteAll();
   inherited destroy;
-end;
-
-{ TXQTermReadAttribute }
-
-constructor TXQTermReadAttribute.create;
-begin
-
-end;
-
-constructor TXQTermReadAttribute.create(avalue: string; func: boolean);
-begin
-  if func then begin
-    if pos('::', avalue) > 0 then if strSplitGet('::', avalue) <> 'attribute' then raiseParsingError('XPST0003', 'Invalid axis for attribute test');
-    if (avalue <> 'attribute') and (avalue <> 'node') then raiseParsingError('XPST0003', 'invalid attribute test: '+avalue);
-    attribName := '*';
-    exit;
-  end;
-
-  attribName:=avalue;
-  if strContains(attribName,':') then begin
-    namespaceURLOrPrefix:=strSplitGet(':',attribName);
-    if namespaceURLOrPrefix = '*' then namespaceCheck := xqtnmnNone
-    else namespaceCheck := xqtnmnPrefix;
-  end else if attribName <> '*' then namespaceCheck := xqtnmnPrefix
-  else namespaceCheck := xqtnmnNone;
-end;
-
-function TXQTermReadAttribute.evaluate(const context: TXQEvaluationContext): IXQValue;
-var
-  tempEl: TTreeNode;
-  testValue: Boolean;
-  testNS: Boolean;
-  readvalue: String;
-  readnamespace: String;
-  temp: INamespace;
-  i: Integer;
-  attrib: TTreeAttribute;
-  nsCheck: TXQTermNodeMatcherNamespace;
-begin
-  tempEl := nil;
-  if context.SeqValue <> nil then begin
-    if context.SeqValue is TXQValueNode then tempEl := context.SeqValue.toNode
-  end else if context.ParentElement <> nil then tempEl := context.ParentElement
-  else raise EXQEvaluationException.create('XPDY0002', 'Need context item to read attributes');
-  if tempEl = nil then
-    raise EXQEvaluationException.create('XPTY0020', 'Need node as context item to read attributes');
-  if (tempEl.typ = tetProcessingInstruction) or (tempel.attributes = nil) then
-    exit(xqvalue);
-
-  if length(children) > 0 then begin
-    if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('XPST0003', 'Invalid subtype');
-    readvalue := TXQTermNodeMatcher(children[0]).select;
-    nsCheck := TXQTermNodeMatcher(children[0]).namespaceCheck;
-    readnamespace := TXQTermNodeMatcher(children[0]).namespaceURLOrPrefix;
-  end else begin
-    readvalue := attribName;
-    nsCheck := namespaceCheck;
-    readnamespace := namespaceURLOrPrefix;
-  end;
-  if nsCheck = xqtnmnPrefix then begin
-    nsCheck := xqtnmnURL;
-    temp := context.findNamespace(readnamespace, xqdnkUnknown);
-    if temp <> nil then readnamespace:=temp.getURL
-    else if readnamespace <> '' then begin
-      if not context.staticContext.useLocalNamespaces then raiseEvaluationError('XPST0081', 'Unknown namespace prefix: '+readnamespace+' for reading attribute: '+readvalue);
-      if (context.SeqValue<>nil) and (context.SeqValue.toNode <> nil) then readnamespace:=context.SeqValue.toNode.getNamespaceURL(readnamespace)
-      else readnamespace:='';
-      if readnamespace = '' then exit(xqvalue); //do not raise an exception if the namespace is unknown and the local namespace extension is enabled (so you can use unknown namespaces in css)
-    end;
-end;
-
-  result := nil;
-
-  testValue := readvalue <> '*';
-  for i := 0 to tempel.attributes.Count - 1 do begin
-    attrib := tempel.attributes.items[i];
-    if      (not testValue or striEqual(attrib.value, readvalue))
-        and ((nsCheck <> xqtnmnURL) or ( attrib.getNamespaceURL() = readnamespace))
-        and not attrib.isNamespaceNode
-        then
-      xqvalueSeqAdd(result, xqvalue(tempEl.attributes.Items[i]));
-  end;
-  if result = nil then result:=xqvalue();
-end;
-
-function TXQTermReadAttribute.getContextDependencies: TXQContextDependencies;
-begin
-    result := ALL_CONTEXT_DEPENDENCIES - [xqcdContextTime, xqcdContextVariables];
-end;
-
-function TXQTermReadAttribute.clone: TXQTerm;
-begin
-  Result:=inherited clone;
-  with TXQTermReadAttribute(result) do begin
-    attribName :=  self.attribName;
-    namespaceURLOrPrefix := self.namespaceURLOrPrefix;
-    namespaceCheck:=self.namespaceCheck;
-  end;
 end;
 
 { TXQTermVariable }

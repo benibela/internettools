@@ -955,7 +955,7 @@ begin
     term := source.Term;
     if isVariableName(term) then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.')) //replace $xx with $xx := .
     else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
-            and (TXQTermBinaryOp(source.term).children[0] is TXQTermReadAttribute) and (TXQTermBinaryOp(source.Term).children[1] is TXQTermSequence)
+            and (TXQTermBinaryOp(source.term).children[0] is TXQTermNodeMatcher)and (TXQTermNodeMatcher(TXQTermBinaryOp(source.term).children[0]).axis = 'attribute') and (TXQTermBinaryOp(source.Term).children[1] is TXQTermSequence)
             and (TXQTermBinaryOp(source.term).children[1] is TXQTermWithChildren) and (length(TXQTermWithChildren(TXQTermBinaryOp(source.term).children[1]).children) = 1) and isVariableName(TXQTermWithChildren(TXQTermBinaryOp(source.term).children[1]).children[0]) then begin
       //replace    @foobar / ( $xyz ) by $xyz := @foobar
       source.term := TXQTermDefineVariable.create(TXQTermWithChildren(TXQTermWithChildren(Term).children[1]).children[0],  TXQTermWithChildren(Term).children[0]);

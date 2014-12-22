@@ -1407,14 +1407,16 @@ type
   end;
 
   { TXQTermNodeMatcher }
-  TXQTermNodeMatcherNamespace = (xqtnmnNone, xqtnmnURL, xqtnmnPrefix);
+  TXQNamespaceMode = (xqnmNone, xqnmURL, xqnmPrefix);
   TXQTermNodeMatcher = class(TXQTermWithChildren)
     axis, namespaceURLOrPrefix, select: string;
-    namespaceCheck: TXQTermNodeMatcherNamespace;
+    namespaceCheck: TXQNamespaceMode;
     func: boolean;
     constructor Create();
     constructor Create(const avalue: string; asfunction: boolean = false);
+    constructor Create(const aaxis: string; const anamespaceMode: TXQNamespaceMode; const anamespaceUrlOrPrefix, aLocalPart: string);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluateAttribute(const context: TXQEvaluationContext): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
     function clone: TXQTerm; override;
@@ -1434,17 +1436,6 @@ type
     procedure addToQueryList(var path: TXQPathMatching); override;
   end;
 
-  { TXQTermReadAttribute }
-
-  TXQTermReadAttribute = class(TXQTermWithChildren)
-    attribName, namespaceURLOrPrefix: string;
-    namespaceCheck: TXQTermNodeMatcherNamespace;
-    constructor create();
-    constructor create(avalue: string; func: boolean = false);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function getContextDependencies: TXQContextDependencies; override;
-    function clone: TXQTerm; override;
-  end;
 
   { TXQTermPatternMatcher }
 
@@ -3542,7 +3533,7 @@ begin
       Include(result.matching, qmValue);
       result.value:=TXQTermNodeMatcher(children[0]).select;
       TXQTermNodeMatcher(children[0]).assignNamespaceToMatchingStep(result);
-    end else if TXQTermNodeMatcher(children[0]).namespaceCheck <> xqtnmnNone then raise EXQEvaluationException.Create('XPST0003', 'Namespace:* not allowed in element test') ;
+    end else if TXQTermNodeMatcher(children[0]).namespaceCheck <> xqnmNone then raise EXQEvaluationException.Create('XPST0003', 'Namespace:* not allowed in element test') ;
     if length(children) <= 1 then exit;
     if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('XPST0003', 'Invalid type attribute: '+children[1].ToString);
     result.requiredType := children[1] as TXQTermSequenceType;
@@ -5023,9 +5014,10 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
     result := TXQTermConstant.create(xqvalue(1));
   end;
 
-  function newReadAttrib(name: string): txqterm;
+  function newReadAttrib(name: string): TXQTerm;
   begin
-    result := TXQTermReadAttribute.Create(name);
+    result := TXQTermNodeMatcher.Create(name);
+    TXQTermNodeMatcher(result).axis := 'attribute';
   end;
 
 //CSS Literal Parsing
@@ -5491,7 +5483,7 @@ var
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
   tempProp: TXQValue;
-  namespaceMatching: TXQTermNodeMatcherNamespace;
+  namespaceMatching: TXQNamespaceMode;
 
   procedure add(const v: IXQValue); inline;
   begin
@@ -5517,15 +5509,15 @@ begin
     if qmCheckNamespacePrefix in command.matching then begin
       if qmAttribute in command.matching then tempNamespace := context.findNamespace(command.namespaceURLOrPrefix, xqdnkUnknown)
       else tempNamespace := context.findNamespace(command.namespaceURLOrPrefix, xqdnkElementType);
-      if tempNamespace = nil then namespaceMatching := xqtnmnPrefix
+      if tempNamespace = nil then namespaceMatching := xqnmPrefix
       else begin
-        namespaceMatching := xqtnmnURL;
+        namespaceMatching := xqnmURL;
         cachedNamespaceURL := tempNamespace.getURL;
       end;
     end else if qmCheckNamespaceURL in command.matching then begin
       cachedNamespaceURL:=command.namespaceURLOrPrefix;
-      namespaceMatching := xqtnmnURL;
-    end else namespaceMatching := xqtnmnNone;
+      namespaceMatching := xqnmURL;
+    end else namespaceMatching := xqnmNone;
 
     newSequence := nil;
     nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
@@ -5547,7 +5539,7 @@ begin
             assert(n.toNode <> nil);
             oldnode := n.toNode;
             unifyQuery(oldnode, command, nodeCondition);
-            if namespaceMatching = xqtnmnURL then begin
+            if namespaceMatching = xqnmURL then begin
               nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
               Include(nodeCondition.options, xqpncCheckNamespace);
             end else exclude(nodeCondition.options, xqpncCheckNamespace);
@@ -5558,7 +5550,7 @@ begin
             newSequenceSeq := (newSequence as TXQValueSequence).seq;
             newSequenceSeq.count := 0;
             while newnode <> nil do begin
-              if (namespaceMatching <> xqtnmnPrefix)
+              if (namespaceMatching <> xqnmPrefix)
                  or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
                  or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
               newSequenceSeq.add(xqvalue(newnode));
