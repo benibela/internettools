@@ -289,7 +289,10 @@ begin
     localpart := nextTokenNCName();
     if prefix = '*' then
       result := xqnmNone;
-  end else url := '';
+  end else begin
+    url := '';
+    if allowWildcards and (localpart = '*') then result := xqnmNone;
+  end;
   if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
 end;
 
@@ -1327,6 +1330,7 @@ var
   namespacePrefix: String;
   axis: String;
   namespaceMode: TXQNamespaceMode;
+  marker: PChar;
 
   function lookupNamedFunction: TXQTermNamedFunction;
   var
@@ -1427,24 +1431,14 @@ begin
     axis := '';
     namespaceURL := '';
     namespacePrefix := '';
+    marker := pos;
     word := nextToken();
-    if word = '@' then begin
-      axis := 'attribute';
-      word := nextToken();
-    end else if nextToken(true) = '::' then begin
+    if word = '@' then axis := 'attribute'
+    else if nextToken(true) = '::' then begin
       axis := word;
       expect('::');
-      word := nextToken();
-    end;
-    if (word = 'Q') and (pos^ = '{') then begin
-      if ((pos-1)^ <> 'Q') then raiseParsingError('err:XPST0003', 'Q{ must not be separated by whitespace');
-      pos -= 1;
-      nextTokenEQName(namespaceURL, namespacePrefix, word, true);
-    end else if (pos^ = ':') and not (((pos+1)^ in (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']))) then begin
-      namespacePrefix := word;
-      expect(':');
-      word := nextToken(); //* or NCName
-    end;
+    end else pos := marker; //roll back
+    namespaceMode := nextTokenEQName(namespaceURL, namespacePrefix, word, true);
 
     skipWhitespaceAndComment();
     case pos^ of
@@ -1555,18 +1549,14 @@ begin
     //  namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
     result := TXQTermNodeMatcher.Create();
     TXQTermNodeMatcher(result).select := word;
-    if namespaceURL <> '' then begin
-      TXQTermNodeMatcher(result).namespaceCheck := xqnmURL;
-      TXQTermNodeMatcher(result).namespaceURLOrPrefix := namespaceURL;
-    end else if (namespacePrefix <> '*') and ((namespacePrefix <> '') or (word <> '*')) then begin
+    if namespaceMode = xqnmPrefix then
       if not staticContext.useLocalNamespaces then begin
-        TXQTermNodeMatcher(result).namespaceCheck := xqnmURL;
-        TXQTermNodeMatcher(result).namespaceURLOrPrefix := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
-      end else begin
-        TXQTermNodeMatcher(result).namespaceURLOrPrefix := namespacePrefix;
-        TXQTermNodeMatcher(result).namespaceCheck := xqnmPrefix;
-      end;
-    end;
+        namespaceMode := xqnmURL;
+        namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
+      end else namespaceURL := namespacePrefix;
+
+    TXQTermNodeMatcher(result).namespaceCheck := namespaceMode;
+    TXQTermNodeMatcher(result).namespaceURLOrPrefix := namespaceURL;
     TXQTermNodeMatcher(result).axis:=axis;
   except
     result.free;
