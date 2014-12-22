@@ -56,8 +56,8 @@ type
     $Q{}foo    -> ('', 'Q', 'foo',   xqnmURL)
     $Q{ns}foo  -> ('ns', 'Q', 'foo', xqnmURL)
   }
-  function nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean=false): TXQNamespaceMode; //returns a splitted EQName (todo: raise an error if not a QName)
-  function parseQNameWithType(out typ: TXQTermSequenceType): string;
+  function nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean=false): TXQNamespaceMode; //returns a splitted EQName
+  function nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): TXQNamespaceMode;
 
 
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
@@ -80,7 +80,8 @@ type
   function parseDirectConstructor(name: string): TXQTermConstructor;
   function parseComputedConstructor(name: string): TXQTermConstructor;
   function parseExtension: TXQTerm;
-  function parseVariable: TXQTerm;
+  function parseVariable: TXQTermVariable;
+  function parseDefineVariable: TXQTermDefineVariable;
   function parseAnnotations: TXQAnnotations;
   function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
 
@@ -296,13 +297,12 @@ begin
   if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
 end;
 
-function TXQParsingContext.parseQNameWithType(out typ: TXQTermSequenceType): string;
+function TXQParsingContext.nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): TXQNamespaceMode;
+var
+  prefix: string;
 begin
-  result := nextTokenQName();
-  if nextToken(true) = 'as' then begin
-    expect('as');
-    typ := parseSequenceType();
-  end else typ := nil;
+  if nextTokenEQName(url, prefix, localpart) = xqnmPrefix then
+    url := staticContext.findNamespaceURL(prefix, resolveKind);
 end;
 
 function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char; allowPartialApplication: boolean
@@ -443,7 +443,7 @@ begin
       if (namespace = nil) then raiseParsingError('XPST0008', 'No schemas loaded for type '+word);
       result.kind:=tikAtomic;
       result.atomicTypeInfo := engine.findType(namespace.getURL, word);
-      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: {'+namespace.getURL+'}:'+word);
+      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: Q{'+namespace.getURL+'}'+word);
     end;
 
     while parens > 0 do begin expect(')'); parens -= 1; end;
@@ -486,11 +486,6 @@ begin
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
-  function parseVariableName: TXQTermVariable;
-  begin
-    if nextToken() <> '$' then raiseParsingError('XPST0003', 'Expected variable name');
-    result := TXQTermVariable.Create(nextTokenQName(), staticContext);
-  end;
 
   procedure parseVarBinding;
   var temp: string;
@@ -506,7 +501,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
       skipWhitespaceAndComment();
       if pos^ = '<' then
         pattern := parsePatternMatcher
-      else loopvar := parseVariableName;
+      else loopvar := parseVariable;
 
       temp := nextToken;
       if temp = 'as' then begin
@@ -525,7 +520,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
         if temp = 'at' then begin
           requireXQuery;
-          positionvar := parseVariableName;
+          positionvar := parseVariable;
           temp := nextToken;
         end;
 
@@ -615,15 +610,13 @@ var
 begin
   result := TXQTermSomeEvery.Create(akind = 'every');
   try
-    expect('$');
-    result.push(TXQTermVariable.Create(nextTokenQName(), staticContext));
+    result.push(parseVariable);
     skipWhitespaceAndComment();
     if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
     expect('in'); result.push(parse());
     word := nextToken();
     while word = ',' do begin
-      expect('$');
-      result.push(TXQTermVariable.Create(nextTokenQName(), staticContext));
+      result.push(parseVariable);
       skipWhitespaceAndComment();
       if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
       expect('in'); result.push(parse());
@@ -656,7 +649,7 @@ begin
       if pos^ = '<' then begin
         tempSeq.push(parsePatternMatcher());
       end else begin
-        if pos^ = '$' then begin expect('$'); tempSeq.push(TXQTermVariable.create(nextTokenQName(), staticContext)); expect('as'); end;
+        if pos^ = '$' then begin tempSeq.push(parseVariable); expect('as'); end;
         tempSeq.push(parseSequenceType());
       end;
       expect('return');
@@ -667,7 +660,7 @@ begin
     skipWhitespaceAndComment();
     tempSeq := TXQTermSequence.Create;
     result.push(tempSeq);
-    if pos^ = '$' then begin expect('$'); tempSeq.push(TXQTermVariable.create(nextTokenQName(), staticContext)); end;
+    if pos^ = '$' then tempSeq.push(parseVariable);
     expect('return');
     tempSeq.push(parse());
   except
@@ -976,36 +969,30 @@ begin
   expect('{'); result := parsePrimaryLevel; expect('}');
 end;
 
-function TXQParsingContext.parseVariable: TXQTerm;
+function TXQParsingContext.parseVariable: TXQTermVariable;
 var
-  operatorMode: Boolean;
-  propertyAccess: Boolean;
+  url: string;
+  name: string;
 begin
-  result := TXQTermVariable.Create(nextTokenQName(), staticContext);
-  operatorMode := false;
-  if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(TXQTermVariable(result).value, '.') then begin
-    propertyAccess := true;
-    operatorMode := strEndsWith(TXQTermVariable(result).value, '.');
-    if operatorMode then begin
-      delete(TXQTermVariable(result).value, length(TXQTermVariable(result).value), 1);
-      propertyAccess := strContains(TXQTermVariable(result).value, '.');
+  expect('$');
+  nextTokenEQName(url, name, xqdnkUnknown);
+  result := TXQTermVariable.create(name, url);
+end;
+
+function TXQParsingContext.parseDefineVariable: TXQTermDefineVariable;
+begin
+  result := TXQTermDefineVariable.create(parseVariable);
+  try
+    if nextToken(true) = 'as' then begin
+      expect('as');
+      result.push(parseSequenceType());
     end;
-    if propertyAccess then
-      result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
-  end else if (options.AllowPropertyDotNotation = xqpdnAllowUnambiguousDotNotation) and strEndsWith(TXQTermVariable(result).value, '.') then begin
-    skipWhitespaceAndComment();
-    operatorMode := pos^ in ['"', '''', '$'];
-    if operatorMode then
-      delete(TXQTermVariable(result).value, length(TXQTermVariable(result).value), 1);
-  end;
-  if operatorMode then begin
-    result := TXQTermDynamicFunctionCall.create(result, parseValue());
-    if TXQTermDynamicFunctionCall(result).children[1] is TXQTermNodeMatcher then begin
-      result.free;
-      raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
-    end;
+  except
+    result.free;
+    raise;
   end;
 end;
+
 
 function TXQParsingContext.parseAnnotations: TXQAnnotations;
 var
@@ -1080,10 +1067,7 @@ begin
     end else require3('Anonymous functions need XPath/XQuery 3');
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
-      expect('$');
-      tempVar := TXQTermDefineVariable.create(parseQNameWithType(tempType), nil);
-      staticContext.splitRawQName((tempVar.variable as TXQTermVariable).namespaceURL, (tempVar.variable as TXQTermVariable).value, xqdnkUnknown);
-      if tempType <> nil then tempVar.push(tempType);
+      tempVar := parseDefineVariable;
       result.push(tempVar);
       for i := 0 to high(Result.children) - 1 do
         if TXQTermVariable(TXQTermDefineVariable(Result.children[i]).variable).equalsVariable(TXQTermVariable(tempVar.variable)) then
@@ -1353,16 +1337,44 @@ var
     result := TXQTermNamedFunction.create(namespaceURL, word); //cannot know if the function is valid yet. XQuery can have mutually recursive functions, but this is called during the function declaration (i.e. before the 2nd function has been parsed)
   end;
 
+  function parseVariableWithDotNotation: TXQTerm;
+  var
+    operatorMode: Boolean;
+    propertyAccess: Boolean;
+  begin
+    result := parseVariable;
+    operatorMode := false;
+    if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(TXQTermVariable(result).value, '.') then begin
+      propertyAccess := true;
+      operatorMode := strEndsWith(TXQTermVariable(result).value, '.');
+      if operatorMode then begin
+        delete(TXQTermVariable(result).value, length(TXQTermVariable(result).value), 1);
+        propertyAccess := strContains(TXQTermVariable(result).value, '.');
+      end;
+      if propertyAccess then
+        result := TXQTermVariable.splitForDotNotation(TXQTermVariable(result));
+    end else if (options.AllowPropertyDotNotation = xqpdnAllowUnambiguousDotNotation) and strEndsWith(TXQTermVariable(result).value, '.') then begin
+      skipWhitespaceAndComment();
+      operatorMode := pos^ in ['"', '''', '$'];
+      if operatorMode then
+        delete(TXQTermVariable(result).value, length(TXQTermVariable(result).value), 1);
+    end;
+    if operatorMode then begin
+      result := TXQTermDynamicFunctionCall.create(result, parseValue());
+      if TXQTermDynamicFunctionCall(result).children[1] is TXQTermNodeMatcher then begin
+        result.free;
+        raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
+      end;
+    end;
+  end;
+
 begin
   result := nil;
   skipWhitespaceAndComment();
   if pos^ = #0 then exit();
   case pos^ of
     '''', '"':  exit(TXQTermConstant.create(parseString()));
-    '$': begin
-      expect('$');
-      exit(parseVariable());
-    end;
+    '$': exit(parseVariableWithDotNotation());
     '+', '-': begin
       word := nextToken();
       wordlookahead:=nextToken(true);
@@ -1846,18 +1858,14 @@ function TXQParsingContext.parseModule(): TXQTerm;
     tempTyp: TXQTermSequenceType;
   begin
     requireModule;
-    expect('$');
-    vari := TXQTermDefineVariable.create(parseQNameWithType(tempTyp), nil);
+    vari := parseDefineVariable;
     vari.annotations := annotations;
-    staticContext.splitRawQName((vari.variable as TXQTermVariable).namespaceURL, (vari.variable as TXQTermVariable).value, xqdnkUnknown);
     TXQTermModule(result).push(vari);
-    if tempTyp <> nil then vari.push(tempTyp);
     case nextToken() of
       ':=': vari.push(parse());
       'external': ;
       else raiseParsingError('XPST0003', 'Invalid variable declaration');
     end;
-
   end;
 
   procedure readBoolean(var b: boolean; const v: string);
