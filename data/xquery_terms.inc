@@ -1299,8 +1299,8 @@ begin
   assert((kind = xqfkUnknown) or (func <> nil));
 
   if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
-    if not func.checkOrConvertTypes(evilkids, context) then
-      raiseEvaluationError('XPTY0004', 'Invalid types for function call: '+func.versions[0].name);
+    func.checkOrConvertTypes(evilkids, context);
+
 
 
   case kind of
@@ -1600,8 +1600,7 @@ begin
     result := op.func(context, children[0].evaluate(context), children[1].evaluate(context))
   else begin
     evaluateChildren(context, evilkids);
-    if not op.checkOrConvertTypes(evilkids, context) then
-      raiseEvaluationError('XPTY0004', 'Invalid types for binary operator: '+op.name+ ' '+op.followedBy);
+    op.checkOrConvertTypes(evilkids, context);
     result := op.func(context, evilkids[0], evilkids[1]);
   end;
 end;

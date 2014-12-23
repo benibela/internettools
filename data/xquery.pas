@@ -1149,7 +1149,7 @@ type
     versions: array of TXQFunctionParameterTypes;
     class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): IXQValue; static;
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
-    function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext): boolean;
+    procedure checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext);
     destructor Destroy; override;
   private
     procedure guessArgCount;
@@ -3597,6 +3597,7 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
   function conversionSingle(const w: IXQValue): IXQValue;
   var
     t: TXSType;
+    errCode: String;
   begin
     result := w;
     if typ.kind = tikFunctionTest then begin
@@ -3616,7 +3617,9 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
        or ((t.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
        or (t.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
          exit(typ.castAs(result, context));
-    raise EXQEvaluationException.Create('XPTY0004', 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
+    if w.kind <> pvkFunction then errCode := 'XPTY0004'
+    else errCode := 'FOTY0013';
+    raise EXQEvaluationException.Create(errCode, 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
   end;
 
 var
@@ -3679,13 +3682,14 @@ begin
 end;
 
 
-function TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext): boolean;
+procedure TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext);
 var
-  i, j: Integer;
-  countMatch: Boolean;
+  i, j, countMatch: Integer;
+  result: Boolean;
+  errCode: String;
 begin
-  if length(versions) = 0 then exit(true);
-  countMatch := false;
+  if length(versions) = 0 then exit;
+  countMatch := -1;
   for i:= 0 to high(versions) do begin
     if length(values) <> length(versions[i].types) then continue;
     result := true;
@@ -3700,11 +3704,17 @@ begin
          values[j] := convertType(values[j], versions[i].types[j], context);
       exit;
     end;
-    countMatch := true;
+    countMatch := i;
   end;
-  result := false;
-  if not countMatch then
+  if countMatch = -1 then
     raise EXQEvaluationException.create('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
+  errCode := 'XPTY0004';
+  for i := 0 to high(values) do
+    if not (versions[countMatch].types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
+      errCode := 'FOTY0013'; //wtf?
+      break;
+    end;
+  raise EXQEvaluationException.create(errCode, 'Invalid types for function call: '+versions[0].name);
 end;
 
 destructor TXQAbstractFunctionInfo.Destroy;
