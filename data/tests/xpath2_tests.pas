@@ -4001,6 +4001,7 @@ begin
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
   f('fn:map(1,2)', 'err:XPST0017');
   f('1 instance of (xs:integer)', 'err:XPST0003');
+  f('fn:string-join(("Blow, ", "blow, ", "thou ", "winter ", "wind!"))', 'err:XPST0017');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');

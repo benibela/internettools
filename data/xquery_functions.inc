@@ -1664,6 +1664,11 @@ begin
   result := xqvalue(args[0].toJoinedString(args[1].toString));
 end;
 
+function xqFunctionString_join_Nosep(const args: TXQVArray): IXQValue;
+begin
+  result := xqvalue(args[0].toJoinedString(''));
+end;
+
 function xqFunctionJoin(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args,1, 2);
