@@ -6236,6 +6236,10 @@ TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'cas
 TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/codepoint', @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
 TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
+TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive', @CompareText, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
+
+
+
 
 GlobalInterpretedNativeFunctionStaticContext:=TXQStaticContext.Create;
 GlobalInterpretedNativeFunctionStaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensions;
@@ -6342,13 +6346,13 @@ fn.registerFunction('month-from-datetime',@xqFunctionMonth_From_Datetime, ['($ar
 fn.registerFunction('day-from-datetime',@xqFunctionDay_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
 fn.registerFunction('hours-from-datetime',@xqFunctionHours_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
 fn.registerFunction('minutes-from-datetime',@xqFunctionMinutes_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-fn.registerFunction('seconds-from-datetime',@xqFunctionSeconds_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('seconds-from-datetime',@xqFunctionSeconds_From_Datetime, ['($arg as xs:dateTime?) as xs:decimal?']);
 
-fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
-fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
-fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
-fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
-fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
+fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
+fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
+fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
+fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
 fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
 
 fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
@@ -6356,7 +6360,7 @@ fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime, ['($arg as
 fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
 fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
 fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
-fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
+fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime, ['($arg as xs:time?) as xs:decimal?']);
 fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime, ['($arg as xs:time?) as xs:dayTimeDuration?']);
 fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime, ['($arg as xs:date?) as xs:dayTimeDuration?']);
 fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime, ['($arg as xs:dateTime?) as xs:dayTimeDuration?']);
