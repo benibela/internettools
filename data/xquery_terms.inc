@@ -1262,18 +1262,22 @@ begin
   inherited destroy;
 end;
 
+constructor TXQTermNamedFunction.Create;
+begin
+
+end;
 
 { TXQTermNamedFunction }
-
+                         {
 constructor TXQTermNamedFunction.create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
 begin
   kind := akind;
   func := afunc;
 end;
-
-constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; const model: TXQParsingModel);
+  }
+constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; arity: integer; const model: TXQParsingModel);
 begin
-  if not findKindIndex(anamespace, alocalname, model, kind, func) then begin
+  if not findKindIndex(anamespace, alocalname, arity, model, kind, func) then begin
     kind := xqfkUnknown;
     funcname:=alocalname;
     namespaceUrl := anamespace;
@@ -1282,7 +1286,7 @@ end;
 
 constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; args: array of TXQTerm; const model: TXQParsingModel);
 begin
-  create(anamespace, alocalname, model);
+  create(anamespace, alocalname, length(args), model);
   push(args);
 end;
 
@@ -1351,7 +1355,7 @@ begin
   TXQTermNamedFunction(result).assignWithoutChildren(self);
 end;
 
-class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
   aindex: Integer;
   module: TXQNativeModule;
@@ -1361,36 +1365,40 @@ begin
 
   if (module = nil) then exit(false);
 
-  afunc := module.findBasicFunction(alocalname, model);
+  afunc := module.findBasicFunction(alocalname, argcount, model);
   if afunc <> nil then begin
     akind:=xqfkBasic;
     exit(true);
   end;
 
-  afunc := module.findComplexFunction(alocalname, model);
+  afunc := module.findComplexFunction(alocalname, argcount, model);
   if afunc <> nil then begin
     akind:=xqfkComplex;
     exit(true);
   end;
 
-  afunc := module.findInterpretedFunction(alocalname, model);
+  afunc := module.findInterpretedFunction(alocalname, argcount, model);
   if afunc <> nil then begin
     akind:=xqfkNativeInterpreted;
     exit(true);
   end;
 
-  aindex := module.binaryOpFunctions.IndexOf(alocalname);
-  if aindex >= 0 then begin
-    afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
-    akind := xqfkWrappedOperator;
-    exit;
+  if argcount = 2 then begin
+    aindex := module.binaryOpFunctions.IndexOf(alocalname);
+    if aindex >= 0 then begin
+      afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
+      akind := xqfkWrappedOperator;
+      exit(true);
+    end;
   end;
 
-  t:=baseSchema.findType(alocalname);
-  if t <> nil then begin
-    akind:=xqfkTypeConstructor;
-    afunc := TXQAbstractFunctionInfo(TObject(t));
-    exit(true)
+  if argcount = 1 then begin
+    t:=baseSchema.findType(alocalname);
+    if t <> nil then begin
+      akind:=xqfkTypeConstructor;
+      afunc := TXQAbstractFunctionInfo(TObject(t));
+      exit(true)
+    end;
   end;
 
   exit(false);
@@ -1444,9 +1452,9 @@ begin
             if (interpretedFunction.annotations[i].name = 'private') and (interpretedFunction.annotations[i].namespace = XMLNamespaceUrl_XQuery ) then
               raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
-        findKindIndex(namespaceUrl, funcname, context.staticContext.model, kind, func);
+        findKindIndex(namespaceUrl, funcname, length(children), context.staticContext.model, kind, func);
         if kind <> xqfkUnknown then exit();
-        raiseEvaluationError('XPST0017', 'Function Q{'+namespaceUrl+'}'+ funcname+' not found. '+suggestions);
+        raiseEvaluationError('XPST0017', 'Function Q{'+namespaceUrl+'}'+ funcname+'#'+IntToStr(length(children))+ ' not found. '+suggestions);
       end;
     end;
     xqfkNativeInterpreted: begin
@@ -2597,7 +2605,7 @@ begin
   parameterCount := arity;
   funcname:=aname;
   namespace := anamespace;
-  call := TXQTermNamedFunction.create(anamespace.getURL, aname);
+  call := TXQTermNamedFunction.create(anamespace.getURL, aname, arity);
   for i := 1 to arity do begin
     push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
     call.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
@@ -2854,7 +2862,7 @@ begin
   result.name:=f.funcname;
   if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
     copyAnnotations(result.annotations, f.interpretedFunction.annotations);
-  result.body := TXQTermNamedFunction.create(xqfkBasic,nil);
+  result.body := TXQTermNamedFunction.create();
   TXQTermNamedFunction(result.body).assignWithoutChildren(f);
 
   setlength(result.parameters, parameterCount);

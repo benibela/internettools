@@ -1145,11 +1145,14 @@ type
   { TXQAbstractFunctionInfo }
 
   TXQAbstractFunctionInfo = class
+    minArgCount, maxArgCount: word;
     versions: array of TXQFunctionParameterTypes;
     class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): IXQValue; static;
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
     function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext): boolean;
     destructor Destroy; override;
+  private
+    procedure guessArgCount;
   end;
   //**Information about a basic xquery function   (basic => function is pure/independent of current context)
   TXQBasicFunctionInfo = class(TXQAbstractFunctionInfo)
@@ -1456,8 +1459,9 @@ type
     kind: TXQTermNamedFunctionKind;
     func: TXQAbstractFunctionInfo;
     funcname: string;
-    constructor create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
-    constructor create(const anamespace, alocalname: string; const model: TXQParsingModel = xqpmXPath2);
+    constructor Create;
+//    constructor create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
+    constructor create(const anamespace, alocalname: string; arity: integer; const model: TXQParsingModel = xqpmXPath2);
     constructor create(const anamespace, alocalname: string; args: array of TXQTerm; const model: TXQParsingModel = xqpmXPath2);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
@@ -1466,7 +1470,7 @@ type
   private
     interpretedFunction: TXQValueFunction;
     functionStaticContext: TXQStaticContext;
-    class function findKindIndex(const anamespace, alocalname: string; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+    class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
     procedure init(const context: TXQEvaluationContext);
   end;
 
@@ -2299,10 +2303,12 @@ type
   constructor create(const anamespace: INamespace; const aparentModule: TXQNativeModule=nil);
   destructor Destroy; override;
   //** Registers a function that does not depend on the context.
-  //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
+  //** TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
+  procedure registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string); overload;
   procedure registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
   //** Registers a function that does depend on the context.
   //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
+  procedure registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   procedure registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   //** Registers a function from a XQuery body
   //**TypeChecking must a standard XQuery function declarations (without the function name but WITH the variable names) (it uses a simplified parser, so only space whitespace is allowed)
@@ -2311,14 +2317,15 @@ type
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 
-  function findBasicFunction(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQBasicFunctionInfo;
-  function findComplexFunction(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQComplexFunctionInfo;
-  function findInterpretedFunction(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQInterpretedFunctionInfo;
+  function findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQBasicFunctionInfo;
+  function findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQComplexFunctionInfo;
+  function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQInterpretedFunctionInfo;
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TStringList;
   binaryOpLists: TStringList;
   binaryOpFunctions: TStringList;
   procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+  class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
 end;
 
 //**Returns a "..." string for use in json (internally used)
@@ -3711,6 +3718,19 @@ begin
   end;
   versions := nil;
   inherited Destroy;
+end;
+
+procedure TXQAbstractFunctionInfo.guessArgCount;
+var
+  i: Integer;
+begin
+  if length(versions) = 0 then raise EXQParsingException.create('pxp:INIT', 'No argument count information');
+  minArgCount:=high(minArgCount);
+  maxArgCount:=0;
+  for i := 0 to high(versions) do begin
+    if length(versions[i].types) > maxArgCount then maxArgCount:=length(versions[i].types);
+    if length(versions[i].types) < minArgCount then minArgCount:=length(versions[i].types);
+  end;
 end;
 
 function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings
@@ -6003,7 +6023,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
+procedure TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string);
 var
   temp: TXQBasicFunctionInfo;
 begin
@@ -6012,9 +6032,19 @@ begin
   basicFunctions.AddObject(name, temp);
   parseTypeChecking(temp, typeChecking);
   if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
+  if minArgCount <> high(Integer) then begin
+     temp.minArgCount := minArgCount;
+     if maxArgCount <> - 1 then temp.maxArgCount := maxArgCount
+     else temp.maxArgCount:=high(temp.maxArgCount);
+  end else temp.guessArgCount;
 end;
 
-procedure TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+procedure TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
+begin
+  registerFunction(name, high(integer), 0, func, typeChecking);
+end;
+
+procedure TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies);
 var
   temp: TXQComplexFunctionInfo;
 begin
@@ -6024,6 +6054,16 @@ begin
   complexFunctions.AddObject(name, temp);
   parseTypeChecking(temp, typeChecking);
   if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
+  if minArgCount <> high(Integer) then begin
+     temp.minArgCount:=minArgCount;
+     if maxArgCount <> - 1 then temp.maxArgCount := maxArgCount
+     else temp.maxArgCount:=high(temp.maxArgCount);
+  end else temp.guessArgCount;
+end;
+
+procedure TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+begin
+  registerFunction(name, high(Integer), 0, func, typeChecking, contextDependencies);
 end;
 
 procedure TXQNativeModule.registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
@@ -6037,6 +6077,7 @@ begin
   interpretedFunctions.AddObject(name, temp);
   parseTypeChecking(temp, [typeDeclaration]);
   temp.versions[0].name:=name; //just for error printing
+  temp.guessArgCount;
 end;
 
 function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
@@ -6069,39 +6110,33 @@ begin
     binaryOpFunctions.AddObject(result.versions[i].name, TObject(result));
 end;
 
-function TXQNativeModule.findBasicFunction(const name: string; model: TXQParsingModel): TXQBasicFunctionInfo;
-var
-  i: Integer;
+function TXQNativeModule.findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQBasicFunctionInfo;
 begin
   if model in acceptedModels then begin
-    i := basicFunctions.IndexOf(name);
-    if i >= 0 then exit(TXQBasicFunctionInfo(basicFunctions.Objects[i]));
+    result := TXQBasicFunctionInfo(findFunction(basicFunctions, name, argCount));
+    if result <> nil then exit;
   end;
-  if parent <> nil then exit(parent.findBasicFunction(name, model));
+  if parent <> nil then exit(parent.findBasicFunction(name, argCount, model));
   result := nil;
 end;
 
-function TXQNativeModule.findComplexFunction(const name: string; model: TXQParsingModel): TXQComplexFunctionInfo;
-var
-  i: Integer;
+function TXQNativeModule.findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQComplexFunctionInfo;
 begin
   if model in acceptedModels then begin
-    i := complexFunctions.IndexOf(name);
-    if i >= 0 then exit(TXQComplexFunctionInfo(complexFunctions.Objects[i]));
+   result := TXQComplexFunctionInfo(findFunction(complexFunctions, name, argCount));
+   if result <> nil then exit;
   end;
-  if parent <> nil then exit(parent.findComplexFunction(name, model));
+  if parent <> nil then exit(parent.findComplexFunction(name, argCount, model));
   result := nil;
 end;
 
-function TXQNativeModule.findInterpretedFunction(const name: string; model: TXQParsingModel): TXQInterpretedFunctionInfo;
-var
-  i: Integer;
+function TXQNativeModule.findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQInterpretedFunctionInfo;
 begin
   if model in acceptedModels then begin
-    i := interpretedFunctions.IndexOf(name);
-    if i >= 0 then exit(TXQInterpretedFunctionInfo(interpretedFunctions.Objects[i]));
+   result := TXQInterpretedFunctionInfo(findFunction(interpretedFunctions, name, argCount));
+   if result <> nil then exit;
   end;
-  if parent <> nil then exit(parent.findInterpretedFunction(name, model));
+  if parent <> nil then exit(parent.findInterpretedFunction(name, argCount, model));
   result := nil;
 end;
 
@@ -6140,6 +6175,28 @@ begin
       if nextToken() = 'as' then
         info.versions[i].returnType := parseSequenceType();
     end;
+end;
+
+class function TXQNativeModule.findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
+var
+  i: Integer;
+  idx: Integer;
+begin
+  idx := sl.IndexOf(name);
+  if idx = -1 then exit(nil);
+  i := idx;
+  repeat
+    if (TXQAbstractFunctionInfo(sl.Objects[i]).minArgCount <= argCount) and (TXQAbstractFunctionInfo(sl.Objects[i]).maxArgCount >= argCount) then
+      exit(TXQAbstractFunctionInfo(sl.Objects[i]));
+    dec(i);
+  until (i < 0) or (sl[i] <> name);
+  i := idx + 1;
+  while (i < sl.Count) and (sl[i] = name) do begin
+    if (TXQAbstractFunctionInfo(sl.Objects[i]).minArgCount <= argCount) and (TXQAbstractFunctionInfo(sl.Objects[i]).maxArgCount >= argCount) then
+      exit(TXQAbstractFunctionInfo(sl.Objects[i]));
+    inc(i);
+  end;
+  result := nil;
 end;
 
 var fn3, fn, pxp, op, xs: TXQNativeModule;
@@ -6196,32 +6253,32 @@ baseJSONiqSchema := TJSONiqAdditionSchema.create();
 
 
 //my functions
-pxp.registerFunction('filter',@xqFunctionExtract, []); //to be removed
-pxp.registerFunction('extract',@xqFunctionExtract, []); //to be removed
-pxp.registerFunction('split-equal',@xqFunctionSplitEqual,[]); //to be removed ?
-pxp.registerFunction('parse-date',@xqFunctionParse_Date, []);
-pxp.registerFunction('parse-datetime',@xqFunctionParse_Datetime, []);
-pxp.registerFunction('parse-time',@xqFunctionParse_Time, []);
-pxp.registerFunction('deep-text',@xqFunctionDeep_Node_Text, []);
-pxp.registerFunction('outer-xml',@xqFunctionOuter_XML, []);
-pxp.registerFunction('inner-xml',@xqFunctionInner_XML, []);
-pxp.registerFunction('outer-html',@xqFunctionOuter_HTML, []);
-pxp.registerFunction('inner-html',@xqFunctionInner_HTML, []);
-pxp.registerFunction('form',@xqFunctionForm, []);
-pxp.registerFunction('resolve-html',@xqFunctionResolve_Html, []);
-pxp.registerFunction('random',@xqFunctionRandom, []);
-pxp.registerFunction('sleep',@xqFunctionSleep, []);
-pxp.registerFunction('eval',@xqFunctionEval, []);
-pxp.registerFunction('css',@xqFunctionCSS, []);
-pxp.registerFunction('get',@xqFunctionGet, ['($name as xs:string)','($name as xs:string, $def as item()*)'], [xqcdContextVariables]);
-pxp.registerFunction('is-nth',@xqFunctionIs_Nth, []);
-pxp.registerFunction('type-of',@xqFunctionType_of, []);
-pxp.registerFunction('get-property',@xqFunctionGet_Property, []);
-pxp.registerFunction('object',@xqFunctionObject,[]); //deprecated
-pxp.registerFunction('join',@xqFunctionJoin,[]);
-pxp.registerFunction('binary-to-string',@xqFunctionBinary_To_String,['($data as xs:hexBinary) as xs:string', '($data as xs:base64Binary) as xs:string','($data as xs:hexBinary, $encoding as xs:string) as xs:string', '($data as xs:base64Binary, $encoding as xs:string) as xs:string']);
-pxp.registerFunction('string-to-hexBinary',@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
-pxp.registerFunction('string-to-base64Binary',@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
+pxp.registerFunction('filter',2,4,@xqFunctionExtract, []); //to be removed
+pxp.registerFunction('extract',2,4,@xqFunctionExtract, []);
+pxp.registerFunction('split-equal',2,3,@xqFunctionSplitEqual,[]); //to be removed ?
+pxp.registerFunction('parse-date',2,2,@xqFunctionParse_Date, []);
+pxp.registerFunction('parse-datetime',2,2,@xqFunctionParse_Datetime, []);
+pxp.registerFunction('parse-time',2,2,@xqFunctionParse_Time, []);
+pxp.registerFunction('deep-text',0,1,@xqFunctionDeep_Node_Text, []);
+pxp.registerFunction('outer-xml',0,1,@xqFunctionOuter_XML, []);
+pxp.registerFunction('inner-xml',0,1,@xqFunctionInner_XML, []);
+pxp.registerFunction('outer-html',0,1,@xqFunctionOuter_HTML, []);
+pxp.registerFunction('inner-html',0,1,@xqFunctionInner_HTML, []);
+pxp.registerFunction('form',1,2,@xqFunctionForm, []);
+pxp.registerFunction('resolve-html',1,2,@xqFunctionResolve_Html, []);
+pxp.registerFunction('random',0,0,@xqFunctionRandom, []);
+pxp.registerFunction('sleep',1,1,@xqFunctionSleep, []);
+pxp.registerFunction('eval',1,1,@xqFunctionEval, []);
+pxp.registerFunction('css',1,1,@xqFunctionCSS, []);
+pxp.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string)','($name as xs:string, $def as item()*)'], [xqcdContextVariables]);
+pxp.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);
+pxp.registerFunction('type-of',1,1,@xqFunctionType_of, []);
+pxp.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
+pxp.registerFunction('object',0,1,@xqFunctionObject,[]); //deprecated
+pxp.registerFunction('join',1,2,@xqFunctionJoin,[]);
+pxp.registerFunction('binary-to-string',1,2,@xqFunctionBinary_To_String,['($data as xs:hexBinary) as xs:string', '($data as xs:base64Binary) as xs:string','($data as xs:hexBinary, $encoding as xs:string) as xs:string', '($data as xs:base64Binary, $encoding as xs:string) as xs:string']);
+pxp.registerFunction('string-to-hexBinary',1,2,@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
+pxp.registerFunction('string-to-base64Binary',1,2,@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
 
 pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
 pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
@@ -6253,7 +6310,7 @@ fn.registerFunction('starts-with',@xqFunctionStarts_with,['($arg1 as xs:string?,
 fn.registerFunction('ends-with',@xqFunctionEnds_with,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean'], [xqcdContextCollation]);
 fn.registerFunction('substring-after',@xqFunctionSubstring_after,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string'], [xqcdContextCollation]);
 fn.registerFunction('substring-before',@xqFunctionSubstring_before,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string'], [xqcdContextCollation]);
-fn.registerFunction('concat',@xqFunctionConcat,[]);
+fn.registerFunction('concat',2,-1,@xqFunctionConcat,[]);
 fn.registerFunction('translate',@xqFunctionTranslate,['($arg as xs:string?, $mapString as xs:string, $transString as xs:string) as xs:string']);
 fn.registerFunction('replace',@xqFunctionReplace,['($input as xs:string?, $pattern as xs:string, $replacement as xs:string) as xs:string', '($input as xs:string?, $pattern as xs:string, $replacement as xs:string, $flags as xs:string) as xs:string ']);
 fn.registerFunction('matches',@xqFunctionMatches,['($input as xs:string?, $pattern as xs:string) as xs:boolean', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:boolean']);
@@ -6340,7 +6397,7 @@ fn.registerFunction('string-length',@xqFunctionString_length, ['() as xs:integer
 fn.registerFunction('normalize-space',@xqFunctionNormalize_space, ['() as xs:string', '($arg as xs:string?) as xs:string'], [xqcdFocusDocument]);
 //TODO: normalize-unicode
 
-fn.registerFunction('concatenate',@xqFunctionConcatenate, []); //this should be an operator
+fn.registerFunction('concatenate',2, 2, @xqFunctionConcatenate, []); //this should be an operator
 fn.registerFunction('index-of', @xqFunctionindex_of, ['($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType) as xs:integer*', '($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType, $collation as xs:string) as xs:integer*'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
 fn.registerFunction('distinct-values', @xqFunctiondistinct_values, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType*', '($arg as xs:anyAtomicType*, $collation as xs:string) as xs:anyAtomicType*'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
 fn.registerFunction('insert-before', @xqFunctioninsert_before, ['($target as item()*, $position as xs:integer, $inserts as item()*) as item()*']);

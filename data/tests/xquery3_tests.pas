@@ -273,6 +273,9 @@ begin
   f('comment { boolean#1 }', 'err:FOTY0013');
   f('element foo { boolean#1 }', 'err:XQTY0105');
 
+  //URL Qualified names
+  m('declare namespace g = "f"; declare %Q{foo}bar function Q{f}succ($i as Q{http://www.w3.org/2001/XMLSchema}integer) as Q{http://www.w3.org/2001/XMLSchema}integer{$i + 1}; join(for $f in (%Q{wtf}omg function ($k){123}, Q{f}succ#1, g:succ#1) return $f(100))', '123 101 101');
+
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');

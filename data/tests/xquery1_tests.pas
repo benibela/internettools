@@ -298,7 +298,7 @@ begin
   //from the standard
   t('let $j := 7 return (let $i := 5, $j := 20 * $i return $i, $j)', '5 7');
   t('let $j := 7 return (let $i := 5, $j := 20 * $i return ($i, $j))', '5 100');
-  t('for $car at $i in ("Ford", "Chevy"), $pet at $j in ("Cat", "Dog") return concat(x"{$i},{$car},{$j},{$pet}")', '1,Ford,1,Cat 1,Ford,2,Dog 2,Chevy,1,Cat 2,Chevy,2,Dog');
+  t('for $car at $i in ("Ford", "Chevy"), $pet at $j in ("Cat", "Dog") return x"{$i},{$car},{$j},{$pet}"', '1,Ford,1,Cat 1,Ford,2,Dog 2,Chevy,1,Cat 2,Chevy,2,Dog');
   t('let $inputvalues := (1,1141,100,200,144,51551,523) return fn:avg(for $x at $i in $inputvalues where $i mod 3 = 0 return $x)', '25825.5');
   t('for $e in //employee order by $e/salary descending return $e/name','23 Obama Sinclair Momo', '<r><employee><salary>1000000</salary><name>Obama</name></employee><employee><salary>1</salary><name>Momo</name></employee><employee><salary>7000000000000</salary><name>23</name></employee><employee><salary>90000</salary><name>Sinclair</name></employee></r>');
   t('for $b in /books/book[price < 100] order by $b/title return $b', '75.3Caesar 6Das Kapital 42The Hitchhiker''s Guide to the Galaxy', '<books><book><price>42</price><title>The Hitchhiker''s Guide to the Galaxy</title></book><book><price>1101010</price><title>How to use binary</title></book><book><price>6</price><title>Das Kapital</title></book><book><title>Das Kapital</title></book><book><price>753</price><title>Caesar</title></book><book><price>75.3</price><title>Caesar</title></book></books>');

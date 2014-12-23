@@ -2155,7 +2155,7 @@ var module: TXQNativeModule;
 initialization
 
 module := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
-module.registerFunction('match', @xqFunctionMatches, []);
+module.registerFunction('match', 2, 2, @xqFunctionMatches, []);
 xquery.patternMatcherParse:=@patternMatcherParse;
 xquery.patternMatcherMatch:=@patternMatcherMatch;
 xquery.patternMatcherVisit:=@patternMatcherVisit;

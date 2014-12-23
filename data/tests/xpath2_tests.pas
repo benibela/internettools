@@ -124,25 +124,14 @@ begin
   t('"$$;"',                   '$$;',                            '');
   t('">$$;<"',                 '>$$;<',                          '');
 
-  t('x"$$;"',                   '$$;',                           '');
-  t('x">$$;<"',                 '>$$;<',                         '');
-
-  f('x">{$unknown}<"', 'err:XPST0008');
-  f('x"{$test}>{$unknown}<"', 'err:XPST0008');
-  f('x"{$test}{$unknown}{$abc}"', 'err:XPST0008');
 
   // t('$abc;',                     'alphabet',                     '');
   t('$abc',                     'alphabet',                     '');
 
-  f('$ABC;', 'err:XPST0003');
-  f('$ABC', 'err:XPST0008');
-  f('x"{$ABC}"', 'err:XPST0008');
 
   t('concat(">",$abc,''<'')',  '>alphabet<',                     '');
   t('''$abc;''',                   '$abc;',                        ''); //no variable matching in '
   t('"$abc;"',                   '$abc;',                        ''); //no variable matching in "
-  t('x"{$abc}"',                   'alphabet',                        ''); //variable matching in x"
-  t('x''{$abc}''',                   'alphabet',                        ''); //variable matching in x"
   t('"&quot;"',                   '&quot;',                        '');
   t('''&quot;''',                 '&quot;',                        '');
   t('"x&quot;y"',                   'x&quot;y',                        '');
@@ -153,6 +142,20 @@ begin
   t('get("unknown")', '');
   t('get("unknown", 42)', '42');
   t('concat(test :=123, get("test"))', '123123');
+
+  f('$ABC;', 'err:XPST0003');
+  f('$ABC', 'err:XPST0008');
+  f('x"{$ABC}"', 'err:XPST0008');
+
+  t('x"{$abc}"',                   'alphabet',                        ''); //variable matching in x"
+  t('x''{$abc}''',                   'alphabet',                        ''); //variable matching in x"
+
+  t('x"$$;"',                   '$$;',                           '');
+  t('x">$$;<"',                 '>$$;<',                         '');
+
+  f('x">{$unknown}<"', 'err:XPST0008');
+  f('x"{$test}>{$unknown}<"', 'err:XPST0008');
+  f('x"{$test}{$unknown}{$abc}"', 'err:XPST0008');
 
   //more extended strings
   t('x"123"', '123');
@@ -217,7 +220,7 @@ begin
                 //('''$test;''==''abc''',       'false',                            ''),
                 //Concatenation tests
   t('concat(''a'',''b'',''c'')', 'abc',                              '');
-  t('concat(''one'')',           'one',                              '');
+  f('concat(''one'')',           'err:XPST0017');
   t('concat(''hallo'', '' '', ''welt'') = ''hallo welt''',  'true', '');
   t('concat  (  ''a'',  ''b'',  ''c''  )',                   'abc',  '');
   t('concat(''a'',''b'',concat(''c'',''d''))',               'abcd', '');
@@ -3803,7 +3806,7 @@ begin
   t('hours-from-dateTime(xs:untypedAtomic("2004-07-09T12:18:34"))', '12');
 
 
-  if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode', xqpmXPath2) <> nil then begin
+  if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode', 1, xqpmXPath2) <> nil then begin
     t('translate("Hallö", "aö", "äo")', 'Hällo');
     t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
     t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);

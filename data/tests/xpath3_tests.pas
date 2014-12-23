@@ -213,6 +213,10 @@ begin
   t('()', '', '<root xmlns="base"><a xmlns="n1">a1</a><a xmlns="n2">a2</a><p:a xmlns:p="n3" p:attrib="AT3">a3</p:a><a xmlns="">an</a></root>');
   t('(/*:root/Q{n1}a,"|",(Q{base}root!(Q{n3}a, "|", Q{n2}a)), "|", descendant::Q{n1}a, "|", descendant::Q{}a)', 'a1 | a3 | a2 | a1 | an');
   t('(/Q{base}root//@Q{n3}attrib, //attribute::Q{n3}attrib, //@Q{n3}attrib)', 'AT3 AT3 AT3');
+  t('for $Q{foo}a in 1, $a in 2 return ($a, $Q{foo}a, every $Q{a}a in $Q{foo}a satisfies $Q{a}a eq 1 )', '2 1 true');
+  t('(Q{http://www.w3.org/2005/xpath-functions}concat("a", "b"), Q{http://www.w3.org/2001/XMLSchema}integer("123"), Q{http://www.benibela.de/2012/pxp/extensions}join(("x")))', 'ab 123 x');
+  t('(1 instance of Q{http://www.w3.org/2001/XMLSchema}integer, let $Q{f}succ := (function ($Q{v}v as Q{http://www.w3.org/2001/XMLSchema}decimal) as Q{http://www.w3.org/2001/XMLSchema}integer { $Q{v}v + 1}) return ($Q{f}succ(10), $Q{f}succ(10) instance of Q{http://www.w3.org/2001/XMLSchema}integer))', 'true 11 true');
+
 
 
   //interface tests

@@ -1183,7 +1183,7 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
     if (result = nil) and (t is TXQTermConstant) then
       result := t
     else if result = nil then
-      result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'concat', [t])
+      result := t//TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'concat', [t])
     else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result)) then
       TXQTermNamedFunction(result).push(t)
     else
@@ -1261,7 +1261,9 @@ begin
     expect('|');
     jn := TXQueryEngine.findNativeModule('http://jsoniq.org/functions');
     if jn = nil then raiseParsingError('pxp:JSONIQ', 'The {| .. |} syntax can only be used, if the json unit is loaded.');
-    result := TXQTermNamedFunction.create(xqfkBasic, jn.findBasicFunction('object', xqpmXPath2));
+    result := TXQTermNamedFunction.create();
+    TXQTermNamedFunction(result).kind := xqfkBasic;
+    TXQTermNamedFunction(result).func := jn.findBasicFunction('object', 1, xqpmXPath2);
     result := parseSequenceLike(result, '|');
     expect('}');
     exit;
@@ -1328,25 +1330,31 @@ var
   namespaceMode: TXQNamespaceMode;
   marker: PChar;
 
-  function lookupNamedFunction: TXQTermNamedFunction;
+  procedure lookupNamedFunction(f: TXQTermNamedFunction);
   var
     akind: TXQTermNamedFunctionKind;
     afunc: TXQAbstractFunctionInfo;
     tempUrl: String;
   begin
-    if namespaceURL = '' then
-      namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkFunction);
-    if TXQTermNamedFunction.findKindIndex(namespaceURL, word, parsingModel, akind, afunc) then
-      exit(TXQTermNamedFunction.Create(akind, afunc));
+    if TXQTermNamedFunction.findKindIndex(namespaceURL, word, length(f.children), parsingModel, akind, afunc) then begin
+      f.kind := akind;
+      f.func := afunc;
+      exit();
+    end;
     if namespacePrefix = '' then begin
       if staticContext.defaultElementTypeNamespace <> nil then tempUrl := staticContext.defaultElementTypeNamespace.getURL
       else if staticContext.defaultTypeNamespace <> nil then tempUrl := staticContext.defaultTypeNamespace.getURL;
-      if TXQTermNamedFunction.findKindIndex(tempUrl, word, parsingModel, akind, afunc) then
-        exit(TXQTermNamedFunction.Create(akind, afunc));
+      if TXQTermNamedFunction.findKindIndex(tempUrl, word, length(f.children), parsingModel, akind, afunc) then begin
+        f.kind := akind;
+        f.func := afunc;
+        exit();
+      end;
     end;
     if namespaceURL = XMLNamespaceURL_XPathFunctions then
       raiseParsingError('XPST0017', 'unknown function: ' + ifthen(namespacePrefix = '', 'Q{'+namespaceURL+'}'+namespacePrefix+':'+word, namespacePrefix+':'+word));
-    result := TXQTermNamedFunction.create(namespaceURL, word); //cannot know if the function is valid yet. XQuery can have mutually recursive functions, but this is called during the function declaration (i.e. before the 2nd function has been parsed)
+    f.namespaceUrl := namespaceURL;
+    f.funcname := word; //cannot know if the function is valid yet. XQuery can have mutually recursive functions, but this is called during the function declaration (i.e. before the 2nd function has been parsed)
+    f.kind := xqfkUnknown;
   end;
 
   function parseVariableWithDotNotation: TXQTerm;
@@ -1507,15 +1515,20 @@ begin
           end;
         end;
 
-        result := lookupNamedFunction;
 
+        if namespaceURL = '' then
+          namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkFunction);
         if namespaceURL = '' then raiseParsingError('XPST0017', 'No namespace given for function '+word);
         //result := TXQTermNamedFunction.createIfExists(namespaceURL, namespa word, parsingModel);
+
+        result := TXQTermNamedFunction.create();
         result := parseFunctionCall(TXQTermNamedFunction(result));
-        if result is TXQTermNamedFunction then
+        if result is TXQTermNamedFunction then begin
+          lookupNamedFunction(TXQTermNamedFunction(result));
           with TXQTermNamedFunction(result) do
             if (kind = xqfkTypeConstructor) and (length(children) = 1) then
               result := staticallyCastQNameAndNotation(TXQTermNamedFunction(result), TXSType(TObject(func)), staticContext);
+        end else lookupNamedFunction(TXQTermWithChildren(result).children[0] as TXQTermNamedFunction);
         exit();
       end;
       '$', '<': case word of
@@ -2091,9 +2104,9 @@ begin
   if (t^ is TXQTermNodeMatcher) and (length(TXQTermNodeMatcher(t^).children) = 0)
      and ((TXQTermNodeMatcher(t^).namespaceCheck <> xqnmNone {this would be *:true}) and (TXQTermNodeMatcher(t^).namespaceURLOrPrefix = '')) then begin
     case TXQTermNodeMatcher(t^).select of
-      'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'true'); end;
-      'false': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'false'); end;
-      'null': if GlobalStaticNamespaces.namespaces['jn'] <> nil then begin t^.free; t^ := TXQTermNamedFunction.create(GlobalStaticNamespaces.namespaces['jn'].getURL, 'null'); end;
+      'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'true', 0); end;
+      'false': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'false', 0); end;
+      'null': if GlobalStaticNamespaces.namespaces['jn'] <> nil then begin t^.free; t^ := TXQTermNamedFunction.create(GlobalStaticNamespaces.namespaces['jn'].getURL, 'null', 0); end;
     end;
     exit(xqtvaNoRecursion);
   end;

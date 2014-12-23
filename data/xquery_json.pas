@@ -341,7 +341,7 @@ initialization
   jn.registerFunction('is-null', @xqFunctionIsNull, ['($arg as item()) as xs:boolean']);
   jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?'], [xqcdContextOther]);
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
-  jn.registerFunction('object', @xqFunctionObject, []); //deprecated
+  jn.registerFunction('object', 0, -1, @xqFunctionObject, []); //deprecated
   jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as item()', '($arg as xs:string?, $options as object()) as item()*']);
   jn.registerFunction('size', @xqFunctionSize, ['($arg as array()?) as xs:integer']);
 
