@@ -6181,18 +6181,21 @@ class function TXQNativeModule.findFunction(const sl: TStringList; const name: s
 var
   i: Integer;
   idx: Integer;
+  info: TXQAbstractFunctionInfo;
 begin
   idx := sl.IndexOf(name);
   if idx = -1 then exit(nil);
   i := idx;
   repeat
-    if (TXQAbstractFunctionInfo(sl.Objects[i]).minArgCount <= argCount) and (TXQAbstractFunctionInfo(sl.Objects[i]).maxArgCount >= argCount) then
+    info := TXQAbstractFunctionInfo(sl.Objects[i]);
+    if (info.minArgCount <= argCount) and ((info.maxArgCount >= argCount) or (info.maxArgCount = high(info.maxArgCount))) then
       exit(TXQAbstractFunctionInfo(sl.Objects[i]));
     dec(i);
   until (i < 0) or (sl[i] <> name);
   i := idx + 1;
   while (i < sl.Count) and (sl[i] = name) do begin
-    if (TXQAbstractFunctionInfo(sl.Objects[i]).minArgCount <= argCount) and (TXQAbstractFunctionInfo(sl.Objects[i]).maxArgCount >= argCount) then
+    info := TXQAbstractFunctionInfo(sl.Objects[i]);
+    if (info.minArgCount <= argCount) and ((info.maxArgCount >= argCount) or (info.maxArgCount = high(info.maxArgCount))) then
       exit(TXQAbstractFunctionInfo(sl.Objects[i]));
     inc(i);
   end;
