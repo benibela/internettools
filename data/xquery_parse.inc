@@ -48,8 +48,6 @@ type
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
   function nextTokenNCName(): string; inline; //returns a NCName (todo: raise an error if not an NCName)
-  function nextTokenMaybeQName(): string; inline; //returns a QName, if there is one, or the same as nextToken otherwise
-  function nextTokenQName(allowWildcards: boolean=false): string; inline; //returns a QName (todo: raise an error if not a QName)
   { $foo       -> ('', '', 'foo',    xqnmPrefix)
     $*:foo     -> ('', '*', 'foo',   xqnmNone)
     $prf:foo   -> ('', 'prf', 'foo', xqnmPrefix)
@@ -57,7 +55,9 @@ type
     $Q{ns}foo  -> ('ns', 'Q', 'foo', xqnmURL)
   }
   function nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean=false): TXQNamespaceMode; //returns a splitted EQName
-  function nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): TXQNamespaceMode;
+  //like the previous function, but resolves the prefix.
+  //Returns true iff there is a prefix or Q{..} url (i.e. in every case except $foo)
+  function nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): boolean;
 
 
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
@@ -77,7 +77,7 @@ type
   function parseSomeEvery(const akind: string): TXQTermSomeEvery;
   function parseTypeSwitch: TXQTermTypeSwitch;
   function parseSwitch: TXQTermSwitch;
-  function parseDirectConstructor(name: string): TXQTermConstructor;
+  function parseDirectConstructor(): TXQTermConstructor;
   function parseComputedConstructor(name: string): TXQTermConstructor;
   function parseExtension: TXQTerm;
   function parseVariable: TXQTermVariable;
@@ -246,23 +246,6 @@ begin
   result := nextToken(false);
 end;
 
-function TXQParsingContext.nextTokenMaybeQName(): string;
-begin
-  result := nextToken();
-  if (pos^ = ':') and not ((pos+1)^ in (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*'])) then begin //same check in parseValue for matchers
-    expect(':');
-    result += ':' + nextToken();
-  end;
-end;
-
-function TXQParsingContext.nextTokenQName(allowWildcards: boolean): string;
-begin
-  result := nextTokenMaybeQName();
-  //todo check that it is really a QName
-  if result = '' then raiseParsingError('XPST0003', 'Expected QName');
-  if (not allowWildcards) and ((result[1] = '*') or (result[length(result)] = '*')) then raiseParsingError('XPST0003', 'Expected QName, got: *');
-end;
-
 function TXQParsingContext.nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
 const NONCNAME = (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']);
 var
@@ -297,12 +280,14 @@ begin
   if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
 end;
 
-function TXQParsingContext.nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): TXQNamespaceMode;
+function TXQParsingContext.nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): boolean;
 var
   prefix: string;
 begin
-  if nextTokenEQName(url, prefix, localpart) = xqnmPrefix then
+  if nextTokenEQName(url, prefix, localpart) = xqnmPrefix then begin
     url := staticContext.findNamespaceURL(prefix, resolveKind);
+    result := prefix <> '';
+  end else result := true;
 end;
 
 function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char; allowPartialApplication: boolean
@@ -362,8 +347,9 @@ end;
 
 function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
 var word: string;
-  namespace: INamespace;
   parens: Integer;
+  namespaceUrl: string;
+  hadNamespace: Boolean;
 begin
   skipWhitespaceAndComment();
   parens := 0;
@@ -373,7 +359,7 @@ begin
     parens += 1;
   end;
   if parens > 0 then require3('for parentheses around types');
-  word := nextTokenQName();
+  hadNamespace := nextTokenEQName(namespaceUrl, word, xqdnkType);
 
   result := TXQTermSequenceType.Create();
   try
@@ -381,7 +367,7 @@ begin
     result.allowMultiple:=false;
 
     result.name:=word;
-    if (isKindTestFunction(word)) or (word = 'empty-sequence') or (word = 'item') then begin
+    if (not hadNamespace) and ((isKindTestFunction(word)) or (word = 'empty-sequence') or (word = 'item')) then begin
       expect('(');
 
       skipWhitespaceAndComment();
@@ -405,7 +391,7 @@ begin
          result.kind:=tikElementTest;
          result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
       end;
-    end else if options.AllowJSON and ((word = 'array') or (word = 'object') or (word = 'json-item') or (word = 'structured-item')) then begin
+    end else if options.AllowJSON and (not hadNamespace) and ((word = 'array') or (word = 'object') or (word = 'json-item') or (word = 'structured-item')) then begin
       expect('('); expect(')');
       case word of
         'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
@@ -414,7 +400,7 @@ begin
         'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
         else raiseParsingError('XPST0003', 'WTF??');
       end;
-    end else if (word = 'function') or (word = '%') then begin
+    end else if (not hadNamespace) and (word = 'function') or (word = '%') then begin
       require3('function test');
       if word = '%' then begin
         parseAnnotations; //we do not need this nonsense
@@ -439,11 +425,9 @@ begin
         result.arguments[high(result.arguments)] := parseSequenceType();
       end;
     end else begin
-      staticContext.splitRawQName(namespace, word, xqdnkType);
-      if (namespace = nil) then raiseParsingError('XPST0008', 'No schemas loaded for type '+word);
       result.kind:=tikAtomic;
-      result.atomicTypeInfo := engine.findType(namespace.getURL, word);
-      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: Q{'+namespace.getURL+'}'+word);
+      result.atomicTypeInfo := engine.findType(namespaceUrl, word);
+      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: Q{'+namespaceUrl+'}'+word);
     end;
 
     while parens > 0 do begin expect(')'); parens -= 1; end;
@@ -471,7 +455,7 @@ begin
   if patternMatcherParse = nil then raiseParsingError('pxp:PATT0', 'No pattern matcher loaded ()');
   curpos := pos;
   expect('<');
-  temp := parseDirectConstructor('???');
+  temp := parseDirectConstructor;
   temp.free;
   case pos^ of
     '+', '*', '?': inc(pos);
@@ -697,7 +681,7 @@ begin
   result.push(parse());
 end;
 
-function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstructor;
+function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
   procedure parseCommonContent(parent: TXQTermConstructor; border: char; atBoundary: boolean);
     procedure pushElementContent(s: string);
     begin
@@ -780,7 +764,8 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
   function parsePIConstructor: TXQTermConstructor;
   var marker: PChar;
   begin
-    result := TXQTermConstructor.create(tetProcessingInstruction, TXQTermConstant.create(xqvalue(nextTokenQName())));
+    expect('?');
+    result := TXQTermConstructor.create(tetProcessingInstruction, TXQTermConstant.create(xqvalue(nextTokenNCName())));
     skipWhitespace();
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do pos+=1;
@@ -792,12 +777,24 @@ function TXQParsingContext.parseDirectConstructor(name: string): TXQTermConstruc
   function parseCommentConstructor: TXQTermConstructor;
   var marker: PChar;
   begin
+    expect('!');
     expect('--');
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '-') or ((pos+1)^ <> '-')) do pos+=1;
     if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
     result := TXQTermConstructor.create(tetComment, TXQTermConstant.create(strFromPchar(marker, pos - marker)));
     expect('-->');
+  end;
+
+  function nextTokenQName: string;
+  var  namespaceUrl: string;
+       namespacePrefix: string;
+       name: string;
+  begin
+    if nextTokenEQName(namespaceUrl, namespacePrefix, name) = xqnmURL then
+      raiseParsingError('XPST0003', 'Cannot use Q{} notation for direct constructors');
+    if namespacePrefix = '' then result := name
+    else result := namespacePrefix + ':' + name;
   end;
 
 var
@@ -808,15 +805,18 @@ var
   i: Integer;
   oldDefaultElementTypeNamespace: INamespace;
 begin
-  name := nextTokenMaybeQName();
-  if name = '!' then exit(parseCommentConstructor)
-  else if name = '?' then exit(parsePIConstructor);
-  result := TXQTermConstructor.create(tetOpen, TXQTermConstant.create(name));
-  token := nextTokenMaybeQName();
-  while (token <> '>') and (token <> '/') and (token <> '') do begin
+  skipWhitespace();
+  case pos^ of
+    '!': exit(parseCommentConstructor);
+    '?': exit(parsePIConstructor);
+  end;
+  result := TXQTermConstructor.create(tetOpen, TXQTermConstant.create(nextTokenQName));
+  skipWhitespace();
+  while not (pos^ in ['>', '/', #0]) do begin
+    token := nextTokenQName;
     attribute := TXQTermConstructor.create(tetAttribute, TXQTermConstant.create(token));
     expect('=');
-    skipWhitespaceAndComment();
+    skipWhitespace();
     if not (pos^ in ['''', '"']) then raiseParsingError('XPST0003', 'Expected attribute value');
     marker := pos;
     pos+=1;
@@ -834,16 +834,18 @@ begin
       attribute.Free;
     end else result.push(attribute);
     expect(marker^);
-    token := nextTokenMaybeQName();
+    skipWhitespace();
   end;
-  if token = '' then begin
+  if pos^ = #0 then begin
     result.Free;
     raiseParsingError('XPST0003', 'Attribute expected');
   end;
-  if token = '/' then begin
+  if pos^ = '/' then begin
+    expect('/');
     expect('>');
     exit;
   end;
+  expect('>');
 
   oldDefaultElementTypeNamespace := staticContext.defaultElementTypeNamespace;
   if Result.implicitNamespaces <> nil then begin
@@ -866,7 +868,8 @@ begin
       case pos^ of
         '/': begin
           pos += 1;
-          if nextTokenQName() <> name then raiseParsingError('XPST0003', 'Expected matching closing tag');
+          if nextTokenQName() <> (result.nameValue as TXQTermConstant).value.toString then
+            raiseParsingError('XPST0003', 'Expected matching closing tag');
           expect('>');
           staticContext.defaultElementTypeNamespace := oldDefaultElementTypeNamespace;
           if Result.implicitNamespaces <> nil then
@@ -883,19 +886,14 @@ begin
           if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
           result.push(TXQTermConstant.create(strFromPchar(marker, pos - marker)));
           pos+=3;
-        end else if strBeginsWith(pos, '!--') then begin
-          pos += 1;
-          result.push(parseCommentConstructor);
-        end else raiseParsingError('XPST0003', 'Invalid character combination after <!');
-        '?': begin
-          pos += 1;
-          result.push(parsePIConstructor);
-        end;
-        else result.push(parseDirectConstructor('<'));
+        end else if strBeginsWith(pos, '!--') then result.push(parseCommentConstructor)
+        else raiseParsingError('XPST0003', 'Invalid character combination after <!');
+        '?': result.push(parsePIConstructor);
+        else result.push(parseDirectConstructor());
       end;
     end;
   end;
-  raiseParsingError('XPST0003', 'Unexpected end (probably missing closing tag for <'+name+'>')
+  raiseParsingError('XPST0003', 'Unexpected end (probably missing closing tag for <'+(result.nameValue as TXQTermConstant).value.toString +'>')
 end;
 
 function TXQParsingContext.parseComputedConstructor(name: string): TXQTermConstructor;
@@ -905,6 +903,8 @@ var
   onlyConstructors: Boolean;
   i: Integer;
   expectName: Boolean;
+  namespaceUrl: string;
+  namespacePrefix: string;
 begin
   token := name;
   if (token = 'element') then result := TXQTermConstructor.create(tetOpen)
@@ -916,13 +916,18 @@ begin
   else raiseParsingError('XPST0003', 'Unknown constructor name');
   expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute]) ;
   if expectName then begin
-    token := nextTokenMaybeQName();
-    if token = '{' then begin
+    skipWhitespaceAndComment();
+    if pos^ = '{' then begin
+      pos += 1;
       result.nameValue := parsePrimaryLevel;
       expect('}');
     end else begin
-      result.nameValue := TXQTermConstant.create(token);
-      if (token = '') or not (token[1] in ['a'..'z','A'..'Z']) then raiseParsingError('XPST0003', 'Expected qname, got '+token);
+      if nextTokenEQName(namespaceUrl, namespacePrefix, token) = xqnmPrefix then begin
+        //namespaceUrl := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
+        if namespacePrefix <> '' then namespacePrefix += ':';
+        result.nameValue := TXQTermConstant.create(xqvalue(namespacePrefix + token));
+      end else
+        result.nameValue := TXQTermConstant.create(TXQValueQName.create(namespaceUrl, namespacePrefix, token));
     end;
   end;
   expect('{');
@@ -952,11 +957,13 @@ end;
 function TXQParsingContext.parseExtension: TXQTerm;
 var
   pragma: String;
+  url: string;
 begin
   requireXQuery('for extensions');
   expect('#');
-  pragma := nextTokenQName();
-  if system.pos(':', pragma) = 0 then raiseParsingError('XPST0003', 'Extension name requires namespace');
+  if not nextTokenEQName(url, pragma, xqdnkUnknown) then
+    raiseParsingError('XPST0003', 'Extension name requires namespace');
+  //just ignore it
   while (pos^ <> #0) and ((pos^ <> '#') or ((pos+1)^ <> ')')) do
     pos += 1;
   if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
@@ -998,29 +1005,30 @@ function TXQParsingContext.parseAnnotations: TXQAnnotations;
 var
   i: Integer;
   j: Integer;
+  prefix: string;
 begin
   requireXQuery3('Annotations need XQuery 3');
   try
     setlength(result, 1);
     while true do begin
       with result[high(result)] do begin
-        name := nextTokenQName();
-        staticContext.splitRawQName(namespace, name, xqdnkUnknown);
-        if namespace = nil then namespace := XMLNamespace_XQuery;
-        if equalNamespaces(namespace, XMLNamespace_XQuery) then begin
-          if not ((name = 'private') or (name = 'public')) then raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+namespace.getURL);
+        if nextTokenEQName(namespace, prefix, name) = xqnmPrefix then
+          if prefix = '' then namespace := XMLNamespaceUrl_XQuery
+          else namespace := staticContext.findNamespaceURL(prefix, xqdnkUnknown);
+        if namespace = XMLNamespaceUrl_XQuery then begin
+          if not ((name = 'private') or (name = 'public')) then raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+namespace);
           if (length(result) > 1) {and ((name = 'private') or (name = 'public')) }  then
             for i := 0 to high(result) - 1 do
-              if ((result[i].name = 'private') or (result[i].name = 'public')) and equalNamespaces(result[i].namespace, XMLNamespace_XQuery) then
+              if ((result[i].name = 'private') or (result[i].name = 'public')) and (result[i].namespace = XMLNamespaceUrl_XQuery) then
                 while true do
                   case nextToken() of
                     'function': raiseParsingError('XQST0106', '%private/%public has to be unique');
                     'variable': raiseParsingError('XQST0116', '%private/%public has to be unique');
                     '': raiseParsingError('XPST0003', 'expected variable/function');
                   end;
-        end else case namespace.getURL of
+        end else case namespace of
           XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance,
-          XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath: raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+namespace.getURL);
+          XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath: raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+namespace);
         end;
 
         if nextToken(true) = '(' then begin
@@ -1051,18 +1059,22 @@ var
   tempType: TXQTermSequenceType;
   tempVar: TXQTermDefineVariable;
   i: Integer;
+  namespaceUrl: string;
+  namespacePrefix: string;
 begin
   if anonymous and (length(annotations) > 0) then
     for i := 0 to high(annotations) do
       with annotations[i] do
-        if equalNamespaces(namespace, XMLNamespace_XQuery) and ((name = 'private') or (name = 'public')) then
+        if (namespace = XMLNamespaceUrl_XQuery) and ((name = 'private') or (name = 'public')) then
           raiseParsingError('XQST0125', 'anonymous functions cannot be public or private');
   result := TXQTermDefineFunction.create();
   result.annotations := annotations;
   try
     if not anonymous then begin
-      result.funcname := nextTokenQName();
-      staticContext.splitRawQName(result.namespace, result.funcname, xqdnkFunction);
+      if nextTokenEQName(namespaceUrl, namespacePrefix, result.funcname) = xqnmPrefix then
+        result.namespace := staticContext.findNamespace(namespacePrefix, xqdnkFunction)
+       else
+        result.namespace := TNamespace.create(namespaceUrl, namespacePrefix);
       expect('(');
     end else require3('Anonymous functions need XPath/XQuery 3');
     skipWhitespaceAndComment();
@@ -1413,7 +1425,8 @@ begin
 
     '<': begin
       requireXQuery('to use constructors (this error can also mean an invalid < )');
-      exit(parseDirectConstructor(nextToken()));
+      inc(pos);
+      exit(parseDirectConstructor());
     end;
 
     '{': begin
@@ -1529,30 +1542,31 @@ begin
           namespacePrefix := 'Q';
     end;
 
-    case word of
-      'element', 'attribute', 'document', 'text', 'processing-instruction', 'comment': begin
-        constr := nextToken(true) = '{';
-        if not constr then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)
-          temp := pos;
-          nextTokenMaybeQName();
-          if nextToken() = '{' then constr := true;
-          pos := temp;
+    if (namespaceMode = xqnmPrefix) and (namespacePrefix = '') then
+      case word of
+        'element', 'attribute', 'document', 'text', 'processing-instruction', 'comment': begin
+          constr := nextToken(true) = '{';
+          if not constr then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)
+            temp := pos;
+            nextTokenEQName(namespaceURL, namespacePrefix, wordlookahead, true);
+            if nextToken() = '{' then constr := true;
+            pos := temp;
+          end;
+          if constr then begin
+            requireXQuery('to use constructors');
+            exit(parseComputedConstructor(word));
+          end;
         end;
-        if constr then begin
-          requireXQuery('to use constructors');
-          exit(parseComputedConstructor(word));
+        'validate': case nextToken(true) of
+          'lax', 'strict', '{': begin
+            requireXQuery('for schema validation');
+            if pos^ <> '{' then
+              nextToken();
+            expect('{');
+            raiseParsingError('XPST0075', 'Schema validation is not supported');
+          end;
         end;
       end;
-      'validate': case nextToken(true) of
-        'lax', 'strict', '{': begin
-          requireXQuery('for schema validation');
-          if pos^ <> '{' then
-            nextToken();
-          expect('{');
-          raiseParsingError('XPST0075', 'Schema validation is not supported');
-        end;
-      end;
-    end;
 
     if (word = '') or (word[1] in [',', ';', ':', ')', ']', '}']) then //todo: check if valid xml node name
       raiseParsingError('XPST0003', 'Unexpected character: ' + word);
@@ -1883,7 +1897,6 @@ var
   nameSpaceName: String;
   nameSpaceURL: String;
   temp: String;
-  namespace: INamespace;
   annotations: TXQAnnotations;
 begin
   result := nil;
@@ -1998,45 +2011,44 @@ begin
           end;
         end;
         'option': begin
-          token := nextTokenQName();
+          if nextTokenEQName(nameSpaceURL, nameSpaceName, token) = xqnmPrefix then
+            if nameSpaceName = '' then nameSpaceURL := XMLNamespaceUrl_XQuery
+            else nameSpaceURL := staticContext.findNamespaceURL(nameSpaceName, xqdnkUnknown);
           temp := parseString;
-          namespace := staticContext.findNamespace(strSplitGet(':', token), xqdnkUnknown);
-          if namespace <> nil then begin
-            if (namespace.getURL = XMLNamespaceURL_MyExtensions) then begin
-              case token of
-                'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
-                'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
-                'json': readBoolean(options.AllowJSON, temp);
-                'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
-                  case temp of
-                    'on':  options.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
-                    'off': options.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
-                    'unambiguous': options.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
-                    'toggle': raiseParsingError('pxp:XPST0003', 'The "toggle" value has been removed for the property-dot-notation option.');
-                    else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/unambiguous');
-                  end;
-                'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
-                'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
-                'pure-json-objects': readBoolean(staticContext.objectsRestrictedToJSONTypes, temp);
-                'extended-json': readBoolean(staticContext.jsonPXPExtensions, temp);
-                'string-entities':
-                  case temp of
-                    'off': options.StringEntities:=xqseIgnoreLikeXPath;
-                    'on': options.StringEntities:=xqseResolveLikeXQuery;
-                    'default': options.StringEntities:=xqseDefault;
-                    else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/default');
-                  end;
-              end;
-            end else if namespace.getURL = 'http://jsoniq.org/functions' then
-              case token of
-                'jsoniq-boolean-and-null-literals':
-                  case temp of
-                    'yes': options.AllowJSONLiterals:=true;
-                    'no': options.AllowJSONLiterals:=false;
-                    else raiseParsingError('XQST0013', 'Unknown option value: '+temp+' for '+token+' (allowed is yes/no)');
-                  end;
-              end;
-          end;
+          if nameSpaceURL = XMLNamespaceURL_MyExtensions then begin
+            case token of
+              'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
+              'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
+              'json': readBoolean(options.AllowJSON, temp);
+              'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
+                case temp of
+                  'on':  options.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+                  'off': options.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+                  'unambiguous': options.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
+                  'toggle': raiseParsingError('pxp:XPST0003', 'The "toggle" value has been removed for the property-dot-notation option.');
+                  else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/unambiguous');
+                end;
+              'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
+              'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
+              'pure-json-objects': readBoolean(staticContext.objectsRestrictedToJSONTypes, temp);
+              'extended-json': readBoolean(staticContext.jsonPXPExtensions, temp);
+              'string-entities':
+                case temp of
+                  'off': options.StringEntities:=xqseIgnoreLikeXPath;
+                  'on': options.StringEntities:=xqseResolveLikeXQuery;
+                  'default': options.StringEntities:=xqseDefault;
+                  else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/default');
+                end;
+            end;
+          end else if nameSpaceURL = 'http://jsoniq.org/functions' then
+            case token of
+              'jsoniq-boolean-and-null-literals':
+                case temp of
+                  'yes': options.AllowJSONLiterals:=true;
+                  'no': options.AllowJSONLiterals:=false;
+                  else raiseParsingError('XQST0013', 'Unknown option value: '+temp+' for '+token+' (allowed is yes/no)');
+                end;
+            end;
         end;
         else raiseParsingError('XPST0003', 'Unknown declaration');
       end;

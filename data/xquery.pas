@@ -769,7 +769,7 @@ type
   end;
 
   TXQAnnotation = record
-    namespace: INamespace;
+    namespace: string;
     name: string;
     params: array of TXQTerm;
   end;
@@ -3022,7 +3022,7 @@ begin
       tempDefVar := TXQTermDefineVariable(children[i]);
       priv := false;
       for j := 0 to high(tempDefVar.annotations) do
-        if (tempDefVar.annotations[j].name = 'private') and (equalNamespaces(tempDefVar.annotations[j].namespace, XMLNamespace_XQuery)) then
+        if (tempDefVar.annotations[j].name = 'private') and (tempDefVar.annotations[j].namespace = XMLNamespaceUrl_XQuery) then
           priv := true;
       if priv then continue;
 
@@ -3056,7 +3056,7 @@ var
 begin
   if context.staticContext <> ownStaticContext then begin
     for i := 0 to high(declaration.annotations) do
-      if (declaration.annotations[i].name = 'private') and equalNamespaces(declaration.annotations[i].namespace, XMLNamespace_XQuery) then
+      if (declaration.annotations[i].name = 'private') and (declaration.annotations[i].namespace = XMLNamespaceUrl_XQuery) then
         raiseEvaluationError('XPST0008', 'Variable is private');
 
     tempcontext := context;

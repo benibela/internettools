@@ -1441,7 +1441,7 @@ begin
       if interpretedFunction <> nil then begin
         if functionStaticContext <> context.staticContext {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
           for i := 0 to high(interpretedFunction.annotations) do
-            if (interpretedFunction.annotations[i].name = 'private') and (equalNamespaces(interpretedFunction.annotations[i].namespace, XMLNamespace_XQuery)) then
+            if (interpretedFunction.annotations[i].name = 'private') and (interpretedFunction.annotations[i].namespace = XMLNamespaceUrl_XQuery ) then
               raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
         findKindIndex(namespaceUrl, funcname, context.staticContext.model, kind, func);
