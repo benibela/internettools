@@ -1806,6 +1806,7 @@ function TXQValueFunction.debugAsStringWithTypeAnnotation(textOnly: boolean): st
 var
   i: Integer;
 begin
+  ignore(textOnly);
   result := 'function (';
   for i := 0 to high(parameters) do begin
     if i <> 0 then result += ', ';

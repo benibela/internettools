@@ -48,16 +48,15 @@ type
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
   function nextTokenNCName(): string; inline; //returns a NCName (todo: raise an error if not an NCName)
-  { $foo       -> ('', '', 'foo',    xqnmPrefix)
-    $*:foo     -> ('', '*', 'foo',   xqnmNone)
-    $prf:foo   -> ('', 'prf', 'foo', xqnmPrefix)
-    $Q{}foo    -> ('', 'Q', 'foo',   xqnmURL)
-    $Q{ns}foo  -> ('ns', 'Q', 'foo', xqnmURL)
-  }
-  function nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean=false): TXQNamespaceMode; //returns a splitted EQName
+  // $foo       -> ('', '', 'foo',    xqnmPrefix)
+  // $*:foo     -> ('', '*', 'foo',   xqnmNone)
+  // $prf:foo   -> ('', 'prf', 'foo', xqnmPrefix)
+  // $Q{}foo    -> ('', 'Q', 'foo',   xqnmURL)
+  // $Q{ns}foo  -> ('ns', 'Q', 'foo', xqnmURL)
+  function nextTokenEQName(out url, prefix, localpart: string; allowWildcards: boolean=false): TXQNamespaceMode; //returns a splitted EQName
   //like the previous function, but resolves the prefix.
   //Returns true iff there is a prefix or Q{..} url (i.e. in every case except $foo)
-  function nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): boolean;
+  function nextTokenEQName(out url, localpart: string; resolveKind: TXQDefaultNamespaceKind): boolean;
 
 
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
@@ -246,7 +245,7 @@ begin
   result := nextToken(false);
 end;
 
-function TXQParsingContext.nextTokenEQName(var url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
+function TXQParsingContext.nextTokenEQName(out url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
 const NONCNAME = (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']);
 var
   marker: PChar;
@@ -280,7 +279,7 @@ begin
   if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
 end;
 
-function TXQParsingContext.nextTokenEQName(var url, localpart: string; resolveKind: TXQDefaultNamespaceKind): boolean;
+function TXQParsingContext.nextTokenEQName(out url, localpart: string; resolveKind: TXQDefaultNamespaceKind): boolean;
 var
   prefix: string;
 begin
@@ -1056,7 +1055,6 @@ end;
 
 function TXQParsingContext.parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean): TXQTermDefineFunction;
 var
-  tempType: TXQTermSequenceType;
   tempVar: TXQTermDefineVariable;
   i: Integer;
   namespaceUrl: string;
@@ -1882,7 +1880,6 @@ function TXQParsingContext.parseModule(): TXQTerm;
 
   procedure declareVariable(annotations: TXQAnnotations);
   var vari: TXQTermDefineVariable;
-    tempTyp: TXQTermSequenceType;
   begin
     requireModule;
     vari := parseDefineVariable;

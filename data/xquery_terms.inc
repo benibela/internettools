@@ -1689,14 +1689,12 @@ function TXQTermNodeMatcher.evaluateAttribute(const context: TXQEvaluationContex
 var
   tempEl: TTreeNode;
   testValue: Boolean;
-  testNS: Boolean;
   readvalue: String;
   readnamespace: String;
   temp: INamespace;
   i: Integer;
   attrib: TTreeAttribute;
   nsCheck: TXQNamespaceMode;
-  tempStep: TXQPathMatchingStep;
 begin
   tempEl := nil;
   if context.SeqValue <> nil then begin
