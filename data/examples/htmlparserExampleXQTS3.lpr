@@ -619,6 +619,19 @@ begin
 
   put('spec', 'XQ30 XP30', config.version in [xqpmXPath3, xqpmXQuery3]);
 
+  put('spec', 'XQ10 XP20 XQ30 XP30', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
+  put('spec', 'XP20 XP30 XQ10 XQ30', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
+
+
+  put('spec', 'XP31', false);
+  put('spec', 'XP31+', false);
+  put('spec', 'XQ31', false);
+  put('spec', 'XQ31+', false);
+  put('spec', 'XQ31+ XP31+', false);
+  put('spec', 'XP31+ XQ31+', false);
+
+  put('spec', 'XP31+ XQ31+ XT30+', false);
+
   put('spec', 'XT30+', false);
 
   put('feature', 'collection-stability', true);
@@ -654,6 +667,8 @@ begin
   //need to put something or it won't load the catalogue
   put('language', 'en', true);
   put('language', 'de', true);
+  put('language', 'fr', false);
+  put('language', 'it', false);
   put('language', 'xib', false);
   put('default-language', 'en', true);
   put('limits', 'year_lt_0', true);
@@ -835,7 +850,12 @@ begin
 
     collations := TStringList.Create;
     for v in xq.parseXPath2('collation').evaluate(e) do begin
-      collations.AddObject(v.toNode['uri'], xqtsCollations.Objects[xqtsCollations.IndexOf(v.toNode['uri'])]);
+      i := xqtsCollations.IndexOf(v.toNode['uri']);
+      if (i < 0) and strBeginsWith(v.toNode['uri'], 'http://www.w3.org/2013/collation/UCA') then //todo: use a real collation
+        xqtsCollations.AddObject(v.toNode['uri'], TXQCollation.create(v.toNode['uri'], @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
+      i := xqtsCollations.IndexOf(v.toNode['uri']);
+      if i < 0 then raise Exception.Create('Failed to find collation: ' + v.toNode['uri']);
+      collations.AddObject(v.toNode['uri'], xqtsCollations.Objects[i]);
       if v.toNode['default'] = 'true' then defaultCollation:=v.toNode['uri'];
     end;
     if (collations.Count > 0) and (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
@@ -992,6 +1012,8 @@ begin
   xqtsCollations.OwnsObjects:=true;
   xqtsCollations.AddObject('http://www.w3.org/2005/xpath-functions/collation/codepoint', TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/codepoint', @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
   xqtsCollations.AddObject('http://www.w3.org/2010/09/qt-fots-catalog/collation/caseblind', TXQCollation.create('http://www.w3.org/2010/09/qt-fots-catalog/collation/caseblind', @AnsiCompareText, @AnsiStrLIComp));
+  xqtsCollations.AddObject('http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive', TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive', @CompareText, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
+
   TXQueryEngine.registerCollation(TXQCollation(xqtsCollations.Objects[0]));
 
 
