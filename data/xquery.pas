@@ -4058,21 +4058,23 @@ function commonTyp(const a, b: TXQValueKind): TXQValueKind;
 begin
   //Conversion rules:
   //  undefined, sequence unconvertible
-  //         int    -->      decimal     -->        string
-  //         /|\              /|\                   /||\
-  //          |                |                     ||
+  //         int    -->      decimal               string
+  //                                                /||\
+  //                                                 ||
   //       boolean          datetime                node
 
   if (a in [pvkUndefined, pvkSequence, pvkNull]) or (b in [pvkUndefined,pvkSequence,pvkNull]) then exit(pvkUndefined);
   //leafes
-  if (a = pvkDateTime) and (b = pvkDateTime) then exit(pvkDateTime);
-  if (a = pvkBoolean) and (b = pvkBoolean) then exit(pvkBoolean);
+  if (a = pvkDateTime) or (b = pvkDateTime) then if a = b then exit(pvkDateTime) else exit(pvkUndefined);
+  if (a = pvkBoolean) or (b = pvkBoolean) then if a = b then exit(pvkBoolean) else exit(pvkUndefined);
+  if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then
+    if (a in [pvkString,pvkNode]) = (b in [pvkString,pvkNode]) then exit(pvkString) else exit(pvkUndefined);
 
-  if (a in [pvkBoolean,pvkInt64]) and (b in [pvkBoolean,pvkInt64]) then exit(pvkInt64);
-  if (a in [pvkBoolean,pvkInt64,pvkBigDecimal]) and (b in [pvkBoolean,pvkInt64,pvkBigDecimal]) then exit(pvkBigDecimal);
-  if (a in [pvkDateTime,pvkFloat]) and (b in [pvkDateTime,pvkFloat]) then exit(pvkFloat);
 
-  if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then exit(pvkString);
+  if (a = pvkInt64) and (b = pvkInt64) then exit(pvkInt64);
+  if (a in [pvkInt64,pvkBigDecimal]) and (b in [pvkInt64,pvkBigDecimal]) then exit(pvkBigDecimal);
+  if (a = pvkFloat) and (b = pvkFloat) then exit(pvkFloat);
+
   if (a = pvkFloat) or (b = pvkFloat) then exit(pvkFloat);
   if (a = pvkBigDecimal) or (b = pvkBigDecimal) then exit(pvkBigDecimal);
   if (a = pvkInt64) or (b = pvkInt64) then exit(pvkInt64);

@@ -2904,9 +2904,12 @@ begin
   ak := args[0].kind;
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
+    if ak = pvkSequence then begin
+      result := args[0].getChild(1);
+      ak := result.kind;
+    end;
     if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0].instanceOf(baseSchema.duration)) and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
-      raise EXQEvaluationException.Create('XPTY0004', 'Wrong type for sum');
-    if ak = pvkSequence then result := args[0].getChild(1);
+      raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
     if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
     exit();
   end;
@@ -2915,7 +2918,6 @@ begin
   seq := (temp as TXQValueSequence).seq;
   baseKind := seq.getPromotedType;
   case baseKind of
-    pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Wrong type for sum');
     pvkDateTime: begin
       result := TXQValueDateTime.create(seq.getPromotedDateTimeType(true));
       for i:=0 to seq.Count-1 do
@@ -2952,10 +2954,15 @@ begin
     end;
     pvkFloat: begin
       tempf := 0;
-      for i:=0 to seq.count-1 do
-        tempf += seq[i].toFloat;
-      result := seq.getPromotedDecimalType.createValue(tempf);
+      try
+        for i:=0 to seq.count-1 do
+          tempf += seq[i].toFloat;
+        result := seq.getPromotedDecimalType.createValue(tempf);
+      except
+        on e: EInvalidOp do raise EXQEvaluationException.Create('FOAR0002', e.Message);
+      end;
     end;
+    else raise EXQEvaluationException.Create('FORG0006', 'Incompatible types for fn:sum');
   end;
 end;
 
@@ -2966,6 +2973,7 @@ var tempf: xqfloat;
  i: Integer;
  seq: TXQVList;
  temp: IXQValue;
+ kind: TXQValueKind;
 begin
   requiredArgCount(args,1);
   i := args[0].getSequenceCount;
@@ -2973,14 +2981,19 @@ begin
   if i = 1 then begin
     result := args[0];
     xqvalueSeqSqueeze(result);
-    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
+    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result)
+    else begin
+      kind := result.kind;
+      if not (kind in [pvkInt64, pvkBigDecimal, pvkFloat])
+         or ((kind = pvkDateTime) and not (result.instanceOf(baseSchema.yearMonthDuration)) and not (result.instanceOf(baseSchema.dayTimeDuration))) then
+         raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:avg');
+    end;
     exit;
   end;
 
   temp := castUntypedToDouble(args[0]);
   seq := (temp as TXQValueSequence).seq;
   case seq.getPromotedType of
-    pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Invalid types for average');
     pvkDateTime: begin
       result := xqFunctionSum(args);
       (result as TXQValueDateTime).divideComponents(i);
@@ -3001,10 +3014,16 @@ begin
       end;
       result := seq.getPromotedDecimalType.createValue(tempf / seq.Count);
     end;
+    else raise EXQEvaluationException.Create('FORG0006', 'Incompatible types for fn:avg');
   end;
 end;
 
 function xqFunctionminmax(const context: TXQEvaluationContext; const args: TXQVArray; const asmin: boolean): IXQValue;
+procedure raiseError;
+begin
+  raise EXQEvaluationException.Create('FORG0006', 'Incompatible types for fn:min/max');
+end;
+
 var tempf: xqfloat;
  tempi: int64;
  temps: string;
@@ -3016,6 +3035,8 @@ var tempf: xqfloat;
  temp: IXQValue;
  tempf2: xqfloat;
  tempd: BigDecimal;
+ kind: TXQValueKind;
+ baseType: TXSSimpleType;
 begin
   requiredArgCount(args,1, 3);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
@@ -3024,7 +3045,11 @@ begin
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
     if result is TXQValueSequence then result := args[0].getChild(1);
-    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
+    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result);
+    kind := result.kind;
+    if (not (kind in [pvkUndefined, pvkDateTime, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString]))
+       or ((kind = pvkDateTime) and (not result.instanceOf(baseSchema.yearMonthDuration)) and (not result.instanceOf(baseSchema.dayTimeDuration))) then
+      raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:min/max');
     exit();
   end;
 
@@ -3034,9 +3059,14 @@ begin
   case seq.getPromotedType of
     pvkDateTime: begin
       result := seq[0];
-      for i:=1 to seq.count-1 do
+      if result.instanceOf(baseSchema.yearMonthDuration) then baseType := baseSchema.yearMonthDuration
+      else if result.instanceOf(baseSchema.dayTimeDuration) then baseType := baseSchema.dayTimeDuration
+      else baseType := nil;
+      for i:=1 to seq.count-1 do begin
         if (xqvalueCompareAtomicBase(context, result, seq[i]) < 0) <> asmin then
-          result := seq[i]
+          result := seq[i];
+        if (baseType <> nil) and (not seq[i].instanceOf(baseType)) then raiseError;
+      end;
     end;
     pvkBoolean: begin
       assert(seq[0].kind = pvkBoolean);
@@ -3090,13 +3120,22 @@ begin
     end;
     pvkString: begin
       temps := seq[0].toString;
+      result := seq[0];
       for i:=1 to seq.count-1 do begin
         temps2 := seq[i].toString;
-        if (collation.compare(temps2, temps) < 0) = asmin then
+        if (collation.compare(temps2, temps) < 0) = asmin then begin
           temps := temps2;
+          result := seq[i];
+        end;
       end;
-      result := xqvalue(temps);
+      if result.instanceOf(baseSchema.anyURI) then
+        for i := 0 to seq.Count-1 do
+          if (seq[i]<>result) and (seq[i].instanceOf(baseSchema.string_)) then begin
+            result := xqvalue(temps);
+            exit;
+          end;
     end;
+    else raiseError;
   end;
 end;
 
