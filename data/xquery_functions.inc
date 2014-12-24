@@ -288,7 +288,7 @@ begin
     result := a.clone;
     if isPosInf(f) or isNegInf(f) then (result as TXQValueDateTime).multiplyComponents(0)
     else if f = 0 then raiseDivisionBy0NotAllowed
-    else (result as TXQValueDateTime).multiplyComponents(1 / f);
+    else (result as TXQValueDateTime).divideComponents(f);
     exit;
   end;
 
@@ -2983,7 +2983,7 @@ begin
     pvkBoolean, pvkString: raise EXQEvaluationException.Create('XPTY0004', 'Invalid types for average');
     pvkDateTime: begin
       result := xqFunctionSum(args);
-      (result as TXQValueDateTime).multiplyComponents(1.0 / i);
+      (result as TXQValueDateTime).divideComponents(i);
     end;
     pvkInt64, pvkBigDecimal: begin
       tempd:=0;

@@ -541,6 +541,7 @@ type
     class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): boolean; static;
 
     procedure multiplyComponents(fac: xqfloat); //Multiply all components of value with fac
+    procedure divideComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure addDuration(const D: TXQValueDateTimeData); //Adds a duration to the current datetime/duration
     class procedure addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
 

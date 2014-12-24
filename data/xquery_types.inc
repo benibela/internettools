@@ -730,12 +730,12 @@ begin
   Result := false;
 end;
 
-function TXQValueDateTime.toInt64: int64;
+function TXQValueDateTime.toInt64: Int64;
 begin
  Result:=trunc(toDateTime);
 end;
 
-function TXQValueDateTime.toDecimal: bigdecimal;
+function TXQValueDateTime.toDecimal: BigDecimal;
 begin
  Result:=toDateTime;
 end;
@@ -887,6 +887,13 @@ procedure TXQValueDateTime.multiplyComponents(fac: xqfloat);
 begin
   setMonths(value, integer(xqround(getMonths(value) * fac)), true);
   setDayTime(value, getDayTime(value) * fac);
+  truncateRange();
+end;
+
+procedure TXQValueDateTime.divideComponents(fac: xqfloat);
+begin
+  setMonths(value, integer(xqround(getMonths(value) / fac)), true);
+  setDayTime(value, getDayTime(value) / fac);
   truncateRange();
 end;
 
