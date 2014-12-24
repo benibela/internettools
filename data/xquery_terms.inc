@@ -1291,15 +1291,20 @@ begin
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
+//{$define checkreturntypes}  there is no point in testing the return type for native functions. but it might spot internal inconsistencies
 var
   evilkids: TXQVArray;
+  {$ifdef checkreturntypes}version: Integer;{$endif}
 begin
   evaluateChildren(context, evilkids);
 
   assert((kind = xqfkUnknown) or (func <> nil));
 
   if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
-    func.checkOrConvertTypes(evilkids, context);
+    {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(evilkids, context)
+   {$ifdef checkreturntypes}
+   else
+    version := -1{$endif};
 
 
 
@@ -1325,6 +1330,13 @@ begin
       result := interpretedFunction.evaluate(evilkids);
     end;
   end;
+
+  {$ifdef checkreturntypes}
+  if version <> -1 then begin
+    if not func.versions[version].returnType.instanceOf(result, context) then
+      raiseEvaluationError('XPTY0004', 'Invalid return value, '+result.debugAsStringWithTypeAnnotation()+' does not have type '+func.versions[version].returnType.serialize);
+  end;
+  {$endif}
 end;
 
 function TXQTermNamedFunction.getContextDependencies: TXQContextDependencies;

@@ -342,8 +342,8 @@ initialization
   jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?'], [xqcdContextOther]);
   jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
   jn.registerFunction('object', 0, -1, @xqFunctionObject, []); //deprecated
-  jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as item()', '($arg as xs:string?, $options as object()) as item()*']);
-  jn.registerFunction('size', @xqFunctionSize, ['($arg as array()?) as xs:integer']);
+  jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as json-item()*', '($arg as xs:string?, $options as object()) as json-item()*']);
+  jn.registerFunction('size', @xqFunctionSize, ['($arg as array()?) as xs:integer?']);
 
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
   pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*'], [xqcdContextOther]);
@@ -377,7 +377,7 @@ initialization
       'case array() return ' +
       '    libjn:descendant-objects(jn:members($i)) ' +
       'default return () ');
-  libjn.registerInterpretedFunction('descendant-pairs', '($seq as item()*)',
+  libjn.registerInterpretedFunction('descendant-pairs', '($seq as item()*) as item()*',
       'for $i in $seq ' +
       'return typeswitch ($i) ' +
       'case object() return ' +
@@ -398,7 +398,7 @@ initialization
     '  case array() return libjn:flatten(jn:members($i)) ' +
     '  default return $i '
   );
-  libjn.registerInterpretedFunction('intersect', '($seq as item()*)',
+  libjn.registerInterpretedFunction('intersect', '($seq as item()*) as object()',
     '{| ' +
     '  let $objects := $seq[. instance of object()] ' +
     '  for $key in jn:keys(($objects)[1]) ' +

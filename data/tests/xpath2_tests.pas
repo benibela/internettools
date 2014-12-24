@@ -20,6 +20,7 @@ begin
   if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
 end;
 
+const strictTypeChecking = true;
 
 procedure unittests(TestErrors:boolean);
 var
@@ -2627,6 +2628,8 @@ begin
 
 
   //Tests based on failed XQTS tests
+  ps.StaticContext.strictTypeChecking:=strictTypeChecking;
+
   t('count(a/attribute::*)', '0', '<a></a>');
   t('count(a/attribute::node())', '0', '<a></a>'); //my
   t('count(a/attribute::node())', '2', '<a a="abc" x="foo"></a>'); //my
@@ -2638,18 +2641,18 @@ begin
   t('count(a/attribute(*))', '2', '<a a="abc" x="foo"></a>'); //my
   t('count(a/attribute::attribute(*))', '0', '<a></a>'); //my
   t('count(a/attribute::attribute(*))', '2', '<a a="abc" x="foo"></a>'); //my
-  t('string-join(for $i in //descendant-or-self::*  return node-name($i), ";")', 'html', '!<html></html>');
-  t('string-join(for $i in .//descendant-or-self::*  return node-name($i), ";")', 'html', '!<html></html>');
-  t('string-join(for $i in .//descendant-or-self::*  return node-name($i), ";")', 'html', '!<html></html>');
-  t('string-join(for $i in /node() return node-name($i), ";")', 'abc;html', '!<?abc?><html/>');
-  t('string-join(for $i in /node() return node-name($i), ";")', 'abc;html', '!<?abc ?><html/>');
-  t('string-join(for $i in /node() return node-name($i), ";")', 'abc;html', '!<?abc foo="bar"?><html/>');
-  t('string-join(for $i in /* return node-name($i), ";")', 'html', '!<?abc?><html/>');
-  t('string-join(for $i in /node() return node-name($i), ";")', 'abc;def;html', '!<?abc?><?def ?><html/>');
-  t('string-join(for $i in /processing-instruction() return node-name($i), ";")', 'abc;def', '!<?abc?><?def ?><html/>');
-  t('string-join(for $i in /processing-instruction(def) return node-name($i), ";")', 'def', '!<?abc?><?def ?><html/>');
-  t('string-join(for $i in /processing-instruction("abc") return node-name($i), ";")', 'abc', '!<?abc?><?def ?><html/>');
-  t('string-join(for $i in /processing-instruction("  abc  ") return node-name($i), ";")', 'abc', '!<?abc?><?def ?><html/>');
+  t('join(for $i in //descendant-or-self::*  return node-name($i), ";")', 'html', '!<html></html>');
+  t('join(for $i in .//descendant-or-self::*  return node-name($i), ";")', 'html', '!<html></html>');
+  t('join(for $i in .//descendant-or-self::*  return node-name($i), ";")', 'html', '!<html></html>');
+  t('join(for $i in /node() return node-name($i), ";")', 'abc;html', '!<?abc?><html/>');
+  t('join(for $i in /node() return node-name($i), ";")', 'abc;html', '!<?abc ?><html/>');
+  t('join(for $i in /node() return node-name($i), ";")', 'abc;html', '!<?abc foo="bar"?><html/>');
+  t('join(for $i in /* return node-name($i), ";")', 'html', '!<?abc?><html/>');
+  t('join(for $i in /node() return node-name($i), ";")', 'abc;def;html', '!<?abc?><?def ?><html/>');
+  t('join(for $i in /processing-instruction() return node-name($i), ";")', 'abc;def', '!<?abc?><?def ?><html/>');
+  t('join(for $i in /processing-instruction(def) return node-name($i), ";")', 'def', '!<?abc?><?def ?><html/>');
+  t('join(for $i in /processing-instruction("abc") return node-name($i), ";")', 'abc', '!<?abc?><?def ?><html/>');
+  t('join(for $i in /processing-instruction("  abc  ") return node-name($i), ";")', 'abc', '!<?abc?><?def ?><html/>');
   t('string-join(//self::*,";")', 'abcxfoobar;x', '!<html>abc<test>x</test>foobar</html>');
   t('string-join(time/x/a[3]/preceding::*,";")', 'q;1;2', '<time><p>q</p>t<x>u<a>1</a><a>2</a><a>3</a></x></time>');
   t('string-join(time/x/a[3]/preceding::a,";")', '1;2', '<time><p>q</p>t<x>u<a>1</a><a>2</a><a>3</a></x></time>');
@@ -2709,7 +2712,9 @@ begin
   t('xs:base64Binary("0FB7")', '0FB7', '');
   t('xs:hexBinary("07fb")', '07FB', '');
   t('xs:hexBinary(base64Binary("YWJj"))', '616263', '');
-  t('xs:hexBinary("616263") eq xs:base64Binary("YWJj")', 'true', ''); //don't know if true or false
+  ps.StaticContext.strictTypeChecking:=false;
+  t('xs:hexBinary("616263") eq xs:base64Binary("YWJj")', 'true', ''); //don't know if true or false. update: actually it is a type error
+  ps.StaticContext.strictTypeChecking:=strictTypeChecking;
   t('xs:hexBinary("616263") castable as xs:boolean', 'false', '');
   t('xs:hexBinary("616263") castable as xs:decimal', 'false', '');
   t('true() castable as xs:decimal', 'true', '');
@@ -2775,7 +2780,9 @@ begin
   f('-10000000000000000000000000000000000000000000E10000000000000000000000000000000000000000000', 'err:FORG0001');
   t('""""', '"', '');
   t('''''''''', '''', '');
+  ps.StaticContext.strictTypeChecking:=false;
   t('duration("P1YT4H") - duration("P12MT240M")', 'PT0S', '');
+  ps.StaticContext.strictTypeChecking:=strictTypeChecking;
   t('sum((dayTimeDuration("PT1S"), dayTimeDuration("PT2S")))', 'PT3S', '');
   t('sum((yearMonthDuration("P1M"), yearMonthDuration("P11M")))', 'P1Y', '');
   t('type-of(sum((dayTimeDuration("PT1S"), dayTimeDuration("PT2S"))))', 'dayTimeDuration', '');
@@ -2875,12 +2882,15 @@ begin
   t('xs:string(xs:dateTime("2002-02-15T21:01:23.110"))', '2002-02-15T21:01:23.11', '');
   t('xs:string(xs:time("21:01:23.001"))', '21:01:23.001', '');
   t('xs:date(xs:dateTime("2002-11-23T22:12:23.867-13:37")) eq xs:date("2002-11-23-13:37")', 'true', '');
+  ps.StaticContext.strictTypeChecking:=false;
   t('xs:time("12:12:12") eq xs:date("2012-12-13")', 'false', '');
   t('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("22:12:23.867-13:37")', 'true', '');
   t('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("22:12:23-13:37")', 'false', '');
   t('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("23:12:23.867-12:37")', 'true', '');
   //             ,('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("24:12:23.867-11:37")', 'true', '') should this work?
   t('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("11:49:23.867Z")', 'false', ''); //day overflow?
+  t('xs:untypedAtomic("NaN") eq xs:double("NaN")', 'false'); //todo should be error
+  ps.StaticContext.strictTypeChecking:=strictTypeChecking;
   t('(xs:gYear("2005-12:00") eq xs:gYear("2005+12:00"))', 'false', '');
   t('(xs:gDay("---12") eq xs:gDay("---12Z"))', 'false', '');
   t('xs:time("08:00:00+09:00") eq xs:time("17:00:00-06:00")', 'false', ''); //from xpath standard example
@@ -2892,7 +2902,6 @@ begin
   t('count(distinct-values((xs:float("NaN"),xs:double("NaN"))))', '1', '');
   t('xs:float("3") idiv xs:float("INF")', '0');
   t('xs:float("3") idiv xs:float("INF") eq xs:float(0)', 'true');
-  t('xs:untypedAtomic("NaN") eq xs:double("NaN")', 'false'); //todo should be error
 
   //             ,('count(distinct-values((xs:float("INF"),xs:double("INF"))))', '1', '')
 
@@ -3266,7 +3275,7 @@ begin
   t('string-join(/r/x/attribute::attribute(*), ",")', 'AB,xB,AC,BA,BB', '');
   t('string-join(/r/x/attribute::attribute(a:b), ",")', 'AB', '');
 
-  t('string-join(for $i in (1, 2), $j in (3, 4) return ($i, $j), ":")', '1:3:1:4:2:3:2:4');
+  t('join(for $i in (1, 2), $j in (3, 4) return ($i, $j), ":")', '1:3:1:4:2:3:2:4');
 
   //More failed XQTS tests
   //t('xs:untypedAtomic("-10000000") cast as xs:float', '-10000000', ''); this is an fpc bug! (22567)
@@ -3277,9 +3286,9 @@ begin
   t('xs:long("92233720368547758") idiv xs:long("-92233720368547758")', '-1', '');
   t('xs:long("-92233720368547758") idiv xs:long("92233720368547758")', '-1', '');
   t('xs:long("92233720368547758") idiv xs:long("92233720368547758")', '1', '');
-  t('string-join(92233720368547757 to 92233720368547759, ":")', '92233720368547757:92233720368547758:92233720368547759', '');
-  t('string-join(-92233720368547759 to -92233720368547757, ":")', '-92233720368547759:-92233720368547758:-92233720368547757', '');
-  t('string-join(-3 to 3, ":")', '-3:-2:-1:0:1:2:3', '');
+  t('join(92233720368547757 to 92233720368547759, ":")', '92233720368547757:92233720368547758:92233720368547759', '');
+  t('join(-92233720368547759 to -92233720368547757, ":")', '-92233720368547759:-92233720368547758:-92233720368547757', '');
+  t('join(-3 to 3, ":")', '-3:-2:-1:0:1:2:3', '');
   //rounding
   t('type-of(ceiling(1.5e20))', 'double');
   t('ceiling(1.5e20)', '1.5E20');
@@ -3380,7 +3389,7 @@ begin
   t('xs:double(1.2) = "1.2"', 'true'); //extension: weak typing.
   t('1.2 = "1.2"', 'true'); //extension: weak typing.
   t('string-join(index-of((0,1,2,3),"1"), ":")', '');
-  t('string-join(distinct-values((1, "1", 2, 2.0)),":")', '1:1:2');
+  t('join(distinct-values((1, "1", 2, 2.0)),":")', '1:1:2');
   t('deep-equal(1, current-dateTime())', 'false');
   t('deep-equal((1,2,3), ("1", "2", "3"))', 'false');
   t('xs:yearMonthDuration("P0Y") eq xs:dayTimeDuration("P0D")', 'true');
@@ -3393,7 +3402,7 @@ begin
   t('op:duration-equal(xs:dayTimeDuration("P10D"), xs:dayTimeDuration("PT240H"))', 'true');
   t('op:duration-equal(xs:duration("P2Y0M0DT0H0M0S"), xs:yearMonthDuration("P24M"))', 'true');
   t('op:duration-equal(xs:duration("P0Y0M10D"), xs:dayTimeDuration("PT240H"))', 'true');
-  t('string-join(fn:distinct-values((xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))),":")', 'P0M');
+  t('join(fn:distinct-values((xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))),":")', 'P0M');
   t('index-of(./r/a, "y")', '2', '<r foo="z"><a>X</a><a>Y</a><a>Z</a></r>');
   t('index-of(./r/a, ./r/@foo)', '3');
   t('string-join(distinct-values((./r/a, ./r/@foo)), ":")', 'X:Y:Z');
@@ -3455,9 +3464,9 @@ begin
   t('"false" and foobar', 'false');
   t('"" and true', 'false');
   t('"" or false', 'false');
-  t('string-join((1,2,3)["false"], ":")', '1:2:3');
-  t('string-join((1,2,3)[""], ":")', '');
-  t('string-join((1,2,3)["abc"], ":")', '1:2:3');
+  t('join((1,2,3)["false"], ":")', '1:2:3');
+  t('join((1,2,3)[""], ":")', '');
+  t('join((1,2,3)["abc"], ":")', '1:2:3');
   t('if ("false") then 1 else 2', '1');
   t('some $x in (1,2,3) satisfies "true"', 'true');
   t('some $x in (1,2,3) satisfies "false"', 'true');
@@ -3508,12 +3517,15 @@ begin
   t('type-of(xs:untypedAtomic("1.0") mod 8)', 'double');
   t('type-of(xs:untypedAtomic("1") mod 8)', 'double');
   t('xs:untypedAtomic("1") + 7', '8');
+  ps.StaticContext.strictTypeChecking := false;
   t('xs:string("1") + 7', '8');
+  t('xs:string("1") - 7', '-6');
+  ps.StaticContext.strictTypeChecking := strictTypeChecking;
+  f('xs:string("1") + 7', 'err:XPTY0004');
   t('type-of(xs:untypedAtomic("1e6") + 7)', 'double');
   t('type-of(xs:untypedAtomic("1.0") + 7)', 'double');
   t('type-of(xs:untypedAtomic("1") + 7)', 'double');
   t('xs:untypedAtomic("1") - 7', '-6');
-  t('xs:string("1") - 7', '-6');
   t('type-of(xs:untypedAtomic("1e6") - 7)', 'double');
   t('type-of(xs:untypedAtomic("1.0") - 7)', 'double');
   t('type-of(xs:untypedAtomic("1") - 7)', 'double');
@@ -3654,7 +3666,7 @@ begin
     t('string-join("a b c d" cast as xs:IDREFS, "|")', 'a|b|c|d');
     t('string-join("a b c d" cast as xs:NMTOKENS, "|")', 'a|b|c|d');
   end;
-  ps.StaticContext.strictTypeChecking:=true;
+  ps.StaticContext.strictTypeChecking:=strictTypeChecking;
 
   t('element', 'E1aT1E1bD1aA1D1bC1PI1E1c', '!<element>E1a<text>T1</text>E1b<document>D1a<attribute>A1</attribute>D1b<comment>C1</comment><processing-instruction>PI1</processing-instruction></document>E1c</element>');
   t('string-join(for $a in element return $a / text(), ":")', 'E1a:E1b:E1c');

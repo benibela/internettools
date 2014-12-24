@@ -988,7 +988,7 @@ end;
 function getBaseType(const x: IXQValue): TXSType;
 begin
   result := x.typeAnnotation;
-  if not (result is TXSNumericType) then exit;
+  if not (result is TXSNumericType) then exit(baseSchema.double);
   case TXSNumericType(result).subType of
     xsstInteger: result := baseSchema.integer;
     xsstDecimal, xsstFloat, xsstDouble: result := TXSNumericType(result).primitive;
@@ -2158,8 +2158,8 @@ begin
   if not (xqv.instanceOf(baseSchema.duration)) then xqv := baseSchema.duration.createValue(xqv);
   tempValue := (xqv as TXQValueDateTime).value;
   TXQValueDateTime.setDayTime(tempValue, (xqv as TXQValueDateTime).toDayTime());
-  if v <> 6 then result := xqvalue(tempValue.values[v])
-  else  result := xqvalue(roundto(tempValue.values[v]  + xqfloat(tempValue.secfraction), -6));
+  if (v <> 6) or (tempValue.secfraction = 0) then result := xqvalue(tempValue.values[v])
+  else  result := xqvalue(tempValue.sec + FloatToBigDecimal(RoundTo(tempValue.secfraction, -6)));
 end;
 
 function xqFunctionDay_From_Duration(const args: TXQVArray): IXQValue;
@@ -2478,9 +2478,9 @@ begin
   end;
   if args[0].isUndefined then exit(xqvalue);
   rel := args[0].toString;
-  if strIsAbsoluteURI(rel) then exit(xqvalue(rel));
+  if strIsAbsoluteURI(rel) then exit(TXQValueString.create(baseSchema.anyURI, rel));
   if not strIsAbsoluteURI(base) then raise EXQEvaluationException.Create('FORG0009', 'Need absolute url to resolve relative url');
-  result := xqvalue(strResolveURI(rel, base));
+  result := TXQValueString.create(baseSchema.anyURI, strResolveURI(rel, base));
 end;
 
 

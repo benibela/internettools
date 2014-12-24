@@ -1149,7 +1149,7 @@ type
     versions: array of TXQFunctionParameterTypes;
     class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): IXQValue; static;
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
-    procedure checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext);
+    function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext): integer;
     destructor Destroy; override;
   private
     procedure guessArgCount;
@@ -3682,26 +3682,27 @@ begin
 end;
 
 
-procedure TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext);
+function TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext): integer;
 var
   i, j, countMatch: Integer;
-  result: Boolean;
+  matches: Boolean;
   errCode: String;
 begin
-  if length(versions) = 0 then exit;
+  if length(versions) = 0 then exit(-1);
   countMatch := -1;
   for i:= 0 to high(versions) do begin
     if length(values) <> length(versions[i].types) then continue;
-    result := true;
+    matches := true;
     for j := 0 to high(values) do
       if (versions[i].types[j].kind <> tikFunctionTest) and not checkType(values[j], versions[i].types[j], context) then begin
-       result := false;
+       matches := false;
        break;
       end;
-    if result then begin
+    if matches then begin
      for j := 0 to high(values) do
        if versions[i].types[j].kind = tikFunctionTest then
          values[j] := convertType(values[j], versions[i].types[j], context);
+      result := i;
       exit;
     end;
     countMatch := i;
@@ -6182,7 +6183,10 @@ begin
         end;
       end;
       expect(')');
-      if nextToken() = 'as' then
+       //if nextToken() = 'as' then
+      expect('as');
+      skipWhitespaceAndComment();
+      if not ((pos^ = 'n') and strlEqual(pos, 'none', 4)) then
         info.versions[i].returnType := parseSequenceType();
     end;
 end;
@@ -6287,7 +6291,7 @@ pxp.registerFunction('random',0,0,@xqFunctionRandom, []);
 pxp.registerFunction('sleep',1,1,@xqFunctionSleep, []);
 pxp.registerFunction('eval',1,1,@xqFunctionEval, []);
 pxp.registerFunction('css',1,1,@xqFunctionCSS, []);
-pxp.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string)','($name as xs:string, $def as item()*)'], [xqcdContextVariables]);
+pxp.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string) as item()*','($name as xs:string, $def as item()*) as item()*'], [xqcdContextVariables]);
 pxp.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);
 pxp.registerFunction('type-of',1,1,@xqFunctionType_of, []);
 pxp.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
@@ -6306,7 +6310,7 @@ pxp.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
 fn.registerFunction('empty', @xqFunctionempty,['($arg as item()*) as xs:boolean']);
 fn.registerFunction('nilled', @xqFunctionNilled,['($arg as node()?) as xs:boolean?']);
-fn.registerFunction('error',@xqFunctionError,['()', '($error as xs:QName)', '($error as xs:QName?, $description as xs:string)', '($error as xs:QName?, $description as xs:string, $error-object as item()*)']);
+fn.registerFunction('error',@xqFunctionError,['() as none', '($error as xs:QName) as none', '($error as xs:QName?, $description as xs:string) as none', '($error as xs:QName?, $description as xs:string, $error-object as item()*) as none']);
 
 fn.registerFunction('abs',@xqFunctionAbs,['($arg as numeric?) as numeric?']);
 fn.registerFunction('ceiling',@xqFunctionCeiling,['($arg as numeric?) as numeric?']);

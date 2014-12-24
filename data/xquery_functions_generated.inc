@@ -57,7 +57,10 @@ begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
-  result := xqvalue(RoundTo(xqfloat((v as TXQValueDateTime).value.sec + (v as TXQValueDateTime).value.secfraction), -6));
+  with (v as TXQValueDateTime) do begin
+    if value.secfraction = 0 then exit(xqvalue(value.sec));
+    result := xqvalue(value.sec + FloatToBigDecimal(RoundTo(value.secfraction, -6)));// RoundTo(xqfloat(value.sec + (v as TXQValueDateTime).value.secfraction), -6));
+  end;
 end;
 
 function xqFunctionTimezone_From_Datetime(const args: TXQVArray): IXQValue;
