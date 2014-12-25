@@ -1301,15 +1301,13 @@ end;
 function staticallyCastQNameAndNotation(term: TXQTermWithChildren; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false): txqterm;
   function castFail: txqterm;
   begin
-    if castable then result := TXQTermConstant.create(xqvalue(false))
+    if castable then result := TXQTermConstant.create(xqvalueFalse)
     else result := createDynamicErrorTerm('FORG0001', 'Invalid cast to QName/NOTATION');
   end;
 
 var
   name: String;
   namespace: INamespace;
-  castAllowed: Boolean;
-  qname: IXQValue;
 begin
   result := term;
   if typ.storage = TXQValueQName then begin
@@ -1319,7 +1317,7 @@ begin
       else begin
         name := trim(TXQTermConstant(term.children[0]).value.toString);
         if not (baseSchema.QName.qnameRegex.Exec(name)) then result := castFail
-        else if castable then result := TXQTermConstant.create(xqvalue(true))
+        else if castable then result := TXQTermConstant.create(xqvalueTrue)
         else if (staticContext.model in [xqpmXPath3, xqpmXQuery3]) then exit
         else begin
           //see  TXQTermSequenceType.staticQNameCast

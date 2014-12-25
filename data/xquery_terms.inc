@@ -561,9 +561,6 @@ begin
 end;
 
 function TXQTermSequenceType.castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
-var
-  temp: String;
-  ns: INamespace;
 begin
   v := xqvalueAtomize(v);
   if (v.isUndefined and not allowNone) or (v.getSequenceCount > 1) then
@@ -663,14 +660,14 @@ var
   s: String;
 begin
   if v.typeAnnotation.storage = TXQValueQName then begin
-    if castableOnly then exit(xqvalue(true))
+    if castableOnly then exit(xqvalueTrue)
     else exit(target.createValue(v));
   end;
   if not (context.model in [xqpmXPath3, xqpmXQuery3]) then
-    if castableOnly then exit(xqvalue(false))
+    if castableOnly then exit(xqvalueFalse)
     else raise EXQEvaluationException.create('FORG0001', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
   if v.kind <> pvkString then
-    if castableOnly then exit(xqvalue(false))
+    if castableOnly then exit(xqvalueFalse)
     else raise EXQEvaluationException.create('FORG0001', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
   s := trim(v.toString);
   castAllowed := (target <> baseSchema.NOTATION) and (baseSchema.QName.qnameRegex.Exec(s));

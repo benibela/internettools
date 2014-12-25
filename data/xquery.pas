@@ -3392,7 +3392,6 @@ begin
   case v of
     true:  result := commonValuesTrue;
     false: result := commonValuesFalse;
-    else result := nil;
   end;
 
   //result := TXQValueBoolean.Create(v);
