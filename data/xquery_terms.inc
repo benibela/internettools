@@ -565,6 +565,7 @@ begin
   v := xqvalueAtomize(v);
   if (v.isUndefined and not allowNone) or (v.getSequenceCount > 1) then
     raiseEvaluationError('XPTY0004', 'impossible cast as');
+  if v.isUndefined then exit(xqvalue);
   if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
   else result := staticQNameCast(false, atomicTypeInfo as TXSQNameType, v, context.staticContext)
 end;

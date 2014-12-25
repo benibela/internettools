@@ -3615,7 +3615,7 @@ begin
 
     t('"foo       bar    def" castable as xs:normalizedString', 'true');
     t('"foo       bar    def" castable as xs:token', 'true');
-    t('QName("", "lname")  castable as xs:QName', 'true');
+    t('join((QName("", "lname")  castable as xs:QName, () castable as QName?, () cast as QName?))', 'true true');
     t('QName("", "lname")  cast as xs:QName', 'lname');
     t('"ABC" castable as xs:QName', 'true');
     t('"foo bar" castable as xs:QName', 'false');
