@@ -606,7 +606,7 @@ begin
   t('xs:decimal("6.5") castable as xs:boolean', 'true');
 
   t('xs:date("1900-01-01")', '1900-01-01', '');
-  f('xs:decimal(xs:date("1900-01-01"))', 'err:FORG0001'); // todo dynamic error [err:FORG0001]: "1900-01-01": value of type xs:string is not castable to type xs:dateTime |dateTime not castable as decimal
+  f('xs:decimal(xs:date("1900-01-01"))', 'err:XPTY0004'); // todo dynamic error [err:FORG0001]: "1900-01-01": value of type xs:string is not castable to type xs:dateTime |dateTime not castable as decimal
   f('xs:decimal("")', 'err:FORG0001');
   f('xs:decimal()', 'err:XPST0017');
   f('xs:string()', 'err:XPST0017');

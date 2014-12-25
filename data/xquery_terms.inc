@@ -555,8 +555,8 @@ function TXQTermSequenceType.castableAsBase(v: IXQValue; staticContext: TXQStati
 begin
   if v.isUndefined then result := allowNone
   else if v.getSequenceCount > 1 then result := false
-  else if v is TXQValueSequence then result := atomicTypeInfo.tryCreateValue((v as TXQValueSequence).seq[0])
-  else if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.tryCreateValue(v)
+  else if v is TXQValueSequence then result := atomicTypeInfo.tryCreateValue((v as TXQValueSequence).seq[0]) = xsceNoError
+  else if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.tryCreateValue(v) = xsceNoError
   else result := staticQNameCast(true, atomicTypeInfo as TXSQNameType, v, staticContext).toBoolean;
 end;
 
@@ -566,7 +566,8 @@ var
   ns: INamespace;
 begin
   v := xqvalueAtomize(v);
-  if not castableAsBase(v, context.staticContext) then raiseEvaluationError('XPTY0004', 'impossible cast as');
+  if (v.isUndefined and not allowNone) or (v.getSequenceCount > 1) then
+    raiseEvaluationError('XPTY0004', 'impossible cast as');
   if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
   else result := staticQNameCast(false, atomicTypeInfo as TXSQNameType, v, context.staticContext)
 end;

@@ -873,6 +873,7 @@ type
   { TXSType }
 
   TXSNumericType = class;
+  TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001);
   TXSType = class
     name: string;
     schema: TXSSchema;
@@ -908,13 +909,13 @@ type
     function createValue(const v: BigDecimal): IXQValue; inline;
     function createValue(const v: String): IXQValue; inline;
   protected
-    function tryCreateValue(const v: IXQValue; outv: PXQValue = nil): boolean;
-    function tryCreateValue(v: string; outv: PXQValue = nil): boolean;
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; virtual;
-    function tryCreateValueInternal(const v: String; outv: PXQValue = nil): boolean; virtual;
-    function tryCreateValue(const v: Int64; outv: PXQValue = nil): boolean; virtual;
-    function tryCreateValue(const v: xqfloat; outv: PXQValue = nil): boolean; virtual;
-    function tryCreateValue(const v: BigDecimal; outv: PXQValue = nil): boolean; virtual;
+    function tryCreateValue(const v: IXQValue; outv: PXQValue = nil): TXSCastingError;
+    function tryCreateValue(v: string; outv: PXQValue = nil): TXSCastingError;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; virtual;
+    function tryCreateValueInternal(const v: String; outv: PXQValue = nil): TXSCastingError; virtual;
+    function tryCreateValue(const v: Int64; outv: PXQValue = nil): TXSCastingError; virtual;
+    function tryCreateValue(const v: xqfloat; outv: PXQValue = nil): TXSCastingError; virtual;
+    function tryCreateValue(const v: BigDecimal; outv: PXQValue = nil): TXSCastingError; virtual;
   end;
 
   //TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
@@ -950,8 +951,8 @@ type
     members: array of TXSSimpleType; //atomic types
     constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSSimpleType);
     function containsTransitive(t: TXSType): boolean;
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): boolean; override;
-    function tryCreateValueInternal(const v: String; outv: PXQValue=nil): boolean; override;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): TXSCastingError; override;
+    function tryCreateValueInternal(const v: String; outv: PXQValue=nil): TXSCastingError; override;
   end;
 
   { TXSListType }
@@ -959,8 +960,8 @@ type
   TXSListType = class(TXSSimpleType)
     itemType: TXSSimpleType;
     constructor Create(aname: string; aparent: TXSType; aitemType: TXSSimpleType);
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): boolean; override;
-    function tryCreateValueInternal(const v: String; outv: PXQValue=nil): boolean; override;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): TXSCastingError; override;
+    function tryCreateValueInternal(const v: String; outv: PXQValue=nil): TXSCastingError; override;
   end;
 
   { TXSDecimalType }
@@ -970,8 +971,8 @@ type
 
   TXSNumericType = class(TXSSimpleType)
     subType: TXSNumericSubType;
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
-    function tryCreateValueInternal(const v: string; outv: PXQValue): boolean; override;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError; override;
     function constraintsSatisfied(const v: BigDecimal): boolean;
     constructor create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
     constructor create(const aname: string; aparent: TXSNumericType);
@@ -980,8 +981,8 @@ type
   { TXSBooleanType }
 
   TXSBooleanType = class(TXSSimpleType)
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
-    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
   end;
 
   { TXSStringType }
@@ -990,8 +991,8 @@ type
   TXSStringType = class(TXSSimpleType)
     lexicalSpaceRegex: TRegExpr;
     subType: TXSStringSubType;
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
-    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
     constructor create(const aname: string; aparent: TXSType; asubtype: TXSStringSubType; pattern: string = '');
     destructor Destroy; override;
   end;
@@ -1002,8 +1003,8 @@ type
     qnameRegex: TRegExpr;
     constructor create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
     destructor Destroy; override;
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
-    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
   end;
 
   { TXSDateTimeType }
@@ -1013,8 +1014,8 @@ type
     isDuration: boolean;
     truncation: TXQDateTimeTruncation;
     function truncated(const value: TXQValueDateTimeData): TXQValueDateTimeData;
-    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean; override;
-    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): boolean; override;
+    function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
+    function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
     constructor Create(aname: string; aparent: TXSType; apattern: string; atruncation: TXQDateTimeTruncation = xqdttNone );
   end;
 

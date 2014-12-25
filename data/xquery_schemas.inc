@@ -251,42 +251,64 @@ end;
   else result := false;} //todo
 
 
+procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string);
+var
+  temp: String;
+begin
+  case err of
+    xsceNoError: temp := '??';
+    xsceFORG0001: temp := 'FORG0001';
+    xsceXPTY0004: temp := 'XPTY0004';
+  end;
+  raise EXQEvaluationException.create('err:'+temp, 'Cannot cast '+from+' to '+to_);
+end;
+
 function TXSType.createValue(const v: IXQValue): IXQValue;
 var temp: TXQValue;
+  err: TXSCastingError;
 begin
-  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast '+v.debugAsStringWithTypeAnnotation()+' to '+name);
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then raiseXSCEError(err, v.debugAsStringWithTypeAnnotation(), name);
   result := temp;
 end;
 
 function TXSType.createValue(const v: Int64): IXQValue;
 var temp: TXQValue;
+  err: TXSCastingError;
 begin
-  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native integer '+IntToStr(v)+' to '+name);
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then raiseXSCEError(err, IntToStr(v), name);
   result := temp;
 end;
 
 function TXSType.createValue(const v: xqfloat): IXQValue;
 var temp: TXQValue;
+  err: TXSCastingError;
 begin
-  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native number '+FloatToStr(v)+' to '+name);
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then raiseXSCEError(err, FloatToStr(v), name);
   result := temp;
 end;
 
 function TXSType.createValue(const v: BigDecimal): IXQValue;
 var temp: TXQValue;
+  err: TXSCastingError;
 begin
-  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native number '+BigDecimalToStr(v)+' to '+name);
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then raiseXSCEError(err, BigDecimalToStr(v), name);
   result := temp;
 end;
 
 function TXSType.createValue(const v: String): IXQValue;
 var temp: TXQValue;
+  err: TXSCastingError;
 begin
-  if not tryCreateValue(v, @temp) then raise EXQEvaluationException.create('err:FORG0001', 'Cannot cast native string '+v+' to '+name);
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then raiseXSCEError(err, v, name);
   result := temp;
 end;
 
-function TXSType.tryCreateValue(const v: IXQValue; outv: PXQValue): boolean;
+function TXSType.tryCreateValue(const v: IXQValue; outv: PXQValue): TXSCastingError;
 begin
   if v.typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.node]) then
     exit(tryCreateValue(v.toString, outv));
@@ -312,14 +334,14 @@ end;
 end;
 
 
-function TXSType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+function TXSType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 begin
-  if base = nil then exit(false);
+  if base = nil then exit(xsceXPTY0004);
   result := base.tryCreateValueInternal(v, outv);
-  if result and (outv <> nil) then (outv^ as TXQValue).ftypeAnnotation := self;
+  if (result = xsceNoError) and (outv <> nil) then (outv^ as TXQValue).ftypeAnnotation := self;
 end;
 
-function TXSType.tryCreateValue(v: string; outv: PXQValue): boolean;
+function TXSType.tryCreateValue(v: string; outv: PXQValue): TXSCastingError;
 begin
   case whiteSpaceFacet of
     xsfwReplace: v := StringReplace(StringReplace(StringReplace(v, #9, ' ', [rfReplaceAll]), #$A, ' ', [rfReplaceAll]), #$D, ' ', [rfReplaceAll]);
@@ -329,24 +351,24 @@ begin
   result := tryCreateValueInternal(v, outv);
 end;
 
-function TXSType.tryCreateValueInternal(const v: String; outv: PXQValue): boolean;
+function TXSType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;
 begin
-  if base = nil then exit(false);
+  if base = nil then exit(xsceXPTY0004);
   result := base.tryCreateValueInternal(v, outv);
-  if result and (outv <> nil) then (outv^ as TXQValue).ftypeAnnotation := self;
+  if (result = xsceNoError) and (outv <> nil) then (outv^ as TXQValue).ftypeAnnotation := self;
 end;
 
-function TXSType.tryCreateValue(const v: Int64; outv: PXQValue): boolean;
+function TXSType.tryCreateValue(const v: Int64; outv: PXQValue): TXSCastingError;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
 
-function TXSType.tryCreateValue(const v: xqfloat; outv: PXQValue): boolean;
+function TXSType.tryCreateValue(const v: xqfloat; outv: PXQValue): TXSCastingError;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
 
-function TXSType.tryCreateValue(const v: BigDecimal; outv: PXQValue): boolean;
+function TXSType.tryCreateValue(const v: BigDecimal; outv: PXQValue): TXSCastingError;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
@@ -377,22 +399,30 @@ begin
   result := false;
 end;
 
-function TXSUnionType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+function TXSUnionType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
   i: Integer;
+  temp: TXSCastingError;
 begin
-  result := false;
-  for i := 0 to high(members) do
-    if members[i].tryCreateValue(v, outv) then exit(true);
+  result := xsceXPTY0004;
+  for i := 0 to high(members) do begin
+    temp := members[i].tryCreateValue(v, outv);
+    if temp = xsceNoError then exit(xsceNoError);
+    if temp <> xsceXPTY0004 then result := temp;
+  end;
 end;
 
-function TXSUnionType.tryCreateValueInternal(const v: String; outv: PXQValue): boolean;
+function TXSUnionType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;
 var
   i: Integer;
+  temp: TXSCastingError;
 begin
-  result := false;
-  for i := 0 to high(members) do
-    if members[i].tryCreateValue(v, outv) then exit(true);
+  result := xsceXPTY0004;
+  for i := 0 to high(members) do begin
+    temp := members[i].tryCreateValue(v, outv);
+    if temp = xsceNoError then exit(xsceNoError);
+    if temp <> xsceXPTY0004 then result := temp;
+  end;
 end;
 
 
@@ -416,12 +446,12 @@ begin
   end;
 end;
 
-function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 begin
-  Result:=false; //todo
+  Result:=xsceXPTY0004; //todo
 end;
 
-function TXSListType.tryCreateValueInternal(const v: String; outv: PXQValue): boolean;
+function TXSListType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;
 var
   l: TStringArray;
   temp: TXQValue;
@@ -433,28 +463,28 @@ begin
     outv^ := TXQValueSequence.create(length(l));
     ptemp := @temp;
   end else ptemp := nil;
-  result := true;
+  result := xsceNoError;
   for i := 0 to high(l) do begin
-    result := result and itemType.tryCreateValue(l[i], ptemp);
+    result := itemType.tryCreateValue(l[i], ptemp);
     if outv <> nil then TXQValueSequence(outv^).addChild(temp);
-    if not result then break;
+    if result <> xsceNoError then break;
   end;
-  if (outv <> nil) and not result then FreeAndNil(outv^);
+  if (outv <> nil) and (result <> xsceNoError) then FreeAndNil(outv^);
 end;
 
 
 { TXSIntegerType }
 
-function TXSNumericType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+function TXSNumericType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
   st: TXSType;
   sispure: Boolean;
   i: BigDecimal;
 begin
   st := v.typeAnnotation;
-  result := false;
+  result := xsceXPTY0004;
   if st.derivedFrom(self) then begin
-    result := true;
+    result := xsceNoError;
     if outv <> nil then
       case subType of
         xsstInteger, xsstDecimal:
@@ -464,23 +494,23 @@ begin
       end;
     exit;
   end else if st.derivedFrom([schema.decimal, schema.boolean]) then begin
-    result := true;
+    result := xsceNoError;
     sispure := true;
   end else begin
     sispure := TXQValueFloat.isPure(v);
     case subType of
-      xsstInteger, xsstDecimal: result := st.derivedFrom([schema.float, schema.double]) and sispure;
-      xsstDouble, xsstFloat :  result := st.derivedFrom([schema.float, schema.double]);
+      xsstInteger, xsstDecimal: if st.derivedFrom([schema.float, schema.double]) and sispure then result := xsceNoError;
+      xsstDouble, xsstFloat :  if st.derivedFrom([schema.float, schema.double]) then result := xsceNoError;
     end;
   end;
-  if not result then exit;
+  if result <> xsceNoError then exit;
   if (outv = nil) and (length(constrainingFacets) = 0) then exit;
   case subType of
     xsstInteger, xsstDecimal: begin
-      if not sispure then exit(false);
+      if not sispure then exit(xsceFORG0001);
       i := v.toDecimal;
       if (subType = xsstInteger) and (not isInteger(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
-      if not constraintsSatisfied(i) then exit(false);
+      if not constraintsSatisfied(i) then exit(xsceFORG0001);
 
       if outv <> nil then
         case subType of
@@ -505,7 +535,7 @@ begin
       end;
       if length(constrainingFacets) > 0 then begin
         i := v.toDecimal;
-        if not constraintsSatisfied(i) then exit(false);
+        if not constraintsSatisfied(i) then exit(xsceFORG0001);
       end;
       case subType of
         xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
@@ -515,30 +545,32 @@ begin
   end;
 end;
 
-function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
+function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 var
   pure: Boolean;
   temp: BigDecimal;
 {  tempintstart, tempintend, tempdot, tempexp: integer;
   tempe: Extended;}
 begin
+  result := xsceFORG0001;
   pure := subType in  [xsstInteger, xsstDecimal];
   if ((v = 'NaN') or (v = 'INF') or (v = '-INF')) then begin
-    if pure then exit(false);
+    if pure then exit();
     if outv <> nil then
       case v of
         'NaN':  outv^ := TXQValueFloat.create(self, getNaN);
         'INF':  outv^ := TXQValueFloat.create(self, getPosInf);
         '-INF':  outv^ := TXQValueFloat.create(self, getNegInf);
       end;
-    exit(true);
+    exit(xsceNoError);
   end;
-  if pure and striContains(v, 'e') then exit(false);
-  if (subType = xsstInteger) and (strContains(v, '.')) then exit(false);
+  if pure and striContains(v, 'e') then exit();
+  if (subType = xsstInteger) and (strContains(v, '.')) then exit();
 
-  result := TryStrToBigDecimal(v, @temp);
-  result := result and constraintsSatisfied(temp);
-  if result and (outv <> nil) then
+  if not TryStrToBigDecimal(v, @temp) then exit;
+  if not constraintsSatisfied(temp) then exit;
+  result := xsceNoError;
+  if (outv <> nil) then
     case subType of
       xsstInteger, xsstDecimal:
         if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
@@ -586,49 +618,50 @@ end;
 
 { TXSBooleanType }
 
-function TXSBooleanType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): boolean;
+function TXSBooleanType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError;
 var
   st: TXSType;
 begin
   st := v.typeAnnotation;
   if st.derivedFrom([schema.untypedAtomic, schema.string_]) then exit(tryCreateValue(v.toString, outv));
-  if not st.derivedFrom([schema.boolean, schema.float, schema.double, schema.decimal]) then exit(false);
-  result := true;
+  if not st.derivedFrom([schema.boolean, schema.float, schema.double, schema.decimal]) then exit(xsceXPTY0004);
+  result := xsceNoError;
   if outv <> nil then outv^ := TXQValueBoolean.create(self, v.toBoolean);
 end;
 
-function TXSBooleanType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
+function TXSBooleanType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 begin
   case v of
     '1', 'true': begin
-      result := true;
+      result := xsceNoError;
       if (outv <> nil) then outv^ := TXQValueBoolean.create(self, true);
     end;
     '0', 'false': begin
-      result := true;
+      result := xsceNoError;
       if (outv <> nil) then outv^ := TXQValueBoolean.create(self, false);
     end;
-    else result := false;
+    else result := xsceFORG0001;
   end;
 end;
 
 
 { TXSStringType }
 
-function TXSStringType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+function TXSStringType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
   st: TXSType;
 begin
   st := v.typeAnnotation;
-  result := false;
+  result := xsceXPTY0004;
   case subType of
     xsstString: begin
-      result := true;
+      result := xsceNoError;
       if outv <> nil then result := tryCreateValueInternal(v.toString, outv);
     end;
     xsstHexBinary, xsstBase64Binary: begin
-      result := st.derivedFrom([schema.hexBinary, schema.base64Binary]);
-      if result and (outv <> nil) then
+      if not st.derivedFrom([schema.hexBinary, schema.base64Binary]) then exit;
+      result := xsceNoError;
+      if outv <> nil then
         if st.derivedFrom(schema.hexBinary) = (subType = xsstHexBinary) then
           outv^ := TXQValueString.create(self, v.toString)
         else if subType = xsstHexBinary then
@@ -637,17 +670,19 @@ begin
           outv^ := TXQValueString.create(self, base64.EncodeStringBase64(strDecodeHex(v.toString)))
     end;
     xsstUrl: begin
-      result := st.derivedFrom(schema.anyURI);
-      if result and (outv <> nil) then
+      if not st.derivedFrom(schema.anyURI) then exit;
+      result := xsceNoError;
+      if (outv <> nil) then
         outv^ := TXQValueString.create(self, v.toString);
     end;
   end;
 end;
 
-function TXSStringType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
+function TXSStringType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 begin
-  result := (lexicalSpaceRegex = nil) or (lexicalSpaceRegex.Exec(v));
-  if Result and (outv <> nil) then
+  if (lexicalSpaceRegex <> nil) and not (lexicalSpaceRegex.Exec(v)) then exit(xsceFORG0001);
+  result := xsceNoError;
+  if (outv <> nil) then
     case subType of
       xsstHexBinary: outv^ := TXQValueString.create(self, UpperCase(v));
       else outv^ := TXQValueString.create(self, v);
@@ -682,24 +717,24 @@ begin
   inherited Destroy;
 end;
 
-function TXSQNameType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+function TXSQNameType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
   st: TXSType;
 begin
-  result := false;
+  result := xsceXPTY0004;
   if self = schema.NOTATION then exit(); //NOTATION itself is an abstract type
   st := v.typeAnnotation;
   if st.derivedFrom([schema.NOTATION, schema.QName]) and (v is TXQValueQName) then begin
-    result := true;
+    result := xsceNoError;
     if outv <> nil then
       outv^ := TXQValueQName.create(self, (v as TXQValueQName).url, (v as TXQValueQName).prefix, (v as TXQValueQName).local);
   end;
 end;
 
-function TXSQNameType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
+function TXSQNameType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 begin
   ignore(v); ignore(outv);
-  result := false;
+  result := xsceXPTY0004;
 end;
 
 
@@ -716,20 +751,21 @@ begin
   end;
 end;
 
-function TXSDateTimeType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): boolean;
+function TXSDateTimeType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
   st: TXSType;
 begin
   st := v.typeAnnotation;
   if isDuration then begin
-   result := (st is TXSDateTimeType) and (st as TXSDateTimeType).isDuration;
+    if not ( (st is TXSDateTimeType) and (st as TXSDateTimeType).isDuration ) then exit(xsceXPTY0004)
   end else begin
-    result :=
+    if not (
        st.derivedFrom(self)
        or (st.derivedFrom(schema.dateTime))
-       or (st.derivedFrom(schema.date)) and not (self.derivedFrom(schema.time));
+       or (st.derivedFrom(schema.date)) and not (self.derivedFrom(schema.time)) ) then exit(xsceXPTY0004)
   end;
-  if result and (outv <> nil) then
+  result := xsceNoError;
+  if (outv <> nil) then
     if v is TXQValueDateTime then //should always be true
       outv^ := TXQValueDateTime.create(self, truncated((v as TXQValueDateTime).value))
      else
@@ -744,12 +780,13 @@ begin
 }
 end;
 
-function TXSDateTimeType.tryCreateValueInternal(const v: string; outv: PXQValue): boolean;
+function TXSDateTimeType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 var
   tvd: TXQValueDateTimeData;
 begin
-  result := TXQValueDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd);
-  if result and (outv <> nil) then
+  if not TXQValueDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd) then exit(xsceFORG0001);
+  result := xsceNoError;
+  if (outv <> nil) then
     outv^ := TXQValueDateTime.create(self, truncated(tvd))
 end;
 

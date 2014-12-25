@@ -214,11 +214,11 @@ begin
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
     if bk <> pvkDateTime then begin
-      if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (not baseSchema.double.tryCreateValue(b)) then exit(xqvalue);
+      if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(b) <> xsceNoError) then exit(xqvalue);
       result := a.clone;
       (result as TXQValueDateTime).multiplyComponents(b.toFloat);
     end else begin
-      if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (not baseSchema.double.tryCreateValue(a)) then exit(xqvalue);
+      if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(a) <> xsceNoError) then exit(xqvalue);
       result := b.clone;
       (result as TXQValueDateTime).multiplyComponents(a.toFloat);
     end;
@@ -971,7 +971,7 @@ function xqFunctionNumber(const context: TXQEvaluationContext; const args: TXQVA
     temp: TXQValue;
   begin
     if v.instanceOf(baseSchema.Double) then exit(v);
-    if baseSchema.double.tryCreateValue(v,  @temp) then exit(temp)
+    if baseSchema.double.tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
     else exit(baseSchema.double.createValue(getNaN));
   end;
 begin
