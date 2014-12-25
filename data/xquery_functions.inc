@@ -3036,7 +3036,7 @@ var tempf: xqfloat;
  tempf2: xqfloat;
  tempd: BigDecimal;
  kind: TXQValueKind;
- baseType: TXSSimpleType;
+ baseType: TXSType;
 begin
   requiredArgCount(args,1, 3);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
@@ -3059,13 +3059,11 @@ begin
   case seq.getPromotedType of
     pvkDateTime: begin
       result := seq[0];
-      if result.instanceOf(baseSchema.yearMonthDuration) then baseType := baseSchema.yearMonthDuration
-      else if result.instanceOf(baseSchema.dayTimeDuration) then baseType := baseSchema.dayTimeDuration
-      else baseType := nil;
+      baseType := (result.typeAnnotation as TXSSimpleType).primitive;
       for i:=1 to seq.count-1 do begin
         if (xqvalueCompareAtomicBase(context, result, seq[i]) < 0) <> asmin then
           result := seq[i];
-        if (baseType <> nil) and (not seq[i].instanceOf(baseType)) then raiseError;
+        if (seq[i].typeAnnotation as TXSSimpleType).primitive <> baseType then raiseError;
       end;
     end;
     pvkBoolean: begin

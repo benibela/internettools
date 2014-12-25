@@ -913,14 +913,14 @@ begin
   t('type-of(max((3,4,5)))', 'integer', '');
   t('max((5, 5.0e0))', '5', '');
 
-  t('max((3,4,"Zero"))', 'Zero', ''); //don't follow xpath
+  t('max(("3","4","Zero"))', 'Zero', '');
   t('max((current-date(), parse-date("2001-01-01","yyyy-mm-dd"))) = current-date()', 'true', '');
   t('max((current-date(), parse-date("9001-01-01","yyyy-mm-dd"))) = current-date()', 'false', '');
   t('max(("a", "b", "c"))', 'c', '');
   t('max((1,2,3,4))', '4', '');
   t('max((1,25.0,-3,4))', '25', '');
-  t('max((1,"5",3,4))', '5', '');
-  t('max((1,"2",3,4))', '4', '');
+  t('max((1,xs:untypedAtomic("5"),3,4))', '5', '');
+  t('max((1,xs:untypedAtomic("2"),3,4))', '4', '');
   t('max(("10haus", "100haus", "2haus", "099haus"))', '100haus', '');
   t('min((1,2,3))', '1', '');
   t('min((1,xs:double("NaN"),3))', 'NaN', '');
@@ -928,15 +928,15 @@ begin
   t('type-of(min((3,4,5)))', 'integer', '');
   t('min((5,5.0))', '5', '');
   t('type-of(min((5,5.0)))', 'integer', '');
-  t('min((3,4,"Zero"))', '3', ''); //don't follow
+  t('min(("3","4","Zero"))', '3', '');
   t('min((current-date(), parse-date("3001-01-01","yyyy-mm-dd"))) = current-date()', 'true', '');
   t('min((current-date(), parse-date("1901-01-01","yyyy-mm-dd"))) = current-date()', 'false', '');
   t('min((-0.0,0.0))', '0', '');
   t('type-of(min((-0.0,0.0)))', 'decimal', '');
   t('min((1,2,3,4))', '1', '');
   t('min((1,25.0,-3,4))', '-3', '');
-  t('min((1,"5",3,4))', '1', '');
-  t('min((1,"2",3,4))', '1', '');
+  t('min((1,xs:untypedAtomic("5"),3,4))', '1', '');
+  t('min((1,xs:untypedAtomic("2"),3,4))', '1', '');
   t('min(("10haus", "100haus", "2haus", "099haus"))', '2haus', '');
   t('min(("a", "b", "c"))', 'a', '');
   t('min((1,xs:double("NaN"),3))', 'NaN', '');
@@ -2793,6 +2793,7 @@ begin
   t('max(a/b)', '3', '');
   t('type-of(max(a/b))', 'double', '');
   t('min((dayTimeDuration("PT1S"), dayTimeDuration("PT2S")))', 'PT1S', '');
+  f('max((xs:yearMonthDuration("P1Y"), xs:dayTimeDuration("P1D")))', 'err:FORG0006');
   t('min(a/b)', '1', '');
   t('min((xs:double("NaN"), 1))', 'NaN', '');
   t('type-of(min(a/b))', 'double', '');
