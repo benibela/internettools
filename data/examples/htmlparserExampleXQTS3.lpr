@@ -528,6 +528,7 @@ begin
       result.result:=tcrNA;
       exit();
     end;
+  FreeAndNil(xq.StaticContext.namespaces);
   contexttree := nil;
   for i := 0 to environments.count - 1 do
     contexttree :=  loadEnvironment(TEnvironment(environments[i]));
@@ -769,6 +770,7 @@ begin
     localResults[res]+=1;
   end;
   write('Results of ', name);
+  write(stderr, 'Results of ', name);
   printResults(localResults);
 end;
 
@@ -883,9 +885,9 @@ begin
         collections.AddObject(v.toNode['uri'], TSource.createMultiple(v.toNode));
     end;
 
-    u := xq.evaluateXPath2('collection', e);
+    u := xq.evaluateXPath2('namespace', e);
     if not u.isUndefined then begin
-      namespaces := TNamespaceList.Create;
+      if namespaces = nil then namespaces := TNamespaceList.Create;
       for v in u do namespaces.add(TNamespace.Create(v.toNode['uri'], v.toNode['prefix']));
     end;
 
@@ -944,6 +946,7 @@ begin
   if (env.defaultCollation <> '') and (TXQueryEngine.collationsInternal[0] <> env.defaultCollation) then
     TXQueryEngine.collationsInternal.Exchange(0, TXQueryEngine.collationsInternal.IndexOf(env.defaultCollation));
 
+
   xq.VariableChangelog.clear;
 
   for i := 0 to env.sources.Count-1 do
@@ -953,7 +956,10 @@ begin
 
   xq.OnCollection:=@env.getCollection;
 
-
+  if env.namespaces = nil then FreeAndNil(sc.namespaces)
+  else begin
+    sc.namespaces := env.namespaces.clone;
+  end;
   for i := 0 to high(env.params) do
     xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
 
