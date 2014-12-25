@@ -114,6 +114,8 @@ begin
 
   t('(10,<a>b</a>,30,<c>d</c>) ! .', '10 b 30 d');
 
+  m('declare namespace t = "foobar"; let $abc := "t:localName" return xs:QName($abc)', 't:localName');
+
   t('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'a');
   t('switch (20) case 10 return "a" case 20 return "b" default return "c"', 'b');
   t('switch (30) case 10 return "a" case 20 return "b" default return "c"', 'c');

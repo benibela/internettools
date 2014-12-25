@@ -1344,12 +1344,13 @@ type
     function clone: TXQTerm; override;
 
     function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
-    function castableAsBase(v: IXQValue): boolean;
+    function castableAsBase(v: IXQValue; staticContext: TXQStaticContext): boolean;
     function castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
-    function castableAs(v: IXQValue): boolean;
+    function castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
     function instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
     function instanceOf(const ta: IXQValue): boolean;
     function subtypeOf(tb: TXQTermSequenceType): boolean;
+    class function staticQNameCast(castableOnly: boolean; target: TXSQNameType; const v: IXQValue; context: TXQStaticContext): ixqvalue; static;
   private
     function subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
     function functionCoercion(const v: IXQValue): IXQValue;
@@ -2877,7 +2878,7 @@ begin
   if (importedSchemas <> nil)  and (defaultNamespaceKind in [xqdnkAny, xqdnkElementType,  xqdnkType]) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
     exit;
   result := sender.findNamespace(nsprefix);
-  if result = nil then
+  if (result = nil) and (nsprefix = '') then
     case defaultNamespaceKind of
       xqdnkUnknown, xqdnkAny : result := nil;
       xqdnkFunction : result := defaultFunctionNamespace;
@@ -2887,7 +2888,6 @@ begin
         if defaultElementTypeNamespace <> nil then result := defaultElementTypeNamespace
         else result := defaultTypeNamespace;
     end;
-
 end;
 
 function TXQStaticContext.findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
@@ -3661,7 +3661,7 @@ class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: T
        or (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
        or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
        or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
-         exit(typ.castableAs(w));
+         exit(typ.castableAs(w, context.staticContext));
     result := false;
   end;
 

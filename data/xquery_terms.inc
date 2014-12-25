@@ -551,12 +551,13 @@ begin
   result := (kind = tikAtomic) and not allowMultiple;
 end;
 
-function TXQTermSequenceType.castableAsBase(v: IXQValue): boolean;
+function TXQTermSequenceType.castableAsBase(v: IXQValue; staticContext: TXQStaticContext): boolean;
 begin
   if v.isUndefined then result := allowNone
   else if v.getSequenceCount > 1 then result := false
   else if v is TXQValueSequence then result := atomicTypeInfo.tryCreateValue((v as TXQValueSequence).seq[0])
-  else result := atomicTypeInfo.tryCreateValue(v);
+  else if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.tryCreateValue(v)
+  else result := staticQNameCast(true, atomicTypeInfo as TXSQNameType, v, staticContext).toBoolean;
 end;
 
 function TXQTermSequenceType.castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
@@ -565,20 +566,16 @@ var
   ns: INamespace;
 begin
   v := xqvalueAtomize(v);
-  if not castableAsBase(v) then raiseEvaluationError('XPTY0004', 'impossible cast as');
-  if not atomicTypeInfo.derivedFrom(baseSchema.QName) then result := atomicTypeInfo.createValue(v)
-  else begin
-    temp := trim(v.toString);
-    context.splitRawQName(ns, temp, xqdnkAny);
-    result := TXQValueQName.create(atomicTypeInfo, ns, temp);
-  end;
+  if not castableAsBase(v, context.staticContext) then raiseEvaluationError('XPTY0004', 'impossible cast as');
+  if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
+  else result := staticQNameCast(false, atomicTypeInfo as TXSQNameType, v, context.staticContext)
 end;
 
-function TXQTermSequenceType.castableAs(v: IXQValue): boolean;
+function TXQTermSequenceType.castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
 begin
   if kind <> tikAtomic then raiseEvaluationError('XPST0051', 'need atomic type for castable as');
   v := xqvalueAtomize(v);
-  result := castableAsBase(v);
+  result := castableAsBase(v, staticContext);
 end;
 
 function TXQTermSequenceType.instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
@@ -655,6 +652,35 @@ begin
   if tb.kind = tikNone then exit(false);
   if (allowNone and not tb.allowNone) or (allowMultiple and not tb.allowMultiple) then exit(false);
   result := subtypeItemTypeOf(tb);
+end;
+
+class function TXQTermSequenceType.staticQNameCast(castableOnly: boolean; target: TXSQNameType; const v: IXQValue; context: TXQStaticContext
+  ): ixqvalue;
+var
+  castAllowed: Boolean;
+  namespace: INamespace;
+  s: String;
+begin
+  if v.typeAnnotation.storage = TXQValueQName then begin
+    if castableOnly then exit(xqvalue(true))
+    else exit(target.createValue(v));
+  end;
+  if not (context.model in [xqpmXPath3, xqpmXQuery3]) then
+    if castableOnly then exit(xqvalue(false))
+    else raise EXQEvaluationException.create('FORG0001', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
+  if v.kind <> pvkString then
+    if castableOnly then exit(xqvalue(false))
+    else raise EXQEvaluationException.create('FORG0001', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
+  s := trim(v.toString);
+  castAllowed := (target <> baseSchema.NOTATION) and (baseSchema.QName.qnameRegex.Exec(s));
+  if castableOnly then  exit(xqvalue(castAllowed));
+  if not castAllowed then
+    raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
+  if pos(':', s) > 0 then begin
+    namespace := context.findNamespace(strSplitGet(':', s), xqdnkElementType);
+    if namespace = nil then raise EXQEvaluationException.create('FONS0004', 'Failed to find namespace of: '+v.toString);
+  end else namespace := context.findNamespace('', xqdnkElementType);
+  result := TXQValueQName.create(target, namespace, s);
 end;
 
 function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
@@ -1294,6 +1320,7 @@ function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQ
 //{$define checkreturntypes}  there is no point in testing the return type for native functions. but it might spot internal inconsistencies
 var
   evilkids: TXQVArray;
+  t: TXSType;
   {$ifdef checkreturntypes}version: Integer;{$endif}
 begin
   evaluateChildren(context, evilkids);
@@ -1321,7 +1348,11 @@ begin
       if length(evilkids) <> 1 then raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
       case evilkids[0].getSequenceCount of
         0: result := xqvalue();
-        1: result := TXSType(TObject(func)).createValue(evilkids[0])
+        1: begin
+          t := TXSType(TObject(func));
+          if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(evilkids[0])
+          else result := TXQTermSequenceType.staticQNameCast(false, t as TXSQNameType, evilkids[0], context.staticContext);
+        end
         else raiseEvaluationError('FORG0001', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
       end;
     end;

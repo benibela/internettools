@@ -1521,9 +1521,12 @@ begin
   t('sum(xs:untypedAtomic(1)) instance of xs:double', 'true');
   t('avg(xs:untypedAtomic(1)) instance of xs:double', 'true');
 
-  m('declare namespace t = "foobar"; namespace-uri-from-QName(xs:QName("t:localName"))', 'foobar');
+  m('declare namespace t = "foobar"; let $n := xs:QName("t:localName") return join((namespace-uri-from-QName($n), prefix-from-QName(xs:QName($n))))', 'foobar t');
   m('declare namespace t = "foobar"; <wiz xmlns:t="123">{namespace-uri-from-QName(xs:QName("t:localName"))}</wiz>', '123');
   m('declare namespace t = "foobar"; <wiz xmlns:t="">{namespace-uri-from-QName(xs:QName("t:localName"))}</wiz>', '');
+  f('xs:QName("t:localName")', 'err:FONS0004');
+  f('declare namespace t = "foobar"; let $abc := "t:localName" return xs:QName($abc)', 'err:FORG0001');
+
 
   m('declare default element namespace "foobar"; namespace-uri-from-QName(xs:QName("localName"))', 'foobar');
   m('declare default element namespace "foobar"; <wiz xmlns="123">{namespace-uri-from-QName(xs:QName("localName"))}</wiz>', '123');

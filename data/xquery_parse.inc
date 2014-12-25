@@ -1291,25 +1291,47 @@ begin
   result := parseSequenceLike(TXQTermJSONArray.Create, ']') as TXQTermJSONArray;
 end;
 
+function createDynamicErrorTerm(const code, msg: string): TXQTermNamedFunction;
+begin
+  result := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'error', [
+                TXQTermConstant.create(TXQValueQName.create(XMLNamespaceURL_XQTErrors, 'err', code)),
+                TXQTermConstant.create(msg)]);
+end;
+
 function staticallyCastQNameAndNotation(term: TXQTermWithChildren; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false): txqterm;
+  function castFail: txqterm;
+  begin
+    if castable then result := TXQTermConstant.create(xqvalue(false))
+    else result := createDynamicErrorTerm('FORG0001', 'Invalid cast to QName/NOTATION');
+  end;
+
 var
   name: String;
   namespace: INamespace;
   castAllowed: Boolean;
+  qname: IXQValue;
 begin
   result := term;
-  if typ.derivedFrom([baseSchema.QName, baseSchema.NOTATION]) then begin
-    castAllowed := (typ <> baseSchema.NOTATION)
-                   and (term.children[0] is TXQTermConstant)
-                   and (baseSchema.QName.qnameRegex.Exec(trim(TXQTermConstant(term.children[0]).value.toString)));
-    if not castAllowed then exit;
-    if not castable then begin
-      name := trim(TXQTermConstant(term.children[0]).value.toString);
-      staticContext.splitRawQName(namespace, name, xqdnkElementType);
-      result := TXQTermConstant.create(TXQValueQName.create(typ, namespace, name));
-    end else
-      result := TXQTermConstant.create(xqvalue(castAllowed));
-    term.free;
+  if typ.storage = TXQValueQName then begin
+    if typ = baseSchema.NOTATION then result := castFail
+    else if (term.children[0] is TXQTermConstant) then begin
+      if (TXQTermConstant(term.children[0]).value.kind <> pvkString) then result := castFail
+      else begin
+        name := trim(TXQTermConstant(term.children[0]).value.toString);
+        if not (baseSchema.QName.qnameRegex.Exec(name)) then result := castFail
+        else if castable then result := TXQTermConstant.create(xqvalue(true))
+        else if (staticContext.model in [xqpmXPath3, xqpmXQuery3]) then exit
+        else begin
+          //see  TXQTermSequenceType.staticQNameCast
+          if pos(':', name) > 0 then begin
+            namespace := staticContext.findNamespace(strSplitGet(':', name), xqdnkElementType);
+            if namespace = nil then result := createDynamicErrorTerm('FONS0004', 'Failed to find namespace of: '+TXQTermConstant(term.children[0]).value.toString)
+            else result := TXQTermConstant.Create(TXQValueQName.create(typ, namespace, name));
+          end else result := TXQTermConstant.Create(TXQValueQName.create(typ, staticContext.findNamespace('', xqdnkElementType), name));
+        end;
+      end;
+    end;
+    if result <> term then term.free;
   end;
 end;
 

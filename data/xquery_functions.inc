@@ -842,7 +842,7 @@ end;
 function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt);
-  result := xqvalue(getTypeInfo(tb).castableAs(ta));
+  result := xqvalue(getTypeInfo(tb).castableAs(ta, cxt.staticContext));
 end;
 
 

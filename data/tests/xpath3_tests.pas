@@ -95,6 +95,8 @@ begin
   t('count((10,20,30) ! (1,2))', '6');
   t('"hallo" ! "world"', 'world');
 
+  t('let $s := "foobar" return xs:QName($s)', 'foobar');
+
   //Xquery 3 only
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
 
