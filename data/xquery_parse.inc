@@ -1313,20 +1313,29 @@ begin
   if typ.storage = TXQValueQName then begin
     if typ = baseSchema.NOTATION then result := castFail
     else if (term.children[0] is TXQTermConstant) then begin
-      if (TXQTermConstant(term.children[0]).value.kind <> pvkString) then result := castFail
-      else begin
-        name := trim(TXQTermConstant(term.children[0]).value.toString);
-        if not (baseSchema.QName.qnameRegex.Exec(name)) then result := castFail
-        else if castable then result := TXQTermConstant.create(xqvalueTrue)
-        else if (staticContext.model in [xqpmXPath3, xqpmXQuery3]) then exit
-        else begin
-          //see  TXQTermSequenceType.staticQNameCast
-          if pos(':', name) > 0 then begin
-            namespace := staticContext.findNamespace(strSplitGet(':', name), xqdnkElementType);
-            if namespace = nil then result := createDynamicErrorTerm('FONS0004', 'Failed to find namespace of: '+TXQTermConstant(term.children[0]).value.toString)
-            else result := TXQTermConstant.Create(TXQValueQName.create(typ, namespace, name));
-          end else result := TXQTermConstant.Create(TXQValueQName.create(typ, staticContext.findNamespace('', xqdnkElementType), name));
-        end;
+      case TXQTermConstant(term.children[0]).value.kind of
+        pvkQName: exit; {begin
+          if castable then result := TXQTermConstant.create(xqvalueTrue)
+          else begin
+            result := term.children[0];
+            term.children[0] := nil;
+          end;
+        end;}
+        pvkString: begin
+          name := trim(TXQTermConstant(term.children[0]).value.toString);
+          if not (baseSchema.QName.qnameRegex.Exec(name)) then result := castFail
+          else if castable then result := TXQTermConstant.create(xqvalueTrue)
+          else if (staticContext.model in [xqpmXPath3, xqpmXQuery3]) then exit
+          else begin
+            //see  TXQTermSequenceType.staticQNameCast
+            if pos(':', name) > 0 then begin
+              namespace := staticContext.findNamespace(strSplitGet(':', name), xqdnkElementType);
+              if namespace = nil then result := createDynamicErrorTerm('FONS0004', 'Failed to find namespace of: '+TXQTermConstant(term.children[0]).value.toString)
+              else result := TXQTermConstant.Create(TXQValueQName.create(typ, namespace, name));
+            end else result := TXQTermConstant.Create(TXQValueQName.create(typ, staticContext.findNamespace('', xqdnkElementType), name));
+          end;
+        end
+        else result := castFail
       end;
     end;
     if result <> term then term.free;

@@ -654,10 +654,7 @@ begin
   st := v.typeAnnotation;
   result := xsceXPTY0004;
   case subType of
-    xsstString: begin
-      result := xsceNoError;
-      if outv <> nil then result := tryCreateValueInternal(v.toString, outv);
-    end;
+    xsstString: result := tryCreateValueInternal(v.toString, outv);
     xsstHexBinary, xsstBase64Binary: begin
       if not st.derivedFrom([schema.hexBinary, schema.base64Binary]) then exit;
       result := xsceNoError;

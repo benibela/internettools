@@ -835,7 +835,8 @@ begin
   for i:=0 to high(formats) do begin
     usedFormat:=formats[i];
     result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.sec, @data^.secfraction, @data^.timezone);
-    if (data^.hour = 24) and (((data^.min <> high(data^.min)) and (data^.min > 0)) or ((data^.sec <> high(data^.sec)) and (data^.sec > 0))) then
+    if ((data^.year = 0) and (not duration))
+       or ((data^.hour = 24) and (((data^.min <> high(data^.min)) and (data^.min > 0)) or ((data^.sec <> high(data^.sec)) and (data^.sec > 0)))) then
       result := false;
     if not result then continue;
     if duration and strBeginsWith(s, '-') then begin

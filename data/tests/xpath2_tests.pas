@@ -3615,7 +3615,7 @@ begin
 
     t('"foo       bar    def" castable as xs:normalizedString', 'true');
     t('"foo       bar    def" castable as xs:token', 'true');
-    t('join((QName("", "lname")  castable as xs:QName, () castable as QName?, () cast as QName?))', 'true true');
+    t('join((QName("", "lname")  castable as xs:QName, () castable as QName?, () cast as QName?, xs:QName("ncname") castable as xs:QName, (xs:QName("ncname"),xs:QName("ncname")) castable as xs:QName?))', 'true true true false');
     t('QName("", "lname")  cast as xs:QName', 'lname');
     t('"ABC" castable as xs:QName', 'true');
     t('"foo bar" castable as xs:QName', 'false');
@@ -3625,6 +3625,7 @@ begin
     t('true() castable as xs:QName', 'false');
     t('true() castable as xs:NCName', 'true');
     t('false() castable as xs:NCName', 'true');
+    t('177 castable as xs:NCName', 'false');
 
     t('"" castable as xs:base64Binary', 'true');
     t('"" cast as xs:base64Binary', '');
@@ -3639,6 +3640,8 @@ begin
     t('"24:01:00"   castable as xs:dateTime', 'false');
     t('"2000-02-03T24:01:00"   castable as xs:dateTime', 'false');
     t('"20000-02-03T20:01:00"  castable as xs:dateTime', 'true');
+    t('"20000000000000000-02-03T20:01:00"  castable as xs:dateTime', 'false'); //overflow
+    t('"0-02-03T20:01:00"  castable as xs:dateTime', 'false'); //no year zero
     t('"200-02-03T20:01:00"    castable as xs:dateTime', 'false');
     t('"2000-13-03T20:01:00"   castable as xs:dateTime', 'false');
     t('"2000-02-03T20:70:00"   castable as xs:dateTime', 'false');
