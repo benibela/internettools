@@ -3048,7 +3048,7 @@ begin
           else assert(false);
         end;
 
-        if ip+count-1 > length(input) then begin result := false; exit; end;
+        if (ip+count-1 > length(input)) or (count >= 10) then begin result := false; exit; end;
 
         case base of
           'y': if (input[ip] = '-') then begin //special case: allow negative years
