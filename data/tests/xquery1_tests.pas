@@ -1835,6 +1835,9 @@ begin
   f('unknown-function(1,2,3)', 'err:XPST0017');
   //todo f('5 /  6', 'err:XPTY0020');
   //todo f('5 / . / 6', 'err:XPTY0020');
+
+  m('declare default function namespace "http://www.w3.org/2005/xquery-local-functions"; declare function local:switch(){ 1 }; declare function function($i) { $i }; function(switch()) ', '1');
+
   //XQuery/XPath 3 syntax tests which must fail in the old version
   f('"a" || "b"', 'err:XPST0003');
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');

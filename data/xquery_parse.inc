@@ -1510,8 +1510,8 @@ begin
               exit;
             end;
             'typeswitch': exit(parseTypeSwitch);
-            'switch': exit(parseSwitch);
-            'function': exit(parseFunctionDeclaration(nil, true));
+            'switch': if parsingModel in [xqpmXPath3, xqpmXQuery3] then exit(parseSwitch); //switch is not a xpath 3 statement, but still not allowed as function name
+            'function': if parsingModel in [xqpmXQuery3, xqpmXPath3] then exit(parseFunctionDeclaration(nil, true));
           end;
 
           if isKindTestFunction(word) then begin
