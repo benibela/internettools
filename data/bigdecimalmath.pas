@@ -116,7 +116,7 @@ function BigDecimalToStr(const v: BigDecimal; format: TBigDecimalFormat = bdfExa
 
 
 //**Converts a bigdecimal to a native int (can overflow)
-function BigDecimalToInteger(const a: BigDecimal): Integer;
+function BigDecimalToLongint(const a: BigDecimal): Longint;
 
 //**Converts a bigdecimal to a native int (can overflow)
 function BigDecimalToInt64(const a: BigDecimal): Int64;
@@ -229,7 +229,9 @@ procedure setOne(out r: BigDecimal);
 //** Returns true iff the bigdecimal is zero
 function isZero(const v: BigDecimal): boolean; overload;
 //** Returns true iff v has no fractional digits
-function isInteger(const v: BigDecimal): boolean;
+function isIntegral(const v: BigDecimal): boolean;
+//** Returns true iff v has no fractional digits and can be stored within an longint (32 bit integer)
+function isLongint(const v: BigDecimal): boolean;
 //** Returns true iff v has no fractional digits and can be stored within an int64
 function isInt64(const v: BigDecimal): boolean;
 //** Returns the absolute value of v
@@ -634,7 +636,7 @@ end;
 
 
 
-function BigDecimalToInteger(const a: BigDecimal): Integer;
+function BigDecimalToLongint(const a: BigDecimal): Longint;
 var
   i: Integer;
 begin
@@ -1232,7 +1234,7 @@ begin
   r.lastDigitHidden:=false;
 end;
 
-function isInteger(const v: BigDecimal): boolean;
+function isIntegral(const v: BigDecimal): boolean;
 var
   i: Integer;
 begin
@@ -1242,9 +1244,17 @@ begin
   result := true;
 end;
 
+function isLongint(const v: BigDecimal): boolean;
+begin
+  if not isIntegral(v) then exit(false);
+  if not v.signed and (v <= high(LongInt)) then exit(true);
+  if v.signed and (v >= low(LongInt)) then exit(true);
+  exit(false);
+end;
+
 function isInt64(const v: BigDecimal): boolean;
 begin
-  if not isInteger(v) then exit(false);
+  if not isIntegral(v) then exit(false);
   if not v.signed and (v <= high(Int64)) then exit(true);
   if v.signed and (v >= low(Int64)) then exit(true);
   exit(false);

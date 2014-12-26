@@ -481,7 +481,7 @@ end;
 
 constructor TXQValueDecimal.create(const v: BigDecimal);
 begin
-  if isInteger(v) then inherited create(baseSchema.integer)
+  if isIntegral(v) then inherited create(baseSchema.integer)
   else inherited create(baseSchema.decimal);
   value := v;
 end;

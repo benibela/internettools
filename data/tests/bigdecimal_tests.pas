@@ -126,7 +126,7 @@ begin
   test(BigDecimalToStr(blarge), '123456789');
   test(BigDecimalToStr(blarge, bdfExponent), '1.23456789E8');
   test(blarge = 123456789); test(blarge = 123456789.0);
-  test(BigDecimalToExtended(blarge) = 123456789.0); test(BigDecimalToInt64(blarge) = 123456789); test(BigDecimalToInteger(blarge) = 123456789);
+  test(BigDecimalToExtended(blarge) = 123456789.0); test(BigDecimalToInt64(blarge) = 123456789); test(BigDecimalToLongint(blarge) = 123456789);
 
   blarge += 1;
   test(blarge = 123456790); test(blarge = 123456790.0);
@@ -650,12 +650,12 @@ begin
 
   test(BigDecimalToStr(StrToBigDecimal('0') mod 7), '0');
 
-  test(isInteger(StrToBigDecimal('1e10')) = true );
-  test(isInteger(StrToBigDecimal('1e-10')) = false );
-  test(isInteger(StrToBigDecimal('1e100000')) = true );
-  test(isInteger(StrToBigDecimal('1e-100000')) = false );
-  test(isInteger(StrToBigDecimal('1234')) = true );
-  test(isInteger(StrToBigDecimal('0.1234')) = false );
+  test(isIntegral(StrToBigDecimal('1e10')) = true );
+  test(isIntegral(StrToBigDecimal('1e-10')) = false );
+  test(isIntegral(StrToBigDecimal('1e100000')) = true );
+  test(isIntegral(StrToBigDecimal('1e-100000')) = false );
+  test(isIntegral(StrToBigDecimal('1234')) = true );
+  test(isIntegral(StrToBigDecimal('0.1234')) = false );
 
   test(IsZero(StrToBigDecimal('0')));
   test(IsZero(StrToBigDecimal('0.0')));
@@ -708,7 +708,7 @@ begin
   test(BigDecimalToStr(bf), '1');
   test(FloatToStr(BigDecimalToExtended(bf)), '1');
   test(BigDecimalToInt64(bf), 1);
-  test(BigDecimalToInteger(bf), 1);
+  test(BigDecimalToLongint(bf), 1);
 
   //fuzzing
   for i := 1 to 10000 do begin

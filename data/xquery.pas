@@ -5453,7 +5453,7 @@ begin
     //optimization for a single number
     if value.kind in [pvkBigDecimal, pvkInt64, pvkFloat] then begin
       if ((value.kind = pvkFloat) and (frac(value.toFloat) <> 0)) or
-         ((value.kind = pvkBigDecimal) and (not isInteger(value.toDecimal) )) then begin
+         ((value.kind = pvkBigDecimal) and (not isIntegral(value.toDecimal) )) then begin
         result := xqvalue();
         exit();
       end;

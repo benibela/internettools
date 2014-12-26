@@ -114,7 +114,7 @@ type TBigDecimalFormat = (bdfExact, bdfExponent);
 //** The result will be fixed width format [0-9]+(.[0-9]+)?, even if the input had an exponent
 function BigDecimalToStr(const v: BigDecimal; format: TBigDecimalFormat = bdfExact): string;
 
-{%REPEAT T_NativeInt_, [Integer, Int64]}
+{%REPEAT T_NativeInt_, [Longint, Int64]}
 //**Converts a bigdecimal to a native int (can overflow)
 function BigDecimalToT_NativeInt_(const a: BigDecimal): T_NativeInt_;
 {%END-REPEAT}
@@ -206,7 +206,9 @@ procedure setOne(out r: BigDecimal);
 //** Returns true iff the bigdecimal is zero
 function isZero(const v: BigDecimal): boolean; overload;
 //** Returns true iff v has no fractional digits
-function isInteger(const v: BigDecimal): boolean;
+function isIntegral(const v: BigDecimal): boolean;
+//** Returns true iff v has no fractional digits and can be stored within an longint (32 bit integer)
+function isLongint(const v: BigDecimal): boolean;
 //** Returns true iff v has no fractional digits and can be stored within an int64
 function isInt64(const v: BigDecimal): boolean;
 //** Returns the absolute value of v
@@ -609,7 +611,7 @@ begin
   end;
 end;
 
-{%REPEAT T_NativeInt_, [Integer, Int64]}
+{%REPEAT T_NativeInt_, [Longint, Int64]}
 
 function BigDecimalToT_NativeInt_(const a: BigDecimal): T_NativeInt_;
 var
@@ -1029,7 +1031,7 @@ begin
   r.lastDigitHidden:=false;
 end;
 
-function isInteger(const v: BigDecimal): boolean;
+function isIntegral(const v: BigDecimal): boolean;
 var
   i: Integer;
 begin
@@ -1039,9 +1041,17 @@ begin
   result := true;
 end;
 
+function isLongint(const v: BigDecimal): boolean;
+begin
+  if not isIntegral(v) then exit(false);
+  if not v.signed and (v <= high(LongInt)) then exit(true);
+  if v.signed and (v >= low(LongInt)) then exit(true);
+  exit(false);
+end;
+
 function isInt64(const v: BigDecimal): boolean;
 begin
-  if not isInteger(v) then exit(false);
+  if not isIntegral(v) then exit(false);
   if not v.signed and (v <= high(Int64)) then exit(true);
   if v.signed and (v >= low(Int64)) then exit(true);
   exit(false);

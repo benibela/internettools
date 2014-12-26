@@ -210,10 +210,10 @@ begin
   if len > MaxInt then raise EXQEvaluationException.Create('XPDY0130', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
   resseqseq := resseq.seq;
-  resseqseq.setCount(BigDecimalToInteger(len));
+  resseqseq.setCount(BigDecimalToLongint(len));
   if (f  > -$3fffffff) and (t < $3fffffff) then begin
-    fsmall := BigDecimalToInteger(f);
-    for idx := 0 to BigDecimalToInteger(len) - 1 do
+    fsmall := BigDecimalToLongint(f);
+    for idx := 0 to BigDecimalToLongint(len) - 1 do
       resseqseq.list[idx] := typ.createValue(idx+fsmall);
   end else begin
     idx := 0;
@@ -1675,7 +1675,7 @@ begin
       end;
       from := round(xqfloatRounded(args[1].toFloat));
     end;
-    {pvkBigDecimal:}else from := BigDecimalToInteger(round(args[1].toDecimal));
+    {pvkBigDecimal:}else from := BigDecimalToLongint(round(args[1].toDecimal));
   end;
 
 
@@ -1689,7 +1689,7 @@ begin
         end else if isPosInf(args[2].toFloat) then unti := maxLen+1
         else unti := from + round(xqfloatRounded(args[2].toFloat));
       end;
-      else unti := from + BigDecimalToInteger(round(args[2].toDecimal));
+      else unti := from + BigDecimalToLongint(round(args[2].toDecimal));
     end;
   end else unti := maxLen + 1;
 

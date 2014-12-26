@@ -509,13 +509,13 @@ begin
     xsstInteger, xsstDecimal: begin
       if not sispure then exit(xsceFORG0001);
       i := v.toDecimal;
-      if (subType = xsstInteger) and (not isInteger(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
+      if (subType = xsstInteger) and (not isIntegral(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
       if not constraintsSatisfied(i) then exit(xsceFORG0001);
 
       if outv <> nil then
         case subType of
           xsstInteger: begin
-            if not isInteger(i) then i := round(i, 0, bfrmTrunc);
+            if not isIntegral(i) then i := round(i, 0, bfrmTrunc);
             if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
             else outv^ := TXQValueDecimal.create(self, i);
           end;
