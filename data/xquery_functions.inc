@@ -165,7 +165,7 @@ begin
   if t < f then exit(xqvalue);
   if t = f then exit(typ.createValue(f));
   len := t - f + 1;
-  if len > MaxInt then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Too large to operation ');
+  if len > MaxInt then raise EXQEvaluationException.Create('XPDY0130', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
   resseqseq := resseq.seq;
   resseqseq.setCount(BigDecimalToInteger(len));
