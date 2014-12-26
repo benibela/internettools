@@ -137,6 +137,43 @@ TAssertionAssert = class(TAssertion)
 end;
 
 
+type TResultSet = array[TTestCaseResult] of integer;
+
+{ TLogger }
+
+TLogger = class
+protected
+  longestTestSetName: integer;
+  testCasesToLog: array[TTestCaseResult] of boolean;
+  logAllTestCases: boolean;
+  printInputs: Boolean;
+  procedure printResults(var f: textfile; const r: TResultSet);
+public
+  constructor create(clr: TCommandLineReader);
+  procedure loadCatalogue; virtual;
+  procedure beginXQTS(testsets: TList); virtual;
+  procedure skipTestSet(ts: TTestSet); virtual;
+  procedure beginTestSet(ts: TTestSet); virtual;
+  procedure beginTestCase(tc: TTestCase); virtual; abstract;
+  procedure endTestCase(tc: TTestCase; const result: TTestCaseResultValue); virtual; abstract;
+  procedure endTestSet(ts: TTestSet; const result: TResultSet); virtual;
+  procedure endXQTS(const result: TResultSet); virtual;
+end;
+
+{ TTextLogger }
+
+TTextLogger = class(TLogger)
+public
+  constructor create(clr: TCommandLineReader);
+  procedure beginXQTS(testsets: TList); override;
+  procedure beginTestSet(ts: TTestSet); override;
+  procedure beginTestCase(tc: TTestCase); override;
+  procedure endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue); override;
+  procedure endTestSet(ts: TTestSet; const result: TResultSet); override;
+  procedure endXQTS(const result: TResultSet); override;
+end;
+
+
 var xq: TXQueryEngine;
   environments: TStringList;
   xqtsCollations: TStringList;
@@ -149,6 +186,8 @@ var xq: TXQueryEngine;
     skipNegative: boolean;
     forceTestSet, forceTestCase: string;
   end;
+  totalResults: TResultSet = (0, 0, 0, 0, 0, 0, 0);
+  logger: TLogger;
 
 { TResult }
 
@@ -217,6 +256,147 @@ begin
     end;
     l.add(a);
   end;
+end;
+
+{ TLogger }
+
+procedure TLogger.printResults(var f: textfile; const r: TResultSet);
+const cols = 4;
+begin
+  writeln(f, 'Passed: ', r[tcrPass]:cols, '  Failed: ', r[tcrFail]:cols, '  Wrong error: ', r[tcrWrongError]:cols, '  N/A: ', r[tcrNA]:cols, '  Other: ', (r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]):cols );
+end;
+
+constructor TLogger.create(clr: TCommandLineReader);
+var
+  s: String;
+  i: Integer;
+  j: TTestCaseResult;
+begin
+  FillChar(testCasesToLog, sizeof(testCasesToLog), 0);
+  s := clr.readString('print-test-cases');
+  for i := 1 to length(s) do
+    case s[i] of
+      'n': testCasesToLog[tcrNA] := true;
+      'f': testCasesToLog[tcrFail] := true;
+      'p': testCasesToLog[tcrPass] := true;
+      'e': testCasesToLog[tcrWrongError] := true;
+      'd': testCasesToLog[tcrDisputed] := true;
+      'b': testCasesToLog[tcrTooBig] := true;
+      's': testCasesToLog[tcrNotRun] := true;
+      else raise exception.Create('Invalid test case option: '+s[i]);
+    end;
+  logAllTestCases := true;
+  for j := low(testCasesToLog) to high(testCasesToLog) do
+    if not testCasesToLog[j] then begin
+      logAllTestCases := false;
+      break;
+    end;
+  printInputs := clr.readFlag('print-failed-inputs');
+end;
+
+procedure TLogger.loadCatalogue;
+begin
+  Writeln(stderr, 'Loading catalogue...');
+end;
+
+procedure TLogger.beginXQTS(testsets: TList);
+var
+  i: Integer;
+begin
+  longestTestSetName := 0;
+  for i := 0 to testsets.Count - 1 do
+    longestTestSetName := max(length(TTestSet(testsets[i]).name), longestTestSetName);
+end;
+
+procedure TLogger.skipTestSet(ts: TTestSet);
+begin
+  writeln(stderr, ts.name, ': ', 'n/a');
+end;
+
+procedure TLogger.beginTestSet(ts: TTestSet);
+begin
+  write(StdErr, ts.name + strDup(' ', longestTestSetName - length(ts.name)), ': ');
+end;
+
+procedure TLogger.endTestSet(ts: TTestSet; const result: TResultSet);
+begin
+//  write(stderr, 'Results of ', ts.name);
+  printResults(stderr, result);
+end;
+
+procedure TLogger.endXQTS(const result: TResultSet);
+begin
+  writeln(stderr);
+  writeln(stderr, 'Total results: ');
+  printResults(stderr, result);
+end;
+
+{ TTextLogger }
+
+constructor TTextLogger.create(clr: TCommandLineReader);
+begin
+  inherited;
+end;
+
+procedure TTextLogger.beginXQTS(testsets: TList);
+begin
+  inherited;
+end;
+
+procedure TTextLogger.beginTestSet(ts: TTestSet);
+begin
+  inherited;
+  writeln('Running: '+ts.name);
+end;
+
+procedure TTextLogger.beginTestCase(tc: TTestCase);
+begin
+  if logAllTestCases then write(tc.name,': ');//,TTest(tc.tests[0]).test);
+end;
+
+procedure TTextLogger.endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue);
+  function got: string;
+  begin
+    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation()
+    else result := resultValue.error;
+  end;
+begin
+  if not logAllTestCases then begin
+    if not testCasesToLog[resultValue.result] then exit;
+    write(tc.name,': ');
+  end;
+  case resultValue.result of
+    tcrPass: writeln('passed'); //todo
+    tcrFail: begin
+      writeln('FAILED');
+      writeln('      got: '+got+ ' expected: '+tc.expected);
+      if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
+    end;
+    tcrWrongError: begin
+      writeln('wrong error');
+      writeln('      got: '+got+ ' expected: '+tc.expected);
+      if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
+    end;
+    tcrNA: writeln('na');
+    tcrDisputed: writeln('disputed');
+    tcrTooBig: writeln('too big') ;
+    tcrNotRun: writeln('not run');
+  end;
+end;
+
+procedure TTextLogger.endTestSet(ts: TTestSet; const result: TResultSet);
+begin
+  inherited;
+  write(output, ts.name+ strDup(' ', longestTestSetName - length(ts.name)), ': ');
+  printResults(output, result);
+end;
+
+procedure TTextLogger.endXQTS(const result: TResultSet);
+begin
+  inherited endXQTS(result);
+  writeln(output);
+  writeln(output, 'Total results: ');
+  printResults(output, result);
 end;
 
 { TAssertionList }
@@ -436,7 +616,7 @@ begin
     end;
     aakError:
       if errorCode = '' then result := tcrFail
-      else if errorCode = value then result := tcrPass
+      else if (errorCode = value) or (value = '*') then result := tcrPass
       else result := tcrWrongError;
     aakSerializationError: raise exception.Create('assert serialization-error not supported ');
   end;
@@ -718,14 +898,6 @@ begin
     result := TTestSet.create(e);
 end;
 
-type TResultSet = array[TTestCaseResult] of integer;
-var totalResults: TResultSet = (0, 0, 0, 0, 0, 0, 0);
-
-procedure printResults(const r: TResultSet);
-begin
-  writeln(stdout, '  Passed: ', r[tcrPass], ' Failed: ', r[tcrFail], ' Wrong error: ', r[tcrWrongError], ' N/A: ', r[tcrNA], ' Other: ', r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun] );
-  writeln(stderr, '  Passed: ', r[tcrPass], ' Failed: ', r[tcrFail], ' Wrong error: ', r[tcrWrongError], ' N/A: ', r[tcrNA], ' Other: ', r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun] );
-end;
 
 procedure TTestSet.run;
 var
@@ -734,44 +906,26 @@ var
   localResults: TResultSet;
   res: TTestCaseResult;
   resultValue: TTestCaseResultValue;
-  function got: string;
-  begin
-    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation()
-    else result := resultValue.error;
-  end;
 
 begin
   fillchar(localResults, sizeof(localResults), 0);
-  writeln('Running: '+name);
   for i := 0 to dependencies.Count - 1 do
-    if not TDependency(dependencies[i]).isSatisfied then exit;
+    if not TDependency(dependencies[i]).isSatisfied then begin
+      logger.skipTestSet(self);
+      exit;
+    end;
+  logger.beginTestSet(self);
   for i := 0 to testCases.Count - 1 do begin
     tc := TTestCase(testCases[i]);
-    write(tc.name,': ');//,TTest(tc.tests[0]).test);
+    logger.beginTestCase(tc);
     resultValue.error:= '????';
     resultValue := tc.run;
     res := resultValue.result;
-    case res of
-      tcrPass: writeln('passed'); //todo
-      tcrFail: begin
-        writeln('FAILED');
-        writeln('      got: '+got+ ' expected: '+tc.expected);
-      end;
-      tcrWrongError: begin
-        writeln('wrong error');
-        writeln('      got: '+got+ ' expected: '+tc.expected);
-      end;
-      tcrNA: writeln('na');
-      tcrDisputed: writeln('disputed');
-      tcrTooBig: writeln('too big') ;
-      tcrNotRun: writeln('not run');
-    end;
+    logger.endTestCase(tc, resultValue);
     totalResults[res]+=1;
     localResults[res]+=1;
   end;
-  write('Results of ', name);
-  write(stderr, 'Results of ', name);
-  printResults(localResults);
+  logger.endTestSet(self, localResults);
 end;
 
 { TSource }
@@ -997,6 +1151,8 @@ begin
   clr.declareFlag('skip-negative', 'Ignore tests expecting only an error');
   clr.declareString('test-set', 'Only runs a certain test set');
   clr.declareString('test-case', 'Only runs a certain test case');
+  clr.declareString('print-test-cases', 'Which test case results to print (n: not run, f: failed, p: passed, e: wrong error, d: disputed, s: skipped, b: too big, o: dbs)', 'penfdsb');
+  clr.declareFlag('print-failed-inputs', 'Print failed inputs');
   //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
   case clr.readString('mode') of
@@ -1032,7 +1188,7 @@ begin
   tree.parsingModel := pmStrict;
   xq :=  TXQueryEngine.create;
   xq.ImplicitTimezone:=-5 / HoursPerDay;
-  xq.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
+  //xq.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
   xq.ParsingOptions.AllowExtendedStrings  := false;
   xq.ParsingOptions.AllowJSON:=false;
   xq.ParsingOptions.AllowJSONLiterals:=false;
@@ -1044,12 +1200,12 @@ begin
   xq.AutomaticallyRegisterParsedModules := true;
   defaultInternetAccessClass := TMockInternetAccess;
 
+  logger := TTextLogger.create(clr);
 
-
-  Writeln(stderr, 'Loading catalogue...');
+  logger.loadCatalogue;
   loadCatalog('catalog.xml');
 
-  Writeln(stderr, 'Running tests...');
+  logger.beginXQTS(testsets);
   for i := 0 to testsets.Count-1 do
     TTestSet(testsets[i]).run;
 
@@ -1058,6 +1214,6 @@ begin
   for cat in  cmd.readNamelessFiles() do begin
 
   end;}
-  printResults(totalResults)
+  logger.endXQTS(totalResults)
 end.
 
