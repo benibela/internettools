@@ -159,7 +159,13 @@ begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
     if not (b.typeAnnotation as TXSDateTimeType).isDuration then begin
       if (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
-      tempdt := a.toDateTime - b.toDateTime;
+      xqtempdt := a as TXQValueDateTime;
+      tempdt := xqtempdt.toDateTime;
+      if IsNan(xqtempdt.value.timezone) and not IsNan(cxt.staticContext.ImplicitTimezone) then tempdt -= cxt.staticContext.ImplicitTimezone;
+      xqtempdt := b as TXQValueDateTime;
+      tempdt -= xqtempdt.toDateTime;
+      if IsNan(xqtempdt.value.timezone) and not IsNan(cxt.staticContext.ImplicitTimezone) then tempdt += cxt.staticContext.ImplicitTimezone;
+
       xqtempdt := TXQValueDateTime.create(baseSchema.dayTimeDuration, abs(tempdt));
       xqtempdt.value.year:=0;
       xqtempdt.value.month:=0;
