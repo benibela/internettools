@@ -1052,9 +1052,9 @@ end;
 
 operator-(const a: BigDecimal): BigDecimal;
 begin
-  result.signed:=not a.signed;
-  result.digits:=a.digits;
-  result.exponent:=a.exponent;
+  result:=a;
+  result.signed:=not result.signed;
+  //should this copy the digits??
 end;
 
 procedure copyShiftedNoAlias(out dest: BigDecimal; const source: BigDecimal; const newExp, newMinLength: integer);
