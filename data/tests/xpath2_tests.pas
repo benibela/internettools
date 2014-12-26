@@ -932,7 +932,7 @@ begin
   t('min((current-date(), parse-date("3001-01-01","yyyy-mm-dd"))) = current-date()', 'true', '');
   t('min((current-date(), parse-date("1901-01-01","yyyy-mm-dd"))) = current-date()', 'false', '');
   t('min((-0.0,0.0))', '0', '');
-  t('type-of(min((-0.0,0.0)))', 'decimal', '');
+  t('min((-0.0,0.0)) instance of xs:decimal', 'true', '');
   t('min((1,2,3,4))', '1', '');
   t('min((1,25.0,-3,4))', '-3', '');
   t('min((1,xs:untypedAtomic("5"),3,4))', '1', '');
@@ -3481,6 +3481,8 @@ begin
   t('xs:integer(1.9999)', '1');
   t('-1.9999 cast as xs:integer', '-1');
   t('1.9999 cast as xs:integer', '1');
+  t('join((-1[0 < .], "|", -t/2, "|", +(-())))', '-1 | -2 |', '<t>7</t>');
+  f('-t/"a"', 'err:XPTY0004');
 
 
   //more precise type tests

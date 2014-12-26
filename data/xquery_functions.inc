@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
-
 function xqvalueF(const v: xqfloat; const typeRef1, typeRef2: IXQValue): IXQValue;
 var
   t: TXSType;
@@ -38,6 +37,43 @@ const Int64Halved = high(int64) div 2;
 const NonNumericKind = [pvkUndefined, pvkBoolean, pvkQName, pvkObject, pvkArray, pvkNull, pvkFunction];
 
 //================================Operators=====================================
+
+
+function xqvalueUnaryMinus(const cxt: TXQEvaluationContext; const nothing, arg: IXQValue): IXQValue;
+var
+  i64: Int64;
+begin
+  ignore(nothing);
+  case arg.kind of
+    pvkBigDecimal: result := TXQValueDecimal.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toDecimal);
+    pvkInt64: begin
+      i64 := arg.toInt64;
+      if i64 = low(int64) then result := TXQValueDecimal.create(baseSchema.integer, - arg.toDecimal)
+      else result := TXQValueInt64.create(- i64);
+    end;
+    pvkFloat: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toFloat);
+    pvkUndefined: result := xqvalue();
+    pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.getChild(1));
+    else result := TXQValueFloat.create(- arg.toFloat);
+  end;
+end;
+
+function xqvalueUnaryPlus(const cxt: TXQEvaluationContext; const nothing, arg: IXQValue): IXQValue;
+var
+  i64: Int64;
+begin
+  ignore(nothing);
+  case arg.kind of
+    pvkBigDecimal: result := TXQValueDecimal.create((arg.typeAnnotation as TXSSimpleType).primitive, arg.toDecimal);
+    pvkInt64: result := TXQValueInt64.create(arg.toInt64);
+    pvkFloat: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, arg.toFloat);
+    pvkUndefined: result := xqvalue();
+    pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.getChild(1));
+    else result := TXQValueFloat.create(arg.toFloat);
+  end;
+end;
+
+
 //** Perform vinary operations on xqvalue and destroys them.
 //** Assumes @a <> @b
 function xqvalueAdd(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;

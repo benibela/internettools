@@ -5740,6 +5740,8 @@ begin
   result := collations;
 end;
 
+
+
 function xqvalueNodeStepChild(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(ta); ignore(tb);
@@ -5760,7 +5762,6 @@ begin
   raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: ! called');
   result := xqvalue();
 end;
-
 
 
 class function TXQueryEngine.getCollation(id: string; base: string): TXQCollation;
@@ -6331,6 +6332,8 @@ pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:str
 pxp.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']);
 pxp.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']);
 
+
+
 //standard functions
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
 fn.registerFunction('empty', @xqFunctionempty,['($arg as item()*) as xs:boolean']);
@@ -6489,9 +6492,12 @@ fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, ['($seq1 as item
 //For *, +  functions with reverted argument order were added (since the order does not matter )
 //For eq/ne/.. boolean and string cases were added
 
-op.registerBinaryOp('/',@xqvalueNodeStepChild,200, [], []);
-op.registerBinaryOp('//',@xqvalueNodeStepDescendant,200, [], []);
-op.registerBinaryOp('!',@xqvalueSimpleMap,200, [], []).require3:=true;
+op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [], []);
+op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [], []);
+op.registerBinaryOp('!',@xqvalueSimpleMap,300, [], []).require3:=true;
+
+op.registerBinaryOp('-u', @xqvalueUnaryMinus, 200, ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+op.registerBinaryOp('+u', @xqvalueUnaryPlus, 200, ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
 
 op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], []);
 op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], []);

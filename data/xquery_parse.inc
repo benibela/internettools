@@ -1422,18 +1422,10 @@ begin
   case pos^ of
     '''', '"':  exit(TXQTermConstant.create(parseString()));
     '$': exit(parseVariableWithDotNotation());
-    '+', '-': begin
-      word := nextToken();
-      wordlookahead:=nextToken(true);
-      if (word = '-') and
-           ((wordlookahead[1] in ['0'..'9'])
-             or ((length(wordlookahead) > 2) and (wordlookahead[1] = '.') and (wordlookahead[2] in ['0'..'9']))) then begin
-        expect(wordlookahead);
-        exit(TXQTermConstant.createNumber('-' + wordlookahead));
-      end else
-        exit(TXQTermBinaryOp.create(word, TXQTermConstant.create(xqvalue(0)), parseValue()));
+    '-', '+': begin
+      word := nextToken() + 'u';
+      exit(TXQTermBinaryOp.create(word, TXQTermConstant.create(xqvalue()), parseValue()));
     end;
-
     '(': begin
       inc(pos);
       if pos^ = '#' then exit(parseExtension);
