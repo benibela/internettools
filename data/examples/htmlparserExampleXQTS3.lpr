@@ -44,6 +44,7 @@ type
   sources: TList;
   class function load(e: TTreeNode): TEnvironment;
   function getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
+  procedure getExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
 end;
 
 { TDependency }
@@ -1067,6 +1068,18 @@ begin
     end;
 end;
 
+procedure TEnvironment.getExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string;
+  var value: IXQValue);
+var
+  i: Integer;
+begin
+  for i := 0 to high(params) do
+    if params[i].declared and (params[i].name = variable) then begin
+      value := params[i].value;
+      exit
+    end;
+end;
+
 
 function loadEnvironment(env: TEnvironment): TTreeNode;
 var
@@ -1101,6 +1114,7 @@ begin
     TXQueryEngine.collationsInternal.Exchange(0, TXQueryEngine.collationsInternal.IndexOf(env.defaultCollation));
 
 
+
   xq.VariableChangelog.clear;
 
   for i := 0 to env.sources.Count-1 do
@@ -1109,13 +1123,15 @@ begin
     else TSource(env.sources[i]).tree; //the query should load it itself, but we need to load it in the cache, because the url does not actually exist
 
   xq.OnCollection:=@env.getCollection;
+  xq.OnDeclareExternalVariable:=@env.getExternalVariable;
 
   if env.namespaces = nil then FreeAndNil(sc.namespaces)
   else begin
     sc.namespaces := env.namespaces.clone;
   end;
   for i := 0 to high(env.params) do
-    xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
+    if not env.params[i].declared then
+      xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
 
 end;
 
