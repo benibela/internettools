@@ -3688,6 +3688,7 @@ var
   i, j, countMatch: Integer;
   matches: Boolean;
   errCode: String;
+  errMessage: String;
 begin
   if length(versions) = 0 then exit(-1);
   countMatch := -1;
@@ -3708,6 +3709,8 @@ begin
     end;
     countMatch := i;
   end;
+
+  //print a nice error message
   if countMatch = -1 then
     raise EXQEvaluationException.create('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
   errCode := 'XPTY0004';
@@ -3716,7 +3719,26 @@ begin
       errCode := 'FOTY0013'; //wtf?
       break;
     end;
-  raise EXQEvaluationException.create(errCode, 'Invalid types for function call: '+versions[0].name);
+  errMessage := 'Invalid types for function '+versions[0].name+'.'+LineEnding;
+  errMessage += 'Got: ';
+  for i := 0 to high(values) do begin
+    if i <> 0 then errMessage += ', ';
+    errMessage += values[i].debugAsStringWithTypeAnnotation();
+  end;
+  errMessage += LineEnding;
+  errMessage += 'Expected: ';
+  for i := countMatch to high(versions) do begin
+    if length(versions[i].types) <> length(values) then continue;
+    if i <> countMatch then errMessage += LineEnding + 'or ';
+    errMessage += '(';
+    for j := 0 to high(versions[i].types) do begin
+      if j <> 0 then errMessage += ', ';
+      errMessage += versions[i].types[j].serialize;
+    end;
+    errMessage += ')';
+  end;
+
+  raise EXQEvaluationException.create(errCode, errMessage);
 end;
 
 destructor TXQAbstractFunctionInfo.Destroy;
