@@ -1595,7 +1595,7 @@ begin
             if pos^ <> '{' then
               nextToken();
             expect('{');
-            raiseParsingError('XPST0075', 'Schema validation is not supported');
+            raiseParsingError('XQST0075', 'Schema validation is not supported');
           end;
         end;
       end;
