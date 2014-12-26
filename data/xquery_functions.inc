@@ -1660,6 +1660,8 @@ end;
 
 procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
+  temp: BigDecimal;
+  temp64: Int64;
 begin
   case args[1].kind of
     pvkInt64: from := args[1].toInt64;
@@ -1675,13 +1677,27 @@ begin
       end;
       from := round(xqfloatRounded(args[1].toFloat));
     end;
-    {pvkBigDecimal:}else from := BigDecimalToLongint(round(args[1].toDecimal));
+    {pvkBigDecimal:}else begin
+      temp := round(args[1].toDecimal);
+      if temp.signed then from := 1
+      else if temp > high(integer) then begin
+        from := 1;
+        len := 0;
+        exit;
+      end else from := BigDecimalToLongint(temp);
+    end;
   end;
 
+  if from > maxLen then begin len := 0; exit; end;
 
   if length(args) = 3 then begin
     case args[2].kind of
-      pvkInt64: unti := from + args[2].toInt64;
+      pvkInt64: begin
+        temp64 := args[2].toInt64;
+        if temp64 < 0 then unti := from
+        else if temp64 > high(integer) - from then unti := maxlen + 1
+        else unti := from + temp64;
+      end;
       pvkFloat: begin
         if IsNan(args[2].toFloat) or isNegInf(args[2].toFloat) then begin //Since -INF + INF returns NaN, no characters are selected.
            len := 0;
@@ -1689,12 +1705,16 @@ begin
         end else if isPosInf(args[2].toFloat) then unti := maxLen+1
         else unti := from + round(xqfloatRounded(args[2].toFloat));
       end;
-      else unti := from + BigDecimalToLongint(round(args[2].toDecimal));
+      else begin
+        temp := round(args[2].toDecimal);
+        if temp.signed then unti := from
+        else if temp > high(Integer) - from then unti := maxLen + 1
+        else unti := from + BigDecimalToLongint(temp);
+      end;
     end;
   end else unti := maxLen + 1;
 
   if from < 1 then from := 1;
-  if from > maxLen then begin len := 0; exit; end;
   if unti > maxLen + 1 then unti := maxLen + 1;
   len := unti-from;
   if len < 0 then len := 0;

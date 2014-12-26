@@ -881,6 +881,7 @@ begin
   t('subsequence((6), 2, 1)', '', '');
   t('subsequence(6, 2, 1)', '', '');
   t('string-join(subsequence((1,2,3,4,5), 3, 2), ",")', '3,4', '');
+  t('concat(string-join(subsequence((1,2,3,4,5), 3, 2147483646), ","), ":", string-join(subsequence((1,2,3,4,5), 3, 2147483648), ","))', '3,4,5:3,4,5', '');
   t('string-join(unordered((1,2,3,4,5)), ",")', '1,2,3,4,5', '');
   t('deep-equal(1, 2)', 'false', '');
   t('deep-equal(1, 1)', 'true', '');
