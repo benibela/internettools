@@ -1849,7 +1849,7 @@ function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
      if axis='preceding-sibling' then exit(qcPrecedingSibling);
      if axis='preceding' then exit(qcPreceding);
      if axis='ancestor-or-self' then exit(qcSameOrAncestor);
-     raise EXQEvaluationException.Create('XPST0010', 'Unknown axis: '+axis);
+     raise EXQEvaluationException.Create('XPST0003', 'Unknown axis: '+axis);  //todo move this to parsing
   end;
 
 begin

@@ -35,6 +35,7 @@ type
   resultquery: TXQuery;
 
   procedure raiseParsingError(errcode, s: string);
+  procedure raiseSyntaxError(s: string);
   procedure raiseInvalidModel(s: string);
 
   procedure requireXQuery(s: string = '');
@@ -108,9 +109,14 @@ begin
   raise EXQParsingException.Create(errcode, s+#13#10'in: '+strslice(@str[1],pos-1)+' [<- error occurs before here] '+strslice(pos,@str[length(str)]));
 end;
 
+procedure TXQParsingContext.raiseSyntaxError(s: string);
+begin
+  raiseParsingError('XPST0003', s);
+end;
+
 procedure TXQParsingContext.raiseInvalidModel(s: string);
 begin
-  raiseParsingError('XPST0003', 'This language feature is not available in the selected language. '+s);
+  raiseSyntaxError('This language feature is not available in the selected language. '+s);
 end;
 
 procedure TXQParsingContext.requireXQuery(s: string);
@@ -804,10 +810,10 @@ var
   i: Integer;
   oldDefaultElementTypeNamespace: INamespace;
 begin
-  skipWhitespace();
   case pos^ of
     '!': exit(parseCommentConstructor);
     '?': exit(parsePIConstructor);
+    #9,#10,#13,' ': raiseSyntaxError('Invalid whitespace in constructor');
   end;
   result := TXQTermConstructor.create(tetOpen, TXQTermConstant.create(nextTokenQName));
   skipWhitespace();
@@ -816,7 +822,7 @@ begin
     attribute := TXQTermConstructor.create(tetAttribute, TXQTermConstant.create(token));
     expect('=');
     skipWhitespace();
-    if not (pos^ in ['''', '"']) then raiseParsingError('XPST0003', 'Expected attribute value');
+    if not (pos^ in ['''', '"']) then raiseSyntaxError('Expected attribute value');
     marker := pos;
     pos+=1;
     parseCommonContent(attribute, marker^, false);
@@ -837,7 +843,7 @@ begin
   end;
   if pos^ = #0 then begin
     result.Free;
-    raiseParsingError('XPST0003', 'Attribute expected');
+    raiseSyntaxError('Attribute expected');
   end;
   if pos^ = '/' then begin
     expect('/');
@@ -1536,6 +1542,7 @@ begin
             end;
             exit;
           end;
+          if axis <> '' then raiseParsingError('XPST0003', 'Not an kind/node test');
         end;
 
 
@@ -1933,42 +1940,57 @@ var
   nameSpaceURL: String;
   temp: String;
   annotations: TXQAnnotations;
+  marker: PChar;
 begin
   result := nil;
   try
     token := nextToken(true);
+    marker := pos;
     if token = 'xquery' then begin
-      requireXQuery();
-      expect(token); expect('version');
-      temp := parseString();
-      if temp = '3.0' then requireXQuery3('XQuery 3 parsing model is not enabled')
-      else if temp = '1.0' then parsingModel := xqpmXQuery1
-      else raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 or 3.0');
-      token := nextToken(true);
-      if token = 'encoding' then begin
-        expect(token);
-        encoding := strEncodingFromName(parseString);
-        expect(';');
-        token := nextToken(true);
-      end else if token = ';' then begin expect(token); token := nextToken(true); end
-      else raiseParsingError('XPST0003', 'expected encoding or ;');
+      expect(token);
+      case nextToken() of
+      '': pos := marker;
+        'version': begin
+          requireXQuery();
+          temp := parseString();
+          if temp = '3.0' then requireXQuery3('XQuery 3 parsing model is not enabled')
+          else if temp = '1.0' then parsingModel := xqpmXQuery1
+          else raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 or 3.0');
+          token := nextToken(true);
+          if token = 'encoding' then begin
+            expect(token);
+            encoding := strEncodingFromName(parseString);
+            expect(';');
+            token := nextToken(true);
+          end else if token = ';' then begin expect(token); token := nextToken(true); end
+          else raiseParsingError('XPST0003', 'expected encoding or ;');
+        end;
+        else expect('version');
+      end;
     end;
 
     if token = 'module' then begin
-      requireModule;
-      expect(token); expect('namespace');
-      staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
-      expect('=');
-      (staticContext.moduleNamespace as TNamespace).url := parseString;
-      expect(';');
-      token := nextToken(true);
-      if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
-      staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, resultquery); //every module import itself so it can lazy initialize its variables
-      if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then
-        staticContext.sender.FModules.Add(IXQuery(resultquery));
+      expect(token);
+      case nextToken() of
+        '': pos := marker;
+        'namespace': begin
+          requireModule;
+          expect('namespace');
+          staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
+          expect('=');
+          (staticContext.moduleNamespace as TNamespace).url := parseString;
+          expect(';');
+          token := nextToken(true);
+          if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
+          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, resultquery); //every module import itself so it can lazy initialize its variables
+          if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then
+            staticContext.sender.FModules.Add(IXQuery(resultquery));
+        end;
+        else expect('namespace');
+      end;
     end;
 
-    while (token = 'declare') or (token = 'import') do begin
+    while ((token = 'declare') or (token = 'import')) do begin
       requireModule;
       expect(token);
       if token = 'import' then begin
@@ -2084,6 +2106,10 @@ begin
                   else raiseParsingError('XQST0013', 'Unknown option value: '+temp+' for '+token+' (allowed is yes/no)');
                 end;
             end;
+        end;
+        '': begin
+          pos := marker;
+          break;
         end;
         else raiseParsingError('XPST0003', 'Unknown declaration');
       end;

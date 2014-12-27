@@ -5582,7 +5582,7 @@ begin
     for n in previous do begin
       if command.typ = qcFunctionSpecialCase then begin
         if not (n.kind in [pvkNode, pvkObject, pvkArray]) then
-          raise EXQEvaluationException.create('err:XPTY0020', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
+          raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
         if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
         else newSequence := nil;
         tempContext.SeqIndex += 1;
@@ -5660,7 +5660,7 @@ begin
             end;
 
           end;
-          else raise EXQEvaluationException.create('err:XPTY0020', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
+          else raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
         end;
       end;
 
