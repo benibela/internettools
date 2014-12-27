@@ -471,6 +471,7 @@ begin
   t('0e0 div 0e0', 'NaN', '');
   t('1e0 div 0e0', 'INF', '');
   t('-1e0 div 0e0', '-INF', '');
+  t('-42 div xs:float("NaN")', 'NaN');
 
                 //comparison+type conversion
   t('5<5.0', 'false', '');

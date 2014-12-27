@@ -345,6 +345,7 @@ begin
   if isnan(f) or (f = 0) then begin
     if a.instanceOf(baseSchema.decimal) and b.instanceOf(baseSchema.decimal) then
       raiseDivisionBy0NotAllowed;
+    if IsNan(f) then exit(xqvalueF(getNaN, a, b));
     f := a.toFloat;
     if isnan(f) or (f=0) then result := xqvalueF(getNaN, a, b)
     else if f > 0 then result := xqvalueF(getPosInf, a, b)
