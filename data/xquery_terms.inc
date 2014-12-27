@@ -1303,18 +1303,18 @@ begin
   func := afunc;
 end;
   }
-constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; arity: integer; const model: TXQParsingModel);
+constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; arity: integer; const staticContext: TXQStaticContext);
 begin
-  if not findKindIndex(anamespace, alocalname, arity, model, kind, func) then begin
+  if not findKindIndex(anamespace, alocalname, arity, staticContext, kind, func) then begin
     kind := xqfkUnknown;
     funcname:=alocalname;
     namespaceUrl := anamespace;
   end;
 end;
 
-constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; args: array of TXQTerm; const model: TXQParsingModel);
+constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; args: array of TXQTerm; const staticContext: TXQStaticContext);
 begin
-  create(anamespace, alocalname, length(args), model);
+  create(anamespace, alocalname, length(args), staticContext);
   push(args);
 end;
 
@@ -1400,45 +1400,57 @@ begin
   TXQTermNamedFunction(result).assignWithoutChildren(self);
 end;
 
-class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
   aindex: Integer;
   module: TXQNativeModule;
   t: TXSType;
+  model: TXQParsingModel;
+  i: Integer;
 begin
   module := TXQueryEngine.findNativeModule(anamespace);
 
-  if (module = nil) then exit(false);
+  if staticContext <> nil then model := staticContext.model
+  else model := xqpmXQuery3;
 
-  afunc := module.findBasicFunction(alocalname, argcount, model);
-  if afunc <> nil then begin
-    akind:=xqfkBasic;
-    exit(true);
-  end;
-
-  afunc := module.findComplexFunction(alocalname, argcount, model);
-  if afunc <> nil then begin
-    akind:=xqfkComplex;
-    exit(true);
-  end;
-
-  afunc := module.findInterpretedFunction(alocalname, argcount, model);
-  if afunc <> nil then begin
-    akind:=xqfkNativeInterpreted;
-    exit(true);
-  end;
-
-  if argcount = 2 then begin
-    aindex := module.binaryOpFunctions.IndexOf(alocalname);
-    if aindex >= 0 then begin
-      afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
-      akind := xqfkWrappedOperator;
+  if (module <> nil) then begin
+    afunc := module.findBasicFunction(alocalname, argcount, model);
+    if afunc <> nil then begin
+      akind:=xqfkBasic;
       exit(true);
+    end;
+
+    afunc := module.findComplexFunction(alocalname, argcount, model);
+    if afunc <> nil then begin
+      akind:=xqfkComplex;
+      exit(true);
+    end;
+
+    afunc := module.findInterpretedFunction(alocalname, argcount, model);
+    if afunc <> nil then begin
+      akind:=xqfkNativeInterpreted;
+      exit(true);
+    end;
+
+    if argcount = 2 then begin
+      aindex := module.binaryOpFunctions.IndexOf(alocalname);
+      if aindex >= 0 then begin
+        afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
+        akind := xqfkWrappedOperator;
+        exit(true);
+      end;
     end;
   end;
 
   if argcount = 1 then begin
-    t:=baseSchema.findType(alocalname);
+    t := nil;
+    if anamespace = baseSchema.url then t:=baseSchema.findType(alocalname);
+    if (t = nil) and (staticContext <> nil) and (staticContext.importedSchemas<>nil) then
+      for i := 0 to staticContext.importedSchemas.Count - 1 do
+        if staticContext.importedSchemas.items[i].getURL = anamespace then begin
+          t:=baseSchema.findType(alocalname);
+          break;
+        end;
     if t <> nil then begin
       akind:=xqfkTypeConstructor;
       afunc := TXQAbstractFunctionInfo(TObject(t));
@@ -1497,7 +1509,7 @@ begin
             if (interpretedFunction.annotations[i].name = 'private') and (interpretedFunction.annotations[i].namespace = XMLNamespaceUrl_XQuery ) then
               raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
-        findKindIndex(namespaceUrl, funcname, length(children), context.staticContext.model, kind, func);
+        findKindIndex(namespaceUrl, funcname, length(children), context.staticContext, kind, func);
         if kind <> xqfkUnknown then exit();
         raiseEvaluationError('XPST0017', 'Function Q{'+namespaceUrl+'}'+ funcname+'#'+IntToStr(length(children))+ ' not found. '+suggestions);
       end;

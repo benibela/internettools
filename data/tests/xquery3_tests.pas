@@ -181,7 +181,7 @@ begin
   m('let $d := data#1 return <a>2</a> ! $d(.)', '2');
   m('let $d := <x>17</x> ! function-lookup(xs:QName("fn:data"), 0) return <a>2</a> ! $d()', '17');
   m('let $d := function-lookup(xs:QName("fn:data"), 1) return <a>2</a> ! $d(.)', '2');
-  m('declare function local:double($x) { 2 * $x }; join( (abs#1, boolean#1, local:double#1, floor#1) ! (.(-17.5)) ) ', '17.5 true -35 -18');
+  m('declare function double($x) { 2 * $x }; join( (abs#1, boolean#1, double#1, floor#1) ! (.(-17.5)) ) ', '17.5 true -35 -18');
   m('declare function local:double($x) { 2 * $x }; join( (function-lookup(xs:QName("fn:abs"), 1), function-lookup(xs:QName("fn:boolean"), 1), function-lookup(xs:QName("local:double"), 1), function-lookup(xs:QName("fn:floor"), 1) ) ! (.(-17.5)) ) ', '17.5 true -35 -18');
   m('declare function wntc($a, $b) { concat(">",$a,$b,"<") }; (let $f := wntc#2 return $f)("foo","bar")', '>foobar<');
   m('declare namespace libjn = "http://jsoniq.org/function-library"; let $d := libjn:descendant-pairs#1 return join($d([{"a": 1, "b": 2}]) ! serialize-json(.))', '{"a": 1} {"b": 2}');

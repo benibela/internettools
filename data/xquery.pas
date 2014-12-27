@@ -1464,8 +1464,8 @@ type
     funcname: string;
     constructor Create;
 //    constructor create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
-    constructor create(const anamespace, alocalname: string; arity: integer; const model: TXQParsingModel = xqpmXPath2);
-    constructor create(const anamespace, alocalname: string; args: array of TXQTerm; const model: TXQParsingModel = xqpmXPath2);
+    constructor create(const anamespace, alocalname: string; arity: integer; const staticContext: TXQStaticContext = nil);
+    constructor create(const anamespace, alocalname: string; args: array of TXQTerm; const staticContext: TXQStaticContext = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     procedure assignWithoutChildren(source: TXQTermNamedFunction);
@@ -1473,7 +1473,7 @@ type
   private
     interpretedFunction: TXQValueFunction;
     functionStaticContext: TXQStaticContext;
-    class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const model: TXQParsingModel; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+    class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
     procedure init(const context: TXQEvaluationContext);
   end;
 

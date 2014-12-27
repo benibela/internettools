@@ -1363,7 +1363,7 @@ var
     afunc: TXQAbstractFunctionInfo;
     tempUrl: String;
   begin
-    if TXQTermNamedFunction.findKindIndex(namespaceURL, word, length(f.children), parsingModel, akind, afunc) then begin
+    if TXQTermNamedFunction.findKindIndex(namespaceURL, word, length(f.children), staticContext, akind, afunc) then begin
       f.kind := akind;
       f.func := afunc;
       exit();
@@ -1371,7 +1371,7 @@ var
     if namespacePrefix = '' then begin
       if staticContext.defaultElementTypeNamespace <> nil then tempUrl := staticContext.defaultElementTypeNamespace.getURL
       else if staticContext.defaultTypeNamespace <> nil then tempUrl := staticContext.defaultTypeNamespace.getURL;
-      if TXQTermNamedFunction.findKindIndex(tempUrl, word, length(f.children), parsingModel, akind, afunc) then begin
+      if TXQTermNamedFunction.findKindIndex(tempUrl, word, length(f.children), staticContext, akind, afunc) then begin
         f.kind := akind;
         f.func := afunc;
         exit();
