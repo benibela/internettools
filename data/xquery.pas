@@ -5445,8 +5445,8 @@ var
  i: Integer;
  value: IXQValue;
 begin
-  if result = nil then exit;
-  if (result is TXQValueUndefined) then exit;
+  if (result = nil) or (result.getSequenceCount = 0) then exit;
+
 
   if [xqcdFocusDocument, xqcdFocusOther] * filter.getContextDependencies = [] then begin
     value := filter.evaluate(context);
@@ -5482,6 +5482,7 @@ begin
       xqvalueSeqAdd(result, v);
     i+=1;
   end;
+  if result = nil then result := xqvalue();
 end;
 
 class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: array of TXQTerm; const context: TXQEvaluationContext);
@@ -5551,7 +5552,7 @@ var
   end;
 
 begin
-  if previous.getSequenceCount = 0 then exit(previous);
+  if (previous = nil) or (previous.getSequenceCount = 0) then exit(previous);
 
   resultSeq:=TXQValueSequence.create(previous.getSequenceCount);
   try

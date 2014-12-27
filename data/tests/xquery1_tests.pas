@@ -412,6 +412,7 @@ begin
   t('<a foo="123"/> / attribute::  foo', '123');
   t('<a foo="123"/> / attribute   ::foo', '123');
   t('<a foo="123"/> / attribute :: foo', '123');
+  t('<a>x</a>[. eq y]/2', '');
 
 
   t('outer-xml(element empty {})', '<empty/>');
