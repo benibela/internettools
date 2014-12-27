@@ -516,6 +516,9 @@ begin
     end;
   fragment1 += '</WRAP>';
 
+  //writeln(stderr, 'Compare:',fragment1,':');
+  //writeln(stderr, '     to:','<WRAP>'+fragment+'</WRAP>',':');
+
   try
   compareTree.clearTrees;
   tree1 := compareTree.parseTree(fragment1);
@@ -978,6 +981,7 @@ begin
     if url <> '' then xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
     doc := ftree.getDocument(); //doc = ftree
     if not strContains(doc.documentURI, '://') then doc.documentURI := 'file://' + doc.documentURI;
+    if not strContains(doc.baseURI, '://') then doc.baseURI := 'file://' + doc.baseURI;
     if doc.documentURI <> '' then xq.ExternalDocumentsCacheInternal.AddObject(doc.documentURI, ftree);
 
   end;
