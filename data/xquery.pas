@@ -5688,10 +5688,14 @@ begin
 end;
 
 class function TXQueryEngine.evaluateSingleStepQuery(const query: TXQPathMatchingStep;const context: TXQEvaluationContext): IXQValue;
+var
+  n: TTreeNode;
 begin
   case query.typ of
     qcDocumentRoot: begin
-      result := xqvalue(context.getRootHighest);
+      n := context.getRootHighest;
+      if not (n is TTreeDocument) then raise EXQEvaluationException.create('XPDY0050', '/ can only select the root if it is a document node.');
+      result := xqvalue(n);
       filterSequence(result, query.filters, context);
     end;
     qcFunctionSpecialCase: begin

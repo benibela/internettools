@@ -71,6 +71,7 @@ var
      err: string;
    begin
      if not TestErrors then exit;
+     if pos(':', code) = 0 then code := 'err:' + code;
      try
        err := '- no error - : ' + performUnitTest(a,'<error>',c);
      except on e: EXQEvaluationException do begin
@@ -819,12 +820,12 @@ begin
   t('document {element a {}} instance of attribute()', 'false');
   t('document {element a {}} instance of element()', 'false');
   t('document {element a {}} instance of document-node()', 'true');
-  t('<foobar>abcxyz</foobar> / (/) / (/)', 'abcxyz');
-  t('<foobar>abcxyz</foobar> / (root()) / (/) / (root())', 'abcxyz');
+  f('<foobar>abcxyz</foobar> / (/) / (/)', 'XPDY0050');
+  f('<foobar>abcxyz</foobar> / (root()) / (/) / (root())', 'XPDY0050');
   t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root())', 'abcxyz');
-  t('<foobar>abcxyz</foobar> / (root()) / (/) / (root()) instance of element()', 'true');
+  f('<foobar>abcxyz</foobar> / (root()) / (/) / (root()) instance of element()', 'XPDY0050');
   t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root()) instance of element()', 'false');
-  t('<foobar>abcxyz</foobar> / (root()) / (/) / (root()) instance of document-node()', 'false');
+  f('<foobar>abcxyz</foobar> / (root()) / (/) / (root()) instance of document-node()', 'XPDY0050');
   t('document { <foobar>abcxyz</foobar> } / (root()) / (/) / (root()) instance of document-node()', 'true');
   t('count(<a/> | <a/>)' , '2');
   t('let $a := <a/> return count($a | $a)' , '1');
