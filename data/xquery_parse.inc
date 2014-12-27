@@ -1975,7 +1975,6 @@ begin
         '': pos := marker;
         'namespace': begin
           requireModule;
-          expect('namespace');
           staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
           expect('=');
           (staticContext.moduleNamespace as TNamespace).url := parseString;
