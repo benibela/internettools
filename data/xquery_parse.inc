@@ -1515,9 +1515,9 @@ begin
           end;
 
           if isKindTestFunction(word) then begin
-            if strContains(word, 'attribute') then axis := 'attribute';
             result := TXQTermNodeMatcher.Create(word, true);
             TXQTermNodeMatcher(result).namespaceCheck := xqnmNone;
+            if strContains(word, 'attribute') and (axis = '') then axis := 'attribute';
             TXQTermNodeMatcher(result).axis:=axis;
             skipWhitespaceAndComment();
             if pos^ <> ')' then begin
@@ -1530,6 +1530,10 @@ begin
               end;
             end;
             expect(')');
+            if (word <> 'node') and (axis <> 'self') and ( (axis = 'attribute') <> (strContains(word, 'attribute')) ) then begin
+              result.free;
+              result := TXQTermSequence.create();
+            end;
             exit;
           end;
         end;
