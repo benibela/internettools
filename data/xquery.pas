@@ -2868,8 +2868,6 @@ begin
     exit(defaultElementTypeNamespace);
   if (defaultTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkType]) and (defaultTypeNamespace.getPrefix = nsprefix) then
     exit(defaultTypeNamespace);
-  if (defaultFunctionNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkFunction]) and (defaultFunctionNamespace.getPrefix = nsprefix) then
-    exit(defaultFunctionNamespace);
   if (namespaces <> nil) and ((nsprefix <> '') or (defaultNamespaceKind in [xqdnkAny, xqdnkElementType])) and (namespaces.hasNamespacePrefix(nsprefix, result)) then
     exit;
   if importedModules <> nil then begin
@@ -2878,6 +2876,8 @@ begin
   end;
   if (importedSchemas <> nil)  and (defaultNamespaceKind in [xqdnkAny, xqdnkElementType,  xqdnkType]) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
     exit;
+  if (defaultFunctionNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkFunction]) and (defaultFunctionNamespace.getPrefix = nsprefix) then
+    exit(defaultFunctionNamespace);
   result := sender.findNamespace(nsprefix);
   if (result = nil) and (nsprefix = '') then
     case defaultNamespaceKind of

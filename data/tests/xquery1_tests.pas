@@ -600,7 +600,7 @@ begin
   m('declare function succi($a as integer) { $a + 1 }; declare function mul($a as integer, $b as integer) { $a * $b }; succi(mul(2,3)) ', '7');
   m('declare function succi($a as integer) { $a + 1 }; declare function mulsucc($a as integer, $b as integer) { succi($a * $b) }; mulsucc(5,6) ', '31');
   m('declare function fac($a as integer) { if ($a = 0) then 1 else $a * fac($a - 1)  }; fac(4) ', '24');
-  m('declare function fac($a as integer) { if ($a = 0) then 1 else $a * fac($a - 1)  }; fac(10) ', '3628800');
+  m('declare namespace fn = "xyz"; declare function fn:fac($a as integer) { if ($a = 0) then 1 else $a * fn:fac($a - 1)  }; fn:fac(10) ', '3628800');
   m('declare function fibi($a as integer) { if ($a <= 0) then 1 else fibi($a - 1) + fibi($a - 2)  }; fibi(5) ', '13');
   m('declare function fibi($a as integer) { if ($a <= 0) then 1 else fibi($a - 1) + fibi($a - 2)  }; fibi(6) ', '21');
 
