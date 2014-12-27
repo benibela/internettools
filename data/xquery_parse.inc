@@ -201,6 +201,7 @@ begin
         if ((pos+1)^ <> '''') then break
         else pos+=1;
     until pos^ in [#0];
+    if pos^ = #0 then raiseSyntaxError('Unclosed string');
     pos+=1;
   end else if pos^='"' then begin
     repeat
@@ -209,6 +210,7 @@ begin
         if ((pos+1)^ <> '"') then break
         else pos+=1;
     until pos^ in [#0];
+    if pos^ = #0 then raiseSyntaxError('Unclosed string');
     pos+=1;
   end else if (pos^ = ':') and ((pos+1)^ in ['=', ':']) then begin
     pos+=2;
@@ -224,15 +226,15 @@ begin
     repeat
       pos+=1;
       if pos^ = '.' then begin
-        if numberPoint then raiseParsingError('XPST0003', 'Double . in number');
+        if numberPoint then raiseSyntaxError('Double . in number');
         numberPoint:=true;
         pos+=1;
       end;
       if pos^ in ['e','E'] then begin
-        if numberE then raiseParsingError('XPST0003', 'Double e in number');
+        if numberE then raiseSyntaxError('Double e in number');
         pos+=1;
         numberE:=true;
-        if not (pos^ in ['0'..'9','+','-']) then raiseParsingError('XPST0003', 'Invalid character after e in number')
+        if not (pos^ in ['0'..'9','+','-']) then raiseSyntaxError('Invalid character after e in number')
         else pos+=1;
       end;
     until not (pos^ in ['0'..'9']);
@@ -1126,6 +1128,7 @@ function TXQParsingContext.replaceEntitiesAlways(s: string): string;
 var
   n, p: Integer;
   temp: string;
+  code: Integer;
 begin
   result := '';
   p := 1;
@@ -1142,10 +1145,18 @@ begin
       'quot': result += '"';
       'apos': result += '''';
       else begin
-        if (temp = '') or (temp[1] <> '#') then raiseParsingError('XPST0003', 'Invalid entity');
+        if (temp = '') or (temp[1] <> '#')  then raiseSyntaxError('Invalid entity');
         delete(temp,1,1);
-        if temp[1] = 'x' then result += strGetUnicodeCharacter(StrToInt('$'+strcopyfrom(temp,2)), staticContext.stringEncoding)
-        else result += strGetUnicodeCharacter(StrToInt(temp), staticContext.stringEncoding);
+        code := -1;
+        if temp <> '' then
+          case temp[1] of
+            'x': code := StrToIntDef('$'+strcopyfrom(temp,2), -1);
+            'X': ; //strToInt does hex with x
+            else code := StrToIntDef(temp, -1);
+          end;
+        if code < 0 then raiseSyntaxError('Invalid entity');
+        if code = 0 then raiseParsingError('XQST0090', '0 is not allowed in strings');
+        result += strGetUnicodeCharacter(code, staticContext.stringEncoding)
       end;
     end;
     p := n + 1;
