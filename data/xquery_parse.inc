@@ -585,8 +585,9 @@ begin
         repeat
           parseOrderSpecAndNextToken;
         until token <> ',';
-        if token <> 'return' then raiseParsingError('XPST0003', 'Expected return');
       end;
+
+      if token <> 'return' then raiseParsingError('XPST0003', 'Expected return');
     end;
 
     result.returned := parse;
