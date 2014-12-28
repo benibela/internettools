@@ -2132,9 +2132,12 @@ begin
         TXQTermModule(result).push(parsePrimaryLevel);
         if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
           raiseParsingError('XPST0003', 'A main module must have a query body, it cannot only declare functions/variables (add ; ())');
-    end else begin
-      if nextToken(true) <> '' then
-        raiseParsingError('XPST0003', 'Module should have ended, but input query did not');
+    end else if nextToken() <> '' then begin
+      if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then begin
+        resultquery._AddRef; //increase ref, so we can remove it from FModules without freeing. Cannot free it here, since the caller still has a reference to the object (but not the interface)
+        staticContext.sender.FModules.Remove(IXQuery(resultquery));
+      end;
+      raiseSyntaxError('Module should have ended, but input query did not');
     end;
   except
     result.free;

@@ -4999,7 +4999,8 @@ begin
       cxt.free;
     end;
   except
-    result.free;
+    if result.RefCount > 0 then result._Release //when it is a module it has a positive ref count and must not be freed directly
+    else result.free;
     raise;
   end;
 end;
