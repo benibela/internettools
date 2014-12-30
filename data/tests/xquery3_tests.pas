@@ -135,16 +135,16 @@ begin
 
   mr('module namespace test = "pseudo://test-module"; '+
      'declare namespace abcxq = "http://www.w3.org/2012/xquery";'+
-     'declare function test:internalref($a){ concat(test:funcI(), $a) } '+
-     'declare function test:internalrevf(){ join(($test:var, $test:varI, test:funcI())) } '+
+     'declare function test:internalref($a){ concat(test:funcI(), $a) }; '+
+     'declare function test:internalrevf(){ join(($test:var, $test:varI, test:funcI())) }; '+
      'declare variable $test:var := 12; '+
      'declare %private variable $test:varI := 34; '+
      'declare %public variable $test:varE := 56; '+
      'declare %local:private %local:private2(1,"13asds",1.343) variable $test:varF := 78; '+
      'declare %abcxq:private(1234) variable $test:varJ := 90; '+
-     'declare function test:func(){ "fn" }'+
-     'declare %private function test:funcI(){ "fi" }'+
-     'declare %public function test:funcE(){ "fe" }');
+     'declare function test:func(){ "fn" };'+
+     'declare %private function test:funcI(){ "fi" };'+
+     'declare %public function test:funcE(){ "fe" };');
   m('import module "pseudo://test-module"; $test:var', '12');
   f('import module "pseudo://test-module"; $test:unknown', 'err:XPST0008');
   f('import module "pseudo://test-module"; $test:varI', 'err:XPST0008');

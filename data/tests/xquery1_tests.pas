@@ -616,7 +616,7 @@ begin
   t('let $pVal := 1, $vList := (2,4,7,11,16), $vList2 := ($pVal, subsequence($vList, 1, count($vList)-1)) return for $i in 1 to count($vList) return $vList[$i] - $vList2[$i]', '1 2 3 4 5');
 
 
-  mr('module namespace test = "pseudo://test-module"; declare function test:internalref(){ concat($test:var, ":", test:func()) } declare variable $test:var := 123; declare function test:func(){ 456 }');
+  mr('module namespace test = "pseudo://test-module"; declare function test:internalref(){ concat($test:var, ":", test:func()) }; declare variable $test:var := 123; declare function test:func(){ 456 };');
   m('import module "pseudo://test-module"; $test:var', '123');
   m('import module "pseudo://test-module"; test:func()', '456');
   m('import module "pseudo://test-module"; test:internalref()', '123:456');
@@ -625,7 +625,7 @@ begin
   m('import module namespace rename = "pseudo://test-module"; rename:internalref()', '123:456');
   f('import module namespace rename = "pseudo://test-module"; $test:var', 'err:XPST0008');
 
-  mr('module namespace test2 = "pseudo://test-module2"; import module "pseudo://test-module"; declare function test2:sumcalc($param){ concat("SUM: ", sum($param)) } declare function test2:wrapwrap() { test:internalref() } ');
+  mr('module namespace test2 = "pseudo://test-module2"; import module "pseudo://test-module"; declare function test2:sumcalc($param){ concat("SUM: ", sum($param)) }; declare function test2:wrapwrap() { test:internalref() };');
   m('import module "pseudo://test-module2"; test2:sumcalc((1,2,3))', 'SUM: 6');
   m('import module "pseudo://test-module2"; test2:wrapwrap()', '123:456');
   m('import module namespace renamed = "pseudo://test-module2"; renamed:sumcalc((1,2,3))', 'SUM: 6');
@@ -684,11 +684,11 @@ begin
   m('declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'second');
   m('declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first');
 
-  m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever" string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'first second');
+  m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'first second');
   m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first second');
   m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'second');
   m('declare namespace temp = "http://www.benibela.de/2012/pxp/extensions"; declare option temp:default-node-collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first');
-  m('declare option pxp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever" string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'first second');
+  m('declare option pxp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'first second');
   m('declare option pxp:default-node-collation "http://www.benibela.de/2012/pxp/case-insensitive-clever"; string-join(<r><A>first</A><a>second</a></r> / A, " ") ', 'first second');
   m('declare option pxp:default-node-collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; string-join(<r><A>first</A><a>second</a></r> / a, " ") ', 'second');
   m('declare option pxp:extended-strings "on"; declare variable $foobar := 123; x"var is {$foobar}."', 'var is 123.');
@@ -1712,13 +1712,13 @@ begin
   ps.StaticContext.strictTypeChecking:=false;
 
   ps.AutomaticallyRegisterParsedModules := true;
-  ps.parseXQuery1('module namespace test3 = "pseudo://test-module3"; declare function test3:double($x) { 2*$x}; declare variable $test3:var := 17');
+  ps.parseXQuery1('module namespace test3 = "pseudo://test-module3"; declare function test3:double($x) { 2*$x}; declare variable $test3:var := 17; ');
   m('import module "pseudo://test-module3"; test3:double(10)', '20');
   m('import module "pseudo://test-module3" at "whatever"; test3:double(10)', '20');
   m('import module namespace test4 = "pseudo://test-module3"; test4:double(10) + $test4:var', '37');
   ps.OnImportModule:=@helper.ImportModule;
 
-  ps.parseXQuery1('module namespace circle1 = "pseudo://circle1"; import module "pseudo://circle2"; declare function circle1:cf1 ($x) { if ($x <= 0) then 1 else $x * circle2:cf2($x - 1)}');
+  ps.parseXQuery1('module namespace circle1 = "pseudo://circle1"; import module "pseudo://circle2"; declare function circle1:cf1 ($x) { if ($x <= 0) then 1 else $x * circle2:cf2($x - 1)};');
 
   m('import module namespace circle1 = "pseudo://circle1"; import module namespace circle2 = "pseudo://circle2"; circle1:cf1(10)', '3628800');
 
@@ -1927,7 +1927,7 @@ procedure THelper.ImportModule(sender: TObject; const namespace: string; const a
 begin
   case namespace of
     'pseudo://circle2':
-      ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ');
+      ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ;');
     'http://www.w3.org/2005/xpath-functions', 'http://jsoniq.org/function-library': ;
     else raise Exception.Create('Invalid namespace: '+namespace)
   end;

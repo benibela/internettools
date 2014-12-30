@@ -1854,6 +1854,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
   var
     prefix, url: String;
   begin
+    requireModule;
     prefix := '';
     url := nextToken();
     case url of
@@ -1889,6 +1890,7 @@ function TXQParsingContext.parseModule(): TXQTerm;
     module: TXQuery;
     nativeModule: TXQNativeModule;
   begin
+    requireModule;
     skipWhitespaceAndComment();
     moduleName := '';
     if pos^ = 'n' then begin
@@ -2002,12 +2004,16 @@ begin
     end;
 
     while ((token = 'declare') or (token = 'import')) do begin
-      requireModule;
+      marker := pos;
       expect(token);
       if token = 'import' then begin
         case nextToken() of
           'schema': importSchema;
           'module': importModule;
+          else begin
+            pos := marker;
+            break;
+          end;
         end;
       end else case nextToken() of //declare ...
         'boundary-space':
@@ -2068,13 +2074,33 @@ begin
            if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
            staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
         end;
+        else begin
+          pos := marker;
+          token := 'declare';
+          break;
+        end;
+      end;
+      expect(';');
+      token := nextToken(true);
+    end;
+
+    while (token = 'declare') do begin
+      marker := pos;
+      expect(token);
+      case nextToken() of
         'variable': declareVariable(nil);
-        'function': TXQTermModule(result).push(parseFunctionDeclaration(nil));
+        'function': begin
+          requireModule;
+          TXQTermModule(result).push(parseFunctionDeclaration(nil));
+        end;
         '%': begin
           annotations := parseAnnotations;
           case nextToken() of
             'variable': declareVariable(annotations);
-            'function': TXQTermModule(result).push(parseFunctionDeclaration(annotations));
+            'function': begin
+              requireModule;
+              TXQTermModule(result).push(parseFunctionDeclaration(annotations));
+            end;
             else raiseParsingError('XPST0003', 'Only variables and functions can have annotations');
           end;
         end;
@@ -2122,12 +2148,13 @@ begin
           pos := marker;
           break;
         end;
-        else raiseParsingError('XPST0003', 'Unknown declaration');
       end;
-      token := nextToken(true);
-      if token = ';' then expect(';');
+      expect(';');
       token := nextToken(true);
     end;
+
+
+
     if result = nil then result := parsePrimaryLevel()
     else if staticContext.moduleNamespace = nil then begin //main module
         TXQTermModule(result).push(parsePrimaryLevel);
