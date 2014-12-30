@@ -68,6 +68,7 @@ type
   TXQTermArray = array of TXQTerm;
   TXQTermVariable = class;
   TXQTermSequenceType = class;
+  TXQTerm_Visitor = class;
   TXQuery = class;
   IXQuery = interface;
   TXQNativeModule = class;
@@ -114,6 +115,9 @@ type
   private
     FNodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
     function getNodeCollation: TXQCollation;
+  protected
+    function findModule(const namespaceURL: string): TXQuery;
+    function findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
   public
     sender: TXQueryEngine; //**< Engine this context belongs to
 
@@ -190,8 +194,6 @@ type
     function compareAtomicBase(const a,b: IXQValue): integer; //**< Compares two values (depending on the context properties like collations)
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
-    function findModule(const namespaceURL: string): TXQuery;
-    function findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
     function getRootHighest: TTreeNode;
@@ -801,6 +803,7 @@ type
     function debugAsStringWithTypeAnnotation(textOnly: boolean=true): string;
   private
     procedure assignCopiedTerms(const func: TXQValueFunction);
+    procedure visit(visitor: TXQTerm_Visitor);
   end;
 
 
@@ -1474,7 +1477,7 @@ type
     interpretedFunction: TXQValueFunction;
     functionStaticContext: TXQStaticContext;
     class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
-    procedure init(const context: TXQEvaluationContext);
+    procedure init(const context: TXQStaticContext);
   end;
 
   { TXQDynamicFunctionCall }
@@ -2212,7 +2215,7 @@ type
     function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
 
     function hasVariable(const variable: string; value: PXQValue; const namespaceURL: string = ''): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
-    function hasVariable(const variable: TXQTermVariable; value: PXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+    function hasVariable(const variable: TXQTermVariable; value: PXQValue = nil): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
     //function hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace = nil): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
 
     property Values[name:string]:IXQValue read get write add; default;
@@ -2792,6 +2795,16 @@ begin
 end;
 
 
+type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
+  overridenVariables: {set of string} TXQVariableChangeLog;
+  tempValue: IXQValue;
+  constructor create;
+  destructor Destroy; override;
+
+  procedure declare(v: PXQTermVariable); override;
+  procedure undeclare(v: PXQTermVariable); override;
+end;
+
 
 { TXQStaticContext }
 
@@ -2799,6 +2812,28 @@ function TXQStaticContext.getNodeCollation: TXQCollation;
 begin
   if FNodeCollation = nil then result :=collation
   else result := FNodeCollation;
+end;
+
+function TXQStaticContext.findModule(const namespaceURL: string): TXQuery;
+var
+  i: Integer;
+begin
+  if (self = nil) or (importedModules = nil) then exit(nil);
+
+  for i := 0 to importedModules.count - 1 do
+    if TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace.getURL = namespaceURL then
+      exit(TXQuery(importedModules.Objects[i]));
+
+  result := nil;
+end;
+
+function TXQStaticContext.findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
+var
+  module: TXQuery;
+begin
+  module := findModule(namespaceURL);
+  if module = nil then exit(self);
+  exit(module.staticContext);
 end;
 
 function TXQStaticContext.clone: TXQStaticContext;
@@ -3008,6 +3043,85 @@ begin
     SetLength(context.staticContext.functions, functionCount); //happens, if a function was overridden
 end;
 
+
+type
+
+{ TVariableCycleDetector }
+
+TVariableCycleDetector = class(TXQTerm_VisitorTrackKnownVariables)
+  stack, visited: TList;
+  declaredVarStack: TXQVariableChangeLog;
+  scontext: TXQStaticContext;
+  module: TXQTermModule;
+  constructor create;
+  destructor Destroy; override;
+  function visit(term: PXQTerm): TXQTerm_VisitAction; override;
+  function leave(term: PXQTerm): TXQTerm_VisitAction; override;
+end;
+
+{ TVariableCycleDetector }
+
+constructor TVariableCycleDetector.create;
+begin
+  inherited;
+  stack := TList.Create;
+  visited := tlist.Create;
+  declaredVarStack:=TXQVariableChangeLog.create();
+end;
+
+destructor TVariableCycleDetector.Destroy;
+begin
+  stack.free;
+  visited.Free;
+  declaredVarStack.free;
+  inherited Destroy;
+end;
+
+function TVariableCycleDetector.visit(term: PXQTerm): TXQTerm_VisitAction;
+var
+  modu: TXQTermModule;
+  q: TXQuery;
+  declaration: TXQTermDefineVariable;
+  hasExpression: Boolean;
+  v: TXQTermVariable;
+  i: Integer;
+begin
+  Result:=inherited visit(term);
+  stack.Add(term^);
+  if visited.IndexOf(term^) >= 0 then exit(xqtvaNoRecursion);
+  visited.Add(term^);
+  if term^ is TXQTermNamedFunction then begin
+    if TXQTermNamedFunction (term^).kind = xqfkUnknown then TXQTermNamedFunction (term^).init(scontext);
+    if TXQTermNamedFunction (term^).kind = xqfkUnknown then TXQTermNamedFunction (term^).interpretedFunction.visit(self);
+  end else if term^ is TXQTermVariable then begin
+    v := TXQTermVariable(term^);
+    if (overridenVariables.hasVariable(v)) or ((scontext.moduleVariables <> nil) and (scontext.moduleVariables.hasVariable(v))) then exit;
+    if declaredVarStack.hasVariable(v) then raise EXQEvaluationException.create( ifthen(scontext.model in [xqpmXPath3, xqpmXQuery3], 'XQDY0054', 'XQST0054' ), 'Dependancy cycle detected for '+term^.debugTermToString);
+    q := scontext.findModule(TXQTermVariable(term^).namespaceURL);
+    if q <> nil then modu := q.fTerm as TXQTermModule
+    else modu := module;
+    for i:=0 to high(modu.children) - ifthen((modu = module) and (scontext.moduleNamespace = nil), 1,0) do
+      if (modu.children[i] is TXQTermDefineVariable) and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
+        declaration := TXQTermDefineVariable(modu.children[i]);
+        hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
+        if hasExpression then begin
+          declaredVarStack.pushAll;
+          declaredVarStack.add(v, xqvalue());
+          simpleTermVisit(@declaration.children[high(declaration.children)], nil);
+          declaredVarStack.popAll();
+        end;
+      end;
+  end;
+end;
+
+function TVariableCycleDetector.leave(term: PXQTerm): TXQTerm_VisitAction;
+begin
+  Result:=inherited leave(term);
+  assert(term^ = txqterm(stack[stack.Count-1]));
+  stack.Delete(stack.Count-1);
+end;
+
+
 procedure TXQTermModule.initializeVariables(var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext);
 var
   targetStaticContext: TXQStaticContext;
@@ -3062,6 +3176,7 @@ var
   hasExpression: Boolean;
   nsu, name: String;
   i: Integer;
+  cycler: TVariableCycleDetector;
 begin
   if context.staticContext <> ownStaticContext then begin
     for i := 0 to high(declaration.annotations) do
@@ -3075,8 +3190,18 @@ begin
   hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
 
   result := nil;
-  if hasExpression then result := declaration.children[high(declaration.children)].evaluate(context)
-  else begin
+  if hasExpression then begin
+    cycler := TVariableCycleDetector.create;
+    cycler.module := self;
+    cycler.scontext := ownStaticContext;
+    try
+      cycler.declaredVarStack.add(declaration.variable as TXQTermVariable, xqvalue());
+      cycler.simpleTermVisit(@declaration.children[high(declaration.children)], declaration);
+    finally
+      cycler.free;
+    end;
+    result := declaration.children[high(declaration.children)].evaluate(context)
+  end else begin
     if (context.staticContext.sender = nil) or not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
     name := (declaration.variable as TXQTermVariable).value;
     nsu := (declaration.variable as TXQTermVariable).namespaceURL;
@@ -3148,28 +3273,6 @@ begin
   result := temp.getURL;
 end;
 
-function TXQEvaluationContext.findModule(const namespaceURL: string): TXQuery;
-var
-  i: Integer;
-begin
-  if (staticContext = nil) or (staticContext.importedModules = nil) then exit(nil);
-
-  for i := 0 to staticContext.importedModules.count - 1 do
-    if TXQuery(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace.getURL = namespaceURL then
-      exit(TXQuery(staticContext.importedModules.Objects[i]));
-
-  result := nil;
-end;
-
-function TXQEvaluationContext.findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
-var
-  module: TXQuery;
-begin
-  module := findModule(namespaceURL);
-  if module = nil then exit(staticContext);
-  exit(module.staticContext);
-end;
-
 procedure TXQEvaluationContext.splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind
   );
 begin
@@ -3206,7 +3309,7 @@ begin
     value := temp;
     if result then exit;
   end;
-  module := findModule(namespaceURL);
+  module := staticContext.findModule(namespaceURL);
   if (module <> nil) then begin
     if (module.staticContext.moduleVariables <> nil) then begin //what is the point of this?? unit tests work without and it might expose private variables. todo: remove if it is not needed for XQTS
       result := module.staticContext.moduleVariables.hasVariable(name, @temp, namespaceURL);

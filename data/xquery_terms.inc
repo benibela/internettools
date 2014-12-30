@@ -1359,7 +1359,7 @@ begin
       end;
     end;
     xqfkUnknown, xqfkNativeInterpreted: begin
-      init(context);
+      init(context.staticContext);
       result := interpretedFunction.evaluate(evilkids);
     end;
   end;
@@ -1461,7 +1461,7 @@ begin
   exit(false);
 end;
 
-procedure TXQTermNamedFunction.init(const context: TXQEvaluationContext);
+procedure TXQTermNamedFunction.init(const context: TXQStaticContext);
   function suggestions: string;
   function strSimilar(const s, ref: string): boolean;
   begin
@@ -1504,12 +1504,12 @@ begin
           end;
         end;
       if interpretedFunction <> nil then begin
-        if functionStaticContext <> context.staticContext {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
+        if functionStaticContext <> context {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
           for i := 0 to high(interpretedFunction.annotations) do
             if (interpretedFunction.annotations[i].name = 'private') and (interpretedFunction.annotations[i].namespace = XMLNamespaceUrl_XQuery ) then
               raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
-        findKindIndex(namespaceUrl, funcname, length(children), context.staticContext, kind, func);
+        findKindIndex(namespaceUrl, funcname, length(children), context, kind, func);
         if kind <> xqfkUnknown then exit();
         raiseEvaluationError('XPST0017', 'Function Q{'+namespaceUrl+'}'+ funcname+'#'+IntToStr(length(children))+ ' not found. '+suggestions);
       end;
@@ -1518,7 +1518,7 @@ begin
       if TXQInterpretedFunctionInfo(func).func = nil then
         TXQInterpretedFunctionInfo(func).initialize();
       interpretedFunction :=  TXQInterpretedFunctionInfo(func).func;
-      functionStaticContext := context.staticContext;
+      functionStaticContext := context;
     end;
   end;
 end;
@@ -2564,16 +2564,6 @@ end;
 type
   PXQEvaluationContext = ^TXQEvaluationContext;
 
-  TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
-    overridenVariables: {set of string} TXQVariableChangeLog;
-    tempValue: IXQValue;
-    constructor create;
-    destructor Destroy; override;
-
-    procedure declare(v: PXQTermVariable); override;
-    procedure undeclare(v: PXQTermVariable); override;
-  end;
-
   { TXQTerm_VisitorReplaceKnownVariables }
 
   TXQTerm_VisitorReplaceKnownVariables = class(TXQTerm_VisitorTrackKnownVariables)
@@ -2839,7 +2829,7 @@ var
 begin
   f := TXQTermNamedFunction(children[high(children)]);
   if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then
-    f.init(context);
+    f.init(context.staticContext);
 
   result := nil;
   case f.kind  of

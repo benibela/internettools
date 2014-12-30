@@ -1840,3 +1840,14 @@ begin
   ownsTerms := true;
 end;
 
+procedure TXQValueFunction.visit(visitor: TXQTerm_Visitor);
+var
+  i: Integer;
+begin
+  for i := 0 to high(parameters) do
+    visitor.declare(@parameters[i].variable, nil);
+  visitor.simpleTermVisit(@body, nil);
+  for i := high(parameters) downto 0 do
+    visitor.undeclare(@parameters[i].variable, nil);
+end;
+

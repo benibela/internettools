@@ -609,6 +609,7 @@ begin
   m('declare variable $var := 123;  declare function wrapper($a as integer) { $var * $a }; wrapper(2) ', '246');
   m('declare function wrapper($a as integer) { $var * $a }; declare variable $var := 123;  wrapper(3) ', '369'); //forward variable reference (if i read the standard correctly that is not allowed. But it is easier to implement this way and in Zorba it also works)
   m('declare function odd($a as integer) { if ($a = 0) then false() else even($a - 1)}; declare function even($a as integer) { if ($a = 0) then true() else odd($a - 1)}; string-join(for $i in 0 to 9 return odd($i), " ") ', 'false true false true false true false true false true');
+  f('declare variable $foo := test(); declare function test() { test() + $foo }; 2', 'XQST0054');
 
   //some realworld examples from stackoverflow
   t('let $x := 1, $seq := (2,4,7,11,16) for $temp at $pos in $seq return $seq[$pos] - if ($pos eq 1) then $x else $seq[$pos - 1]', '1 2 3 4 5');

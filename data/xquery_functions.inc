@@ -59,8 +59,6 @@ begin
 end;
 
 function xqvalueUnaryPlus(const cxt: TXQEvaluationContext; const nothing, arg: IXQValue): IXQValue;
-var
-  i64: Int64;
 begin
   ignore(nothing);
   case arg.kind of
