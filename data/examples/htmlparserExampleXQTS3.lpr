@@ -622,7 +622,7 @@ begin
       if errorCode = '' then result := tcrFail
       else if (errorCode = value) or (value = '*') then result := tcrPass
       else result := tcrWrongError;
-    aakSerializationError: raise exception.Create('assert serialization-error not supported ');
+    aakSerializationError: result := tcrFail; //  raise exception.Create('assert serialization-error not supported ');
   end;
 end;
 
@@ -719,7 +719,8 @@ begin
   xq.OnImportModule:=@importModule;
   for i := 0 to modules.Count - 1 do
     if xq.findModule(TModule(modules[i]).uri) = nil then
-      xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);
+      if FileExists(TModule(modules[i]).fn) then
+        xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);
   if tests.Count <> 1 then raise Exception.Create('invalid test count');
   try
     result.value := xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree);
@@ -745,7 +746,7 @@ var
   i: Integer;
 begin
   for i := 0 to modules.Count-1 do
-    if TModule(modules[i]).uri = namespace then
+    if (TModule(modules[i]).uri = namespace) and (FileExists(TModule(modules[i]).fn)) then
       xq.registerModule(xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version));
 end;
 

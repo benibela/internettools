@@ -31,6 +31,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
+        <CommandLineParams Value="--mode xquery1  --test-set VarDecl --test-case K-InternalVariablesWith-6a"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
     </RunParams>
