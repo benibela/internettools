@@ -1787,14 +1787,16 @@ begin
 end;
 
 function xqFunctionString_length(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  temp: String;
 begin
-  if length(args) = 0 then begin
-    if context.SeqValue <> nil then result := xqvalue(length(context.SeqValue.toString))
-    else result := xqvalue(length(treeElementAsString(context.ParentElement)));
-    exit;
-  end;
   requiredArgCount(args, 0, 1);
-  result := xqvalue(length(args[0].toString));
+  if length(args) = 1 then temp := args[0].toString
+  else if context.SeqValue <> nil then temp := context.SeqValue.toString
+  else if context.ParentElement <> nil then temp := treeElementAsString(context.ParentElement)
+  else raise EXQEvaluationException.create('XPDY0002', 'No context item');
+
+  result := xqvalue(length(temp));
 end;
 
 function xqFunctionNormalize_space(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

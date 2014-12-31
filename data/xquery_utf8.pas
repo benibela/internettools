@@ -31,7 +31,8 @@ begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then temp := args[0].toString
   else if context.SeqValue <> nil then temp := context.SeqValue.toString
-  else temp := xqvalue(context.ParentElement).toString;
+  else if context.ParentElement <> nil then temp := xqvalue(context.ParentElement).toString
+  else raise EXQEvaluationException.create('XPDY0002', 'No context item');
 
   result := xqvalue(UTF8Length(temp));
 end;
