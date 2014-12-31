@@ -20,6 +20,15 @@ begin
   result := seq;
 end;
 
+function xqFunctionHas_Children(const context: TXQEvaluationContext;  const arg: TXQVArray): IXQValue;
+var n: TTreeNode;
+begin
+  if length(arg) = 0 then n := context.contextNode()
+  else n := arg[0].toNode;
+  if n = nil then exit(xqvalueFalse);
+  result := xqvalue(n.getFirstChild() <> nil);
+end;
+
 function xqFunctionFunction_lookup(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   qname: TXQValueQName;
