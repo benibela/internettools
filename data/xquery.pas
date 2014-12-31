@@ -6139,12 +6139,15 @@ begin
   basicFunctions:=TStringList.Create;
   basicFunctions.Sorted := true;
   basicFunctions.OwnsObjects:=true;
+  basicFunctions.Duplicates := dupAccept;
   complexFunctions:=TStringList.Create;
   complexFunctions.Sorted := true;
   complexFunctions.OwnsObjects:=true;
+  complexFunctions.Duplicates := dupAccept;
   interpretedFunctions:=TStringList.Create;
   interpretedFunctions.Sorted := true;
   interpretedFunctions.OwnsObjects:=true;
+  interpretedFunctions.Duplicates := dupAccept;
   binaryOpLists:=TStringList.Create;
   binaryOpLists.Sorted := true;
   binaryOpLists.OwnsObjects:=true;
