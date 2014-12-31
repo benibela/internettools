@@ -1360,7 +1360,16 @@ begin
   end;
 end;
 
-
+function StrToIntWithError(const s: string): integer;
+var
+  i: Integer;
+begin
+  result := StrToIntDef(s, -1);
+  if result = -1 then begin
+    for i := 1 to length(s) do if not (s[i] in ['0'..'9']) then raise EXQEvaluationException.create('XPST0003', 'Invalid number: '+s);
+    raise EXQEvaluationException.create('FOAR0002', 'Invalid number: '+s);
+  end;
+end;
 
 function TXQParsingContext.parseValue: TXQTerm;
 var
@@ -1588,9 +1597,9 @@ begin
         require3('Named Function Reference');
         expect('#');
         if namespaceURL = '' then
-          exit(TXQTermDefineFunction.CreateReference(staticContext.findNamespace(namespacePrefix, xqdnkFunction), word, StrToInt(nextToken())))
+          exit(TXQTermDefineFunction.CreateReference(staticContext.findNamespace(namespacePrefix, xqdnkFunction), word, StrToIntWithError(nextToken())))
          else
-          exit(TXQTermDefineFunction.CreateReference(namespaceURL, word, StrToInt(nextToken())));
+          exit(TXQTermDefineFunction.CreateReference(namespaceURL, word, StrToIntWithError(nextToken())));
       end;
       ':': if (pos+1)^ = '=' then
         if namespacePrefix = '' then

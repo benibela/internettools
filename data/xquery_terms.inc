@@ -2760,9 +2760,10 @@ end;
 
 function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;
 begin
- result := TXQTermSequenceType(t.clone);
- if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
-   result.atomicTypeInfo := baseSchema.anyAtomicType;
+  if t = nil then exit(nil);
+  result := TXQTermSequenceType(t.clone);
+  if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
+    result.atomicTypeInfo := baseSchema.anyAtomicType;
 end;
 
 function isPseudoVariable(v: TXQTerm): boolean; inline;
@@ -2865,7 +2866,8 @@ begin
     resulttype := nil;
     if version <> nil then begin
       for i := 0 to parameterCount-1 do
-        (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(version^.types[i]));
+        if version^.types[i] <> nil then
+          (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(version^.types[i]));
       resulttype := nativeMetaTypeToActualType(version^.returnType);
     end else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
       for i := 0 to parameterCount-1 do begin
