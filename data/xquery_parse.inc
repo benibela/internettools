@@ -1106,7 +1106,8 @@ begin
         result.push(parsePrimaryLevel);
         expect('}');
       end;
-      'external': ;
+      'external': if anonymous then raiseSyntaxError('Anonymous function cannot be external');
+      else raiseSyntaxError('Function body { } or external expected');
     end;
     if not anonymous then begin
       if result.namespace = nil then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.funcname);
@@ -2169,15 +2170,13 @@ begin
         TXQTermModule(result).push(parsePrimaryLevel);
         if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
           raiseParsingError('XPST0003', 'A main module must have a query body, it cannot only declare functions/variables (add ; ())');
-    end else if nextToken() <> '' then begin
-      if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then begin
-        resultquery._AddRef; //increase ref, so we can remove it from FModules without freeing. Cannot free it here, since the caller still has a reference to the object (but not the interface)
-        staticContext.sender.FModules.Remove(IXQuery(resultquery));
-      end;
-      raiseSyntaxError('Module should have ended, but input query did not');
-    end;
+    end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
   except
     result.free;
+    if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then begin
+      resultquery._AddRef; //increase ref, so we can remove it from FModules without freeing. Cannot free it here, since the caller still has a reference to the object (but not the interface)
+      staticContext.sender.FModules.Remove(IXQuery(resultquery));
+    end;
     raise;
   end;
   if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) and (result is TXQTermModule) and (staticContext.moduleNamespace <> nil)  then begin
