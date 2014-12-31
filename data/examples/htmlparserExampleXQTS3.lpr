@@ -584,7 +584,13 @@ begin
 
   case kind of
     aakAssert: result := OK[xq.evaluateXPath2(value).toBoolean];
-    aakEq: result := OK[xqvalueCompareAtomicBase(res, xq.parseQuery(value, config.version).evaluate(),  TXQCollation(TXQueryEngine.collationsInternal.Objects[0]), 0.0/0.0) = 0];
+    aakEq: try
+      result := OK[xqvalueCompareAtomicBase(res, xq.parseQuery(value, config.version).evaluate(),  TXQCollation(TXQueryEngine.collationsInternal.Objects[0]), 0.0/0.0) = 0];
+    except
+      on e: EXQEvaluationException do
+        if e.errorCode = 'XPTY0004' then result := OK[false]
+        else raise;
+    end;
     aakCount: result := OK[res.getSequenceCount = StrToInt(value)];
     aakDeepEq: result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
     aakXml: result := OK[xmlEqual(res, value)];
@@ -603,7 +609,7 @@ begin
     end;
 
     aakEmpty: result := OK[res.isUndefined];
-    aakType: result := OK[xq.evaluateXPath2('$result instance of '+value).toBoolean];
+    aakType: result := OK[xq.evaluateXPath3('$result instance of '+value).toBoolean];
     aakTrue: result := OK[(res.kind = pvkBoolean) and res.toBoolean];
     aakFalse: result := OK[(res.kind = pvkBoolean) and not res.toBoolean];
     aakStringValue: begin
@@ -717,10 +723,10 @@ begin
   for i := 0 to environments.count - 1 do
     contexttree :=  loadEnvironment(TEnvironment(environments[i]));
   xq.OnImportModule:=@importModule;
-  for i := 0 to modules.Count - 1 do
+  {for i := 0 to modules.Count - 1 do
     if xq.findModule(TModule(modules[i]).uri) = nil then
       if FileExists(TModule(modules[i]).fn) then
-        xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);
+        xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);}
   if tests.Count <> 1 then raise Exception.Create('invalid test count');
   try
     result.value := xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree);
