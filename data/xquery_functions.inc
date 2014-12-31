@@ -1590,14 +1590,52 @@ begin
   if res = nil then exit(xqvalue);
 end;
 
+function tryValueToInteger(const v: IXQValue; var outv: integer): boolean;
+var
+  i64: Int64;
+  f: xqfloat;
+  bd: BigDecimal;
+begin
+  case v.kind of
+    pvkInt64: begin
+      i64 := v.toInt64;
+      result := (i64 >= low(integer)) and (i64 <= high(Integer));
+      if result then outv := i64;
+    end;
+    pvkFloat: begin
+      f := v.toFloat;
+      result := (f >= low(integer)) and (f <= high(Integer)) and (frac(f) = 0);
+      if result then outv := trunc(f);
+    end;
+    else begin
+      bd := v.toDecimal;
+      result := isLongint(bd);
+      if result then outv := BigDecimalToLongint(bd)
+    end;
+  end;
+end;
+
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
 var temp: string;
  v: IXQValue;
+ i: Int64;
+ bd: BigDecimal;
+ codepoint: integer;
+ ok: Boolean;
 begin
   requiredArgCount(args,1);
   temp := '';
-  for v in args[0] do
+  for v in args[0] do begin
+    ok := tryValueToInteger(v, codepoint);
+    if ok then
+      case codepoint of
+        $20..$D7FF, $E000..$FFFD, $10000..$10FFFF: ok := true;
+        $1..$19: ok := (codepoint in [$9,$A,$D]) or (baseSchema.version = xsd11);
+        else ok := false;
+      end;
+    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v.debugAsStringWithTypeAnnotation());
     temp += strGetUnicodeCharacter(v.toInt64);
+  end;
   result := xqvalue(temp);
 end;
 

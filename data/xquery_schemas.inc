@@ -906,6 +906,7 @@ end;
 constructor TXSSchema.Create;
 
 begin
+  version := xsd10;
   typeList := TStringList.Create;
   if baseSchema <> nil then begin
     typeList.Sorted := true;

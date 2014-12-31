@@ -1225,6 +1225,7 @@ begin
   xq.StaticContext.strictTypeChecking:=true;
   xq.StaticContext.defaultFunctionNamespace := TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
   xq.AutomaticallyRegisterParsedModules := true;
+  baseSchema.version := xsd11;
   defaultInternetAccessClass := TMockInternetAccess;
 
   logger := TTextLogger.create(clr);

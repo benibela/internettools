@@ -1022,10 +1022,12 @@ type
     constructor Create(aname: string; aparent: TXSType; apattern: string; atruncation: TXQDateTimeTruncation = xqdttNone );
   end;
 
-  { TXSBaseSchema }
+  { TXSSchema }
 
+  TXSSchemaVersion = (xsd10, xsd11);
   TXSSchema = class
     //engine: TXQueryEngine;
+    version: TXSSchemaVersion;
     url: string;
     anyType, anySimpleType, anyAtomicType: TXSSimpleType;
     decimal, integer, double, float: TXSNumericType;
