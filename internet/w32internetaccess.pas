@@ -354,7 +354,7 @@ begin
     if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
       HttpAddRequestHeadersA(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
      else
-      overridenPostHeader := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
+      overridenPostHeader := additionalHeaders[i];
 
 
 
