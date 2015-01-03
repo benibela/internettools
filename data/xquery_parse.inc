@@ -372,7 +372,12 @@ begin
     parens += 1;
   end;
   if parens > 0 then require3('for parentheses around types');
-  hadNamespace := nextTokenEQName(namespaceUrl, word, xqdnkType);
+  if pos^ <> '%' then hadNamespace := nextTokenEQName(namespaceUrl, word, xqdnkType)
+  else begin
+    word := '%';
+    inc(pos)
+  end;
+
 
   result := TXQTermSequenceType.Create();
   try
@@ -1675,8 +1680,9 @@ begin
     if (namespaceMode = xqnmPrefix) and (namespacePrefix = '') then
       case word of
         'element', 'attribute', 'document', 'text', 'processing-instruction', 'comment': begin
+          skipWhitespaceAndComment();
           constr := nextToken(true) = '{';
-          if not constr then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)
+          if (not constr) and (pos^ <> #0) and not (pos^ in SYMBOLS) then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)
             temp := pos;
             nextTokenEQName(namespaceURL, namespacePrefix, wordlookahead, true);
             if nextToken() = '{' then constr := true;

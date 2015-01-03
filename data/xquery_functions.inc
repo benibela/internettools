@@ -2503,12 +2503,15 @@ function xqFunctionNamespace_URI_For_Prefix(const args: TXQVArray): IXQValue;
 var
   temp: TNamespaceList;
   tempns: INamespace;
+  prefix: String;
 begin
   requiredArgCount(args, 2);
+  prefix := args[0].toString;
+  if prefix = 'xml' then exit(xqvalue(XMLNamespaceUrl_XML));
   if args[1].toNode = nil then exit(xqvalue);
   temp := TNamespaceList.Create;
   args[1].toNode.getAllNamespaces(temp);
-  if not temp.hasNamespacePrefix(args[0].toString, tempns) then result := xqvalue
+  if not temp.hasNamespacePrefix(prefix, tempns) then result := xqvalue
   else result := baseSchema.anyURI.createValue(tempns.getURL);
   temp.free;
 end;

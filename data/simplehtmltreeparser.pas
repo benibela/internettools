@@ -206,7 +206,7 @@ TTreeNode = class
   function getNamespaceURL(): string;    //**< Returns the namespace url. (very slow, it searches the parents for a matching xmlns attribute) cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
   procedure getOwnNamespaces(var list: TNamespaceList); //**< Returns all namespaces declared or used in this element and its attributes
-  procedure getAllNamespaces(var list: TNamespaceList; first: boolean = true); //**< Returns all namespaces declared/used by this element and all parent
+  procedure getAllNamespaces(var list: TNamespaceList; first: boolean = true); //**< Returns all namespaces declared/used by this element and all ancestors
   function isNamespaceUsed(const n: INamespace): boolean; //**< Tests if a namespace is used by this element or any child (same prefix + url)
 
   property defaultProperty[name: string]: string read getAttribute; default;
@@ -1080,11 +1080,11 @@ begin
       for attrib in attributes do
         if attrib.isNamespaceNode then
           list.addIfNewPrefix(attrib.toNamespace);
-    list.addIfNewPrefix(namespace);
-    if attributes <> nil then
+    //list.addIfNewPrefix(namespace); //implicit namespaces of the ancestor are not in scope, see XQTS cbcl-directconelem-001
+   { if attributes <> nil then
       for attrib in attributes do
         if not attrib.isNamespaceNode then
-          list.addIfNewPrefix(attrib.namespace);
+          list.addIfNewPrefix(attrib.namespace);}
   end;
   if parent <> nil then parent.getAllNamespaces(list, false);
 end;
