@@ -358,7 +358,7 @@ end;
 procedure TTextLogger.endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue);
   function got: string;
   begin
-    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation()
+    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation(false)
     else result := resultValue.error;
   end;
 begin

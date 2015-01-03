@@ -68,6 +68,8 @@ public
   function hasNamespacePrefix(const prefix: string): boolean;
   function hasNamespace(const n: INamespace): boolean;
 
+  function lastIndexOfNamespacePrefix(const prefix: string): integer;
+
   procedure add(const ns: TNamespace);
   procedure add(const ns: INamespace);
   procedure addIfNewPrefix(const ns: TNamespace);
@@ -634,6 +636,16 @@ begin
   if not hasNamespacePrefix(n.getPrefix, temp) then exit(false);
   if temp.getURL <> n.getURL then exit(false);
   result := true;
+end;
+
+function TNamespaceList.lastIndexOfNamespacePrefix(const prefix: string): integer;
+var
+  i: Integer;
+begin
+  for i := Count - 1 downto 0 do
+    if (Items[i]).getPrefix = prefix then
+      exit(i);
+  exit(-1);
 end;
 
 procedure TNamespaceList.add(const ns: TNamespace);

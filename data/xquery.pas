@@ -1053,6 +1053,7 @@ type
     function findType(const typeName: string): TXSType;
   private
     typeList: TStringList;
+    function isValidNCName(const s: string): boolean;
   end;
 
   { TJSSchema }

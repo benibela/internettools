@@ -2262,6 +2262,7 @@ var
         kid.document:=tree.document;
         //baseOffset+=1;
 
+        if tree.typ = tetDocument then raiseTypeError0004('Document node must not contain attributes');
         if tree.getFirstChild() <> nil then //errors need to be thrown after attribute has been or we get memory leaks
           raiseEvaluationError('XQTY0024', 'Attribute node after element node');
         for i := 0 to tree.attributes.Count - 2 do
@@ -2428,11 +2429,13 @@ var
           raiseEvaluationError(IfThen(tree.typ <> tetAttribute, 'XQDY0096', 'XQDY0044'), 'Invalid namespace: '+tree.namespace.serialize);
     if (tree.typ = tetAttribute) and (tree.value = 'xmlns') and (tree.namespace = nil) then
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
-
+    if not baseSchema.isValidNCName(tree.value) then
+      raiseEvaluationError('XQDY0074', 'Invalid name: '+tree.value);
   end;
 
 var i, oldnamespacecount: integer;
   nameValueEvaluated: IXQValue;
+  tempxqvalue: TXQValue;
 begin
   if not (typ in [tetOpen,tetDocument]) then nameValueEvaluated := nameValue.evaluate(context);
   if (typ = tetText) and (nameValueEvaluated.isUndefined) then exit(xqvalue);
@@ -2499,7 +2502,6 @@ begin
             kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
             if (kid.typ = tetAttribute) then begin
               if (kid.namespace <> nil) then needNamespaceList.addIfNewPrefixUrl(kid.namespace);
-              if tree.typ = tetDocument then raiseTypeError0004('Document node must not contain attributes');
             end;
             addNodeAsKid;
           end else
@@ -2516,12 +2518,17 @@ begin
       tetProcessingInstruction: begin
         xqvalueSeqSqueeze(nameValueEvaluated);
         if nameValueEvaluated.instanceOf(baseSchema.NCName) then tree.value := nameValueEvaluated.toString
-        else if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node) then
-          tree.value := baseSchema.NCName.createValue(nameValueEvaluated).toString
-        else raiseTypeError0004('Need NCName', nameValueEvaluated);
+        else if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node) then begin
+          tree.value := strTrim(nameValueEvaluated.toString, WHITE_SPACE);
+          if not baseSchema.isValidNCName(tree.value) then raiseEvaluationError('XQDY0041', 'Invalid NCName');
+        end else raiseTypeError0004('Need NCName', nameValueEvaluated);
         if striEqual(tree.value, 'XML') then raiseEvaluationError('XQDY0064', '"XML" cannot be used as PI name');
         if length(children) = 0 then tree.addAttribute('', '')
-        else tree.addAttribute('', strTrimLeft(valueToString(children[0].evaluate(subcontext^)), [#9,#10,#13,' ']));
+        else begin
+          tree.addAttribute('', strTrimLeft(valueToString(children[0].evaluate(subcontext^)), WHITE_SPACE));
+          if strContains(tree.attributes.Items[0].realvalue, '?>') then
+            raiseEvaluationError('XQDY0026', '?> in PI content');
+        end;
       end;
       tetText: tree.value := valueToString(nameValueEvaluated);
       tetComment: begin

@@ -48,7 +48,7 @@ type
   procedure expect(c: char);
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
-  function nextTokenNCName(): string; inline; //returns a NCName (todo: raise an error if not an NCName)
+  function nextTokenNCName(): string; inline; //returns a NCName
   // $foo       -> ('', '', 'foo',    xqnmPrefix)
   // $*:foo     -> ('', '*', 'foo',   xqnmNone)
   // $prf:foo   -> ('', 'prf', 'foo', xqnmPrefix)
@@ -249,8 +249,12 @@ begin
 end;
 
 function TXQParsingContext.nextTokenNCName(): string;
+var
+  i: Integer;
 begin
   result := nextToken(false);
+  if not baseSchema.isValidNCName(result) then
+    raiseSyntaxError('Invalid NCName: '''+result+'''');
 end;
 
 function TXQParsingContext.nextTokenEQName(out url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
@@ -259,10 +263,11 @@ var
   marker: PChar;
 begin
   skipWhitespaceAndComment();
-  localpart:=nextToken();
+  if pos^ <> '*' then localpart:=nextTokenNCName()
+  else localpart := nextToken();
   result := xqnmPrefix;
   if (localpart = 'Q') and (pos^ = '{') then begin
-    if ((pos-1)^ <> 'Q') then raiseParsingError('err:XPST0003', 'Q{ must not be separated by whitespace');
+    if ((pos-1)^ <> 'Q') then raiseSyntaxError('Q{ must not be separated by whitespace');
     require3('Q{..} namespace urls');
     prefix := localpart;
     inc(pos);
@@ -277,7 +282,8 @@ begin
   end else if (pos^ = ':') and not ((pos+1)^ in NONCNAME) then begin //same check in parseValue for matchers
     expect(':');
     prefix := localpart;
-    localpart := nextTokenNCName();
+    if pos^ <> '*' then localpart := nextTokenNCName()
+    else localpart := nextToken();
     if prefix = '*' then
       result := xqnmNone;
   end else begin
@@ -714,7 +720,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     atBoundary := atBoundary and staticContext.stripBoundarySpace;
     while pos^ <> #0 do begin
       marker := pos;
-      while not (pos^ in [#0, '{', '}', '&']) and (pos^ <> border) and ((border = '<') or not (pos^ in [#9, #10, #13])) do pos+=1;
+      while not (pos^ in [#0, '{', '}', '&', '<']) and (pos^ <> border) and ((border = '<') or not (pos^ in [#9, #10, #13])) do pos+=1;
 
       if pos^ in [#9, #10, #13] then begin //whitespace normalization #9, #10, #13 => space
         pushElementContent(strFromPchar(marker, pos - marker));
@@ -766,15 +772,20 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
           pushElementContent(replaceEntitiesAlways(strFromPchar(marker, pos - marker)));
           atBoundary:=false;
         end;
+        '<': raiseSyntaxError('Unexpected <');
       end;
     end;
   end;
 
   function parsePIConstructor: TXQTermConstructor;
   var marker: PChar;
+    name: String;
   begin
     expect('?');
-    result := TXQTermConstructor.create(tetProcessingInstruction, TXQTermConstant.create(xqvalue(nextTokenNCName())));
+    if pos^ in WHITE_SPACE then raiseSyntaxError('Unexpected space');
+    name := nextTokenNCName();
+    if striEqual(name, 'XML') or not (pos^ in (WHITE_SPACE + ['?'])) then raiseSyntaxError('Invalid PI name');
+    result := TXQTermConstructor.create(tetProcessingInstruction, TXQTermConstant.create(xqvalue(name)));
     skipWhitespace();
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do pos+=1;
@@ -985,7 +996,7 @@ begin
         else if (namespaceUrl = '') and (namespacePrefix = '') then
           result.nameValue := TXQTermConstant.create(baseSchema.NCName.createValue(token))
         else
-          raiseParsingError('XPTY0004', 'Cannot use namespace for processing instructions');
+          raiseSyntaxError('Cannot use namespace for processing instructions');
       end;
     end;
     expect('{');
@@ -2019,8 +2030,14 @@ var
   temp: String;
   annotations: TXQAnnotations;
   marker: PChar;
+
+
+
+  oldNamespaceCount: Integer;
 begin
   result := nil;
+  oldNamespaceCount := 0;
+  if staticContext.namespaces <> nil then oldNamespaceCount := staticContext.namespaces.Count;
   try
     token := nextToken(true);
     marker := pos;
@@ -2135,7 +2152,12 @@ begin
            nameSpaceName := nextTokenNCName();
            expect('=');
            nameSpaceURL := parseString;
-           if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+           if (nameSpaceName = 'xml') or (nameSpaceName = 'xmlns')
+              or (nameSpaceURL = XMLNamespaceUrl_XML) or (nameSpaceURL = XMLNamespaceUrl_XMLNS) then
+                raiseParsingError('XQST0070', 'Undeclarable namespace');
+           if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create
+           else if staticContext.namespaces.lastIndexOfNamespacePrefix(nameSpaceName) >= oldNamespaceCount then
+             raiseParsingError('XQST0033', 'Duplicated namespace declaration');
            staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
         end;
         else begin
