@@ -1274,6 +1274,8 @@ type
   protected
     procedure raiseParsingError(const errcode, s: string);
     procedure raiseEvaluationError(const errcode, s: string);
+    procedure raiseTypeError0004(const s: string);
+    procedure raiseTypeError0004(const s: string; const got: IXQValue);
 
     function toQueryCommand: TXQPathMatchingStep; virtual;
     procedure addToQueryList(var path: TXQPathMatching); virtual;

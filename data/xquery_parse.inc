@@ -690,7 +690,7 @@ begin
 end;
 
 function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
-  procedure parseCommonContent(parent: TXQTermConstructor; border: char; atBoundary: boolean);
+  procedure parseCommonContent(parent: TXQTermConstructor; border: char; atBoundary: boolean; mustBeLiteral: boolean = false);
     procedure pushElementContent(s: string);
     begin
       if length(s) = 0 then exit;
@@ -724,7 +724,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
         continue;
       end;
 
-      if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+      if pos^ = #0 then raiseSyntaxError('Unexpected end');
 
       if not atBoundary or (pos^ in ['}', '&']) or strBeginsWith(pos, '<![') or not strIsWhitespace(marker, pos - marker) then begin
         pushElementContent(strFromPchar(marker, pos - marker));
@@ -741,6 +741,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
 
       case pos^ of
         '{': if (pos+1)^ <> '{' then begin
+          if mustBeLiteral then raiseParsingError('XQST0022', 'Enclosed expression not allowed') ;
           pos += 1;
           temp := parsePrimaryLevel;
           if temp is TXQTermConstructor then parent.push(TXQTermSequence.Create().push([temp]))
@@ -752,7 +753,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
           pos+=2;
         end;
         '}': begin
-          if (pos+1)^ <> '}' then raiseParsingError('XPST0003', 'Invalid closing parenthesis');
+          if (pos+1)^ <> '}' then raiseSyntaxError('Invalid closing parenthesis');
           pushElementContent('}');
           atBoundary:=false;
           pos += 2;
@@ -760,7 +761,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
         '&': begin
           marker := pos;
           while not (pos^ in [#0, ';']) do pos += 1;
-          if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+          if pos^ = #0 then raiseSyntaxError('Unexpected end');
           pos += 1;
           pushElementContent(replaceEntitiesAlways(strFromPchar(marker, pos - marker)));
           atBoundary:=false;
@@ -778,7 +779,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do pos+=1;
     result.push(TXQTermConstant.create(xqvalue(strFromPchar(marker, pos - marker))));
-    if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+    if pos^ = #0 then raiseSyntaxError('Unexpected end');
     expect('?>');
   end;
 
@@ -789,7 +790,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     expect('--');
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '-') or ((pos+1)^ <> '-')) do pos+=1;
-    if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+    if pos^ = #0 then raiseSyntaxError('Unexpected end');
     result := TXQTermConstructor.create(tetComment, TXQTermConstant.create(strFromPchar(marker, pos - marker)));
     expect('-->');
   end;
@@ -800,9 +801,40 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
        name: string;
   begin
     if nextTokenEQName(namespaceUrl, namespacePrefix, name) = xqnmURL then
-      raiseParsingError('XPST0003', 'Cannot use Q{} notation for direct constructors');
+      raiseSyntaxError('Cannot use Q{} notation for direct constructors');
     if namespacePrefix = '' then result := name
     else result := namespacePrefix + ':' + name;
+  end;
+
+  procedure qnameToEQname(var vqname: IXQValue);
+  var
+    qname: String;
+    prefix: String;
+    namespace: INamespace;
+  begin
+    qname := vqname.toString;
+    prefix := '';
+    if system.pos(':', qname) > 0 then prefix := strSplitGet(':', qname);
+    if (result.implicitNamespaces <> nil) and (Result.implicitNamespaces.hasNamespacePrefix(prefix)) then begin
+      namespace := Result.implicitNamespaces.namespaces[prefix];
+      if namespace.getURL = '' then namespace := nil;
+    end else
+      namespace := staticContext.findNamespace(prefix, xqdnkUnknown);
+    if namespace <> nil then vqname := TXQValueQName.create(namespace.getURL, prefix, qname)
+    else if prefix <> '' then raiseParsingError('XPST0081', 'Unknown namespace: '+vqname.toString)
+    else vqname := TXQValueQName.create('', prefix, qname)
+  end;
+
+  procedure checkForDuplicatedAttributes;
+  var
+    i, j: Integer;
+  begin
+    for i := 0 to high(Result.children) do qnameToEQname(TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value);
+    for i := 0 to high(Result.children) do
+      for j := 0 to high(Result.children) do
+        if (i <> j)
+           and (xqvalueCompareAtomicBase(TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value, TXQTermConstant(TXQTermConstructor(result.children[j]).nameValue).value, nil, 0) = 0) then
+           raiseParsingError('XQST0040', 'Duplicated attribute: '+TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value.toString);
   end;
 
 var
@@ -812,6 +844,10 @@ var
   lastWasCData: Boolean;
   i: Integer;
   oldDefaultElementTypeNamespace: INamespace;
+  prefix: String;
+  namespace: INamespace;
+  isNamespaceNode: Boolean;
+  oldNamespaceCount: Integer;
 begin
   case pos^ of
     '!': exit(parseCommentConstructor);
@@ -819,89 +855,95 @@ begin
     #9,#10,#13,' ': raiseSyntaxError('Invalid whitespace in constructor');
   end;
   result := TXQTermConstructor.create(tetOpen, TXQTermConstant.create(nextTokenQName));
-  skipWhitespace();
-  while not (pos^ in ['>', '/', #0]) do begin
-    token := nextTokenQName;
-    attribute := TXQTermConstructor.create(tetAttribute, TXQTermConstant.create(token));
-    expect('=');
+  try
     skipWhitespace();
-    if not (pos^ in ['''', '"']) then raiseSyntaxError('Expected attribute value');
-    marker := pos;
-    pos+=1;
-    parseCommonContent(attribute, marker^, false);
-    if strBeginsWith(token, 'xmlns:') or (token = 'xmlns') then begin
-      token := '';
-      if length(attribute.children) > 0 then begin
-        if not (attribute.children[0] is TXQTermConstant) or
-           not (TXQTermConstant(attribute.children[0]).value is TXQValueString) then raiseParsingError('XQST0022', 'Namespace url is not a literal string');
-        token := TXQTermConstant(attribute.children[0]).value.toString;
-      end; //else namespace undeclaration
-      if result.implicitNamespaces = nil then result.implicitNamespaces := TNamespaceList.Create;
-      if TXQTermConstant(attribute.nameValue).value.toString = 'xmlns' then result.implicitNamespaces.add(TNamespace.create(token, ''))
-      else result.implicitNamespaces.add(TNamespace.create(token, strCopyFrom(TXQTermConstant(attribute.nameValue).value.toString, length('xmlns:')+1)));
-      attribute.Free;
-    end else result.push(attribute);
-    expect(marker^);
-    skipWhitespace();
-  end;
-  if pos^ = #0 then begin
-    result.Free;
-    raiseSyntaxError('Attribute expected');
-  end;
-  if pos^ = '/' then begin
-    expect('/');
-    expect('>');
-    exit;
-  end;
-  expect('>');
-
-  oldDefaultElementTypeNamespace := staticContext.defaultElementTypeNamespace;
-  if Result.implicitNamespaces <> nil then begin
-    if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
-    for i := 0 to result.implicitNamespaces.Count - 1 do begin
-      staticContext.namespaces.add(Result.implicitNamespaces.namespaces[i]);
-      if Result.implicitNamespaces.namespaces[i].getPrefix = '' then
-        staticContext.defaultElementTypeNamespace := Result.implicitNamespaces.namespaces[i];
+    while not (pos^ in ['>', '/', #0]) do begin
+      token := nextTokenQName;
+      attribute := TXQTermConstructor.create(tetAttribute, TXQTermConstant.create(token));
+      expect('=');
+      skipWhitespace();
+      if not (pos^ in ['''', '"']) then raiseSyntaxError('Expected attribute value');
+      marker := pos;
+      pos+=1;
+      isNamespaceNode := strBeginsWith(token, 'xmlns:') or (token = 'xmlns');
+      parseCommonContent(attribute, marker^, false, isNamespaceNode);
+      expect(marker^);
+      if isNamespaceNode then begin
+        if token = 'xmlns' then prefix := ''
+        else prefix := strCopyFrom(token, length('xmlns:')+1);
+        if result.implicitNamespaces = nil then result.implicitNamespaces := TNamespaceList.Create
+        else if result.implicitNamespaces.hasNamespacePrefix(prefix) then raiseParsingError('XQST0071', 'Duplicate namespace declaration');
+        token := '';
+        if length(attribute.children) > 0 then token := (attribute.children[0] as TXQTermConstant).value.toString;
+        if ((prefix = 'xml') <> (token = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (token = XMLNamespaceUrl_XMLNS) then
+          raiseParsingError('XQST0070', 'Invalid namespace declaration');
+        result.implicitNamespaces.add(TNamespace.create(token, prefix));
+        attribute.Free;
+      end else result.push(attribute);
+      skipWhitespace();
     end;
-  end;
+    checkForDuplicatedAttributes;
+    if pos^ = #0 then raiseSyntaxError('Attribute expected');
+    if pos^ = '/' then begin
+      expect('/');
+      if pos^ <> '>' then raiseSyntaxError('Need >');
+      inc(pos);
+      exit;
+    end;
+    expect('>');
 
-  lastWasCData := false;
-  while pos^ <> #0 do begin
-    parseCommonContent(result, '<', not lastWasCData);
-    lastWasCData := false;
-
-    if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
-    if pos^ = '<' then begin
-      pos += 1;
-      case pos^ of
-        '/': begin
-          pos += 1;
-          if nextTokenQName() <> (result.nameValue as TXQTermConstant).value.toString then
-            raiseParsingError('XPST0003', 'Expected matching closing tag');
-          expect('>');
-          staticContext.defaultElementTypeNamespace := oldDefaultElementTypeNamespace;
-          if Result.implicitNamespaces <> nil then
-            for i := 0 to result.implicitNamespaces.Count - 1 do
-              staticContext.namespaces.Delete(staticContext.namespaces.Count-1);
-
-          exit;
-        end;
-        '!': if strBeginsWith(pos, '![CDATA[') then begin
-          lastWasCData := true;
-          pos += length('![CDATA[');
-          marker := pos;
-          while (pos^ <> #0) and not strBeginsWith(pos, ']]>') do pos+=1;
-          if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
-          result.push(TXQTermConstant.create(strFromPchar(marker, pos - marker)));
-          pos+=3;
-        end else if strBeginsWith(pos, '!--') then result.push(parseCommentConstructor)
-        else raiseParsingError('XPST0003', 'Invalid character combination after <!');
-        '?': result.push(parsePIConstructor);
-        else result.push(parseDirectConstructor());
+    oldDefaultElementTypeNamespace := staticContext.defaultElementTypeNamespace;
+    if Result.implicitNamespaces <> nil then begin
+      if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+      oldNamespaceCount := staticContext.namespaces.Count;
+      for i := 0 to result.implicitNamespaces.Count - 1 do begin
+        staticContext.namespaces.add(Result.implicitNamespaces.namespaces[i]);
+        if Result.implicitNamespaces.namespaces[i].getPrefix = '' then
+          staticContext.defaultElementTypeNamespace := Result.implicitNamespaces.namespaces[i];
       end;
     end;
+
+    lastWasCData := false;
+    while pos^ <> #0 do begin
+      parseCommonContent(result, '<', not lastWasCData);
+      lastWasCData := false;
+
+      if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+      if pos^ = '<' then begin
+        pos += 1;
+        case pos^ of
+          '/': begin
+            pos += 1;
+            if nextTokenQName() <> (result.nameValue as TXQTermConstant).value.toString then
+              raiseParsingError('XQST0118', 'Expected matching closing tag');
+            expect('>');
+            staticContext.defaultElementTypeNamespace := oldDefaultElementTypeNamespace;
+            if result.implicitNamespaces <> nil then
+              staticContext.namespaces.deleteFrom(oldNamespaceCount);
+
+            exit;
+          end;
+          '!': if strBeginsWith(pos, '![CDATA[') then begin
+            lastWasCData := true;
+            pos += length('![CDATA[');
+            marker := pos;
+            while (pos^ <> #0) and not strBeginsWith(pos, ']]>') do pos+=1;
+            if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+            result.push(TXQTermConstant.create(strFromPchar(marker, pos - marker)));
+            pos+=3;
+          end else if strBeginsWith(pos, '!--') then result.push(parseCommentConstructor)
+          else raiseParsingError('XPST0003', 'Invalid character combination after <!');
+          '?': result.push(parsePIConstructor);
+          else result.push(parseDirectConstructor());
+        end;
+      end;
+    end;
+    raiseParsingError('XPST0003', 'Unexpected end (probably missing closing tag for <'+(result.nameValue as TXQTermConstant).value.toString +'>');
+
+  except
+    result.free;
+    raise;
   end;
-  raiseParsingError('XPST0003', 'Unexpected end (probably missing closing tag for <'+(result.nameValue as TXQTermConstant).value.toString +'>')
 end;
 
 function TXQParsingContext.parseComputedConstructor(name: string): TXQTermConstructor;
@@ -922,44 +964,56 @@ begin
   else if (token = 'processing-instruction') then result := TXQTermConstructor.create(tetProcessingInstruction)
   else if (token = 'comment') then result := TXQTermConstructor.create(tetComment)
   else raiseParsingError('XPST0003', 'Unknown constructor name');
-  expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute]) ;
-  if expectName then begin
-    skipWhitespaceAndComment();
-    if pos^ = '{' then begin
-      pos += 1;
-      result.nameValue := parsePrimaryLevel;
-      expect('}');
-    end else begin
-      if nextTokenEQName(namespaceUrl, namespacePrefix, token) = xqnmPrefix then begin
-        //namespaceUrl := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
-        if namespacePrefix <> '' then namespacePrefix += ':';
-        result.nameValue := TXQTermConstant.create(xqvalue(namespacePrefix + token));
-      end else
-        result.nameValue := TXQTermConstant.create(TXQValueQName.create(namespaceUrl, namespacePrefix, token));
-    end;
-  end;
-  expect('{');
-  skipWhitespaceAndComment();
-  if pos^ <> '}' then begin
-    if result.typ in [tetDocument, tetOpen, tetProcessingInstruction, tetAttribute] then begin
-      tempSeq := parsePrimaryLevel;
-      if tempSeq is TXQTermSequence then begin
-        onlyConstructors := true;
-        for i:= 0 to high(TXQTermSequence(tempseq).children) do
-          if not (TXQTermSequence(tempSeq).children[i] is TXQTermConstructor) then begin
-            onlyConstructors:=false;
-            break;
+  try
+    expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute]) ;
+    if expectName then begin
+      skipWhitespaceAndComment();
+      if pos^ = '{' then begin
+        pos += 1;
+        result.nameValue := parsePrimaryLevel;
+        expect('}');
+      end else begin
+        if (nextTokenEQName(namespaceUrl, namespacePrefix, token) = xqnmPrefix) then begin
+          if result.typ <> tetProcessingInstruction then begin
+            if result.typ <> tetAttribute then namespaceUrl := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType)
+            else namespaceUrl := staticContext.findNamespaceURL(namespacePrefix, xqdnkUnknown);
+            if (namespacePrefix <> '') and (namespaceUrl = '') then raiseParsingError('XPST0081', 'Unknown prefix: '+namespacePrefix+':'+token);
           end;
-        if onlyConstructors then begin
-          result.children := TXQTermSequence(tempseq).children;
-          TXQTermSequence(tempseq).children := nil;
-          tempSeq.free;
-        end else result.push(tempSeq); //that's really slow for nodes because it makes a deep copy of them if they are taken from a subsequence. But if it's mixing atomic/nodes flattening the sequences makes the separator spaces wrong
-      end else result.push(tempSeq);
-    end else result.nameValue := parsePrimaryLevel;
-  end else if not expectName then
-    raiseParsingError('XPST0003', 'This type of node must not be empty ');
-  expect('}');
+        end;
+        if result.typ <> tetProcessingInstruction then
+           result.nameValue := TXQTermConstant.create(TXQValueQName.create(namespaceUrl, namespacePrefix, token))
+        else if (namespaceUrl = '') and (namespacePrefix = '') then
+          result.nameValue := TXQTermConstant.create(baseSchema.NCName.createValue(token))
+        else
+          raiseParsingError('XPTY0004', 'Cannot use namespace for processing instructions');
+      end;
+    end;
+    expect('{');
+    skipWhitespaceAndComment();
+    if pos^ <> '}' then begin
+      if result.typ in [tetDocument, tetOpen, tetProcessingInstruction, tetAttribute] then begin
+        tempSeq := parsePrimaryLevel;
+        if tempSeq is TXQTermSequence then begin
+          onlyConstructors := true;
+          for i:= 0 to high(TXQTermSequence(tempseq).children) do
+            if not (TXQTermSequence(tempSeq).children[i] is TXQTermConstructor) then begin
+              onlyConstructors:=false;
+              break;
+            end;
+          if onlyConstructors then begin
+            result.children := TXQTermSequence(tempseq).children;
+            TXQTermSequence(tempseq).children := nil;
+            tempSeq.free;
+          end else result.push(tempSeq); //that's really slow for nodes because it makes a deep copy of them if they are taken from a subsequence. But if it's mixing atomic/nodes flattening the sequences makes the separator spaces wrong
+        end else result.push(tempSeq);
+      end else result.nameValue := parsePrimaryLevel;
+    end else if not expectName then
+      raiseParsingError('XPST0003', 'This type of node must not be empty ');
+    expect('}');
+  except
+    result.free;
+    raise;
+  end;
 end;
 
 function TXQParsingContext.parseExtension: TXQTerm;

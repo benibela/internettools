@@ -219,8 +219,10 @@ begin
   t('(Q{http://www.w3.org/2005/xpath-functions}concat("a", "b"), Q{http://www.w3.org/2001/XMLSchema}integer("123"), Q{http://www.benibela.de/2012/pxp/extensions}join(("x")))', 'ab 123 x');
   t('(1 instance of Q{http://www.w3.org/2001/XMLSchema}integer, let $Q{f}succ := (function ($Q{v}v as Q{http://www.w3.org/2001/XMLSchema}decimal) as Q{http://www.w3.org/2001/XMLSchema}integer { $Q{v}v + 1}) return ($Q{f}succ(10), $Q{f}succ(10) instance of Q{http://www.w3.org/2001/XMLSchema}integer))', 'true 11 true');
 
-
   //New functions
+  t('(has-children(/), has-children(/*:root/Q{n1}a), has-children(/*:root/Q{n1}a/text()), /* ! has-children())', 'true true false true');
+  t('innermost((//node(), //@*))', 'a1 a2 AT3 a3 an');
+  t('outermost((//node(), //@*))', 'a1a2a3an');
   t('fn:string-join(("Blow, ", "blow, ", "thou ", "winter ", "wind!"))', 'Blow, blow, thou winter wind!');
 
   //interface tests
