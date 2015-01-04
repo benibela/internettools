@@ -1794,7 +1794,7 @@ begin
   if length(args) = 1 then temp := args[0].toString
   else if context.SeqValue <> nil then temp := context.SeqValue.toString
   else if context.ParentElement <> nil then temp := treeElementAsString(context.ParentElement)
-  else raise EXQEvaluationException.create('XPDY0002', 'No context item');
+  else raiseXPDY0002ContextItemAbsent;
 
   result := xqvalue(length(temp));
 end;
@@ -1804,10 +1804,9 @@ var temp: string;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) > 0 then temp := args[0].toString
-  else begin
-    if context.SeqValue = nil then temp := context.ParentElement.getValue()
-    else temp := context.SeqValue.toString;
-  end;
+  else if context.SeqValue <> nil then temp := context.SeqValue.toString
+  else if context.ParentElement <> nil then temp := treeElementAsString(context.ParentElement)
+  else raiseXPDY0002ContextItemAbsent;
   result := xqvalue(strTrimAndNormalize(temp));
 end;
 
