@@ -199,7 +199,7 @@ procedure shift10(var v: BigDecimal; shift: integer);
 //** Calculates a decimal shift: @code(result := v * 10^shift)
 function shifted10(const v: BigDecimal; shift: integer): BigDecimal;
 
-//** Compares the big decimals. Returns -1, 0 or 1
+//** Compares the big decimals. Returns -1, 0 or 1 corresponding to a <, = or > b
 function compareBigDecimals(const a, b: BigDecimal): integer;
 
 operator <(const a: BigDecimal; const b: BigDecimal): boolean;
@@ -1163,23 +1163,24 @@ var
   i: Integer;
 begin
   if a.exponent >= b.exponent then begin
-    //aaaaaa
-    //   bbbbbb
+    //aaaaaaDELTA
+    //   bbbbbbbb
     delta := a.exponent - b.exponent;
-    for i := high(a.digits) downto high(b.digits) + 1 - delta do  //aaaaa
-      if a.digits[i] <> 0 then exit(1);                           //   bbbbbb
-    for i := high(b.digits) downto high(a.digits) + 1 + delta do  //  aaaaa
-      if b.digits[i] <> 0 then exit(-1);                          //bbbbbbbbb
+    for i := high(a.digits) downto max(length(b.digits) - delta, 0) do    //aaaaa
+      if a.digits[i] <> 0 then exit(1);                                   //   bbbbbb
+    for i := high(b.digits) downto length(a.digits) + delta do            //  aaaaa
+      if b.digits[i] <> 0 then exit(-1);                                  //bbbbbbbbb
     for i := min(delta + high(a.digits), high(b.digits)) downto delta do
       if a.digits[i - delta] <> b.digits[i] then
         if a.digits[i - delta] > b.digits[i] then exit(1)
         else exit(-1);
-    for i := delta - 1 downto 0 do
+    for i := min(high(b.digits), delta - 1) downto 0 do
       if 0 < b.digits[i]  then exit(-1);
     result := 0;
   end else exit(-compareAbsolute(b,a));
 end;
 
+{what is that for?
 function compareAbsolutePrecisionBins(const a, b: BigDecimal; precisionBins: integer): integer;
 var
   delta: Integer;
@@ -1204,7 +1205,7 @@ begin
       if 0 < b.digits[i]  then exit(-1);
     result := 0;
   end else exit(-compareAbsolutePrecisionBins(b,a, precisionBins));
-end;
+end;}
 
 
 function isZero(const v: BigDecimal): boolean;
