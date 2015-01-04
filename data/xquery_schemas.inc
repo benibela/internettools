@@ -494,55 +494,12 @@ begin
       end;
     exit;
   end else if st.derivedFrom([schema.decimal, schema.boolean]) then begin
-    result := xsceNoError;
-    sispure := true;
-  end else begin
-    sispure := TXQValueFloat.isPure(v);
-    case subType of
-      xsstInteger, xsstDecimal: if st.derivedFrom([schema.float, schema.double]) and sispure then result := xsceNoError;
-      xsstDouble, xsstFloat :  if st.derivedFrom([schema.float, schema.double]) then result := xsceNoError;
-    end;
-  end;
-  if result <> xsceNoError then exit;
-  if (outv = nil) and (length(constrainingFacets) = 0) then exit;
-  case subType of
-    xsstInteger, xsstDecimal: begin
-      if not sispure then exit(xsceFORG0001);
-      i := v.toDecimal;
-      if (subType = xsstInteger) and (not isIntegral(i)) then i := round(i, 0, bfrmTrunc); //i might satisfy the constraints, but integer(i) not
-      if not constraintsSatisfied(i) then exit(xsceFORG0001);
-
-      if outv <> nil then
-        case subType of
-          xsstInteger: begin
-            if not isIntegral(i) then i := round(i, 0, bfrmTrunc);
-            if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
-            else outv^ := TXQValueDecimal.create(self, i);
-          end;
-          xsstDecimal:
-            if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
-            else outv^ := TXQValueDecimal.create(self, i);
-        end;
-    end;
-    xsstFloat, xsstDouble: begin
-      if not sispure then begin
-        if outv <> nil then
-          case subType of
-            xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
-            xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
-          end;
-        exit;
-      end;
-      if length(constrainingFacets) > 0 then begin
-        i := v.toDecimal;
-        if not constraintsSatisfied(i) then exit(xsceFORG0001);
-      end;
-      case subType of
-        xsstFloat:   outv^ := TXQValueFloat.create(self, single(v.toFloat));
-        xsstDouble:  outv^ := TXQValueFloat.create(self, double(v.toFloat));
-      end;
-    end;
-  end;
+    if v is TXQValueInt64 then exit(tryCreateValue(v.toInt64, outv))
+    else exit(tryCreateValue(v.toDecimal, outv));
+  end else if st.derivedFrom([schema.float, schema.double]) then
+    exit(tryCreateValue(v.toFloat, outv))
+  else
+   exit(xsceXPTY0004);
 end;
 
 function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
@@ -586,6 +543,79 @@ begin
     else if v[tempexp+1] = '-' then tempe := 0
     else if v[1]= '-' then tempe := getNegInf
     else tempe := getPosInf;}
+end;
+
+function TXSNumericType.tryCreateValue(const v: Int64; outv: PXQValue): TXSCastingError;
+begin
+  if (length(constrainingFacets) > 0) and not constraintsSatisfied(v) then exit(xsceFORG0001);
+  result := xsceNoError;
+  if (outv <> nil) then
+    case subType of
+      xsstInteger, xsstDecimal: outv^ := TXQValueInt64.create(self, v);
+      xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
+      xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+    end
+end;
+
+function TXSNumericType.tryCreateValue(const v: BigDecimal; outv: PXQValue): TXSCastingError;
+var i: BigDecimal;
+begin
+  if (subType = xsstInteger) and (not isIntegral(v)) then i := round(v, 0, bfrmTrunc) //i might satisfy the constraints, but integer(i) not
+  else i := v;
+  if not constraintsSatisfied(i) then exit(xsceFORG0001);
+  result := xsceNoError;
+  if outv <> nil then
+    case subType of
+      xsstInteger: begin
+        if not isIntegral(i) then i := round(i, 0, bfrmTrunc);
+        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+        else outv^ := TXQValueDecimal.create(self, i);
+      end;
+      xsstDecimal:
+        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+        else outv^ := TXQValueDecimal.create(self, i);
+      xsstFloat:   outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(i)));
+      xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(i)));
+    end;
+end;
+
+function TXSNumericType.tryCreateValue(const v: xqfloat; outv: PXQValue): TXSCastingError;
+var
+  sispure: Boolean;
+  bd: BigDecimal;
+begin
+  result := xsceNoError;
+  sispure := not IsNan(v) and not IsInfinite(v);
+  case subType of
+    xsstInteger, xsstDecimal: begin
+      if not sispure then exit(xsceFORG0001);
+      bd := FloatToBigDecimal(v);
+      if (length(constrainingFacets) > 0) and not constraintsSatisfied(bd) then exit(xsceFORG0001);
+      if outv <> nil then
+        if isInt64(bd) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(bd))
+        else outv^ := TXQValueDecimal.create(self, bd)
+    end;
+    xsstDouble, xsstFloat :  begin
+      if not sispure then begin
+        if outv <> nil then
+          case subType of
+            xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
+            xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+          end;
+        exit;
+      end;
+
+      if length(constrainingFacets) > 0 then begin
+        bd := FloatToBigDecimal(v);
+        if not constraintsSatisfied(bd) then exit(xsceFORG0001);
+      end;
+      if outv <> nil then
+        case subType of
+          xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
+          xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+        end;
+    end;
+  end;
 end;
 
 constructor TXSNumericType.create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
