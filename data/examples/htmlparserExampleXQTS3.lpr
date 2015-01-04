@@ -26,6 +26,7 @@ type
  end;
 
  TEnvironment = class
+  definition: TTreeNode;
   name, ref: string;
   namespaces: TNamespaceList;
   staticBaseUri: string;
@@ -42,6 +43,7 @@ type
   collections: TStringList;
   refed: TEnvironment;
   sources: TList;
+  procedure init;
   class function load(e: TTreeNode): TEnvironment;
   function getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
   procedure getExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
@@ -905,8 +907,8 @@ end;
 class function TTestSet.load(e: TTreeNode): TTestSet;
 begin
   result := nil;
-  if (config.forceTestSet = '') or (striEqual(e['name'], config.forceTestSet) or striContains(e.getDocument().baseURI, config.forceTestSet)) then
-    result := TTestSet.create(e);
+  if (config.forceTestSet = '') or (striEqual(e['name'], config.forceTestSet) or striContains(e['file'], config.forceTestSet)) then
+    result := TTestSet.create(tree.parseTreeFromFile(e['file']).findChild(tetOpen, 'test-set'));
 end;
 
 
@@ -997,14 +999,71 @@ end;
 
 { TEnvironment }
 
-class function TEnvironment.load(e: TTreeNode): TEnvironment;
-var v: IXQValue;
+procedure TEnvironment.init;
+var
+  e: TTreeNode;
+  v: IXQValue;
   n: TTreeNode;
   u: IXQValue;
   i: Integer;
 begin
+  e := definition;
+  definition := nil;
+  staticBaseUri := xq.parseXPath2('static-base-uri/@uri').evaluate(e).toString;
+  if staticBaseUri = '' then staticBaseUri := e.getDocument().baseURI;
+
+  collations := TStringList.Create;
+  for v in xq.parseXPath2('collation').evaluate(e) do begin
+    i := xqtsCollations.IndexOf(v.toNode['uri']);
+    if (i < 0) and strBeginsWith(v.toNode['uri'], 'http://www.w3.org/2013/collation/UCA') then //todo: use a real collation
+      xqtsCollations.AddObject(v.toNode['uri'], TXQCollation.create(v.toNode['uri'], @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
+    i := xqtsCollations.IndexOf(v.toNode['uri']);
+    if i < 0 then raise Exception.Create('Failed to find collation: ' + v.toNode['uri']);
+    collations.AddObject(v.toNode['uri'], xqtsCollations.Objects[i]);
+    if v.toNode['default'] = 'true' then defaultCollation:=v.toNode['uri'];
+  end;
+  if (collations.Count > 0) and (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
+    collations.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
+
+  u := xq.parseXPath2('param').evaluate(e);
+  SetLength(params, u.getSequenceCount);
+  for i := 0 to u.getSequenceCount -1  do begin
+    n := u.getChild(i+1).toNode;
+    params[i].name := n['name'];
+    if n.hasAttribute('select') then params[i].value := xq.parseXQuery3(n['select']).evaluate()
+    else params[i].value := xqvalue();
+    if n.hasAttribute('as') then if 'xs:'+params[i].value.typeAnnotation.name <> n['as'] then raise Exception.Create('Type mismatch in environment definition');
+    if n.hasAttribute('source') then raise exception.Create('Unsupported environment param attribute');
+    if n.hasAttribute('declared') then params[i].declared := n['declared']= 'true';
+  end;
+
+  for v in xq.evaluateXPath2('context-item', e) do
+    contextItem := xq.evaluateXPath2(v.toString);
+
+  u := xq.evaluateXPath2('collection', e);
+  if not u.isUndefined then begin
+    collections := TStringList.Create;
+    for v in u do
+      collections.AddObject(v.toNode['uri'], TSource.createMultiple(v.toNode));
+  end;
+
+  u := xq.evaluateXPath2('namespace', e);
+  if not u.isUndefined then begin
+    if namespaces = nil then namespaces := TNamespaceList.Create;
+    for v in u do namespaces.add(TNamespace.Create(v.toNode['uri'], v.toNode['prefix']));
+  end;
+
+  sources := TSource.createMultiple(e);
+
+  {resource
+  unsupported: <xs:element ref="schema"/>   <xs:element ref="decimal-format"/>  <xs:element ref="function-library"/>                     <xs:element ref="resource"/>}
+end;
+
+class function TEnvironment.load(e: TTreeNode): TEnvironment;
+begin
   result := TEnvironment.Create;
   with result do begin
+    definition := e;
     name := e['name'];
     ref := e['ref'];
 
@@ -1012,55 +1071,6 @@ begin
       refed := TEnvironment(environments.Objects[environments.IndexOf(ref)]);
       exit;
     end;
-
-    staticBaseUri := xq.parseXPath2('static-base-uri/@uri').evaluate(e).toString;
-    if staticBaseUri = '' then staticBaseUri := e.getDocument().baseURI;
-
-    collations := TStringList.Create;
-    for v in xq.parseXPath2('collation').evaluate(e) do begin
-      i := xqtsCollations.IndexOf(v.toNode['uri']);
-      if (i < 0) and strBeginsWith(v.toNode['uri'], 'http://www.w3.org/2013/collation/UCA') then //todo: use a real collation
-        xqtsCollations.AddObject(v.toNode['uri'], TXQCollation.create(v.toNode['uri'], @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
-      i := xqtsCollations.IndexOf(v.toNode['uri']);
-      if i < 0 then raise Exception.Create('Failed to find collation: ' + v.toNode['uri']);
-      collations.AddObject(v.toNode['uri'], xqtsCollations.Objects[i]);
-      if v.toNode['default'] = 'true' then defaultCollation:=v.toNode['uri'];
-    end;
-    if (collations.Count > 0) and (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
-      collations.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
-
-    u := xq.parseXPath2('param').evaluate(e);
-    SetLength(params, u.getSequenceCount);
-    for i := 0 to u.getSequenceCount -1  do begin
-      n := u.getChild(i+1).toNode;
-      params[i].name := n['name'];
-      if n.hasAttribute('select') then params[i].value := xq.parseXQuery3(n['select']).evaluate()
-      else params[i].value := xqvalue();
-      if n.hasAttribute('as') then if 'xs:'+params[i].value.typeAnnotation.name <> n['as'] then raise Exception.Create('Type mismatch in environment definition');
-      if n.hasAttribute('source') then raise exception.Create('Unsupported environment param attribute');
-      if n.hasAttribute('declared') then params[i].declared := n['declared']= 'true';
-    end;
-
-    for v in xq.evaluateXPath2('context-item', e) do
-      contextItem := xq.evaluateXPath2(v.toString);
-
-    u := xq.evaluateXPath2('collection', e);
-    if not u.isUndefined then begin
-      collections := TStringList.Create;
-      for v in u do
-        collections.AddObject(v.toNode['uri'], TSource.createMultiple(v.toNode));
-    end;
-
-    u := xq.evaluateXPath2('namespace', e);
-    if not u.isUndefined then begin
-      if namespaces = nil then namespaces := TNamespaceList.Create;
-      for v in u do namespaces.add(TNamespace.Create(v.toNode['uri'], v.toNode['prefix']));
-    end;
-
-    sources := TSource.createMultiple(e);
-
-    {resource
-    unsupported: <xs:element ref="schema"/>   <xs:element ref="decimal-format"/>  <xs:element ref="function-library"/>                     <xs:element ref="resource"/>}
 
     environments.AddObject(name, Result);
   end;
@@ -1102,6 +1112,7 @@ var
 begin
   SetExceptionMask([exInvalidOp, exDenormalized, {exZeroDivide,}
                    exOverflow, exUnderflow, exPrecision]);
+  if env.definition <> nil then env.init;
   result := nil;
 //  idx := environments.IndexOf(id);
 //  env := TEnvironment(environments.Objects[idx]);
@@ -1158,7 +1169,7 @@ begin
       'environment': //environments.AddObject(e['name'], TEnvironment.load(e));
                      TEnvironment.load(e);
       'test-set': begin
-        ts := TTestSet.load(tree.parseTreeFromFile(e['file']).findChild(tetOpen, 'test-set'));
+        ts := TTestSet.load(e);
         if ts <> nil then testsets.add(ts);
       end;
       'version', 'test-suite': ;
