@@ -976,6 +976,9 @@ type
     subType: TXSNumericSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError; override;
+    function tryCreateValue(const v: Int64; outv: PXQValue = nil): TXSCastingError; override; overload;
+    function tryCreateValue(const v: xqfloat; outv: PXQValue = nil): TXSCastingError; override; overload;
+    function tryCreateValue(const v: BigDecimal; outv: PXQValue = nil): TXSCastingError; override; overload;
     function constraintsSatisfied(const v: BigDecimal): boolean;
     constructor create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
     constructor create(const aname: string; aparent: TXSNumericType);
@@ -3751,7 +3754,9 @@ begin
     seq := (result as TXQValueSequence).seq;
     for i := 0 to seq.Count - 1 do
       seq[i] := conversionSingle(seq[i]);
-  end;
+  end else if typ.kind = tikElementTest then
+    raise EXQEvaluationException.Create('XPTY0004', 'Expected '+typ.serialize+', but got : '+result.debugAsStringWithTypeAnnotation());
+    ;
 end;
 
 class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext
@@ -6604,7 +6609,7 @@ fn3.registerFunction('function-arity', @xqFunctionFunction_Arity, ['($func as fu
 fn3.registerInterpretedFunction('for-each', '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
 fn3.registerInterpretedFunction('filter', '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
 fn3.registerFunction('fold-left', @xqFunctionFold_left, ['($seq as item()*, $zero as item()*, $f as function(item()*, item()) as item()*) as item()*']);
-fn3.registerFunction('fold-right', @xqFunctionFold_right, ['($seq as item()*, $zero 	 as item()*, $f 	 as function(item()*, item()) as item()*) as item()*']);
+fn3.registerFunction('fold-right', @xqFunctionFold_right, ['($seq as item()*, $zero 	 as item()*, $f 	 as function(item(), item()*) as item()*) as item()*']);
 fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, ['($seq1 as item()*, $seq2 as item()*, $f as function(item(), item()) as item()*) as item()*']);
 
 
