@@ -1412,7 +1412,7 @@ begin
         end;}
         pvkString: begin
           name := trim(TXQTermConstant(term.children[0]).value.toString);
-          if not (baseSchema.QName.qnameRegex.Exec(name)) then result := castFail
+          if not (baseSchema.isValidQName(name)) then result := castFail
           else if castable then result := TXQTermConstant.create(xqvalueTrue)
           else if (staticContext.model in [xqpmXPath3, xqpmXQuery3]) then exit
           else begin

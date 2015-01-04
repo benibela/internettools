@@ -707,7 +707,14 @@ end;
 
 function TXSStringType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 begin
-  if (lexicalSpaceRegex <> nil) and not (lexicalSpaceRegex.Exec(v)) then exit(xsceFORG0001);
+  if (lexicalSpaceRegex <> nil) then begin
+    EnterCriticalsection(lexicalSpaceRegexCS);
+    try
+      if not (lexicalSpaceRegex.Exec(v)) then exit(xsceFORG0001);
+    finally
+      LeaveCriticalsection(lexicalSpaceRegexCS);
+    end;
+  end;
   result := xsceNoError;
   if (outv <> nil) then
     case subType of
@@ -720,12 +727,18 @@ constructor TXSStringType.create(const aname: string; aparent: TXSType; asubtype
 begin
   inherited Create(aname, aparent, TXQValueString);
   subType:=asubtype;
-  if pattern <> '' then lexicalSpaceRegex := TRegExpr.Create(pattern);
+  if pattern <> '' then begin
+    lexicalSpaceRegex := TRegExpr.Create(pattern);
+    InitCriticalSection(lexicalSpaceRegexCS);
+  end;
 end;
 
 destructor TXSStringType.Destroy;
 begin
-  lexicalSpaceRegex.free;
+  if lexicalSpaceRegex <> nil then begin
+    lexicalSpaceRegex.free;
+    DoneCriticalsection(lexicalSpaceRegexCS);
+  end;
   inherited Destroy;
 end;
 
@@ -735,12 +748,12 @@ end;
 constructor TXSQNameType.create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
 begin
   inherited create(aname, aparent, astorage, aschema);
-  qnameRegex := TRegExpr.Create(RegExpr_XMLQName);
+  //qnameRegex := TRegExpr.Create(RegExpr_XMLQName);
 end;
 
 destructor TXSQNameType.Destroy;
 begin
-  qnameRegex.Free;
+  //qnameRegex.Free;
   inherited Destroy;
 end;
 
@@ -900,6 +913,13 @@ begin
     end;
   end;
   result := true;
+end;
+
+function TXSSchema.isValidQName(s: string): boolean;
+var prefix: string;
+begin
+  prefix := strSplitGet(':', s);
+  result := isValidNCName(prefix) and ((s = '') or (isValidNCName(s)));
 end;
 
 { TXSSimpleType }

@@ -996,6 +996,7 @@ type
   TXSStringSubType = (xsstString, xsstHexBinary, xsstBase64Binary, xsstUrl);
   TXSStringType = class(TXSSimpleType)
     lexicalSpaceRegex: TRegExpr;
+    lexicalSpaceRegexCS: TRTLCriticalSection;
     subType: TXSStringSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
@@ -1006,7 +1007,6 @@ type
   { TXSQNameType }
 
   TXSQNameType = class(TXSSimpleType)
-    qnameRegex: TRegExpr;
     constructor create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
     destructor Destroy; override;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
@@ -1057,6 +1057,7 @@ type
   private
     typeList: TStringList;
     function isValidNCName(const s: string): boolean;
+    function isValidQName(s: string): boolean;
   end;
 
   { TJSSchema }

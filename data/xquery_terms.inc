@@ -684,7 +684,7 @@ begin
     if castableOnly then exit(xqvalueFalse)
     else raise EXQEvaluationException.create('FORG0001', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
   s := trim(v.toString);
-  castAllowed := (target <> baseSchema.NOTATION) and (baseSchema.QName.qnameRegex.Exec(s));
+  castAllowed := (target <> baseSchema.NOTATION) and (baseSchema.isValidQName(s));
   if castableOnly then  exit(xqvalue(castAllowed));
   if not castAllowed then
     raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
