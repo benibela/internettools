@@ -1759,7 +1759,6 @@ begin
    t('xs:untypedAtomic("abc") instance of string','false','');
    t('string("def") instance of xs:untypedAtomic','false','');
 //   t('xs:untyped("abc") instance of string','false','');
-   t('string("def") instance of xs:untyped','false','');
    t('xs:byte(1) castable as byte','true','');
    t('xs:byte(1) castable as integer','true','');
    t('xs:byte(1) castable as float','true','');
@@ -3673,9 +3672,9 @@ begin
     t('"  abc:def   " castable as xs:Name', 'true');
     t('"0:def" castable as xs:Name', 'false');
 
-    t('string-join("a b c d" cast as xs:ENTITIES, "|")', 'a|b|c|d');
+{    t('string-join("a b c d" cast as xs:ENTITIES, "|")', 'a|b|c|d');
     t('string-join("a b c d" cast as xs:IDREFS, "|")', 'a|b|c|d');
-    t('string-join("a b c d" cast as xs:NMTOKENS, "|")', 'a|b|c|d');
+    t('string-join("a b c d" cast as xs:NMTOKENS, "|")', 'a|b|c|d');}
   end;
   ps.StaticContext.strictTypeChecking:=strictTypeChecking;
 

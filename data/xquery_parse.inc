@@ -363,6 +363,7 @@ var word: string;
   parens: Integer;
   namespaceUrl: string;
   hadNamespace: Boolean;
+  schema: TXSSchema;
 begin
   skipWhitespaceAndComment();
   parens := 0;
@@ -444,8 +445,11 @@ begin
       end;
     end else begin
       result.kind:=tikAtomic;
-      result.atomicTypeInfo := engine.findType(namespaceUrl, word);
-      if result.atomicTypeInfo = nil then raiseParsingError('XPST0008', 'Unknown type: Q{'+namespaceUrl+'}'+word);
+      schema := staticContext.findSchema(namespaceUrl);
+      if schema = nil then raiseParsingError('XPST0081', 'Unknown schema: '+namespaceUrl);
+      result.atomicTypeInfo := schema.findType(word);
+      if (result.atomicTypeInfo = nil)  then
+        raiseParsingError(ifthen(staticContext.model in [xqpmXPath2, xqpmXQuery1], 'XPST0051', 'XPST0052'), 'Unknown type: Q{'+namespaceUrl+'}'+word);
     end;
 
     while parens > 0 do begin expect(')'); parens -= 1; end;
@@ -1763,7 +1767,11 @@ var astroot: TXQTerm;
       res.push(st); //assume we read instance of/cast/castable/treat as
       if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) then begin
         if not (st.isSingleType()) then
-          raiseParsingError('XPST0003', 'Need single typ for cast');
+          raiseSyntaxError('Need single typ for cast')
+        else if (st.atomicTypeInfo = baseSchema.anyAtomicType) or (st.atomicTypeInfo = baseSchema.anySimpleType) or (st.atomicTypeInfo = baseSchema.NOTATION) then
+          raiseParsingError('XPST0080', 'Invalid type for cast')
+        else if (st.atomicTypeInfo is TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
+          raiseParsingError('XQST0052', 'Expected simple type');
         replace^ := staticallyCastQNameAndNotation(res, st.atomicTypeInfo, staticContext, res.op.func = @xqvalueCastableAs);
       end;
     end;

@@ -156,6 +156,7 @@ type
 
     function clone(): TXQStaticContext;
     destructor Destroy; override;
+    function findSchema(const namespace: string): TXSSchema;
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
@@ -1011,6 +1012,8 @@ type
     destructor Destroy; override;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
+    function castable(const v: IXQValue; const context: TXQStaticContext): boolean;
+    function cast(const v: IXQValue; const context: TXQEvaluationContext): IXQValue;
   end;
 
   { TXSDateTimeType }
@@ -1055,9 +1058,10 @@ type
     destructor Destroy; override;
     function findType(const typeName: string): TXSType;
   private
-    typeList: TStringList;
+    typeList, hiddenTypeList: TStringList;
     function isValidNCName(const s: string): boolean;
     function isValidQName(s: string): boolean;
+    procedure hide(const s: string);
   end;
 
   { TJSSchema }
@@ -1363,7 +1367,6 @@ type
     function instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
     function instanceOf(const ta: IXQValue): boolean;
     function subtypeOf(tb: TXQTermSequenceType): boolean;
-    class function staticQNameCast(castableOnly: boolean; target: TXSQNameType; const v: IXQValue; context: TXQStaticContext): ixqvalue; static;
   private
     function subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
     function functionCoercion(const v: IXQValue): IXQValue;
@@ -1964,7 +1967,7 @@ type
   *)
   TXQueryEngine=class
   public
-    Schemas: TList;
+    //Schemas: TList;
 
     //RootElement: TTreeNode; //**< Root element
     //ParentElement: TTreeNode; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
@@ -2102,7 +2105,6 @@ public
   protected
     function findNamespace(const nsprefix: string): INamespace;
     class function findOperator(const pos: pchar): TXQOperatorInfo;
-    function findType(const namespace, name: string): TXSType;
   end;
 
   { TXQQueryIterator }
@@ -2613,7 +2615,7 @@ function myStrToFloat(s:string): xqfloat;
 begin
   s := trim(s);
   if not TryStrToFloat(s, result, XQFormats) then
-    if striEqual(s, 'INF') then result:=getPosInf
+    if striEqual(s, 'INF') or striEqual(s, '+INF') then result:=getPosInf
     else if striEqual(s, '-INF') then result:=getNegInf
     else {if strliEqual(string(v.varstr), 'NaN') then }result:=getNaN;
 end;
@@ -2899,6 +2901,18 @@ begin
   namespaces.free;
   importedSchemas.Free;
   inherited Destroy;
+end;
+
+function TXQStaticContext.findSchema(const namespace: string): TXSSchema;
+var
+  i: Integer;
+begin
+  if namespace = baseSchema.url then exit(baseSchema);
+  if importedSchemas <> nil then
+    for i := 0 to importedSchemas.Count - 1 do
+      if importedSchemas.items[i].getURL = namespace then
+        exit(baseSchema); //todo: return real schema
+  result := nil;
 end;
 
 function TXQStaticContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
@@ -5953,24 +5967,6 @@ begin
   end;
 end;
 
-function TXQueryEngine.findType(const namespace, name: string): TXSType;
-var
-  i: Integer;
-begin
-  if (self <> nil) and (Schemas <> nil) then
-    for i := 0 to Schemas.count - 1 do
-      if TXSSchema(Schemas[i]).url = namespace then
-        exit(TXSSchema(Schemas[i]).findType(name));
-  if namespace = baseSchema.url then
-    exit(baseSchema.findType(name));
-  raise EXQEvaluationException.create('XPST0008', 'unknown type {'+namespace+'}:'+name);
-  {for i := 0 to nativeModules.count - 1 do begin
-    j := TXQNativeModule(nativeModules.Objects[i]).types.IndexOf(name);
-    if j >= 0 then exit(TXQValueClass(TXQNativeModule(nativeModules.Objects[i]).types.Objects[j]));
-  end;
-  result := nil;}
-end;
-
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean;
 begin
   if not Assigned(node) or not (node.typ in nodeCondition.searchedTypes) then exit(false);
@@ -6174,6 +6170,7 @@ begin
   complexFunctions.Clear;
   interpretedFunctions.Clear;
   binaryOpLists.Clear;
+  binaryOpFunctions.Clear;
 
   basicFunctions.free;
   complexFunctions.free;
@@ -6677,6 +6674,18 @@ op.registerBinaryOp('or',@xqvalueOr,30,[]);
 commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped);
 commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
+
+
+baseSchema.hide('NMTOKENS');
+baseSchema.hide('IDREFS');
+baseSchema.hide('ENTITIES');
+baseSchema.hide('untyped');
+baseSchema.hide('node()');
+baseSchema.hide('sequence*');
+baseSchema.hide('function(*)');
+baseSchema.hide('numeric');
+baseSchema.hide('true-numeric');
+
 
 InitCriticalSection(interpretedFunctionSynchronization)
 finalization

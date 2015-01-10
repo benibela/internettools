@@ -511,12 +511,13 @@ var
 begin
   result := xsceFORG0001;
   pure := subType in  [xsstInteger, xsstDecimal];
-  if ((v = 'NaN') or (v = 'INF') or (v = '-INF')) then begin
+  if ((v = 'NaN') or (v = 'INF') or (v = '-INF') or (v = '+INF')) then begin
     if pure then exit();
+    if (v = '+INF') and (baseSchema.version = xsd10) then exit;
     if outv <> nil then
       case v of
         'NaN':  outv^ := TXQValueFloat.create(self, getNaN);
-        'INF':  outv^ := TXQValueFloat.create(self, getPosInf);
+        'INF', '+INF':  outv^ := TXQValueFloat.create(self, getPosInf);
         '-INF':  outv^ := TXQValueFloat.create(self, getNegInf);
       end;
     exit(xsceNoError);
@@ -589,11 +590,7 @@ begin
   case subType of
     xsstInteger, xsstDecimal: begin
       if not sispure then exit(xsceFORG0001);
-      bd := FloatToBigDecimal(v);
-      if (length(constrainingFacets) > 0) and not constraintsSatisfied(bd) then exit(xsceFORG0001);
-      if outv <> nil then
-        if isInt64(bd) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(bd))
-        else outv^ := TXQValueDecimal.create(self, bd)
+      result := tryCreateValue(FloatToBigDecimal(v), outv);
     end;
     xsstDouble, xsstFloat :  begin
       if not sispure then begin
@@ -777,6 +774,38 @@ begin
   result := xsceXPTY0004;
 end;
 
+function TXSQNameType.castable(const v: IXQValue; const context: TXQStaticContext): boolean;
+begin
+  result := (v.typeAnnotation.storage = TXQValueQName)
+            or ((context.model in [xqpmXPath3, xqpmXQuery3])
+                and (v.kind = pvkString)
+                and (v.instanceOf(baseSchema.string_))
+                and (self <> baseSchema.NOTATION)
+                and (baseSchema.isValidQName(trim(v.toString))));
+end;
+
+function TXSQNameType.cast(const v: IXQValue; const context: TXQEvaluationContext): IXQValue;
+var
+  castAllowed: Boolean;
+  namespace: INamespace;
+  s: String;
+begin
+  if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
+  if not (context.staticContext.model in [xqpmXPath3, xqpmXQuery3]) then
+    raise EXQEvaluationException.create('FORG0001', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
+  if (v.kind <> pvkString) or not (v.instanceOf(baseSchema.string_)) then
+    raise EXQEvaluationException.create('FORG0001', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
+  s := trim(v.toString);
+  castAllowed := (self <> baseSchema.NOTATION) and (baseSchema.isValidQName(s));
+  if not castAllowed then
+    raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
+  if pos(':', s) > 0 then begin
+    namespace := context.findNamespace(strSplitGet(':', s), xqdnkElementType);
+    if namespace = nil then raise EXQEvaluationException.create('FONS0004', 'Failed to find namespace of: '+v.toString);
+  end else namespace := context.findNamespace('', xqdnkElementType);
+  result := TXQValueQName.create(self, namespace, s);
+end;
+
 
 { TXSDateTimeType }
 
@@ -922,6 +951,21 @@ begin
   result := isValidNCName(prefix) and ((s = '') or (isValidNCName(s)));
 end;
 
+procedure TXSSchema.hide(const s: string);
+var
+  objIdx: Integer;
+begin
+  if hiddenTypeList = nil then begin
+    hiddenTypeList := TStringList.Create;
+    hiddenTypeList.OwnsObjects := true;
+  end;
+  objIdx := typeList.IndexOf(s);
+  hiddenTypeList.AddObject(typeList[objIdx], typeList.Objects[objIdx]);
+  typeList.OwnsObjects := false;
+  typeList.Delete(objIdx);
+  typeList.OwnsObjects := true;
+end;
+
 { TXSSimpleType }
 
 
@@ -997,6 +1041,7 @@ constructor TXSSchema.Create;
 begin
   version := xsd10;
   typeList := TStringList.Create;
+  typeList.OwnsObjects := true;
   if baseSchema <> nil then begin
     typeList.Sorted := true;
     anyType := baseSchema.anyType;
@@ -1112,9 +1157,12 @@ destructor TXSSchema.Destroy;
 var
   i: Integer;
 begin
-  for i := 0 to typeList.Count - 1 do
-    typeList.Objects[i].Free;
-  typeList.free;
+  typeList.Clear;
+  typeList.Free;
+  if hiddenTypeList <> nil then begin
+    hiddenTypeList.Clear;
+    hiddenTypeList.Free;
+  end;
   inherited Destroy;
 end;
 
