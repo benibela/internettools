@@ -417,8 +417,8 @@ begin
   else result := tcrPass;
   for i := 0 to list.Count - 1 do begin
     result := TAssertion(list[i]).check(errorCode);
-    if (kind = alkAnyOf) and (result in [tcrPass, tcrWrongError]) then exit;
-    if (kind = alkAllOf) and (result in [tcrFail]) then exit;
+    if (kind = alkAnyOf) and (result in [tcrPass]) then exit;
+    if (kind = alkAllOf) and (result in [tcrFail, tcrWrongError]) then exit;
   end;
 end;
 
