@@ -1050,6 +1050,7 @@ constructor TXSSchema.Create;
 begin
   version := xsd10;
   typeList := TStringList.Create;
+  typeList.CaseSensitive := true;
   typeList.OwnsObjects := true;
   if baseSchema <> nil then begin
     typeList.Sorted := true;

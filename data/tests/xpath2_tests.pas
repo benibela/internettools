@@ -1754,8 +1754,9 @@ begin
    t('4.0 instance of integer','false','');
    t('xs:decimal(1) instance (: ... :) of decimal','true','');
    t('xs:decimal(1) instance of (: .. :) decimal','true','');
-   t('xs:date("1800-02-03") instance of datetime','false','');
-   t('xs:time("23:59:59") instance of datetime','false','');
+   t('xs:date("1800-02-03") instance of dateTime','false','');
+   t('xs:time("23:59:59") instance of dateTime','false','');
+   f('xs:time("23:59:59") instance of datetime','err:XPST0051');
    t('xs:untypedAtomic("abc") instance of string','false','');
    t('string("def") instance of xs:untypedAtomic','false','');
 //   t('xs:untyped("abc") instance of string','false','');
@@ -1781,13 +1782,13 @@ begin
    t('5 castable as boolean','true','');
    t('0 castable as boolean','true','');
    t('"false" castable as boolean','true','');
-   t('xs:date("2050-01-01") castable as datetime','true','');
-   t('xs:time("00:00:00") castable as datetime','false','');
-   t('xs:datetime("1899-12-31T04:04:04") castable as date','true','');
-   t('xs:datetime("2012-02-01T14:15:16") castable as time','true','');
-   t('xs:datetime("1234-12-12T01:01:01") castable as time','true','');
-   t('xs:datetime("6543-12-12T08:08:08") castable as date','true','');
-   t('xs:datetime("65436-12-12T08:08:08") castable as date','true','');
+   t('xs:date("2050-01-01") castable as dateTime','true','');
+   t('xs:time("00:00:00") castable as dateTime','false','');
+   t('xs:dateTime("1899-12-31T04:04:04") castable as date','true','');
+   t('xs:dateTime("2012-02-01T14:15:16") castable as time','true','');
+   t('xs:dateTime("1234-12-12T01:01:01") castable as time','true','');
+   t('xs:dateTime("6543-12-12T08:08:08") castable as date','true','');
+   t('xs:dateTime("65436-12-12T08:08:08") castable as date','true','');
    t('xs:date("1650-04-12") castable as time','false','');
    t('xs:time("12:00:00") castable as date','false','');
    t('xs:time("12:12:59") castable as untypedAtomic','true','');
@@ -1877,7 +1878,7 @@ begin
   t('(xs:date("2012-12-20") + xs:dayTimeDuration("P4DT20H")) + xs:dayTimeDuration("P4DT20H")', '2012-12-28', '');
   t('xs:date("2012-12-20") - xs:dayTimeDuration("P4DT20H")', '2012-12-15', '');
   t('xs:date("2012-12-24") - xs:date("2012-12-20")', 'P4D', '');
-  t('timezone-from-datetime(xs:date("2012-12-30+05:30"))', 'PT5H30M', '');
+  t('timezone-from-dateTime(xs:date("2012-12-30+05:30"))', 'PT5H30M', '');
   t('timezone-from-date(xs:date("2012-12-30Z"))', 'PT0S', '');
   t('timezone-from-time(xs:time("02:18:20-1203"))', '-PT12H3M', '');
      {
@@ -2738,11 +2739,11 @@ begin
   t('xs:date("-0753-12-05") cast as xs:dateTime', '-0753-12-05T00:00:00', '');
   t('xs:time("12:12:12.5") - xs:time("12:12:12")', 'PT0.5S', '');
   t('fn:month-from-dateTime(fn:dateTime(xs:date("1999-12-31+10:00"), xs:time("23:00:00+10:00")))', '12', '');
-  t('xs:datetime("1999-12-30T20:30:40.5")', '1999-12-30T20:30:40.5', '');
+  t('xs:dateTime("1999-12-30T20:30:40.5")', '1999-12-30T20:30:40.5', '');
   t('xs:date("1999-07-19") - xs:date("1969-11-30")', 'P10823D', '');
   t('(xs:date("1999-07-19") - xs:date("1969-11-30")) eq xs:dayTimeDuration("P10823D")', 'true', '');
-  t('fn:datetime(date("1999-12-30"), time("20:30:40.23-05"))', '1999-12-30T20:30:40.23-05:00', '');
-  t('fn:datetime(date("1999-12-30+04"), time("20:30:40.23"))', '1999-12-30T20:30:40.23+04:00', '');
+  t('fn:dateTime(date("1999-12-30"), time("20:30:40.23-05"))', '1999-12-30T20:30:40.23-05:00', '');
+  t('fn:dateTime(date("1999-12-30+04"), time("20:30:40.23"))', '1999-12-30T20:30:40.23+04:00', '');
   t('op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))', 'P337D', '');
   t('(op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))) + dayTimeDuration("P1D")', 'P338D', '');
   t('dayTimeDuration("P1D") + (op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28")))', 'P338D', '');
@@ -3715,7 +3716,7 @@ begin
   t('/r', 'test');
   ps.StaticContext.defaultElementTypeNamespace := nil;
 
-  t('day-from-datetime(())', '');
+  t('day-from-dateTime(())', '');
   t('doc(())', '');
   t('collection(())', '');
 
