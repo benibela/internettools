@@ -568,7 +568,7 @@ begin
   else begin
     if v is TXQValueSequence then v := (v as TXQValueSequence).seq[0];
     if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.tryCreateValue(v) = xsceNoError
-    else result := staticQNameCast(true, atomicTypeInfo as TXSQNameType, v, staticContext).toBoolean;
+    else result := (atomicTypeInfo as TXSQNameType).castable(v, staticContext);
   end;
 end;
 
@@ -580,7 +580,7 @@ begin
   if v.isUndefined then exit(xqvalue);
   if v is TXQValueSequence then v := (v as TXQValueSequence).seq[0]; //does this matter?
   if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
-  else result := staticQNameCast(false, atomicTypeInfo as TXSQNameType, v, context.staticContext)
+  else result := (atomicTypeInfo as TXSQNameType).cast(v, context);
 end;
 
 function TXQTermSequenceType.castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
@@ -666,34 +666,6 @@ begin
   result := subtypeItemTypeOf(tb);
 end;
 
-class function TXQTermSequenceType.staticQNameCast(castableOnly: boolean; target: TXSQNameType; const v: IXQValue; context: TXQStaticContext
-  ): ixqvalue;
-var
-  castAllowed: Boolean;
-  namespace: INamespace;
-  s: String;
-begin
-  if v.typeAnnotation.storage = TXQValueQName then begin
-    if castableOnly then exit(xqvalueTrue)
-    else exit(target.createValue(v));
-  end;
-  if not (context.model in [xqpmXPath3, xqpmXQuery3]) then
-    if castableOnly then exit(xqvalueFalse)
-    else raise EXQEvaluationException.create('FORG0001', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
-  if v.kind <> pvkString then
-    if castableOnly then exit(xqvalueFalse)
-    else raise EXQEvaluationException.create('FORG0001', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
-  s := trim(v.toString);
-  castAllowed := (target <> baseSchema.NOTATION) and (baseSchema.isValidQName(s));
-  if castableOnly then  exit(xqvalue(castAllowed));
-  if not castAllowed then
-    raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
-  if pos(':', s) > 0 then begin
-    namespace := context.findNamespace(strSplitGet(':', s), xqdnkElementType);
-    if namespace = nil then raise EXQEvaluationException.create('FONS0004', 'Failed to find namespace of: '+v.toString);
-  end else namespace := context.findNamespace('', xqdnkElementType);
-  result := TXQValueQName.create(target, namespace, s);
-end;
 
 function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
   function subtypeItemTypeAtomic(xsa, xsb: TXSType): boolean;
@@ -1363,7 +1335,7 @@ begin
         1: begin
           t := TXSType(TObject(func));
           if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(evilkids[0])
-          else result := TXQTermSequenceType.staticQNameCast(false, t as TXSQNameType, evilkids[0], context.staticContext);
+          else result := (t as TXSQNameType).cast(evilkids[0], context);
         end
         else raiseEvaluationError('FORG0001', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
       end;
@@ -1417,6 +1389,7 @@ var
   t: TXSType;
   model: TXQParsingModel;
   i: Integer;
+  schema: TXSSchema;
 begin
   module := TXQueryEngine.findNativeModule(anamespace);
 
@@ -1453,18 +1426,16 @@ begin
   end;
 
   if argcount = 1 then begin
-    t := nil;
-    if anamespace = baseSchema.url then t:=baseSchema.findType(alocalname);
-    if (t = nil) and (staticContext <> nil) and (staticContext.importedSchemas<>nil) then
-      for i := 0 to staticContext.importedSchemas.Count - 1 do
-        if staticContext.importedSchemas.items[i].getURL = anamespace then begin
-          t:=baseSchema.findType(alocalname);
-          break;
-        end;
-    if t <> nil then begin
-      akind:=xqfkTypeConstructor;
-      afunc := TXQAbstractFunctionInfo(TObject(t));
-      exit(true)
+    if anamespace = baseSchema.url then schema := baseSchema
+    else if staticContext <> nil then schema := staticContext.findSchema(anamespace)
+    else schema := nil;
+    if schema <> nil then begin
+      t := schema.findType(alocalname);
+      if t <> nil then begin
+        akind:=xqfkTypeConstructor;
+        afunc := TXQAbstractFunctionInfo(TObject(t));
+        exit(true)
+      end;
     end;
   end;
 
