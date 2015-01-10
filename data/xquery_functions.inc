@@ -42,10 +42,15 @@ const NonNumericKind = [pvkUndefined, pvkBoolean, pvkQName, pvkObject, pvkArray,
 function xqvalueUnaryMinus(const cxt: TXQEvaluationContext; const nothing, arg: IXQValue): IXQValue;
 var
   i64: Int64;
+  bd: BigDecimal;
 begin
   ignore(nothing);
   case arg.kind of
-    pvkBigDecimal: result := TXQValueDecimal.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toDecimal);
+    pvkBigDecimal: begin
+      bd := -arg.toDecimal;
+      if isIntegral(bd) then result := TXQValueDecimal.create(baseSchema.integer, bd)
+      else result := TXQValueDecimal.create(baseSchema.decimal, bd);
+    end;
     pvkInt64: begin
       i64 := arg.toInt64;
       if i64 = low(int64) then result := TXQValueDecimal.create(baseSchema.integer, - arg.toDecimal)
@@ -62,11 +67,11 @@ function xqvalueUnaryPlus(const cxt: TXQEvaluationContext; const nothing, arg: I
 begin
   ignore(nothing);
   case arg.kind of
-    pvkBigDecimal: result := TXQValueDecimal.create((arg.typeAnnotation as TXSSimpleType).primitive, arg.toDecimal);
+    pvkBigDecimal: result := TXQValueDecimal.create(arg.typeAnnotation, arg.toDecimal);
     pvkInt64: result := TXQValueInt64.create(arg.toInt64);
-    pvkFloat: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, arg.toFloat);
+    pvkFloat: result := TXQValueFloat.create(arg.typeAnnotation, arg.toFloat);
     pvkUndefined: result := xqvalue();
-    pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.getChild(1));
+    pvkSequence: result := xqvalueUnaryPlus(cxt, nothing, arg.getChild(1));
     else result := TXQValueFloat.create(arg.toFloat);
   end;
 end;
@@ -190,32 +195,37 @@ end;
 
 function xqvalueTo(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var i, f,t: BigDecimal;
-    typ: TXSType;
     len: BigDecimal;
     resseq: TXQValueSequence;
     idx: Integer;
     resseqseq: TXQVList;
     fsmall: integer;
+    i64: int64;
+    typ: TXSNumericType;
 begin
   ignore(cxt);
   if a.isUndefined or b.isUndefined then exit(xqvalue);
-  typ := TXSType.commonIntegerType(a,b);
   f := a.toDecimal();
   t := b.toDecimal();
   if t < f then exit(xqvalue);
-  if t = f then exit(typ.createValue(f));
+  if t = f then exit(a);
   len := t - f + 1;
   if len > MaxInt then raise EXQEvaluationException.Create('XPDY0130', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
   resseqseq := resseq.seq;
   resseqseq.setCount(BigDecimalToLongint(len));
-  if (f  > -$3fffffff) and (t < $3fffffff) then begin
+  if isLongint(f) and isLongint(t) then begin
     fsmall := BigDecimalToLongint(f);
     for idx := 0 to BigDecimalToLongint(len) - 1 do
-      resseqseq.list[idx] := typ.createValue(idx+fsmall);
+      resseqseq.list[idx] := TXQValueInt64.Create(baseSchema.integer, idx+fsmall);
+  end else if isInt64(f) and isInt64(t) then begin
+    i64 := BigDecimalToInt64(f);
+    for idx := 0 to BigDecimalToLongint(len) - 1 do
+      resseqseq.list[idx] := TXQValueInt64.Create(baseSchema.integer, idx+i64);
   end else begin
     idx := 0;
     i := f;
+    typ := baseSchema.integer;
     while i < t do begin
       resseqseq.list[idx] := typ.createValue(i);
       i += 1;
