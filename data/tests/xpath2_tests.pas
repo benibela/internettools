@@ -1850,7 +1850,7 @@ begin
   t('(5,4,2) instance of anyAtomicType', 'false', '');
   t('(5,4,2) instance of anyAtomicType+', 'true', '');
   t('123.6 instance of anySimpleType', 'true', '');
-  t('xs:Name("B4") instance of anyType', 'true', '');
+  ///t('xs:Name("B4") instance of anyType', 'true', '');
   //             ,('(5,4,2) instance of anySimpleType', 'true', '') todo: check ??
   //             ,('(5,4,2) instance of anyType', 'true', '') todo: check??
 

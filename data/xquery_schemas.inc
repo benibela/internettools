@@ -778,7 +778,7 @@ begin
   result := (v.typeAnnotation.storage = TXQValueQName)
             or ((context.model in [xqpmXPath3, xqpmXQuery3])
                 and (v.kind = pvkString)
-                and (v.instanceOf(baseSchema.string_))
+                and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic))
                 and (self <> baseSchema.NOTATION)
                 and (baseSchema.isValidQName(trim(v.toString))));
 end;
@@ -792,8 +792,8 @@ begin
   if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
   if not (context.staticContext.model in [xqpmXPath3, xqpmXQuery3]) then
     raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
-  if (v.kind <> pvkString) or not (v.instanceOf(baseSchema.string_)) then
-    raise EXQEvaluationException.create('FORG0001', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
+  if (v.kind <> pvkString) or (not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic)) then
+    raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
   s := trim(v.toString);
   castAllowed := (self <> baseSchema.NOTATION) and (baseSchema.isValidQName(s));
   if not castAllowed then

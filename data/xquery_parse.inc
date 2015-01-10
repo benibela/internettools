@@ -1398,10 +1398,10 @@ begin
 end;
 
 function staticallyCastQNameAndNotation(term: TXQTermWithChildren; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false): txqterm;
-  function castFail: txqterm;
+  function castFail(code: string): txqterm;
   begin
     if castable then result := TXQTermConstant.create(xqvalueFalse)
-    else result := createDynamicErrorTerm('FORG0001', 'Invalid cast to QName/NOTATION');
+    else result := createDynamicErrorTerm(code, 'Invalid cast to QName/NOTATION');
   end;
 
 var
@@ -1410,7 +1410,7 @@ var
 begin
   result := term;
   if typ.storage = TXQValueQName then begin
-    if typ = baseSchema.NOTATION then result := castFail
+    if typ = baseSchema.NOTATION then result := castFail('XPST0080')
     else if (term.children[0] is TXQTermConstant) then begin
       case TXQTermConstant(term.children[0]).value.kind of
         pvkQName: exit; {begin
@@ -1422,7 +1422,7 @@ begin
         end;}
         pvkString: begin
           name := trim(TXQTermConstant(term.children[0]).value.toString);
-          if not (baseSchema.isValidQName(name)) then result := castFail
+          if not (baseSchema.isValidQName(name)) then result := castFail('FORG0001')
           else if castable then result := TXQTermConstant.create(xqvalueTrue)
           else if (staticContext.model in [xqpmXPath3, xqpmXQuery3]) then exit
           else begin
@@ -1434,7 +1434,7 @@ begin
             end else result := TXQTermConstant.Create(TXQValueQName.create(typ, staticContext.findNamespace('', xqdnkElementType), name));
           end;
         end
-        else result := castFail
+        else result := castFail('XPTY0004')
       end;
     end;
     if result <> term then term.free;

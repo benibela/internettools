@@ -2409,6 +2409,8 @@ var
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 
+  PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
+
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
 { TXQFunctionParameter }
@@ -3740,13 +3742,17 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
       t := result.typeAnnotation;
     end;
     if typ.instanceOf(result, context) then exit;
-    if t.derivedFrom(baseSchema.UntypedAtomic)
-       or (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (t.derivedFrom(baseSchema.Float) or t.derivedFrom(baseSchema.Double)))
-       or ((t.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
-       or (t.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
-         exit(typ.castAs(result, context));
-    if w.kind <> pvkFunction then errCode := 'XPTY0004'
-    else errCode := 'FOTY0013';
+    if t.derivedFrom(baseSchema.UntypedAtomic) then begin
+      if (typ.atomicTypeInfo.storage <> TXQValueQName) then exit(typ.castAs(result, context))
+      else if context.staticContext.model in PARSING_MODEL3 then errCode := 'XPTY0117'
+      else errCode := 'XPTY0004';
+    end else if (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (t.derivedFrom(baseSchema.Float) or t.derivedFrom(baseSchema.Double)))
+             or ((t.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
+             or (t.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
+      exit(typ.castAs(result, context))
+    else
+      if w.kind <> pvkFunction then errCode := 'XPTY0004'
+      else errCode := 'FOTY0013';
     raise EXQEvaluationException.Create(errCode, 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
   end;
 
@@ -3786,8 +3792,11 @@ class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: T
     if typ.instanceOf(w, context) then exit(true);
     if (w.kind = pvkNull) and (typ.allowNone) then exit(true);
     st := w.typeAnnotation;
-    if (st.derivedFrom(baseSchema.UntypedAtomic) and (typ.atomicTypeInfo <> baseSchema.trueNumericPseudoType))
-       or (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
+    if (st.derivedFrom(baseSchema.UntypedAtomic) and (typ.atomicTypeInfo <> baseSchema.trueNumericPseudoType)) then begin
+      if typ.atomicTypeInfo.storage = TXQValueQName then exit(false); //XPTY0117
+      exit(typ.castableAs(w, context.staticContext))
+    end;
+    if    (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
        or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
        or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
          exit(typ.castableAs(w, context.staticContext));
@@ -3845,8 +3854,11 @@ begin
   errCode := 'XPTY0004';
   for i := 0 to high(values) do
     if not (versions[countMatch].types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
-      errCode := 'FOTY0013'; //wtf?
-      break;
+     errCode := 'FOTY0013'; //wtf?
+     break;
+    end else if (context.staticContext.model in PARSING_MODEL3) and (versions[countMatch].types[i].kind = tikAtomic) and (versions[countMatch].types[i].atomicTypeInfo.storage = TXQValueQName) and (values[i].instanceOf(baseSchema.untypedAtomic)) then begin
+     errCode := 'XPTY0117'; //wtf?
+     break;
     end;
   errMessage := 'Invalid types for function '+versions[0].name+'.'+LineEnding;
   errMessage += 'Got: ';
