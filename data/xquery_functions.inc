@@ -1030,7 +1030,7 @@ begin
   if length(args) = 0 then begin
     if context.SeqValue <> nil then result := numberize(context.SeqValue)
     else if context.ParentElement <> nil then result := numberize(xqvalue(context.ParentElement))
-    else result := xqvalue();
+    else raiseXPDY0002ContextItemAbsent;
     exit;
   end;
   result := numberize(args[0]);
