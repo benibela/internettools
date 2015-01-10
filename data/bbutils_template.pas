@@ -3357,7 +3357,7 @@ begin
   else if not IsNan(timeZone) then result := result -  timeZone;
 end;
 
-function dateTimeFormat(const mask: RawByteString; y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString;
+function dateTimeFormat(const mask: RawByteString; y, m, d, h, n, s: integer; const secondFraction: double; const timezone: TDateTime): RawByteString;
 const invalid = high(integer);
 begin
   Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,secondFraction,timezone);
