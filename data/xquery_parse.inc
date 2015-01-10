@@ -1768,7 +1768,7 @@ var astroot: TXQTerm;
       if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) then begin
         if not (st.isSingleType()) then
           raiseSyntaxError('Need single typ for cast')
-        else if (st.atomicTypeInfo = baseSchema.anyAtomicType) or (st.atomicTypeInfo = baseSchema.anySimpleType) or (st.atomicTypeInfo = baseSchema.NOTATION) then
+        else if baseSchema.isAbstractType(st.atomicTypeInfo) then
           raiseParsingError('XPST0080', 'Invalid type for cast')
         else if (st.atomicTypeInfo is TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
           raiseParsingError('XQST0052', 'Expected simple type');

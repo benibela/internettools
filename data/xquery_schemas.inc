@@ -259,6 +259,7 @@ begin
     xsceNoError: temp := '??';
     xsceFORG0001: temp := 'FORG0001';
     xsceXPTY0004: temp := 'XPTY0004';
+    xsceFOCA0002: temp := 'FOCA0002';
   end;
   raise EXQEvaluationException.create('err:'+temp, 'Cannot cast '+from+' to '+to_);
 end;
@@ -478,8 +479,6 @@ end;
 function TXSNumericType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
   st: TXSType;
-  sispure: Boolean;
-  i: BigDecimal;
 begin
   st := v.typeAnnotation;
   result := xsceXPTY0004;
@@ -512,7 +511,7 @@ begin
   result := xsceFORG0001;
   pure := subType in  [xsstInteger, xsstDecimal];
   if ((v = 'NaN') or (v = 'INF') or (v = '-INF') or (v = '+INF')) then begin
-    if pure then exit();
+    if pure then exit(xsceFORG0001);
     if (v = '+INF') and (baseSchema.version = xsd10) then exit;
     if outv <> nil then
       case v of
@@ -589,7 +588,7 @@ begin
   sispure := not IsNan(v) and not IsInfinite(v);
   case subType of
     xsstInteger, xsstDecimal: begin
-      if not sispure then exit(xsceFORG0001);
+      if not sispure then exit(xsceFOCA0002);
       result := tryCreateValue(FloatToBigDecimal(v), outv);
     end;
     xsstDouble, xsstFloat :  begin
@@ -792,7 +791,7 @@ var
 begin
   if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
   if not (context.staticContext.model in [xqpmXPath3, xqpmXQuery3]) then
-    raise EXQEvaluationException.create('FORG0001', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
+    raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
   if (v.kind <> pvkString) or not (v.instanceOf(baseSchema.string_)) then
     raise EXQEvaluationException.create('FORG0001', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
   s := trim(v.toString);
@@ -964,6 +963,11 @@ begin
   typeList.OwnsObjects := false;
   typeList.Delete(objIdx);
   typeList.OwnsObjects := true;
+end;
+
+function TXSSchema.isAbstractType(t: TXSType): boolean;
+begin
+  result := (t = anySimpleType) or (t = NOTATION) or (t = anyAtomicType);
 end;
 
 { TXSSimpleType }

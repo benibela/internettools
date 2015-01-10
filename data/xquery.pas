@@ -877,7 +877,7 @@ type
   { TXSType }
 
   TXSNumericType = class;
-  TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001);
+  TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001, xsceFOCA0002);
   TXSType = class
     name: string;
     schema: TXSSchema;
@@ -1062,6 +1062,7 @@ type
     function isValidNCName(const s: string): boolean;
     function isValidQName(s: string): boolean;
     procedure hide(const s: string);
+    function isAbstractType(t: TXSType): boolean;
   end;
 
   { TJSSchema }
@@ -6680,6 +6681,7 @@ baseSchema.hide('NMTOKENS');
 baseSchema.hide('IDREFS');
 baseSchema.hide('ENTITIES');
 baseSchema.hide('untyped');
+baseSchema.hide('anyType');
 baseSchema.hide('node()');
 baseSchema.hide('sequence*');
 baseSchema.hide('function(*)');
