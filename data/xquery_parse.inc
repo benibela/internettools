@@ -41,6 +41,7 @@ type
   procedure requireXQuery(s: string = '');
   procedure require3(s: string = '');
   procedure requireXQuery3(s: string = '');
+  function isModel3: boolean;
 
   procedure skipWhitespace();
   procedure skipComment();
@@ -132,6 +133,11 @@ end;
 procedure TXQParsingContext.requireXQuery3(s: string);
 begin
   if (parsingModel <> xqpmXQuery3) then raiseInvalidModel('XQuery version 3.0 is required '+s);
+end;
+
+function TXQParsingContext.isModel3: boolean;
+begin
+  result := (parsingModel = xqpmXPath3) or (parsingModel = xqpmXQuery3) ;
 end;
 
 procedure TXQParsingContext.skipWhitespace;
@@ -1769,7 +1775,7 @@ var astroot: TXQTerm;
         if not (st.isSingleType()) then
           raiseSyntaxError('Need single typ for cast')
         else if baseSchema.isAbstractType(st.atomicTypeInfo) then
-          raiseParsingError('XPST0080', 'Invalid type for cast')
+          raiseParsingError(ifthen(isModel3 or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast')
         else if (st.atomicTypeInfo is TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
           raiseParsingError('XQST0052', 'Expected simple type');
         replace^ := staticallyCastQNameAndNotation(res, st.atomicTypeInfo, staticContext, res.op.func = @xqvalueCastableAs);
