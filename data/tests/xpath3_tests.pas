@@ -96,7 +96,7 @@ begin
   t('"hallo" ! "world"', 'world');
 
   t('let $s := "foobar" return xs:QName($s)', 'foobar');
-  f('let $s := base64Binary("bbbb") return xs:QName($s)', 'err:FORG0001');
+  f('let $s := base64Binary("bbbb") return xs:QName($s)', 'err:XPTY0004');
 
   //Xquery 3 only
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');

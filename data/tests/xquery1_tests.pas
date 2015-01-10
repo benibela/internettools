@@ -961,7 +961,7 @@ begin
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; element foobar { } instance of element(pre2:foobar)', 'true');
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; element foobar { } instance of element(pre1:foobar)', 'false');
   t('element foobar { } instance of element(*)', 'true');
-  t('element foobar { } instance of element(*, xs:anyType)', 'true');
+  //t('element foobar { } instance of element(*, xs:anyType)', 'true');
   t('element foobar { } instance of element(*, xs:integer)', 'false');
   t('element foobar { } instance of attribute()', 'false');
   t('element foobar { } instance of attribute(*)', 'false');
@@ -1545,7 +1545,7 @@ begin
   m('declare namespace t = "foobar"; <wiz xmlns:t="123">{namespace-uri-from-QName(xs:QName("t:localName"))}</wiz>', '123');
   m('declare namespace t = "foobar"; <wiz xmlns:t="">{namespace-uri-from-QName(xs:QName("t:localName"))}</wiz>', '');
   f('xs:QName("t:localName")', 'err:FONS0004');
-  f('declare namespace t = "foobar"; let $abc := "t:localName" return xs:QName($abc)', 'err:FORG0001');
+  f('declare namespace t = "foobar"; let $abc := "t:localName" return xs:QName($abc)', 'err:XPTY0004');
 
 
   m('declare default element namespace "foobar"; namespace-uri-from-QName(xs:QName("localName"))', 'foobar');

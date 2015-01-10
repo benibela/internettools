@@ -1431,7 +1431,7 @@ begin
     else schema := nil;
     if schema <> nil then begin
       t := schema.findType(alocalname);
-      if (t <> nil) and not (baseSchema.isAbstractType(t)) then begin
+      if (t <> nil) and not (baseSchema.isAbstractType(t)) and not (baseSchema.isValidationOnlyType(t)) then begin
         akind:=xqfkTypeConstructor;
         afunc := TXQAbstractFunctionInfo(TObject(t));
         exit(true)

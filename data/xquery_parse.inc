@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 type
 
+ TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast);
+ TXQSequenceTypeFlags = set of TXQSequenceTypeFlag;
 { TXQParsingContext }
 
  TXQParsingContext = class
@@ -63,7 +65,7 @@ type
 
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
   function parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
-  function parseSequenceType(): TXQTermSequenceType;
+  function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
   function replaceEntitiesAlways(s: string): string;
   function replaceEntitiesIfNeeded(const s: string): string; inline;
@@ -364,7 +366,7 @@ begin
             or (word = 'element') or (word = 'document-node') or (word = 'schema-element') or (word = 'attribute') or (word = 'schema-attribute');
 end;
 
-function TXQParsingContext.parseSequenceType: TXQTermSequenceType;
+function TXQParsingContext.parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
 var word: string;
   parens: Integer;
   namespaceUrl: string;
@@ -400,7 +402,7 @@ begin
       else begin
         result.push(parse());
         if nextToken() = ',' then begin
-          result.push(parseSequenceType());
+          result.push(parseSequenceType([xqstAllowValidationTypes]));
           expect(')');
         end;
       end;
@@ -440,22 +442,23 @@ begin
       end else begin
         while pos^ <> ')' do begin
           SetLength(result.arguments, length(result.arguments) + 1);
-          result.arguments[high(result.arguments)] := parseSequenceType();
+          result.arguments[high(result.arguments)] := parseSequenceType([]);
           skipWhitespaceAndComment();
           if pos^ <> ')' then expect(',');
         end;
         expect(')');
         expect('as');
         SetLength(result.arguments, length(result.arguments) + 1);
-        result.arguments[high(result.arguments)] := parseSequenceType();
+        result.arguments[high(result.arguments)] := parseSequenceType([]);
       end;
     end else begin
       result.kind:=tikAtomic;
       schema := staticContext.findSchema(namespaceUrl);
       if schema = nil then raiseParsingError('XPST0081', 'Unknown schema: '+namespaceUrl);
       result.atomicTypeInfo := schema.findType(word);
-      if (result.atomicTypeInfo = nil)  then
-        raiseParsingError(ifthen(staticContext.model in [xqpmXPath2, xqpmXQuery1], 'XPST0051', 'XPST0052'), 'Unknown type: Q{'+namespaceUrl+'}'+word);
+      if (result.atomicTypeInfo = nil)
+         or (not (xqstAllowValidationTypes in flags) and baseSchema.isValidationOnlyType(result.atomicTypeInfo)) then
+        raiseParsingError(ifthen((xqstIsCast in flags) and isModel3 , 'XQST0052', 'XPST0051'), 'Unknown type: Q{'+namespaceUrl+'}'+word);
     end;
 
     while parens > 0 do begin expect(')'); parens -= 1; end;
@@ -518,7 +521,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
       temp := nextToken;
       if temp = 'as' then begin
         requireXQuery;
-        sequenceTyp := parseSequenceType;
+        sequenceTyp := parseSequenceType([]);
         temp := nextToken;
       end else sequenceTyp := nil;
 
@@ -625,13 +628,13 @@ begin
   try
     result.push(parseVariable);
     skipWhitespaceAndComment();
-    if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
+    if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType([])); end;
     expect('in'); result.push(parse());
     word := nextToken();
     while word = ',' do begin
       result.push(parseVariable);
       skipWhitespaceAndComment();
-      if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType()); end;
+      if pos^ = 'a' then begin expect('as'); result.push(parseSequenceType([])); end;
       expect('in'); result.push(parse());
       word := nextToken();
     end;
@@ -663,7 +666,7 @@ begin
         tempSeq.push(parsePatternMatcher());
       end else begin
         if pos^ = '$' then begin tempSeq.push(parseVariable); expect('as'); end;
-        tempSeq.push(parseSequenceType());
+        tempSeq.push(parseSequenceType([]));
       end;
       expect('return');
       tempSeq.push(parse());
@@ -1080,7 +1083,7 @@ begin
   try
     if nextToken(true) = 'as' then begin
       expect('as');
-      result.push(parseSequenceType());
+      result.push(parseSequenceType([]));
     end;
   except
     result.free;
@@ -1179,7 +1182,7 @@ begin
     result.parameterCount:=length(result.children);
     if nextToken(true) = 'as' then begin
       expect('as');
-      result.push(parseSequenceType());
+      result.push(parseSequenceType([]));
     end;
     case nextToken() of
       '{': begin
@@ -1634,7 +1637,7 @@ begin
                 if (word <> 'element') and (word <> 'attribute') then
                   raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
                 expect(',');
-                TXQTermNodeMatcher(result).push(parseSequenceType());
+                TXQTermNodeMatcher(result).push(parseSequenceType([xqstAllowValidationTypes]));
               end;
             end;
             expect(')');
@@ -1767,11 +1770,14 @@ var astroot: TXQTerm;
     procedure handleCastStrangeness;
     var
       st: TXQTermSequenceType;
+      isCast: Boolean;
     begin
-      expect(res.op.followedBy);
-      st := parseSequenceType();
-      res.push(st); //assume we read instance of/cast/castable/treat as
-      if ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs)) then begin
+      expect(res.op.followedBy); //assume we read instance of/cast/castable/treat as
+      isCast := ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs));
+      if isCast then st := parseSequenceType([xqstIsCast])
+      else st := parseSequenceType([]);
+      res.push(st);
+      if isCast then begin
         if not (st.isSingleType()) then
           raiseSyntaxError('Need single typ for cast')
         else if baseSchema.isAbstractType(st.atomicTypeInfo) then

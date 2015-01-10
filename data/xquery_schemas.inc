@@ -970,6 +970,11 @@ begin
   result := (t = anySimpleType) or (t = NOTATION) or (t = anyAtomicType);
 end;
 
+function TXSSchema.isValidationOnlyType(t: TXSType): boolean;
+begin
+  result := (t = anyType) or (t = untyped);
+end;
+
 { TXSSimpleType }
 
 

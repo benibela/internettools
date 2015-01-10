@@ -1063,6 +1063,7 @@ type
     function isValidQName(s: string): boolean;
     procedure hide(const s: string);
     function isAbstractType(t: TXSType): boolean;
+    function isValidationOnlyType(t: TXSType): boolean;
   end;
 
   { TJSSchema }
@@ -6338,7 +6339,7 @@ begin
             ',': expect(',');
           end;
           expect('$'); nextTokenNCName(); expect('as');
-          info.versions[i].types[j] := parseSequenceType();
+          info.versions[i].types[j] := parseSequenceType([]);
         end;
       end;
       expect(')');
@@ -6346,7 +6347,7 @@ begin
       expect('as');
       skipWhitespaceAndComment();
       if not ((pos^ = 'n') and strlEqual(pos, 'none', 4)) then
-        info.versions[i].returnType := parseSequenceType();
+        info.versions[i].returnType := parseSequenceType([]);
     end;
 end;
 
@@ -6692,8 +6693,6 @@ commonValuesFalse := TXQValueBoolean.create(false);
 baseSchema.hide('NMTOKENS');
 baseSchema.hide('IDREFS');
 baseSchema.hide('ENTITIES');
-baseSchema.hide('untyped');
-baseSchema.hide('anyType');
 baseSchema.hide('node()');
 baseSchema.hide('sequence*');
 baseSchema.hide('function(*)');
