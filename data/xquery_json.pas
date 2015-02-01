@@ -17,6 +17,26 @@
 
 unit xquery_json;
 
+{
+Copyright (C) 2008 - 2015 Benito van der Zander (BeniBela)
+                          benito@benibela.de
+                          www.benibela.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+}
+
 {$mode objfpc}{$H+}
 
 interface
@@ -150,14 +170,14 @@ var
     begin
       Result := TXQValueJSONArray.create();
       if nextToken = tkSquaredBraceClose then exit;
-      result.addChild(parse(true));
+      result.add(parse(true));
       while true do begin
         case nextToken of
           tkSquaredBraceClose: exit;
           tkComma: ; //ok
           else raiseError('Unexpected token in array');
         end;
-        result.addChild(parse());
+        result.add(parse());
       end;
     end;
 
@@ -217,7 +237,7 @@ begin
 
   multipleTopLevelItems := true;
   if (length(args) = 2) and (args[1] is TXQValueObject) and ((args[1] as TXQValueObject).hasProperty('jsoniq-multiple-top-level-items', @value)) then begin
-    if (value.getSequenceCount > 2) or not (value.getChild(1) is TXQValueBoolean) then
+    if (value.getSequenceCount > 2) or not (value.get(1) is TXQValueBoolean) then
       raise EXQEvaluationException.create('jerr:JNTY0020', 'Expected true/false got: '+value.debugAsStringWithTypeAnnotation()+' for property jsoniq-multiple-top-level-items');
     multipleTopLevelItems:=value.toBoolean;
   end;
@@ -310,7 +330,7 @@ var
 begin
   requiredArgCount(args, 1);
   a := args[0];
-  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.getChild(1);
+  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.get(1);
   if a.getSequenceCount = 0 then exit(xqvalue());
   if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.debugAsStringWithTypeAnnotation());
   result := xqvalue((a as TXQValueJSONArray).seq.Count);

@@ -283,10 +283,10 @@ end;
 function httpRequest(const destination: xquery.IXQValue): string;
 var dest: IXQValue;
 begin
-  if destination.kind = pvkSequence then dest := destination.getChild(1)
+  if destination.kind = pvkSequence then dest := destination.get(1)
   else dest := destination;
   dest := pxpParser.evaluateXPath3('pxp:resolve-html(.)', dest);
-  if dest.kind = pvkSequence then dest := dest.getChild(1);
+  if dest.kind = pvkSequence then dest := dest.get(1);
 
   case dest.kind of
     pvkUndefined: exit('');

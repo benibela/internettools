@@ -467,7 +467,7 @@ begin
   result := xsceNoError;
   for i := 0 to high(l) do begin
     result := itemType.tryCreateValue(l[i], ptemp);
-    if outv <> nil then TXQValueSequence(outv^).addChild(temp);
+    if outv <> nil then TXQValueSequence(outv^).add(temp);
     if result <> xsceNoError then break;
   end;
   if (outv <> nil) and (result <> xsceNoError) then FreeAndNil(outv^);

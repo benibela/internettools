@@ -117,7 +117,7 @@ begin
   resseq := TXQValueSequence.create(length(temp));
   scanner := TUTF8Scanner.Create(temp);
   for i := 1 to scanner.Length do
-    resseq.addChild(xqvalue(scanner.UCS4Chars[i]));
+    resseq.add(xqvalue(scanner.UCS4Chars[i]));
   scanner.Free;
   result := resseq;
   xqvalueSeqSqueeze(result);

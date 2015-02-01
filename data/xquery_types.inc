@@ -167,7 +167,7 @@ begin
   result := 1;
 end;
 
-function TXQValue.getChild(i: integer): IXQValue;
+function TXQValue.get(i: integer): IXQValue;
 begin
   if i = 1 then exit(self);
   exit(xqvalue);
@@ -1176,7 +1176,7 @@ begin
   Result:=seq.Count;
 end;
 
-function TXQValueSequence.getChild(i: integer): IXQValue;
+function TXQValueSequence.get(i: integer): IXQValue;
 begin
   if (i < 1) or (i > seq.Count) then exit(xqvalue);
   exit(seq[i-1]);
@@ -1223,17 +1223,17 @@ begin
   result += '</'+sequenceTag+'>';
 end;
 
-procedure TXQValueSequence.addChild(child: IXQValue);
+procedure TXQValueSequence.add(const value: IXQValue);
 begin
-  seq.add(child);
+  seq.add(value);
 end;
 
-procedure TXQValueSequence.addChildMerging(child: IXQValue);
+procedure TXQValueSequence.addOrdered(const node: IXQValue);
 begin
-  seq.addMerging(child);
+  seq.addOrdered(node);
 end;
 
-function TXQValueSequence.takeFirstChild: IXQValue;
+function TXQValueSequence.takeFirst: IXQValue;
 begin
   if seq.Count = 0 then exit(nil);
   result := seq[0];
@@ -1504,7 +1504,7 @@ var
 begin
   tempSeq := TXQValueSequence.create(values.count);
   for prop in getPropertyEnumerator do
-    tempSeq.addChild(prop.Value);
+    tempSeq.add(prop.Value);
   result := tempSeq;
   xqvalueSeqSqueeze(result);
 end;
@@ -1686,9 +1686,9 @@ begin
   result += '</'+sequenceTag+'>';
 end;
 
-procedure TXQValueJSONArray.addChild(child: IXQValue);
+procedure TXQValueJSONArray.add(const value: IXQValue);
 begin
-  seq.add(child);
+  seq.add(value);
 end;
 
 destructor TXQValueJSONArray.Destroy;

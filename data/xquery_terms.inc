@@ -1,5 +1,5 @@
 {
-Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2015 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -789,7 +789,7 @@ begin
   tempSeq := TXQValueSequence.create(length(children));
   try
     for i := 0 to high(children) do
-      tempSeq.addChild(children[i].evaluate(context));
+      tempSeq.add(children[i].evaluate(context));
     result := tempSeq;
   except
     tempSeq.free;
@@ -814,7 +814,7 @@ var
 begin
   tempSeq := TXQValueJSONArray.create(length(children));
   for i := 0 to high(children) do
-    tempSeq.addChild(children[i].evaluate(context));
+    tempSeq.add(children[i].evaluate(context));
   result := tempSeq;
 end;
 
@@ -1527,7 +1527,7 @@ begin
   if func.isUndefined then
     if AllowJSONDefaultInternal then exit(xqvalue())
     else raise EXQEvaluationException.create('XPTY0004', 'Cannot use an empty sequence as function, if JSONiq is disabled');
-  if (func is TXQValueSequence) and (func.getSequenceCount = 1) then func := func.getChild(0);
+  if (func is TXQValueSequence) and (func.getSequenceCount = 1) then func := func.get(0);
 
   if func is TXQValueFunction then begin
     setlength(evilkids, length(children)-1);
@@ -1938,11 +1938,13 @@ function TXQTermPatternMatcher.evaluate(const context: TXQEvaluationContext): IX
 begin
   ignore(context);
   raiseEvaluationError('pxp:INTERNAL', 'TXQTermPatternMatcher.evaluate');
+  result := nil;
 end;
 
 function TXQTermPatternMatcher.getContextDependencies: TXQContextDependencies;
 begin
   raiseEvaluationError('pxp:INTERNAL', 'TXQTermPatternMatcher.getContextDependencies');
+  result := [];
 end;
 
 { TXQTermVariable }
@@ -2384,7 +2386,7 @@ var
     vname: TXQValueQName;
     prefix: String;
   begin
-    if (v is TXQValueSequence) and (v.getSequenceCount = 1) then v := v.getChild(1);
+    if (v is TXQValueSequence) and (v.getSequenceCount = 1) then v := v.get(1);
     if (v.instanceOf(baseSchema.QName))  then begin
      vname := (v as TXQValueQName);
       tree.namespace := subcontext^.findNamespace(vname.prefix, defkind);
@@ -2573,7 +2575,7 @@ function TXQTermJSONObjectConstructor.evaluate(const context: TXQEvaluationConte
         result := TXQValueJSONArray.create(v.getSequenceCount);
         (result as TXQValueJSONArray).seq.add(v);
         exit;
-      end else v := v.getChild(1);
+      end else v := v.get(1);
     if v is TXQValueNode then
       exit(xqvalue(v.toNode.outerXML(false)));
     result := v;

@@ -1,5 +1,5 @@
 {
-Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2015 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -58,7 +58,7 @@ begin
     end;
     pvkFloat: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toFloat);
     pvkUndefined: result := xqvalue();
-    pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.getChild(1));
+    pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.get(1));
     else result := TXQValueFloat.create(- arg.toFloat);
   end;
 end;
@@ -71,7 +71,7 @@ begin
     pvkInt64: result := TXQValueInt64.create(arg.toInt64);
     pvkFloat: result := TXQValueFloat.create(arg.typeAnnotation, arg.toFloat);
     pvkUndefined: result := xqvalue();
-    pvkSequence: result := xqvalueUnaryPlus(cxt, nothing, arg.getChild(1));
+    pvkSequence: result := xqvalueUnaryPlus(cxt, nothing, arg.get(1));
     else result := TXQValueFloat.create(arg.toFloat);
   end;
 end;
@@ -824,7 +824,7 @@ begin
       for x in v do begin
         if (x.kind <> pvkNode) or (x.toNode = nil) then
           raise EXQEvaluationException.Create('XPTY0004', 'invalid node');
-        result.addChild(x);
+        result.add(x);
       end;
       result.seq.sortInDocumentOrderUnchecked;
       for i:=result.seq.Count-1 downto 1 do
@@ -843,7 +843,7 @@ begin
     raise EXQEvaluationException.Create('XPTY0004', 'invalid type for union');
   a := xqvalueToNormalizedNodeSeq(ta); //todo: optimize
   b := xqvalueToNormalizedNodeSeq(tb);
-  a.addChildMerging(b);
+  a.addOrdered(b);
   result := a;
   xqvalueSeqSqueeze(result);
 end;
@@ -868,7 +868,7 @@ begin
   while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
     cmp := TTreeNode.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
     if cmp = 0 then begin
-      resseq.addChild(xqvalue(a.seq[ia].toNode));
+      resseq.add(xqvalue(a.seq[ia].toNode));
       ia+=1; ib+=1;
     end else if cmp < 0 then ia+=1
     else ib+=1;
@@ -932,7 +932,7 @@ begin
   while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
     cmp := TTreeNode.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
     if cmp < 0 then begin
-      resseq.addChild(a.seq[ia]);
+      resseq.add(a.seq[ia]);
       ia+=1;
     end else if cmp > 0 then ib+=1
     else begin
@@ -942,7 +942,7 @@ begin
   end;
   if ia < a.seq.Count then begin
     for i:=ia to a.seq.Count-1 do
-      resseq.addChild(a.seq[i]);
+      resseq.add(a.seq[i]);
   end;
   result := resseq;
 end;
@@ -1584,7 +1584,7 @@ begin
     end;
 
   if (length(args) > 1) and (baseUri = '') then begin //use 2nd parameter only as fallback uri, if 1st parameter does not have one. (it would be nicer to have a way to override the url, but checking if there is a url, is too much caller overhead)
-    tempv := args[1].getChild(1);
+    tempv := args[1].get(1);
     case tempv.kind of
       pvkNode: begin
         n := tempv.toNode;
@@ -1661,7 +1661,7 @@ begin
   while i <= length(temp) do begin
     cp := strDecodeUTF8Character(temp, i);
     if cp < 0 then break;
-    resseq.addChild(xqvalue(cp));
+    resseq.add(xqvalue(cp));
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);
@@ -2705,7 +2705,7 @@ var
 begin
   resseq := TXQValueSequence.create(length(args));
   for i:=0 to high(args) do
-    resseq.addChild(args[i]);
+    resseq.add(args[i]);
   result := resseq;
 end;
 
@@ -3016,7 +3016,7 @@ begin
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
     if ak = pvkSequence then begin
-      result := args[0].getChild(1);
+      result := args[0].get(1);
       ak := result.kind;
     end;
     if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0].instanceOf(baseSchema.duration)) and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
@@ -3155,7 +3155,7 @@ begin
 
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
-    if result is TXQValueSequence then result := args[0].getChild(1);
+    if result is TXQValueSequence then result := args[0].get(1);
     if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result);
     kind := result.kind;
     if (not (kind in [pvkUndefined, pvkDateTime, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString]))

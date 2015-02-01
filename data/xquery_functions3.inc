@@ -1,7 +1,7 @@
 function xqFunctionHead(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
-  result := args[0].getChild(1);
+  result := args[0].get(1);
 end;
 
 function xqFunctionTail(const args: TXQVArray): IXQValue;
@@ -13,10 +13,10 @@ begin
   requiredArgCount(args, 1);
   len := args[0].getSequenceCount;
   if len < 2 then exit(xqvalue);
-  if len = 2 then exit(args[0].getChild(2));
+  if len = 2 then exit(args[0].get(2));
   seq := TXQValueSequence.create(len-1);
   for i := 2 to len do
-    seq.seq.add(args[0].getChild(i));
+    seq.seq.add(args[0].get(i));
   result := seq;
 end;
 
@@ -97,7 +97,7 @@ begin
     // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
     newargs[1] := args[1];
     for i := count downto 1 do begin
-      newargs[0] := args[0].getChild(i);
+      newargs[0] := args[0].get(i);
       newargs[1] := func.evaluate(newargs);
     end;
     result := newargs[1];
@@ -135,9 +135,9 @@ begin
   SetLength(newargs, 2);
   resseq := TXQValueSequence.create(count);
   for i := 1 to count do begin
-    newargs[0] := seq1.getChild(i);
-    newargs[1] := seq2.getChild(i);
-    resseq.addChild(func.evaluate(newargs));
+    newargs[0] := seq1.get(i);
+    newargs[1] := seq2.get(i);
+    resseq.add(func.evaluate(newargs));
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);

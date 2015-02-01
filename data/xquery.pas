@@ -8,7 +8,7 @@
 unit xquery;
 
 {
-Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2015 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -37,17 +37,12 @@ interface
 
 uses
    Classes, SysUtils,
-   dregexpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page dead, I create a mirror on benibela.de) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr)
+   dregexpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page was dead, I create a mirror on benibela.de, but it is reachable again) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr. although nowadays fpc also included this unit)
              //ATTENTION: You must use my version of it, OR set NSUBEXP = 90, otherwise it will crash with an "TRegExpr(comp): ParseReg Unmatched ()" error everytime you use the anyURI type
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif};
 
 
-
-
-//Some Options
-const MAX_EXP_NESTING=32; //**<Maximal nesting depth of the expressions
-const MAX_TOTAL_EXPS=128; //**<Maximal count of sub-expressions, if you are using static memory (changed by $define)
 
 //Type definitions
 type
@@ -218,7 +213,7 @@ type
   (***
   @abstract(Variant used in XQuery-expressions)
 
-  This is the base interface used to access the various values occuring during the evaluation of a XQuery expression.
+  This is the base interface used to access the various values occuring during the evaluation of an XQuery expression.
 
   You can read its value with the methods toBoolean, toInt64, toDecimal, toString, toDateTime, toNode, toArray,
   which convert the returned value to the requested type.
@@ -229,22 +224,23 @@ type
   So if you have an IXQValue @code(value), you can read it like @code(value.toString) or @code(value.toBoolean).
   Or assign it to another value2 just by writing @code(value2 := value).
 
-  IXQValue are usually returned by the "parser" classes, so you don't have to create your own, but if you want, you can
+  An IXQValue can store a sequence of IXQValue-s which can be iterated with a for each loop @code(for valueIterator in valueSequence)
+  or using @code(count) and @code(get).
+
+  IXQValue are usually returned by the evaluation of a query, so you don't have to create your own, but if you want, you can
   use the xqvalue() functions which return a IXQValue corresponding to the type of their parameter.
 
-  You can declare user defined types by deriving TXQValue (not IXQValue, there is a bunch of staff depending on the class) and
-  calling TXQueryEngine.registerType with the new type.
+  You can declare user defined types by deriving TXQValue (not IXQValue, there is a bunch of staff depending on the class).
 
-  Each value is a tuple of the value of a Pascal type (e.g. string, int65 double, bigdecimal), and a xml schema type annotation.
-
+  Each value is a tuple of the value of a Pascal type (e.g. string, int64, double, bigdecimal), and an XML schema type annotation.
 
   There are different ways to check which type an IXQValue has:
   @unorderedList(
-    @item(The method code(typeAnnotation) returns the logical type of the value, i.e. the type seen by a XQuery expression. @br
+    @item(The method code(typeAnnotation) returns the logical type of the value, i.e. the type seen by an XQuery expression. @br
           This is an object in a  @noLink(schema) describing the type (e.g. name "xs:string", ranges), and does not necessary
           correspond to the type used to store the value. )
     @item(A derivation check @code(is TXQValue...). This checks if the value is stored in a certain implementation class (e.g. TXQValueString))
-    @item(The method @code(kind) returns the kind of the value, an enum corresponding to each of the implementation classes, e.g. pvkString)
+    @item(The method @code(kind) returns the kind of the value, an enum corresponding to each of the implementation base classes, e.g. pvkString)
   )
 
 
@@ -260,17 +256,17 @@ type
     function toBoolean: boolean;  //**< Returns the value as boolean; dynamically converted, if necessary
     function toBooleanEffective: boolean;  //**< Returns the effective boolean value, as defined in XPath. (the main difference to toBoolean is that toBooleanEffective returns true for the string "false", while toBoolean returns false)
     function toInt64: int64;  //**< Returns the value as int64; dynamically converted, if necessary
-    function toFloat: xqfloat;  //**< Returns the value as float (extended if available); dynamically converted, if necessary
+    function toFloat: xqfloat;  //**< Returns the value as xqfloat (double); dynamically converted, if necessary
     function toDecimal: BigDecimal;  //**< Returns the value as bigdecimal; dynamically converted, if necessary
     function toString: string;  //**< Returns the value as string; dynamically converted, if necessary
     function toJoinedString(const sep: string=' '): string;  //**< Returns the value as joined string (string-join($self, $sep)); dynamically converted, if necessary
-    function toDateTime: TDateTime;  //**< Returns the value as datetime; dynamically converted, if necessary
-    function toNode: TTreeNode;  //**< Returns the value as node; dynamically converted, if necessary
-    function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer interface to each element of the sequence
+    function toDateTime: TDateTime;  //**< Returns the value as dateTime; dynamically converted, if necessary
+    function toNode: TTreeNode;  //**< Returns the value as node; or nil if it is no node
+    function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single element, the array contains that element; if it is a sequence, the array contains each element of the sequence
     function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
 
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
-    function getChild(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
+    function get(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
 
@@ -282,6 +278,8 @@ type
     function GetEnumerator: TXQValueEnumerator; //**< Returns an enumerator for @code(for var in value). For a sequence the enumerator runs over all values contained in the sequence, for other values it will do one iteration over the value of that value. The iterated values have the IXQValue interface type
 
     function instanceOf(const typ: TXSType): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
+
+    property Count: integer read getSequenceCount;
   end;
 
 
@@ -299,26 +297,26 @@ type
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); virtual;
 
     function kind: TXQValueKind;  //**< Primary type of a value (actually just wraps classKind. Since you can't define class functions in the interface, but we need to do calculations with types itself)
-    function typeName: string;      //**< XPath type name (actually just wraps classTypeName. Since you can't define class functions in the interface, but we need to do calculations with types itself)
+    function typeName: string;      //**< XPath type name (actually just wraps typeAnnotation.name)
     function typeAnnotation: TXSType; inline; //**< Returns the class underlying the interface
     //function schema: TXSSchema;
 
     function isUndefined: boolean; virtual;  //**< Returns true, iff the value is undefined or an empty sequence
 
     function toBoolean: boolean; virtual; //**< Returns the value as boolean; dynamically converted, if necessary
-    function toBooleanEffective: boolean; virtual; //**< Returns the value effective boolean value
+    function toBooleanEffective: boolean; virtual; //**< Returns the effective boolean value (the main difference to toBoolean is that toBooleanEffective returns true for the string "false", while toBoolean returns false)
     function toInt64: int64; virtual; //**< Returns the value as int64; dynamically converted, if necessary
-    function toFloat: xqfloat; virtual; //**< Returns the value as int64; dynamically converted, if necessary
+    function toFloat: xqfloat; virtual; //**< Returns the value as xqfloat; dynamically converted, if necessary
     function toDecimal: BigDecimal; virtual; //**< Returns the value as BigDecimal; dynamically converted, if necessary
     function toString: string; override; //**< Returns the value as string; dynamically converted, if necessary
     function toJoinedString(const sep: string = ' '): string; virtual; //**< Returns the value as joined string (string-join($self, $sep)); dynamically converted, if necessary
-    function toDateTime: TDateTime; virtual; //**< Returns the value as datetime; dynamically converted, if necessary
-    function toNode: TTreeNode; virtual; //**< Returns the value as node; dynamically converted, if necessary
-    function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @brIf the value is a single element, the array contains just the self pointer; if it is a sequence, the array contains a pointer to each element of the sequence
+    function toDateTime: TDateTime; virtual; //**< Returns the value as dateTime; dynamically converted, if necessary
+    function toNode: TTreeNode; virtual; //**< Returns the value as node, or nil if it is not a node
+    function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single value, the array contains just this value; if it is a sequence, the array contains all members of the sequence
     function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
 
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
-    function getChild(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
+    function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
 
@@ -331,7 +329,6 @@ type
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
-//    class function classParentNonBlocked: TXQValueClass; virtual; //**< This returns the class of the parent type of the current type in the scheme type hierarchy. (which is often the same as fpc's classParent, but also often skips a parent or even jumps to an unrelated class. It is then used to implement instanceOf )
 
   private
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (private because it wraps the object instance in a IXQValue. which may free it, if there is not another interface variable pointing to it )
@@ -343,7 +340,7 @@ type
     class function classKind: TXQValueKind; override;
     function isUndefined: boolean; override;
     function toArray: TXQVArray; override;
-    function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toXQVList: TXQVList; override;
     function getSequenceCount: integer; override;
     function clone: IXQValue; override;
 
@@ -367,7 +364,7 @@ type
     class function classKind: TXQValueKind; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
-    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to float
+    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
     function toInt64: int64; override; //**< Converts the TXQValue dynamically to int64
     function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
@@ -379,10 +376,10 @@ type
 
 
   { TXQValueInt65 }
-  //** integer value (should have unlimited range, but is actually a signed 65 bit)
 
   { TXQValueInt64 }
 
+  //** int64 value (for larger integers use TXQValueDecimal)
   TXQValueInt64 = class (TXQValue)
     value:  int64;
 
@@ -396,7 +393,7 @@ type
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: int64; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
-    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to float
+    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
@@ -410,7 +407,7 @@ type
 
   //**Double float value
   TXQValueFloat = class (TXQValue)
-    value:  double;   //*< plain decimal value
+    value:  double;   //*< plain double value
 
     constructor create(const aflt: xqfloat = 0); reintroduce; virtual;
     constructor create(atypeannotation: TXSType; const aflt: xqfloat = 0); reintroduce; virtual;
@@ -423,7 +420,7 @@ type
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
-    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to float
+    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
@@ -436,7 +433,7 @@ type
 
   { TXQValueDecimal }
 
-  //**BigDecimal value (unlimited real number \mathbb{R})
+  //**BigDecimal value (almost unlimited decimal floating number a*10^b for a,b \in \mathbb{Z})
   TXQValueDecimal = class (TXQValue)
     value:  BigDecimal;   //*< plain BigDecimal value
 
@@ -460,7 +457,7 @@ type
 
   { TXQValueString }
 
-  //**< string value
+  //** string value
   TXQValueString = class (TXQValue)
     str:  string;
 
@@ -474,35 +471,34 @@ type
 
     function toBoolean: boolean; override;
     function toBooleanEffective: boolean; override;
-    function toString: string; override; //**< Converts the TXQValue dynamically to string
-    function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function toString: string; override;
+    function toDateTime: TDateTime; override;
 
     function toRawBinary: string;
 
     function clone: IXQValue; override;
   end;
 
-    //**< string value
 
-    { TXQValueQName }
+  { TXQValueQName }
+  //** QName value (namespace + local part)
+  TXQValueQName = class (TXQValue)
+    prefix, url, local: string;
 
-    TXQValueQName = class (TXQValue)
-      prefix, url, local: string;
+    constructor create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);
+    constructor create(atypeAnnotation: TXSType; const ns: INamespace; const alocal: string);
+    constructor create(const aurl, aprefix, alocal: string);
+    constructor create(const aurl, aprefixedLocal: string);
+    constructor create(const ns: INamespace; const alocal: string);
+    constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
 
-      constructor create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);
-      constructor create(atypeAnnotation: TXSType; const ns: INamespace; const alocal: string);
-      constructor create(const aurl, aprefix, alocal: string);
-      constructor create(const aurl, aprefixedLocal: string);
-      constructor create(const ns: INamespace; const alocal: string);
-      constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
+    class function classKind: TXQValueKind; override;
 
-      class function classKind: TXQValueKind; override;
+    function toString: string; override; //**< Converts the TXQValue dynamically to string (excludes namespace url)
+    function toBooleanEffective: boolean; override;
 
-      function toString: string; override; //**< Converts the TXQValue dynamically to string
-      function toBooleanEffective: boolean; override;
-
-      function clone: IXQValue; override;
-    end;
+    function clone: IXQValue; override;
+  end;
 
   { TXQValueDateTime }
 
@@ -517,7 +513,7 @@ type
   end;
   PXQValueDateTimeData=^TXQValueDateTimeData;
 
-  //**< Datetime value
+  //** Datetime value
   TXQValueDateTime = class (TXQValue)
     value: TXQValueDateTimeData;
 
@@ -566,9 +562,9 @@ type
 
   { TXQValueSequence }
 
-  //**< Type for a sequence containg an arbitrary number (>= 0) of other IXQValue
+  //** Type for a sequence containing an arbitrary number (>= 0) of other IXQValue
   TXQValueSequence = class (TXQValue)
-    seq: TXQVList;    //**< pointer to a list of the contained sequence values.
+    seq: TXQVList;    //**< list of the contained sequence values.
 
     constructor create(capacity: integer = 0);
     constructor create(firstChild: IXQValue);
@@ -577,31 +573,31 @@ type
 
     function isUndefined: boolean; override;
 
-    function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
-    function toBooleanEffective: boolean; override;
-    function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
-    function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
-    function toString: string; override; //**< Converts the TXQValue dynamically to string
+    function toBoolean: boolean; override; //**< Converts the first element to boolean
+    function toBooleanEffective: boolean; override; //Returns the effective boolean value. Raises an exception if count > 1 and first element is not a node/json-item
+    function toInt64: Int64; override; //**< Converts the first element to integer
+    function toDecimal: BigDecimal; override; //**< Converts the first element to BigDecimal
+    function toString: string; override; //**< Converts the first element to string
     function toJoinedString(const sep: string=' '): string; override;
-    function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
-    function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
+    function toDateTime: TDateTime; override; //**< Converts the first element to TDateTime
+    function toNode: TTreeNode; override; //**< Converts the first element to a node
 
-    function toArray: TXQVArray; override; //**< Converts the TXQValue dynamically to a Pascal array
-    function toXQVList: TXQVList; override; //**< Converts the TXQValue dynamically to a TXQVList sequence
+    function toArray: TXQVArray; override; //**< Returns all elements as array
+    function toXQVList: TXQVList; override; //**< Returns all elements as list (which must be freed by the caller)
 
     function getSequenceCount: integer; override;
-    function getChild(i: integer): IXQValue; override;
+    function get(i: integer): IXQValue; override;
     function GetEnumerator: TXQValueEnumerator; override;
 
-    function takeFirstChild: IXQValue;
+    function takeFirst: IXQValue;
 
     function clone: IXQValue; override;
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
-    procedure addChild(child: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence can not contain another sequence, so they will be merged)
-    procedure addChildMerging(child: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that a xpath sequence can not contain another sequence, so they will be merged)
+    procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence can not contain another sequence, so they will be merged)
+    procedure addOrdered(const node: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that a xpath sequence can not contain another sequence, so they will be merged)
 
     destructor Destroy; override;
   end;
@@ -615,17 +611,17 @@ type
 
   //** Type for a node
   TXQValueNode = class (TXQValueJSONIQStructuredItem)
-    node: TTreeNode; //**< pointer to a tree element in the html tree.@br Attention: this tree is shared, you don't have to free anything, but the pointer becomes invalid if the tree is free
+    node: TTreeNode; //**< reference to a tree node in the html tree.@br Attention: this tree is shared, you don't have to free anything, but the pointer becomes invalid if the tree is free
 
     constructor create(anode: TTreeNode = nil); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
-    function toBooleanEffective: boolean; override;
+    function toBooleanEffective: boolean; override; //**< Returns true
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
-    function toNode: TTreeNode; override; //**< Converts the TXQValue dynamically to a node
+    function toNode: TTreeNode; override; //**< Returns the node
 
     function clone: IXQValue; override;
 
@@ -678,12 +674,12 @@ type
   { TXQValueObject }
 
   //**(Experimental) object type.
-  //**Every object obj has properties obj.something which are arbitrary TXQValues and a prototype from which it inherits all properties. @br
+  //**Every object obj has properties obj.something which are arbitrary TXQValue-s and a prototype from which it inherits all properties. @br
   //**The objects can be used mutable and immutable. If used immutable, they still appear mutable, but every change creates a new object
   //**that is linked to the previous objects (i.e. has the old object as prototype). @br
   //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
   TXQValueObject = class (TXQValueJSONIQItem)
-    values: TXQVariableChangeLog; //todo: can there be multiple properties with the same name? some parts assume theq are unique
+    values: TXQVariableChangeLog; //todo: can there be multiple properties with the same name? some parts assume they are unique
     prototype: IXQValue;
 
     constructor create(); reintroduce; virtual;
@@ -717,11 +713,8 @@ type
 
   end;
 
-
-  //** Experimental type for a JSON array of other IXQValue
-
   { TXQValueJSONArray }
-
+  //** Experimental type for a JSON array of other IXQValue
   TXQValueJSONArray = class (TXQValueJSONIQItem)
     seq: TXQVList;
 
@@ -742,15 +735,13 @@ type
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
-    procedure addChild(child: IXQValue); inline;  //**< Simply adds a value to the sequence
+    procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence
 
     destructor Destroy; override;
   end;
 
-  //**undefined/empty sequence
-
   { TXQValueJSONNull }
-
+  //** null in JSON
   TXQValueJSONNull = class(TXQValue)
     constructor create; reintroduce;
     class function classKind: TXQValueKind; override;
@@ -779,7 +770,7 @@ type
   end;
   TXQAnnotations = array of TXQAnnotation;
 
-  //** A function. Also used to store type information
+  //** A function. Anonymous or a named reference. Also used to store type information
   TXQValueFunction = class(TXQValue)
     name: string;
     namespace: INamespace;
@@ -797,7 +788,7 @@ type
 
     function toBooleanEffective: boolean; override;
 
-    function evaluate(const args: TXQVArray): IXQValue;
+    function evaluate(const args: TXQVArray): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
@@ -878,6 +869,7 @@ type
 
   TXSNumericType = class;
   TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001, xsceFOCA0002);
+  //** General XML schema type
   TXSType = class
     name: string;
     schema: TXSSchema;
@@ -927,6 +919,7 @@ type
 
   { TXSSimpleType }
 
+  //** Simple XML Schema type
   TXSSimpleType = class(TXSType)
     //annotations: array of TXSAnnotation;
     final: (xsfRestriction, xsfExtension, xsfList, xsfUnion);
@@ -951,6 +944,7 @@ type
 
   { TXSUnionType }
 
+  //** XML Schema union type
   TXSUnionType = class(TXSSimpleType)
     members: array of TXSSimpleType; //atomic types
     constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSSimpleType);
@@ -961,6 +955,7 @@ type
 
   { TXSListType }
 
+  //** XML Schema list type (not used) todo
   TXSListType = class(TXSSimpleType)
     itemType: TXSSimpleType;
     constructor Create(aname: string; aparent: TXSType; aitemType: TXSSimpleType);
@@ -973,6 +968,7 @@ type
 
   { TXSNumericType }
 
+  //** XML Schema numeric type, derived from xs:decimal, xs:float or xs:double.
   TXSNumericType = class(TXSSimpleType)
     subType: TXSNumericSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
@@ -987,6 +983,7 @@ type
 
   { TXSBooleanType }
 
+  //** XML Schema boolean type, derived from xs:boolean
   TXSBooleanType = class(TXSSimpleType)
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
@@ -994,6 +991,7 @@ type
 
   { TXSStringType }
 
+  //** XML Schema string type, derived from xs:string, xs:anyURI, xs:hexBinary, xs:base64Binary or xs:untypedAtomic
   TXSStringSubType = (xsstString, xsstHexBinary, xsstBase64Binary, xsstUrl);
   TXSStringType = class(TXSSimpleType)
     lexicalSpaceRegex: TRegExpr;
@@ -1007,6 +1005,7 @@ type
 
   { TXSQNameType }
 
+  //** XML Schema QName type, derived from xs:QName or xs:NOTATION
   TXSQNameType = class(TXSSimpleType)
     constructor create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
     destructor Destroy; override;
@@ -1018,6 +1017,7 @@ type
 
   { TXSDateTimeType }
   TXQDateTimeTruncation = (xqdttNone, xqdttTime, xqdttDate, xqdttYearMonth);
+  //** XML Schema date time or duration type (also gDay, etc. types). @br Might be splitted in later versions
   TXSDateTimeType = class(TXSSimpleType)
     fixedDateTimePattern: string;
     isDuration: boolean;
@@ -1031,9 +1031,10 @@ type
   { TXSSchema }
 
   TXSSchemaVersion = (xsd10, xsd11);
+  //** XML Schema
   TXSSchema = class
     //engine: TXQueryEngine;
-    version: TXSSchemaVersion;
+    version: TXSSchemaVersion; //**< XML Schema version, XSD1.0 or XSD1.1. Only latter will be maintained in future
     url: string;
     anyType, anySimpleType, anyAtomicType: TXSSimpleType;
     decimal, integer, double, float: TXSNumericType;
@@ -1105,8 +1106,8 @@ type
   public
     constructor create(capacity: integer = 0);
     procedure insert(i: integer; value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
-    procedure add(child: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
-    procedure addMerging(child: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure add(const value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure addOrdered(const node: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
     function get(i: integer): IXQValue; inline; //**< Gets a PXQValue from the list.
     procedure put(i: integer; const AValue: IXQValue); inline; //**< Puts a IXQValue to a node sequence
@@ -1182,10 +1183,10 @@ type
     contextDependencies: TXQContextDependencies;
   end;
   TXQTermDefineFunction = class;
-  //**Information about a complex xquery function (interpreted => the function is defined as XQuery function)
 
   { TXQInterpretedFunctionInfo }
 
+  //**Information about a complex xquery function (interpreted => the function is defined as XQuery function)
   TXQInterpretedFunctionInfo = class(TXQAbstractFunctionInfo)
     namespace: INamespace;
     source: string;
@@ -1646,15 +1647,16 @@ type
   //============================XQUERY QUERY HOLDER==========================
 
   { IXQuery }
-
+  //** @abstract Interface for an XPath/XQuery query.
+  //** Reference counted. Call evaluate to evaluate it.
   IXQuery = interface
-    function evaluate(const tree: TTreeNode = nil): IXQValue;
-    function evaluate(const context: TXQEvaluationContext): IXQValue;
-    function evaluate(const contextItem: IXQValue): IXQValue;
+    function evaluate(const tree: TTreeNode = nil): IXQValue; //**< Evaluates the query with a certain root element (i.e. @code(/) will return tree)
+    function evaluate(const context: TXQEvaluationContext): IXQValue; //**< Evaluates the query with a certain evaluation context
+    function evaluate(const contextItem: IXQValue): IXQValue; //**< Evaluates the query with (i.e. @code(.) will return contextItem. If it is a node @code(/) will return the root of it)
 
     function getTerm: TXQTerm;
     procedure setTerm(aterm: TXQTerm);
-    property Term: TXQTerm read getTerm write setTerm;
+    property Term: TXQTerm read getTerm write setTerm; //**< The AST of the query
 
     function clone: IXQuery;
     function visit(visitor: TXQTerm_VisitorClass; parent: TXQTerm = nil): TXQTerm_VisitAction;
@@ -1663,7 +1665,7 @@ type
   end;
 
   { TXQuery }
-
+  //** An XPath/XQuery query. See IXQuery
   TXQuery = class(TInterfacedObject, IXQuery)
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeNode = nil): IXQValue;
@@ -1687,7 +1689,7 @@ type
   //============================EXCEPTIONS/EVENTS==========================
 
   { EXQException }
-
+  //**General XQuery exception, with an namespace, errorCode and message
   EXQException = class(Exception)
     errorCode: string;
     namespace: INamespace;
@@ -1741,7 +1743,7 @@ type
     AllowPropertyDotNotation: TXQPropertyDotNotation; //**< If it is possible to access (json) object properties with the @code(($obj).property) or even @code($obj.property) syntax (default is xqpdnAllowUnambiguousDotNotation, property syntax can be used, where a dot would be an invalid expression in standard xquery)
     AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
     AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
-    StringEntities: (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery); //**< XQuery is almost a super set of XPath, except for the fact that they parse string entities differenty. This option lets you change the parsing behaviour.
+    StringEntities: (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery); //**< XQuery is almost a super set of XPath, except for the fact that they parse string entities differently. This option lets you change the parsing behaviour.
   end;
 
 
@@ -1750,8 +1752,6 @@ type
   //============================MAIN CLASS==========================
 
   { TXQueryEngine }
-
-
 
   (***
     @abstract(@bold(This is the XPath/XQuery-engine))
@@ -1763,7 +1763,11 @@ type
 
     @bold(Syntax of a XQuery / XPath / Pseudo-XPath-Expression)
 
-    This XQuery engine currently supports XPath 2.0, XQuery 1.0 and JSONiq, with some extensions and minor deviations.@br@br
+    This query engine currently supports XPath 2.0, XQuery 1.0 and JSONiq, with some extensions and minor deviations, as well as parts of XPath 3.0 and XQuery 3.0.
+    @br@br
+
+    A formal syntax definition of these languages is given at: http://www.w3.org/TR/xpath20/ , http://www.w3.org/TR/xquery/ , http://www.jsoniq.org/ ,
+                                                               http://www.w3.org/TR/xpath-30/ and  http://www.w3.org/TR/xquery-30/ .
 
     Some very basic, standard XPath examples, for people who do not have seen XPath before:
     @unorderedList(
@@ -1773,7 +1777,8 @@ type
             Instead of +, you can also use one of operators @code(-, *, div, idiv, =, !=, <, >, <=, =>, to, or, and, eq, ne, lt, gt, le, ge) )
       @item(@code(1245.567)  @br This returns the number 1245.567)
       @item(@code(concat("a","b","c")) @br This concatenates the strings a,b and c.@br
-            There are many more functions than @code(concat), you can look them up in a XPath reference)
+            There are many more functions than @code(concat), a list of extension functions is given below.
+            Standard functions are described at  http://www.w3.org/TR/xquery-operators/ and http://www.w3.org/TR/xpath-functions-30/ )
       @item(@code((1,2,3)) @br This returns a sequence (1,2,3). @br Sequences can not be nested.)
       @item(@code((1,2,3)[. mod 2 = 1]) @br This returns the sequence (1,3) of all odd numbers.)
 
@@ -1793,6 +1798,7 @@ type
       @item(@code(some $x in @code(seq) satisfies condition) @br This returns true iff one element of @code(seq) satisfies @code(condition) )
       @item(@code(every $x in @code(seq) satisfies condition) @br This returns true iff every element of @code(seq) satisfies @code(condition) )
       @item(@code(if (condition) then $x else $y) @br This returns @code($x) if @code(condition) is true, and @code($y) otherwise  )
+      @item(@code(function ($a, $b) { $a + $b } @br This returns an anonymous function which adds two numbers. )
     )
 
     Differences between this implementation and standard XPath/XQuery (most differences can be turned off with the respective option or the field in the default StaticContext):
@@ -1839,11 +1845,11 @@ type
           @br Using it also activates the JSONiq literal mode, in which @code(true, false, null) evaluate to @code(true(), false(), jn:null()). (option: json-literals).
           )
     @item(Element tests based on types of the xml are not supported (since it can not read schemas ) )
-    @item(Regex remarks: @unorderedList(
+    @item(Regex remarks (it might be changed to standard compatible matching in future): @unorderedList(
       @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
       @item($0 and $& can be used as substitute for the
     whole regex, and $i or  ${i} is substituted with the i-th submatch, for any integer i. Therefore $12 is match 12, while ${1}2 is match 1 followed by digit 2)
-    ))
+    )    )
     @item( Most of them can be disabled with 'declare option pxp:respective-option "off"' (that there are syntax modifying options is another extension) )
     )
 
@@ -1863,7 +1869,7 @@ type
                   @br Reads a date/time from string with the given format. $format is a standard Pascal format, using ymdhnsz (e.g. "yyyy-mm-dd"), not a XQuery 3.0 picture string. )
       @item(@code(parse-time(input as xs:string, $format as xs:string))
                   @br Reads a date/time from string with the given format. $format is a standard Pascal format (see above) )
-      @item(@code(parse-datetime($input as xs:string, $format as xs:string))
+      @item(@code(parse-dateTime($input as xs:string, $format as xs:string))
                   @br Reads a date/time from string with the given format. $format is a standard Pascal format (see above) )
       @item(@code(inner-xml($node as node()))
                   @br Returns the inner xml of a node as string (like innerHTML in javascript) )
@@ -1883,6 +1889,16 @@ type
                   @br url: The url the form should be send to (includes the encoded data for a GET request)
                   @br method: POST or GET
                   @br post: Url encoded post data (in future versions it might be multipart-encoded, if enctype is set correspondingly) )
+      @item(@code(resolve-html($relative as item()*, [$base as item()]))
+                  @br Resolves every value in the $relative sequence to an HTTP request with an absolute URL/URI, using $base as reference base URI.
+                  @br Atomic values (e.g. strings) are resolved as simple URIs similar to resolve-uri.
+                  @br For HTML elements that refer to other resources (e.g. <a href=...> or <img src=...>) it returns the absolute URI of that resource.
+                      For <form> elements it returns the same object as the @code(form) function. For all other HTML elements it interprets the text content as relative string URI.
+                  @br If $base is not a node it treated as simple absolute URI. If $base is a node, the function uses the base URI of the document that contains the node.)
+      @item(@code(uri-encode($uri-part as xs:string?))
+                  @br Encodes a string for a URI. Exactly the same as @code(fn:encode-for-uri) but with a simpler name.)
+      @item(@code(uri-decode($uri-part as xs:string?))
+                  @br Decodes an URI string. The reverse of @code(uri-encode) (but no roundtrip guarantee) )
       @item(@code(is-nth($i as xs:integer, $a as xs:integer, $b as xs:integer))
                   @br Returns true iff the equation @code( i = a * n + b ) can be solved by an non-negative integer @code(n).
                   (This is used to implement the css functions like nth-child ) )
@@ -1892,7 +1908,7 @@ type
                   )
       @item(@code(get-property($obj as object(), $name as xs:string))
                   @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled
-                  @br Deprecated, now the JSONiq syntax @code($obj($name)) should be used. This function may be removed in later versions.
+                  @br Deprecated, now the JSONiq syntax @code($obj($name)) should be used. This function will be removed in later versions.
                   )
       @item(@code(join($sequence as xs:item()*[, $seperator as xs:string]))
                   @br This is the same as string-join, but without type checking. If seperator is omitted it becomes " ".
@@ -1920,6 +1936,14 @@ type
       @item(@code(serialize-json($object as item()* ))
                   @br Converts an xq value to a json string.
                   @br Only available if the xquery_json unit is included in an uses clause.)
+      @item(@code(binary-to-string($data as xs:base64Binary|xs:hexBinary[, $encoding as xs:string]) as xs:string)
+                  @br Converts $data to a string using the given $encoding)
+      @item(@code(string-to-hexBinary($data as xs:string[, $encoding as xs:string]) as xs:hexBinary)
+                  @br Returns a hex binary representation of $data with the given $encoding)
+      @item(@code(string-to-base64Binary($data as xs:string[, $encoding as xs:string]) as xs:base64Binary)
+                  @br Returns a base64 binary representation of $data with the given $encoding)
+      @item(@code(random())
+                  @br Returns a random number)
       @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions",
             which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
 
@@ -1930,15 +1954,15 @@ type
 
     @bold(Using the class in FPC)
 
-    The easiest way to evaluate a XQuery/XPath-expression is to call the class methods like @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
+    You can evaluate XQuery/XPath-expressions by just calling the class methods, e.g. @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
     If you want to process a html/xml document, you have to pass the root TTreeNode (obtained by TTreeParser) instead of nil.@br@br@br
-    If you call @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) without a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br
+    If you call @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) without a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br
     With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeNode or @code(toDecimal) an extended. @br@br
 
     You can also create a TXQueryEngine instance and then call @code(parseXPath2('expression')) and @code(evaluateXPath2()). @br
-    This is not as easy, but you have more options: @br
-    For the basic you can set separate root (/) (with the property RootElement) and parent elements (./) (with the property ParentElement), or  you can read and define variables in the expression,
-    or change other behaviours.
+    This is not as easy, but you have more options.
+
+    The unit simpleinternet provides a simpler procedural interface with its function simpleinternet.process .
 
 
     @br@br@bold(Compatibility to previous version)@br
@@ -1958,6 +1982,7 @@ type
     )
     @item(API changes to previous versions:
       @unorderedList(
+      @item(IXQValue.getChild was renamed to get, TXQValueSequence.addChild to add and addChildMerging to addOrdered. "child" never made any sense here)
       @item(ParentElement/RootElement/TextElement have been moved from TXQueryEngine to TXQEvaluationContext. Avoid using them, just pass the element to @code(evaluate). )
       @item(Parsing modifying properties Allow* are now moved in a ParsingOptions record. It was becoming too confusing)
       @item(everything has been renamed, pseudoxpath.pas => xquery.pas, TPseudoXPathParser => TXQueryEngine, TPXPValue => IXQValue)
@@ -3614,7 +3639,7 @@ begin
   if v.kind <> pvkSequence then exit;
   seq := v as TXQValueSequence;
   if seq.seq.Count > 1 then exit;
-  if seq.seq.Count = 1 then v := seq.takeFirstChild
+  if seq.seq.Count = 1 then v := seq.takeFirst
   else v := xqvalue();
 end;
 
@@ -3628,10 +3653,10 @@ begin
   end;
   case list.kind of
     pvkUndefined: list := add;
-    pvkSequence: (list as TXQValueSequence).addChild(add);
+    pvkSequence: (list as TXQValueSequence).add(add);
     else begin
       temp := TXQValueSequence.create(list);  //don't use xqvalueAssign, as result is moved in the list
-      temp.addChild(add);
+      temp.add(add);
       list := temp;
     end;
   end;
@@ -4035,38 +4060,38 @@ begin
   end;
 end;
 
-procedure TXQVList.add(child: IXQValue);
+procedure TXQVList.add(const value: IXQValue);
 var
  v: IXQValue;
 begin
-  assert(child <> nil);
-  case child.kind of
+  assert(value <> nil);
+  case value.kind of
     pvkSequence: begin
-      for v in child do
+      for v in value do
         Add(v);
     end;
     pvkUndefined: ;
     else begin
       reserve(fcount + 1);
-      list[fcount] := child;
+      list[fcount] := value;
       fcount += 1;
     end;
   end;
 end;
 
-procedure TXQVList.addMerging(child: IXQValue);
+procedure TXQVList.addOrdered(const node: IXQValue);
 var
  a,b,m, cmp: Integer;
  s: IXQValue;
  childnode: TTreeNode;
 begin
-  case child.kind of
+  case node.kind of
     pvkNode: begin
-      childnode:=(child as TXQValueNode).node;
+      childnode:=(node as TXQValueNode).node;
       if (Count = 0) or (TTreeNode.compareInDocumentOrder(childnode, (Items[count-1] as TXQValueNode).node) > 0) then
-        add(child)
+        add(node)
       else if (TTreeNode.compareInDocumentOrder(childnode, (Items[0] as TXQValueNode).node) < 0) then
-        insertSingle(0, child)
+        insertSingle(0, node)
       else begin
         a := 0;
         b := count-1;
@@ -4080,16 +4105,16 @@ begin
         for m := b to a do begin
           cmp:=TTreeNode.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
           if cmp = 0 then begin exit; end
-          else if cmp < 0 then begin insertSingle(m, child); exit; end
-          else begin insertSingle(m + 1, child); exit; end;
+          else if cmp < 0 then begin insertSingle(m, node); exit; end
+          else begin insertSingle(m + 1, node); exit; end;
         end;
         raise EXQEvaluationException.Create('pxp:INTERNAL', 'binary insert failed');
       end;
     end;
     pvkUndefined: ;
     pvkSequence:
-      for s in child do
-        addMerging(s); //TODO: optimize
+      for s in node do
+        addOrdered(s); //TODO: optimize
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
   end;
 end;
@@ -5692,8 +5717,8 @@ var
     if resultSeq.seq.count = 0 then onlyNodes := v is TXQValueNode;
     if onlyNodes <> (v is TXQValueNode) then
       raise EXQEvaluationException.Create('XPTY0018', 'Nodes and non-node values must not be mixed in step expressions');;
-    if onlyNodes then resultSeq.addChildMerging(v)
-    else resultSeq.addChild(v);
+    if onlyNodes then resultSeq.addOrdered(v)
+    else resultSeq.add(v);
   end;
 
 begin
