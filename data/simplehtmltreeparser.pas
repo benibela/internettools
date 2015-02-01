@@ -582,8 +582,6 @@ begin
 end;
 
 destructor TAttributeList.Destroy;
-var
-  i: Integer;
 begin
   clear;
   inherited Destroy;

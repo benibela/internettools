@@ -257,8 +257,6 @@ begin
 end;
 
 function TXQParsingContext.nextTokenNCName(): string;
-var
-  i: Integer;
 begin
   result := nextToken(false);
   if not baseSchema.isValidNCName(result) then
@@ -874,7 +872,6 @@ var
   i: Integer;
   oldDefaultElementTypeNamespace: INamespace;
   prefix: String;
-  namespace: INamespace;
   isNamespaceNode: Boolean;
   oldNamespaceCount: Integer;
 begin

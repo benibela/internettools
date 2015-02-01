@@ -1181,7 +1181,7 @@ begin
     strategyi := FAttributeMatching.IndexOfName(attrib.value);
     if strategyi <> -1 then begin
       if FAttributeMatching.ValueFromIndex[strategyi] <> '' then strategy := FAttributeMatching.ValueFromIndex[strategyi];
-      if FAttributeMatching.Objects[strategyi] <> nil then caseSensitive := integer(pointer(FAttributeMatching.Objects[strategyi])) = -1;
+      if FAttributeMatching.Objects[strategyi] <> nil then caseSensitive := FAttributeMatching.Objects[strategyi] <> nil;
     end;
     case strategy of
       'eq', 'is' {is is deprecated}:
@@ -1261,7 +1261,7 @@ begin
       end;
       case el.templateAttributes.Values['case-sensitive'] of
         '':;//ignore
-        'false', 'case-insensitive', 'insensitive': FAttributeMatching.Objects[i] := Tobject(1);
+        'false', 'case-insensitive', 'insensitive': FAttributeMatching.Objects[i] := nil;
         else FAttributeMatching.Objects[i] := Tobject(-1);
       end;
     end;
@@ -1803,7 +1803,6 @@ var el: TTemplateElement;
     i: Integer;
     looper: TTemplateElement;
     temp: TTemplateElement;
-    temps: string;
 begin
    //read template
   FTemplate.parseTree(template, templateName);
@@ -2128,22 +2127,32 @@ begin
   end;
 end;
 
+procedure visitActionMerge(var result: TXQTerm_VisitAction; merge: TXQTerm_VisitAction); inline;
+begin
+  case merge of
+    xqtvaAbort: result := merge;
+    xqtvaNoRecursion: if result <> xqtvaAbort then result := merge;
+    xqtvaContinue: ;
+  end;
+end;
+
 function patternMatcherVisit(const template: TXQTermPatternMatcher; visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   t: TTemplateElement;
 begin
+  result := xqtvaContinue;
   if template.node is TTreeDocument then t := template.node.next as TTemplateElement
   else t := template.node as TTemplateElement;
   while t <> nil do begin
     with t do begin
-      if test <> nil then test.visit(visitor, template);
-      if condition <> nil then condition.visit(visitor, template);
-      if valuepxp <> nil then valuepxp.visit(visitor, template);
-      if source <> nil then source.visit(visitor, template);
-      if min <> nil then min.visit(visitor, template);
-      if max <> nil then max.visit(visitor, template);
-      if varname <> nil then varname.visit(visitor, template);
-      if ignoreSelfTest <> nil then ignoreSelfTest.visit(visitor, template);
+      if test <> nil then visitActionMerge(result, test.visit(visitor, template));
+      if condition <> nil then visitActionMerge(result,condition.visit(visitor, template));
+      if valuepxp <> nil then visitActionMerge(result,valuepxp.visit(visitor, template));
+      if source <> nil then visitActionMerge(result,source.visit(visitor, template));
+      if min <> nil then visitActionMerge(result,min.visit(visitor, template));
+      if max <> nil then visitActionMerge(result,max.visit(visitor, template));
+      if varname <> nil then visitActionMerge(result,varname.visit(visitor, template));
+      if ignoreSelfTest <> nil then visitActionMerge(result,ignoreSelfTest.visit(visitor, template));
     end;
     t := t.templateNext;
   end;

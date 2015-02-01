@@ -1600,7 +1600,7 @@ begin
   if res = nil then exit(xqvalue);
 end;
 
-function tryValueToInteger(const v: IXQValue; var outv: integer): boolean;
+function tryValueToInteger(const v: IXQValue; out outv: integer): boolean;
 var
   i64: Int64;
   f: xqfloat;
@@ -1628,8 +1628,6 @@ end;
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
 var temp: string;
  v: IXQValue;
- i: Int64;
- bd: BigDecimal;
  codepoint: integer;
  ok: Boolean;
 begin

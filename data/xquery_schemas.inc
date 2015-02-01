@@ -7,7 +7,7 @@ const RegExpr_XMLName = '^'+RegExpr_XMLNameRaw+'$';
 const RegExpr_XMLNCNameRaw = '('+RegExpr_XMLLetter+'|_)('+RegExpr_XMLNCNameChar+')*'; //name without :
 const RegExpr_XMLNCName = '^'+RegExpr_XMLNCNameRaw+'$'; //name without :
 const RegExpr_language = '^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$';
-const RegExpr_XMLQName = '^(('+RegExpr_XMLNCNameRaw+')|('+RegExpr_XMLNCNameRaw+':'+RegExpr_XMLNCNameRaw+'))$'; //name without :
+//const RegExpr_XMLQName = '^(('+RegExpr_XMLNCNameRaw+')|('+RegExpr_XMLNCNameRaw+':'+RegExpr_XMLNCNameRaw+'))$'; //name without :
 
 
 { TXSType }
@@ -1164,8 +1164,6 @@ begin
 end;
 
 destructor TXSSchema.Destroy;
-var
-  i: Integer;
 begin
   typeList.Clear;
   typeList.Free;

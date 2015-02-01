@@ -1388,7 +1388,6 @@ var
   module: TXQNativeModule;
   t: TXSType;
   model: TXQParsingModel;
-  i: Integer;
   schema: TXSSchema;
 begin
   module := TXQueryEngine.findNativeModule(anamespace);
@@ -1935,6 +1934,17 @@ begin
   inherited destroy;
 end;
 
+function TXQTermPatternMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
+begin
+  ignore(context);
+  raiseEvaluationError('pxp:INTERNAL', 'TXQTermPatternMatcher.evaluate');
+end;
+
+function TXQTermPatternMatcher.getContextDependencies: TXQContextDependencies;
+begin
+  raiseEvaluationError('pxp:INTERNAL', 'TXQTermPatternMatcher.getContextDependencies');
+end;
+
 { TXQTermVariable }
 
 constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
@@ -2406,7 +2416,6 @@ var
 
 var i, oldnamespacecount: integer;
   nameValueEvaluated: IXQValue;
-  tempxqvalue: TXQValue;
 begin
   if not (typ in [tetOpen,tetDocument]) then nameValueEvaluated := nameValue.evaluate(context);
   if (typ = tetText) and (nameValueEvaluated.isUndefined) then exit(xqvalue);
