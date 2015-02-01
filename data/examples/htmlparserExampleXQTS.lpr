@@ -260,7 +260,7 @@ type
 { TVariableProvider }
 
  TVariableProvider = class
-  procedure getvar(sender: TObject; const context: TXQStaticContext; const namespace: INamespace;  const variable: string; var value: IXQValue);
+  procedure getvar(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
   procedure importModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
@@ -297,8 +297,7 @@ var htp: THtmlTemplateParser;
 
 { TVariableProvider }
 
-procedure TVariableProvider.getvar(sender: TObject; const context: TXQStaticContext; const namespace: INamespace; const variable: string;
-  var value: IXQValue);
+procedure TVariableProvider.getvar(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
 var
   temp: TXQValue;
   iname: Integer;
@@ -358,14 +357,14 @@ begin
   buffer3 := TStringList.Create;
   htp := THtmlTemplateParser.create;
   htp.parseTemplate(CATALOG_TEMPLATE);
-  htp.QueryEngine.AllowJSON:=true;
+  htp.QueryEngine.ParsingOptions.AllowJSON:=true;
   pxp := TXQueryEngine.create;
   pxp.ImplicitTimezone:=-5 / HoursPerDay;
   pxp.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
-  pxp.AllowExtendedStrings := false;
-  pxp.AllowJSON:=false;
-  pxp.AllowJSONLiterals:=false;
-  pxp.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+  pxp.ParsingOptions.AllowExtendedStrings := false;
+  pxp.ParsingOptions.AllowJSON:=false;
+  pxp.ParsingOptions.AllowJSONLiterals:=false;
+  pxp.ParsingOptions.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
   pxp.StaticContext.collation := pxp.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   pxp.StaticContext.stripBoundarySpace:=true;
   pxp.StaticContext.strictTypeChecking:=true;
@@ -392,10 +391,9 @@ begin
     writeln(stderr, 'Query: ', paramstr(2), LineEnding);
     if paramstr(3) = '--xml' then begin
       tree.parseTreeFromFile(paramstr(4));
-      pxp.RootElement:=tree.getLastTree;
     end;
     pxp.parseXPath2(ParamStr(2));
-    writeln(mytostring(pxp.evaluate()));
+    writeln(mytostring(pxp.evaluate(tree.getLastTree)));
     exit;
   end;
 
@@ -482,19 +480,16 @@ begin
           if fileOpenFailed <> '' then raise EFOpenError.Create(fileOpenFailed);
 
           if (inputfile = 'emptydoc') or (inputfile='') then begin
-            pxp.RootElement:=nil;
-            pxp.ParentElement:=nil;
             if isxpath2 then pxp.parseXPath2('('+query+')')
             else pxp.parseXQuery1(query);
+            currentTree := nil;
           end else begin
             //query := StringReplace(query, '$'+inputfilevar, '.', [rfReplaceAll]);
             if isxpath2 then pxp.parseXPath2('('+query+')')
             else pxp.parseXQuery1(query);
-            pxp.RootElement:=currentTree;
-            pxp.ParentElement:=currentTree;
           end;
           timing := now;
-          mypxpoutput := pxp.evaluate();
+          mypxpoutput := pxp.evaluate(currentTree);
           timing := now - timing;
           myoutput := mytostring(mypxpoutput);
           testfailed := true;

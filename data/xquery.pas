@@ -1985,6 +1985,7 @@ type
       @unorderedList(
       @item(IXQValue.getChild was renamed to get, TXQValueSequence.addChild to add and addChildMerging to addOrdered. "child" never made any sense here)
       @item(ParentElement/RootElement/TextElement have been moved from TXQueryEngine to TXQEvaluationContext. Avoid using them, just pass the element to @code(evaluate). )
+      @item(Callbacks for external variables/functions have been changed to ask for a namespace URI instead a namespace object with URI/prefix (for 3's EQNames which do not have a prefix) )
       @item(Parsing modifying properties Allow* are now moved in a ParsingOptions record. It was becoming too confusing)
       @item(everything has been renamed, pseudoxpath.pas => xquery.pas, TPseudoXPathParser => TXQueryEngine, TPXPValue => IXQValue)
       @item(The TPXPValue class has been replaced by an interface => memory deallocation has become implicit and .free must not be called.@br

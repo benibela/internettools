@@ -615,7 +615,7 @@ begin
     aakTrue: result := OK[(res.kind = pvkBoolean) and res.toBoolean];
     aakFalse: result := OK[(res.kind = pvkBoolean) and not res.toBoolean];
     aakStringValue: begin
-      if ((value = '-0') or (value = '0')) and (res.getSequenceCount = 1) and (res.getChild(1).kind = pvkFloat)
+      if ((value = '-0') or (value = '0')) and (res.getSequenceCount = 1) and (res.get(1).kind = pvkFloat)
          and (res.toFloat = 0) then exit(tcrPass); //todo: actual handle this
 
       if res.getSequenceCount <= 1 then str := res.toString
@@ -1028,7 +1028,7 @@ begin
   u := xq.parseXPath2('param').evaluate(e);
   SetLength(params, u.getSequenceCount);
   for i := 0 to u.getSequenceCount -1  do begin
-    n := u.getChild(i+1).toNode;
+    n := u.get(i+1).toNode;
     params[i].name := n['name'];
     if n.hasAttribute('select') then params[i].value := xq.parseXQuery3(n['select']).evaluate()
     else params[i].value := xqvalue();

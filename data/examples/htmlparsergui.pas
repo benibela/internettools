@@ -123,14 +123,12 @@ begin
     else ppath.ParsingOptions.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
     ppath.ParsingOptions.AllowJSON:=CheckBoxJSON.Checked;
 
-    if (sender as tbutton).tag = 1 then ppath.parseXQuery1(memo1.lines.Text)
-    else ppath.parseXPath2(memo1.Lines.text);
+    if (sender as tbutton).tag = 1 then ppath.parseXQuery3(memo1.lines.Text)
+    else ppath.parseXPath3(memo1.Lines.text);
 
     parseHTML(tp);
 
-    ppath.ParentElement := tp.getLastTree;
-    ppath.RootElement := tp.getLastTree;
-    temp := ppath.evaluate();
+    temp := ppath.evaluate(tp.getLastTree);
     memo3.Lines.Text:=mypxptostring(temp);
   finally
     tp.Free;

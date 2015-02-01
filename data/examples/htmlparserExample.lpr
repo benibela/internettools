@@ -9,7 +9,7 @@ begin
     writeln('  ', v.toString, ' * 10 = ', v.toInt64 * 10);
   writeln;
   writeln('Print the numbers of 1 to 5 and multiply by 10 (in XPath):');
-  for v in process('', '(1 to 5) / x"  {.} * 10 = {. * 10}"') do
+  for v in process('', '(1 to 5) ! x"  {.} * 10 = {. * 10}"') do
     writeln(v.toString);
 
   writeln;
@@ -43,7 +43,7 @@ begin
 
   WriteLn();
 
-  writeln('Use pattern matching to read values in an object:');
+  writeln('Use pattern matching to read values into an object:');
   v := process('<html><a>V1</a><b>V2</b></html>', '<html>{obj:=object()}<a>{obj.x:=.}</a><b>{obj.y:=.}</b></html>').getProperty('obj');
   writeln('  a: ',v.getProperty('x').toString, '  b: ',v.getProperty('y').toString);
 
