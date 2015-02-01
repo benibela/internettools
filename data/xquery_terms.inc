@@ -1715,8 +1715,8 @@ end;
 function TXQTermNodeMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue
-  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.TextElement<>nil) then
-    result := xqvalue(context.TextElement)
+  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.TextNode<>nil) then
+    result := xqvalue(context.TextNode)
   else if axis <> 'attribute' then begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
     xqvalueSeqSqueeze(result);
@@ -2772,7 +2772,7 @@ begin
   if clearFocus then begin
     result.context.ParentElement := nil;
     result.context.RootElement := nil;
-    result.context.TextElement := nil;
+    result.context.TextNode := nil;
     result.context.SeqValue := nil;
     result.context.SeqIndex := 0;
     result.context.SeqLength := 0;

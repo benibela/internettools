@@ -182,7 +182,7 @@ type
     //important note to myself: when adding fields update getEvaluationContext
     RootElement: TTreeNode;   //**< associated tree (returned by @code( / ) within an expression)
     ParentElement: TTreeNode; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
-    TextElement: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
+    TextNode: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
 
     SeqValue: IXQValue; //**<Context item / value of @code( . ),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
@@ -1923,7 +1923,7 @@ type
     )
 
 
-    You can look at the unit tests in the tests directory to see many (> 3000) examples.
+    You can look at the unit tests in the tests directory to see many (> 5000) examples.
 
     @bold(Using the class in FPC)
 
@@ -1955,6 +1955,7 @@ type
     )
     @item(API changes to previous versions:
       @unorderedList(
+      @item(ParentElement/RootElement/TextElement have been moved from TXQueryEngine to TXQEvaluationContext. Avoid using them, just pass the element to @code(evaluate). )
       @item(Parsing modifying properties Allow* are now moved in a ParsingOptions record. It was becoming too confusing)
       @item(everything has been renamed, pseudoxpath.pas => xquery.pas, TPseudoXPathParser => TXQueryEngine, TPXPValue => IXQValue)
       @item(The TPXPValue class has been replaced by an interface => memory deallocation has become implicit and .free must not be called.@br
@@ -1972,10 +1973,6 @@ type
   TXQueryEngine=class
   public
     //Schemas: TList;
-
-    //RootElement: TTreeNode; //**< Root element
-    //ParentElement: TTreeNode; //**< Set this to the element you want as current. The XPath expressions will be evaluated relative to this, so e.g. @code(@attrib) will get you the attribute attrib of this element
-    //TextElement: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
     CurrentDateTime: TDateTime; //**< Current time
     ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
 

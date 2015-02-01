@@ -1216,7 +1216,7 @@ begin
   if template.condition = nil then exit(true);
   tempContext := FQueryContext;
   tempContext.ParentElement := html;
-  tempContext.TextElement := nil;
+  tempContext.TextNode := nil;
   result := template.condition.evaluate(tempContext).toBoolean;
 end;
 
@@ -1281,7 +1281,7 @@ var xpathText: TTreeNode;
     if pxp = nil then exit(xqvalue());
     tempContext := FQueryContext;
     tempContext.ParentElement := htmlParent;
-    tempContext.TextElement := xpathText;
+    tempContext.TextNode := xpathText;
     result := pxp.evaluate(tempContext);
   end;
 
