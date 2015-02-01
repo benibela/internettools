@@ -205,7 +205,7 @@ var data: array[1..290] of array[1..3] of string = (
    '<a><br/><br   />abc<br /></a>',
    'test=abc'),
  //xpath conditions
-   ('<html><a template:condition="filter(@cond, ''a+'') = ''aaa'' "><template:read source="text()" var="test"/></a></html>',
+   ('<html><a template:condition="extract(@cond, ''a+'') = ''aaa'' "><template:read source="text()" var="test"/></a></html>',
    '<html><a>a1</a><a cond="xyz">a2</a><a cond="a">a3</a><a cond="xaay">a4</a><a cond="aaaa">a5</a><a cond="xaaay">a6</a><a cond="xaaaay">a7</a><a cond="xaay">a8</a></html>',
    'test=a6'),
 

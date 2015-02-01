@@ -1970,7 +1970,8 @@ type
     @unorderedList(
     @item(Language changes:
       @unorderedList(
-        @item(Function and type names are now case sensitive)
+        @item(Function and type names are now case sensitive.)
+        @item(The function pxp:filter has been removed to avoid confusion with the function fn:filter. (The replacement pxp:extract has existed for years))
         @item(Declarations in XQuery need to be separated by @code(;) and conflicting declarations or non-module queries containing only declarations are forbidden )
         @item(Variables are no longer replaced inside "-strings. Instead x"-strings were added. All old uses of "$var;" therefore have to be replaced by x"{$var}" )
         @item(All string comparisons are now (non-localized ascii) case-insensitive, not only equal comparisons (as always mentioned in the documentation) )
@@ -6466,7 +6467,6 @@ baseJSONiqSchema := TJSONiqAdditionSchema.create();
 
 
 //my functions
-pxp.registerFunction('filter',2,4,@xqFunctionExtract, []); //to be removed
 pxp.registerFunction('extract',2,4,@xqFunctionExtract, []);
 pxp.registerFunction('split-equal',2,3,@xqFunctionSplitEqual,[]); //to be removed ?
 pxp.registerFunction('parse-date',2,2,@xqFunctionParse_Date, []);
@@ -6495,8 +6495,9 @@ pxp.registerFunction('string-to-base64Binary',1,2,@xqFunctionString_To_base64Bin
 
 pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
 pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
-pxp.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']);
-pxp.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']);
+pxp.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']); //will probably be removed in future version
+pxp.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
+pxp.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
 
 
 

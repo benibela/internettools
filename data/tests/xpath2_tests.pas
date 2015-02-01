@@ -247,18 +247,16 @@ begin
 
 
                 //Regex-Filter
-  t('filter(''modern'', ''oder'')',                 'oder',            '');
-  t('filter(''regex'', ''.g.'')',                   'ege',             '');
-  t('filter(''reg123ex'', ''[0-9]*'')',             '',                '');
-  t('filter(''reg123ex'', ''[0-9]+'')',             '123',             '');
-  t('filter(''regexREGEX'', ''.G.'')',              'EGE',             '');
-  t('filter(''abcdxabcdefx'', ''b[^x]*'')',         'bcd',             '');
+  t('extract(''modern'', ''oder'')',                 'oder',            '');
+  t('extract(''regex'', ''.g.'')',                   'ege',             '');
+  t('extract(''reg123ex'', ''[0-9]*'')',             '',                '');
+  t('extract(''reg123ex'', ''[0-9]+'')',             '123',             '');
+  t('extract(''regexREGEX'', ''.G.'')',              'EGE',             '');
   t('extract(''abcdxabcdefx'', ''b[^x]*'')',         'bcd',             '');
-  t('filter(''hallo welt'', ''(.*) (.*)'')',        'hallo welt',      '');
   t('extract(''hallo welt'', ''(.*) (.*)'')',        'hallo welt',      '');
-  t('filter(''hallo welt'', ''(.*) (.*)'', ''0'')', 'hallo welt',      '');
-  t('filter(''hallo welt'', ''(.*) (.*)'', ''1'')', 'hallo',           '');
-  t('filter(''hallo welt'', ''(.*) (.*)'', ''2'')', 'welt',            '');
+  t('extract(''hallo welt'', ''(.*) (.*)'', ''0'')', 'hallo welt',      '');
+  t('extract(''hallo welt'', ''(.*) (.*)'', ''1'')', 'hallo',           '');
+  t('extract(''hallo welt'', ''(.*) (.*)'', ''2'')', 'welt',            '');
 
                 //Replace
   t('replace("abracadabra", "bra", "*")', 'a*cada*', '');
@@ -285,18 +283,18 @@ begin
   t('eval($eval)', 'true', '');
 
                 //All together
-  t('filter(concat(''abc'', ''def''), concat(''[^a'',''d]+'' ))', 'bc','');
-  t('concat(''-->'', filter(''miauim'', ''i.*i'') , ''<--'')',   '-->iaui<--','');
-  t('filter(''hallo'', ''a'') = ''a''', 'true',                       '');
-  t('filter(''hallo'', ''x'') != ''''', 'false',                       '');
-  t('filter(html/@attrib1, ''[^ ]+'')', 'FIRST',                            '');
-  t('filter(html/@attrib2, ''[^ ]+'')', 'SECOND',                           '');
-  t('filter(html/text(), ''[^:]+'')', 'test',                               '');
+  t('extract(concat(''abc'', ''def''), concat(''[^a'',''d]+'' ))', 'bc','');
+  t('concat(''-->'', extract(''miauim'', ''i.*i'') , ''<--'')',   '-->iaui<--','');
+  t('extract(''hallo'', ''a'') = ''a''', 'true',                       '');
+  t('extract(''hallo'', ''x'') != ''''', 'false',                       '');
+  t('extract(html/@attrib1, ''[^ ]+'')', 'FIRST',                            '');
+  t('extract(html/@attrib2, ''[^ ]+'')', 'SECOND',                           '');
+  t('extract(html/text(), ''[^:]+'')', 'test',                               '');
   t('string-join(tokenize("a,b,c",","), ";")', 'a;b;c',                               '');
-                //('filter(''$testvar_t;'', ''$testvar_f;'' == ''true'') == ''true''', 'false',''),
-                //('filter(''$testvar_t;'', ''$testvar_t;'' == ''true'') == ''true''', 'true',''),
-                //('filter(''$testvar_f;'', ''$testvar_f;'' == ''true'') == ''true''', 'false',''),
-                //('filter(''$testvar_f;'', ''$testvar_t;'' == ''true'') == ''true''', 'false','')
+                //('extract(''$testvar_t;'', ''$testvar_f;'' == ''true'') == ''true''', 'false',''),
+                //('extract(''$testvar_t;'', ''$testvar_t;'' == ''true'') == ''true''', 'true',''),
+                //('extract(''$testvar_f;'', ''$testvar_f;'' == ''true'') == ''true''', 'false',''),
+                //('extract(''$testvar_f;'', ''$testvar_t;'' == ''true'') == ''true''', 'false','')
 
 
   t('inner-xml(a/b)', 'x<t>y<u>++</u></t>z', '<a><aa>aaa</aa><b>x<t>y<u>++</u></t>z</b>233<c>23</c>434<d>434</d></a>');
