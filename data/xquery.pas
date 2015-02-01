@@ -1939,10 +1939,12 @@ type
 
 
     @br@br@bold(Compatibility to previous version)@br
-    The following breaking changes occured to make it more standard compatible:
+    The following major breaking changes occured to make it more standard compatible:
     @unorderedList(
     @item(Language changes:
       @unorderedList(
+        @item(Function and type names are now case sensitive)
+        @item(Declarations in XQuery need to be separated by @code(;) and conflicting declarations or non-module queries containing only declarations are forbidden )
         @item(Variables are no longer replaced inside "-strings. Instead x"-strings were added. All old uses of "$var;" therefore have to be replaced by x"{$var}" )
         @item(All string comparisons are now (non-localized ascii) case-insensitive, not only equal comparisons (as always mentioned in the documentation) )
         @item(Variables defined by a PXPath expression inside an PXPath eval call are exported to the outside)
@@ -6159,20 +6161,25 @@ begin
   basicFunctions.Sorted := true;
   basicFunctions.OwnsObjects:=true;
   basicFunctions.Duplicates := dupAccept;
+  basicFunctions.CaseSensitive := true;
   complexFunctions:=TStringList.Create;
   complexFunctions.Sorted := true;
   complexFunctions.OwnsObjects:=true;
   complexFunctions.Duplicates := dupAccept;
+  complexFunctions.CaseSensitive := true;
   interpretedFunctions:=TStringList.Create;
   interpretedFunctions.Sorted := true;
   interpretedFunctions.OwnsObjects:=true;
   interpretedFunctions.Duplicates := dupAccept;
+  interpretedFunctions.CaseSensitive := true;
   binaryOpLists:=TStringList.Create;
   binaryOpLists.Sorted := true;
   binaryOpLists.OwnsObjects:=true;
+  binaryOpLists.CaseSensitive := true;
 
   binaryOpFunctions:=TStringList.Create;
   binaryOpFunctions.Sorted := true;
+  binaryOpFunctions.CaseSensitive := true;
   parent := aparentModule;
 
   acceptedModels := [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3];
@@ -6438,7 +6445,7 @@ pxp.registerFunction('filter',2,4,@xqFunctionExtract, []); //to be removed
 pxp.registerFunction('extract',2,4,@xqFunctionExtract, []);
 pxp.registerFunction('split-equal',2,3,@xqFunctionSplitEqual,[]); //to be removed ?
 pxp.registerFunction('parse-date',2,2,@xqFunctionParse_Date, []);
-pxp.registerFunction('parse-datetime',2,2,@xqFunctionParse_Datetime, []);
+pxp.registerFunction('parse-dateTime',2,2,@xqFunctionParse_Datetime, []);
 pxp.registerFunction('parse-time',2,2,@xqFunctionParse_Time, []);
 pxp.registerFunction('deep-text',0,1,@xqFunctionDeep_Node_Text, []);
 pxp.registerFunction('outer-xml',0,1,@xqFunctionOuter_XML, []);
@@ -6507,12 +6514,12 @@ fn.registerFunction('not',@xqFunctionNot,['($arg as item()*) as xs:boolean']);
 
 
 fn.registerFunction('dateTime',@xqFunctionDateTime,['($arg1 as xs:date?, $arg2 as xs:time?) as xs:dateTime?']);
-fn.registerFunction('year-from-datetime',@xqFunctionYear_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-fn.registerFunction('month-from-datetime',@xqFunctionMonth_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-fn.registerFunction('day-from-datetime',@xqFunctionDay_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-fn.registerFunction('hours-from-datetime',@xqFunctionHours_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-fn.registerFunction('minutes-from-datetime',@xqFunctionMinutes_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-fn.registerFunction('seconds-from-datetime',@xqFunctionSeconds_From_Datetime, ['($arg as xs:dateTime?) as xs:decimal?']);
+fn.registerFunction('year-from-dateTime',@xqFunctionYear_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('month-from-dateTime',@xqFunctionMonth_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('day-from-dateTime',@xqFunctionDay_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('hours-from-dateTime',@xqFunctionHours_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('minutes-from-dateTime',@xqFunctionMinutes_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
+fn.registerFunction('seconds-from-dateTime',@xqFunctionSeconds_From_Datetime, ['($arg as xs:dateTime?) as xs:decimal?']);
 
 fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
 fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, ['($arg as xs:duration?) as xs:integer?']);

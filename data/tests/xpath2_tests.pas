@@ -708,7 +708,7 @@ begin
   t('type-of(0)', 'integer', '');
   t('type-of(0.0)', 'decimal', '');
   t('type-of("a")', 'string', '');
-  t('type-of(parse-datetime("2010-10-10","yyyy-mm-dd"))', 'dateTime', '');
+  t('type-of(parse-dateTime("2010-10-10","yyyy-mm-dd"))', 'dateTime', '');
   t('type-of(parse-date("2010-10-10","yyyy-mm-dd"))', 'date', '');
   t('type-of(parse-time("2010-10-10","yyyy-mm-dd"))', 'time', '');
   t('type-of(eval("0"))', 'integer', '');
@@ -823,16 +823,16 @@ begin
   t('parse-date("2010-10-08", "yyyy-mm-d")', '2010-10-08', '');
   t('parse-date("1899-Dec-31", "yyyy-mmm-d")', '1899-12-31', '');
   t('parse-date("1899-Dec-29", "yyyy-mmm-d")', '1899-12-29', '');
-  t('year-from-datetime(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
+  t('year-from-dateTime(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
   t('year-from-date(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
-  t('year-from-datetime(parse-date(">>2012<<01:01", ">>yyyy<<mm:dd"))', '2012', '');
-  t('year-from-datetime(parse-date(">>1700<<01:01", ">>yyyy<<mm:dd"))', '1700', '');
-  t('year-from-datetime(parse-date(">>05<<01:01", ">>yy<<mm:dd"))', '2005', '');
-  t('year-from-datetime(parse-date(">>90<<01:01", ">>yy<<mm:dd"))', '1990', '');
-  t('year-from-datetime(parse-date(">>89<<01:01", ">>yy<<mm:dd"))', '2089', '');
-  t('month-from-datetime(parse-date("1899-Dec-31", "yyyy-mmm-d")) ', '12', '');
-  t('month-from-datetime(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '7', '');
-  t('day-from-datetime(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '31', '');
+  t('year-from-dateTime(parse-date(">>2012<<01:01", ">>yyyy<<mm:dd"))', '2012', '');
+  t('year-from-dateTime(parse-date(">>1700<<01:01", ">>yyyy<<mm:dd"))', '1700', '');
+  t('year-from-dateTime(parse-date(">>05<<01:01", ">>yy<<mm:dd"))', '2005', '');
+  t('year-from-dateTime(parse-date(">>90<<01:01", ">>yy<<mm:dd"))', '1990', '');
+  t('year-from-dateTime(parse-date(">>89<<01:01", ">>yy<<mm:dd"))', '2089', '');
+  t('month-from-dateTime(parse-date("1899-Dec-31", "yyyy-mmm-d")) ', '12', '');
+  t('month-from-dateTime(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '7', '');
+  t('day-from-dateTime(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '31', '');
   t('parse-date("1899-Dec-31", "yyyy-mmm-d") - parse-date("1899-Dec-29", "yyyy-mmm-d")', 'P2D', '');
                 //Sequences
   t('index-of ((10, 20, 30, 40), 35)', '', '');
