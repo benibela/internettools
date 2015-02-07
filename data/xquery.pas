@@ -3141,14 +3141,23 @@ var
   hasExpression: Boolean;
   v: TXQTermVariable;
   i: Integer;
+  tnf: TXQTermNamedFunction;
+  oldContext: TXQStaticContext;
 begin
   Result:=inherited visit(term);
   stack.Add(term^);
   if visited.IndexOf(term^) >= 0 then exit(xqtvaNoRecursion);
   visited.Add(term^);
   if term^ is TXQTermNamedFunction then begin
-    if TXQTermNamedFunction (term^).kind = xqfkUnknown then TXQTermNamedFunction (term^).init(scontext);
-    if TXQTermNamedFunction (term^).kind = xqfkUnknown then TXQTermNamedFunction (term^).interpretedFunction.visit(self);
+    tnf := TXQTermNamedFunction (term^);
+    if tnf.kind = xqfkUnknown then tnf.init(scontext);
+    if tnf.kind = xqfkUnknown then begin
+      oldContext := scontext;
+      if tnf.functionStaticContext <> nil then //should always be true?
+        scontext := tnf.functionStaticContext;
+      TXQTermNamedFunction (term^).interpretedFunction.visit(self);
+      scontext := oldContext;
+    end;
   end else if term^ is TXQTermVariable then begin
     v := TXQTermVariable(term^);
     if (overridenVariables.hasVariable(v)) or ((scontext.moduleVariables <> nil) and (scontext.moduleVariables.hasVariable(v))) then exit;
