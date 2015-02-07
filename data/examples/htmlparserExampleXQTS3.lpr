@@ -824,6 +824,7 @@ begin
   put('spec', 'XQ31+ XP31+', false);
   put('spec', 'XP31+ XQ31+', false);
 
+  put('spec', 'XT30+ XP31+ XQ31+', false);
   put('spec', 'XP31+ XQ31+ XT30+', false);
 
   put('spec', 'XT30+', false);
