@@ -291,7 +291,7 @@ begin
   bufferTestSet := TStringList.Create;
 
   writeln('<!doctype html><html><head><title>XQuery Test Suite Evaluation</title>');
-  writeln('<style>  table tr th {background-color: #EEEEFF}    table tr:hover td {background-color: #A0A0FF} tr.passed {background-color: #AAFFAA} tr.correctIgnored {background-color: #FFFFAA} tr.correctNA {}  tr.failed {background-color: #FFAAAA} tr.wrongError {background-color: #FFBBBB}</style>');
+  writeln('<link rel="stylesheet" type="text/css" href="xqts.css">');
   writeln('</head><body>');
 
   writeln('<h1>XQuery/XPath Test Suite Evaluation</h1>');
@@ -302,7 +302,7 @@ begin
   writeln('<br>');
   writeln('<br><br>');
   writeln('<table>');
-  writeln('<tr><th>Name</th><th>Passed</th><th>Failed</th><th>Wrong error</th><th>N/A</th><th>Other</th></tr>');
+  writeln('<tr><th>Name</th><th>Passed</th><th>Failed</th><th>Wrong error</th><th>N/A</th><th>Skipped</th></tr>');
 end;
 
 destructor THTMLLogger.Destroy;
@@ -394,7 +394,7 @@ begin
   bufferOverview.add(formatResultHTML('<a href="#'+ts.name+'">'+ts.name+'</a>', r, true));
   bufferBody.add('<h3><a name="'+ts.name+'">'+ts.name+'</a></h3>');
   bufferBody.add('<a href="http://dev.w3.org/cvsweb/~checkout~/2011/QT3-test-suite/'+ts.fileName+'?content-type=application%2Fxml" rel="nofollow">'+ts.fileName+'</a>:<br><br>');
-  bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failed: '+ inttostr(r[tcrFail])+ '  Wrong error: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Other: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
+  bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failed: '+ inttostr(r[tcrFail])+ '  Wrong error: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Skipped: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
   for i := 0 to bufferTestSet.Count - 1 do
     bufferBody.add(bufferTestSet[i]);
   bufferBody.Add('</table>');
@@ -419,7 +419,7 @@ end;
 procedure TLogger.printResults(var f: textfile; const r: TResultSet);
 const cols = 4;
 begin
-  writeln(f, 'Passed: ', r[tcrPass]:cols, '  Failed: ', r[tcrFail]:cols, '  Wrong error: ', r[tcrWrongError]:cols, '  N/A: ', r[tcrNA]:cols, '  Other: ', (r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]):cols );
+  writeln(f, 'Passed: ', r[tcrPass]:cols, '  Failed: ', r[tcrFail]:cols, '  Wrong error: ', r[tcrWrongError]:cols, '  N/A: ', r[tcrNA]:cols, '  Skipped: ', (r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]):cols );
 end;
 
 constructor TLogger.create(clr: TCommandLineReader);
