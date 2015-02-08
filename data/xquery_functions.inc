@@ -2462,14 +2462,18 @@ begin
 end;
 
 function xqFunctionQName(const args: TXQVArray): IXQValue;
+var
+  qname: String;
 begin
   requiredArgCount(args,2,2);
 //  if length(args) = 1 then
 //    exit(TXQValueQName.create(baseSchema.QName, args[0].toString));
+  qname := args[1].toString;
+  if not baseSchema.isValidQName(qname) then raise EXQEvaluationException.Create('FOCA0002', 'Invalid QName');
   if args[0].isUndefined or (args[0].toString = '') then begin
     if pos(':', args[1].toString) > 0 then raise EXQEvaluationException.Create('FOCA0002', 'Need namespace uri for '+args[1].toString);
-    result := TXQValueQName.create('', '', args[1].toString);
-  end else result := TXQValueQName.create(args[0].toString, args[1].toString)
+    result := TXQValueQName.create('', '', qname);
+  end else result := TXQValueQName.create(args[0].toString, qname)
 end;
 
 function xqFunctionPrefix_From_QName(const args: TXQVArray): IXQValue;

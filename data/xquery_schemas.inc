@@ -944,10 +944,11 @@ begin
 end;
 
 function TXSSchema.isValidQName(s: string): boolean;
-var prefix: string;
+var i: integer;
 begin
-  prefix := strSplitGet(':', s);
-  result := isValidNCName(prefix) and ((s = '') or (isValidNCName(s)));
+  i := pos(':', s);
+  if i = 0 then result := isValidNCName(s)
+  else result := isValidNCName(copy(s, 1, i-1)) and isValidNCName(strCopyFrom(s, i+1));
 end;
 
 procedure TXSSchema.hide(const s: string);
