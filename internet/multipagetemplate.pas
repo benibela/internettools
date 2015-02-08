@@ -115,6 +115,9 @@ type
       @item(@code(<page>)     Downloads a page and processes it with a single-page template )
       @item(@code(<loop>)      Repeats the children of the loop element )
       @item(@code(<call>)      Calls another action )
+      @item(@code(<if>)      Tests, if a condition is satisfied )
+      @item(@code(<choose><when><otherwise>)      Switches depending on a value  )
+      @item(@code(<s>)      Evaluated an XPath/XQuery expression )
     )
 
     Details for each element:
@@ -165,12 +168,29 @@ type
     @item(
 
       Calls the action of the given name.
+    )
+
+    @itemLabel(@code(<if test="...">))
+    @item(
+      Evaluates the children of this element, if the test evaluates to true().
+    )
+
+    @itemLabel(@code(<choose> <when test="..."/> <otherwise/> </choose>))
+    @item(
+
+      Evaluates the tests of the when-elements and the children of the first <when> that is true. @br
+      If no test evaluates to true(), the children of <otherwise> are evaluated.
 
     )
-   )
 
-   Within all string attributes you can access the previously defined variables by writing @code($variable;)  (with colon).@br
-   Within a xpath expression you can access the variables as usually with @code($variable)
+    @itemLabel(@code(<s>..</s>))
+    @item(
+      Evaluates an XPath/XQuery expression (which can set global variables with :=).
+    )
+  )
+
+   Within all string attributes you can access the previously defined variables by writing @code({$variable}) .@br
+   Within an XPath expression you can access the variables as usually with @code($variable).
   *)
   TMultiPageTemplate=class
   protected
@@ -652,7 +672,7 @@ begin
     if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
     else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
       reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), @tempvalue) then begin
-      tempvi := reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).getChild(1);
+      tempvi := reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1);
       if tempvi.kind = pvkObject then begin
         cururl := tempvi.getProperty('url').toString;
         curmethod := tempvi.getProperty('method').toString;

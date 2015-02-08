@@ -108,7 +108,7 @@ type
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   TXQStaticContext = class
   private
-    FNodeCollation: TXQCollation;  //**< default collation used for node name comparisons (extension, does not exist in XQuery)
+    FNodeCollation: TXQCollation;  // default collation used for node name comparisons (extension, does not exist in XQuery)
     function getNodeCollation: TXQCollation;
   protected
     function findModule(const namespaceURL: string): TXQuery;
@@ -1094,8 +1094,8 @@ type
   (*** @abstract(List of TXQValue-s) *)
   TXQVList = class
   protected
-    fcount: integer; //**< count
-    list: TXQVArray; //**< Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
+    fcount: integer; // count
+    list: TXQVArray; // Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
     function everyIsNodeOrNot(checkForNode: boolean): boolean; //**< checks: every $n in (self) satisfies (($n is node) = checkForNode)
     procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
     procedure checkIndex(i: integer); inline; //**< Range check
@@ -1770,7 +1770,7 @@ type
     A formal syntax definition of these languages is given at: http://www.w3.org/TR/xpath20/ , http://www.w3.org/TR/xquery/ , http://www.jsoniq.org/ ,
                                                                http://www.w3.org/TR/xpath-30/ and  http://www.w3.org/TR/xquery-30/ .
 
-    Some very basic, standard XPath examples, for people who do not have seen XPath before:
+    Some very basic, standard XPath examples, for people who have never seen XPath before:
     @unorderedList(
       @item(@code("something") or @code("something") @br This returns the string 'something'.)
       @item(@code($var)  @br This returns the value of the variable @code(var).)
@@ -1799,7 +1799,7 @@ type
       @item(@code(some $x in @code(seq) satisfies condition) @br This returns true iff one element of @code(seq) satisfies @code(condition) )
       @item(@code(every $x in @code(seq) satisfies condition) @br This returns true iff every element of @code(seq) satisfies @code(condition) )
       @item(@code(if (condition) then $x else $y) @br This returns @code($x) if @code(condition) is true, and @code($y) otherwise  )
-      @item(@code(function ($a, $b) { $a + $b } @br This returns an anonymous function which adds two numbers. )
+      @item(@code(function ($a, $b) { $a + $b }) @br This returns an anonymous function which adds two numbers. )
     )
 
     Differences between this implementation and standard XPath/XQuery (most differences can be turned off with the respective option or the field in the default StaticContext):
@@ -1812,7 +1812,7 @@ type
                             @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code($a) with the value @code(2)
                             @br @code($a := 2) is also allowed
                             @br Can also be used to change object properties, array elements and sequences.
-                                @code($a("property")(1)("foo")[] := 17)) appends 17 to @code({"property": [{"foo": THIS }]}). (but remember that everything is immutable! so it makes a copy (except objects which are shared) )
+                                @code($a("property")(1)("foo")[] := 17) appends 17 to @code({"property": [{"foo": THIS }]}). (but remember that everything is immutable! so it makes a copy, except objects which are shared)
                             )
     @item(All string comparisons are case insensitive, and "clever", e.g. @code('9xy' = '9XY' < '10XY' < 'xy'),@br
           unless you use collations.)
@@ -2012,8 +2012,8 @@ type
 
     VariableChangelog: TXQVariableChangeLog;  //**< All global variables that have been set (if a variable was overriden, it stores the old and new value)
 
-    //OnEvaluateVariable: TXQEvaluateVariableEvent; //**< Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
-    //OnDefineVariable: TXQDefineVariableEvent; //**< Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
+    //OnEvaluateVariable: TXQEvaluateVariableEvent;  Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
+    //OnDefineVariable: TXQDefineVariableEvent;  Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
     OnDeclareExternalVariable: TXQDeclareExternalVariableEvent; //**< Event called to import a variable that is declared as "declare variable ... external" in a XQuery expression
     OnDeclareExternalFunction: TXQDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression.
     OnImportModule: TXQImportModuleEvent;  //**< Event called to import a XQuery module that has not previously be defined
@@ -2141,11 +2141,11 @@ public
 
   { TXQQueryIterator }
         (*
-  //** Query Iterator that iterates all nodes matching a query.@br
-  //** None are stored, so it should be faster and less memory using than the full evaluation which enumerates all matching
-  //** nodes for all steps@br
-  //** However, it is  not finished (or better deprecated, because I didn't extend it when implementing new query types), so
-  //** it only supports qcSameNode, qcDirectParent, qcDirectChild, qcSameOrDescendant and is not tested.
+  //   Query Iterator that iterates all nodes matching a query.@br
+  //   None are stored, so it should be faster and less memory using than the full evaluation which enumerates all matching
+  //   nodes for all steps@br
+  //   However, it is  not finished (or better deprecated, because I didn't extend it when implementing new query types), so
+  //   it only supports qcSameNode, qcDirectParent, qcDirectChild, qcSameOrDescendant and is not tested.
   TXQQueryIterator = class
      query: array of TXQPathMatchingStep; //**< Query as array of query steps
      startNode: TTreeElement; //**< First node (set it to root for / type queries, and to . for ./ type queries)
