@@ -1738,20 +1738,28 @@ end;
 
 
 
-//searchs the term to split
-//e.g.
-//          to                          to
-//        1     +        * 4      =>  1     +
-//            2    3                      2    3 <- * 4
-//takes a pointer to a txqterm, since it sets the variable that should be changed
-//(parentheses can be ignored since they are stored as sequence terms in the tree)
-function ripBinOpApart(term: pxqterm; const prio: integer): PXQTerm;
-begin
-  if not (term^ is TXQTermBinaryOp) or (TXQTermBinaryOp(term^).op.priority >= prio) then result := term
-  else result := ripBinOpApart(@TXQTermBinaryOp(term^).children[1], prio);
-end;
 
 function TXQParsingContext.parse: TXQTerm;
+  //searchs the term to split
+  //e.g.
+  //          to                          to
+  //        1     +        * 4      =>  1     +
+  //            2    3                      2    3 <- * 4
+  //takes a pointer to a txqterm, since it sets the variable that should be changed
+  //(parentheses can be ignored since they are stored as sequence terms in the tree)
+  function ripBinOpApart(term: pxqterm; const prio: integer): PXQTerm;
+  var
+    binOp: TXQTermBinaryOp;
+  begin
+    if not (term^ is TXQTermBinaryOp) then exit(term);
+    binOp := TXQTermBinaryOp(term^);
+    if binOp.op.priority > prio then exit(term);
+    if (binOp.op.priority = prio) then begin
+      if (binOp.op.associativeSyntax) then exit(term);
+      raiseSyntaxError('Operator requires parenthesis '+ binOp.op.name);
+    end;
+    result := ripBinOpApart(@binOp.children[1], prio);
+  end;
 var astroot: TXQTerm;
 
   function parseSomething: TXQTerm;
