@@ -6,7 +6,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
+  Classes, sysutils, strutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
   { you can add units after this };
 type
 
@@ -60,11 +60,12 @@ end;
 { TTestSet }
 
 TTestSet = class
+  fileName: string;
   name: string;
   coversName: string; //test kind
   dependencies, links, environments {descriptions}: TList;
   testCases: TList;
-  constructor create(e: TTreeNode);
+  constructor create(e: TTreeNode; afileName: string = '');
   class function load(e: TTreeNode): TTestSet;
   procedure run;
 end;
@@ -176,6 +177,23 @@ public
   procedure endXQTS(const result: TResultSet); override;
 end;
 
+{ THTMLLogger }
+
+THTMLLogger = class(TLogger)
+private
+  bufferOverview, bufferBody, bufferTestSet: TStringList;
+  currentTestSet: TTestSet;
+  function formatResultHTML(caption: string; const r: TResultSet; colorize: boolean): string;
+public
+  constructor create(clr: TCommandLineReader);
+  destructor Destroy; override;
+  procedure beginXQTS(testsets: TList); override;
+  procedure beginTestSet(ts: TTestSet); override;
+  procedure beginTestCase(tc: TTestCase); override;
+  procedure endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue); override;
+  procedure endTestSet(ts: TTestSet; const r: TResultSet); override;
+  procedure endXQTS(const result: TResultSet); override;
+end;
 
 var xq: TXQueryEngine;
   environments: TStringList;
@@ -259,6 +277,141 @@ begin
     end;
     l.add(a);
   end;
+end;
+
+{ THTMLLogger }
+
+constructor THTMLLogger.create(clr: TCommandLineReader);
+var
+  i: Integer;
+begin
+  inherited;
+  bufferOverview := TStringList.Create;
+  bufferBody := TStringList.Create;
+  bufferTestSet := TStringList.Create;
+
+  writeln('<!doctype html><html><head><title>XQuery Test Suite Evaluation</title>');
+  writeln('<style>  table tr th {background-color: #EEEEFF}    table tr:hover td {background-color: #A0A0FF} tr.passed {background-color: #AAFFAA} tr.correctIgnored {background-color: #FFFFAA} tr.correctNA {}  tr.failed {background-color: #FFAAAA} tr.wrongError {background-color: #FFBBBB}</style>');
+  writeln('</head><body>');
+
+  writeln('<h1>XQuery/XPath Test Suite Evaluation</h1>');
+  writeln('<h2>Overview</h2>');
+  write('Command line: ');
+  for i := 1 to Paramcount do
+    write(paramstr(i)+ ' ');;
+  writeln('<br>');
+  writeln('<br><br>');
+  writeln('<table>');
+  writeln('<tr><th>Name</th><th>Passed</th><th>Failed</th><th>Wrong error</th><th>N/A</th><th>Other</th></tr>');
+end;
+
+destructor THTMLLogger.Destroy;
+begin
+  bufferOverview.Free;
+  bufferBody.Free;
+  bufferTestSet.Free;
+  inherited Destroy;
+end;
+
+procedure THTMLLogger.beginXQTS(testsets: TList);
+begin
+  inherited beginXQTS(testsets);
+
+end;
+
+procedure THTMLLogger.beginTestSet(ts: TTestSet);
+begin
+  inherited beginTestSet(ts);
+  bufferTestSet.Clear;
+  currentTestSet := ts;
+end;
+
+procedure THTMLLogger.beginTestCase(tc: TTestCase);
+begin
+end;
+
+procedure THTMLLogger.endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue);
+  function got: string;
+  begin
+    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation(false)
+    else result := resultValue.error;
+  end;
+var
+  n: String;
+begin
+  if not logAllTestCases then begin
+    if not testCasesToLog[resultValue.result] then exit;
+  end;
+  if bufferTestSet.count = 0 then bufferTestSet.add('<table><tr><th>Testname</th><th>Status</th><th>Got</th><th>Expected</th>'+ifthen(printInputs,'<th>Test Input</th>','')+'</tr>');
+  n := '<td>'+tc.name+'</td>';
+  case resultValue.result of
+    tcrPass: bufferTestSet.add('<tr class="passed" >'+n+'<td colspan="4">passed</td>');
+    tcrFail: begin
+      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expected)+'</td>');
+      if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
+    end;
+    tcrWrongError: begin
+      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expected)+'</td>');
+      if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
+    end;
+    tcrNA: bufferTestSet.add('<tr class="correctNA" >'+n+'<td colspan="4">n/a</td>');
+    tcrDisputed: bufferTestSet.add('<tr class="correctIgnored" >'+n+'<td colspan="4">disputed</td>');
+    tcrTooBig: bufferTestSet.add('<tr class="correctIgnored" >'+n+'<td colspan="4">too big</td>');
+    tcrNotRun: bufferTestSet.add('<tr class="correctIgnored" >'+n+'<td colspan="4">not run</td>');
+  end;
+  bufferTestSet.add('</tr>');
+end;
+
+function THTMLLogger.formatResultHTML(caption: string; const r: TResultSet; colorize: boolean): string;
+var
+  color: String;
+begin
+  color := '';
+  if (not colorize) or (r[tcrPass]+r[tcrFail]+r[tcrWrongError] = 0) then color := ''
+  else begin
+    if r[tcrFail]+r[tcrWrongError] = 0 then color := 'AAFFAA'
+    else if r[tcrFail]+r[tcrWrongError] <= r[tcrPass] then  begin
+      color := IntToHex(($FF - $88) * (r[tcrFail]+r[tcrWrongError]) div r[tcrPass]  + $88 , 2);
+      color := color+'FF00';
+    end else begin
+      color := IntToHex(($FF - $88) * (r[tcrFail]+r[tcrWrongError]) div (r[tcrPass]+r[tcrFail]+r[tcrWrongError])  + $88 , 2);
+      color := color+'5500'; //'FF'+color+color;
+    end;
+    color := 'style="background-color:#'+color+'"';
+  end;
+
+  result := '<tr '+color+'><td>'+caption+'</td><td>'+inttostr( r[tcrPass])+ '</td><td>'+ inttostr(r[tcrFail])+ '</td><td>'+ inttostr(r[tcrWrongError])+ '</td><td>'+ inttostr(r[tcrNA])+ '</td><td>'+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'</td></tr>';
+end;
+
+procedure THTMLLogger.endTestSet(ts: TTestSet; const r: TResultSet);
+var i: integer;
+begin
+  inherited endTestSet(ts, r);
+  if bufferTestSet.count = 0 then begin
+    bufferOverview.add(formatResultHTML(ts.name, r, true));
+    exit;
+  end;
+  bufferOverview.add(formatResultHTML('<a href="#'+ts.name+'">'+ts.name+'</a>', r, true));
+  bufferBody.add('<h3><a name="'+ts.name+'">'+ts.name+'</a></h3>');
+  bufferBody.add('<a href="http://dev.w3.org/cvsweb/~checkout~/2011/QT3-test-suite/'+ts.fileName+'?content-type=application%2Fxml" role="nofollow">'+ts.fileName+'</a>:<br><br>');
+  bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failed: '+ inttostr(r[tcrFail])+ '  Wrong error: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Other: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
+  for i := 0 to bufferTestSet.Count - 1 do
+    bufferBody.add(bufferTestSet[i]);
+  bufferBody.Add('</table>');
+end;
+
+procedure THTMLLogger.endXQTS(const result: TResultSet);
+var i: integer;
+begin
+  inherited endXQTS(result);
+  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
+  writeln(formatResultHTML('Total', result, false));
+  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
+  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
+  for i := 0 to bufferOverview.Count - 1 do writeln(bufferOverview[i]);
+  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
+  writeln('</table>');
+  for i := 0 to bufferBody.Count - 1 do writeln(bufferBody[i]);
 end;
 
 { TLogger }
@@ -881,10 +1034,11 @@ end;
 
 { TTestSet }
 
-constructor TTestSet.create(e: TTreeNode);
+constructor TTestSet.create(e: TTreeNode; afileName: string = '');
 var v: IXQValue;
   f: TTreeNode;
 begin
+  fileName := afileName;
   dependencies := tlist.Create;
   links := tlist.Create;
   environments := tlist.Create;
@@ -909,7 +1063,7 @@ class function TTestSet.load(e: TTreeNode): TTestSet;
 begin
   result := nil;
   if (config.forceTestSet = '') or (striEqual(e['name'], config.forceTestSet) or striContains(e['file'], config.forceTestSet)) then
-    result := TTestSet.create(tree.parseTreeFromFile(e['file']).findChild(tetOpen, 'test-set'));
+    result := TTestSet.create(tree.parseTreeFromFile(e['file']).findChild(tetOpen, 'test-set'), e['file']);
 end;
 
 
@@ -1192,6 +1346,7 @@ begin
   clr.declareString('test-case', 'Only runs a certain test case');
   clr.declareString('print-test-cases', 'Which test case results to print (n: not run, f: failed, p: passed, e: wrong error, d: disputed, s: skipped, b: too big, o: dbs)', 'penfdsb');
   clr.declareFlag('print-failed-inputs', 'Print failed inputs');
+  clr.declareString('format', 'html or text output','text');
   //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
   case clr.readString('mode') of
@@ -1240,7 +1395,12 @@ begin
   baseSchema.version := xsd11;
   defaultInternetAccessClass := TMockInternetAccess;
 
-  logger := TTextLogger.create(clr);
+  case clr.readString('format') of
+    'text': logger := TTextLogger.create(clr);
+    'html': logger := THTMLLogger.create(clr);
+    else raise Exception.Create('Invalid output format')
+  end;
+
 
   logger.loadCatalogue;
   loadCatalog('catalog.xml');
