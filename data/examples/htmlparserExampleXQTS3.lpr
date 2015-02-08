@@ -393,7 +393,7 @@ begin
   end;
   bufferOverview.add(formatResultHTML('<a href="#'+ts.name+'">'+ts.name+'</a>', r, true));
   bufferBody.add('<h3><a name="'+ts.name+'">'+ts.name+'</a></h3>');
-  bufferBody.add('<a href="http://dev.w3.org/cvsweb/~checkout~/2011/QT3-test-suite/'+ts.fileName+'?content-type=application%2Fxml" role="nofollow">'+ts.fileName+'</a>:<br><br>');
+  bufferBody.add('<a href="http://dev.w3.org/cvsweb/~checkout~/2011/QT3-test-suite/'+ts.fileName+'?content-type=application%2Fxml" rel="nofollow">'+ts.fileName+'</a>:<br><br>');
   bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failed: '+ inttostr(r[tcrFail])+ '  Wrong error: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Other: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
   for i := 0 to bufferTestSet.Count - 1 do
     bufferBody.add(bufferTestSet[i]);
