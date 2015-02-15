@@ -3206,8 +3206,10 @@ begin
     if parts[7] = high(parts[7]) then outSecondFraction^:=0
     else outSecondFraction^:= parts[7] / 1000000000.0;
   if assigned(outTimeZone) then begin
+    {$PUSH}{$Q-}{$R-}
     if parts[8] = high(integer) then outTimeZone^ := NaN
     else outTimeZone^ := parts[8] / MinsPerDay;
+    {$POP}
   end;
 end;
 

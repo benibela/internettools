@@ -3034,14 +3034,18 @@ end;
 
 function TXQStaticContext.ImplicitTimezone: TDateTime;
 begin
+  {$PUSH}{$Q-}{$R-}
   if sender <> nil then result := sender.ImplicitTimezone
   else result := nan;
+  {$POP}
 end;
 
 function TXQStaticContext.CurrentDateTime: TDateTime;
 begin
+  {$PUSH}{$Q-}{$R-}
   if sender <> nil then result := sender.CurrentDateTime
   else result := nan;
+  {$POP}
 end;
 
 { TXQTermModule }
