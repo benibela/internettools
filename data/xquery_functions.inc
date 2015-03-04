@@ -1614,6 +1614,7 @@ begin
     end;
     pvkFloat: begin
       f := v.toFloat;
+      if IsNan(f) then exit(false); //comparison works with infinite
       result := (f >= low(integer)) and (f <= high(Integer)) and (frac(f) = 0);
       if result then outv := trunc(f);
     end;
