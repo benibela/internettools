@@ -410,14 +410,16 @@ begin
   SetLength(encodedData, length(data));
   for i := 0 to high(data) do begin
     joinedHeaders[i] := trim(strJoin(data[i].headers, #13#10)); //trim to remove additional #13#10 at the end
-    if indexOfHeader(data[i].headers, 'Content-Type') < 0 then begin
+ { todo: this actually breaks it.
+   firefox only sets content-type for file, nothing else
+      if indexOfHeader(data[i].headers, 'Content-Type') < 0 then begin
       if joinedHeaders[i] <> '' then joinedHeaders[i] += #13#10;
       joinedHeaders[i] += 'Content-Type: application/octet-stream'; //todo: use text for plain text
     end;
     if indexOfHeader(data[i].headers, 'Content-transfer-encoding') < 0 then begin
       if joinedHeaders[i] <> '' then joinedHeaders[i] += #13#10;
       joinedHeaders[i] += 'Content-transfer-encoding: binary'; //todo: binary is not allowed for mails (use base64, or 8-bit with line wrapping)
-    end;
+    end;    }
     encodedData[i] := data[i].data;
   end;
 

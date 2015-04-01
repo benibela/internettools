@@ -1320,11 +1320,20 @@ begin
   exit(false);
 end;
 
-procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; out names, values: TStringArray);
+
+
+procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlEncoded: boolean;
+                               out names, values: TStringArray;
+                               out specialNames: TStringArray; out specialValues: TXQVArray);
   procedure addSingleValue(temp: string);
   begin
-    arrayAdd(names, strSplitGet('=', temp));
-    arrayAdd(values, temp);
+    if urlEncoded then begin
+      arrayAdd(names, strSplitGet('=', temp));
+      arrayAdd(values, temp);
+    end else begin
+      arrayAdd(names,  urlHexDecode(strSplitGet('=', temp)));
+      arrayAdd(values, urlHexDecode(temp));
+    end;
   end;
 
   procedure add(s: string);
@@ -1336,6 +1345,18 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; out 
     split := strSplit(s, '&');
     for i:=0 to high(split) do addSingleValue(split[i]);
   end;
+
+  procedure addPair(const n, v: string);
+  begin
+    if urlEncoded then begin
+      arrayAdd(names, urlHexEncode(n));
+      arrayAdd(values, urlHexEncode(v));
+    end else begin
+      arrayAdd(names, n);
+      arrayAdd(values, v);
+    end;
+  end;
+
 var v, temp: IXQValue;
   tempobj: TXQValueObject;
   i: Integer;
@@ -1344,76 +1365,123 @@ var v, temp: IXQValue;
 begin
   setlength(names, 0);
   setlength(values, 0);
+  SetLength(specialNames, 0);
+  SetLength(specialValues, 0);
   for v in value do
     if v is TXQValueObject then begin
       if (v as TXQValueObject).prototype = nil then temp := v
       else temp := v.clone;
       tempobj := temp as TXQValueObject;
       for i:=0 to tempobj.values.count-1 do begin
-        arrayAdd(names, urlHexEncode(tempobj.values.Names[i]));
-        arrayAdd(values, urlHexEncode(tempobj.values.Values[i].toString));
+        if tempobj.values.Values[i].kind <> pvkObject then
+          addPair(tempobj.values.Names[i], tempobj.values.Values[i].toString)
+         else begin
+           arrayAdd(specialNames, tempobj.values.Names[i]);
+           setlength(specialValues, length(specialValues) + 1);
+           specialValues[high(specialValues)] := tempobj.values.Values[i];
+         end;
       end;
     end else if v is TXQValueNode then begin
-      if nodeToFormData(v.toNode, cmp, true, sname, svalue) then begin
-        arrayAdd(names, urlHexEncode(sname));
-        arrayAdd(values, urlHexEncode(svalue));
-      end;
+      if nodeToFormData(v.toNode, cmp, true, sname, svalue) then
+        addPair(sname, svalue);
     end else add(v.toString)
 end;
 
 function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var replaceNames, replaceValues: TStringArray;
+    specialReplaceValues: TXQVArray;
+    specialReplaceNames: TStringArray;
     cmp: TStringComparisonFunc;
 
     function encodeForm(const form: TTreeNode): IXQValue;
     var
       temp: TTreeNode;
-      typ: string;
+      method: string;
       name, value: String;
       request: string;
       used: TStringList;
       i: Integer;
+      mime: TMIMEMultipartData;
+      multipart: boolean;
+      header: string;
+      post: Boolean;
+
+      procedure addPair(n: string; v: string);
+      begin
+        if not multipart then begin
+          if request <> '' then request += '&';
+          request += urlHexEncode(n) + '=' + urlHexEncode(v);
+        end else begin
+          mime.addFormData(n, v);
+        end;
+      end;
+
+      procedure addSpecialValue(n: string; v: TXQValueObject);
+      var
+        filename: TXQValue;
+      begin
+        if v.hasProperty('filename', @filename) then begin
+          mime.addFormDataFile(n, filename.toString);
+        end;
+      end;
 
       procedure addToRequest(n: string; v: string; addToUsed: boolean = true);
       var
         replaced: Integer;
       begin
-        if request <> '' then request += '&';
         if addToUsed then begin
           replaced := arrayIndexOf(replaceNames, n);
-          if replaced >= 0 then v := replaceValues[replaced];
-          request += n + '=' + v;
+          if replaced >= 0 then v := replaceValues[replaced]
+          else if multipart then begin
+            replaced := arrayIndexOf(specialReplaceNames, n);
+            if replaced >= 0 then begin
+              addSpecialValue(n, specialReplaceValues[replaced] as TXQValueObject);
+              used.Add(n);
+              exit;
+            end;
+          end;
           used.Add(n);
-        end else request += n + '=' + v;
+        end;
+        addPair(n, v);
       end;
 
     begin
       if form = nil then exit(xqvalue());
+      method := UpperCase(form.getAttribute('method', 'GET', cmp));
+      post := striEqual(method, 'POST');
+      multipart := post and striEqual( form.getAttribute('enctype', cmp), 'multipart/form-data');
+
       used := TStringList.Create;
       used.CaseSensitive:=false;
       temp := form.getFirstChild();
       while (temp <> nil) and (temp <> form.reverse) do begin
         if nodeToFormData(temp, cmp, false, name, value) then begin
-          addToRequest(urlHexEncode(name), urlHexEncode(value));
+          addToRequest(name, value);
           temp := temp.reverse;
         end;
         temp := temp.next;
       end;
 
-      for i:=0 to high(replaceNames) do begin
-        typ := replaceNames[i];
-        value := replaceValues[i];
-        if used.IndexOf(typ) < 0 then addToRequest(typ, value, false);
-      end;
+      for i:=0 to high(replaceNames) do
+        if used.IndexOf(replaceNames[i]) < 0 then
+          addToRequest(replaceNames[i], replaceValues[i], false);
+      for i:=0 to high(specialReplaceNames) do
+        if used.IndexOf(specialReplaceNames[i]) < 0 then
+          addSpecialValue(specialReplaceNames[i], specialReplaceValues[i] as TXQValueObject);
       used.free;
 
-      typ := UpperCase(form.getAttribute('method', 'GET', cmp));
       value := form.getAttribute('action', cmp);
 
       result := TXQValueObject.create();
-      (result as TXQValueObject).setMutable('method', typ);
-      if striEqual(typ, 'POST') then (result as TXQValueObject).setMutable('post', request)
-      else if request <> '' then
+      (result as TXQValueObject).setMutable('method', method);
+
+      if post then begin
+        if multipart then begin
+          request := mime.compose(header);
+          (result as TXQValueObject).setMutable('header', 'Content-Type: ' + ContentTypeMultipart + '; boundary="' + header + '"')
+        end;
+        (result as TXQValueObject).setMutable('post', request)
+      end else if request <> '' then
         if strContains(value, '?') then value += '&' + request
         else value += '?' + request;
 
@@ -1435,7 +1503,8 @@ begin
   cmp := @context.staticContext.nodeCollation.equal;
 
   if length(args) = 2 then
-    urlEncodingFromValue(args[1], cmp, replaceNames, replaceValues);
+    urlEncodingFromValue(args[1], cmp, false, replaceNames, replaceValues, specialReplaceNames, specialReplaceValues);
+
 
   result := nil;
   for v in args[0] do
@@ -1451,12 +1520,14 @@ var names, values: array of TStringArray;
     res: String;
     cmp: TStringComparisonFunc;
     i: Integer;
+    specialNames: TStringArray;
+    specialValues: TXQVArray;
 begin
   requiredArgCount(args, 1, 2);
   setlength(names, 2); setlength(values, 2);
   cmp := @context.staticContext.nodeCollation.equal; ignore(context);
-  urlEncodingFromValue(args[0], cmp, names[0], values[0]);
-  urlEncodingFromValue(args[1], cmp, names[1], values[1]);
+  urlEncodingFromValue(args[0], cmp, true, names[0], values[0], specialNames, specialValues); //todo: handle specials
+  urlEncodingFromValue(args[1], cmp, true, names[1], values[1], specialNames, specialValues);
   setlength(used, 2);
 
   setlength(used[1], length(values[1]));
