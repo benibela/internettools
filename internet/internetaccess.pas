@@ -26,7 +26,7 @@ unit internetaccess;
 interface
 
 uses
-  Classes, SysUtils; 
+  Classes, SysUtils, bbutils;
 type
   PInternetConfig=^TInternetConfig;
   //**@abstract(Internet configuration)
@@ -67,6 +67,22 @@ type
     function resolved(rel: string): TDecodedUrl;
     function serverConnectionOnly: TDecodedUrl;
     procedure prepareSelfForRequest(const lastConnectedURL: TDecodedUrl);
+  end;
+
+  { TMIMEMultipartData }
+
+  TMIMEMultipartSubData = record
+    data: string;
+    headers: TStringArray;
+  end;
+
+  TMIMEMultipartData = record //encodes the data corresponding to RFC 1341
+    data: array of TMIMEMultipartSubData;
+    procedure add(const sdata: string; const headers: string = '');
+    procedure addFormData(const name, sdata: string; headers: string = '');
+    procedure addFormDataFile(const name, filename: string; headers: string = '');
+    function compose(out boundary: string; boundaryHint: string = '4g=Y+CxK-.y7=-B-=X'): string;
+    procedure clear;
   end;
 
   { TCustomInternetAccess }
@@ -110,6 +126,8 @@ type
     internetConfig: PInternetConfig;
     additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
     ContentTypeForData: string; //**< Defines the Content-Type that is used to transmit data. Usually @code(application/x-www-form-urlencoded) or @code(multipart/form-data; boundary=...). @br This is overriden by a Content-Type set in additionalHeaders.
+    multipartFormData: TMIMEMultipartData;
+    function getFinalMultipartFormData: string;
   public
     //out
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
@@ -190,8 +208,11 @@ function guessType(const data: string): TRetrieveType;
 
 var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all our classes
   defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access, here you can store which internet library the program should use
+
+const ContentTypeUrlEncoded: string = 'application/x-www-form-urlencoded';
+const ContentTypeMultipart: string = 'multipart/form-data'; //; boundary=
 implementation
-uses bbutils;
+
 //==============================================================================
 //                            TInternetAccess
 //==============================================================================
@@ -344,6 +365,93 @@ begin
   tempdebug.free;
   except
   end;
+end;
+
+{ TMIMEMultipartData }
+
+procedure TMIMEMultipartData.addFormData(const name, sdata: string; headers: string);
+begin
+  headers := 'Content-Disposition: form-data; name="'+name+'"' + #13#10 + headers; //todo: name may encoded with [RFC2045]/rfc2047
+  add(sdata, headers);
+end;
+
+procedure TMIMEMultipartData.addFormDataFile(const name, filename: string; headers: string);
+begin
+  headers := 'Content-Disposition: form-data; name="'+name+'"; filename="'+filename+'"' + #13#10 + headers; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
+  add(strLoadFromFileUTF8(filename), headers);
+end;
+
+procedure TMIMEMultipartData.add(const sdata: string; const headers: string);
+begin
+  SetLength(data, length(data) + 1);
+  data[high(data)].headers := strSplit(headers, #13#10, false);
+  data[high(data)].data := sdata;
+end;
+
+function TMIMEMultipartData.compose(out boundary: string; boundaryHint: string): string;
+  function indexOfHeader(const sl: TStringArray; name: string): integer;
+  var
+    i: Integer;
+  begin
+    name := trim(name) + ':';
+    for i:=0 to high(sl) do
+      if striBeginsWith(sl[i], name) then
+        exit(i);
+    exit(-1);
+  end;
+
+const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?';
+var joinedHeaders: TStringArray;
+    encodedData: TStringArray;
+    i: Integer;
+    ok: Boolean;
+begin
+  SetLength(joinedHeaders, length(data));
+  SetLength(encodedData, length(data));
+  for i := 0 to high(data) do begin
+    joinedHeaders[i] := trim(strJoin(data[i].headers, #13#10)); //trim to remove additional #13#10 at the end
+    if indexOfHeader(data[i].headers, 'Content-Type') < 0 then begin
+      if joinedHeaders[i] <> '' then joinedHeaders[i] += #13#10;
+      joinedHeaders[i] += 'Content-Type: application/octet-stream'; //todo: use text for plain text
+    end;
+    if indexOfHeader(data[i].headers, 'Content-transfer-encoding') < 0 then begin
+      if joinedHeaders[i] <> '' then joinedHeaders[i] += #13#10;
+      joinedHeaders[i] += 'Content-transfer-encoding: binary'; //todo: binary is not allowed for mails (use base64, or 8-bit with line wrapping)
+    end;
+    encodedData[i] := data[i].data;
+  end;
+
+
+  boundary := boundaryHint;
+  repeat
+    repeat
+      ok := true;
+      boundary += ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
+      for i := 0 to high(data) do begin
+        ok := ok and not strContains(joinedHeaders[i], boundary) and not strContains(encodedData[i], boundary);
+        if ok then break;
+      end;
+    until ok or (length(boundary) >= 70 {max length});
+    if not ok then begin
+      boundary := boundaryHint;
+      if length(boundary) > 8 then SetLength(boundary, 8); //if boundary hint has max length, we can only use a (random) prefix
+    end;
+  until ok;
+
+  result := '';
+  for i := 0 to high(data) do begin
+    result += #13#10'--' +boundary + #13#10;
+    result += joinedHeaders[i] + #13#10;
+    result += #13#10; //separator
+    result += encodedData[i];
+  end;
+
+  result += #13#10'--' + boundary + '--';
+end;
+
+procedure TMIMEMultipartData.clear;
+begin
+  setlength(data, 0);
 end;
 
 { EInternetException }
@@ -531,7 +639,7 @@ begin
   additionalHeaders := TStringList.Create;
   additionalHeaders.nameValueSeparator := ':';
 
-  ContentTypeForData := 'application/x-www-form-urlencoded';
+  ContentTypeForData := ContentTypeForData;
 end;
 
 class function TInternetAccess.parseHeaderForLocation(header: string): string;
@@ -556,6 +664,16 @@ begin
     if (i <= length(header)) and (header[i] = #13) then i+=1;
     if (i <= length(header)) and (header[i] = #10) then i+=1;
   end;
+end;
+
+function TInternetAccess.getFinalMultipartFormData: string;
+var
+  boundary: String;
+begin
+  boundary := '';
+  result := multipartFormData.compose(boundary);
+  ContentTypeForData := ContentTypeMultipart + '; boundary=' + boundary;
+  multipartFormData.clear;
 end;
 
 function TInternetAccess.getLastHTTPHeader(header: string): string;
