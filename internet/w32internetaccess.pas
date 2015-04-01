@@ -293,7 +293,6 @@ begin
 end;
 
 function TW32InternetAccess.doTransferRec(method:string; decoded: TDecodedUrl; data:string;redirectionCount: integer): string;
-const postHeader='Content-Type: application/x-www-form-urlencoded';
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', '');
 var
   databuffer : array[0..4095] of char;
@@ -349,7 +348,7 @@ begin
   cookiestr:=makeCookieHeader;
   if cookiestr<>'' then
     HttpAddRequestHeadersA(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
-  overridenPostHeader := postHeader;
+  overridenPostHeader := 'Content-Type: ' + ContentTypeForData;;
   for i:=0 to additionalHeaders.Count - 1 do
     if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
       HttpAddRequestHeadersA(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
@@ -455,11 +454,8 @@ constructor TW32InternetAccess.create();
 var proxyStr:string;
     timeout: longint;
 begin
+  init;
   FLastHTTPHeaders := TStringList.Create;
-  additionalHeaders := TStringList.Create;
-  internetConfig:=@defaultInternetConfiguration;
-  if defaultInternetConfiguration.userAgent='' then
-    defaultInternetConfiguration.userAgent:='Mozilla 3.0 (compatible)';
   if defaultInternetConfiguration.tryDefaultConfig then
     hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
                             INTERNET_OPEN_TYPE_PRECONFIG,

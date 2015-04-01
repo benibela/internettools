@@ -102,12 +102,14 @@ type
     procedure setCookie(name,value:string);
     procedure parseHeaderForCookies(header: string);
     function makeCookieHeader:string;
+    procedure init; //constructor, since .create is "abstract" and can not be called
   public
     class function parseHeaderForLocation(header: string): string; static;
   public
     //in
     internetConfig: PInternetConfig;
     additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
+    ContentTypeForData: string; //**< Defines the Content-Type that is used to transmit data. Usually @code(application/x-www-form-urlencoded) or @code(multipart/form-data; boundary=...). @br This is overriden by a Content-Type set in additionalHeaders.
   public
     //out
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
@@ -518,6 +520,18 @@ begin
   for i:=1 to high(cookies) do
     result+='; '+cookies[i].name+'='+cookies[i].value;
   result+=#13#10;
+end;
+
+procedure TInternetAccess.init;
+begin
+  internetConfig:=@defaultInternetConfiguration;
+  if defaultInternetConfiguration.userAgent='' then
+    defaultInternetConfiguration.userAgent:='Mozilla/3.0 (compatible)';
+
+  additionalHeaders := TStringList.Create;
+  additionalHeaders.nameValueSeparator := ':';
+
+  ContentTypeForData := 'application/x-www-form-urlencoded';
 end;
 
 class function TInternetAccess.parseHeaderForLocation(header: string): string;

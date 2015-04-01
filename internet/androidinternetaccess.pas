@@ -294,7 +294,7 @@ var jRequest: jobject;
       jentity.l := j.env^^.NewObjectA(j.env, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
       //entity.setContentType(..)
       if additionalHeaders.IndexOfName('Content-Type') < 0 then begin
-        temp.l := j.NewStringUTF('application/x-www-form-urlencoded');
+        temp.l := j.NewStringUTF(ContentTypeForData);
         j.CallVoidMethod(jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
         j.DeleteLocalRef(temp.l);
       end;
@@ -456,8 +456,7 @@ var args:array[0..1] of jvalue;
     tempClasses: TClassInformation;
     javaEnvRef: PJNIEnv;
 begin
-  additionalHeaders := TStringList.Create;
-  additionalHeaders.nameValueSeparator := ':';
+  init;
   FLastHTTPHeaders := TStringList.Create;
 
   javaEnvRef:=needJ.env; //todo, use j. directl
@@ -472,19 +471,15 @@ begin
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, jlhttpclient);
 
 
-      internetConfig:=@defaultInternetConfiguration;
-      if defaultInternetConfiguration.userAgent='' then
-        defaultInternetConfiguration.userAgent:='Mozilla/3.0 (compatible)';
-
       jparams := javaEnvRef^^.CallObjectMethod(javaEnvRef, jhttpclient, jmDefaultHttpClientGetParams);
 
       args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, 'http.useragent');
-      args[1].l  := j.stringToJString(defaultInternetConfiguration.userAgent);
+      args[1].l  := j.stringToJString(internetConfig^.userAgent);
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, javaEnvRef^^.CallObjectMethodA(javaEnvRef, jparams, jmHttpParamsSetParameter, @args));
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[1].l);
 
-      if defaultInternetConfiguration.useProxy then begin
+      if internetConfig^.useProxy then begin
         args[0].l := j.stringToJString(internetConfig^.proxyHTTPName);
         args[1].i := StrToIntDef(internetConfig^.proxyHTTPPort, 8080);
         temp := javaEnvRef^^.NewObjectA(javaEnvRef, jcHttpHost, jmHttpHostConstructor, @args);

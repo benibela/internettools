@@ -148,7 +148,7 @@ function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; d
                                          );
    if data <> '' then begin
      WriteStrToStream(connection.Document, data);
-     connection.MimeType := 'application/x-www-form-urlencoded';
+     connection.MimeType := ContentTypeForData;
    end;
    if lastUrl <> '' then
      connection.Headers.Add('Referer: '+lastUrl);
@@ -229,11 +229,7 @@ constructor TSynapseInternetAccess.create();
 var
   temp: String;
 begin
-  additionalHeaders := TStringList.Create;
-
-  internetConfig:=@defaultInternetConfiguration;
-  if defaultInternetConfiguration.userAgent='' then
-    defaultInternetConfiguration.userAgent:='Mozilla/3.0 (compatible)';
+  init;
 
   connection:=THTTPSend.Create;
   connection.Sock.OnStatus:=@connectionStatus;
