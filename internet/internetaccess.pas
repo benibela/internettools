@@ -641,7 +641,7 @@ begin
   additionalHeaders := TStringList.Create;
   additionalHeaders.nameValueSeparator := ':';
 
-  ContentTypeForData := ContentTypeForData;
+  ContentTypeForData := ContentTypeUrlEncoded;
 end;
 
 class function TInternetAccess.parseHeaderForLocation(header: string): string;
