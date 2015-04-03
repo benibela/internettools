@@ -2291,14 +2291,24 @@ begin
 end;
 {$ENDIF}
 
+function utf8toSys(const filename: RawByteString): RawByteString;
+begin
+{$ifdef windows}
+  result :=  Utf8ToAnsi(filename);
+{$else}
+  result := filename;
+{$endif}
+  //lazarus's version works better, but we cannot have a lcl dependency here
+end;
+
 function strLoadFromFileUTF8(filename: RawByteString): RawByteString;
 begin
-  result:=strLoadFromFile(Utf8ToAnsi(filename));
+  result:=strLoadFromFile(utf8toSys(filename));
 end;
 
 procedure strSaveToFileUTF8(filename: RawByteString; str: RawByteString);
 begin
-  strSaveToFile(Utf8ToAnsi(filename),str);
+  strSaveToFile(utf8toSys(filename),str);
 end;
 
 function strFromSize(size: int64): RawByteString;
