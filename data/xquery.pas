@@ -159,6 +159,9 @@ type
 
     function resolveDocURI(url: string): string;
     function retrieveFromURI(url: string; out contenttype: string): string;
+  protected
+    function retrieveFromFile(url: string; out contenttype: string): string;
+  public
 
     function ImplicitTimezone: TDateTime; inline;
     function CurrentDateTime: TDateTime; inline;
@@ -3030,6 +3033,14 @@ begin
   end;
   result := sender.FInternet.get(url);
   contenttype := sender.FInternet.getLastHTTPHeader('Content-Type');
+end;
+
+function TXQStaticContext.retrieveFromFile(url: string; out contenttype: string): string;
+begin
+  //contenttype is always '' unless it is an url and not a file
+  if strContains(url, '://') then result := retrieveFromURI(url, contenttype)
+  else if strBeginsWith(url, '/') then result := retrieveFromURI('file://' + url, contenttype)
+  else result := retrieveFromURI('file://./' + url, contenttype);
 end;
 
 function TXQStaticContext.ImplicitTimezone: TDateTime;

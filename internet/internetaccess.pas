@@ -81,6 +81,7 @@ type
     procedure add(const sdata: string; const headers: string = '');
     procedure addFormData(const name, sdata: string; headers: string = '');
     procedure addFormDataFile(const name, filename: string; headers: string = '');
+    procedure addFormData(const name, sdata, filename, contenttype, headers: string);
     function compose(out boundary: string; boundaryHint: string = '4g=Y+CxK-.y7=-B-=X'): string;
     procedure clear;
   end;
@@ -381,6 +382,37 @@ begin
   add(strLoadFromFileUTF8(filename), headers);
 end;
 
+function indexOfHeader(const sl: TStringArray; name: string): integer;
+var
+  i: Integer;
+begin
+  name := trim(name) + ':';
+  for i:=0 to high(sl) do
+    if striBeginsWith(sl[i], name) then
+      exit(i);
+  exit(-1);
+end;
+
+procedure TMIMEMultipartData.addFormData(const name, sdata, filename, contenttype, headers: string);
+var
+  splittedHeaders: TStringArray;
+  disposition: String;
+begin
+  splittedHeaders := strSplit(headers, #13#10, false);
+
+  if (indexOfHeader(splittedHeaders, 'Content-Type') < 0) and (contenttype <> '') then
+    arrayInsert(splittedHeaders, 0, 'Content-Type: ' + contenttype);
+  if indexOfHeader(splittedHeaders, 'Content-Disposition') < 0 then begin
+    disposition := 'Content-Disposition: form-data; name="'+name+'";';
+    if filename <> '' then disposition += ' filename="'+filename+'"'; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
+    arrayInsert(splittedHeaders, 0, disposition);
+  end;
+
+  SetLength(data, length(data) + 1);
+  data[high(data)].headers := splittedHeaders;
+  data[high(data)].data := sdata;
+end;
+
 procedure TMIMEMultipartData.add(const sdata: string; const headers: string);
 begin
   SetLength(data, length(data) + 1);
@@ -389,16 +421,6 @@ begin
 end;
 
 function TMIMEMultipartData.compose(out boundary: string; boundaryHint: string): string;
-  function indexOfHeader(const sl: TStringArray; name: string): integer;
-  var
-    i: Integer;
-  begin
-    name := trim(name) + ':';
-    for i:=0 to high(sl) do
-      if striBeginsWith(sl[i], name) then
-        exit(i);
-    exit(-1);
-  end;
 
 const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?';
 var joinedHeaders: TStringArray;

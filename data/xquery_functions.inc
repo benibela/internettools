@@ -1418,11 +1418,34 @@ var replaceNames, replaceValues: TStringArray;
 
       procedure addSpecialValue(n: string; v: TXQValueObject);
       var
-        filename: TXQValue;
+        temp: TXQValue;
+        value, filename, contenttype, headers: String;
+        h: String;
+        i: integer;
       begin
-        if v.hasProperty('filename', @filename) then begin
-          mime.addFormDataFile(n, filename.toString);
+        headers := '';
+        value := '';
+        filename := '';
+        contenttype := '';
+        if v.hasProperty('file', @temp) then begin
+          filename := temp.toString;
+          value := context.staticContext.retrieveFromFile(filename, contenttype);
         end;
+        if v.hasProperty('filename', @temp) then filename := temp.toString;
+        if v.hasProperty('type', @temp) then contenttype := temp.toString;
+        if v.hasProperty('value', @temp) then value := temp.toString;
+
+        if v.hasProperty('headers', @temp) then begin
+          for i := 1 to temp.getSequenceCount do begin
+            h := temp.get(i).toString;
+            if i > 1 then h := #13#10 + h;
+            headers += h;
+          end;
+        end;
+
+        if (value <> '') or (headers <> '') then
+          mime.addFormData(n, value, filename, contenttype, headers);
+
       end;
 
       procedure addToRequest(n: string; v: string; addToUsed: boolean = true);
