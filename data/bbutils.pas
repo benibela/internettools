@@ -602,6 +602,9 @@ function strWrap(Line: RawByteString; MaxCol: Integer = 80; const BreakChars: TC
 function strSplitGetUntilBracketClosing(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
 function strSplitGetBetweenBrackets(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
 
+function strBetween(const s, from, till: string): string;
+function striBetween(const s, from, till: string): string;
+
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
@@ -3874,6 +3877,23 @@ begin
   move(p^,result[1],l);
 end;
 
+function strBetween(const s, from, till: string): string;
+var
+  i, j: Integer;
+begin
+  i := strIndexOf(s, from) + length(from);
+  j := strIndexOf(s, till, i);
+  result := strslice(s, i, j - 1);
+end;
+
+function striBetween(const s, from, till: string): string;
+var
+  i, j: Integer;
+begin
+  i := striIndexOf(s, from) + length(from);
+  j := striIndexOf(s, till, i);
+  result := strslice(s, i, j - 1);
+end;
 
 function strJoin(const sl: TStrings; const sep: RawByteString  = ', '; limit: Integer=0; const limitStr: RawByteString='...'): RawByteString; overload;
 var i:longint;

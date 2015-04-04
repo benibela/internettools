@@ -1387,6 +1387,38 @@ begin
     end else add(v.toString)
 end;
 
+procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValueObject; defaultValue: string = '');
+var
+  temp: TXQValue;
+  value, filename, contenttype, headers: String;
+  h: String;
+  i: integer;
+begin
+  headers := '';
+  value := defaultValue;
+  filename := '';
+  contenttype := '';
+  if v.hasProperty('file', @temp) then begin
+    filename := temp.toString;
+    value := staticContext.retrieveFromFile(filename, contenttype);
+  end;
+  if v.hasProperty('filename', @temp) then filename := temp.toString;
+  if v.hasProperty('type', @temp) then contenttype := temp.toString;
+  if v.hasProperty('value', @temp) then value := temp.toString;
+
+  if v.hasProperty('headers', @temp) then begin
+    for i := 1 to temp.getSequenceCount do begin
+      h := temp.get(i).toString;
+      if i > 1 then h := #13#10 + h;
+      headers += h;
+    end;
+  end;
+
+  if (value <> '') or (headers <> '') then
+    mime.addFormData(n, value, filename, contenttype, headers);
+
+end;
+
 function xqFunctionForm(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var replaceNames, replaceValues: TStringArray;
     specialReplaceValues: TXQVArray;
@@ -1416,37 +1448,6 @@ var replaceNames, replaceValues: TStringArray;
         end;
       end;
 
-      procedure addSpecialValue(n: string; v: TXQValueObject; defaultValue: string = '');
-      var
-        temp: TXQValue;
-        value, filename, contenttype, headers: String;
-        h: String;
-        i: integer;
-      begin
-        headers := '';
-        value := defaultValue;
-        filename := '';
-        contenttype := '';
-        if v.hasProperty('file', @temp) then begin
-          filename := temp.toString;
-          value := context.staticContext.retrieveFromFile(filename, contenttype);
-        end;
-        if v.hasProperty('filename', @temp) then filename := temp.toString;
-        if v.hasProperty('type', @temp) then contenttype := temp.toString;
-        if v.hasProperty('value', @temp) then value := temp.toString;
-
-        if v.hasProperty('headers', @temp) then begin
-          for i := 1 to temp.getSequenceCount do begin
-            h := temp.get(i).toString;
-            if i > 1 then h := #13#10 + h;
-            headers += h;
-          end;
-        end;
-
-        if (value <> '') or (headers <> '') then
-          mime.addFormData(n, value, filename, contenttype, headers);
-
-      end;
 
       procedure addToRequest(n: string; v: string; addToUsed: boolean = true);
       var
@@ -1458,7 +1459,7 @@ var replaceNames, replaceValues: TStringArray;
           else if multipart then begin
             replaced := arrayIndexOf(specialReplaceNames, n);
             if replaced >= 0 then begin
-              addSpecialValue(n, specialReplaceValues[replaced] as TXQValueObject, v);
+              addSpecialValue(context.staticContext, mime, n, specialReplaceValues[replaced] as TXQValueObject, v);
               used.Add(n);
               exit;
             end;
@@ -1490,7 +1491,7 @@ var replaceNames, replaceValues: TStringArray;
           addToRequest(replaceNames[i], replaceValues[i], false);
       for i:=0 to high(specialReplaceNames) do
         if used.IndexOf(specialReplaceNames[i]) < 0 then
-          addSpecialValue(specialReplaceNames[i], specialReplaceValues[i] as TXQValueObject, '');
+          addSpecialValue(context.staticContext, mime, specialReplaceNames[i], specialReplaceValues[i] as TXQValueObject, '');
       used.free;
 
       value := form.getAttribute('action', cmp);
@@ -1578,19 +1579,85 @@ end;
 function xqFunctionForm_combine(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var temp: TXQVArray;
   propName: String;
+  h, headers: IXQValue;
+  multipart: String;
+  mime: TMIMEMultipartData;
+  obj: TXQValueObject;
+  tempSeq: TXQValueSequence;
+  procedure mimeCombine;
+  var
+    cmp: TStringComparisonFunc;
+    names: TStringArray;
+    values: TStringArray;
+    specialNames: TStringArray;
+    specialValues: TXQVArray;
+    i, j: Integer;
+    temps: String;
+  begin
+    cmp := @context.staticContext.nodeCollation.equal;
+    urlEncodingFromValue(args[1], cmp, false, names, values, specialNames, specialValues);
+    for i := 0 to high(names) do begin
+      j := mime.getFormDataIndex(names[i]);
+      if j < 0 then mime.addFormData(names[i], values[i])
+      else mime.data[j].data := values[i];
+    end;
+    for i := 0 to high(specialNames) do begin
+      j := mime.getFormDataIndex(specialNames[i]);
+      temps := '';
+      if j >= 0 then temps := mime.data[j].data;;
+      addSpecialValue(context.staticContext, mime, specialNames[i], specialValues[i] as TXQValueObject, temps);
+      if j >= 0 then begin
+        mime.data[j] := mime.data[high(mime.data)];
+        SetLength(mime.data, length(mime.data) - 1);
+      end
+    end;
+  end;
+
 begin
   requiredArgCount(args, 2);
   if not (args[0] is TXQValueObject) then raise EXQEvaluationException.create('pxp:FORM', 'Expected object {"url", "method", "post"}, got: '+args[0].debugAsStringWithTypeAnnotation());
 
-  if args[0].getProperty('method').toString = 'POST' then propName := 'post'
-  else propName := 'url';
+  multipart := '';
+  headers := args[0].getProperty('headers');
+  for h in headers do begin
+    propName := h.toString;
+    if striBeginsWith(propName, 'Content-Type') and striContains(propName, ContentTypeMultipart) then begin
+      multipart:=propName;
+      break;
+    end;
+  end;
 
-  SetLength(temp, 2);
-  temp[0] := args[0].getProperty(propName);
-  temp[1] := args[1];
+  if multipart = '' then begin
+    if args[0].getProperty('method').toString = 'POST' then propName := 'post'
+    else propName := 'url';
+
+    SetLength(temp, 2);
+    temp[0] := args[0].getProperty(propName);
+    temp[1] := args[1];
 
 
-  result := (args[0] as TXQValueObject).setImmutable(propName, xqFunctionUri_combine(context, temp));
+    result := (args[0] as TXQValueObject).setImmutable(propName, xqFunctionUri_combine(context, temp));
+  end else begin
+    obj := args[0] as TXQValueObject;
+    multipart := trim(strCopyFrom(multipart, pos('=', multipart) + 1));
+    if strBeginsWith(multipart, '"') then multipart := copy(multipart, 2, length(multipart) - 2);
+
+    mime.parse(args[0].getProperty('post').toString, multipart);
+    mimeCombine();
+    obj := obj.setImmutable('post', mime.compose(propName, multipart));
+
+    if propName <> multipart then begin
+      tempSeq := TXQValueSequence.create(headers.getSequenceCount);
+      tempSeq.add(xqvalue('Content-Type: '+ContentTypeMultipart+'; boundary="'+propName+'"'));
+      for h in headers do begin
+        propName := h.toString;
+        if not striBeginsWith(propName, 'Content-Type') then
+          tempSeq.add(h);
+      end;
+      obj := obj.setImmutable('headers', tempSeq);
+    end;
+    result := obj;
+  end;
 end;
 
 function xqFunctionResolve_Html(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

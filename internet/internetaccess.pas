@@ -75,14 +75,17 @@ type
     data: string;
     headers: TStringArray;
   end;
+  PMIMEMultipartSubData = ^TMIMEMultipartSubData;
 
-  TMIMEMultipartData = record //encodes the data corresponding to RFC 1341
+  TMIMEMultipartData = record //encodes the data corresponding to RFC 1341 (preliminary)
     data: array of TMIMEMultipartSubData;
+    function getFormDataIndex(const name: string): integer;
     procedure add(const sdata: string; const headers: string = '');
     procedure addFormData(const name, sdata: string; headers: string = '');
     procedure addFormDataFile(const name, filename: string; headers: string = '');
     procedure addFormData(const name, sdata, filename, contenttype, headers: string);
     function compose(out boundary: string; boundaryHint: string = '4g=Y+CxK-.y7=-B-=X'): string;
+    procedure parse(sdata, boundary: string);
     procedure clear;
   end;
 
@@ -413,6 +416,18 @@ begin
   data[high(data)].data := sdata;
 end;
 
+function TMIMEMultipartData.getFormDataIndex(const name: string): integer;
+var
+  i,j: Integer;
+begin
+  for i := 0 to high(data) do
+     for j := 0 to high(data[i].headers) do
+        if striBeginsWith(data[i].headers[j], 'Content-Disposition:') then
+          if name = striBetween(data[i].headers[j], 'name="', '"') then
+            exit(i);
+  exit(-1);
+end;
+
 procedure TMIMEMultipartData.add(const sdata: string; const headers: string);
 begin
   SetLength(data, length(data) + 1);
@@ -452,7 +467,7 @@ begin
       ok := true;
       for i := 0 to high(data) do begin
         ok := ok and not strContains(joinedHeaders[i], boundary) and not strContains(encodedData[i], boundary);
-        if ok then break;
+        if not ok then break;
       end;
       if not ok then
         boundary += ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
@@ -472,6 +487,26 @@ begin
   end;
 
   result += #13#10'--' + boundary + '--';
+end;
+
+procedure TMIMEMultipartData.parse(sdata, boundary: string);
+var
+  p,q,r: Integer;
+begin
+  boundary := #13#10'--'+boundary;
+
+  p := 1;
+  q := strIndexOf(sdata, boundary, p) + length(boundary);
+  while (q + 2 <= length(sdata)) and strBeginsWith(@sdata[q], #13#10) do begin
+    r := strIndexOf(sdata, #13#10#13#10, q);
+    SetLength(data, length(data) + 1);
+    data[high(data)].headers := strSplit(strSlice(sdata, q+2, r-1), #13#10, false);
+    p := r + 4;
+    q := strIndexOf(sdata, boundary, p);
+    data[high(data)].data := strSlice(sdata, p,  q- 1);
+    q += length(boundary);
+  end;
+
 end;
 
 procedure TMIMEMultipartData.clear;
