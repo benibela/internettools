@@ -653,6 +653,7 @@ var
   tempvalue: TXQValue;
   curmethod: String;
   tempvi: IXQValue;
+  oldHeaders: String;
 begin
   if condition <> '' then begin
     cachedCondition := reader.parser.parseQuery(condition); //TODO: long term cache
@@ -668,16 +669,15 @@ begin
   curmethod := method;
   post := '';
 
+  oldHeaders := reader.internet.additionalHeaders.Text;
+
   if cururl <> '' then begin
     if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
     else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
       reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), @tempvalue) then begin
       tempvi := reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1);
-      if tempvi.kind = pvkObject then begin
-        cururl := tempvi.getProperty('url').toString;
-        curmethod := tempvi.getProperty('method').toString;
-        post := tempvi.getProperty('post').toString;
-      end else cururl := tempvi.toString;
+      if tempvi.kind = pvkObject then TXQValueObject.prepareInternetRequest(tempvi, cururl, curmethod, post, reader.internet)
+      else cururl := tempvi.toString;
     end else cururl := reader.parser.replaceEnclosedExpressions(url);
     if cururl = '' then exit;
   end else begin
@@ -710,12 +710,12 @@ begin
   case guessType(cururl) of
     rtRemoteURL: begin
       for j := 0 to high(headers) do
-        reader.internet.additionalHeaders.Add(headers[j].name + ': ' + reader.parser.replaceEnclosedExpressions(headers[j].value));
+        reader.internet.additionalHeaders.Values[trim(headers[j].name)] := trim (reader.parser.replaceEnclosedExpressions(headers[j].value));
 
       page:=reader.internet.request(curmethod, cururl, post);
       reader.lastURL:=reader.internet.lastURL;
 
-      if length(headers) > 0 then reader.internet.additionalHeaders.Clear;
+      reader.internet.additionalHeaders.Text := oldHeaders;
     end;
     rtFile: begin
       page := strLoadFromFileUTF8(cururl);

@@ -403,8 +403,8 @@ begin
   if (indexOfHeader(splittedHeaders, 'Content-Type') < 0) and (contenttype <> '') then
     arrayInsert(splittedHeaders, 0, 'Content-Type: ' + contenttype);
   if indexOfHeader(splittedHeaders, 'Content-Disposition') < 0 then begin
-    disposition := 'Content-Disposition: form-data; name="'+name+'";';
-    if filename <> '' then disposition += ' filename="'+filename+'"'; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
+    disposition := 'Content-Disposition: form-data; name="'+name+'"';
+    if filename <> '' then disposition += '; filename="'+filename+'"'; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
     arrayInsert(splittedHeaders, 0, disposition);
   end;
 
@@ -450,11 +450,12 @@ begin
   repeat
     repeat
       ok := true;
-      boundary += ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
       for i := 0 to high(data) do begin
         ok := ok and not strContains(joinedHeaders[i], boundary) and not strContains(encodedData[i], boundary);
         if ok then break;
       end;
+      if not ok then
+        boundary += ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
     until ok or (length(boundary) >= 70 {max length});
     if not ok then begin
       boundary := boundaryHint;

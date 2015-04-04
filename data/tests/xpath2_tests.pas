@@ -3124,8 +3124,10 @@ begin
   t('', '', '!<html><form action="abc" method="POST"><input name="foo" value="bar"/><input name="X" value="123" type="unknown"/><input name="Y" value="456" type="checkbox" checked/><input name="Z" value="789" type="checkbox"/></form>'
                 + '<form action="abc22"><input name="foo2" value="bar2"/><input name="X" value="123" type="unknown"/><input name="Y" value="456" type="checkbox" checked/><input name="Z" value="789" type="checkbox"/></form>'
                 + '<form action="next/haus/bimbam?k=y"><input name="T" value="Z"/><textarea name="fy">ihl</textarea></form>'
+                + '<form action="multi" enctype="multipart/form-data" method="POST"><input name="foo" value="bar"/><input name="X" value="123" type="unknown"/><input name="Y" value="456" type="checkbox" checked/><input name="Z" value="789" type="checkbox"/></form>'
                 + '</html>');
   t('form(//form[1]).url', 'pseudo://test/abc', '');
+  t('form(//form[1]).headers', '', '');
   t('form(//form[1]).method', 'POST', '');
   t('form(//form[1]).post', 'foo=bar&Y=456', '');
   t('form(//form[1], "foo=override").post', 'foo=override&Y=456', '');
@@ -3141,10 +3143,16 @@ begin
   t('form(//form[2], "tt=tttt").url', 'pseudo://test/abc22?foo2=bar2&Y=456&tt=tttt', '');
   t('form(//form[2], ("tt=tttt", "foo2=maus")).url', 'pseudo://test/abc22?foo2=maus&Y=456&tt=tttt', '');
 
-  t('count(form(//form))', '3', '');
+  t('count(form(//form))', '4', '');
   t('form(//form)[1].url', 'pseudo://test/abc', '');
   t('form(//form)[2].url', 'pseudo://test/abc22?foo2=bar2&Y=456', '');
   t('form(//form)[3].url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
+
+  t('form(//form[4]).headers', 'Content-Type: multipart/form-data; boundary="4g=Y+CxK-.y7=-B-=X"');
+  t('form(//form[4]).post', #13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'bar'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X--');
+  RandSeed:=4294967295;
+  t('form(//form[4], {"foo": "4g=Y+CxK-.y7=-B-=X", "t": {"value": 17123, "filename": "xyz"}}).post', #13#10'--4g=Y+CxK-.y7=-B-=X.'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'4g=Y+CxK-.y7=-B-=X'#13#10'--4g=Y+CxK-.y7=-B-=X.'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X.'#13#10'Content-Disposition: form-data; name="t"; filename="xyz"'#13#10#13#10'17123'#13#10'--4g=Y+CxK-.y7=-B-=X.--');
+  t('form(//form[4], {"foo": {"type": "text/html"}, "Y": {"headers": ("a: 1", "b: 2")}, "new": {"type": "text/html", "headers": "Content-Type: override"}}).post', #13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: text/html'#13#10#13#10'bar'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="Y"'#13#10'a: 1'#13#10'b: 2'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="new"'#13#10'Content-Type: override'#13#10#13#10#13#10'--4g=Y+CxK-.y7=-B-=X--');
 
   t('form(//form).url', 'abs://hallo?abc=cba', '!<html><form action="abs://hallo"><input name="abc" value="cba"/></form></html>');
   t('form(//form).url', 'abs://foo/bar?abcdef=on', '!<html><form action="abs://foo/bar"><input name="abcdef" type="checkbox" checked/></form></html>');

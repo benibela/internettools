@@ -1416,7 +1416,7 @@ var replaceNames, replaceValues: TStringArray;
         end;
       end;
 
-      procedure addSpecialValue(n: string; v: TXQValueObject);
+      procedure addSpecialValue(n: string; v: TXQValueObject; defaultValue: string = '');
       var
         temp: TXQValue;
         value, filename, contenttype, headers: String;
@@ -1424,7 +1424,7 @@ var replaceNames, replaceValues: TStringArray;
         i: integer;
       begin
         headers := '';
-        value := '';
+        value := defaultValue;
         filename := '';
         contenttype := '';
         if v.hasProperty('file', @temp) then begin
@@ -1458,7 +1458,7 @@ var replaceNames, replaceValues: TStringArray;
           else if multipart then begin
             replaced := arrayIndexOf(specialReplaceNames, n);
             if replaced >= 0 then begin
-              addSpecialValue(n, specialReplaceValues[replaced] as TXQValueObject);
+              addSpecialValue(n, specialReplaceValues[replaced] as TXQValueObject, v);
               used.Add(n);
               exit;
             end;
@@ -1490,7 +1490,7 @@ var replaceNames, replaceValues: TStringArray;
           addToRequest(replaceNames[i], replaceValues[i], false);
       for i:=0 to high(specialReplaceNames) do
         if used.IndexOf(specialReplaceNames[i]) < 0 then
-          addSpecialValue(specialReplaceNames[i], specialReplaceValues[i] as TXQValueObject);
+          addSpecialValue(specialReplaceNames[i], specialReplaceValues[i] as TXQValueObject, '');
       used.free;
 
       value := form.getAttribute('action', cmp);
@@ -1501,7 +1501,7 @@ var replaceNames, replaceValues: TStringArray;
       if post then begin
         if multipart then begin
           request := mime.compose(header);
-          (result as TXQValueObject).setMutable('header', 'Content-Type: ' + ContentTypeMultipart + '; boundary="' + header + '"')
+          (result as TXQValueObject).setMutable('headers', 'Content-Type: ' + ContentTypeMultipart + '; boundary="' + header + '"')
         end;
         (result as TXQValueObject).setMutable('post', request)
       end else if request <> '' then

@@ -1577,6 +1577,21 @@ begin
   result +=  '</'+objectTag+'>';
 end;
 
+class procedure TXQValueObject.prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess);
+var h: IXQValue;
+  value: String;
+  name: RawByteString;
+begin
+  url := obj.getProperty('url').toString;
+  method := obj.getProperty('method').toString;
+  post := obj.getProperty('post').toString;
+  for h in obj.getProperty('headers') do begin
+    value := h.toString;
+    name := strSplitGet('=', value);
+    internet.additionalHeaders.Values[trim(name)] := trim(value);
+  end;
+end;
+
 function TXQValueObject.getProperty(const name: string): IXQValue;
 var
   temp: TXQValue;

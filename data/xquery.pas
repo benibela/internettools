@@ -714,6 +714,7 @@ type
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
+    class procedure prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess); static;
   end;
 
   { TXQValueJSONArray }

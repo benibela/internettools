@@ -69,6 +69,8 @@ function httpRequest(url: string; postdata: TStringList): string;
 //**object: Download obj.url, possibly sending obj.post as postdata.
 //**else: Download the string value.
 function httpRequest(const destination: xquery.IXQValue): string;
+//**Make a http request to a certain url, sending the data in rawdata unmodified to the server.
+function httpRequest(const method, url, rawdata: string): string;
 
 (***
 Processes data with a certain query.@br@br
@@ -282,6 +284,10 @@ end;
 
 function httpRequest(const destination: xquery.IXQValue): string;
 var dest: IXQValue;
+  tempHeaders: String;
+  method: string;
+  url: string;
+  post: string;
 begin
   if destination.kind = pvkSequence then dest := destination.get(1)
   else dest := destination;
@@ -291,12 +297,22 @@ begin
   case dest.kind of
     pvkUndefined: exit('');
     pvkNode: raise EXQEvaluationException.Create('pxp:ASSERT', 'Got '+dest.debugAsStringWithTypeAnnotation()+', but expected resolved url');
-    pvkObject:
-      if dest.getProperty('method').toString <> 'GET' then result := httpRequest(dest.getProperty('url').toString, dest.getProperty('post').toString)
-      else result := httpRequest(dest.getProperty('url').toString);
+    pvkObject: begin
+      needInternetAccess;
+      tempHeaders := defaultInternet.additionalHeaders.Text;
+      TXQValueObject.prepareInternetRequest(dest, method, url, post, defaultInternet);
+      result := httpRequest(method, url, post);
+      defaultInternet.additionalHeaders.Text := tempHeaders;
+    end;
     pvkSequence: raise EXQEvaluationException.Create('pxp:ASSERT', 'Impossible (nested) sequence');
     else result := httpRequest(dest.toString);
   end;
+end;
+
+function httpRequest(const method, url, rawdata: string): string;
+begin
+  needInternetAccess();
+  result := defaultInternet.request(method, url, rawdata);
 end;
 
 finalization
