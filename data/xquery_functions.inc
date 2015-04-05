@@ -1473,7 +1473,8 @@ var replaceNames, replaceValues: TStringArray;
       if form = nil then exit(xqvalue());
       method := UpperCase(form.getAttribute('method', 'GET', cmp));
       post := striEqual(method, 'POST');
-      multipart := post and striEqual( form.getAttribute('enctype', cmp), 'multipart/form-data');
+      multipart := FALSE and //TODO
+                  post and striEqual( form.getAttribute('enctype', cmp), 'multipart/form-data');
 
       used := TStringList.Create;
       used.CaseSensitive:=false;
