@@ -1893,11 +1893,7 @@ type
                   @br It returns a JSON object with these properties:
                   @br url: The url the form should be send to (includes the encoded data for a GET request)
                   @br method: POST or GET
-                  @br post: Encoded post data
-                  @br headers: Sequence of additional headers
-                  @br
-                  @br Depending on the enctype attribute of the form, it will either return url encoded or multipart encoded post data. For latter, also a Content-Type header with the specific boundary is added.
-                  @br For multipart encoded data, the value parameters do not have to be strings, but can be JSON-objects. They can have these properties: "file": to upload a file. "value": for a string value. "filename": to set the filename field of the Content-Disposition header. "type": Becomes a Content-Type header. "headers": An arbitrary sequence of headers )
+                  @br post: Url encoded post data (in future versions it might be multipart-encoded, if enctype is set correspondingly) )
       @item(@code(resolve-html($relative as item()*, [$base as item()]))
                   @br Resolves every value in the $relative sequence to an HTTP request with an absolute URL/URI, using $base as reference base URI.
                   @br Atomic values (e.g. strings) are resolved as simple URIs similar to resolve-uri.

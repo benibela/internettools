@@ -1587,7 +1587,7 @@ begin
   post := obj.getProperty('post').toString;
   for h in obj.getProperty('headers') do begin
     value := h.toString;
-    name := strSplitGet(':', value);
+    name := strSplitGet('=', value);
     internet.additionalHeaders.Values[trim(name)] := trim(value);
   end;
 end;

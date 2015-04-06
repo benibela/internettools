@@ -84,11 +84,9 @@ type
     procedure addFormData(const name, sdata: string; headers: string = '');
     procedure addFormDataFile(const name, filename: string; headers: string = '');
     procedure addFormData(const name, sdata, filename, contenttype, headers: string);
-    function compose(out boundary: string; boundaryHint: string = '---------------------------1212jhjg2ypsdofx0235p2z5as09'): string;
+    function compose(out boundary: string; boundaryHint: string = '4g=Y+CxK-.y7=-B-=X'): string;
     procedure parse(sdata, boundary: string);
     procedure clear;
-
-    class function HeaderForBoundary(const boundary: string): string; static;
   end;
 
   { TCustomInternetAccess }
@@ -474,9 +472,10 @@ begin
       if not ok then
         boundary += ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
     until ok or (length(boundary) >= 70 {max length});
-    if not ok then
-      if length(boundaryHint) <= 16 then boundary := boundaryHint
-      else boundary := copy(boundaryHint, 1, 8) + strCopyFrom(boundaryHint, length(boundaryHint) - 7); //if boundary hint has max length, we can only use a (random) part
+    if not ok then begin
+      boundary := boundaryHint;
+      if length(boundary) > 8 then SetLength(boundary, 8); //if boundary hint has max length, we can only use a (random) prefix
+    end;
   until ok;
 
   result := '';
@@ -513,11 +512,6 @@ end;
 procedure TMIMEMultipartData.clear;
 begin
   setlength(data, 0);
-end;
-
-class function TMIMEMultipartData.HeaderForBoundary(const boundary: string): string;
-begin
-  result := 'Content-Type: ' + ContentTypeMultipart + '; boundary=' + boundary;
 end;
 
 { EInternetException }

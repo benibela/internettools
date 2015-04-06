@@ -1473,7 +1473,8 @@ var replaceNames, replaceValues: TStringArray;
       if form = nil then exit(xqvalue());
       method := UpperCase(form.getAttribute('method', 'GET', cmp));
       post := striEqual(method, 'POST');
-      multipart := post and striEqual( form.getAttribute('enctype', cmp), ContentTypeMultipart);
+      multipart := FALSE and //TODO
+                  post and striEqual( form.getAttribute('enctype', cmp), 'multipart/form-data');
 
       used := TStringList.Create;
       used.CaseSensitive:=false;
@@ -1502,7 +1503,7 @@ var replaceNames, replaceValues: TStringArray;
       if post then begin
         if multipart then begin
           request := mime.compose(header);
-          (result as TXQValueObject).setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
+          (result as TXQValueObject).setMutable('headers', 'Content-Type: ' + ContentTypeMultipart + '; boundary="' + header + '"')
         end;
         (result as TXQValueObject).setMutable('post', request)
       end else if request <> '' then
