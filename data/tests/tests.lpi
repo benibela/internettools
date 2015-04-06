@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
     <Version Value="9"/>
@@ -31,7 +31,6 @@
       <local>
         <FormatVersion Value="1"/>
         <CommandLineParams Value="--plain /home/benito/xxtest/cat/DefaultNamespaceProlog.xml"/>
-        <LaunchingApplication PathPlusParams="/usr/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
@@ -50,12 +49,10 @@
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="tests"/>
       </Unit0>
       <Unit1>
         <Filename Value="bbutils_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="bbutils_tests"/>
       </Unit1>
       <Unit2>
         <Filename Value="../extendedhtmlparser.pas"/>
@@ -110,6 +107,9 @@
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="11"/>
+    <Target>
+      <Filename Value="tests"/>
+    </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
       <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;/home/benito/hg/components/pascal/internet/;../../import;.;../../../components/pascal/import/bigint;.."/>
@@ -135,12 +135,6 @@
         </Win32>
       </Options>
     </Linking>
-    <Other>
-      <CompilerMessages>
-        <UseMsgFile Value="True"/>
-      </CompilerMessages>
-      <CompilerPath Value="$(CompPath)"/>
-    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="7">
