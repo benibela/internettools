@@ -439,7 +439,8 @@ end;
 
 function TMIMEMultipartData.compose(out boundary: string; boundaryHint: string): string;
 
-const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?';
+//const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?'; //all allowed
+const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-'; //might be preferable to use those only
 var joinedHeaders: TStringArray;
     encodedData: TStringArray;
     i: Integer;

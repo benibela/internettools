@@ -1648,7 +1648,7 @@ begin
 
     if propName <> multipart then begin
       tempSeq := TXQValueSequence.create(headers.getSequenceCount);
-      tempSeq.add(xqvalue('Content-Type: '+ContentTypeMultipart+'; boundary="'+propName+'"'));
+      tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(propName)));
       for h in headers do begin
         propName := h.toString;
         if not striBeginsWith(propName, 'Content-Type') then

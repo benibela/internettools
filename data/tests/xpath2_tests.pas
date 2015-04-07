@@ -86,6 +86,7 @@ var
 var tempb: Boolean;
   tt: String;
   j: Integer;
+  baseboundary: String;
 begin
   i := 0;
 //  time := Now;
@@ -3149,16 +3150,17 @@ begin
   t('form(//form)[2].url', 'pseudo://test/abc22?foo2=bar2&Y=456', '');
   t('form(//form)[3].url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
 
-  t('form(//form[4]).headers', 'Content-Type: multipart/form-data; boundary="4g=Y+CxK-.y7=-B-=X"');
-  t('($f := form(//form[4])).post', #13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'bar'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X--');
-  t('form-combine($f, {"foo": 17}).post', #13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'17'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X--');
-  t('form-combine($f, {"foo": {"value": 17, "headers": "Content-Type: image/png"}}).post', #13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: image/png'#13#10#13#10'17'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X--');
+  baseboundary := '---------------------------1212jhjg2ypsdofx0235p2z5as09';
+  t('form(//form[4]).headers', 'Content-Type: multipart/form-data; boundary='+baseboundary);
+  t('($f := form(//form[4])).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'bar'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
+  t('form-combine($f, {"foo": 17}).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'17'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
+  t('form-combine($f, {"foo": {"value": 17, "headers": "Content-Type: image/png"}}).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: image/png'#13#10#13#10'17'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
   RandSeed:=4294967295;
-  t('form(//form[4], {"foo": "4g=Y+CxK-.y7=-B-=X", "t": {"value": 17123, "filename": "xyz"}}).post', #13#10'--4g=Y+CxK-.y7=-B-=X.'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'4g=Y+CxK-.y7=-B-=X'#13#10'--4g=Y+CxK-.y7=-B-=X.'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X.'#13#10'Content-Disposition: form-data; name="t"; filename="xyz"'#13#10#13#10'17123'#13#10'--4g=Y+CxK-.y7=-B-=X.--');
-  t('($f := form(//form[4], {"foo": {"type": "text/html"}, "Y": {"headers": ("a: 1", "b: 2")}, "new": {"type": "text/html", "headers": "Content-Type: override"}})).post', #13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: text/html'#13#10#13#10'bar'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="Y"'#13#10'a: 1'#13#10'b: 2'#13#10#13#10'456'#13#10'--4g=Y+CxK-.y7=-B-=X'#13#10'Content-Disposition: form-data; name="new"'#13#10'Content-Type: override'#13#10#13#10#13#10'--4g=Y+CxK-.y7=-B-=X--');
+  t('form(//form[4], {"foo": "---------------------------1212jhjg2ypsdofx0235p2z5as09", "t": {"value": 17123, "filename": "xyz"}}).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09t'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'---------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09t'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09t'#13#10'Content-Disposition: form-data; name="t"; filename="xyz"'#13#10#13#10'17123'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09t--');
+  t('($f := form(//form[4], {"foo": {"type": "text/html"}, "Y": {"headers": ("a: 1", "b: 2")}, "new": {"type": "text/html", "headers": "Content-Type: override"}})).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: text/html'#13#10#13#10'bar'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10'a: 1'#13#10'b: 2'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="new"'#13#10'Content-Type: override'#13#10#13#10#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
   RandSeed:=123;
-  t('($g := form-combine($f, {"Y": "4g=Y+CxK-.y7=-B-=X"})).headers', 'Content-Type: multipart/form-data; boundary="4g=Y+CxK-.y7=-B-=XU"');
-  t('$g.post', #13#10'--4g=Y+CxK-.y7=-B-=XU'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: text/html'#13#10#13#10'bar'#13#10'--4g=Y+CxK-.y7=-B-=XU'#13#10'Content-Disposition: form-data; name="Y"'#13#10'a: 1'#13#10'b: 2'#13#10#13#10'4g=Y+CxK-.y7=-B-=X'#13#10'--4g=Y+CxK-.y7=-B-=XU'#13#10'Content-Disposition: form-data; name="new"'#13#10'Content-Type: override'#13#10#13#10#13#10'--4g=Y+CxK-.y7=-B-=XU--');
+  t('($g := form-combine($f, {"Y": "'+baseboundary+'"})).headers', 'Content-Type: multipart/form-data; boundary='+baseboundary+'S');
+  t('$g.post', #13#10'--'+baseboundary+'S'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: text/html'#13#10#13#10'bar'#13#10'--'+baseboundary+'S'#13#10'Content-Disposition: form-data; name="Y"'#13#10'a: 1'#13#10'b: 2'#13#10#13#10+baseboundary+#13#10'--'+baseboundary+'S'#13#10'Content-Disposition: form-data; name="new"'#13#10'Content-Type: override'#13#10#13#10#13#10'--'+baseboundary+'S--');
 
   t('form(//form).url', 'abs://hallo?abc=cba', '!<html><form action="abs://hallo"><input name="abc" value="cba"/></form></html>');
   t('form(//form).url', 'abs://foo/bar?abcdef=on', '!<html><form action="abs://foo/bar"><input name="abcdef" type="checkbox" checked/></form></html>');
