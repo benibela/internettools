@@ -1344,8 +1344,6 @@ begin
 end;
 
 function compareBigDecimals(const a, b: BigDecimal): integer;
-var
-  ai, bi: Integer;
 begin
   if a.signed <> b.signed then begin
     if isZero(a) then begin
@@ -1760,14 +1758,7 @@ var temp: BigDecimal;
   end;
 
 var
-  bhighskip, blowskip: integer;
-  bhigh: Integer;
   i: Integer;
-  j: Integer;
-  guess: Integer;
-  maximalAdditionalFractionBins: Integer;
-  last: Integer;
-  ahigh, aprecision, bprecision: Integer;
 
   abin, rbin: integer;
   bin: BigDecimalBin;
@@ -1789,8 +1780,6 @@ begin
     setZero(remainder);
     exit;
   end;
-  skipZeros(b, bhighskip, blowskip);
-  bhigh := high(b.digits) - bhighskip;
   quotient.signed := a.signed <> b.signed;
   quotient.lastDigitHidden:=a.lastDigitHidden or (bddfAddHiddenDigit in flags);
   remainder.signed := false;
