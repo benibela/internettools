@@ -155,8 +155,8 @@ operator :=(const a: QWord): BigDecimal;
 
 //operator :=(const a: BigDecimal): Extended; auto conversion of bigdecimal to extended is possible, but it confuses fpc overload resolution. Then e.g. power calls either math or bigdecimalbc depending on the unit order in the uses clause
 //** Converts an extended to a BigDecimal @br
-//** May lead to rounding errors. FloatToBigDecimal is exact, but probably some magnitudes slower
-operator :=(const a: Extended): BigDecimal;
+//** Marked as deprecated, because it may lead to rounding errors. FloatToBigDecimal is exact, but probably some magnitudes slower. For constant values StrToBigDecimal should be used instead.
+operator :=(const a: Extended): BigDecimal; deprecated;
 
 //** Standard operator unary -
 operator -(const a: BigDecimal): BigDecimal;
@@ -1048,8 +1048,10 @@ end;
 
 
 operator:=(const a: Extended): BigDecimal;
+var temp: string;
 begin
-  result := StrToBigDecimal(FloatToStr(a));
+  str(a, temp);
+  result := StrToBigDecimal(trim(temp));
 end;
 
 operator-(const a: BigDecimal): BigDecimal;
@@ -1527,7 +1529,7 @@ begin
   end;
 
 
-  half := 0.5;
+  half := StrToBigDecimal('0.5');
   e := v - Result*Result;    //writeln(BigDecimalToStr(Result)+ ' '+BigDecimalToStr(e));
   e.signed := false;
   precisionBins := (precision + DIGITS_PER_ELEMENT - 1) div DIGITS_PER_ELEMENT;
