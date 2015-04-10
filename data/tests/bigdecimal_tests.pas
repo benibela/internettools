@@ -101,6 +101,7 @@ var
   s1, s2: single;
   b1e1000: BigDecimal;
   bn1e1000: BigDecimal;
+  oldRandSeed: Cardinal;
 
   procedure compareTest(const bd: BigDecimal; res0, res1: integer);
   begin
@@ -111,7 +112,7 @@ var
   end;
 
 begin
-
+  oldRandSeed := RandSeed;
   test(TryStrToBigDecimal('1', @b1));
   test((b1.exponent = 0) and not (b1.signed) and (length(b1.digits) = 1) and (b1.digits[0] = 1));
   test(BigDecimalToStr(b1), '1');
@@ -1077,6 +1078,7 @@ begin
 
 
   writeln('bd complete');
+  RandSeed:=oldRandSeed;
 end;
 
 
