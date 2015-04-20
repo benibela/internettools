@@ -486,161 +486,11 @@ end;
 
 
 
-function xqvalueCompareAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
-var ak, bk: TXQValueKind;
-
-  function compareAsFloats(): integer;
-  var
-    cmpClass: TXSType;
-    ad, bd: xqfloat;
-  begin
-    if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
-      exit(-2);
-    cmpClass := TXSType.commonDecimalType(a, b);
-    ad := a.toFloat;
-    bd := b.toFloat;
-    if cmpClass.derivedFrom(baseSchema.Double) then begin
-      result := compareValue(double(ad), double(bd));
-    end else if cmpClass.derivedFrom(baseSchema.Float) then begin
-      result := compareValue(Single(ad), Single(bd));
-    end;
-    //result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal));
-  end;
-
-var tempDateTime: TXQValueDateTime;
-begin
-  ak := a.kind; bk := b.kind;
-  result:=-2;
-  if not (ak in [pvkUndefined]) and not (bk in [pvkUndefined]) then begin
-    if (ak = bk) and not (ak in [pvkString,pvkNode]) then begin
-      case ak of
-        pvkBoolean:
-          if TXQValueBoolean(a).bool = TXQValueBoolean(b).bool then result := 0
-          else if TXQValueBoolean(a).bool then result := 1
-          else result := -1;
-        pvkInt64:
-          if TXQValueInt64(a).value = TXQValueInt64(b).value then result := 0
-          else if TXQValueInt64(a).value < TXQValueInt64(b).value then result := -1
-          else result := 1;
-        pvkBigDecimal: result := compareBigDecimals(a.toDecimal, b.toDecimal);
-        pvkFloat: result := compareAsFloats();
-        pvkDateTime: begin
-          if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
-          if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
-            result := compareValue(TXQValueDateTime(a).toMonths(), TXQValueDateTime(b).toMonths());
-            if result <> 0 then exit;
-            result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime(), 1e-6);
-          end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
-            result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
-        end;
-        pvkQName:
-          if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
-             or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
-            if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
-              result := 0;
-        pvkNull: result := 0;
-      end;
-      //This also implements the generic comparison type conversion rules (in those case where it would affect the result, a type error should be raised)
-    end else if ak = pvkNull then exit(-1)
-    else if bk = pvkNull then exit(1)
-    else if (ak = pvkFloat) or (bk = pvkFloat) then
-      result := compareAsFloats()
-    else if (ak in [pvkInt64, pvkBigDecimal]) or (bk in [pvkInt64, pvkBigDecimal]) then
-      result := compareBigDecimals(a.toDecimal, b.toDecimal)
-    else if (a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary)) and (b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary)) then
-      result := CompareStr(TXQValueString(a).toRawBinary, TXQValueString(b).toRawBinary)
-    else if (a.instanceOf(baseSchema.QName)) or (b.instanceOf(baseSchema.QName)) then begin
-      if a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName) then begin
-        if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then exit(0) //ignore prefix
-        else exit(-2);
-      end;
-      raise EXQEvaluationException.Create('XPTY0004', 'QName compared');
-    end else if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
-      if ak = pvkDateTime then begin
-        tempDateTime := TXQValueDateTime.create(a.typeAnnotation as TXSDateTimeType, b.toString);
-        result := xqvalueCompareAtomicBase(a, tempDateTime, collation, implicitTimezone);
-      end else if bk = pvkDateTime then begin
-        tempDateTime := TXQValueDateTime.create(b.typeAnnotation as TXSDateTimeType, a.toString);
-        result := xqvalueCompareAtomicBase(tempDateTime, b, collation, implicitTimezone);
-      end;
-      tempDateTime.free;
-    end else if collation <> nil then result := collation.compare(a.toString,b.toString)
-    else result := CompareStr(a.toString, b.toString);
-  end;
-end;
-
-function xqvalueCompareAtomicBase(a, b: IXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
-begin
-  result := xqvalueCompareAtomicBase(a as TXQValue, b as TXQValue, collation, implicitTimezone);
-end;
-
-function xqvalueCompareAtomicBase(const cxt: TXQEvaluationContext; a, b: IXQValue): integer; inline;
-begin
-  result := xqvalueCompareAtomicBase(a,b,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
-end;
-
-function xqvalueEqualAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
-var
-  ak: TXQValueKind;
-  bk: TXQValueKind;
-begin
-  result:=false;
-  ak := a.kind; bk := b.kind;
-  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
-    exit(acceptNAN and ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)));
-  result := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone)=0;
-end;
-
-                                                           (*
-function xqvalueEqualAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
-var
-  ak, bk: TXQValueKind;
-  cmpClass: TXQValueDecimalClass;
-begin
-  result:=false;
-  ak := a.kind; bk := b.kind;
-  if (ak <> pvkUndefined) and (bk <> pvkUndefined) then begin
-    if (ak = bk) and not (ak in [pvkString,pvkNode]) then begin
-      case ak of
-        pvkBoolean: result := TXQValueBoolean(a).bool = TXQValueBoolean(b).bool;
-        pvkInt: result := TXQValueInt65(a).value = TXQValueInt65(b).value;
-        pvkDecimal: begin
-          if IsNan(TXQValueDecimal(a).value) or IsNan(TXQValueDecimal(b).value) then
-            exit(acceptNAN and (IsNan(TXQValueDecimal(a).value) and IsNan(TXQValueDecimal(b).value)));
-          cmpClass := commonDecimalClass(a, b);
-          result := compareValue(cmpClass.truncateRange(TXQValueDecimal(a).value), cmpClass.truncateRange(TXQValueDecimal(b).value)) = 0;
-        end;
-        pvkDateTime: result :=  (xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone) = 0);
-        else raise EXQEvaluationException.Create('Impossible type');
-      end;
-    end else if (ak in [pvkInt, pvkDecimal]) or (bk in [pvkInt, pvkDecimal]) then begin
-      if ((a is TXQValueDecimal) and IsNan(TXQValueDecimal(a).value)) or ((b is TXQValueDecimal) and IsNan(TXQValueDecimal(b).value)) then
-        exit(acceptNAN and ((a is TXQValueDecimal) and IsNan(TXQValueDecimal(a).value)) and ((b is TXQValueDecimal) and IsNan(TXQValueDecimal(b).value)));
-      cmpClass := commonDecimalClass(a, b);
-      result := compareValue(cmpClass.truncateRange(a.toDecimal), cmpClass.truncateRange(b.toDecimal)) = 0;
-    end else if (a is TXQValue_Binary) and (b is TXQValue_Binary) then
-      result := TXQValue_Binary(a).toRawBinary = TXQValue_Binary(b).toRawBinary
-    else if (a is TXQValue_QName) or (b is TXQValue_QName) then begin
-      if (a is TXQValue_QName) <> (b is TXQValue_QName) then raise EXQEvaluationException.Create('QNames can only be compared with QNames');
-      result := qnameEqual(TXQValue_QName(a).str, TXQValue_QName(b).str);
-    end else if collation <> nil then
-      result := collation.equal(a.toString,b.toString)
-    else
-      result := TXQueryEngine.getDefaultCollation.equal(a.toString,b.toString)
-
-  end;
-end;                                                      *)
-
-function xqvalueEqualAtomicBase(a, b: IXQValue; collation: TXQCollation; implicitTimeZone: TDateTime; acceptNAN: boolean = false): boolean;
-begin
-  result := xqvalueEqualAtomicBase(a as txqvalue,b as txqvalue,collation,implicitTimeZone,acceptNAN);
-
-end;
 
 function xqvalueEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.ImplicitTimezone))
+    result := xqvalue(cxt.staticContext.equalAtomic(a,b,nil))
   else
     result := xqvalue();
 end;
@@ -648,120 +498,62 @@ end;
 function xqvalueUnequalAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(not xqvalueEqualAtomicBase(a,b, cxt.staticContext.collation, cxt.staticContext.ImplicitTimezone))
+    result := xqvalue(not cxt.staticContext.equalAtomic(a,b,nil))
   else
     result := xqvalue;
 end;
 
-procedure xqvalueCompareAtomic(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimeZone: TDateTime);
-var
- compres: Integer;
-begin
-  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then begin
-    compres := xqvalueCompareAtomicBase(a,b,collation,implicitTimeZone);
-    result := xqvalue((compres = accept1) or (compres = accept2) );
-  end else
-    result := xqvalue();
-end;
 
 function xqvalueLessThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,-1,9999,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
+  cxt.staticContext.compareAtomic(a,b,result,-1,9999);
 end;
 function xqvalueGreaterThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,1,9999,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
+  cxt.staticContext.compareAtomic(a,b,result,1,9999);
 end;
 function xqvalueLessEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,-1,0,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
+  cxt.staticContext.compareAtomic(a,b,result,-1,0);
 end;
 function xqvalueGreaterEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareAtomic(a,b,result,1,0,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone);
-end;
-
-function xqvalueCompareGenericBase(a, b: TXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
-var
- compres: Integer;
- seq, plain: TXQValue;
- i: Integer;
- j: Integer;
- ak, bk: TXQValueKind;
-begin
-  ak := a.kind; bk := b.kind;
-  if (ak in [pvkUndefined]) or (bk in [pvkUndefined]) then
-    result := false
-  else if (ak <> pvkSequence) and (bk <> pvkSequence) then begin
-    compres := xqvalueCompareAtomicBase(a,b,collation, implicitTimezone);
-    result := (compres = accept1) or (compres = accept2);
-  end else if (ak = pvkSequence) and (bk = pvkSequence) then begin
-    result := false;
-    for i:=0 to TXQValueSequence(a).seq.Count-1 do
-      for j:=0 to TXQValueSequence(b).seq.Count-1 do begin
-        compres := xqvalueCompareAtomicBase(TXQValueSequence(a).seq[i], TXQValueSequence(b).seq[j], collation, implicitTimezone);
-        if (compres = accept1) or (compres=accept2) then exit(true);
-      end;
-  end else begin
-    if ak = pvkSequence then seq := a
-    else plain := a;
-    if bk = pvkSequence then seq := b
-    else plain := b;
-    if plain = a then begin
-      accept1:=-accept1;
-      accept2:=-accept2;
-    end;
-    result := false;
-    for i:=0 to TXQValueSequence(seq).seq.Count-1 do begin
-      compres := xqvalueCompareAtomicBase(TXQValueSequence(seq).seq[i], plain,collation,implicitTimezone);
-      if (compres = accept1) or (compres=accept2) then exit(true);
-    end;
-  end;
-end;
-
-function xqvalueCompareGenericBase(a, b: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
-begin
-  result := xqvalueCompareGenericBase(a as TXQValue,b as TXQValue,accept1,accept2,collation,implicitTimezone);
-end;
-
-procedure xqvalueCompareGeneric(const cxt: TXQEvaluationContext; a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
-begin
-  result := xqvalue(xqvalueCompareGenericBase(a,b,accept1,accept2,cxt.staticContext.collation,cxt.staticContext.ImplicitTimezone));
+  cxt.staticContext.compareAtomic(a,b,result,1,0);
 end;
 
 function xqvalueEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareGeneric(cxt,a,b,result,0);
+  cxt.staticContext.compareGeneral(a,b,result,0);
 end;
 function xqvalueUnequalGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareGeneric(cxt,a,b,result,-1,1);
+  cxt.staticContext.compareGeneral(a,b,result,-1,1);
 end;
 function xqvalueLessThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareGeneric(cxt,a,b,result,-1);
+  cxt.staticContext.compareGeneral(a,b,result,-1);
 end;
 function xqvalueGreaterThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareGeneric(cxt,a,b,result,1);
+  cxt.staticContext.compareGeneral(a,b,result,1);
 end;
 function xqvalueLessEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareGeneric(cxt,a,b,result,-1,0);
+  cxt.staticContext.compareGeneral(a,b,result,-1,0);
 end;
 function xqvalueGreaterEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  xqvalueCompareGeneric(cxt,a,b,result,1,0);
+  cxt.staticContext.compareGeneral(a,b,result,1,0);
 end;
 
 function xqvalueToSingleNode(v: IXQValue): TTreeNode;
@@ -2882,16 +2674,16 @@ var  i: Integer;
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
-  else collation := context.staticContext.collation;
+  else collation := nil;
   if args[0].kind <> pvkSequence then begin
-    if xqvalueComparableTypes(args[0], args[1]) and xqvalueEqualAtomicBase(args[0], args[1], collation, context.staticContext.ImplicitTimezone) then result := xqvalue(1)
+    if xqvalueComparableTypes(args[0], args[1]) and context.staticContext.equalAtomic(args[0], args[1], collation) then result := xqvalue(1)
     else result := xqvalue();
   end else begin
     i := 0;
     result := nil;
     for v in args[0] do begin
       i += 1;
-      if xqvalueComparableTypes(v, args[1]) and xqvalueEqualAtomicBase(v, args[1], collation, context.staticContext.ImplicitTimezone) then
+      if xqvalueComparableTypes(v, args[1]) and context.staticContext.equalAtomic(v, args[1], collation) then
         xqvalueSeqAdd(result, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
@@ -2944,20 +2736,18 @@ var
  collation: TXQCollation;
  found: Boolean;
  atom: IXQValue;
- ImplicitTimezone: TDateTime;
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
-  else collation := context.staticContext.collation;
+  else collation := nil;
   atom := xqvalueAtomize(args[0]);
   if atom.kind <> pvkSequence then
     exit(xqvalueAtomize(atom));
   resseq := TXQValueSequence.create(atom.getSequenceCount);
-  ImplicitTimezone := context.staticContext.ImplicitTimezone;
   for v in atom do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if xqvalueComparableTypes(resseq.seq[i], v) and xqvalueEqualAtomicBase(resseq.seq[i], v, collation, ImplicitTimezone,true) then begin
+      if xqvalueComparableTypes(resseq.seq[i], v) and context.staticContext.equalAtomic(resseq.seq[i], v, collation, true) then begin
         found := true;
         break;
       end;
@@ -3103,7 +2893,7 @@ begin
     if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
       if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
          or not xqvalueComparableTypes(enum1.Current, enum2.Current)
-         or not xqvalueEqualAtomicBase(enum1.Current, enum2.Current, collation, context.staticContext.ImplicitTimezone,true) then //todo:   nodes?
+         or not context.staticContext.equalAtomic(enum1.Current, enum2.Current, collation, true) then //todo:   nodes?
         exit(false);
     end else begin
       if enum1.Current.kind = pvkFunction then raiseFOTY0015(enum1.Current);
@@ -3338,7 +3128,7 @@ begin
       result := seq[0];
       baseType := (result.typeAnnotation as TXSSimpleType).primitive;
       for i:=1 to seq.count-1 do begin
-        if (xqvalueCompareAtomicBase(context, result, seq[i]) < 0) <> asmin then
+        if (context.staticContext.compareAtomic(result, seq[i], nil) < 0) <> asmin then
           result := seq[i];
         if (seq[i].typeAnnotation as TXSSimpleType).primitive <> baseType then raiseError;
       end;

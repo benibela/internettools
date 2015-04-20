@@ -860,7 +860,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     for i := 0 to high(Result.children) do
       for j := 0 to high(Result.children) do
         if (i <> j)
-           and (xqvalueCompareAtomicBase(TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value, TXQTermConstant(TXQTermConstructor(result.children[j]).nameValue).value, nil, 0) = 0) then
+           and (staticContext.compareAtomic(TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value, TXQTermConstant(TXQTermConstructor(result.children[j]).nameValue).value, nil) = 0) then
            raiseParsingError('XQST0040', 'Duplicated attribute: '+TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value.toString);
   end;
 

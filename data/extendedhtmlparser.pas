@@ -1467,7 +1467,7 @@ var xpathText: TTreeNode;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
-        result := xqvalueCompareGenericBase(evaluatedvalue, value, 0, 9999, FQueryEngine.StaticContext.collation, FQueryEngine.ImplicitTimezone);
+        result := FQueryEngine.StaticContext.compareGeneral(evaluatedvalue, value, nil, 0);
       end;
 
     begin
@@ -2172,4 +2172,4 @@ xquery.patternMatcherVisit:=@patternMatcherVisit;
 end.
 
 
-
+

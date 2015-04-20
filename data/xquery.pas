@@ -165,6 +165,27 @@ type
 
     function ImplicitTimezone: TDateTime; inline;
     function CurrentDateTime: TDateTime; inline;
+
+  protected
+    function compareCommonFloat(ak, bk: TXQValueKind; a, b: TXQValue): integer;
+    function compareCommonAsStrings(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+    function compareCommonEqualKind(kind: TXQValueKind; a, b: TXQValue; overrideCollation: TXQCollation): integer;
+    function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
+  public
+    //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
+    function compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+    //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
+    function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer; inline;
+    procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
+    function equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation; acceptNAN: boolean = false): boolean;
+    function equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation; acceptNAN: boolean = false): boolean;
+    //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
+    //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
+    function compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
+    //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
+    //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
+    function compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
+    procedure compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
   property
     NodeCollation: TXQCollation read getNodeCollation write FNodeCollation;
   end;
@@ -190,7 +211,6 @@ type
 
     staticContext: TXQStaticContext;
 
-    function compareAtomicBase(const a,b: IXQValue): integer; //**< Compares two values (depending on the context properties like collations)
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
@@ -332,7 +352,6 @@ type
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
-
   private
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (private because it wraps the object instance in a IXQValue. which may free it, if there is not another interface variable pointing to it )
   end;
@@ -2196,18 +2215,6 @@ public
   procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add )
   //function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
 
-  //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b (doesn't free them); -2 for unknown
-  function xqvalueCompareAtomicBase(a, b: TXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
-  //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b (doesn't free them); -2 for unknown
-  function xqvalueCompareAtomicBase(a, b: IXQValue; collation: TXQCollation; implicitTimezone: TDateTime): integer;
-  //**Compares two values generically (=,!=,...) and returns if the compare value \in [accept1,accept2]@br
-  //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
-  function xqvalueCompareGenericBase(a, b: TXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
-  //**Compares two values generically (=,!=,...) and returns if the compare value \in [accept1,accept2]@br
-  //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
-  function xqvalueCompareGenericBase(a, b: IXQValue; accept1: integer; accept2: integer; collation: TXQCollation; implicitTimezone: TDateTime): boolean;
-
-
 
 type
   (***
@@ -2842,9 +2849,21 @@ end;
 
 function xqvalueAtomize(const v: IXQValue): IXQValue; forward;
 
+procedure raisePXPInternalError;
+begin
+  raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error');
+end;
 procedure raiseXPDY0002ContextItemAbsent;
 begin
   raise EXQEvaluationException.create('XPDY0002', 'Context item (.) is not set');
+end;
+procedure raiseFORG0001InvalidConversion(const v: IXQValue; const convTo: string);
+begin
+  raise EXQEvaluationException.create('FORG0001', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to type '+convTo);
+end;
+procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
+begin
+  raise EXQEvaluationException.create('XPTY0004', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to type '+convTo);
 end;
 
 
@@ -3062,6 +3081,230 @@ begin
   if sender <> nil then result := sender.CurrentDateTime
   else result := nan;
   {$POP}
+end;
+
+function TXQStaticContext.compareCommonFloat(ak, bk: TXQValueKind; a, b: TXQValue): integer;
+function vtof(k: TXQValueKind; v: txqvalue): xqfloat; //faster implementation of cast
+begin
+  result := v.toFloat;
+  case k of
+    pvkInt64, pvkFloat, pvkBigDecimal: ; //always ok
+    pvkString, pvkNode: begin
+      if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'float/double');
+      if IsNan(result) and (v.toString <> 'NaN') then raiseFORG0001InvalidConversion(v, 'float/double')
+    end;
+    else begin
+      if strictTypeChecking then raiseXPTY0004TypeError(v, 'float/double');
+      result := v.toFloat;
+    end;
+  end;
+end;
+
+var
+  cmpClass: TXSType;
+  ad, bd: xqfloat;
+begin
+  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
+    exit(-2);
+  cmpClass := TXSType.commonDecimalType(a, b);
+  ad := vtof(ak, a);
+  bd := vtof(bk, b);
+  if cmpClass.derivedFrom(baseSchema.Double) then begin
+    result := compareValue(double(ad), double(bd));
+  end else if cmpClass.derivedFrom(baseSchema.Float) then begin
+    result := compareValue(Single(ad), Single(bd));
+  end;
+end;
+
+function TXQStaticContext.compareCommonAsStrings(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+var sa, sb: string;
+begin
+  if overrideCollation = nil then overrideCollation := collation;
+  if a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary) then begin
+    sa := (a as TXQValueString).toRawBinary;
+    overrideCollation := nil;
+  end else sa := a.toString;
+  if b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary) then begin
+    sb := (b as TXQValueString).toRawBinary;
+    overrideCollation := nil;
+  end else sb := b.toString;
+
+
+  if overrideCollation <> nil then result := overrideCollation.compare(sa,sb)
+  else result := CompareStr(sa, sb);
+end;
+
+function TXQStaticContext.compareCommonEqualKind(kind: TXQValueKind; a, b: TXQValue; overrideCollation: TXQCollation): integer;
+begin
+  case kind of
+    pvkBoolean:
+      if TXQValueBoolean(a).bool = TXQValueBoolean(b).bool then result := 0
+      else if TXQValueBoolean(a).bool then result := 1
+      else result := -1;
+    pvkInt64:
+      if TXQValueInt64(a).value = TXQValueInt64(b).value then result := 0
+      else if TXQValueInt64(a).value < TXQValueInt64(b).value then result := -1
+      else result := 1;
+    pvkBigDecimal: result := compareBigDecimals(a.toDecimal, b.toDecimal);
+    pvkFloat: result := compareCommonFloat(kind, kind, a, b);
+    pvkDateTime: begin
+      if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
+      if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
+        result := compareValue(TXQValueDateTime(a).toMonths(), TXQValueDateTime(b).toMonths());
+        if result <> 0 then exit;
+        result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime(), 1e-6);
+      end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
+        result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
+    end;
+    pvkQName:
+      if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
+         or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
+        if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
+          result := 0;
+    pvkNull: result := 0;
+    pvkUndefined: result := -2;
+    pvkNode, pvkString: result := compareCommonAsStrings(a, b, overrideCollation);
+  end;
+end;
+
+function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
+  function vtod(k: TXQValueKind; v: txqvalue): BigDecimal; //faster implementation of cast
+  begin
+    case k of
+      pvkInt64, pvkBigDecimal: result := v.toDecimal; //always ok
+      pvkFloat: raisePXPInternalError(); //float trigger floating point conversion
+      pvkString, pvkNode: begin
+        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'decimal');
+        if not tryStrToBigDecimal(v.toString, @result) then raiseFORG0001InvalidConversion(v, 'decimal');
+      end;
+      else begin
+        if strictTypeChecking then raiseXPTY0004TypeError(v, 'decimal');
+        result := v.toDecimal;
+      end;
+    end;
+  end;
+var tempDateTime: TXQValueDateTime;
+  ak, bk: TXQValueKind;
+begin
+  ak := a.kind; bk := b.kind;
+  if ak = bk then exit(compareCommonEqualKind(ak, a, b, overrideCollation));
+  if (ak = pvkUndefined) or (bk = pvkUndefined) then exit(-2);
+  if ak = pvkNull then exit(-1);
+  if bk = pvkNull then exit(1);
+  if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
+    exit(compareCommonAsStrings(a,b, overrideCollation));
+  if (ak = pvkFloat) or (bk = pvkFloat) then
+    exit(compareCommonFloat(ak, bk, a, b));
+  if (ak in [pvkInt64, pvkBigDecimal]) or (bk in [pvkInt64, pvkBigDecimal]) then begin
+    //if not (ak in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(a) <> xsceNoError) then raiseXPTY0004TypeError(a, 'decimal');
+    //if not (bk in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(b) <> xsceNoError) then raiseXPTY0004TypeError(b, 'decimal');
+    exit(compareBigDecimals(vtod(ak, a), vtod(bk, b)));
+  end;
+  if (ak = pvkQName) or (bk = pvkQName) then
+    raise EXQEvaluationException.Create('XPTY0004', 'QName compared');
+  if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
+    if ak = pvkDateTime then begin
+      tempDateTime := TXQValueDateTime.create(a.typeAnnotation as TXSDateTimeType, b.toString);
+      result := compareCommon(a, tempDateTime, overrideCollation, castUnknownToString);
+    end else if bk = pvkDateTime then begin
+      tempDateTime := TXQValueDateTime.create(b.typeAnnotation as TXSDateTimeType, a.toString);
+      result := compareCommon(tempDateTime, b, overrideCollation, castUnknownToString);
+    end;
+    tempDateTime.free;
+    exit;
+  end;
+  exit(compareCommonAsStrings(a,b, overrideCollation));
+end;
+
+function TXQStaticContext.compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+begin
+  result := compareCommon(a, b, overrideCollation, true);
+end;
+
+function TXQStaticContext.compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
+begin
+  result := compareAtomic(a as TXQValue, b as TXQValue, overrideCollation);
+end;
+
+procedure TXQStaticContext.compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
+var
+ compres: Integer;
+begin
+  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then begin
+    compres := compareAtomic(a,b, nil);
+    result := xqvalue((compres = accept1) or (compres = accept2) );
+  end else
+    result := xqvalue();
+end;
+
+function TXQStaticContext.equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation; acceptNAN: boolean): boolean;
+var
+  ak: TXQValueKind;
+  bk: TXQValueKind;
+begin
+  result:=false;
+  ak := a.kind; bk := b.kind;
+  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
+    exit(acceptNAN and ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)));
+  result := compareAtomic(a,b,overrideCollation)=0;
+end;
+
+function TXQStaticContext.equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation; acceptNAN: boolean): boolean;
+begin
+  result := equalAtomic(a as txqvalue,b as txqvalue,overrideCollation, acceptNAN);
+end;
+
+function TXQStaticContext.compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+  function compare(x,y: TXQValue): integer; inline;
+  begin
+    result :=  compareCommon(x, y, overrideCollation, false);
+  end;
+
+var
+  compres: Integer;
+  seq, plain: TXQValue;
+  i: Integer;
+  j: Integer;
+  ak, bk: TXQValueKind;
+begin
+  ak := a.kind; bk := b.kind;
+  if (ak in [pvkUndefined]) or (bk in [pvkUndefined]) then
+    result := false
+  else if (ak <> pvkSequence) and (bk <> pvkSequence) then begin
+    compres := compare(a,b);
+    result := (compres = accept1) or (compres = accept2);
+  end else if (ak = pvkSequence) and (bk = pvkSequence) then begin
+    result := false;
+    for i:=0 to TXQValueSequence(a).seq.Count-1 do
+      for j:=0 to TXQValueSequence(b).seq.Count-1 do begin
+        compres := compare(TXQValueSequence(a).seq[i] as TXQValue, TXQValueSequence(b).seq[j] as TXQValue);
+        if (compres = accept1) or (compres=accept2) then exit(true);
+      end;
+  end else begin
+    if ak = pvkSequence then seq := a
+    else plain := a;
+    if bk = pvkSequence then seq := b
+    else plain := b;
+    if plain = a then begin
+      accept1:=-accept1;
+      accept2:=-accept2;
+    end;
+    result := false;
+    for i:=0 to TXQValueSequence(seq).seq.Count-1 do begin
+      compres := compare(TXQValueSequence(seq).seq[i] as TXQValue, plain);
+      if (compres = accept1) or (compres=accept2) then exit(true);
+    end;
+  end;
+end;
+
+function TXQStaticContext.compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+begin
+  result := compareGeneral(a as TXQValue,b as TXQValue,overrideCollation, accept1,accept2);
+end;
+
+procedure TXQStaticContext.compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
+begin
+  result := xqvalue(compareGeneral(a,b, nil, accept1,accept2));
 end;
 
 { TXQTermModule }
@@ -3334,11 +3577,6 @@ end;
 
 
 { TXQEvaluationContext }
-
-function TXQEvaluationContext.compareAtomicBase(const a, b: IXQValue): integer;
-begin
-  result := xqvalueCompareAtomicBase(a, b, staticContext.collation, staticContext.ImplicitTimezone);
-end;
 
 function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
 begin

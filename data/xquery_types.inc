@@ -81,12 +81,6 @@ begin
   result:=myStrToFloat(toString);
 end;
 
-function TXQValue.toDecimal: BigDecimal;
-begin
-  if not tryStrToBigDecimal(trim(toString), @result) then
-    setZero(result);
-end;
-
 function TXQValue.toString: string;
 begin
   result := '';
@@ -149,6 +143,12 @@ end;
 function TXQValue.instanceOf(const typ: TXSType): boolean;
 begin
   result := typeAnnotation.derivedFrom(typ);
+end;
+
+function TXQValue.toDecimal: BigDecimal;
+begin
+  if not tryStrToBigDecimal(toString, @result) then
+    setZero(result);
 end;
 
 function TXQValue.isUndefined: boolean;

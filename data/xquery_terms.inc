@@ -943,7 +943,7 @@ var meta: PFlowerSortingData;
 
     if (collation <> nil) and (v is TXQValueString) and (w is TXQValueString) then
       exit(collation.compare(v.toString, w.toString) < 0);
-    temp := meta^.context^.compareAtomicBase(v,w) ;
+    temp := meta^.context^.staticContext.compareAtomic(v,w,nil) ;
     result := (temp <> -2) and (temp < 0);
   end;
 
