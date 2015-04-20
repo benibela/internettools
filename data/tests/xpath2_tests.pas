@@ -5,7 +5,7 @@ unit xpath2_tests;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, strutils;
 
 
 procedure unittests(TestErrors:boolean);
@@ -79,7 +79,7 @@ var
        err := e.namespace.getPrefix+':'+e.errorCode;
      end end;
      if err = '' then raise Exception.Create('No error => Test failed ');
-     if err <> code then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
+     if (err <> code) and (err <> 'err:'+code)  then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
    end;
 
 //var  time: TDateTime;
@@ -87,10 +87,14 @@ var tempb: Boolean;
   tt: String;
   j: Integer;
   baseboundary: String;
+  func: String;
+  untypedAtomic: String;
 begin
   i := 0;
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
+  if strictTypeChecking then untypedAtomic := 'xs:untypedAtomic'
+  else untypedAtomic := '';
 
   ps := TXQueryEngine.Create;
   ps.ParsingOptions.AllowJSONLiterals:=false;
@@ -479,14 +483,22 @@ begin
   t('5<4.9', 'false', '');
   t('5>=1e-20', 'true', '');
   t('5>=6e-20', 'true', '');
-  t('5.00<true()', 'false', '');
-  t('5.00<false()', 'false', '');
-  t('5.00>true()', 'true', '');
-  t('5.00>false()', 'true', '');
-  t('1.00>true()', 'false', '');
-  t('1.00>false()', 'true', '');
-  t('0.00>true()', 'false', '');
-  t('0.00>false()', 'false', '');
+  ps.StaticContext.strictTypeChecking:=strictTypeChecking;
+  if strictTypeChecking then begin
+    f('5.00<true()', 'XPTY0004');
+    f('5.00<false()', 'XPTY0004');
+    f('5.00>true()', 'XPTY0004');
+    f('5.00>false()', 'XPTY0004');
+  end else begin
+    t('5.00<true()', 'false');
+    t('5<false()', 'false');
+    t('5>true()', 'true');
+    t('5.00>false()', 'true');
+    t('1.00>true()', 'false');
+    t('1.00>false()', 'true');
+    t('0.00<true()', 'true');
+    t('0.00<false()', 'false');
+  end;
 
                 //Generic comparisons
   t('(1, 2) = (2, 3)', 'true', '');
@@ -537,13 +549,13 @@ begin
   t('-3= ---3.0', 'true','');
 
   t('1 to 3', '1','');
-  t('string-join(1 to 3,",")', '1,2,3','');
-  t('string-join(3 to 1,",")', '','');
-  t('string-join(5 to 5,",")', '5','');
-  t('string-join((10, 1 to 4),",")', '10,1,2,3,4','');
-  t('string-join((10 to 10),",")', '10','');
-  t('string-join((15 to 10),",")', '','');
-  t('string-join(reverse(10 to 15),",")', '15,14,13,12,11,10','');
+  t('join(1 to 3,",")', '1,2,3','');
+  t('join(3 to 1,",")', '','');
+  t('join(5 to 5,",")', '5','');
+  t('join((10, 1 to 4),",")', '10,1,2,3,4','');
+  t('join((10 to 10),",")', '10','');
+  t('join((15 to 10),",")', '','');
+  t('join(reverse(10 to 15),",")', '15,14,13,12,11,10','');
 
 
   t('true() and true()', 'true', '');
@@ -736,10 +748,10 @@ begin
   t('codepoints-to-string(65)', 'A', '');
   t('codepoints-to-string((65,66,67,68))', 'ABCD', '');
   t('string-to-codepoints("ABCD")', '65', '');
-  t('string-join(string-to-codepoints("ABCD"),",")', '65,66,67,68', '');
+  t('join(string-to-codepoints("ABCD"),",")', '65,66,67,68', '');
   t('codepoints-to-string((2309, 2358, 2378, 2325))', 'अशॊक', ''); //if these tests fail, but those above work, fpc probably compiled the file with the wrong encoding (must be utf8);
   t('string-to-codepoints("Thérèse")', '84', '');
-  t('string-join(string-to-codepoints("Thérèse"),",")', '84,104,233,114,232,115,101', '');
+  t('join(string-to-codepoints("Thérèse"),",")', '84,104,233,114,232,115,101', '');
   t('substring("motor car", 6)', ' car', '');
   t('substring("metadata", 4, 3)', 'ada', '');
   t('substring("12345", 1.5, 2.6)', '234', '');
@@ -822,24 +834,26 @@ begin
   t('parse-date("2010-10-08", "yyyy-mm-d")', '2010-10-08', '');
   t('parse-date("1899-Dec-31", "yyyy-mmm-d")', '1899-12-31', '');
   t('parse-date("1899-Dec-29", "yyyy-mmm-d")', '1899-12-29', '');
-  t('year-from-dateTime(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
+  if strictTypeChecking then func := 'year-from-date'
+  else func := 'year-from-dateTime';
+  t(func+'(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
   t('year-from-date(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');
-  t('year-from-dateTime(parse-date(">>2012<<01:01", ">>yyyy<<mm:dd"))', '2012', '');
-  t('year-from-dateTime(parse-date(">>1700<<01:01", ">>yyyy<<mm:dd"))', '1700', '');
-  t('year-from-dateTime(parse-date(">>05<<01:01", ">>yy<<mm:dd"))', '2005', '');
-  t('year-from-dateTime(parse-date(">>90<<01:01", ">>yy<<mm:dd"))', '1990', '');
-  t('year-from-dateTime(parse-date(">>89<<01:01", ">>yy<<mm:dd"))', '2089', '');
-  t('month-from-dateTime(parse-date("1899-Dec-31", "yyyy-mmm-d")) ', '12', '');
-  t('month-from-dateTime(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '7', '');
-  t('day-from-dateTime(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '31', '');
+  t(func+'(parse-date(">>2012<<01:01", ">>yyyy<<mm:dd"))', '2012', '');
+  t(func+'(parse-date(">>1700<<01:01", ">>yyyy<<mm:dd"))', '1700', '');
+  t(func+'(parse-date(">>05<<01:01", ">>yy<<mm:dd"))', '2005', '');
+  t(func+'(parse-date(">>90<<01:01", ">>yy<<mm:dd"))', '1990', '');
+  t(func+'(parse-date(">>89<<01:01", ">>yy<<mm:dd"))', '2089', '');
+  t('month-from-date(parse-date("1899-Dec-31", "yyyy-mmm-d")) ', '12', '');
+  t('month-from-date(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '7', '');
+  t('day-from-date(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '31', '');
   t('parse-date("1899-Dec-31", "yyyy-mmm-d") - parse-date("1899-Dec-29", "yyyy-mmm-d")', 'P2D', '');
                 //Sequences
   t('index-of ((10, 20, 30, 40), 35)', '', '');
   t('index-of ((10, 20, 30, 30, 10), 20)', '2', '');
   t('index-of ((10, 20, 30, 30, 20, 10), 20)', '2', '');
-  t('string-join(index-of ((10, 20, 30, 30, 10), 20), ",")', '2', '');
-  t('string-join(index-of ((10, 20, 30, 30, 20, 10), 20), ",")', '2,5', '');
-  t('string-join(index-of (("a", "sport", "and", "a", "pastime"), "a"), ",")', '1,4', '');
+  t('join(index-of ((10, 20, 30, 30, 10), 20), ",")', '2', '');
+  t('join(index-of ((10, 20, 30, 30, 20, 10), 20), ",")', '2,5', '');
+  t('join(index-of (("a", "sport", "and", "a", "pastime"), "a"), ",")', '1,4', '');
   t('("MEMLEAKTEST1", "MEMLEAKTEST2")', 'MEMLEAKTEST1', '');
   t('string-join(("MEMLEAKTEST3", "MEMLEAKTEST4"), "-")', 'MEMLEAKTEST3-MEMLEAKTEST4', '');
   t('empty(())', 'true', '');
@@ -847,7 +861,7 @@ begin
   t('empty((false()))', 'false', '');
   t('empty((true(),1,2,3))', 'false', '');
   t('distinct-values((1, 2.0, 3, 2))', '1', '');
-  t('string-join(distinct-values((1, 2.0, 3, 2)),",")', '1,2,3', '');
+  t('join(distinct-values((1, 2.0, 3, 2)),",")', '1,2,3', '');
   t('string-join(insert-before(("a", "b", "c"), 0, "z"), ",")', 'z,a,b,c', '');
   t('string-join(insert-before(("a", "b", "c"), 1, "z"), ",")', 'z,a,b,c', '');
   t('string-join(insert-before(("a", "b", "c"), 2, "z"), ",")', 'a,z,b,c', '');
@@ -870,7 +884,7 @@ begin
   t('string-join(reverse(("c","b","a")), ",")', 'a,b,c', '');
   t('string-join(reverse(("hello")), ",")', 'hello', '');
   t('string-join(reverse(()), ",")', '', '');
-  t('string-join(subsequence((1,2,3,4,5), 4), ",")', '4,5', '');
+  t('join(subsequence((1,2,3,4,5), 4), ",")', '4,5', '');
   t('subsequence((), 1)', '', '');
   t('subsequence((), 1, 2)', '', '');
   t('subsequence((6), 1, 2)', '6', '');
@@ -880,9 +894,9 @@ begin
   t('subsequence((6,7), 2, 1)', '7', '');
   t('subsequence((6), 2, 1)', '', '');
   t('subsequence(6, 2, 1)', '', '');
-  t('string-join(subsequence((1,2,3,4,5), 3, 2), ",")', '3,4', '');
-  t('concat(string-join(subsequence((1,2,3,4,5), 3, 2147483646), ","), ":", string-join(subsequence((1,2,3,4,5), 3, 2147483648), ","))', '3,4,5:3,4,5', '');
-  t('string-join(unordered((1,2,3,4,5)), ",")', '1,2,3,4,5', '');
+  t('join(subsequence((1,2,3,4,5), 3, 2), ",")', '3,4', '');
+  t('concat(join(subsequence((1,2,3,4,5), 3, 2147483646), ","), ":", join(subsequence((1,2,3,4,5), 3, 2147483648), ","))', '3,4,5:3,4,5', '');
+  t('join(unordered((1,2,3,4,5)), ",")', '1,2,3,4,5', '');
   t('deep-equal(1, 2)', 'false', '');
   t('deep-equal(1, 1)', 'true', '');
   t('deep-equal((1), ())', 'false', '');
@@ -958,46 +972,46 @@ begin
 
   t('(1,2,3)[true()]', '1', '');
   t('(1,2,3)[false()]', '', '');
-  t('string-join((1,2,3)[true()], ",")', '1,2,3', '');
-  t('string-join((1,2,3)[false()], ",")', '', '');
+  t('join((1,2,3)[true()], ",")', '1,2,3', '');
+  t('join((1,2,3)[false()], ",")', '', '');
   t('(4,5,6)[1]', '4', '');
   t('(4,5,6)[2]', '5', '');
   t('(4,5,6)[3]', '6', '');
   t('("a","bc","de")[2]', 'bc', '');
-  t('string-join((4,5,6)[1], ",")', '4', '');
-  t('string-join((4,5,6)[2], ",")', '5', '');
-  t('string-join((4,5,6)[3], ",")', '6', '');
-  t('string-join((4,5,6)[true()][1], ",")', '4', '');
-  t('string-join((4,5,6)[true()][true()][true()][true()][true()][1], ",")', '4', '');
+  t('join((4,5,6)[1], ",")', '4', '');
+  t('join((4,5,6)[2], ",")', '5', '');
+  t('join((4,5,6)[3], ",")', '6', '');
+  t('join((4,5,6)[true()][1], ",")', '4', '');
+  t('join((4,5,6)[true()][true()][true()][true()][true()][1], ",")', '4', '');
   t('(4,5,6)[string() = ''5'']', '5', '');
-  t('string-join((4,5,6)[string()="5"], ",")', '5', '');
-  t('string-join((1 to 100)[number() eq 15 or string() = "23"], ",")', '15,23', '');
-  t('string-join((1 to 100)[number() mod 5 eq 0], ",")', '5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100', '');
-  t('string-join((21 to 29)[5],",")', '25', '');
-  t('string-join((21 to 29)[5],",")', '25', '');
-  t('string-join((21 to 29)[number() gt 24][2],",")', '26', '');
+  t('join((4,5,6)[string()="5"], ",")', '5', '');
+  t('join((1 to 100)[number() eq 15 or string() = "23"], ",")', '15,23', '');
+  t('join((1 to 100)[number() mod 5 eq 0], ",")', '5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100', '');
+  t('join((21 to 29)[5],",")', '25', '');
+  t('join((21 to 29)[5],",")', '25', '');
+  t('join((21 to 29)[number() gt 24][2],",")', '26', '');
   t('string-join(("hallo","mast","welt","test","tast","ast")[contains(string(),"as")], ",")', 'mast,tast,ast', '');
-  t('string-join( (4,5) [.=4] , ",")', '4', '');
-  t('string-join( ( (4,5) [.=4] ) , ",")', '4', '');
-  t('string-join( ( ((4,5)) [(.=4)] ) , ",")', '4', '');
-  t('string-join( (((( ((4,5)) [(.=4)] )))) , ",")', '4', '');
-  t('string-join((1 to 100)[. mod 5 eq 0],",")', '5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100', '');
-  t('(string-join(((1 to 100)[. mod 5 eq 0]),","))', '5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100', '');
-  t('string-join(((1 to 5)[3] to (3 to 7)[3]),",")', '3,4,5', '');
-  t('string-join((4,5,6)[.=(5,6)], ",")', '5,6', '');
+  t('join( (4,5) [.=4] , ",")', '4', '');
+  t('join( ( (4,5) [.=4] ) , ",")', '4', '');
+  t('join( ( ((4,5)) [(.=4)] ) , ",")', '4', '');
+  t('join( (((( ((4,5)) [(.=4)] )))) , ",")', '4', '');
+  t('join((1 to 100)[. mod 5 eq 0],",")', '5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100', '');
+  t('(join(((1 to 100)[. mod 5 eq 0]),","))', '5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100', '');
+  t('join(((1 to 5)[3] to (3 to 7)[3]),",")', '3,4,5', '');
+  t('join((4,5,6)[.=(5,6)], ",")', '5,6', '');
   t('count((98.5, 98.3, 98.9))', '3', '');
   t('count((98.5, 98.3, 98.9)[.>100])', '0', '');
   t('count((98.5, 98.3, 98.9)[.>98.5])', '1', '');
   t('sum((1 to 100)[.<0], 0)', '0', '');
   t('sum((1 to 100)[.<0], "aber")', 'aber', '');
   t('sum((1 to 100)[.<10], "abc")', '45', '');
-  t('string-join((101 to 120)[position() = 4], ",")', '104', '');
-  t('string-join((101 to 120)[position() = last()], ",")', '120', '');
-  t('string-join((101 to 120)[position() = last() - 2], ",")', '118', '');
-  t('string-join((101 to 120)[position() >= 4 and position() < 10], ",")', '104,105,106,107,108,109', '');
-  t('string-join((101 to 120)[position() >= 4 and position() < 10][position()=last()], ",")', '109', '');
-  t('string-join((101 to 120)[position() >= 4 and position() < 10][position()=3], ",")', '106', '');
-  t('string-join((101 to 120)[position() >= 4 and position() < 10][4], ",")', '107', '');
+  t('join((101 to 120)[position() = 4], ",")', '104', '');
+  t('join((101 to 120)[position() = last()], ",")', '120', '');
+  t('join((101 to 120)[position() = last() - 2], ",")', '118', '');
+  t('join((101 to 120)[position() >= 4 and position() < 10], ",")', '104,105,106,107,108,109', '');
+  t('join((101 to 120)[position() >= 4 and position() < 10][position()=last()], ",")', '109', '');
+  t('join((101 to 120)[position() >= 4 and position() < 10][position()=3], ",")', '106', '');
+  t('join((101 to 120)[position() >= 4 and position() < 10][4], ",")', '107', '');
 
                 //Axis tests
   t('','','<a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2</b>al</a>');
@@ -1274,25 +1288,25 @@ begin
 
                //block structures
   t('for $x in (1,2,3) return $x', '1', '');
-  t('string-join(for $x in (1,2,3) return $x,",")', '1,2,3', '');
-  t('string-join(for $x in (1,2,3,"4","5") return $x,",")', '1,2,3,4,5', '');
-  t('string-join(for $x in (1,2,3,"4","5") return ($x + 1),",")', '2,3,4,5,6', '');
-  t('string-join(for $x in (1,2,3,"4","5") return $x + 1,",")', '2,3,4,5,6', '');
-  t('for $x in (1,2,3,"4","5") return $x + 1', '2', '');
+  t('join(for $x in (1,2,3) return $x,",")', '1,2,3', '');
+  t('join(for $x in (1,2,3,"4","5") return $x,",")', '1,2,3,4,5', '');
+  t('join(for $x in (1,2,3,'+untypedAtomic+'("4"),'+untypedAtomic+'("5")) return ($x + 1),",")', '2,3,4,5,6', '');
+  t('join(for $x in (1,2,3,'+untypedAtomic+'("4"),'+untypedAtomic+'("5")) return $x + 1,",")', '2,3,4,5,6', '');
+  t('for $x in (1,2,3,'+untypedAtomic+'("4"),'+untypedAtomic+'("5")) return $x + 1', '2', '');
   t('for $x in (1,2,3) return (for $y in (10,20,30) return $x)', '1', '');
   t('for $x in (1,2,3) return (for $y in (10,20,30) return $y)', '10', '');
   t('for $x in (1,2,3) return (for $y in (10,20,30) return $x + $y)', '11', '');
-  t('string-join(for $x in (1,2,3) return (for $y in (10,20,30) return $x),",")', '1,1,1,2,2,2,3,3,3', '');
-  t('string-join(for $x in (1,2,3) return (for $y in (10,20,30) return $y),",")', '10,20,30,10,20,30,10,20,30', '');
-  t('string-join(for $x in (1,2,3) return (for $y in (10,20,30) return $x + $y),",")', '11,21,31,12,22,32,13,23,33', '');
-  t('string-join(for $x in (1,2,3) return (for $y in (10,20,30) return $x),",")', '1,1,1,2,2,2,3,3,3', '');
-  t('string-join(for $x in (1,2,3) return (for $y in (10,20,30) return $y),",")', '10,20,30,10,20,30,10,20,30', '');
-  t('string-join(for $x in (1,2,3) return for $y in (10,20,30) return $x + $y,",")', '11,21,31,12,22,32,13,23,33', '');
-  t('string-join(for $x in (1,2,3), $y in (10,20,30) return $x + $y,",")', '11,21,31,12,22,32,13,23,33', '');
-  t('string-join(for $x in (1,2,3), $y in (10,20,30) return $x + $y + 1 * 5,",")', '16,26,36,17,27,37,18,28,38', '');
+  t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $x),",")', '1,1,1,2,2,2,3,3,3', '');
+  t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $y),",")', '10,20,30,10,20,30,10,20,30', '');
+  t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $x + $y),",")', '11,21,31,12,22,32,13,23,33', '');
+  t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $x),",")', '1,1,1,2,2,2,3,3,3', '');
+  t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $y),",")', '10,20,30,10,20,30,10,20,30', '');
+  t('join(for $x in (1,2,3) return for $y in (10,20,30) return $x + $y,",")', '11,21,31,12,22,32,13,23,33', '');
+  t('join(for $x in (1,2,3), $y in (10,20,30) return $x + $y,",")', '11,21,31,12,22,32,13,23,33', '');
+  t('join(for $x in (1,2,3), $y in (10,20,30) return $x + $y + 1 * 5,",")', '16,26,36,17,27,37,18,28,38', '');
   t('for $i in (10, 20), $j in (1, 2)  return ($i + $j)', '11', '');
   t('for $i in (10, 20), $j in (1, 2)  return $i + $j', '11', '');
-  t('string-join(for $i in (10, 20), $j in (1, 2)  return ($i + $j), ",")', '11,12,21,22', '');
+  t('join(for $i in (10, 20), $j in (1, 2)  return ($i + $j), ",")', '11,12,21,22', '');
                //For-example of the standard. Attention: The example is wrong in the standard
   t('for $a in fn:distinct-values(bib/book/author) return (bib/book/author[. = $a][1], bib/book[author = $a]/title)','Stevens','<bib>' + '  <book>' + '    <title>TCP/IP Illustrated</title>' + '    <author>Stevens</author>' + '    <publisher>Addison-Wesley</publisher>' + '  </book>' + '  <book>' + '    <title>Advanced Programming in the Unix Environment</title>' + '    <author>Stevens</author>' + '    <publisher>Addison-Wesley</publisher>' + '  </book>' + '  <book>' + '    <title>Data on the Web</title>' + '    <author>Abiteboul</author>' + '    <author>Buneman</author>' + '    <author>Suciu</author>' + '  </book>' + '</bib>' );
   t('string-join(for $a in fn:distinct-values(bib/book/author) return (bib/book/author[. = $a][1], bib/book[author = $a]/title), ",")','Stevens,Stevens,TCP/IP Illustrated,Advanced Programming in the Unix Environment,Abiteboul,Data on the Web,Buneman,Data on the Web,Suciu,Data on the Web','');
@@ -1362,17 +1376,17 @@ begin
   t('if (false()) then 4*7+3 else 5+2*2', '9', '');
 
   t('if (true()) then for $x in (1,2,3) return $x else for $x in (4,5,6) return $x', '1', '');
-  t('string-join(if (true()) then (for $x in (1,2,3) return $x) else for $x in (4,5,6) return $x,",")', '1,2,3', '');
-  t('string-join(if (false()) then (for $x in (1,2,3) return $x) else for $x in (4,5,6) return $x,",")', '4,5,6', '');
-  t('string-join(if (true()) then for $x in (1,2,3) return $x else (for $x in (4,5,6) return $x),",")', '1,2,3', '');
-  t('string-join(if (false()) then for $x in (1,2,3) return $x else (for $x in (4,5,6) return $x),",")', '4,5,6', '');
-  t('string-join(if (true()) then (for $x in (1,2,3) return $x) else (for $x in (4,5,6) return $x),",")', '1,2,3', '');
-  t('string-join(if (false()) then (for $x in (1,2,3) return $x) else (for $x in (4,5,6) return $x),",")', '4,5,6', '');
-  t('string-join(if (true()) then for $x in (1,2,3) return $x else for $x in (4,5,6) return $x,",")', '1,2,3', '');
-  t('string-join(if (false()) then for $x in (1,2,3) return $x else for $x in (4,5,6) return $x,",")', '4,5,6', '');
-  t('string-join(for $x in (1,2,3,4,5) return if ($x mod 2 = 0) then $x else (),",")', '2,4', '');
-  t('string-join(for $x in (1,2,3,4,5) return if ($x mod 2 = 1) then $x else (),",")', '1,3,5', '');
-  t('string-join(for $x in (1,2,3,4,5) return if ($x mod 2 = 0) then $x else "",",")', ',2,,4,', '');
+  t('join(if (true()) then (for $x in (1,2,3) return $x) else for $x in (4,5,6) return $x,",")', '1,2,3', '');
+  t('join(if (false()) then (for $x in (1,2,3) return $x) else for $x in (4,5,6) return $x,",")', '4,5,6', '');
+  t('join(if (true()) then for $x in (1,2,3) return $x else (for $x in (4,5,6) return $x),",")', '1,2,3', '');
+  t('join(if (false()) then for $x in (1,2,3) return $x else (for $x in (4,5,6) return $x),",")', '4,5,6', '');
+  t('join(if (true()) then (for $x in (1,2,3) return $x) else (for $x in (4,5,6) return $x),",")', '1,2,3', '');
+  t('join(if (false()) then (for $x in (1,2,3) return $x) else (for $x in (4,5,6) return $x),",")', '4,5,6', '');
+  t('join(if (true()) then for $x in (1,2,3) return $x else for $x in (4,5,6) return $x,",")', '1,2,3', '');
+  t('join(if (false()) then for $x in (1,2,3) return $x else for $x in (4,5,6) return $x,",")', '4,5,6', '');
+  t('join(for $x in (1,2,3,4,5) return if ($x mod 2 = 0) then $x else (),",")', '2,4', '');
+  t('join(for $x in (1,2,3,4,5) return if ($x mod 2 = 1) then $x else (),",")', '1,3,5', '');
+  t('join(for $x in (1,2,3,4,5) return if ($x mod 2 = 0) then $x else "",",")', ',2,,4,', '');
   t('deep-equal(for $x in (1,2,3,4,5) return if ($x mod 2 = 1) then $x else (),(1,3,5))', 'true', '');
   t('deep-equal(for $x in (1,2,3,4,5) return if ($x mod 2 = 1) then $x else (),(1,3,5,7))', 'false', '');
   t('for $x in 4 return $x + 1', '5', '');
@@ -1388,9 +1402,9 @@ begin
   t('every $x in (1,2,3) satisfies ($x > 0)', 'true', '');
   t('some $x in 1 to 3 satisfies ($x > 0)', 'true', '');
   t('every $x in 1 to 3 satisfies ($x > 0)', 'true', '');
-  t('string-join(for $x in 1 to 10 return 2*$x,",")', '2,4,6,8,10,12,14,16,18,20', '');
+  t('join(for $x in 1 to 10 return 2*$x,",")', '2,4,6,8,10,12,14,16,18,20', '');
   t('for $x in (1,2,3), $y in (1,2) return concat("x",$x,"y",$y)', 'x1y1', '');
-  t('string-join(for $x in (1,2,3), $y in (1,2) return concat("x",$x,"y",$y),",")', 'x1y1,x1y2,x2y1,x2y2,x3y1,x3y2', '');
+  t('join(for $x in (1,2,3), $y in (1,2) return concat("x",$x,"y",$y),",")', 'x1y1,x1y2,x2y1,x2y2,x3y1,x3y2', '');
   t('for $i in (1, 2), $j in (1, 2)  return $i + $j', '2', '');
   t('for $i in (1,2  ), $j in (1,2) return $i + $j', '2', '');
   t('for $i in (1,2,3), $j in (1,2) return $i+$j', '2', '');
@@ -1398,8 +1412,8 @@ begin
   t('for $x in (1,2,3), $y in (1,2) return ($y*$x)', '1', '');
   t('for $x in (1,2,3), $y in (1,2) return $y*$x', '1', '');
   t('for $x in 1 to 3, $y in (1,2) return $y*$x', '1', '');
-  t('string-join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
-  t('string-join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
+  t('join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
+  t('join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
   t('some $x in 1 to 3, $y in (1,2) satisfies $x = $y', 'true', '');
   t('every $x in 1 to 3, $y in (1,2) satisfies $x = $y', 'false', '');
   t('some $x in 1 to 3, $y in (1,2) satisfies $x > $y', 'true', '');
@@ -1522,17 +1536,17 @@ begin
   t('a := 1, b:= ($a * 3), c := $b + 7', '1', '');
   t('concat($a,";",$b,";",$c)', '1;3;10', '');
   t('a := (1,2,3,42), b:= 4+5, c:=2*3 + 1, d:=a/text()', '1', '<a>hallo</a>');
-  t('string-join($a,";")', '1;2;3;42', '');
+  t('join($a,";")', '1;2;3;42', '');
   t('concat($b,";",$c,";",$d)', '9;7;hallo', '');
   t('x := for $y in $a return $y+10 ', '11', '');
-  t('string-join($x,",")', '11,12,13,52', '');
-  t('string-join(m := (1,2,3),",")', '1,2,3', '');
-  t('string-join($m,",")', '1,2,3', '');
-  t('string-join((m := (1,2,3), b := (4,5,6), c:=(7,8,9)),",")', '1,2,3,4,5,6,7,8,9', '');
-  t('string-join($m,",")', '1,2,3', '');
-  t('string-join($b,",")', '4,5,6', '');
-  t('string-join($c,",")', '7,8,9', '');
-  t('string-join((m := (1,2,3), b := ($m, 10), c:=(100,$b, 1000)),",")', '1,2,3,1,2,3,10,100,1,2,3,10,1000', '');
+  t('join($x,",")', '11,12,13,52', '');
+  t('join(m := (1,2,3),",")', '1,2,3', '');
+  t('join($m,",")', '1,2,3', '');
+  t('join((m := (1,2,3), b := (4,5,6), c:=(7,8,9)),",")', '1,2,3,4,5,6,7,8,9', '');
+  t('join($m,",")', '1,2,3', '');
+  t('join($b,",")', '4,5,6', '');
+  t('join($c,",")', '7,8,9', '');
+  t('join((m := (1,2,3), b := ($m, 10), c:=(100,$b, 1000)),",")', '1,2,3,1,2,3,10,100,1,2,3,10,1000', '');
   t('if (1 = 1) then a := 10 else a := 20', '10', '');
   t('$a', '10', '');
   t('if (() = 1) then a := 10 else a := 20', '20', '');
@@ -1877,7 +1891,7 @@ begin
   t('(xs:date("2012-12-20") + xs:dayTimeDuration("P4DT20H")) + xs:dayTimeDuration("P4DT20H")', '2012-12-28', '');
   t('xs:date("2012-12-20") - xs:dayTimeDuration("P4DT20H")', '2012-12-15', '');
   t('xs:date("2012-12-24") - xs:date("2012-12-20")', 'P4D', '');
-  t('timezone-from-dateTime(xs:date("2012-12-30+05:30"))', 'PT5H30M', '');
+  t('timezone-from-dateTime(xs:date("2012-12-30+05:30") '+ IfThen(strictTypeChecking, 'cast as xs:dateTime', '')+')', 'PT5H30M', '');
   t('timezone-from-date(xs:date("2012-12-30Z"))', 'PT0S', '');
   t('timezone-from-time(xs:time("02:18:20-1203"))', '-PT12H3M', '');
      {
@@ -2113,28 +2127,28 @@ begin
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return ($i.b,$i.c), "|")', 'Y|Z', '');
   t('string-join(for $i in (object(("abc", "123")), object(("abc", "456")), object(("abc", "789"))) return $i.abc, "|")', '123|456|789', '');
   t('string-join(for $i in (object(("abc", "123")), object(("abc", "456")), object(("abc", "789"))) return x"{$i.abc}", "|")', '123|456|789', '');
-  t('string-join((i := object(("a", 1)), for $i in object(("a", "2")) return $i.a), "|")', '|2', '');
-  t('string-join((i := object(("a", 1)), for $i in object(("b", "2")) return $i.a), "|")', '', '');
-  t('string-join((i := object(("a", 1)), for $i in (object(("b", "2")),object(("a", "3"))) return $i.a), "|")', '|3', '');
+  t('join((i := object(("a", 1)), for $i in object(("a", "2")) return $i.a), "|")', '|2', '');
+  t('join((i := object(("a", 1)), for $i in object(("b", "2")) return $i.a), "|")', '', '');
+  t('join((i := object(("a", 1)), for $i in (object(("b", "2")),object(("a", "3"))) return $i.a), "|")', '|3', '');
 
   //New object syntax
   t('object(("hallo", 123)).hallo', '123'); //old
   t('({"hallo": 123}).hallo', '123');
   t('({"hallo": 123, "foobar": 456, "xyz": 789}).foobar', '456');
   t('({"nest": {"ing": "birdy"}}).nest.ing', 'birdy');
-  t('string-join(({"array": (1, 2, 3)}).array, " ")', '1 2 3');
+  t('join(({"array": (1, 2, 3)}).array, " ")', '1 2 3');
   t('{"hallo": 123}.hallo', '123');
   t('{}.hallo', ''); //no exception on undefined properties
-  t('string-join({"array": (1, 2, 3)}.array, " ")', '1 2 3');
-  t('string-join(jn:members({"array": [1, 2, 3]}.array), " ")', '1 2 3');
-  t('string-join(({"array": [1, 2, 3]}.array)(), " ")', '1 2 3');
-  t('string-join({"array": [1, 2, 3]}.array(), " ")', '1 2 3');
-  t('string-join({"array": (1)}.array, " ")', '1');
-  t('string-join(jn:members({"array": [1]}.array), " ")', '1');
-  t('string-join(({"array": [1]}.array)(), " ")', '1');
-  t('string-join({"array": ()}.array, " ")', '');
-  t('string-join(jn:members({"array": []}.array), " ")', '');
-  t('string-join(({"array": []}.array)(), " ")', '');
+  t('join({"array": (1, 2, 3)}.array, " ")', '1 2 3');
+  t('join(jn:members({"array": [1, 2, 3]}.array), " ")', '1 2 3');
+  t('join(({"array": [1, 2, 3]}.array)(), " ")', '1 2 3');
+  t('join({"array": [1, 2, 3]}.array(), " ")', '1 2 3');
+  t('join({"array": (1)}.array, " ")', '1');
+  t('join(jn:members({"array": [1]}.array), " ")', '1');
+  t('join(({"array": [1]}.array)(), " ")', '1');
+  t('join({"array": ()}.array, " ")', '');
+  t('join(jn:members({"array": []}.array), " ")', '');
+  t('join(({"array": []}.array)(), " ")', '');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[1].a', '10');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[2].a', '20');
   t('{"array": ({"a": 10}, {"a": 20}, {"a": 30})}.array[3].a', '30');
@@ -2449,8 +2463,8 @@ begin
   t('json(''2000000000000000'')', '2000000000000000');
   t('json(''true'')', 'true');
   t('jn:members(json(''[1, 2, 3]''))', '1');
-  t('string-join(jn:members(json(''[1, 2, 3]'')), " ")', '1 2 3');
-  t('string-join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
+  t('join(jn:members(json(''[1, 2, 3]'')), " ")', '1 2 3');
+  t('join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
   t('join(jn:members(([1, 2, 3], {"a": 17}, [4,5,6], 7889, "hallo")))', '1 2 3 4 5 6');
   t('join(jn:keys(([1, 2, 3], {"a": 17}, [4,5,6], 7889, "hallo")))', 'a');
   t('join(jn:keys(([1, 2, 3], {"a": 17}, [4,5,6], {"a": 7, "b": 8, "c": 89}, "hallo", {"b": []})))', 'a b c');
@@ -2708,7 +2722,7 @@ begin
   t('(xs:untypedAtomic("INF") div xs:float("-INF"))', 'NaN', '');
   t('(xs:untypedAtomic("   INF     ") div xs:float("   -INF  "))', 'NaN', '');
   t('(3 idiv xs:untypedAtomic("2"))', '1', '');
-  t('(3 idiv xs:untypedAtomic(" 2 "))', '1', '');
+  //t('(3 idiv xs:untypedAtomic(" 2 "))', '1', '');
   t('xs:float(0.0 div 0e0) castable as xs:integer', 'false', '');
   t('xs:base64Binary("0FB7")', '0FB7', '');
   t('xs:hexBinary("07fb")', '07FB', '');
@@ -3405,9 +3419,8 @@ begin
   t('xs:float("INF") eq xs:double("-INF")', 'false');
   t('xs:float("-INF") eq xs:double("INF")', 'false');
   t('xs:float("-INF") eq xs:double("-INF")', 'true');
-  //t('xs:float(1.2) = "1.2"', 'true'); //extension: weak typing.
-  t('xs:double(1.2) = "1.2"', 'true'); //extension: weak typing.
-  t('1.2 = "1.2"', 'true'); //extension: weak typing.
+  //t('xs:float(1.2) = '+untypedAtomic+'("1.2")', 'true'); rounding error
+  t('xs:double(1.2) = '+untypedAtomic+'("1.2")', 'true');
   t('string-join(index-of((0,1,2,3),"1"), ":")', '');
   t('join(distinct-values((1, "1", 2, 2.0)),":")', '1:1:2');
   t('deep-equal(1, current-dateTime())', 'false');
@@ -3501,7 +3514,7 @@ begin
   t('-1.9999 cast as xs:integer', '-1');
   t('1.9999 cast as xs:integer', '1');
   t('join((-1[0 < .], "|", -t/2, "|", +(-())))', '-1 | -2 |', '<t>7</t>');
-  f('-t/"a"', 'err:XPTY0004');
+  if strictTypeChecking then f('-t/"a"', 'err:XPTY0004');
 
 
   //more precise type tests
@@ -3539,11 +3552,9 @@ begin
   t('type-of(xs:untypedAtomic("1.0") mod 8)', 'double');
   t('type-of(xs:untypedAtomic("1") mod 8)', 'double');
   t('xs:untypedAtomic("1") + 7', '8');
-  ps.StaticContext.strictTypeChecking := false;
-  t('xs:string("1") + 7', '8');
-  t('xs:string("1") - 7', '-6');
-  ps.StaticContext.strictTypeChecking := strictTypeChecking;
-  f('xs:string("1") + 7', 'err:XPTY0004');
+  t(untypedAtomic+'("1") + 7', '8');
+  t(untypedAtomic+'("1") - 7', '-6');
+  if strictTypeChecking then f('xs:string("1") + 7', 'err:XPTY0004');
   t('type-of(xs:untypedAtomic("1e6") + 7)', 'double');
   t('type-of(xs:untypedAtomic("1.0") + 7)', 'double');
   t('type-of(xs:untypedAtomic("1") + 7)', 'double');
@@ -3553,8 +3564,18 @@ begin
   t('type-of(xs:untypedAtomic("1") - 7)', 'double');
   t('type-of(1 - 7)', 'integer');
 
+  if strictTypeChecking then begin
+    f('1 eq xs:untypedAtomic("1")', 'XPTY0004');
+    f('1 eq xs:untypedAtomic("1.0")', 'XPTY0004');
+    f('0 eq xs:untypedAtomic("fooo")', 'XPTY0004');
+  end else begin
+    t('1 eq xs:untypedAtomic("1")', 'true');
+    t('1 eq xs:untypedAtomic("1.0")', 'false');
+    t('0 eq xs:untypedAtomic("fooo")', 'false');
+  end;
   t('1 = xs:untypedAtomic("1")', 'true');
   t('1 = xs:untypedAtomic("1.0")', 'true');
+  f('0 = xs:untypedAtomic("foo")', 'FORG0001');
   t('xs:dayTimeDuration("P1D") = xs:untypedAtomic("P0DT23H")', 'false');
   t('xs:dayTimeDuration("P1D") = xs:untypedAtomic("P0DT24H")', 'true');
   t('xs:dayTimeDuration("P1D") < xs:untypedAtomic("P0DT23H")', 'false');
