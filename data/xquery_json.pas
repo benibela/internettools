@@ -351,8 +351,8 @@ initialization
 
   jn := TXQNativeModule.Create(XMLNamespace_JSONiqFunctions);
   TXQueryEngine.registerNativeModule(jn);
-  jn.registerFunction('keys', @xqFunctionKeys, ['($arg as object()) as xs:string*']);
-  jn.registerFunction('members', @xqFunctionMembers, ['($arg as array()) as item()*']);
+  jn.registerFunction('keys', @xqFunctionKeys, ['($arg as item()*) as xs:string*']);
+  jn.registerFunction('members', @xqFunctionMembers, ['($arg as item()*) as item()*']);
 
   //TODO: fn:string/fn:data errors
   //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
