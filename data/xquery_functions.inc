@@ -2777,6 +2777,7 @@ begin
   end;
   if index > 0 then resseq.seq.add(args[2]);
   result := resseq;
+  xqvalueSeqSqueeze(result);
 end;
 
 function xqFunctionRemove(const args: TXQVArray): IXQValue;
