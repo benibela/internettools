@@ -89,6 +89,7 @@ var tempb: Boolean;
   baseboundary: String;
   func: String;
   untypedAtomic: String;
+  xqv,xqw: IXQValue;
 begin
   i := 0;
 //  time := Now;
@@ -4060,6 +4061,14 @@ begin
   f('fn:map(1,2)', 'err:XPST0017');
   f('1 instance of (xs:integer)', 'err:XPST0003');
   f('fn:string-join(("Blow, ", "blow, ", "thou ", "winter ", "wind!"))', 'err:XPST0017');
+
+  //test differences between value and (value)
+  xqv := xqvalue(10);
+  xqw := TXQValueSequence.create(xqvalue(10));
+  if ps.StaticContext.compareAtomic(xqv,xqw) <> 0 then raise Exception.Create('eq seq');
+  if ps.StaticContext.compareAtomic(xqw,xqv) <> 0 then raise Exception.Create('seq eq');
+  if ps.StaticContext.compareAtomic(xqw,xqw) <> 0 then raise Exception.Create('seq seq');
+
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');

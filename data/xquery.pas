@@ -167,15 +167,12 @@ type
     function CurrentDateTime: TDateTime; inline;
 
   protected
-    function compareCommonFloat(ak, bk: TXQValueKind; a, b: TXQValue): integer;
-    function compareCommonAsStrings(a, b: TXQValue; overrideCollation: TXQCollation): integer;
-    function compareCommonEqualKind(kind: TXQValueKind; a, b: TXQValue; overrideCollation: TXQCollation): integer;
     function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
   public
     //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
     function compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
     //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer; inline;
+    function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation = nil): integer; inline;
     procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
     function equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation; acceptNAN: boolean = false): boolean;
     function equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation; acceptNAN: boolean = false): boolean;
@@ -3083,91 +3080,100 @@ begin
   {$POP}
 end;
 
-function TXQStaticContext.compareCommonFloat(ak, bk: TXQValueKind; a, b: TXQValue): integer;
-function vtof(k: TXQValueKind; v: txqvalue): xqfloat; //faster implementation of cast
-begin
-  result := v.toFloat;
-  case k of
-    pvkInt64, pvkFloat, pvkBigDecimal: ; //always ok
-    pvkString, pvkNode: begin
-      if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'float/double');
-      if IsNan(result) and (v.toString <> 'NaN') then raiseFORG0001InvalidConversion(v, 'float/double')
-    end;
-    else begin
-      if strictTypeChecking then raiseXPTY0004TypeError(v, 'float/double');
-      result := v.toFloat;
-    end;
-  end;
-end;
-
-var
-  cmpClass: TXSType;
-  ad, bd: xqfloat;
-begin
-  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
-    exit(-2);
-  cmpClass := TXSType.commonDecimalType(a, b);
-  ad := vtof(ak, a);
-  bd := vtof(bk, b);
-  if cmpClass.derivedFrom(baseSchema.Double) then begin
-    result := compareValue(double(ad), double(bd));
-  end else if cmpClass.derivedFrom(baseSchema.Float) then begin
-    result := compareValue(Single(ad), Single(bd));
-  end;
-end;
-
-function TXQStaticContext.compareCommonAsStrings(a, b: TXQValue; overrideCollation: TXQCollation): integer;
-var sa, sb: string;
-begin
-  if overrideCollation = nil then overrideCollation := collation;
-  if a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary) then begin
-    sa := (a as TXQValueString).toRawBinary;
-    overrideCollation := nil;
-  end else sa := a.toString;
-  if b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary) then begin
-    sb := (b as TXQValueString).toRawBinary;
-    overrideCollation := nil;
-  end else sb := b.toString;
 
 
-  if overrideCollation <> nil then result := overrideCollation.compare(sa,sb)
-  else result := CompareStr(sa, sb);
-end;
-
-function TXQStaticContext.compareCommonEqualKind(kind: TXQValueKind; a, b: TXQValue; overrideCollation: TXQCollation): integer;
-begin
-  case kind of
-    pvkBoolean:
-      if TXQValueBoolean(a).bool = TXQValueBoolean(b).bool then result := 0
-      else if TXQValueBoolean(a).bool then result := 1
-      else result := -1;
-    pvkInt64:
-      if TXQValueInt64(a).value = TXQValueInt64(b).value then result := 0
-      else if TXQValueInt64(a).value < TXQValueInt64(b).value then result := -1
-      else result := 1;
-    pvkBigDecimal: result := compareBigDecimals(a.toDecimal, b.toDecimal);
-    pvkFloat: result := compareCommonFloat(kind, kind, a, b);
-    pvkDateTime: begin
-      if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
-      if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
-        result := compareValue(TXQValueDateTime(a).toMonths(), TXQValueDateTime(b).toMonths());
-        if result <> 0 then exit;
-        result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime(), 1e-6);
-      end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
-        result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
-    end;
-    pvkQName:
-      if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
-         or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
-        if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
-          result := 0;
-    pvkNull: result := 0;
-    pvkUndefined: result := -2;
-    pvkNode, pvkString: result := compareCommonAsStrings(a, b, overrideCollation);
-  end;
-end;
 
 function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
+var ak, bk: TXQValueKind;
+  function compareCommonFloat(): integer;
+    function vtof(k: TXQValueKind; v: txqvalue): xqfloat; //faster implementation of cast
+    begin
+      result := v.toFloat;
+      case k of
+        pvkInt64, pvkFloat, pvkBigDecimal: ; //always ok
+        pvkString, pvkNode: begin
+          if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'float/double');
+          if IsNan(result) and (v.toString <> 'NaN') then raiseFORG0001InvalidConversion(v, 'float/double')
+        end;
+        else begin
+          if strictTypeChecking then raiseXPTY0004TypeError(v, 'float/double');
+          result := v.toFloat;
+        end;
+      end;
+    end;
+
+  var
+    cmpClass: TXSType;
+    ad, bd: xqfloat;
+  begin
+    if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
+      exit(-2);
+    cmpClass := TXSType.commonDecimalType(a, b);
+    ad := vtof(ak, a);
+    bd := vtof(bk, b);
+    if cmpClass.derivedFrom(baseSchema.Double) then begin
+      result := compareValue(double(ad), double(bd));
+    end else if cmpClass.derivedFrom(baseSchema.Float) then begin
+      result := compareValue(Single(ad), Single(bd));
+    end;
+  end;
+
+  function compareCommonAsStrings(): integer;
+  var sa, sb: string;
+  begin
+    if overrideCollation = nil then overrideCollation := collation;
+    if a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary) then begin
+      sa := (a as TXQValueString).toRawBinary;
+      overrideCollation := nil;
+    end else sa := a.toString;
+    if b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary) then begin
+      sb := (b as TXQValueString).toRawBinary;
+      overrideCollation := nil;
+    end else sb := b.toString;
+
+
+    if overrideCollation <> nil then result := overrideCollation.compare(sa,sb)
+    else result := CompareStr(sa, sb);
+  end;
+  function compareCommonEqualKind(): integer;
+  begin
+
+    case ak of
+      pvkBoolean:
+        if TXQValueBoolean(a).bool = TXQValueBoolean(b).bool then result := 0
+        else if TXQValueBoolean(a).bool then result := 1
+        else result := -1;
+      pvkInt64:
+        if TXQValueInt64(a).value = TXQValueInt64(b).value then result := 0
+        else if TXQValueInt64(a).value < TXQValueInt64(b).value then result := -1
+        else result := 1;
+      pvkBigDecimal: result := compareBigDecimals(a.toDecimal, b.toDecimal);
+      pvkFloat: result := compareCommonFloat();
+      pvkDateTime: begin
+        if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
+        if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
+          result := compareValue(TXQValueDateTime(a).toMonths(), TXQValueDateTime(b).toMonths());
+          if result <> 0 then exit;
+          result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime(), 1e-6);
+        end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
+          result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
+      end;
+      pvkQName:
+        if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
+           or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
+          if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
+            result := 0;
+      pvkNull: result := 0;
+      pvkUndefined: result := -2;
+      pvkNode, pvkString: result := compareCommonAsStrings;
+      pvkSequence: begin
+        if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
+        if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
+        result := compareCommon(a.get(1) as TXQValue, b.get(1) as TXQValue, overrideCollation, castUnknownToString);
+      end
+      else raisePXPInternalError;
+    end;
+  end;
   function vtod(k: TXQValueKind; v: txqvalue): BigDecimal; //faster implementation of cast
   begin
     case k of
@@ -3184,17 +3190,29 @@ function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCo
     end;
   end;
 var tempDateTime: TXQValueDateTime;
-  ak, bk: TXQValueKind;
 begin
   ak := a.kind; bk := b.kind;
-  if ak = bk then exit(compareCommonEqualKind(ak, a, b, overrideCollation));
-  if (ak = pvkUndefined) or (bk = pvkUndefined) then exit(-2);
-  if ak = pvkNull then exit(-1);
-  if bk = pvkNull then exit(1);
+  if ak = bk then exit(compareCommonEqualKind());
+  case ak of
+    pvkUndefined: exit(-2);
+    pvkSequence: begin
+      if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
+      exit(compareCommon(a.get(1) as TXQValue,b,overrideCollation,castUnknownToString));
+    end;
+  end;
+  case bk of
+    pvkUndefined: exit(-2);
+    pvkSequence: begin
+      if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
+      exit(compareCommon(a,b.get(1) as TXQValue,overrideCollation,castUnknownToString));
+    end;
+    pvkNull: exit(1);
+  end;
+  if ak = pvkNull then exit(-1); //can only test this after checkin b's sequence state
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
-    exit(compareCommonAsStrings(a,b, overrideCollation));
+    exit(compareCommonAsStrings());
   if (ak = pvkFloat) or (bk = pvkFloat) then
-    exit(compareCommonFloat(ak, bk, a, b));
+    exit(compareCommonFloat());
   if (ak in [pvkInt64, pvkBigDecimal]) or (bk in [pvkInt64, pvkBigDecimal]) then begin
     //if not (ak in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(a) <> xsceNoError) then raiseXPTY0004TypeError(a, 'decimal');
     //if not (bk in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(b) <> xsceNoError) then raiseXPTY0004TypeError(b, 'decimal');
@@ -3213,7 +3231,7 @@ begin
     tempDateTime.free;
     exit;
   end;
-  exit(compareCommonAsStrings(a,b, overrideCollation));
+  exit(compareCommonAsStrings());
 end;
 
 function TXQStaticContext.compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
