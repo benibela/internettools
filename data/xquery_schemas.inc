@@ -783,21 +783,39 @@ begin
                 and (baseSchema.isValidQName(trim(v.toString))));
 end;
 
+procedure TXSQNameType.castAllowed(const v: ixqvalue; const s: string; const context: TXQStaticContext);
+begin
+  if not (context.model in [xqpmXPath3, xqpmXQuery3]) then
+    raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
+  if (v.kind <> pvkString) or (not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic)) then
+    raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
+  if not (self <> baseSchema.NOTATION) and (baseSchema.isValidQName(s)) then
+    raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
+end;
+
 function TXSQNameType.cast(const v: IXQValue; const context: TXQEvaluationContext): IXQValue;
 var
-  castAllowed: Boolean;
   namespace: INamespace;
   s: String;
 begin
   if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
-  if not (context.staticContext.model in [xqpmXPath3, xqpmXQuery3]) then
-    raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
-  if (v.kind <> pvkString) or (not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic)) then
-    raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
   s := trim(v.toString);
-  castAllowed := (self <> baseSchema.NOTATION) and (baseSchema.isValidQName(s));
-  if not castAllowed then
-    raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
+  castAllowed(v, s, context.staticContext);
+  if pos(':', s) > 0 then begin
+    namespace := context.findNamespace(strSplitGet(':', s), xqdnkElementType);
+    if namespace = nil then raise EXQEvaluationException.create('FONS0004', 'Failed to find namespace of: '+v.toString);
+  end else namespace := context.findNamespace('', xqdnkElementType);
+  result := TXQValueQName.create(self, namespace, s);
+end;
+
+function TXSQNameType.cast(const v: IXQValue; const context: TXQStaticContext): IXQValue;
+var
+  namespace: INamespace;
+  s: String;
+begin
+  if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
+  s := trim(v.toString);
+  castAllowed(v, s, context  );
   if pos(':', s) > 0 then begin
     namespace := context.findNamespace(strSplitGet(':', s), xqdnkElementType);
     if namespace = nil then raise EXQEvaluationException.create('FONS0004', 'Failed to find namespace of: '+v.toString);

@@ -490,6 +490,8 @@ begin
     f('5.00<false()', 'XPTY0004');
     f('5.00>true()', 'XPTY0004');
     f('5.00>false()', 'XPTY0004');
+    f('xs:untypedAtomic("fn:a") eq xs:QName("fn:a")', 'XPTY0004');
+    f('xs:untypedAtomic("fn:a") = xs:QName("fn:a")', 'XPTY0004');
   end else begin
     t('5.00<true()', 'false');
     t('5<false()', 'false');
@@ -3583,8 +3585,8 @@ begin
     f('1 = "1"', 'XPTY0004');
     f('false() = "false"', 'XPTY0004');
   end else begin
-    f('1 = "1"', 'true');
-    f('false() = "false"', 'true');
+    t('1 = "1"', 'true');
+    t('false() = "false"', 'true');
   end;
   t('false() = xs:untypedAtomic("false")', 'true');
   t('true() = xs:untypedAtomic("1")', 'true');

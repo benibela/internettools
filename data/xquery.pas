@@ -1025,6 +1025,7 @@ type
 
   { TXSQNameType }
 
+
   //** XML Schema QName type, derived from xs:QName or xs:NOTATION
   TXSQNameType = class(TXSSimpleType)
     constructor create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
@@ -1032,7 +1033,9 @@ type
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
     function castable(const v: IXQValue; const context: TXQStaticContext): boolean;
+    procedure castAllowed(const v: ixqvalue; const s: string; const context: TXQStaticContext);
     function cast(const v: IXQValue; const context: TXQEvaluationContext): IXQValue;
+    function cast(const v: IXQValue; const context: TXQStaticContext): IXQValue;
   end;
 
   { TXSDateTimeType }
@@ -3135,7 +3138,7 @@ var ak, bk: TXQValueKind;
     if overrideCollation <> nil then result := overrideCollation.compare(sa,sb)
     else result := CompareStr(sa, sb);
   end;
-  function compareBooleans(const ab, bb: boolean): integer;
+  function compareBooleans(const ab, bb: boolean): integer; inline;
   begin
     if ab = bb then result := 0
     else if ab then result := 1
@@ -3194,7 +3197,7 @@ var ak, bk: TXQValueKind;
       end;
     end;
   end;
-  function vtob(k: TXQValueKind; v: TXQValue): Boolean;
+  {function vtob(k: TXQValueKind; v: TXQValue): Boolean;
   begin
     case k of
       pvkString, pvkNode: begin
@@ -3207,9 +3210,10 @@ var ak, bk: TXQValueKind;
       end;
       pvkBoolean: result := TXQValueBoolean(v).bool;
     end;
-  end;
+  end;             }
 
 var tempDateTime: TXQValueDateTime;
+  tempxqv: IXQValue;
 begin
   ak := a.kind; bk := b.kind;
   if ak = bk then exit(compareCommonEqualKind());
@@ -3219,6 +3223,7 @@ begin
       if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
       exit(compareCommon(a.get(1) as TXQValue,b,overrideCollation,castUnknownToString));
     end;
+    pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
   end;
   case bk of
     pvkUndefined: exit(-2);
@@ -3231,6 +3236,10 @@ begin
   if ak = pvkNull then exit(-1); //can only test this after checkin b's sequence state
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
     exit(compareCommonAsStrings());
+  if strictTypeChecking then begin
+    if (ak = pvkString) and not a.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(a, b.typeName);
+    if (bk = pvkString) and not b.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(b, a.typeName);
+  end;
   if (ak = pvkFloat) or (bk = pvkFloat) then
     exit(compareCommonFloat());
   if (ak in [pvkInt64, pvkBigDecimal]) or (bk in [pvkInt64, pvkBigDecimal]) then begin
@@ -3238,7 +3247,7 @@ begin
     //if not (bk in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(b) <> xsceNoError) then raiseXPTY0004TypeError(b, 'decimal');
     exit(compareBigDecimals(vtod(ak, a), vtod(bk, b)));
   end;
-  if (ak = pvkQName) or (bk = pvkQName) then
+  {if (ak = pvkQName) or (bk = pvkQName) then
     raise EXQEvaluationException.Create('XPTY0004', 'QName compared');
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ak = pvkDateTime then begin
@@ -3250,9 +3259,23 @@ begin
     end;
     tempDateTime.free;
     exit;
+  end;               }
+  //if (ak = pvkBoolean) then exit(compareBooleans(TXQValueBoolean(a).bool, vtob(bk,b)));
+  //if (bk = pvkBoolean) then exit(compareBooleans(vtob(ak,a), TXQValueBoolean(b).bool));
+  if not (ak in [pvkString, pvkNode]) then begin
+    if ak <> pvkQName then tempxqv := (a.typeAnnotation as TXSSimpleType).primitive.createValue(b)
+    else tempxqv := ((a.typeAnnotation as TXSSimpleType).primitive as TXSQNameType).cast(b, Self);
+    b := tempxqv as TXQValue;
+    bk := ak;
+    exit(compareCommonEqualKind());
   end;
-  if (ak = pvkBoolean) then exit(compareBooleans(TXQValueBoolean(a).bool, vtob(bk,b)));
-  if (bk = pvkBoolean) then exit(compareBooleans(vtob(ak,a), TXQValueBoolean(b).bool));
+  if not (bk in [pvkString, pvkNode]) then begin
+    if bk <> pvkQName then tempxqv := (b.typeAnnotation as TXSSimpleType).primitive.createValue(a)
+    else tempxqv := ((b.typeAnnotation as TXSSimpleType).primitive as TXSQNameType).cast(a, Self);
+    a := tempxqv as TXQValue;
+    ak := bk;
+    exit(compareCommonEqualKind());
+  end;
   exit(compareCommonAsStrings());
 end;
 

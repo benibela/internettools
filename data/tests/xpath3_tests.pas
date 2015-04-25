@@ -64,7 +64,7 @@ var
        err := e.namespace.getPrefix+':'+e.errorCode;
      end end;
      if err = '' then raise Exception.Create('No error => Test failed ');
-     if err <> code then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
+     if (err <> code) and (err <> 'err:'+code) then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
    end;
 
 begin
@@ -225,6 +225,9 @@ begin
   t('innermost((//node(), //@*))', 'a1 a2 AT3 a3 an');
   t('outermost((//node(), //@*))', 'a1a2a3an');
   t('fn:string-join(("Blow, ", "blow, ", "thou ", "winter ", "wind!"))', 'Blow, blow, thou winter wind!');
+
+  f('xs:untypedAtomic("fn:a") eq xs:QName("fn:a")', 'XPTY0004');
+  t('xs:untypedAtomic("fn:a") = xs:QName("fn:a")', 'true');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');

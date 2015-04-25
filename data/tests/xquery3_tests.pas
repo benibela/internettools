@@ -137,7 +137,7 @@ begin
      'declare namespace abcxq = "http://www.w3.org/2012/xquery";'+
      'declare function test:internalref($a){ concat(test:funcI(), $a) }; '+
      'declare function test:internalrevf(){ join(($test:var, $test:varI, test:funcI())) }; '+
-     'declare variable $test:var := 12; '+
+     'declare variable $test:var external := 12; '+
      'declare %private variable $test:varI := 34; '+
      'declare %public variable $test:varE := 56; '+
      'declare %local:private %local:private2(1,"13asds",1.343) variable $test:varF := 78; '+
