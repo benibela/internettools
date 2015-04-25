@@ -2039,7 +2039,14 @@ function TXQParsingContext.parseModule(): TXQTerm;
     TXQTermModule(result).push(vari);
     case nextToken() of
       ':=': vari.push(parse());
-      'external': ;
+      'external': if nextToken(true) = ':=' then begin
+        requireXQuery3('default value');
+        expect(':=');
+        vari.push(parse());
+        SetLength(vari.annotations, length(vari.annotations)+1);
+        vari.annotations[high(vari.annotations)].name := 'external';
+        vari.annotations[high(vari.annotations)].namespace := XMLNamespaceURL_MyExtensions;
+      end;
       else raiseParsingError('XPST0003', 'Invalid variable declaration');
     end;
   end;

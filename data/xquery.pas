@@ -3546,6 +3546,7 @@ var
   nsu, name: String;
   i: Integer;
   cycler: TVariableCycleDetector;
+  extern: Boolean;
 begin
   if context.staticContext <> ownStaticContext then begin
     for i := 0 to high(declaration.annotations) do
@@ -3557,6 +3558,10 @@ begin
     exit(getVariableValue(declaration, tempcontext, ownStaticContext));
   end;
   hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
+  extern := not hasExpression;
+  if not extern and (length(declaration.annotations) > 0) then
+    with declaration.annotations[high(declaration.annotations)] do
+      extern := (name = 'external') and (namespace = XMLNamespaceURL_MyExtensions);
 
   result := nil;
   if hasExpression then begin
@@ -3570,11 +3575,14 @@ begin
       cycler.free;
     end;
     result := declaration.children[high(declaration.children)].evaluate(context)
-  end else begin
-    if (context.staticContext.sender = nil) or not assigned(context.staticContext.sender.OnDeclareExternalVariable) then raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
-    name := (declaration.variable as TXQTermVariable).value;
-    nsu := (declaration.variable as TXQTermVariable).namespaceURL;
-    context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, nsu, name, result);
+  end;
+  if extern then begin
+    if (context.staticContext.sender <> nil) and assigned(context.staticContext.sender.OnDeclareExternalVariable) then begin
+     //raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
+      name := (declaration.variable as TXQTermVariable).value;
+      nsu := (declaration.variable as TXQTermVariable).namespaceURL;
+      context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, nsu, name, result);
+    end;
     if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
   end;
 end;
