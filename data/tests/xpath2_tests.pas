@@ -3569,14 +3569,26 @@ begin
     f('1 eq xs:untypedAtomic("1")', 'XPTY0004');
     f('1 eq xs:untypedAtomic("1.0")', 'XPTY0004');
     f('0 eq xs:untypedAtomic("fooo")', 'XPTY0004');
+    f('"false" eq false()', 'XPTY0004');
   end else begin
     t('1 eq xs:untypedAtomic("1")', 'true');
     t('1 eq xs:untypedAtomic("1.0")', 'false');
     t('0 eq xs:untypedAtomic("fooo")', 'false');
+    t('"false" eq false()', 'true');
   end;
   t('1 = xs:untypedAtomic("1")', 'true');
   t('1 = xs:untypedAtomic("1.0")', 'true');
   f('0 = xs:untypedAtomic("foo")', 'FORG0001');
+  if strictTypeChecking then begin
+    f('1 = "1"', 'XPTY0004');
+    f('false() = "false"', 'XPTY0004');
+  end else begin
+    f('1 = "1"', 'true');
+    f('false() = "false"', 'true');
+  end;
+  t('false() = xs:untypedAtomic("false")', 'true');
+  t('true() = xs:untypedAtomic("1")', 'true');
+  f('false() = xs:untypedAtomic("falseXXX")', 'FORG0001');
   t('xs:dayTimeDuration("P1D") = xs:untypedAtomic("P0DT23H")', 'false');
   t('xs:dayTimeDuration("P1D") = xs:untypedAtomic("P0DT24H")', 'true');
   t('xs:dayTimeDuration("P1D") < xs:untypedAtomic("P0DT23H")', 'false');

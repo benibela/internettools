@@ -3135,14 +3135,19 @@ var ak, bk: TXQValueKind;
     if overrideCollation <> nil then result := overrideCollation.compare(sa,sb)
     else result := CompareStr(sa, sb);
   end;
+  function compareBooleans(const ab, bb: boolean): integer;
+  begin
+    if ab = bb then result := 0
+    else if ab then result := 1
+    else result := -1;
+  end;
+
   function compareCommonEqualKind(): integer;
   begin
 
     case ak of
       pvkBoolean:
-        if TXQValueBoolean(a).bool = TXQValueBoolean(b).bool then result := 0
-        else if TXQValueBoolean(a).bool then result := 1
-        else result := -1;
+        result := compareBooleans(TXQValueBoolean(a).bool, TXQValueBoolean(b).bool);
       pvkInt64:
         if TXQValueInt64(a).value = TXQValueInt64(b).value then result := 0
         else if TXQValueInt64(a).value < TXQValueInt64(b).value then result := -1
@@ -3189,6 +3194,21 @@ var ak, bk: TXQValueKind;
       end;
     end;
   end;
+  function vtob(k: TXQValueKind; v: TXQValue): Boolean;
+  begin
+    case k of
+      pvkString, pvkNode: begin
+        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'boolean');
+        case v.toString of
+          '0', 'false': result := false;
+          '1', 'true': result := true;
+          else raiseFORG0001InvalidConversion(v, 'decimal');
+        end;
+      end;
+      pvkBoolean: result := TXQValueBoolean(v).bool;
+    end;
+  end;
+
 var tempDateTime: TXQValueDateTime;
 begin
   ak := a.kind; bk := b.kind;
@@ -3231,6 +3251,8 @@ begin
     tempDateTime.free;
     exit;
   end;
+  if (ak = pvkBoolean) then exit(compareBooleans(TXQValueBoolean(a).bool, vtob(bk,b)));
+  if (bk = pvkBoolean) then exit(compareBooleans(vtob(ak,a), TXQValueBoolean(b).bool));
   exit(compareCommonAsStrings());
 end;
 
