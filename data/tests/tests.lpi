@@ -58,7 +58,6 @@
       <Unit2>
         <Filename Value="../extendedhtmlparser.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="extendedhtmlparser"/>
       </Unit2>
       <Unit3>
         <Filename Value="xpath2_tests.pas"/>
@@ -73,7 +72,6 @@
       <Unit5>
         <Filename Value="internetaccess_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="internetaccess_tests"/>
       </Unit5>
       <Unit6>
         <Filename Value="xpath3_tests.pas"/>
