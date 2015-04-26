@@ -2867,6 +2867,10 @@ procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
 begin
   raise EXQEvaluationException.create('XPTY0004', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to type '+convTo);
 end;
+procedure raiseFOTY0013TypeError(const v: IXQValue);
+begin
+  raise EXQEvaluationException.create('FOTY0013', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to atomic value');
+end;
 
 
 type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)

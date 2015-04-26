@@ -1873,7 +1873,13 @@ var temp:string;
  i: Integer;
 begin
   temp:='';
-  for i:=0 to high(args) do temp+=args[i].toString;
+  for i:=0 to high(args) do begin
+    case args[i].kind of
+      pvkSequence: if args[i].getSequenceCount > 1 then raiseXPTY0004TypeError(args[i], 'singleton');
+      pvkFunction: raiseFOTY0013TypeError(args[i]);
+    end;
+    temp+=args[i].toString;
+  end;
   result := xqvalue(temp);
 end;
 
