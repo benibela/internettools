@@ -578,7 +578,10 @@ end;
 
 function TXQValueString.toBooleanEffective: boolean;
 begin
-  result := length(str) > 0
+  if ftypeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.anyURI]) then
+    result := length(str) > 0
+   else
+    raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+debugAsStringWithTypeAnnotation() + ' to boolean.');
 end;
 
 
