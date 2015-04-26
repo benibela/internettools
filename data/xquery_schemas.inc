@@ -1179,7 +1179,6 @@ begin
 
   typeList.Sorted := true;
   numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
-  trueNumericPseudoType  := TXSUnionType.Create('true-numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
 end;
 
 destructor TXSSchema.Destroy;

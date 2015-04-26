@@ -1755,7 +1755,7 @@ function TXQParsingContext.parse: TXQTerm;
     binOp := TXQTermBinaryOp(term^);
     if binOp.op.priority > prio then exit(term);
     if (binOp.op.priority = prio) then begin
-      if (binOp.op.associativeSyntax) then exit(term);
+      if (xqofAssociativeSyntax in binOp.op.flags) then exit(term);
       raiseSyntaxError('Operator requires parenthesis '+ binOp.op.name);
     end;
     result := ripBinOpApart(@binOp.children[1], prio);

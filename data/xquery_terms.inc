@@ -1621,6 +1621,7 @@ function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue
   end;
 
 var evilkids: TXQVArray;
+  i: Integer;
 begin
   if length(children)<2 then raiseEvaluationError('XPST0003', 'Not enough subterms');
   if length(children)>2 then raiseEvaluationError('XPST0003', 'Too many subterms');
@@ -1637,6 +1638,12 @@ begin
     result := op.func(context, children[0].evaluate(context), children[1].evaluate(context))
   else begin
     evaluateChildren(context, evilkids);
+    if xqofCastUntypedToString in op.flags then
+      for i := 0 to high(evilkids) do
+        case evilkids[i].kind of
+          pvkNode: evilkids[i] := xqvalue(evilkids[i].toString);
+          pvkString: if evilkids[i].instanceOf(baseSchema.untypedAtomic) then evilkids[i] := xqvalue(evilkids[i].toString);
+        end;
     op.checkOrConvertTypes(evilkids, context);
     result := op.func(context, evilkids[0], evilkids[1]);
   end;
@@ -2799,7 +2806,7 @@ function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType
 begin
   if t = nil then exit(nil);
   result := TXQTermSequenceType(t.clone);
-  if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType) or (t.atomicTypeInfo = baseSchema.trueNumericPseudoType)) then
+  if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType)) then
     result.atomicTypeInfo := baseSchema.anyAtomicType;
 end;
 
