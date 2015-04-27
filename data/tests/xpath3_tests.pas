@@ -229,6 +229,8 @@ begin
   f('xs:untypedAtomic("fn:a") eq xs:QName("fn:a")', 'XPTY0004');
   t('xs:untypedAtomic("fn:a") = xs:QName("fn:a")', 'true');
 
+  t('(string-length(environment-variable("PATH")) > 0, empty(environment-variable("invalidvar=!!invalid")))', 'true true');
+
   //interface tests
   t('. + 1', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');

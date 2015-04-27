@@ -143,3 +143,28 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+
+function xqFunctionEnvironment_Variable(const args: TXQVArray): IXQValue;
+var
+  name: String;
+  i: Integer;
+begin
+  requiredArgCount(args, 1);
+  //result := xqvalue(GetEnvironmentVariable(args[0].toString));
+  name := args[0].toString + '=';
+  for i:=1 to GetEnvironmentVariableCount do
+    if strBeginsWith(GetEnvironmentString(i), name) then
+      exit(xqvalue(strCopyFrom(GetEnvironmentString(i), length(name) + 1)));
+  result := xqvalue();
+end;
+
+function xqFunctionAvailable_Environment_Variables(const args: TXQVArray): IXQValue;
+var
+  sl: TStringList;
+  i: Integer;
+begin
+  requiredArgCount(args, 0);
+  result := xqvalue();
+  for i:=1 to GetEnvironmentVariableCount do
+    xqvalueSeqAdd(result, xqvalue(strBefore(GetEnvironmentString(i), '=')));
+end;
