@@ -602,8 +602,21 @@ function strWrap(Line: RawByteString; MaxCol: Integer = 80; const BreakChars: TC
 function strSplitGetUntilBracketClosing(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
 function strSplitGetBetweenBrackets(var text: RawByteString; const openBracket, closingBracket: RawByteString; updateText: boolean): RawByteString;
 
-function strBetween(const s, from, till: string): string;
-function striBetween(const s, from, till: string): string;
+
+//** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
+function strBetween(const s, from, till: RawByteString): RawByteString;
+//** If the string s has the form 'STARTsep...' it returns 'START'
+function strBefore(const s, sep: RawByteString): RawByteString;
+//** If the string s has the form '...sepEND' it returns 'END'
+function strAfter(const s, sep: RawByteString): RawByteString;
+
+//** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
+function striBetween(const s, from, till: RawByteString): RawByteString;
+//** If the string s has the form 'STARTsep...' it returns 'START'
+function striBefore(const s, sep: RawByteString): RawByteString;
+//** If the string s has the form '...sepEND' it returns 'END'
+function striAfter(const s, sep: RawByteString): RawByteString;
+
 
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
@@ -3877,23 +3890,77 @@ begin
   move(p^,result[1],l);
 end;
 
-function strBetween(const s, from, till: string): string;
+
+
+function strBetween(const s, from, till: RawByteString): RawByteString;
 var
   i, j: Integer;
 begin
-  i := strIndexOf(s, from) + length(from);
-  j := strIndexOf(s, till, i);
-  result := strslice(s, i, j - 1);
+  i := strIndexOf(s, from);
+  if i = 0 then result := ''
+  else begin
+    i := i + length(from);
+    j := strIndexOf(s, till, i);
+    if j = 0 then result := ''
+    else result := strslice(s, i, j - 1);
+  end;
 end;
 
-function striBetween(const s, from, till: string): string;
+function strBefore(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := strIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := copy(s, 1, i-1);
+end;
+
+function strAfter(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := strIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := strcopyfrom(s, i + length(sep));
+end;
+
+
+
+
+function striBetween(const s, from, till: RawByteString): RawByteString;
 var
   i, j: Integer;
 begin
-  i := striIndexOf(s, from) + length(from);
-  j := striIndexOf(s, till, i);
-  result := strslice(s, i, j - 1);
+  i := striIndexOf(s, from);
+  if i = 0 then result := ''
+  else begin
+    i := i + length(from);
+    j := striIndexOf(s, till, i);
+    if j = 0 then result := ''
+    else result := strslice(s, i, j - 1);
+  end;
 end;
+
+function striBefore(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := striIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := copy(s, 1, i-1);
+end;
+
+function striAfter(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := striIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := strcopyfrom(s, i + length(sep));
+end;
+
+
+
 
 function strJoin(const sl: TStrings; const sep: RawByteString  = ', '; limit: Integer=0; const limitStr: RawByteString='...'): RawByteString; overload;
 var i:longint;
@@ -5799,4 +5866,5 @@ end;
 
 
 end.
+
 

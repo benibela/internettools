@@ -825,6 +825,19 @@ begin
   if strWrap('ha llo    ab cd ef g hi', 8) <> 'ha llo'+LineEnding+'ab cd ef'+LineEnding+'g hi' then raise Exception.Create('strWrap failed, 9');
   if strWrap('ha'#13'llo', 8) <> 'ha'+LineEnding+'llo' then raise Exception.Create('strWrap failed, 10');
 
+  test(strBefore('hallo', 'a'), 'h');
+  test(strBefore('hallo', 'A'), '');
+  test(striBefore('hallo', 'l'), 'ha');
+  test(striBefore('hallo', 'A'), 'h');
+  test(striBefore('hallo', 'x'), '');
+  test(strAfter('hallo', 'a'), 'llo');
+  test(strAfter('hallo', 'A'), '');
+  test(striAfter('hallo', 'l'), 'lo');
+  test(striAfter('hallo', 'A'), 'llo');
+  test(striAfter('hallo', 'x'), '');
+  test(strBetween('a="b"', '="', '"'), 'b');
+  test(striBetween('hallo', 'A', 'O'), 'll');
+
   //trimming
   test(strTrimLeft('  ABC  DEF '#9) = 'ABC  DEF '#9);
   test(strTrimRight('  ABC  DEF '#9) = '  ABC  DEF');
@@ -1521,4 +1534,4 @@ end;
 
 
 end.
-
+
