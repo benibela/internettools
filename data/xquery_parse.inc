@@ -161,6 +161,7 @@ begin
       nestene+=1;
     end else pos+=1;
   end;
+  raiseSyntaxError('Never ending comment')
 end;
 
 procedure TXQParsingContext.skipWhitespaceAndComment;
