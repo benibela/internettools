@@ -80,7 +80,7 @@ var
       err := e.namespace.getPrefix+':'+e.errorCode;
     end end;
     if err = '' then raise Exception.Create('No error => Test failed ');
-    if err <> code then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
+    if (err <> code) and (err <> 'err:'+code) then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
   end;
 
   procedure mr(s1: string); //module register
@@ -111,6 +111,15 @@ begin
   t('''&quot;''',                 '"');
 
   t('"a" || "b"', 'ab');
+
+
+  t('3!(10---.)', '7');
+  t('12!(.div 3)', '4');
+  f('12!(12 div.)', 'XPST0003');
+  f('1<<a>2</a>', 'XPST0003');
+  f('1<<<a>2</a>', 'XPTY0004');
+  f('12 div-3', 'XPST0003');
+  f('3!(12 div-.)', 'XPST0003');
 
   t('(10,<a>b</a>,30,<c>d</c>) ! .', '10 b 30 d');
 

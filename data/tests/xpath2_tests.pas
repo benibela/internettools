@@ -126,6 +126,9 @@ begin
   t('"He said, ""I don''t like it."""', 'He said, "I don''t like it."', '');
   t('''He said, "I don''''t like it."''', 'He said, "I don''t like it."', '');
 
+  f('12 div3', 'XPST0003');
+  //f('12div 3', 'XPST0003');
+  f('12 div-3', 'XPST0003');
 
                 //Variable tests
   t('"$$;"',                   '$$;',                            '');

@@ -6278,6 +6278,13 @@ begin
   result := xqvalue();
 end;
 
+function xqvalueAssignment(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+begin
+  ignore(cxt); ignore(ta); ignore(tb);
+  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: := called');
+  result := xqvalue();
+end;
+
 function xqvalueSimpleMap(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(ta); ignore(tb);
@@ -7016,8 +7023,8 @@ op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [xqofAssociativeSyntax], [], 
 op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [xqofAssociativeSyntax], [], []);
 op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [], []).require3:=true;
 
-op.registerBinaryOp('-u', @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
-op.registerBinaryOp('+u', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+op.registerBinaryOp('-u'#0, @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+op.registerBinaryOp('+u'#0, @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
 
 op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], [], []);
 op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], [], []);
@@ -7065,6 +7072,8 @@ op.registerBinaryOp('>>',@xqvalueNodeAfter,50,[],['node-after($parameter1 as nod
 op.registerBinaryOp('and',@xqvalueAnd,40,[xqofAssociativeSyntax],[]);
 
 op.registerBinaryOp('or',@xqvalueOr,30,[xqofAssociativeSyntax],[]);
+
+op.registerBinaryOp(':=',@xqvalueAssignment,20,[xqofAssociativeSyntax],[]);
 
 commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped);
 commonValuesTrue := TXQValueBoolean.create(true);

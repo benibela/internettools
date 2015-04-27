@@ -198,58 +198,67 @@ const START_SYMBOLS = ['-'];
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
 var start:pchar;
    numberE, numberPoint: boolean;
+   tempOp: TXQOperatorInfo;
 begin
   skipWhitespaceAndComment;
   if pos^ = #0 then exit('');
   start:=pos;
-  if pos^='''' then begin
-    repeat
+  case pos^ of
+    '''', '"': begin
+      repeat
+        pos+=1;
+        if (pos^ = start^) then
+          if ((pos+1)^ <> start^) then break
+          else pos+=1;
+      until pos^ in [#0];
+      if pos^ = #0 then raiseSyntaxError('Unclosed string');
       pos+=1;
-      if (pos^ = '''') then
-        if ((pos+1)^ <> '''') then break
-        else pos+=1;
-    until pos^ in [#0];
-    if pos^ = #0 then raiseSyntaxError('Unclosed string');
-    pos+=1;
-  end else if pos^='"' then begin
-    repeat
-      pos+=1;
-      if (pos^ = '"') then
-        if ((pos+1)^ <> '"') then break
-        else pos+=1;
-    until pos^ in [#0];
-    if pos^ = #0 then raiseSyntaxError('Unclosed string');
-    pos+=1;
-  end else if (pos^ = ':') and ((pos+1)^ in ['=', ':']) then begin
-    pos+=2;
-  end else if pos^ in (SYMBOLS + START_SYMBOLS) then begin
-    if lookahead then exit(pos^)
-    else begin
-      pos+=1;
-      exit((pos-1)^);
     end;
-  end else if (pos^ in ['0'..'9','-']) or ((pos^ = '.') and ((pos+1)^ in ['0'..'9','e','E'])) then begin
-    numberE:=false;
-    numberPoint:=pos^ = '.';
-    repeat
-      pos+=1;
-      if pos^ = '.' then begin
-        if numberPoint then raiseSyntaxError('Double . in number');
-        numberPoint:=true;
-        pos+=1;
+    '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', '@', '$', '%', '-': begin//SYMBOLS+START_SYMBOLS - [:-]
+      tempOp := TXQueryEngine.findOperator(pos);
+      if tempOp <> nil then result := tempOp.name
+      else result := pos^;
+
+      if lookahead then exit(result)
+      else begin
+        pos+=length(result);
+        exit(result);
       end;
-      if pos^ in ['e','E'] then begin
-        if numberE then raiseSyntaxError('Double e in number');
+    end;
+    ':': begin
+      inc(pos);
+      if pos^ in [':','='] then inc(pos);
+    end;
+    '0'..'9','.': begin
+      numberE:=false;
+      numberPoint:=pos^ = '.';
+      repeat
         pos+=1;
-        numberE:=true;
-        if not (pos^ in ['0'..'9','+','-']) then raiseSyntaxError('Invalid character after e in number')
-        else pos+=1;
-      end;
-    until not (pos^ in ['0'..'9']);
-  end else begin
-    repeat
-      pos+=1;
-    until (pos^ in SYMBOLS + WHITE_SPACE + [#0]) or ((pos^ = ':') and ((pos+1)^='='));
+        if pos^ = '.' then begin
+          if numberPoint then begin
+            if pos = start + 1 then begin
+              pos+=1;
+              break;
+            end;
+            raiseSyntaxError('Double . in number');
+          end;
+          numberPoint:=true;
+          pos+=1;
+        end;
+        if pos^ in ['e','E'] then begin
+          if numberE then raiseSyntaxError('Double e in number');
+          pos+=1;
+          numberE:=true;
+          if not (pos^ in ['0'..'9','+','-']) then raiseSyntaxError('Invalid character after e in number')
+          else pos+=1;
+        end;
+      until not (pos^ in ['0'..'9']);
+    end;
+    else begin
+      repeat
+        pos+=1;
+      until (pos^ in SYMBOLS + WHITE_SPACE + [#0]) {deprecated? or ((pos^ = ':') and ((pos+1)^='='))};
+    end;
   end;
   assert(start<pos);
   result:=strslice(start,pos-1);
@@ -1537,7 +1546,13 @@ begin
     '(': begin
       inc(pos);
       if pos^ = '#' then exit(parseExtension);
-      exit(parseSequenceLike(TXQTermSequence.Create)); //only sequence or priority brackets
+      result := TXQTermSequence.Create;
+      try
+        exit(parseSequenceLike(TXQTermWithChildren(result))); //only sequence or priority brackets
+      except
+        result.free;
+        raise;
+      end;
     end;
 
 
@@ -1795,11 +1810,14 @@ var astroot: TXQTerm;
 
   begin
     expect(opinfo.name);
+    if (opinfo.name[1] in ['a'..'z','A'..'Z']) and (pos^ in ['a'..'z','A'..'Z','0'..'9','.','-'])  then
+      raiseSyntaxError('Need whitespace after operator');
+
     if opinfo.require3 then require3();
 
-    res := TXQTermBinaryOp.Create(opinfo);
-    replace := ripBinOpApart(@astroot, res.op.priority);
+    replace := ripBinOpApart(@astroot, opinfo.priority);
 
+    res := TXQTermBinaryOp.Create(opinfo);
     res.push(replace^);
     replace^ := res;
 
@@ -1815,17 +1833,21 @@ var astroot: TXQTerm;
 
   procedure parseDotOperator;
   var prop: string;
+    needDynamicCall: Boolean;
   begin
     replace := ripBinOpApart(@astroot, 10000);
     if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable)
        or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor) or (replace^ is TXQTermDynamicFunctionCall) then begin
-         word := strCopyFrom(word, 2);
-         if word <> '' then
+         if pos^ in SYMBOLS + WHITE_SPACE then needDynamicCall:=true
+         else begin
+           word := nextToken();
            for prop in strSplit(word, '.') do begin
              if prop = '' then raiseParsingError('XPST0003', 'Unexpected ..');
              replace^ := TXQTermReadObjectProperty.Create(prop).push([replace^]);
            end;
-         if (word = '') or (strEndsWith(word, '.')) then begin
+           needDynamicCall:=strEndsWith(word, '.');
+         end;
+         if needDynamicCall then begin
            replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseValue);
            if TXQTermDynamicFunctionCall(replace^).children[1] is TXQTermNodeMatcher then
              raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
@@ -1881,7 +1903,7 @@ begin
         else begin
           op := TXQueryEngine.findOperator(pos);
           if op <> nil then pushBinaryOp(op)
-          else if (word[1] = '.') and (options.AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
+          else if (word = '.') and (options.AllowPropertyDotNotation <> xqpdnDisallowDotNotation) then begin
             expect(word);
             parseDotOperator;
           end else
