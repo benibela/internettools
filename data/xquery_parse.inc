@@ -230,29 +230,29 @@ begin
       if pos^ in [':','='] then inc(pos);
     end;
     '0'..'9','.': begin
-      numberE:=false;
       numberPoint:=pos^ = '.';
-      repeat
-        pos+=1;
-        if pos^ = '.' then begin
-          if numberPoint then begin
-            if pos = start + 1 then begin
-              pos+=1;
-              break;
-            end;
-            raiseSyntaxError('Double . in number');
+      if numberPoint and not ((pos+1)^ in ['0'..'9']) then begin
+        pos += 1; //not a number
+        if pos^ = '.' then pos += 1; //..
+      end else begin
+        numberE:=false;
+        repeat
+          pos+=1;
+          if pos^ = '.' then begin
+            if numberPoint then raiseSyntaxError('Double . in number');
+            numberPoint:=true;
+            pos+=1;
           end;
-          numberPoint:=true;
-          pos+=1;
-        end;
-        if pos^ in ['e','E'] then begin
-          if numberE then raiseSyntaxError('Double e in number');
-          pos+=1;
-          numberE:=true;
-          if not (pos^ in ['0'..'9','+','-']) then raiseSyntaxError('Invalid character after e in number')
-          else pos+=1;
-        end;
-      until not (pos^ in ['0'..'9']);
+          if pos^ in ['e','E'] then begin
+            if numberE then raiseSyntaxError('Double e in number');
+            pos+=1;
+            numberE:=true;
+            if not (pos^ in ['0'..'9','+','-']) then raiseSyntaxError('Invalid character after e in number')
+            else pos+=1;
+          end;
+        until not (pos^ in ['0'..'9']);
+        if (pos^ in ['a'..'z','A'..'Z']) then raiseSyntaxError('Space needed between number and non-symbolic operator');
+      end;
     end;
     else begin
       repeat
