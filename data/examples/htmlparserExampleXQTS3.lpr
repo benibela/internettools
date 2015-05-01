@@ -7,7 +7,9 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Classes, sysutils, strutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
-  { you can add units after this };
+  {$ifdef windows}windows{$endif}
+  ;
+  { you can add units after this }
 type
 
 { TEnvironment }
@@ -1355,6 +1357,18 @@ begin
     'xpath2': config.version := xqpmXPath2;
     'xpath3': config.version := xqpmXPath3;
   end;
+  if config.version in [xqpmXPath3, xqpmXQuery3] then begin
+    if GetEnvironmentVariable('QTTEST') <> '42' then begin
+      {$ifndef windows}
+      writeln(stderr, 'You need to set enviroment variables QTTEST="42" QTTEST2="other" QTTESTEMPTY=""');
+      halt;
+      {$else}
+      SetEnvironmentVariable('QTTEST', '42');
+      SetEnvironmentVariable('QTTEST2', 'other');
+      SetEnvironmentVariable('QTTESTEMPTY', '');
+      {$endif}
+    end;
+  end;
   config.skipNegative := clr.readFlag('skip-negative');
   config.forceTestSet := clr.readString('test-set');
   config.forceTestCase := clr.readString('test-case');
@@ -1391,6 +1405,7 @@ begin
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
   xq.StaticContext.defaultFunctionNamespace := TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
+  xq.StaticContext.defaultTypeNamespace := nil;
   xq.AutomaticallyRegisterParsedModules := true;
   baseSchema.version := xsd11;
   defaultInternetAccessClass := TMockInternetAccess;
