@@ -885,30 +885,112 @@ begin
   end;
 end;
 
-function xqfloatRounded(f: xqfloat): xqfloat;
+function xqfloatRounded(f: xqfloat; prec: integer = 0): xqfloat;
 var
   ff: xqfloat;
+  p: math.float;
 begin
   if IsNan(f) or IsInfinite(f) then exit((f));
-  ff := frac(f);
-  if ff = 0 then exit((f));
-  f := f + 0.5;
-  ff := frac(f);
-  if ff >= 0 then result := (f - ff)
-  else result := (f - ff - 1);
+  if prec = 0 then begin
+    ff := frac(f);
+    if ff = 0 then exit((f));
+    f := f + 0.5;
+    ff := frac(f);
+    if ff >= 0 then result := (f - ff)
+    else result := (f - ff - 1);
+  end else begin
+    p := power(10, prec);
+    result := xqfloatRounded(f / p) * p;
+  end;
+
+end;
+
+function getReasonablePrecision(const prec: IXQValue): integer;
+//prec must be xs:integer
+var prec64: Int64;
+  precbcd: BigDecimal;
+begin
+
+  //result := - prec.toInteger with overflow checking:
+  if prec.kind = pvkBigDecimal then begin
+    precbcd := prec.toDecimal;
+    if isLongint(precbcd) then begin
+      Result := BigDecimalToLongint(precbcd);
+      if result <> low(Integer) then result := -result
+      else result := -result;
+    end else if precbcd.signed then Result := high(integer)
+    else result := Low(integer);
+  end else begin
+    prec64 := prec.toInt64;
+    if prec64 <= low(Integer) then result := high(integer)
+    else if prec64 > high(integer) then result := low(Integer)
+    else result := -prec64;
+  end;
+ (*
+  //specific caps
+  case toRoundKind of
+    pvkInt64: begin
+      {if result < 0 then result := 0
+      else if result > 17 then result := 17;}
+    end;
+    pvkBigDecimal: begin
+     prec := - args[1].toInt64;
+     if prec > high(integer) then prec := high(integer) else if prec < low(integer) then prec := low(integer);
+     ;
+    end;
+    else begin
+     prec := - args[1].toInt64;
+     if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
+     else if prec > 4933 then result := baseType.createValue(0)
+    end;
+                               *)
+
 end;
 
 function xqFunctionRound(const args: TXQVArray): IXQValue;
+  function intRound(const i: int64; prec: integer): int64;
+  var rpower: int64;
+    switchPoint: Int64;
+    modu: Int64;
+  begin
+    rpower := 1;
+    if prec >= 9 then begin rpower *= powersOf10[9]; prec -= 9; end;
+    rpower *= powersOf10[prec];
+
+    result := i div rpower;
+    modu := abs(i - result * rpower);
+
+    switchPoint := rpower div 2;
+    if modu > switchPoint then begin
+      if result >= 0 then result += 1
+      else result -= 1;
+    end else if (modu = switchPoint) and (result >= 0) then
+      result += 1;
+    result := result * rpower;
+  end;
+
 var
   baseType: TXSType;
+  prec: Integer;
+  f: xqfloat;
 begin
-  requiredArgCount(args, 1);
+  requiredArgCount(args, 1, 2);
   if args[0].isUndefined then exit(xqvalue);
   baseType := getBaseType(args[0]);
+  if length(args) = 1 then prec := 0
+  else prec := getReasonablePrecision(args[1]);
   case args[0].kind of
-    pvkInt64:      result := baseType.createValue(args[0].toInt64);
-    pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmRoundHalfUp));
-    else           result := baseType.createValue(xqfloatRounded(args[0].toFloat));
+    pvkInt64:
+      if prec <= 0 then result := baseType.createValue(args[0].toInt64)
+      else if prec <= 17 then result := baseType.createValue(intRound(args[0].toInt64, prec))
+      else result := baseType.createValue(0);
+    pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, prec, bfrmRoundHalfUp));
+    pvkFloat: begin
+      f := args[0].toFloat;
+      if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
+      else if prec > 4933 then result := baseType.createValue(0)
+      else result := baseType.createValue(xqfloatRounded(f, prec));
+    end;
   end;
 end;
 
@@ -951,42 +1033,41 @@ function xqFunctionRound_Half_To_Even(const args: TXQVArray): IXQValue;
 var
   f: xqfloat;
   temp, p: extended;
-  prec: Int64;
   baseType: TXSType;
+  prec: Integer;
 
 begin
   requiredArgCount(args, 1, 2);
   if args[0].isUndefined then exit(xqvalue);
   baseType := getBaseType(args[0]);
   case args[0].kind of
-    pvkInt64:
-      if length(args) = 1 then exit(baseType.createValue(args[0].toInt64))
-      else if (args[1].toInt64 > 0) or (args[1].toInt64 = 0) then exit(baseType.createValue(args[0].toInt64))
-      else if args[1].toInt64 >= -17 then exit(baseType.createValue(intRoundHalfToEven(args[0].toInt64, - args[1].toInt64)))
+    pvkInt64: begin
+      if length(args) = 1 then exit(baseType.createValue(args[0].toInt64));
+      prec := getReasonablePrecision(args[1]);
+      if (prec <= 0) then exit(baseType.createValue(args[0].toInt64))
+      else if prec <= 17 then exit(baseType.createValue(intRoundHalfToEven(args[0].toInt64, - args[1].toInt64)))
       else exit(baseType.createValue(0));
+    end;
     pvkBigDecimal:
      if length(args) = 1 then exit(baseType.createValue(round(args[0].toDecimal, 0, bfrmRoundHalfToEven)))
      else begin
-       prec := - args[1].toInt64;
-       if prec > high(integer) then prec := high(integer) else if prec < low(integer) then prec := low(integer);
+       prec := getReasonablePrecision(args[1]);
        exit(baseType.createValue(round(args[0].toDecimal, prec, bfrmRoundHalfToEven)));
      end;
     else begin
       f := args[0].toFloat;
       if IsNan(f) or IsInfinite(f) then exit(baseType.createValue(f));
 
-      if length(args) = 1 then
-        result := baseType.createValue(floatRoundHalfToEven(f))
+      if length(args) = 1 then exit(baseType.createValue(floatRoundHalfToEven(f)));
+
+      prec := getReasonablePrecision(args[1]);
+      if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
+      else if prec > 4933 then result := baseType.createValue(0)
       else begin
-        prec := - args[1].toInt64;
-        if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
-        else if prec > 4933 then result := baseType.createValue(0)
-        else begin
-          p := power(10, prec);
-          temp := f /  p;
-          if frac(temp) = 0 then result := baseType.createValue(f)
-          else result := baseType.createValue(floatRoundHalfToEven(temp) * p)
-        end;
+        p := power(10, prec);
+        temp := f /  p;
+        if frac(temp) = 0 then result := baseType.createValue(f)
+        else result := baseType.createValue(floatRoundHalfToEven(temp) * p)
       end;
     end
   end;

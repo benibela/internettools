@@ -6864,6 +6864,7 @@ fn.registerFunction('abs',@xqFunctionAbs,['($arg as numeric?) as numeric?']);
 fn.registerFunction('ceiling',@xqFunctionCeiling,['($arg as numeric?) as numeric?']);
 fn.registerFunction('floor',@xqFunctionFloor,['($arg as numeric?) as numeric?']);
 fn.registerFunction('round',@xqFunctionRound,['($arg as numeric?) as numeric?']);
+fn3.registerFunction('round',@xqFunctionRound,['($arg as numeric?, $precision as xs:integer) as numeric?']);
 fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even,['($arg as numeric?) as numeric?', '($arg as numeric?, $precision as xs:integer) as numeric?']);
 
 fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string,['($arg as xs:integer*) as xs:string']);

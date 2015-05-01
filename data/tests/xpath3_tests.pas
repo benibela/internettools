@@ -24,6 +24,8 @@ var
   count: integer;
   ps: TXQueryEngine;
   xml: TTreeParser;
+  j: Integer;
+  tt: String;
 
   function performUnitTest(s1,s2,s3: string): string;
   var rooted: Boolean;
@@ -232,6 +234,59 @@ begin
   t('(string-length(environment-variable("PATH")) > 0, empty(environment-variable("invalidvar=!!invalid")))', 'true true');
 
   f('1 ! root()', 'XPTY0004');
+
+  //rounding
+  for j := 1 to 4 do begin
+    case j of
+      1: tt := 'integer';
+      2: tt := 'decimal';
+      3: tt := 'double';
+      4: tt := 'byte';
+    end;
+    t('fn:round(xs:'+tt+'(10), 0)', '10');
+    t('fn:round(xs:'+tt+'(10), -1)', '10');
+    t('fn:round(xs:'+tt+'(14), -1)', '10');
+    t('fn:round(xs:'+tt+'(15), -1)', '20');
+    t('fn:round(xs:'+tt+'(24), -1)', '20');
+    t('fn:round(xs:'+tt+'(25), -1)', '30');
+    t('fn:round(xs:'+tt+'(26), -1)', '30');
+    t('fn:round(xs:'+tt+'(124), -1)', '120');
+    t('fn:round(xs:'+tt+'(125), -1)', '130');
+    t('fn:round(xs:'+tt+'(126), -1)', '130');
+    t('fn:round(xs:'+tt+'(-124), -1)', '-120');
+    t('fn:round(xs:'+tt+'(-125), -1)', '-120');
+    t('fn:round(xs:'+tt+'(-126), -1)', '-130');
+    t('fn:round(xs:'+tt+'(126), 1)', '126');
+    t('fn:round(xs:'+tt+'(-126), 1)', '-126');
+    t('fn:round(xs:'+tt+'(10), -2)', '0');
+  end;
+
+  t('fn:round(10.3, -5000)', '0');
+  t('fn:round(10.3, 5000)', '10.3');
+  t('fn:round(10.3, -999999999999)', '0');
+  t('fn:round(10.3, 999999999999)', '10.3');
+  t('fn:round(10, -2)', '0');
+  t('fn:round(xs:float("3.4028235E38"), -38)', '3.0E38');
+  t('fn:round(xs:float("-3.4028235E38"), -38)', '-3.0E38');
+  t('fn:round(xs:double("3.4028235E38"), -38)', '3.0E38');
+  t('fn:round(xs:double("-3.4028235E38"), -38)', '-3.0E38');
+  t('fn:round(xs:double("3.5E38"), -38)', '4.0E38');
+  t('fn:round(xs:double("-3.5E38"), -38)', '-3.0E38');
+  t('fn:round(10.344, 2)', '10.34');
+  t('fn:round(10.345, 2)', '10.35');
+  t('fn:round(10.346, 2)', '10.35');
+  t('fn:round(10.354, 2)', '10.35');
+  t('fn:round(10.355, 2)', '10.36');
+  t('fn:round(10.356, 2)', '10.36');
+  t('fn:round(-10.344, 2)', '-10.34');
+  t('fn:round(-10.345, 2)', '-10.34');
+  t('fn:round(-10.346, 2)', '-10.35');
+  t('fn:round(-10.354, 2)', '-10.35');
+  t('fn:round(-10.355, 2)', '-10.35');
+  t('fn:round(-10.356, 2)', '-10.36');
+  t('fn:round(-12550, -2)', '-12500');
+  t('fn:round(xs:float(12345.6), 2)', '12345.6');
+
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
