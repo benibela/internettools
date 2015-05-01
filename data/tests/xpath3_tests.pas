@@ -231,6 +231,8 @@ begin
 
   t('(string-length(environment-variable("PATH")) > 0, empty(environment-variable("invalidvar=!!invalid")))', 'true true');
 
+  f('1 ! root()', 'XPTY0004');
+
   //interface tests
   t('. + 1', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
