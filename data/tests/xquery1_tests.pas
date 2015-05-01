@@ -1667,8 +1667,9 @@ begin
   f('"1" + 2', 'err:XPTY0004');
   m('1 + 2', '3');
   m('untypedAtomic("1") + 2', '3');
-  f('untypedAtomic("1a") + 2', 'err:XPTY0004');
+  f('untypedAtomic("1a") + 2', 'err:FORG0001');
   m('text {"1"} + 2', '3');
+  f('<a>1aa</a> + 2', 'FORG0001');
   f('comment {"1"} + 2', 'err:XPTY0004');
   m('- 2', '-2');
   f('- "2"', 'err:XPTY0004');

@@ -786,15 +786,7 @@ begin
   if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
   if not (v is TXQValueNode) then
     raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
-  case v.toNode.typ of
-    tetOpen, tetDocument: result := TXQValueString.create(baseSchema.untypedAtomic, v.tonode.deepNodeText()); //todo: handle i:type="xs:integer" attribute
-    tetClose: result := xqvalue();
-    tetText: result := TXQValueString.create(baseSchema.untypedAtomic,v.tonode.value);// xqvalue(v.tonode.value);
-    tetComment: result := TXQValueString.create(v.tonode.value);
-    tetAttribute: result := TXQValueString.create(baseSchema.untypedAtomic,TTreeAttribute(v.tonode).realvalue);
-    tetProcessingInstruction: result := xqvalue(v.tonode.getAttribute(''));
-    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
-  end;
+  result := TXQValueNode.nodeTypeAnnotation(v.toNode).createValue(v.toString);
 end;
 
 function xqFunctionData(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

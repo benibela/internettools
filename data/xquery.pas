@@ -300,6 +300,10 @@ type
     function instanceOf(const typ: TXSType): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
 
     property Count: integer read getSequenceCount;
+
+
+    //**Same as toFloat, but throws an exception if the conversion is not invalid
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat;
   end;
 
 
@@ -327,6 +331,7 @@ type
     function toBooleanEffective: boolean; virtual; //**< Returns the effective boolean value (the main difference to toBoolean is that toBooleanEffective returns true for the string "false", while toBoolean returns false)
     function toInt64: int64; virtual; //**< Returns the value as int64; dynamically converted, if necessary
     function toFloat: xqfloat; virtual; //**< Returns the value as xqfloat; dynamically converted, if necessary
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; virtual;
     function toDecimal: BigDecimal; virtual; //**< Returns the value as BigDecimal; dynamically converted, if necessary
     function toString: string; override; //**< Returns the value as string; dynamically converted, if necessary
     function toJoinedString(const sep: string = ' '): string; virtual; //**< Returns the value as joined string (string-join($self, $sep)); dynamically converted, if necessary
@@ -413,6 +418,7 @@ type
     function toInt64: int64; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
@@ -440,6 +446,7 @@ type
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
     function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
@@ -465,6 +472,7 @@ type
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
@@ -492,6 +500,8 @@ type
     function toBooleanEffective: boolean; override;
     function toString: string; override;
     function toDateTime: TDateTime; override;
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+
 
     function toRawBinary: string;
 
@@ -596,6 +606,7 @@ type
     function toBooleanEffective: boolean; override; //Returns the effective boolean value. Raises an exception if count > 1 and first element is not a node/json-item
     function toInt64: Int64; override; //**< Converts the first element to integer
     function toDecimal: BigDecimal; override; //**< Converts the first element to BigDecimal
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the first element to string
     function toJoinedString(const sep: string=' '): string; override;
     function toDateTime: TDateTime; override; //**< Converts the first element to TDateTime
@@ -640,12 +651,15 @@ type
     function toBooleanEffective: boolean; override; //**< Returns true
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toNode: TTreeNode; override; //**< Returns the node
 
     function clone: IXQValue; override;
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+  private
+    class function nodeTypeAnnotation(tn: TTreeNode): TXSType; static;
   end;
 
   TXQPropertyEnumeratorInternal = class
@@ -1221,7 +1235,8 @@ type
   end;
   //**Information about a xquery binary operator
   TXQOperatorFlags = set of (xqofAssociativeSyntax, //if the syntax is associative. (not the semantic!). e.g. @code(1 + 2 + 3) is valid, but @code(1 eq 2 = true()) is a syntax error;
-                             xqofCastUntypedToString);
+                             xqofCastUntypedToString,
+                             xqofCastUntypedToDouble);
   TXQOperatorInfo = class(TXQAbstractFunctionInfo)
     name: string;
     func: TXQBinaryOp;
@@ -3095,22 +3110,6 @@ end;
 function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
 var ak, bk: TXQValueKind;
   function compareCommonFloat(): integer;
-    function vtof(k: TXQValueKind; v: txqvalue): xqfloat; //faster implementation of cast
-    begin
-      result := v.toFloat;
-      case k of
-        pvkInt64, pvkFloat, pvkBigDecimal: ; //always ok
-        pvkString, pvkNode: begin
-          if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'float/double');
-          if IsNan(result) and (v.toString <> 'NaN') then raiseFORG0001InvalidConversion(v, 'float/double')
-        end;
-        else begin
-          if strictTypeChecking then raiseXPTY0004TypeError(v, 'float/double');
-          result := v.toFloat;
-        end;
-      end;
-    end;
-
   var
     cmpClass: TXSType;
     ad, bd: xqfloat;
@@ -3118,8 +3117,8 @@ var ak, bk: TXQValueKind;
     if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
       exit(-2);
     cmpClass := TXSType.commonDecimalType(a, b);
-    ad := vtof(ak, a);
-    bd := vtof(bk, b);
+    ad := a.toFloatChecked(Self);
+    bd := b.toFloatChecked(self);
     if cmpClass.derivedFrom(baseSchema.Double) then begin
       result := compareValue(double(ad), double(bd));
     end else if cmpClass.derivedFrom(baseSchema.Float) then begin
@@ -3218,8 +3217,7 @@ var ak, bk: TXQValueKind;
     end;
   end;             }
 
-var tempDateTime: TXQValueDateTime;
-  tempxqv: IXQValue;
+var tempxqv: IXQValue;
 begin
   ak := a.kind; bk := b.kind;
   if ak = bk then exit(compareCommonEqualKind());
@@ -7025,8 +7023,8 @@ op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [xqofAssociativeSyntax], [], 
 op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [xqofAssociativeSyntax], [], []);
 op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [], []).require3:=true;
 
-op.registerBinaryOp('-u'#0, @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
-op.registerBinaryOp('+u'#0, @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+op.registerBinaryOp('-u'#0, @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+op.registerBinaryOp('+u'#0, @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
 
 op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], [], []);
 op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], [], []);
@@ -7040,13 +7038,13 @@ op.registerBinaryOp('|',@xqvalueUnion,115, [xqofAssociativeSyntax],['union($para
 op.registerBinaryOp('union',@xqvalueUnion,115, [xqofAssociativeSyntax],['union($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
 
 
-op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax],['numeric-integer-divide($arg1 as numeric?, $arg2 as numeric?) as xs:integer'], []);
-op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax],['numeric-divide($arg1 as numeric?, $arg2 as numeric?) as numeric', 'divide-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', 'divide-yearMonthDuration-by-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:decimal', 'divide-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', 'divide-dayTimeDuration-by-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:decimal'], []);
-op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax],['numeric-multiply($arg1 as numeric?, $arg2 as numeric?) as numeric', 'multiply-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', '($arg2 as xs:double?, $arg1 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'multiply-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', '($arg2 as xs:double?, $arg1 as xs:dayTimeDuration?) as xs:dayTimeDuration'], []);
-op.registerBinaryOp('mod',@xqvalueMod,100,[xqofAssociativeSyntax],['numeric-mod($arg1 as numeric?, $arg2 as numeric?) as numeric'], []);
+op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-integer-divide($arg1 as numeric?, $arg2 as numeric?) as xs:integer'], []);
+op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-divide($arg1 as numeric?, $arg2 as numeric?) as numeric', 'divide-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', 'divide-yearMonthDuration-by-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:decimal', 'divide-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', 'divide-dayTimeDuration-by-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:decimal'], []);
+op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-multiply($arg1 as numeric?, $arg2 as numeric?) as numeric', 'multiply-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', '($arg2 as xs:double?, $arg1 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'multiply-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', '($arg2 as xs:double?, $arg1 as xs:dayTimeDuration?) as xs:dayTimeDuration'], []);
+op.registerBinaryOp('mod',@xqvalueMod,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-mod($arg1 as numeric?, $arg2 as numeric?) as numeric'], []);
 
-op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax],['numeric-add($arg1 as numeric?, $arg2 as numeric?) as numeric', 'add-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'add-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'add-yearMonthDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'add-dayTimeDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'add-yearMonthDuration-to-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'add-dayTimeDuration-to-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'add-dayTimeDuration-to-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time', {reverted: } '($arg2 as xs:yearMonthDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:yearMonthDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:time?) as xs:time'], []);
-op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax],['numeric-subtract($arg1 as numeric?, $arg2 as numeric?) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date?, $arg2 as xs:date?) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time?, $arg2 as xs:time?) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time'], []);
+op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-add($arg1 as numeric?, $arg2 as numeric?) as numeric', 'add-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'add-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'add-yearMonthDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'add-dayTimeDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'add-yearMonthDuration-to-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'add-dayTimeDuration-to-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'add-dayTimeDuration-to-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time', {reverted: } '($arg2 as xs:yearMonthDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:yearMonthDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:time?) as xs:time'], []);
+op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-subtract($arg1 as numeric?, $arg2 as numeric?) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date?, $arg2 as xs:date?) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time?, $arg2 as xs:time?) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time'], []);
 
 op.registerBinaryOp('to',@xqvalueTo,60,[],['to($firstval as xs:integer?, $lastval as xs:integer?) as xs:integer*'], []);
 

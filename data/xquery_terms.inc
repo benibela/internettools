@@ -1638,11 +1638,16 @@ begin
     result := op.func(context, children[0].evaluate(context), children[1].evaluate(context))
   else begin
     evaluateChildren(context, evilkids);
-    if xqofCastUntypedToString in op.flags then
+    if xqofCastUntypedToString in op.flags then begin
       for i := 0 to high(evilkids) do
         case evilkids[i].kind of
           pvkNode: evilkids[i] := xqvalue(evilkids[i].toString);
           pvkString: if evilkids[i].instanceOf(baseSchema.untypedAtomic) then evilkids[i] := xqvalue(evilkids[i].toString);
+        end;
+    end else if xqofCastUntypedToDouble in op.flags then
+      for i := 0 to high(evilkids) do
+        case evilkids[i].kind of
+          pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toFloatChecked(context.staticContext) );
         end;
     op.checkOrConvertTypes(evilkids, context);
     result := op.func(context, evilkids[0], evilkids[1]);

@@ -462,8 +462,9 @@ begin
     end else begin
       result.kind:=tikAtomic;
       schema := staticContext.findSchema(namespaceUrl);
-      if schema = nil then raiseParsingError('XPST0081', 'Unknown schema: '+namespaceUrl);
-      result.atomicTypeInfo := schema.findType(word);
+      if schema <> nil then result.atomicTypeInfo := schema.findType(word)
+      else if hadNamespace then raiseParsingError('XPST0081', 'Unknown schema: '+namespaceUrl)
+      else result.atomicTypeInfo := nil;
       if (result.atomicTypeInfo = nil)
          or (not (xqstAllowValidationTypes in flags) and baseSchema.isValidationOnlyType(result.atomicTypeInfo)) then
         raiseParsingError(ifthen((xqstIsCast in flags) and isModel3 , 'XQST0052', 'XPST0051'), 'Unknown type: Q{'+namespaceUrl+'}'+word);

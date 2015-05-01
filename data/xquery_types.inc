@@ -192,6 +192,12 @@ begin
   result.flist := nil;
 end;
 
+function TXQValue.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  if scontext.strictTypeChecking then raiseXPTY0004TypeError(self, 'float/double');
+  result := self.toFloat;
+end;
+
 function TXQValue.debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
 var
   temp: TXQValueObject;
@@ -362,6 +368,12 @@ begin
   Result:=value;
 end;
 
+function TXQValueInt64.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  ignore(scontext);
+  result := value;
+end;
+
 function TXQValueInt64.toString: string;
 begin
   result:=inttostr(value);
@@ -444,6 +456,12 @@ begin
   Result:=value;
 end;
 
+function TXQValueFloat.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  ignore(scontext);
+  Result:=value;
+end;
+
 function TXQValueFloat.toDecimal: BigDecimal;
 begin
   Result:=value;
@@ -514,9 +532,15 @@ begin
   result := BigDecimalToInt64(value);
 end;
 
-function TXQValueDecimal.toDecimal: bigdecimal;
+function TXQValueDecimal.toDecimal: BigDecimal;
 begin
  Result:=value;
+end;
+
+function TXQValueDecimal.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  ignore(scontext);
+  result := toFloat;
 end;
 
 function TXQValueDecimal.toString: string;
@@ -596,6 +620,13 @@ end;
 function TXQValueString.toDateTime: TDateTime;
 begin
   result := StrToDateTimeDef(str,0);
+end;
+
+function TXQValueString.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  if scontext.strictTypeChecking and not instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
+  result := myStrToFloat(str);
+  if IsNan(result) and (str <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
 function TXQValueString.toRawBinary: string;
@@ -1130,6 +1161,12 @@ begin
   else result := 0;
 end;
 
+function TXQValueSequence.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  if getSequenceCount <> 1 then raiseXPTY0004TypeError(self, 'float/double');
+  Result := seq[0].toFloatChecked(scontext);
+end;
+
 function TXQValueSequence.toString: string;
 begin
   if seq.Count >= 1 then result := seq[0].toString
@@ -1257,7 +1294,7 @@ begin
   node := anode;
 end;
 
-class function TXQValueNode.classkind: TXQValueKind;
+class function TXQValueNode.classKind: TXQValueKind;
 begin
   Result:=pvkNode;
 end;
@@ -1295,6 +1332,17 @@ begin
   result := StrToDateTimeDef(toString,0);
 end;
 
+function TXQValueNode.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+var
+  str: String;
+begin
+  ignore(scontext);
+  if scontext.strictTypeChecking and (nodeTypeAnnotation(node) = baseSchema.string_) then raiseXPTY0004TypeError(self, 'float/double');
+  str := toString;
+  result := myStrToFloat(str);
+  if IsNan(result) and (str <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
+end;
+
 function TXQValueNode.toNode: TTreeNode;
 begin
   result := node;
@@ -1323,6 +1371,15 @@ begin
     tnsText: result := xmlStrEscape(toString);
     tnsXML: result := xmlStrEscape(node.outerXML());
     tnsHTML: result := xmlStrEscape(node.outerHTML());
+  end;
+end;
+
+class function TXQValueNode.nodeTypeAnnotation(tn: TTreeNode): TXSType;
+begin
+  case tn.typ of
+    tetOpen, tetDocument, tetText, tetAttribute: result := baseSchema.untypedAtomic; //todo: handle i:type="xs:integer" attribute
+    tetComment, tetProcessingInstruction: result := baseSchema.string_;
+    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
   end;
 end;
 
