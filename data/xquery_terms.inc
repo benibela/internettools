@@ -2150,12 +2150,14 @@ var
   seq: TXQTermSequence;
 begin
   v := children[0].evaluate(context);
+  if v.getSequenceCount > 1 then raiseXPTY0004TypeError(v, 'singleton');
+  v := xqvalueAtomize(v);
   for i:=1 to high(children) - 1 do begin
     if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
     seq := TXQTermSequence(children[i]);
     for j := 0 to high(seq.children) - 1 do begin
       operand := xqvalueAtomize(seq.children[j].evaluate(context));
-      if operand.getSequenceCount > 1 then raiseEvaluationError('XPTY0004', 'Sequences are not allowed as case operands in a switch statement');
+      if operand.getSequenceCount > 1 then raiseXPTY0004TypeError(operand, 'Sequences are not allowed as case operands in a switch statement');
       if xqvalueDeep_equal(context, v, operand, context.staticContext.collation) then
         exit(seq.children[high(seq.children)].evaluate(context));
     end;

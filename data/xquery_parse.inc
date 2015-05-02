@@ -705,6 +705,7 @@ begin
   expect(')');
 
   word := nextToken();
+  if word <> 'case' then raiseSyntaxError('Need at least one case');
   while word = 'case' do begin
     skipWhitespaceAndComment();
     tempSeq := TXQTermSequence.Create;
@@ -713,11 +714,11 @@ begin
       tempSeq.push(parse());
       word := nextToken();
     end;
-    if word <> 'return' then raiseParsingError('XPST0003', 'expected return');
+    if word <> 'return' then raiseSyntaxError('expected return');
     tempSeq.push(parse());
     word := nextToken();
   end;
-  if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
+  if word <> 'default' then raiseSyntaxError('expected "default" clause');
   expect('return');
   result.push(parse());
 end;
