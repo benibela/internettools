@@ -1699,10 +1699,28 @@ begin
 end;
 
 procedure TTreeParser.doRepairMissingStartTags(const tag: string);
-  procedure goBack(t: TTreeNode);
+  procedure goBack(t: TTreeNode);  //remove t.reverse
+  var
+    u: TTreeNode;
   begin
     if t = nil  then exit;
-    if FCurrentElement = t.reverse then FCurrentElement := FCurrentElement.previous;
+    if FCurrentElement = t.reverse then begin
+      FCurrentElement := FCurrentElement.previous;
+      FCurrentElement.next := nil;
+    end else begin
+      //t.reverse is somewhere in the middle => update doubly linked list
+      u := t.reverse.previous;
+      u.next := t.reverse.next;
+      t.reverse.next.previous := u;
+
+      //correct parents (no parent can be t.parent, since t will now still be open)
+      u := u.next;
+      while u <> nil do begin
+        if u.parent = t.parent then
+          u.parent := t;
+        u := u.next;
+      end;
+    end;
     t.reverse.free;
     t.reverse := nil;
     FElementStack.Add(t);
