@@ -352,6 +352,7 @@ private
 public
   treeNodeClass: TTreeNodeClass; //**< Class of the tree nodes. You can subclass TTreeNode if you need to store additional data at every node
   globalNamespaces: TNamespaceList;
+  allowTextAtRootLevel: boolean;
 
   constructor Create;
   destructor destroy;override;
@@ -2069,13 +2070,14 @@ var
 begin
   result:=prContinue;
 
-  if (FParsingModel = pmStrict) and (FElementStack.Count < 2) then begin
-    strlTrimLeft(text, textLen);
-    if textLen = 0 then exit;
-    if strBeginsWith(text, #239#187#191) or strBeginsWith(text,#254#255) or strBeginsWith(text, #255#254) or
-       strBeginsWith(text, #43#47#118) then raise ETreeParseException.Create('xml ' + FCurrentTree.FBaseURI + ' starts with unicode BOM. That is not supported');
-    raise ETreeParseException.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
-  end;
+  if not allowTextAtRootLevel then
+    if (FParsingModel = pmStrict) and (FElementStack.Count < 2)  then begin
+      strlTrimLeft(text, textLen);
+      if textLen = 0 then exit;
+      if strBeginsWith(text, #239#187#191) or strBeginsWith(text,#254#255) or strBeginsWith(text, #255#254) or
+         strBeginsWith(text, #43#47#118) then raise ETreeParseException.Create('xml ' + FCurrentTree.FBaseURI + ' starts with unicode BOM. That is not supported');
+      raise ETreeParseException.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
+    end;
 
   if FAutoCloseTag then
     autoCloseLastTag();
@@ -2295,6 +2297,8 @@ begin
   FCurrentFile:=html;
   FAutoCloseTag:=false;
   FCurrentNamespace := nil;
+
+  allowTextAtRootLevel := strBeginsWith(contentType, 'text/xml-external-parsed-entity'); //todo: should it detect parsing mode from content-type? so far it does not. but parsed entity is so rarely used, it does not matter
 
   //initialize root element
   //there are two reasons for an empty root element which doesn't exists in the file
