@@ -199,3 +199,41 @@ begin
   result := xqFunctionParse_Common(context, args, 'html');
 end;
 
+function xqFunctionUnparsed_Text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  url: String;
+  data: String;
+  encoding: String;
+  contenttype: string;
+  enc: TEncoding;
+begin
+  requiredArgCount(args, 1, 2);
+
+  if args[0].isUndefined then exit(xqvalue);
+
+  url := context.staticContext.resolveDocURI(args[0].toString);
+  if strContains(url, '#') then raise EXQEvaluationException.create('FOUT1170', 'Fragment identifiers are not allowed');
+
+  data := context.staticContext.retrieveFromURI(url, contenttype, 'FOUT1170');
+  //todo: guess encoding
+  encoding := 'utf-8';
+  if length(args) = 2 then encoding := args[1].toString;
+
+  enc := strEncodingFromName(encoding);
+  if enc = eUnknown then raise EXQEvaluationException.create(IfThen(length(args) = 2,  'FOUT1190', 'FOUT1200'), 'Unknown encoding: '+encoding);
+
+  data := strConvertToUtf8(data, enc);
+
+  result := xqvalue(data);
+end;
+
+
+function xqFunctionUnparsed_Text_Available(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqvalueTrue;
+  try
+    xqFunctionUnparsed_Text(context, args);
+  except
+    result := xqvalueFalse;
+  end;
+end;

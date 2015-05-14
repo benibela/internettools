@@ -275,7 +275,7 @@ begin
   url := args[0].toString;
   if url = '' then exit(xqvalue);
 
-  data := context.staticContext.retrieveFromURI(url, contenttype);
+  data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
   setlength(temp, 1);
   temp[0] := xqvalue(data);
   result := xqFunctionParseJson(temp);

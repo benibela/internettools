@@ -1335,8 +1335,24 @@ begin
   end;
 end;
 
+type
+
+{ TFailInternetAccess }
+
+ TFailInternetAccess = class(TMockInternetAccess)
+  function doTransfer(method: string; const url: TDecodedUrl; data: string): string; override;
+end;
+
 var i: integer;
   clr: TCommandLineReader;
+
+{ TFailInternetAccess }
+
+function TFailInternetAccess.doTransfer(method: string; const url: TDecodedUrl; data: string): string;
+begin
+  raise EInternetException.create('Internet unavailable');
+end;
+
 begin
   testsets := TList.Create;
   environments := TStringList.Create;
@@ -1408,7 +1424,7 @@ begin
   xq.StaticContext.defaultTypeNamespace := nil;
   xq.AutomaticallyRegisterParsedModules := true;
   baseSchema.version := xsd11;
-  defaultInternetAccessClass := TMockInternetAccess;
+  defaultInternetAccessClass := TFailInternetAccess;
 
   case clr.readString('format') of
     'text': logger := TTextLogger.create(clr);

@@ -1265,7 +1265,7 @@ begin
   contenttype := '';
   if v.hasProperty('file', @temp) then begin
     filename := temp.toString;
-    value := staticContext.retrieveFromFile(filename, contenttype);
+    value := staticContext.retrieveFromFile(filename, contenttype, 'FOUT1170');
   end;
   if v.hasProperty('filename', @temp) then filename := temp.toString;
   if v.hasProperty('type', @temp) then contenttype := temp.toString;
@@ -2682,7 +2682,7 @@ begin
   if context.staticContext.sender.FExternalDocuments.IndexOf(url) >= 0 then
     exit(xqvalue(TTreeNode(context.staticContext.sender.FExternalDocuments.Objects[context.staticContext.sender.FExternalDocuments.IndexOf(url)])));
 
-  data := context.staticContext.retrieveFromURI(url, contenttype);
+  data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
 
   node := context.parseDoc(data, url, contenttype);
   if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url);

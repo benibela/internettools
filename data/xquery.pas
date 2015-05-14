@@ -158,9 +158,9 @@ type
     procedure splitRawQName(out namespace: string; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
     function resolveDocURI(url: string): string;
-    function retrieveFromURI(url: string; out contenttype: string): string;
+    function retrieveFromURI(url: string; out contenttype: string; failErrCode: string): string;
   protected
-    function retrieveFromFile(url: string; out contenttype: string): string;
+    function retrieveFromFile(url: string; out contenttype: string; failErrCode: string): string;
   public
 
     function ImplicitTimezone: TDateTime; inline;
@@ -3060,33 +3060,38 @@ begin
   result := strResolveURI(url, baseURI);
 end;
 
-function TXQStaticContext.retrieveFromURI(url: string; out contenttype: string): string;
+function TXQStaticContext.retrieveFromURI(url: string; out contenttype: string; failErrCode: string): string;
 begin
   {$IFNDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-  raise EXQEvaluationException.create('pxp:CONFIG', 'Retrieving external documents is not allowed. (define ALLOW_EXTERNAL_DOC_DOWNLOAD to activate it)');
+  raise EXQEvaluationException.create(failErrCode, 'Retrieving external documents is not allowed. (define ALLOW_EXTERNAL_DOC_DOWNLOAD to activate it)');
   {$ENDIF}
   url := resolveDocURI(url);
   if not strContains(url, '://') or striBeginsWith(url, 'file:/') then begin
     url := strRemoveFileURLPrefix(url);
-    if not FileExists(url) then raise EXQEvaluationException.Create('FODC0002', 'Failed to find document: ' + url);
+    if not FileExists(url) then raise EXQEvaluationException.Create(failErrCode, 'Failed to find document: ' + url);
     contenttype := '';
     exit(strLoadFromFileUTF8(url));
   end;
   if sender.FInternet = nil then begin
     if defaultInternetAccessClass = nil then
-      raise EXQEvaluationException.Create('pxp:CONFIG', 'To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
+      raise EXQEvaluationException.Create(failErrCode, 'To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
     sender.FInternet := defaultInternetAccessClass.create();
   end;
-  result := sender.FInternet.get(url);
+  try
+    result := sender.FInternet.get(url);
+  except
+    on e: EInternetException do
+      raise EXQEvaluationException.create(failErrCode, e.Message);
+  end;
   contenttype := sender.FInternet.getLastHTTPHeader('Content-Type');
 end;
 
-function TXQStaticContext.retrieveFromFile(url: string; out contenttype: string): string;
+function TXQStaticContext.retrieveFromFile(url: string; out contenttype: string; failErrCode: string): string;
 begin
   //contenttype is always '' unless it is an url and not a file
-  if strContains(url, '://') then result := retrieveFromURI(url, contenttype)
-  else if strBeginsWith(url, '/') then result := retrieveFromURI('file://' + url, contenttype)
-  else result := retrieveFromURI('file://./' + url, contenttype);
+  if strContains(url, '://') then result := retrieveFromURI(url, contenttype, failErrCode)
+  else if strBeginsWith(url, '/') then result := retrieveFromURI('file://' + url, contenttype, failErrCode)
+  else result := retrieveFromURI('file://./' + url, contenttype, failErrCode);
 end;
 
 function TXQStaticContext.ImplicitTimezone: TDateTime;
@@ -7045,6 +7050,11 @@ fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Env
 fn3.registerFunction('parse-xml', @xqFunctionParse_XML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
 fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
 {pxp3}pxp.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
+
+fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, ['($href as xs:string?) as xs:string?', '($href as xs:string?, $encoding as xs:string) as xs:string?'], []);
+fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, ['($href as xs:string?) as xs:boolean', '($href as xs:string?, $encoding as xs:string) as xs:boolean'], []);
+fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?) as xs:string*',                          'fn:tokenize(fn:unparsed-text($href           ), "\r\n|\r|\n")[not(position()=last() and .="")]');
+fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?, $encoding as xs:string) as xs:string*',  'fn:tokenize(fn:unparsed-text($href, $encoding), "\r\n|\r|\n")[not(position()=last() and .="")]');
 
 //Operators
 //The type information are just the function declarations of the up-backing functions
