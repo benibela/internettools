@@ -1791,6 +1791,9 @@ var
       if enc = 'utf-8' then FXmlHeaderEncoding:=eUTF8
       else if (enc = 'windows-1252') or (enc = 'iso-8859-1') or (enc = 'iso-8859-15') or (enc = 'latin1') then
         FXmlHeaderEncoding:=eWindows1252;
+      if allowTextAtRootLevel and (parsingModel = pmStrict) and (getProperty('standalone', properties) = 'yes') then
+        raise ETreeParseException.Create('External-preparsed-entity cannot be standalone');
+
       exit;
     end;
     if not FReadProcessingInstructions then exit;
@@ -2291,20 +2294,17 @@ begin
   FElementStack.Clear;
   FCurrentTree:=nil;
 
+  allowTextAtRootLevel := strBeginsWith(contentType, 'text/xml-external-parsed-entity'); //todo: should it detect parsing mode from content-type? so far it does not. but parsed entity is so rarely used, it does not matter
+
   //FVariables.clear;
-  if html='' then exit(nil);
+  if (html='') and not allowTextAtRootLevel then exit(nil);
 
   FCurrentFile:=html;
   FAutoCloseTag:=false;
   FCurrentNamespace := nil;
 
-  allowTextAtRootLevel := strBeginsWith(contentType, 'text/xml-external-parsed-entity'); //todo: should it detect parsing mode from content-type? so far it does not. but parsed entity is so rarely used, it does not matter
 
-  //initialize root element
-  //there are two reasons for an empty root element which doesn't exists in the file
-  //1. it is necessary for the correct interpretion of xpath expressions html/... assumes
-  //   that the current element is a parent of html
-  //2. it serves as parent for multiple top level elements (althought they aren't allowed)
+  //initialize document node
   FCurrentTree:=TTreeDocument.create(self);
   FCurrentTree.FCreator:=self;
   FCurrentTree.typ := tetDocument;
