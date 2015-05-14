@@ -2736,6 +2736,7 @@ begin
          and (length(TXQTermNamedFunction(children[high(children)]).interpretedFunction.parameters) = parameterCount)
          then begin
         temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
+        if temp.context.staticContext.sender = nil then temp.context.staticContext := context.staticContext.sender.StaticContext; //only for native interpreted functions
       end else temp := define(context, false);
     end;
     xqtdfStaticPartialApplication: temp := defineStaticPartialApplication(context);

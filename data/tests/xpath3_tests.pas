@@ -169,6 +169,11 @@ begin
   t('(let $f := function-lookup(xs:QName("fn:abs"), 1) return $f)(-12.3)', '12.3');
   t('function ($temp) { (let $f := function-lookup(xs:QName("fn:abs"), 1) return $f)(-12.3) } (0)', '12.3');
 
+  f('unparsed-text-lines("http://example.org")', 'FOUT1170');
+  f('(let $f := unparsed-text-lines#1 return $f)("http://example.org")', 'FOUT1170');
+  f('(let $f := unparsed-text-lines(?, "utf-8") return $f)("http://example.org")', 'FOUT1170');
+  f('(let $f := unparsed-text-lines(?) return $f(?))("http://example.org")', 'FOUT1170');
+  f('(let $f := function-lookup(xs:QName("fn:unparsed-text-lines"), 1) return $f(?))("http://example.org")', 'FOUT1170');
 
   //higher order functions
   t('join(for-each((1,2,3), function($x) {$x * 10}))', '10 20 30');
@@ -238,6 +243,7 @@ begin
   t('parse-xml-fragment("<abc xmlns=""foobar"" attrib=""value""/><abc attrib=""value2""/>")/Q{foobar}abc/@attrib', 'value value2');
   t('">"||string(parse-xml-fragment(" <w> </w>  <s> </s>"))||parse-xml-fragment("&lt;")', '>     <');
   t('parse-html("<html><a href=""foobar""/></html>")//a/@href', 'foobar');
+
 
   f('1 ! root()', 'XPTY0004');
 
