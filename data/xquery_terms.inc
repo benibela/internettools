@@ -1340,7 +1340,11 @@ begin
         else raiseEvaluationError('FORG0001', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
       end;
     end;
-    xqfkUnknown, xqfkNativeInterpreted: begin
+    xqfkNativeInterpreted: begin
+      init(context.staticContext);
+      result := interpretedFunction.evaluateInContext(context, evilkids);
+    end;
+    xqfkUnknown: begin
       init(context.staticContext);
       result := interpretedFunction.evaluate(evilkids);
     end;

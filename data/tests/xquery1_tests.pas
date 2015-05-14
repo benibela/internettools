@@ -182,6 +182,7 @@ var
 
 var //vars: TXQVariableChangeLog;
   helper: THelper;
+  modu: TXQNativeModule;
 begin
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
@@ -1858,6 +1859,15 @@ begin
   //todo f('5 / . / 6', 'err:XPTY0020');
 
   m('declare default function namespace "http://www.w3.org/2005/xquery-local-functions"; declare function local:switch(){ 1 }; declare function function($i) { $i }; function(switch()) ', '1');
+
+  modu := TXQNativeModule.Create(TNamespace.create('http://benibela.de/native-test-module', 'xyz'));
+  TXQueryEngine.registerNativeModule(modu);
+  modu.registerInterpretedFunction('test-context', '() as item()*', '. + 1');
+
+  m('declare namespace test = "http://benibela.de/native-test-module"; <a>17</a> / test:test-context()', '18');
+  f('declare function local:local-context() { . + 1} ; <a>17</a> / local:local-context()', 'XPDY0002');
+
+  modu.free;
 
   //XQuery/XPath 3 syntax tests which must fail in the old version
   f('"a" || "b"', 'err:XPST0003');

@@ -1864,6 +1864,26 @@ begin
   end;
 end;
 
+function TXQValueFunction.evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  tempcontext: TXQEvaluationContext;
+  j: Integer;
+begin
+  tempcontext := inContext;
+  if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
+  if tempcontext.temporaryVariables = nil then tempcontext.temporaryVariables := TXQVariableChangeLog.create()
+  else tempcontext.temporaryVariables.pushAll;
+  try
+    for j := 0 to high(parameters) do
+      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, inContext));
+    result := body.evaluate(tempcontext);
+    result := TXQAbstractFunctionInfo.convertType(result, resulttype, inContext);
+  finally
+    if inContext.temporaryVariables = nil then tempcontext.temporaryVariables.free
+    else tempcontext.temporaryVariables.popAll();
+  end;
+end;
+
 function TXQValueFunction.directClone: TXQValue;
 var
   f: TXQValueFunction;

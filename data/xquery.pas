@@ -824,6 +824,7 @@ type
     function toBooleanEffective: boolean; override;
 
     function evaluate(const args: TXQVArray): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    function evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
@@ -1535,7 +1536,7 @@ type
     function clone: TXQTerm; override;
   private
     interpretedFunction: TXQValueFunction;
-    functionStaticContext: TXQStaticContext;
+    functionStaticContext: TXQStaticContext; //used for variable cycle detection
     class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
     procedure init(const context: TXQStaticContext);
   end;
@@ -2392,7 +2393,7 @@ type
   //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
   procedure registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   procedure registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
-  //** Registers a function from a XQuery body
+  //** Registers a function from an XQuery body
   //**TypeChecking must a standard XQuery function declarations (without the function name but WITH the variable names) (it uses a simplified parser, so only space whitespace is allowed)
   procedure registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   //** Registers a binary operator
@@ -6596,6 +6597,8 @@ begin
 end;
 
 destructor TXQNativeModule.Destroy;
+var
+  i: Integer;
 begin
   basicFunctions.Clear;
   complexFunctions.Clear;
@@ -6608,6 +6611,10 @@ begin
   binaryOpLists.free;
   binaryOpFunctions.Free;
   interpretedFunctions.free;
+
+  i := nativeModules.IndexOf(namespace.getURL);
+  if (i >= 0) and (nativeModules.Objects[i] = self) then nativeModules.Delete(i);
+
   inherited Destroy;
 end;
 
