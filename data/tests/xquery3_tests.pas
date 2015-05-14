@@ -287,6 +287,24 @@ begin
   //URL Qualified names
   m('declare namespace g = "f"; declare %Q{foo}bar function Q{f}succ($i as Q{http://www.w3.org/2001/XMLSchema}integer) as Q{http://www.w3.org/2001/XMLSchema}integer{$i + 1}; join(for $f in (%Q{wtf}omg function ($k){123}, Q{f}succ#1, g:succ#1) return $f(100))', '123 101 101');
 
+  t('path(<r><hello>world</hello></r>/hello/text())', 'Q{http://www.w3.org/2005/xpath-functions}root()/Q{}hello[1]/text()[1]');
+
+  t('let $e := fn:parse-xml(''<?xml version="1.0"?><p xmlns="http://example.com/one" xml:lang="de" author="Friedrich von Schiller">Freude, schöner Götterfunken,<br/>Tochter aus Elysium,<br/>Wir betreten feuertrunken,<br/>Himmlische, dein Heiligtum.</p>'')' +
+     ' return string-join(($e,$e/*:p,$e/*:p/@xml:lang,$e/*:p/@author,$e/*:p/*:br[2],$e//text()[starts-with(normalize-space(), "Tochter")])!path(.), "|")',
+    '/|' +
+     '/Q{http://example.com/one}p[1]|' +
+     '/Q{http://example.com/one}p[1]/@Q{http://www.w3.org/XML/1998/namespace}lang|' +
+     '/Q{http://example.com/one}p[1]/@author|' +
+     '/Q{http://example.com/one}p[1]/Q{http://example.com/one}br[2]|' +
+     '/Q{http://example.com/one}p[1]/text()[2]'  );
+  t('let $emp := <employee xml:id="ID21256"><empnr>E21256</empnr><first>John</first><last>Brown</last></employee>' +
+     ' return string-join(($emp,$emp/@xml:id,$emp/empnr)!path(.), "|")',
+    'Q{http://www.w3.org/2005/xpath-functions}root()|' +
+     'Q{http://www.w3.org/2005/xpath-functions}root()/@Q{http://www.w3.org/XML/1998/namespace}id|' +
+     'Q{http://www.w3.org/2005/xpath-functions}root()/Q{}empnr[1]');
+
+
+
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');

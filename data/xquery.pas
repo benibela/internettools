@@ -4325,7 +4325,6 @@ function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for
 {$I xquery_functions_generated.inc}
 {$I xquery_functions3.inc}
 
-
 function sequenceFilterConditionSatisfied(evaluatedCondition: IXQValue; const index: integer): boolean;
 begin
   case evaluatedCondition.kind of
@@ -7039,6 +7038,7 @@ fn3.registerFunction('tail', @xqFunctionTail, ['($arg as item()*) as item()*']);
 fn3.registerFunction('has-children', @xqFunctionHas_Children, ['() as xs:boolean', '($node as node()?) as xs:boolean']);
 fn3.registerInterpretedFunction('innermost', '($nodes as node()*) as node()*', '$nodes except $nodes/ancestor::node()', []);
 fn3.registerInterpretedFunction('outermost', '($nodes as node()*) as node()*', '$nodes[not(ancestor::node() intersect $nodes)]/.', []);
+fn3.registerFunction('path', @xqFunctionPath, ['() as xs:string?', '($arg as node()?) as xs:string?']);
 
 
 fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, ['($name as xs:QName, $arity as xs:integer) as function(*)?']);

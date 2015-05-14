@@ -29,6 +29,65 @@ begin
   result := xqvalue(n.getFirstChild() <> nil);
 end;
 
+function xqFunctionPath(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+  function path(n: TTreeNode): string;
+    function getPosition(checkValue: boolean): integer;
+    var cur: TTreeNode;
+    begin
+      result := 1;
+      cur := n.getPreviousSibling();
+      while cur <> nil do begin
+        if (cur.typ = n.typ) and (equalNamespaces(cur.namespace, n.namespace)) and ((not checkValue) or (cur.value = n.value)) then inc(result);
+        cur := cur.getPreviousSibling();
+      end;
+    end;
+    function getQualifiedName: string;
+    begin
+      result += n.value;
+    end;
+
+  var
+    step: String;
+  begin
+    result := '';
+    while n.parent <> nil do begin
+      case n.typ of
+        tetOpen: begin
+          if n.namespace <> nil then step := 'Q{' + n.namespace.getURL + '}'
+          else step := 'Q{}';
+          step += n.value + '['+IntToStr(getPosition(true))+']';
+        end;
+        tetAttribute: begin
+          if n.namespace <> nil then step := '@Q{' + n.namespace.getURL + '}'
+          else step := '@';
+          step += n.value;
+        end;
+        tetText: step := 'text()['+IntToStr(getPosition(false))+']';
+        tetComment: step := 'comment()['+IntToStr(getPosition(false))+']';
+        tetProcessingInstruction: step := 'processing-instruction('+n.value+')['+IntToStr(getPosition(true))+']';
+        else raise EXQEvaluationException.create('pxp:INTERNAL', 'Invalid node: '+n.toString());
+      end;
+      if result <> '' then result := step + '/' + result
+      else result := step;
+      n := n.parent;
+    end;
+    if n.typ = tetDocument then exit('/' + result);
+    if result <> '' then result := '/' + result;
+    result := 'Q{http://www.w3.org/2005/xpath-functions}root()' + result;
+  end;
+
+var
+  node: TTreeNode;
+begin
+  requiredArgCount(args, 0, 1);
+  if length(args) = 1 then begin
+    if args[0].isUndefined then exit(args[0]);
+    node := args[0].toNode;
+  end else node := context.contextNode();
+  result := xqvalue(path(node));
+end;
+
+
 function xqFunctionFunction_lookup(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   qname: TXQValueQName;
@@ -209,7 +268,7 @@ var
 begin
   requiredArgCount(args, 1, 2);
 
-  if args[0].isUndefined then exit(xqvalue);
+  if args[0].isUndefined then exit(args[0]);
 
   url := context.staticContext.resolveDocURI(args[0].toString);
   if strContains(url, '#') then raise EXQEvaluationException.create('FOUT1170', 'Fragment identifiers are not allowed');
@@ -237,3 +296,6 @@ begin
     result := xqvalueFalse;
   end;
 end;
+
+
+

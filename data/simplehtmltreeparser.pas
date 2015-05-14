@@ -192,6 +192,7 @@ TTreeNode = class
   function getAttributeTry(a: string; out valueout: TTreeAttribute; cmpFunction: TStringComparisonFunc = nil):boolean; //**< get the value of an attribute of this element and returns false if it doesn't exist cmpFunction controls is used to compare the attribute name the searched string. (can be used to switch between case/in/sensitive)
   function getAttributeCount(): integer;
 
+  function getPreviousSibling(): TTreeNode; //**< Get the previous element on the same level or nil if there is none
   function getNextSibling(): TTreeNode; //**< Get the next element on the same level or nil if there is none
   function getFirstChild(): TTreeNode; //**< Get the first child, or nil if there is none
   function getParent(): TTreeNode; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
@@ -961,6 +962,16 @@ function TTreeNode.getAttributeCount: integer;
 begin
   if (self = nil) or (attributes = nil) then exit(0);
   result := attributes.Count;
+end;
+
+function TTreeNode.getPreviousSibling: TTreeNode;
+begin
+  result := previous;
+  if result = nil then exit;
+  case result.typ of
+    tetOpen, tetDocument: result := nil;
+    tetClose: result := result.reverse;
+  end;
 end;
 
 function TTreeNode.getNextSibling(): TTreeNode;
