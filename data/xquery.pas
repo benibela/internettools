@@ -222,6 +222,7 @@ type
     procedure endSubContextWithVariables(const oldContext: TXQEvaluationContext);
   private
     function contextNode(mustExists: boolean = true): TTreeNode;
+    function parseDoc(const data, url, contenttype: string): TTreeNode;
   end;
 
 
@@ -3774,6 +3775,33 @@ begin
   result := nil;
 end;
 
+function TXQEvaluationContext.parseDoc(const data, url, contenttype: string): TTreeNode;
+var
+  tempnode: TTreeNode;
+  parser: TTreeParser;
+begin
+  if not Assigned(staticContext) or not assigned(staticContext.sender) then raisePXPInternalError;
+  with staticContext.sender do begin
+    if assigned(OnParseDoc) then begin
+      result := nil;
+      onParseDoc(StaticContext.sender, data, url, contenttype, result);
+    end else begin
+      tempnode := contextNode(false);
+      parser := nil;
+      if (tempnode <> nil) and (tempnode.document is TTreeDocument) then parser := tempnode.getDocument().getCreator;
+      if parser = nil then parser := defaultParser;
+      if parser = nil then begin
+        defaultParser := TTreeParser.Create;
+        defaultParser.readComments:=true;
+        defaultParser.readProcessingInstructions:=true;
+        parser := defaultParser;
+      end;
+
+      result := parser.parseTree(data, url, contenttype);
+    end;
+  end
+end;
+
 
 { TXQuery }
 
@@ -7013,6 +7041,10 @@ fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, ['($seq1 as item
 
 fn3.registerFunction('environment-variable', @xqFunctionEnvironment_Variable, ['($name as xs:string) as xs:string?']);
 fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables, ['() as xs:string*']);
+
+fn3.registerFunction('parse-xml', @xqFunctionParse_XML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
+fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
+{pxp3}pxp.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
 
 //Operators
 //The type information are just the function declarations of the up-backing functions

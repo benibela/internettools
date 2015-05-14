@@ -36,6 +36,7 @@ var
       if tn.typ in [tetOpen, tetDocument] then parents.Add(tn);
       tn := tn.next;
     end;
+    parents.free;
     if tp.getLastTree.outerXML() <> o then
       raise Exception.Create('Parsing result invalid: '+tp.getLastTree.outerXML()+ ' != '+o);
   end;

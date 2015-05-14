@@ -802,6 +802,7 @@ var previoushtml: string;
    end;
 
 begin
+  XQGlobalTrimNodes:=true;
   extParser:=THtmlTemplateParser.create;
   extParser.QueryEngine.GlobalNamespaces.Add(TNamespace.create('uri:mynamespace', 'my'));
   sl:=TStringList.Create;

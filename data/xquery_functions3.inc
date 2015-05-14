@@ -160,7 +160,6 @@ end;
 
 function xqFunctionAvailable_Environment_Variables(const args: TXQVArray): IXQValue;
 var
-  sl: TStringList;
   i: Integer;
 begin
   requiredArgCount(args, 0);
@@ -168,3 +167,34 @@ begin
   for i:=1 to GetEnvironmentVariableCount do
     xqvalueSeqAdd(result, xqvalue(strBefore(GetEnvironmentString(i), '=')));
 end;
+
+function xqFunctionParse_Common(const context: TXQEvaluationContext; const args: TXQVArray; typ: string): IXQValue;
+var
+  node: TTreeNode;
+begin
+  requiredArgCount(args, 1);
+  if args[0].isUndefined then exit(args[0]);
+  node := nil;
+  try
+    node := context.parseDoc(args[0].toString, context.staticContext.baseURI, 'text/'+typ+'; charset=utf-8');
+  except
+  end;
+  if node = nil then raise EXQEvaluationException.create('FODC0006', 'Invalid document for parse-xml/-fragment/html: '+copy(args[0].toString, 1, 1000));
+  result := xqvalue(node);
+end;
+
+function xqFunctionParse_XML(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionParse_Common(context, args, 'xml');
+end;
+
+function xqFunctionParse_XML_Fragment(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionParse_Common(context, args, 'xml-external-parsed-entity');
+end;
+
+function xqFunctionParse_HTML(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionParse_Common(context, args, 'html');
+end;
+
