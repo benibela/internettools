@@ -180,6 +180,7 @@ begin
   except
   end;
   if node = nil then raise EXQEvaluationException.create('FODC0006', 'Invalid document for parse-xml/-fragment/html: '+copy(args[0].toString, 1, 1000));
+  (node as TTreeDocument).documentURI := '';
   result := xqvalue(node);
 end;
 
