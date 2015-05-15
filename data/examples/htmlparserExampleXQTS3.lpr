@@ -893,7 +893,7 @@ begin
   except
     on e: EXQException do begin
       result.error := e.errorCode +': '+e.Message;
-      result.result := TResult(results[0]).check(e.errorCode);
+      result.result := TResult(results[0]).check(ifthen(e.namespace.getURL <> XMLNamespaceURL_XQTErrors, 'Q{'+e.namespace.getURL+'}', '') + e.errorCode);
     end;
     on e: ETreeParseException do begin
       result.error := 'XML-PARSING-FAILED: '+e.Message;

@@ -759,7 +759,7 @@ begin
     raise EXQEvaluationException.create(ename.local, 'error function called', TNamespace.create(ename.url, ename.prefix));
   if length(args) = 2 then
     raise EXQEvaluationException.create(ename.local, args[1].toString, TNamespace.create(ename.url, ename.prefix));
-  raise EXQEvaluationException.create(ename.local, args[1].toString+':'+LineEnding+args[2].debugAsStringWithTypeAnnotation(), TNamespace.create(ename.url, ename.prefix));
+  raise EXQEvaluationException.create(ename.local, args[1].toString, TNamespace.create(ename.url, ename.prefix), args[2]);
   result := xqvalue();
 end;
 

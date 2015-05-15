@@ -87,6 +87,7 @@ type
   function parseDefineVariable: TXQTermDefineVariable;
   function parseAnnotations: TXQAnnotations;
   function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
+  function parseTryCatch: TXQTermTryCatch;
 
   //**Parses the next complete value@br
   //**i.e. it will parse from the left, until it obtains a value that can be evaluated.
@@ -1217,6 +1218,46 @@ begin
   end;
 end;
 
+function TXQParsingContext.parseTryCatch: TXQTermTryCatch;
+var
+  body: TXQTerm;
+  url: string;
+  prefix: string;
+  localpart: string;
+  kind: TXQNamespaceMode;
+  token: String;
+begin
+  expect('{');
+  result := TXQTermTryCatch.Create(parsePrimaryLevel);
+  try
+    expect('}');
+    token := nextToken(true);
+    while token = 'catch' do begin
+      expect('catch');
+      SetLength(result.catches, length(result.catches) + 1);
+      repeat
+        kind := nextTokenEQName(url, prefix, localpart, true);
+        if kind = xqnmPrefix then begin
+          url := staticContext.findNamespaceURLMandatory(prefix, xqdnkUnknown);
+          kind := xqnmURL;
+        end;
+        SetLength(result.catches[high(result.catches)].tests, length(result.catches[high(result.catches)].tests) + 1);
+        result.catches[high(result.catches)].tests[high(result.catches[high(result.catches)].tests)].local := localpart;
+        result.catches[high(result.catches)].tests[high(result.catches[high(result.catches)].tests)].namespace := url;
+        result.catches[high(result.catches)].tests[high(result.catches[high(result.catches)].tests)].kind := kind;
+        token := nextToken();
+      until token <> '|';
+      if token <> '{' then raiseSyntaxError('{ expected');
+      result.catches[high(result.catches)].expr := parsePrimaryLevel;
+      expect('}');
+      token := nextToken(true);
+    end;
+  except
+    result.free;
+    raise;
+  end;
+end;
+
 
 function TXQParsingContext.replaceEntitiesAlways(s: string): string;
 var
@@ -1691,6 +1732,10 @@ begin
            expect('{'); result := parse(); expect('}');
            exit;
          end;
+        'try': begin
+          requireXQuery3('try');
+          exit(parseTryCatch);
+        end;
       end;
       '#': begin
         require3('Named Function Reference');

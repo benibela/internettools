@@ -3035,4 +3035,126 @@ begin
 end;
 
 
+{ TXQTermTryCatch }
+
+constructor TXQTermTryCatch.create(abody: TXQTerm);
+begin
+  body := abody;
+end;
+
+function TXQTermTryCatch.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  tempcontext: TXQEvaluationContext;
+  ns: String;
+  matches: Boolean;
+  i: Integer;
+  j: Integer;
+  nsprefix: String;
+begin
+  try
+    result := body.evaluate(context);
+  except
+    on e: EXQEvaluationException do begin
+      if e.namespace <> nil then begin
+        ns := e.namespace.getURL;
+        nsprefix := e.namespace.getPrefix;
+      end else begin
+        ns := XMLNamespaceURL_XQTErrors;
+        nsprefix := 'err';
+      end;
+
+      for i := 0 to high(catches) do begin
+        matches := false;
+        for j := 0 to high(catches[i].tests) do
+          if ((catches[i].tests[j].local = '*') or (catches[i].tests[j].local = e.errorCode) )  and
+             ((catches[i].tests[j].kind = xqnmNone) or (catches[i].tests[j].namespace = ns) ) then begin
+            matches := true;
+            break;
+          end;
+        if matches then begin
+         tempcontext := context;
+         if context.temporaryVariables = nil then tempcontext.temporaryVariables := TXQVariableChangeLog.create()
+         else tempcontext.temporaryVariables.pushAll;
+
+         tempcontext.temporaryVariables.add('code', TXQValueQName.create(ns, nsprefix, e.errorCode), XMLNamespaceURL_XQTErrors);
+         tempcontext.temporaryVariables.add('description', e.rawMessage, XMLNamespaceURL_XQTErrors);
+         tempcontext.temporaryVariables.add('value', e.value, XMLNamespaceURL_XQTErrors);
+         tempcontext.temporaryVariables.add('module', xqvalue(), XMLNamespaceURL_XQTErrors);
+         tempcontext.temporaryVariables.add('line-number', xqvalue(), XMLNamespaceURL_XQTErrors);
+         tempcontext.temporaryVariables.add('column-number', xqvalue(), XMLNamespaceURL_XQTErrors);
+         tempcontext.temporaryVariables.add('additional', xqvalue(), XMLNamespaceURL_XQTErrors);
+
+         result := catches[i].expr.evaluate(tempcontext);
+
+         if context.temporaryVariables = nil then tempcontext.temporaryVariables.free
+         else tempcontext.temporaryVariables.popAll();
+         exit;
+        end;
+      end;
+
+      raise;
+    end;
+  end;
+end;
+
+function TXQTermTryCatch.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := body.getContextDependencies;
+  for i := 0 to high(catches) do
+    result += catches[i].expr.getContextDependencies;
+end;
+
+function TXQTermTryCatch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i: Integer;
+  l: array of TXQTermVariable;
+begin
+  result := visitor.simpleTermVisit(@body, self);
+  case result of xqtvaAbort: exit; end;
+  SetLength(l, 7);
+  l[0] := TXQTermVariable.create('code', XMLNamespaceURL_XQTErrors);
+  l[1] := TXQTermVariable.create('description', XMLNamespaceURL_XQTErrors);
+  l[2] := TXQTermVariable.create('value', XMLNamespaceURL_XQTErrors);
+  l[3] := TXQTermVariable.create('module', XMLNamespaceURL_XQTErrors);
+  l[4] := TXQTermVariable.create('line-number', XMLNamespaceURL_XQTErrors);
+  l[5] := TXQTermVariable.create('column-number', XMLNamespaceURL_XQTErrors);
+  l[6] := TXQTermVariable.create('additional', XMLNamespaceURL_XQTErrors);
+  try
+    for i := 0 to high(l) do
+      visitor.declare(PXQTermVariable(@l[i]));
+
+    for i := 0 to high(catches) do begin
+      result := visitor.simpleTermVisit(@catches[i].expr, self);
+      case result of xqtvaAbort: break; end;
+    end;
+    for i := high(l) downto 0 do
+      visitor.undeclare(PXQTermVariable(@l[i]));
+  finally
+    for i := high(l) downto 0 do
+      l[i].free;
+  end;
+end;
+
+function TXQTermTryCatch.clone: TXQTerm;
+var
+  i: Integer;
+begin
+  result := TXQTermTryCatch.create(body);
+  TXQTermTryCatch(result).catches := catches;
+  SetLength(TXQTermTryCatch(result).catches, length(catches));
+  for i := 0 to high(catches) do
+    TXQTermTryCatch(result).catches[i].expr := catches[i].expr.clone;
+end;
+
+destructor TXQTermTryCatch.Destroy;
+var
+  i: Integer;
+begin
+  body.free;
+  for i := 0 to high(catches) do
+    catches[i].expr.free;
+  inherited Destroy;
+end;
 

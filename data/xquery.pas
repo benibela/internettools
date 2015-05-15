@@ -154,6 +154,7 @@ type
     function findSchema(const namespace: string): TXSSchema;
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
+    function findNamespaceURLMandatory(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
     procedure splitRawQName(out namespace: string; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
@@ -1667,6 +1668,26 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
+  { TXQTermTryCatch }
+
+  TXQTermTryCatch = class(TXQTerm)
+    body: TXQTerm;
+    catches: array of record
+      tests: array of record
+        namespace, local: string;
+        kind: TXQNamespaceMode;
+      end;
+      expr: TXQTerm;
+    end;
+
+    constructor create(abody: TXQTerm);
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+    function clone: TXQTerm; override;
+    destructor Destroy; override;
+  end;
+
   { TXQTermModule }
 
   TXQTermModule = class(TXQTermWithChildren)
@@ -1737,6 +1758,9 @@ type
     errorCode: string;
     namespace: INamespace;
     constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+  private
+    function messagePrefix: string;
+    function rawMessage: string; virtual;
   end;
 
   //**Exception raised during the parsing of an expression
@@ -1745,8 +1769,13 @@ type
   end;
 
   //**Exception raised during the evaluation of an expression
+
+  { EXQEvaluationException }
+
   EXQEvaluationException = class(EXQException)
-    constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+    value: IXQValue;
+    constructor create(aerrcode, amessage: string; anamespace: INamespace = nil; avalue: IXQValue = nil);
+    function rawMessage: string; override;
   end;
 
   (***
@@ -2533,10 +2562,20 @@ end;
 
 { EXQEvaluationException }
 
-constructor EXQEvaluationException.create(aerrcode, amessage: string; anamespace: INamespace);
+constructor EXQEvaluationException.create(aerrcode, amessage: string; anamespace: INamespace; avalue: IXQValue);
 begin
   inherited create(aerrcode, amessage, anamespace);
+  value := avalue;
+  if value <> nil then
+    message := message + ':'+LineEnding+value.debugAsStringWithTypeAnnotation();
 end;
+
+function EXQEvaluationException.rawMessage: string;
+begin
+  Result:=inherited rawMessage;
+  if value <> nil then result := copy(result, 1, length(result) - length( ':'+LineEnding+value.debugAsStringWithTypeAnnotation() ) );
+end;
+
 
 { EXQParsingException }
 
@@ -2565,10 +2604,20 @@ begin
   end else if anamespace = nil then namespace := TNamespace.create(XMLNamespaceURL_XQTErrors, 'err')
   else namespace := anamespace;
   errorCode:=aerrcode;
-  temp := '';
-  if namespace <> nil then temp += namespace.getPrefix + ':';
-  if aerrcode <> '' then temp += errorCode + ': ';
-  inherited create(temp + amessage);
+  inherited create(messagePrefix + amessage);
+end;
+
+function EXQException.messagePrefix: string;
+begin
+  result := '';
+  if namespace <> nil then Result += namespace.getPrefix + ':';
+  if errorCode <> '' then Result += errorCode + ': ';
+end;
+
+function EXQException.rawMessage: string;
+begin
+  result := Message;
+  delete(result, 1, length(messagePrefix));
 end;
 
 var collations: TStringList;
@@ -3040,6 +3089,16 @@ begin
   temp := findNamespace(nsprefix, defaultNamespaceKind);
   if temp <> nil then result := temp.getURL
   else result := '';
+end;
+
+function TXQStaticContext.findNamespaceURLMandatory(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
+var
+  temp: INamespace;
+begin
+  temp := findNamespace(nsprefix, defaultNamespaceKind);
+  if temp <> nil then exit(temp.getURL);
+  if nsprefix <> '' then raise EXQParsingException.create('XPST0081', 'Unknown namespace prefix: ' + nsprefix);
+  result := '';
 end;
 
 procedure TXQStaticContext.splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
