@@ -303,6 +303,8 @@ begin
      'Q{http://www.w3.org/2005/xpath-functions}root()/@Q{http://www.w3.org/XML/1998/namespace}id|' +
      'Q{http://www.w3.org/2005/xpath-functions}root()/Q{}empnr[1]');
 
+  m('<r><a xmlns="f">text</a></r>/Q{f}*', 'text');
+
   //try/catch
   m('try { "a" cast as xs:integer } catch * { 1 }', '1');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { "a" cast as xs:integer } catch err:FORG0001 { 2 }', '2');

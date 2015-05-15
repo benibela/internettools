@@ -293,8 +293,13 @@ begin
     url := strFromPchar(marker, pos - marker);
     if parsingModel in [xqpmXQuery1,xqpmXQuery3] then url := replaceEntitiesIfNeeded(url);
     inc(pos);
-    if (pos^ in WHITE_SPACE + SYMBOLS) then raiseParsingError('err:XPST0003', 'Q{..}localname must not be separated by whitespace');
-    localpart := nextTokenNCName();
+    if pos^ = '*' then begin
+      inc(pos);
+      localpart := '*';
+    end else begin
+      if (pos^ in WHITE_SPACE + SYMBOLS - ['*']) then raiseParsingError('err:XPST0003', 'Q{..}localname must not be separated by whitespace');
+      localpart := nextTokenNCName();
+    end;
     result := xqnmURL;
   end else if (pos^ = ':') and not ((pos+1)^ in NONCNAME) then begin //same check in parseValue for matchers
     expect(':');
