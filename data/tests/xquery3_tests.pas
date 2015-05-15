@@ -315,6 +315,8 @@ begin
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000"), "sometext") } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 sometext');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000"), "foo", "bar") } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 foo bar');
 
+  //typeswitch's sequence type unions
+  m('typeswitch (123) case xs:string | xs:integer return "union" default return "flag" ', 'union');
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');

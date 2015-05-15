@@ -1386,7 +1386,7 @@ type
   { TXQTermType }
 
   type
-  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikFunctionTest, tikElementTest);
+  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikFunctionTest, tikElementTest, tikUnion);
 
   { TXQTermSequenceType }
 

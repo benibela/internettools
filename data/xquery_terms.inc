@@ -538,6 +538,8 @@ begin
 end;
 
 function TXQTermSequenceType.serialize: string;
+var
+  i: Integer;
 begin
   result := name;
   if Result = '' then
@@ -547,6 +549,12 @@ begin
       tikAtomic: result := 'xs:'+atomicTypeInfo.name;
       tikFunctionTest: result := 'function';
       tikElementTest: result := 'node()';
+      tikUnion: begin
+        result := '';
+        for i := 0 to high(children) do
+          result += '| ' + (children[i] as TXQTermSequenceType).serialize;
+        delete(result, 1, 2);
+      end;
     end;
   //incomplete
 end;
@@ -623,9 +631,17 @@ var nodeCondition: TXQPathNodeCondition;
 var
   count: Integer;
   v: IXQValue;
+  i: Integer;
 begin
   //compare count with sequence count
-  if kind = tikNone then exit(ta.isUndefined);
+  case kind of
+    tikNone: exit(ta.isUndefined);
+    tikUnion: begin
+      for i := 0 to high(children) do
+        if TXQTermSequenceType(children[i]).instanceOf(ta, context) then exit(true);
+      exit(false);
+    end;
+  end;
   count := ta.getSequenceCount;
   if ((count = 0) and not allowNone) or
      ((count > 1) and not allowMultiple) then
@@ -759,8 +775,12 @@ begin
 end;
 
 function TXQTermSequenceType.isItemStar: boolean;
+var
+  i: Integer;
 begin
   result := (kind = tikAny) and allowMultiple and allowNone;
+  if kind = tikUnion then
+    for i := 0 to high(children) do result := result or TXQTermSequenceType(children[i]).isItemStar();
 end;
 
 function TXQTermSequenceType.clone: TXQTerm;

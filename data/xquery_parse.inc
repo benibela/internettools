@@ -66,6 +66,7 @@ type
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
   function parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
   function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
+  function parseSequenceTypeUnion(): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
   function replaceEntitiesAlways(s: string): string;
   function replaceEntitiesIfNeeded(const s: string): string; inline;
@@ -493,6 +494,28 @@ begin
   end;
 end;
 
+function TXQParsingContext.parseSequenceTypeUnion: TXQTermSequenceType;
+var
+  temp: TXQTermSequenceType;
+begin
+  result := parseSequenceType([]);
+  if isModel3 and (nextToken(true) = '|') then begin
+    temp := result;
+    result := TXQTermSequenceType.create();
+    try
+      result.kind := tikUnion;
+      result.push(temp);
+      while nextToken(true) = '|' do begin
+        expect('|');
+        result.push(parseSequenceType([]));
+      end;
+    except
+      result.free;
+      raise;
+    end;
+  end;
+end;
+
 function TXQParsingContext.parsePatternMatcher: TXQTermPatternMatcher;
 var
   curpos: PChar;
@@ -681,7 +704,7 @@ begin
         tempSeq.push(parsePatternMatcher());
       end else begin
         if pos^ = '$' then begin tempSeq.push(parseVariable); expect('as'); end;
-        tempSeq.push(parseSequenceType([]));
+        tempSeq.push(parseSequenceTypeUnion());
       end;
       expect('return');
       tempSeq.push(parse());

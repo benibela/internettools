@@ -1872,6 +1872,8 @@ begin
   //XQuery/XPath 3 syntax tests which must fail in the old version
   f('"a" || "b"', 'err:XPST0003');
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');
+  f('typeswitch (123) case xs:string | xs:integer return "union" default return "flag"', 'err:XPST0003');
+  f('try { "a" cast as xs:integer } catch * { 1 }', 'XPST0003');
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
