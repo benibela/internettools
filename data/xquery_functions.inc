@@ -2663,7 +2663,6 @@ var
   node: TTreeNode;
   data: String;
   contenttype: string;
-  parser: TTreeParser;
 begin
   requiredArgCount(args, 1);
   url := args[0].toString;

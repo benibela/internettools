@@ -1225,7 +1225,6 @@ end;
 
 function TXQParsingContext.parseTryCatch: TXQTermTryCatch;
 var
-  body: TXQTerm;
   url: string;
   prefix: string;
   localpart: string;

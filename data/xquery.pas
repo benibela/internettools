@@ -2589,8 +2589,6 @@ end;
 { EXQException }
 
 constructor EXQException.create(aerrcode, amessage: string; anamespace: INamespace = nil);
-var
-  temp: String;
 begin
   if strBeginsWith(aerrcode, 'pxp:') then begin
     delete(aerrcode, 1, 4);
