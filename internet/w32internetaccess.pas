@@ -351,7 +351,7 @@ begin
   overridenPostHeader := 'Content-Type: ' + ContentTypeForData;;
   for i:=0 to additionalHeaders.Count - 1 do
     if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
-      HttpAddRequestHeadersA(hfile, pchar(additionalHeaders), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
+      HttpAddRequestHeadersA(hfile, pchar(additionalHeaders[i]), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
      else
       overridenPostHeader := additionalHeaders[i];
 
@@ -542,4 +542,4 @@ end;
 
 end.
 
-
+
