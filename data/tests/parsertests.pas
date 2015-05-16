@@ -80,6 +80,12 @@ begin
   t('<html><body></body></html>aaa', '<html><head/><body>aaa</body></html>');
   t('<html><body></body>u</html> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '<html><head/><body>u aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</body></html>');
   t('<html><body></body>  </html> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '<html><head/><body>   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</body></html>');
+
+
+  tp.parsingModel := pmStrict;
+  t('<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>', '<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>');
+  t('<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;&#x20;&apos;&#x20;&#x20;&#x20;&#x20;&#x20;&#x20;">93.7</ex:b>', '<ex:b xmlns:ex="http://www.example.com/ns?p=&apos; &apos;">93.7</ex:b>');
+
   finally
       tp.free;
   end;

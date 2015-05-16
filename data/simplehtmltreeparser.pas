@@ -336,9 +336,11 @@ protected
   function readComment(text: pchar; textLen: longint):TParsingResult;
 
 private
+  //in-scope namespaces
   FCurrentNamespace: INamespace;
   FCurrentNamespaces: TNamespaceList;
   FCurrentNamespaceDefinitions: TList;
+  FCurrentAndPreviousNamespaces: TNamespaceList; //all namespaces encountered during parsing
   FTargetEncoding: TEncoding;
   FHasOpenedPTag: boolean;
   FBasicParsingState: TBasicParsingState; //similar to html 5. Only used when repair start tags is enabled
@@ -799,7 +801,7 @@ procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boo
     result := strChangeEncoding(s, from, toe);
     result := strNormalizeLineEndings(result);
     if substituteEntities then result := strDecodeHTMLEntities(result, toe, false);
-    if trimText then result := trim(result); //retrim because &nbsp; replacements could have introduced new spaces
+    if trimText then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
   end;
 
 var tree: TTreeNode;
@@ -822,6 +824,7 @@ begin
           for attrib in tree.attributes do begin
             attrib.value := change(attrib.value);
             attrib.realvalue := change(attrib.realvalue);
+            if attrib.isNamespaceNode then attrib.realvalue := strTrimAndNormalize(attrib.realvalue, [#9,#$A,#$D,' ']);
           end;
       end;
       else raise ETreeParseException.Create('Unkown tree element: '+tree.outerXML());
@@ -2137,6 +2140,7 @@ begin
   ns := TNamespace.Create(url, prefix);
   FCurrentNamespaces.Add(ns);
   FCurrentNamespaceDefinitions.Add(FCurrentElement);
+  FCurrentAndPreviousNamespaces.Add(ns);
   if prefix = '' then FCurrentNamespace := ns;
 end;
 
@@ -2226,6 +2230,7 @@ begin
 
   FCurrentNamespaceDefinitions := TList.Create;
   FCurrentNamespaces := TNamespaceList.Create;
+  FCurrentAndPreviousNamespaces := TNamespaceList.Create;
   globalNamespaces := TNamespaceList.Create;
   FTargetEncoding:=eUTF8;
 
@@ -2241,6 +2246,7 @@ begin
   ftrees.Free;
   FCurrentNamespaces.Free;
   FCurrentNamespaceDefinitions.Free;
+  FCurrentAndPreviousNamespaces.free;
   globalNamespaces.free;
   inherited destroy;
 end;
@@ -2300,10 +2306,14 @@ var
   el: TTreeNode;
   attrib: TTreeAttribute;
   encMeta, encBOM: TEncoding;
+  i: Integer;
 begin
   FTemplateCount:=0;
   FElementStack.Clear;
   FCurrentTree:=nil;
+  FCurrentNamespaces.clear;
+  FCurrentNamespaceDefinitions.Clear;
+  FCurrentAndPreviousNamespaces.Clear;
 
   allowTextAtRootLevel := strBeginsWith(contentType, 'text/xml-external-parsed-entity'); //todo: should it detect parsing mode from content-type? so far it does not. but parsed entity is so rarely used, it does not matter
 
@@ -2389,11 +2399,15 @@ begin
 
   FTrees.Add(FCurrentTree);
   result := FCurrentTree;
-  FCurrentNamespaces.clear;
-  FCurrentNamespaceDefinitions.Clear;
-  if FTargetEncoding <> eUnknown then
-    FCurrentTree.setEncoding(FTargetEncoding, true, true)
-   else begin
+  if FTargetEncoding <> eUnknown then begin
+    for i := 0 to FCurrentAndPreviousNamespaces.Count - 1 do
+      with FCurrentAndPreviousNamespaces.Get(i) as TNamespace do begin
+        url := strChangeEncoding(url, FCurrentTree.FEncoding, FTargetEncoding);
+        url := strDecodeHTMLEntities(url, FTargetEncoding, false);
+        url := strTrimAndNormalize(url, [#9,#$A,#$D,' ']);
+      end;
+    FCurrentTree.setEncoding(FTargetEncoding, true, true);
+  end else begin
      el := FCurrentTree.next;
      while el <> nil do begin
        if el.typ = tetInternalDoNotUseCDATAText then el.typ := tetText;
