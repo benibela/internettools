@@ -1961,7 +1961,7 @@ begin
           expect('[');
           skipWhitespaceAndComment();
           replace := ripBinOpApart(@astroot, 10000);
-          if pos^ <> ']' then replace^ := TXQTermFilterSequence.Create(replace^, parse())
+          if pos^ <> ']' then replace^ := TXQTermFilterSequence.Create(replace^, parsePrimaryLevel())
           else                replace^ := TXQTermFilterSequence.Create(replace^); //stupid hack to allow $var [] :=
           expect(']');
         end;
