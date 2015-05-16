@@ -304,6 +304,7 @@ begin
      'Q{http://www.w3.org/2005/xpath-functions}root()/Q{}empnr[1]');
 
   m('<r><a xmlns="f">text</a></r>/Q{f}*', 'text');
+  m('<r><a xmlns="f   a ">text</a></r>/Q{f              a   '#13#10'}*', 'text');
 
   //try/catch
   m('try { "a" cast as xs:integer } catch * { 1 }', '1');

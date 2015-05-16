@@ -389,6 +389,7 @@ end;
 
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
+function xmlStrWhitespaceCollapse(const s: string):string;
 function htmlStrEscape(s: string; attrib: boolean = false; encoding: TEncoding = eUnknown):string;
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
@@ -824,7 +825,7 @@ begin
           for attrib in tree.attributes do begin
             attrib.value := change(attrib.value);
             attrib.realvalue := change(attrib.realvalue);
-            if attrib.isNamespaceNode then attrib.realvalue := strTrimAndNormalize(attrib.realvalue, [#9,#$A,#$D,' ']);
+            if attrib.isNamespaceNode then attrib.realvalue := xmlStrWhitespaceCollapse(attrib.realvalue);
           end;
       end;
       else raise ETreeParseException.Create('Unkown tree element: '+tree.outerXML());
@@ -2404,7 +2405,7 @@ begin
       with FCurrentAndPreviousNamespaces.Get(i) as TNamespace do begin
         url := strChangeEncoding(url, FCurrentTree.FEncoding, FTargetEncoding);
         url := strDecodeHTMLEntities(url, FTargetEncoding, false);
-        url := strTrimAndNormalize(url, [#9,#$A,#$D,' ']);
+        url := xmlStrWhitespaceCollapse(url);
       end;
     FCurrentTree.setEncoding(FTargetEncoding, true, true);
   end else begin
@@ -2493,6 +2494,11 @@ begin
     i+=1;
   end;
   setlength(result, p - 1);
+end;
+
+function xmlStrWhitespaceCollapse(const s: string): string;
+begin
+  result := strTrimAndNormalize(s, [#9,#$A,#$D,' ']);
 end;
 
 function htmlStrEscape(s: string; attrib: boolean; encoding: TEncoding): string;

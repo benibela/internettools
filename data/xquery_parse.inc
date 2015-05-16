@@ -292,7 +292,7 @@ begin
     marker := pos;
     while not (pos^ in ['}', #0]) do inc(pos);
     url := strFromPchar(marker, pos - marker);
-    if parsingModel in [xqpmXQuery1,xqpmXQuery3] then url := replaceEntitiesIfNeeded(url);
+    url := xmlStrWhitespaceCollapse(replaceEntitiesIfNeeded(url));
     inc(pos);
     if pos^ = '*' then begin
       inc(pos);
@@ -944,7 +944,7 @@ begin
         if length(attribute.children) > 0 then token := (attribute.children[0] as TXQTermConstant).value.toString;
         if ((prefix = 'xml') <> (token = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (token = XMLNamespaceUrl_XMLNS) then
           raiseParsingError('XQST0070', 'Invalid namespace declaration');
-        result.implicitNamespaces.add(TNamespace.create(token, prefix));
+        result.implicitNamespaces.add(TNamespace.create(xmlStrWhitespaceCollapse(token), prefix));
         attribute.Free;
       end else result.push(attribute);
       skipWhitespace();
@@ -2251,8 +2251,8 @@ begin
             end;
             'element', 'function': begin
               expect('namespace');
-              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseString, '')
-              else staticContext.defaultFunctionNamespace := TNamespace.Create(parseString, '')
+              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(xmlStrWhitespaceCollapse(parseString), '')
+              else staticContext.defaultFunctionNamespace := TNamespace.Create(xmlStrWhitespaceCollapse(parseString), '')
             end;
             else raiseParsingError('XPST0003', 'Unknown default value');
           end;
@@ -2286,7 +2286,7 @@ begin
         'namespace': begin
            nameSpaceName := nextTokenNCName();
            expect('=');
-           nameSpaceURL := parseString;
+           nameSpaceURL := xmlStrWhitespaceCollapse(parseString);
            if (nameSpaceName = 'xml') or (nameSpaceName = 'xmlns')
               or (nameSpaceURL = XMLNamespaceUrl_XML) or (nameSpaceURL = XMLNamespaceUrl_XMLNS) then
                 raiseParsingError('XQST0070', 'Undeclarable namespace');
