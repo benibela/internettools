@@ -184,7 +184,7 @@ begin
 
   data := retrieve(data);
 
-  if lastRetrievedType <> rtXML then dataFileName:=datain;
+  if lastRetrievedType <> rtXML then dataFileName:=fileNameExpandToURI(datain);
 
   query := trim(query);
   if query[1] = '<' then begin
