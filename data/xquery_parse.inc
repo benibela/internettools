@@ -1715,10 +1715,26 @@ begin
             TXQTermNodeMatcher(result).axis:=axis;
             skipWhitespaceAndComment();
             if pos^ <> ')' then begin
-              TXQTermNodeMatcher(result).push(parseValue());   skipWhitespaceAndComment();
+              with TXQTermNodeMatcher(result) do begin
+                case word of
+                  'processing-instruction': begin
+                    skipWhitespaceAndComment();
+                    if pos^ in ['"', ''''] then push(TXQTermConstant.create(parseString()))
+                    else push(TXQTermConstant.create(nextTokenNCName()))
+                  end;
+                  'element', 'schema-element', 'attribute', 'schema-attribute', 'document-node': begin
+                    push(parseValue());
+                    if (not (children[0] is TXQTermNodeMatcher)) or
+                       ((word <> 'document-node') and (length(TXQTermNodeMatcher(children[0]).children) > 0)) then
+                         raiseSyntaxError('Invalid test');
+                  end;
+                  else raiseSyntaxError('No option allowed for matching test: '+word);
+                end;
+              end;
+              skipWhitespaceAndComment();
               if pos^ = ',' then begin
                 if (word <> 'element') and (word <> 'attribute') then
-                  raiseParsingError('XPST0003', 'Only one parameter is allowed to matching test '+word);
+                  raiseParsingError('XPST0003', 'Only one parameter is allowed for matching test '+word);
                 expect(',');
                 TXQTermNodeMatcher(result).push(parseSequenceType([xqstAllowValidationTypes]));
               end;
