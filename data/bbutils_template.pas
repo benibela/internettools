@@ -1994,7 +1994,7 @@ end;
 function strEncodingFromName(str: RawByteString): TEncoding;
 begin
   case UpperCase(str) of
-    'UTF-8', 'UTF8' {error preventive}: result:=eUTF8;
+    'UTF-8', 'UTF8' {error preventive}, 'US-ASCII' {ascii is an utf-8 subset}: result:=eUTF8;
     'CP1252', 'ISO-8859-1', 'LATIN1', 'ISO-8859-15': Result:=eWindows1252;
     'UTF-16': result := {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF};
     'UTF-16LE': result := eUTF16LE;
