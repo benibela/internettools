@@ -2062,6 +2062,16 @@ begin
 end;
 
 function TXQParsingContext.parseModule(): TXQTerm;
+  procedure parseEncoding;
+  var
+    encname: String;
+  begin
+    encname := parseString;
+    encoding := strEncodingFromName(encname);
+    if encoding = eUnknown then raiseParsingError('XQST0087', 'Unknown encoding: ' + encname);
+    expect(';');
+  end;
+
   procedure requireModule;
   begin
     if result <> nil then exit;
@@ -2195,23 +2205,25 @@ begin
     if token = 'xquery' then begin
       expect(token);
       case nextToken() of
-      '': pos := marker;
         'version': begin
           requireXQuery();
           temp := parseString();
-          if temp = '3.0' then requireXQuery3('XQuery 3 parsing model is not enabled')
-          else if temp = '1.0' then parsingModel := xqpmXQuery1
-          else raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 or 3.0');
+          if temp = '1.0' then parsingModel := xqpmXQuery1
+          else if (temp <> '3.0') or not isModel3 then
+            raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 or 3.0');
           token := nextToken(true);
           if token = 'encoding' then begin
             expect(token);
-            encoding := strEncodingFromName(parseString);
-            expect(';');
+            parseEncoding;
             token := nextToken(true);
           end else if token = ';' then begin expect(token); token := nextToken(true); end
-          else raiseParsingError('XPST0003', 'expected encoding or ;');
+          else raiseSyntaxError('expected encoding or ;');
         end;
-        else expect('version');
+        'encoding': begin
+          requireXQuery3();
+          parseEncoding;
+        end
+        else pos := marker;
       end;
     end;
 
