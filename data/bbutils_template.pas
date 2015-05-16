@@ -454,6 +454,12 @@ function strIsAbsoluteURI(const s: RawByteString): boolean;
 //**Or.  strResolveURI('foo/bar', 'http://example.org/abc/def/') returns 'http://example.org/abc/def/foo/bar'@br
 //**base may be relative itself (e.g. strResolveURI('foo/bar', 'test/') becomes 'test/foo/bar')
 function strResolveURI(rel, base: RawByteString): RawByteString;
+//**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
+function strIsAbsoluteURI(const s: RawByteString): boolean;
+//**Expands a path to an absolute path, if it not already is one
+function fileNameExpand(const rel: string): string;
+//**Expands a path to an absolute path starting with file://
+function fileNameExpandToURI(const rel: string): string;
 
 //**Levenshtein distance between s and t
 //**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space
@@ -2549,6 +2555,24 @@ begin
   else
     result := strResolveURIReal(rel, base);
 end;
+
+function fileNameExpand(const rel: string): string;
+begin
+  result := rel;
+  if strContains(rel, '://') then exit;
+  if rel = '' then exit;
+  if rel[1] in AllowDirectorySeparators then exit;
+  if (length(rel) >= 3) and (rel[2] = ':') and (rel[3] in AllowDirectorySeparators) then exit;
+  result := ExpandFileName(rel)
+end;
+
+function fileNameExpandToURI(const rel: string): string;
+begin
+  result := fileNameExpand(rel);
+  if strContains(rel, '://') then exit;
+  result := 'file://' + result;
+end;
+
 
 function strSimilarity(const s, t: RawByteString): integer;
 //see http://en.wikipedia.org/wiki/Levenshtein_distance
