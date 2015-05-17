@@ -5,21 +5,12 @@ unit internetaccess_tests;
 interface
 
 uses
-  Classes, SysUtils, internetaccess;
+  Classes, SysUtils, internetaccess, commontestutils;
 
 procedure unitTests();
 
 implementation
 
-procedure test(condition: boolean; name: string='');
-begin
-  if not condition then raise Exception.Create('test: '+name);
-end;
-procedure test(a, b: string; name: string = '');
-begin
-  if a <> b then
-    raise Exception.Create('test: '+name+': '+a+' <> '+b);
-end;
 
 procedure testurl(fullUrl: string; protocol, username, password, host, port, path, params, linktarget: string; combined: string = '');
 var

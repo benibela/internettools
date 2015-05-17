@@ -44,6 +44,7 @@ interface
 uses
   Classes, SysUtils, bigdecimalmath, xquery;
 
+function parseJSON(const data: string; multipleTopLevelItems: boolean = true): IXQValue;
 
 implementation
 
@@ -98,8 +99,7 @@ begin
   result := resobj;
 end;
 
-function xqFunctionParseJson(const args: TXQVArray): IXQValue;
-
+function parseJSON(const data: string; multipleTopLevelItems: boolean): IXQValue;
   {function convert(data: TJSONData): IXQValue;
   var
     seq: TXQValueJSONArray;
@@ -229,20 +229,10 @@ var
   end;
 
 var
-  multipleTopLevelItems: Boolean;
   value: TXQValue;
 
 begin
-  requiredArgCount(args, 1, 2);
-
-  multipleTopLevelItems := true;
-  if (length(args) = 2) and (args[1] is TXQValueObject) and ((args[1] as TXQValueObject).hasProperty('jsoniq-multiple-top-level-items', @value)) then begin
-    if (value.getSequenceCount > 2) or not (value.get(1) is TXQValueBoolean) then
-      raise EXQEvaluationException.create('jerr:JNTY0020', 'Expected true/false got: '+value.debugAsStringWithTypeAnnotation()+' for property jsoniq-multiple-top-level-items');
-    multipleTopLevelItems:=value.toBoolean;
-  end;
-
-  scanner := TJSONScanner.Create(args[0].toString);
+  scanner := TJSONScanner.Create(data);
   try
     result := parse();
     if multipleTopLevelItems then begin
@@ -253,6 +243,24 @@ begin
   finally
     scanner.free;
   end;
+end;
+
+
+function xqFunctionParseJson(const args: TXQVArray): IXQValue;
+var
+  multipleTopLevelItems: Boolean;
+  value: TXQValue;
+begin
+  requiredArgCount(args, 1, 2);
+
+  multipleTopLevelItems := true;
+  if (length(args) = 2) and (args[1] is TXQValueObject) and ((args[1] as TXQValueObject).hasProperty('jsoniq-multiple-top-level-items', @value)) then begin
+    if (value.getSequenceCount > 2) or not (value.get(1) is TXQValueBoolean) then
+      raise EXQEvaluationException.create('jerr:JNTY0020', 'Expected true/false got: '+value.debugAsStringWithTypeAnnotation()+' for property jsoniq-multiple-top-level-items');
+    multipleTopLevelItems:=value.toBoolean;
+  end;
+
+  result := parseJSON(args[0].toString, multipleTopLevelItems);
 end;
 
 function xqFunctionSerialize_Json(const args: TXQVArray): IXQValue;
@@ -339,6 +347,7 @@ end;
 
 var jn, pxp, libjn: TXQNativeModule;
     XMLNamespace_JSONiqFunctions, XMLNamespace_JSONiqLibraryFunctions: INamespace;
+
 initialization
   AllowJSONDefaultInternal := true;
   XMLNamespace_JSONiqFunctions:=TNamespace.create('http://jsoniq.org/functions', 'jn');

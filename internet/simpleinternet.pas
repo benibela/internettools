@@ -166,16 +166,22 @@ begin
     rtEmpty:;
     rtRemoteURL: exit(httpRequest(trimmed));
     rtFile: exit(strLoadFromFileUTF8(trimmed));
-    rtXML: exit(data);
+    else exit(data);
   end;
 end;
 
+function lastContentType: string;
+begin
+  if lastRetrievedType = rtRemoteURL then result := defaultInternet.getLastContentType
+  else result := '';
+end;
 
 function process(data: string; query: string): xquery.IXQValue;
 var dataFileName: string;
   datain: String;
   tempVars: TXQVariableChangeLog;
   context: TXQEvaluationContext;
+  format: TInternetToolsFormat;
 begin
   result := xqvalue();
   if query = '' then exit();
@@ -184,12 +190,18 @@ begin
 
   data := retrieve(data);
 
-  if lastRetrievedType <> rtXML then dataFileName:=fileNameExpandToURI(datain);
+  if lastRetrievedType = rtFile then dataFileName:=fileNameExpandToURI(datain);
+  format := guessFormat(data, dataFileName, lastContentType);
 
   query := trim(query);
   if query[1] = '<' then begin
     lastQueryWasPXP := false;
-    if templateParser = nil then begin templateParser := THtmlTemplateParser.create; templateParser.TemplateParser.parsingModel:= pmHTML;end;
+    if templateParser = nil then begin
+      templateParser := THtmlTemplateParser.create;
+      templateParser.TemplateParser.parsingModel:= pmHTML;
+      templateParser.TemplateParser.repairMissingStartTags := false;
+      templateParser.HTMLParser.repairMissingStartTags := format = itfHTML;
+    end;
     templateParser.parseTemplate(query);
     templateParser.parseHTML(data, dataFileName);
     if templateParser.variableChangeLog.count > 0 then begin
@@ -201,19 +213,28 @@ begin
     end;
   end else begin
     lastQueryWasPXP := true;
-    if tree = nil then begin
-      tree := TTreeParser.Create;
-      tree.parsingModel:=pmHTML;
-    end;
-    tree.parseTree(data, dataFileName);
     if pxpParser = nil then pxpParser := TXQueryEngine.create;
     pxpparser.StaticContext.baseURI:=dataFileName;
     if strBeginsWith(query, 'xquery') then pxpParser.parseXQuery3(query, pxpParser.StaticContext)
     else pxpParser.parseXPath3(query, pxpParser.StaticContext);
     context := pxpParser.getEvaluationContext();
-    context.ParentElement := tree.getLastTree;
-    context.RootElement := tree.getLastTree;
+
+    if format <> itfJSON then begin
+      if tree = nil then begin
+        tree := TTreeParser.Create;
+        tree.parsingModel:=pmHTML;
+      end;
+      tree.repairMissingStartTags := format = itfHTML;
+      tree.parseTree(data, dataFileName);
+      context.ParentElement := tree.getLastTree;
+      context.RootElement := tree.getLastTree;
+    end else begin
+      assert(context.temporaryVariables = nil);
+      context.temporaryVariables := TXQVariableChangeLog.create();
+      context.temporaryVariables.add('json', parseJSON(data));
+    end;
     result := pxpParser.evaluate(context);
+    FreeAndNil(context.temporaryVariables);
   end;
 end;
 

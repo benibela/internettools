@@ -7,7 +7,7 @@ unit bbutils_tests;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, commontestutils;
 
 procedure unitTests();
 
@@ -39,19 +39,6 @@ end;
 function stringCompareReverseFunction(c:TObject; a,b:pointer):longint;
 begin
   result := - CompareText(PString(a)^,PString(b)^);
-end;
-procedure test(condition: boolean; name: string='');overload;
-begin
-  if not condition then raise Exception.Create('test: '+name);
-end;
-procedure test(a, b: string; name: string = '');overload;
-begin
-  if a <> b then
-    raise Exception.Create('test: '+name+': '+a+' <> '+b);
-end;
-procedure test(a, b: integer; name: string = '');overload;
-begin
-  if a <> b then raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
 end;
 procedure test(a, b: extended; name: string = '');overload;
 begin

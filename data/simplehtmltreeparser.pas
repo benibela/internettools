@@ -402,6 +402,12 @@ var
 function equalNamespaces(const ans, bns: INamespace): boolean; inline;
 function equalNamespaces(const ans, bns: string): boolean; inline;
 function namespaceGetURL(const n: INamespace): string; inline;
+
+
+type TInternetToolsFormat = (itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<- not used, might be used in future});
+function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
+
+
 implementation
 uses xquery;
 
@@ -2558,6 +2564,42 @@ function namespaceGetURL(const n: INamespace): string;
 begin
   if n = nil then result := ''
   else result := n.getURL;
+end;
+
+function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
+var
+  tdata: PChar;
+  tdatalength: Integer;
+  function checkRawDataForHtml: boolean; //following http://mimesniff.spec.whatwg.org/ (except allowing #9 as TT ) todo: what is with utf-16?
+  var tocheck: array[1..16] of string = ('<!DOCTYPE HTML', '<HTML', '<HEAD', '<SCRIPT', '<IFRAME', '<H1', '<DIV', '<FONT', '<TABLE', '<A', '<STYLE', '<TITLE', '<B', '<BODY', '<BR', '<P');
+    i: Integer;
+  begin
+    for i := low(tocheck) to high(tocheck) do
+      if (tdatalength > length(tocheck[i])) and
+         (tdata[length(tocheck[i])] in [' ', '>', #9]) and
+         (striBeginsWith(tdata, tocheck[i])) then
+        exit(true);
+    exit(false);
+  end;
+
+begin
+  tdata := pchar(data);
+  tdatalength := length(data);
+  strlTrim(tdata, tdatalength);
+  if striEndsWith(uri, 'html') or striEndsWith(uri, 'htm')
+     or striContains(contenttype, 'html')
+     or checkRawDataForHtml() then
+      Result := itfHTML
+    else if strBeginsWith(tdata, '<?xml') //mimesniff.spec says to check for this
+            or striContains(contenttype, 'xml') then
+      result := itfXML
+    else if striEndsWith(uri, '.json')
+         or striContains(contentType, 'json')
+         or strBeginsWith(tdata, '{')
+         or strBeginsWith(tdata, '[') then
+      result := itfJSON
+    else
+      result := itfXML;
 end;
 
 initialization

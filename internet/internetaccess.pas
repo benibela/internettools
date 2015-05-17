@@ -201,7 +201,7 @@ type
 //** normalize performs some normalizations (e.g. foo//bar -> foo/bar)
 function decodeURL(const totalURL: string; normalize: boolean = true): TDecodedUrl;
 
-type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML);
+type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML, rtJSON);
 
 (***
   Guesses the type of given string@br@br
@@ -338,8 +338,11 @@ begin
   if striBeginsWith(trimmed, 'file://') then
     exit(rtFile);
 
-  if striBeginsWith(trimmed, '<') then
+  if trimmed[1] = '<' then
     exit(rtXML);
+
+  if trimmed[1] in ['[', '{'] then
+    exit(rtJSON);
 
   exit(rtFile);
 end;
