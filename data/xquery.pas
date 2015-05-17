@@ -5539,6 +5539,7 @@ begin
   end;
 end;
 
+
 procedure TXQueryEngine.registerModule(module: IXQuery);
 var
   modobj: TXQuery;

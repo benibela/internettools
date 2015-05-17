@@ -182,6 +182,7 @@ var dataFileName: string;
   tempVars: TXQVariableChangeLog;
   context: TXQEvaluationContext;
   format: TInternetToolsFormat;
+  querykind: TExtractionKind;
 begin
   result := xqvalue();
   if query = '' then exit();
@@ -194,47 +195,62 @@ begin
   format := guessFormat(data, dataFileName, lastContentType);
 
   query := trim(query);
-  if query[1] = '<' then begin
-    lastQueryWasPXP := false;
-    if templateParser = nil then begin
-      templateParser := THtmlTemplateParser.create;
-      templateParser.TemplateParser.parsingModel:= pmHTML;
-      templateParser.TemplateParser.repairMissingStartTags := false;
-      templateParser.HTMLParser.repairMissingStartTags := format = itfHTML;
-    end;
-    templateParser.parseTemplate(query);
-    templateParser.parseHTML(data, dataFileName);
-    if templateParser.variableChangeLog.count > 0 then begin
-      tempVars := templateParser.VariableChangeLogCondensed.collected;
-      if (tempVars.count = 1) and (tempVars.getName(0) = templateParser.UnnamedVariableName) then begin
-        result := tempVars.get(0);
-        tempVars.free;
-      end else result := TXQValueObject.createTakingVariableLog(tempVars);
-    end;
-  end else begin
-    lastQueryWasPXP := true;
-    if pxpParser = nil then pxpParser := TXQueryEngine.create;
-    pxpparser.StaticContext.baseURI:=dataFileName;
-    if strBeginsWith(query, 'xquery') then pxpParser.parseXQuery3(query, pxpParser.StaticContext)
-    else pxpParser.parseXPath3(query, pxpParser.StaticContext);
-    context := pxpParser.getEvaluationContext();
+  querykind := guessExtractionKind(query);
 
-    if format <> itfJSON then begin
-      if tree = nil then begin
-        tree := TTreeParser.Create;
-        tree.parsingModel:=pmHTML;
+  case querykind of
+    ekTemplate: begin
+      lastQueryWasPXP := false;
+      if templateParser = nil then begin
+        templateParser := THtmlTemplateParser.create;
+        templateParser.TemplateParser.parsingModel:= pmHTML;
+        templateParser.TemplateParser.repairMissingStartTags := false;
+        templateParser.HTMLParser.repairMissingStartTags := format = itfHTML;
       end;
-      tree.repairMissingStartTags := format = itfHTML;
-      tree.parseTree(data, dataFileName);
-      context.ParentElement := tree.getLastTree;
-      context.RootElement := tree.getLastTree;
-    end else begin
-      assert(context.temporaryVariables = nil);
-      context.temporaryVariables := TXQVariableChangeLog.create();
-      context.temporaryVariables.add('json', parseJSON(data));
+      templateParser.parseTemplate(query);
+      templateParser.parseHTML(data, dataFileName);
+      if templateParser.variableChangeLog.count > 0 then begin
+        tempVars := templateParser.VariableChangeLogCondensed.collected;
+        if (tempVars.count = 1) and (tempVars.getName(0) = templateParser.UnnamedVariableName) then begin
+          result := tempVars.get(0);
+          tempVars.free;
+        end else result := TXQValueObject.createTakingVariableLog(tempVars);
+      end;
     end;
-    result := pxpParser.evaluate(context);
-    FreeAndNil(context.temporaryVariables);
+    else begin
+      lastQueryWasPXP := true;
+      if pxpParser = nil then pxpParser := TXQueryEngine.create;
+      pxpparser.StaticContext.baseURI:=dataFileName;
+      case querykind of
+        ekXQuery1, ekXQuery3: begin
+          pxpParser.ParsingOptions.StringEntities := xqseResolveLikeXQuery;
+          pxpParser.parseXQuery3(query, pxpParser.StaticContext);
+        end;
+        ekXPath2, ekXPath3: begin
+          pxpParser.ParsingOptions.StringEntities := xqseIgnoreLikeXPath;
+          pxpParser.parseXQuery3(query, pxpParser.StaticContext) //no point in using a less power language.
+        end;
+        ekCSS: pxpParser.parseCSS3(query);
+        else raise Exception.Create('internal error 21412466');
+      end;
+      context := pxpParser.getEvaluationContext();
+
+      if format <> itfJSON then begin
+        if tree = nil then begin
+          tree := TTreeParser.Create;
+          tree.parsingModel:=pmHTML;
+        end;
+        tree.repairMissingStartTags := format = itfHTML;
+        tree.parseTree(data, dataFileName);
+        context.ParentElement := tree.getLastTree;
+        context.RootElement := tree.getLastTree;
+      end else begin
+        assert(context.temporaryVariables = nil);
+        context.temporaryVariables := TXQVariableChangeLog.create();
+        context.temporaryVariables.add('json', parseJSON(data));
+      end;
+      result := pxpParser.evaluate(context);
+      FreeAndNil(context.temporaryVariables);
+    end;
   end;
 end;
 
