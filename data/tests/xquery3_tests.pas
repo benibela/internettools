@@ -319,6 +319,13 @@ begin
   //typeswitch's sequence type unions
   m('typeswitch (123) case xs:string | xs:integer return "union" default return "flag" ', 'union');
 
+  //transform extension
+  m('outer-xml($test-doc := document { <r> <a id="foo"> text </a> <span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span>  </r> })', '<r> <a id="foo"> text </a> <span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span>  </r>');
+  m('outer-xml(transform($test-doc, function($x) { if ($x instance of text()) then () else $x  }))', '<r><a id="foo"/><span class="bar"><!--comment--><a class="foo" href="index.html"/></span></r>');
+  m('outer-xml($test-doc!transform(function($x) { if ($x instance of attribute(href)) then attribute href { "changedlink.html" } else $x  }))', '<r> <a id="foo"> text </a> <span class="bar"><!--comment--><a class="foo" href="changedlink.html">...</a></span>  </r>');
+  m('outer-xml($test-doc!transform(function($x) { if ($x/@id eq "foo") then <a id="foo" href=".."/> else if ($x instance of comment()) then () else $x  }))', '<r> <a id="foo" href=".."/> <span class="bar"><a class="foo" href="index.html">...</a></span>  </r>');
+  //that is not working because and is not shortcutted TODO m('outer-xml($test-doc!transform(function($x) { if ($x instance of text()) then normalize-space($x) else $x  }))', '<r><a id="foo">text</a><span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span></r>');
+
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');

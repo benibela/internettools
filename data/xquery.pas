@@ -1989,6 +1989,12 @@ type
       @item(@code(join($sequence as xs:item()*[, $seperator as xs:string]))
                   @br This is the same as string-join, but without type checking. If seperator is omitted it becomes " ".
                   )
+      @item(@code(transform([$root as item()*,] $f as function(*), [$options as object()]]) as item()*)
+                  @br Transform calls $f for every descendant and attribute node of $root and replaces each node with the return value of $f.
+                  @br If $root is omitted, the context item . is used.
+                  @br If $options("always-recurse") is true, all values returned by $f are also transformed with further calls of $f.
+                  @br Preliminary, behaviour might change in future versions. E.g. it might be renamed to map-nodes
+                  )
       @item(@code(match($template as item(), $node as node()+))
                   @br Performs pattern matching between the template and the nodes, and returns a list or an object of matched values.@br
                   @br E.g. @code(match(<a>{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code(<a>FOO</a>), and
@@ -6949,7 +6955,15 @@ pxp.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*,
 pxp.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
 pxp.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
 
-
+pxp.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
+'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+
+'                typeswitch (.)'+
+'                  case element() return element {node-name(.)} { @* ! $f(.), node()!pxp:transform(., $f, $options) }'+
+'                  case document-node() return document {  node() ! pxp:transform(., $f, $options) }'+
+'                  default return .'+
+'             ) else . )');
+pxp.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
+pxp.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
 //standard functions
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
