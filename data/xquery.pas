@@ -149,7 +149,8 @@ type
     ordering: boolean;  //**< unused
     constructionPreserve: boolean; //**< unused
 
-    function clone(): TXQStaticContext;
+    procedure assign(sc: TXQStaticContext);
+    function clone(): TXQStaticContext; virtual;
     destructor Destroy; override;
     function findSchema(const namespace: string): TXSSchema;
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
@@ -2984,46 +2985,55 @@ begin
   exit(module.staticContext);
 end;
 
-function TXQStaticContext.clone: TXQStaticContext;
+procedure TXQStaticContext.assign(sc: TXQStaticContext);
 var
   i: Integer;
+  Result: TXQStaticContext;
 begin
-  Result := TXQStaticContext.Create;
-  result.sender := sender;
-  result.stripboundaryspace := stripboundaryspace;
-  if modulevariables <> nil then result.modulevariables := modulevariables.clone;
-  if namespaces <> nil then result.namespaces := namespaces.clone;
-  result.functions := functions;
-  if length(result.functions) > 0 then begin
-    setlength(result.functions, length(result.functions));
-    for i:= 0 to high(result.functions) do begin
-      result.functions[i] := result.functions[i].directClone as TXQValueFunction;
-      result.functions[i].context.staticContext := result;
+  Result := self;
+  with sc do begin
+    result.sender := sender;
+    result.stripboundaryspace := stripboundaryspace;
+    if modulevariables <> nil then result.modulevariables := modulevariables.clone;
+    if namespaces <> nil then result.namespaces := namespaces.clone;
+    result.functions := functions;
+    if length(result.functions) > 0 then begin
+      setlength(result.functions, length(result.functions));
+      for i:= 0 to high(result.functions) do begin
+        result.functions[i] := result.functions[i].directClone as TXQValueFunction;
+        result.functions[i].context.staticContext := result;
+      end;
     end;
+    result.importedmodules := importedmodules;
+    if result.importedModules <> nil then begin
+      result.importedModules := TStringList.Create;
+      for i:=0 to importedModules.count - 1 do result.importedModules.AddObject(importedModules[i], importedModules.Objects[i]);
+    end;
+    result.importedSchemas := importedSchemas;
+    if result.importedSchemas <> nil then result.importedSchemas := importedSchemas.clone;
+    result.collation := collation;
+    result.fnodeCollation := fnodeCollation;
+    result.emptyorderspec := emptyorderspec;
+    result.defaultFunctionNamespace := defaultFunctionNamespace;
+    result.defaultElementTypeNamespace := defaultElementTypeNamespace;
+    result.defaultTypeNamespace := defaultTypeNamespace;
+    result.baseuri := baseuri;
+    result.constructionpreserve := constructionpreserve;
+    result.ordering := ordering;
+    result.copynamespacepreserve := copynamespacepreserve;
+    result.copynamespaceinherit := copynamespaceinherit;
+    result.stringEncoding:=stringEncoding;
+    result.strictTypeChecking:=strictTypeChecking;
+    Result.useLocalNamespaces:=useLocalNamespaces;
+    result.objectsRestrictedToJSONTypes:=objectsRestrictedToJSONTypes;
+    result.jsonPXPExtensions := jsonPXPExtensions;
   end;
-  result.importedmodules := importedmodules;
-  if result.importedModules <> nil then begin
-    result.importedModules := TStringList.Create;
-    for i:=0 to importedModules.count - 1 do result.importedModules.AddObject(importedModules[i], importedModules.Objects[i]);
-  end;
-  result.importedSchemas := importedSchemas;
-  if result.importedSchemas <> nil then result.importedSchemas := importedSchemas.clone;
-  result.collation := collation;
-  result.fnodeCollation := fnodeCollation;
-  result.emptyorderspec := emptyorderspec;
-  result.defaultFunctionNamespace := defaultFunctionNamespace;
-  result.defaultElementTypeNamespace := defaultElementTypeNamespace;
-  result.defaultTypeNamespace := defaultTypeNamespace;
-  result.baseuri := baseuri;
-  result.constructionpreserve := constructionpreserve;
-  result.ordering := ordering;
-  result.copynamespacepreserve := copynamespacepreserve;
-  result.copynamespaceinherit := copynamespaceinherit;
-  result.stringEncoding:=stringEncoding;
-  result.strictTypeChecking:=strictTypeChecking;
-  Result.useLocalNamespaces:=useLocalNamespaces;
-  result.objectsRestrictedToJSONTypes:=objectsRestrictedToJSONTypes;
-  result.jsonPXPExtensions := jsonPXPExtensions;
+end;
+
+function TXQStaticContext.clone: TXQStaticContext;
+begin
+  result := TXQStaticContext.Create;
+  result.assign(self);
 end;
 
 destructor TXQStaticContext.Destroy;
