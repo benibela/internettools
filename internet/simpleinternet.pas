@@ -191,7 +191,7 @@ begin
 
   data := retrieve(data);
 
-  if lastRetrievedType = rtFile then dataFileName:=fileNameExpandToURI(datain);
+  if lastRetrievedType in [rtFile, rtRemoteURL] then dataFileName:=fileNameExpandToURI(datain);
   format := guessFormat(data, dataFileName, lastContentType);
 
   query := trim(query);
