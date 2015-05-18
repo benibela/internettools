@@ -1989,7 +1989,7 @@ type
       @item(@code(join($sequence as xs:item()*[, $seperator as xs:string]))
                   @br This is the same as string-join, but without type checking. If seperator is omitted it becomes " ".
                   )
-      @item(@code(transform([$root as item()*,] $f as function(*), [$options as object()]]) as item()*)
+      @item(@code(transform([$root as item()*,] $f as function(), [$options as object()]]) as item()* )
                   @br Transform calls $f for every descendant and attribute node of $root and replaces each node with the return value of $f.
                   @br If $root is omitted, the context item . is used.
                   @br If $options("always-recurse") is true, all values returned by $f are also transformed with further calls of $f.
