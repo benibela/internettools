@@ -289,6 +289,7 @@ begin
   bd :=  StrToBigDecimal('1000000001000000000000000000.0000000000000001E-18');  test(BigDecimalToStr(bd), '1000000001.0000000000000000000000000000000001'); test(BigDecimalToStr(bd, bdfExponent), '1.0000000010000000000000000000000000000000001E9');
   bd :=  StrToBigDecimal('1000000000000000000000000000.0000000000000001E-18');  test(BigDecimalToStr(bd), '1000000000.0000000000000000000000000000000001'); test(BigDecimalToStr(bd, bdfExponent), '1.0000000000000000000000000000000000000000001E9');
 
+  test(TryStrToBigDecimal('', nil) = false);
   test(TryStrToBigDecimal('.', nil) = false);
   test(TryStrToBigDecimal('e', nil) = false);
   test(TryStrToBigDecimal('a', nil) = false);

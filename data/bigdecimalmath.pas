@@ -303,11 +303,12 @@ var dot, exp, i: integer;
   totalintlength: Integer;
 begin
   result := TryStrDecodeDecimal(s, intstart, intend, dot, exp);
+  if not result then exit;
   if exp = 0 then trueexponent := 0
   else begin
     if (length(s) - exp <= 10) and (res = nil) then exit;
     if not TryStrToInt64(copy(s, exp + 1, length(s)), trueexponent) then begin
-      //exponent to big
+      //exponent too big
       for i := 1 to exp - 1 do
         if not (s[i] in ['0', '.', '-']) then exit(false);
       if res <> nil then setZero(res^); //but if all digigts are 0, the exponent can be ignored
@@ -316,7 +317,6 @@ begin
     if (trueexponent < DIGITS_PER_ELEMENT * int64(low(integer))) or (trueexponent > DIGITS_PER_ELEMENT * int64(high(integer))) then
       exit(false);
   end;
-  if not result then exit;
   if res = nil then exit;
   with res^ do begin
     signed := s[1] = '-';
