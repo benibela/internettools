@@ -275,8 +275,6 @@ type
 implementation
 
 
-{ TTemplateActionLoop }
-
 type
 
   { TTemplateActionMain }
