@@ -1959,6 +1959,7 @@ end;
 function xqFunctionExtract(const args: TXQVArray): IXQValue;
 var
  regEx: TRegExpr;
+ v: IXQValue;
 begin
   requiredArgCount(args, 2,4);
   //TODO: cache regex
@@ -1969,7 +1970,9 @@ begin
       regEx.ModifierStr := args[3].toString;
     regEx.Exec(args[0].toString);
     if length(args) >= 3 then begin
-      result := xqvalue(regex.Match[args[2].toInt64]);
+      result := xqvalue;
+      for v in args[2] do
+        xqvalueSeqAdd(result, xqvalue(regex.Match[v.toInt64]));
     end else
       result := xqvalue(regEx.Match[0]);
   finally

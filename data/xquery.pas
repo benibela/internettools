@@ -1932,9 +1932,9 @@ type
 
       @item(@code(deep-text()) @br This is the concatenated plain text of the every tag inside the current text.
                                       You can also pass a separator like deep-text(' ') to separate text of different nodes.)
-      @item(@code(extract($string as xs:string, $regex as xs:string [, $match as xs:integer,[$flags as xs:string]])) @br
+      @item(@code(extract($string as xs:string, $regex as xs:string [, $match as xs:integer *,[$flags as xs:string]])) @br
             This applies the regex $regex to $string and returns only the matching part.
-            If the $match argument is used, only the $match-th submatch will be returned
+            @br If the $match argument is provided, only the $match-th submatch will be returned. This can be a sequence of several integers.
             @br (This functions used to be called filter, but was renamed to due to XQuery 3))
       @item(@code(eval($query as xs:string)) @br This evaluates $query as a XQuery-expression. )
       @item(@code(css($css as xs:string)) @br This evaluates the $css string as a css selector. )

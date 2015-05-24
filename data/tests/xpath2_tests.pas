@@ -266,6 +266,9 @@ begin
   t('extract(''hallo welt'', ''(.*) (.*)'', ''0'')', 'hallo welt',      '');
   t('extract(''hallo welt'', ''(.*) (.*)'', ''1'')', 'hallo',           '');
   t('extract(''hallo welt'', ''(.*) (.*)'', ''2'')', 'welt',            '');
+  t('exists(extract(''hallo welt'', ''(.*) (.*)'', ()))', 'false',      '');
+  t('string-join( extract(''hallo welt'', ''(.*) (.*)'', (1,2) ), ":")', 'hallo:welt');
+  t('string-join( extract(''hallo welt foo bar'', ''(.*) (.*) (.*) (.*)'', (1,3,4,1,2,1) ), ":")', 'hallo:foo:bar:hallo:welt:hallo');
 
                 //Replace
   t('replace("abracadabra", "bra", "*")', 'a*cada*', '');
