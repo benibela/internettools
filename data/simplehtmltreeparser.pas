@@ -1898,6 +1898,8 @@ begin
       bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
     end;
     FAutoCloseTag:=htmlElementChildless(tag);
+    if striEqual(tag, 'table') and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, 'table') then
+      leaveTag(tagName, tagNameLen);
   end;
   new := newTreeNode(tetOpen, tag, longint(tagName - @FCurrentFile[1]));
 
@@ -2177,9 +2179,14 @@ begin
 
   //heavy weight 'bod y' 'code' 'dd' 'dl' 'div' 'dt' 'fieldset' 'head' 'html' 'li' 'menu'  'table' 'td' 'tr' 'ul'
   if striequal(s, 'code') or  striequal(s,'fieldset') or striequal(s,'head') or striequal(s,'menu') then exit(2);
-  if striequal(s, 'td') or striequal(s, 'ul') or striequal(s, 'ol') or striequal(s, 'dd') or striequal(s, 'dt') then exit(3);
-  if striequal(s, 'tr') or striequal(s, 'li') or striequal(s, 'dl') then exit(4);
-  if striequal(s, 'body') or striequal(s, 'html') or striequal(s, 'div') or striequal(s, 'table') then exit(5);
+  if striequal(s, 'ul') or striequal(s, 'ol') or striequal(s, 'dd') or striequal(s, 'dt') then exit(3);
+  if striequal(s, 'li') or striequal(s, 'dl') then exit(4);
+  if striequal(s, 'div') then exit(5);
+
+  //super heavy tables
+  if striequal(s, 'td') then exit(6);
+  if striequal(s, 'tr') then exit(7);
+  if striequal(s, 'body') or striequal(s, 'html') or striequal(s, 'table') then exit(8);
 
   if striequal(s, '') then exit(100); //force closing of root element
 end;
