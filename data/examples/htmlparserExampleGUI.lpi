@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
     <Version Value="9"/>
@@ -40,7 +40,6 @@
       <Unit0>
         <Filename Value="htmlparserExampleGUI.lpr"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="htmlparserExampleGUI"/>
       </Unit0>
       <Unit1>
         <Filename Value="htmlparsergui.pas"/>
@@ -72,6 +71,9 @@
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="11"/>
+    <Target>
+      <Filename Value="htmlparserExampleGUI"/>
+    </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
       <OtherUnitFiles Value="../../import/regexpr/source;../../internet;../../import;.."/>
@@ -96,10 +98,6 @@
       <ConfigFile>
         <StopAfterErrCount Value="10"/>
       </ConfigFile>
-      <CompilerMessages>
-        <UseMsgFile Value="True"/>
-      </CompilerMessages>
-      <CompilerPath Value="$(CompPath)"/>
     </Other>
   </CompilerOptions>
   <Debugging>
