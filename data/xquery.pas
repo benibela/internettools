@@ -1568,22 +1568,15 @@ type
   end;
 
   { TXQTermFlower }
-  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcWhere, xqtfcOrder);
-
-  { TXQTermFlowerSubClause }
-
+  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder);
   TXQTermFlowerSubClause = class(TXQTerm)
     class function kind: TXQTermFlowerSubClauseKind; virtual;
 
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
   end;
-
-  { TXQTermFlowerLet }
-
   TXQTermFlowerLet = class(TXQTermFlowerSubClause)
     loopvar: TXQTermVariable;
-    pattern: TXQTermPatternMatcher;
     sequenceTyp: TXQTermSequenceType;
     expr: TXQTerm;
 
@@ -1592,9 +1585,6 @@ type
     function clone: TXQTerm; override;
     destructor destroy; override;
   end;
-
-  { TXQTermFlowerFor }
-
   TXQTermFlowerFor = class(TXQTermFlowerLet)
     //allowingEmpty: boolean;
     positionVar: TXQTermVariable;
@@ -1602,9 +1592,19 @@ type
     function clone: TXQTerm; override;
     destructor destroy; override;
   end;
+  TXQTermFlowerLetPattern = class(TXQTermFlowerSubClause)
+    pattern: TXQTermPatternMatcher;
+    expr: TXQTerm;
+    sequenceTyp: TXQTermSequenceType;
 
-  { TXQTermFlowerWhere }
-
+    class function kind: TXQTermFlowerSubClauseKind; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
+  end;
+  TXQTermFlowerForPattern = class(TXQTermFlowerLetPattern)
+    class function kind: TXQTermFlowerSubClauseKind; override;
+  end;
   TXQTermFlowerWhere = class(TXQTermFlowerSubClause)
     test: TXQTerm;
     class function kind: TXQTermFlowerSubClauseKind; override;
@@ -1612,9 +1612,6 @@ type
     function clone: TXQTerm; override;
     destructor destroy; override;
   end;
-
-  { TXQTermFlowerOrder }
-
   TXQTermFlowerOrder = class(TXQTermFlowerSubClause)
     //stableOrder: boolean; //always be stable
     expr: TXQTerm;
