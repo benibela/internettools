@@ -1568,29 +1568,66 @@ type
   end;
 
   { TXQTermFlower }
-  TXQTermFlowerVariable = record
-    kind: (xqfkFor, xqfkLet);
-    //namespace: INamespace;
+  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcWhere, xqtfcOrder);
+
+  { TXQTermFlowerSubClause }
+
+  TXQTermFlowerSubClause = class(TXQTerm)
+    class function kind: TXQTermFlowerSubClauseKind; virtual;
+
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+  end;
+
+  { TXQTermFlowerLet }
+
+  TXQTermFlowerLet = class(TXQTermFlowerSubClause)
     loopvar: TXQTermVariable;
     pattern: TXQTermPatternMatcher;
     sequenceTyp: TXQTermSequenceType;
+    expr: TXQTerm;
+
+    class function kind: TXQTermFlowerSubClauseKind; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
+  end;
+
+  { TXQTermFlowerFor }
+
+  TXQTermFlowerFor = class(TXQTermFlowerLet)
     //allowingEmpty: boolean;
     positionVar: TXQTermVariable;
-    expr: TXQTerm;
+    class function kind: TXQTermFlowerSubClauseKind; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
   end;
-  TXQTermFlowerOrder = record
+
+  { TXQTermFlowerWhere }
+
+  TXQTermFlowerWhere = class(TXQTermFlowerSubClause)
+    test: TXQTerm;
+    class function kind: TXQTermFlowerSubClauseKind; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
+  end;
+
+  { TXQTermFlowerOrder }
+
+  TXQTermFlowerOrder = class(TXQTermFlowerSubClause)
+    //stableOrder: boolean; //always be stable
     expr: TXQTerm;
     descending: boolean; //ascending is default
     emptyOrder: TXQTermFlowerOrderEmpty;
     collation: string;
+    class function kind: TXQTermFlowerSubClauseKind; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
   end;
 
   TXQTermFlower = class(TXQTermWithChildren)
-    vars: array of TXQTermFlowerVariable;
-    where: TXQTerm;
-    //stableOrder: boolean; //always be stable
-    orders: array of TXQTermFlowerOrder;
-    returned: TXQTerm;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
@@ -2513,6 +2550,8 @@ var
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+
 
 { TXQFunctionParameter }
 
@@ -5855,16 +5894,16 @@ var pos: pchar;
         if axis <> '' then axisTerm := TXQTermNodeMatcher.Create(axis+'::*')
         else axisTerm := newBinOp(TXQTermNodeMatcher.Create('..'), '/', TXQTermNodeMatcher.Create('*'));
         result := TXQTermFlower.Create();
-        setlength(TXQTermFlower(result).vars, 1);
-        TXQTermFlower(result).vars[0].kind:=xqfkFor;
-        TXQTermFlower(result).vars[0].loopvar := TXQTermVariable.create('__csstemp');
-        TXQTermFlower(result).vars[0].sequenceTyp := nil;
-        TXQTermFlower(result).vars[0].expr := newFunction('name', [TXQTermNodeMatcher.Create('.')]);
-
-        TXQTermFlower(result).returned := TXQTermFilterSequence.create(
+        TXQTermFlower(result).push(TXQTermFlowerFor.Create);
+        with TXQTermFlowerFor(TXQTermFlower(result).children[high(TXQTermFlower(result).children)]) do begin
+          loopvar := TXQTermVariable.create('__csstemp');
+          //TXQTermFlower(result).vars[0].sequenceTyp := nil;
+          expr := newFunction('name', [TXQTermNodeMatcher.Create('.')]);
+        end;
+        TXQTermFlower(result).push(TXQTermFilterSequence.create(
           axisTerm,
           newBinOp(newFunction('name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('__csstemp', StaticContext))
-        );
+        ));
       end;
     end;
 

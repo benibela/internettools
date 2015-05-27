@@ -930,12 +930,143 @@ end;
 
 { TXQTermFor }
 
+{ TXQTermFlowerSubClause }
+
+class function TXQTermFlowerSubClause.kind: TXQTermFlowerSubClauseKind;
+begin
+  raise EXQEvaluationException.create('pxp:INTERNAL', 'flower fail');
+  result := xqtfcOrder;
+end;
+
+function TXQTermFlowerSubClause.evaluate(const context: TXQEvaluationContext): IXQValue;
+begin
+  ignore(context);
+  raiseEvaluationError('pxp:INTERNAL', 'A flower subclause cannot be evaluated');
+  result := nil;
+end;
+
+function TXQTermFlowerSubClause.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  ignore(visitor);
+  raiseEvaluationError('pxp:INTERNAL', 'A flower subclause cannot be visited');
+  Result:=xqtvaAbort;
+end;
+
+
+{ TXQTermFlowerLet }
+
+class function TXQTermFlowerLet.kind: TXQTermFlowerSubClauseKind;
+begin
+  result := xqtfcLet;
+end;
+
+function TXQTermFlowerLet.getContextDependencies: TXQContextDependencies;
+begin
+  result := [xqcdContextVariables];
+  //if Assigned(loopvar) then result += loopvar.getContextDependencies;
+  //if Assigned(pattern) then result += pattern.getContextDependencies;
+  //if Assigned(sequenceTyp) then result += sequenceTyp.getContextDependencies;
+  if Assigned(expr) then result += expr.getContextDependencies;
+end;
+
+function TXQTermFlowerLet.clone: TXQTerm;
+begin
+  Result:=inherited clone();
+  if Assigned(loopvar) then TXQTermFlowerLet(result).loopvar := TXQTermVariable(loopvar.clone);
+  if Assigned(pattern) then TXQTermFlowerLet(result).pattern := TXQTermPatternMatcher(pattern.clone);
+  if Assigned(sequenceTyp) then TXQTermFlowerLet(result).sequenceTyp := TXQTermSequenceType(sequenceTyp.clone);
+  if Assigned(expr) then TXQTermFlowerLet(result).expr := expr.clone;
+end;
+
+destructor TXQTermFlowerLet.destroy;
+begin
+  loopvar.free;
+  pattern.free;
+  sequenceTyp.free;
+  expr.free;
+  inherited destroy;
+end;
+
+{ TXQTermFlowerFor }
+
+class function TXQTermFlowerFor.kind: TXQTermFlowerSubClauseKind;
+begin
+  result := xqtfcFor;
+end;
+
+function TXQTermFlowerFor.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  if Assigned(positionVar) then TXQTermFlowerFor(result).positionVar := TXQTermVariable(positionVar.clone);
+end;
+
+destructor TXQTermFlowerFor.destroy;
+begin
+  positionVar.Free;
+  inherited destroy;
+end;
+
+
+{ TXQTermFlowerWhere }
+
+class function TXQTermFlowerWhere.kind: TXQTermFlowerSubClauseKind;
+begin
+  result := xqtfcWhere;
+end;
+
+function TXQTermFlowerWhere.getContextDependencies: TXQContextDependencies;
+begin
+  result := test.getContextDependencies;
+end;
+
+function TXQTermFlowerWhere.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermFlowerWhere(result).test := test.clone;
+end;
+
+destructor TXQTermFlowerWhere.destroy;
+begin
+  test.free;
+  inherited destroy;
+end;
+
+
+{ TXQTermFlowerOrder }
+
+class function TXQTermFlowerOrder.kind: TXQTermFlowerSubClauseKind;
+begin
+  result := xqtfcOrder;
+end;
+
+function TXQTermFlowerOrder.getContextDependencies: TXQContextDependencies;
+begin
+  result := expr.getContextDependencies;
+end;
+
+function TXQTermFlowerOrder.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermFlowerOrder(result).expr := expr.clone;
+  TXQTermFlowerOrder(result).descending := descending;
+  TXQTermFlowerOrder(result).emptyOrder := emptyOrder;
+  TXQTermFlowerOrder(result).collation := collation;
+end;
+
+destructor TXQTermFlowerOrder.destroy;
+begin
+  expr.Free;
+  inherited destroy;
+end;
+
+
 type TOrderedTuple = class
   orders: array of IXQValue;
   result: IXQValue;
 end;
   TFlowerSortingData = record
-    flower: TXQTermFlower;
+    //flower: TXQTermFlower;
+    orders: array of TXQTermFlowerOrder;
     collations: array of TXQCollation;
     context: ^TXQEvaluationContext;
   end;
@@ -972,16 +1103,18 @@ var
   orders: array of TXQTermFlowerOrder;
   i: Integer;
   emptyLeast: Boolean;
+  order: TXQTermFlowerOrder;
 begin
   meta := PFlowerSortingData(data);
-  orders := meta^.flower.orders;
+  orders := meta^.orders;
   a := TOrderedTuple(ppointer(xa)^);
   b := TOrderedTuple(ppointer(xb)^);
 
   result := 0;
 
   for i := 0 to high(orders) do begin
-    emptyLeast := (orders[i].emptyOrder = xqeoEmptyLeast) or ((orders[i].emptyOrder = xqeoStatic) and (meta^.context^.staticContext.emptyOrderSpec = xqeoEmptyLeast));
+    order := orders[i];
+    emptyLeast := (order.emptyOrder = xqeoEmptyLeast) or ((order.emptyOrder = xqeoStatic) and (meta^.context^.staticContext.emptyOrderSpec = xqeoEmptyLeast));
     if isGreaterThan(a.orders[i], b.orders[i], emptyLeast, meta^.collations[i]) then result := 1
     else if isGreaterThan(b.orders[i], a.orders[i], emptyLeast, meta^.collations[i]) then result := -1;
     if orders[i].descending then result := -Result;
@@ -994,20 +1127,23 @@ var
   tempContext: TXQEvaluationContext;
   sortingCache: TFPList;
   finalResult: IXQValue;
+  currentTuple: TOrderedTuple;
+  orders: array of TXQTermFlowerOrder;
 
-  procedure evaluateForLoop(const pos: Integer);
+  procedure evaluateForLoop(const pos, tuplepos: Integer);
+  var letclause: TXQTermFlowerLet;
+      clausekind: TXQTermFlowerSubClauseKind;
     procedure continueWithValue(v: IXQValue; index: integer = 1);
     begin
-      if (vars[pos].sequenceTyp <> nil) and not (vars[pos].sequenceTyp.instanceOf(v, context)) then
-        raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+v.debugAsStringWithTypeAnnotation());
+      if (letclause.sequenceTyp <> nil) and not (letclause.sequenceTyp.instanceOf(v, context)) then
+        raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+letclause.sequenceTyp.serialize+' got value '+v.debugAsStringWithTypeAnnotation());
 
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.add(vars[pos].loopvar.value, v, vars[pos].loopvar.namespaceURL);
-      if vars[pos].positionVar <> nil then
-        tempContext.temporaryVariables.add(vars[pos].positionVar.value, xqvalue(index), vars[pos].positionVar.namespaceURL);
-      evaluateForLoop(pos+1);
+      tempContext.temporaryVariables.add(letclause.loopvar, v);
+      if (clausekind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then
+        tempContext.temporaryVariables.add(TXQTermFlowerFor(letclause).positionVar, xqvalue(index));
+      evaluateForLoop(pos+1, tuplepos);
       tempContext.temporaryVariables.popAll();
-
     end;
 
     procedure continueWithValues(log: TXQVariableChangeLog);
@@ -1040,12 +1176,12 @@ var
     begin
       try
 
-        if vars[pos].kind = xqfkLet then begin
+        if clausekind = xqtfcLet then begin
           oldLog := log;   log := log.condensedCollected;  oldLog.free;
-          if (vars[pos].sequenceTyp <> nil) then
+          if (letclause.sequenceTyp <> nil) then
             for i := 0 to log.count - 1 do
-              if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
-                raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
+              if not (letclause.sequenceTyp.instanceOf(log[i], context)) then
+                raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+letclause.sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
           contextValue := nil;
           if log.hasVariable('$', @contextValue) then begin
             if contextValue.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Only singletons can be assigned to .');
@@ -1055,11 +1191,11 @@ var
           oldLog := tempContext.temporaryVariables;
           log.parentLog := tempContext.temporaryVariables;
           tempContext.temporaryVariables := log;
-          for i := 0 to high(vars[pos].pattern.vars) do
-            if not log.hasVariable(vars[pos].pattern.vars[i].value, nil, vars[pos].pattern.vars[i].namespaceURL) then
-              tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespaceURL);
+          for i := 0 to high(letclause.pattern.vars) do
+            if not log.hasVariable(letclause.pattern.vars[i].value, nil, letclause.pattern.vars[i].namespaceURL) then
+              tempContext.temporaryVariables.add(letclause.pattern.vars[i].value, xqvalue(), letclause.pattern.vars[i].namespaceURL);
           try
-            evaluateForLoop(pos+1);
+            evaluateForLoop(pos+1, tuplepos);
           finally
             tempContext.temporaryVariables := oldLog;
             if contextValue <> nil then
@@ -1068,28 +1204,28 @@ var
 
         end else begin // for
           oldLog := log;   log := log.condensed;  oldLog.free;
-          if (vars[pos].sequenceTyp <> nil) then
+          if (letclause.sequenceTyp <> nil) then
             for i := 0 to log.count - 1 do
-              if not (vars[pos].sequenceTyp.instanceOf(log[i], context)) then
-                raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+vars[pos].sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
+              if not (letclause.sequenceTyp.instanceOf(log[i], context)) then
+                raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+letclause.sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
 
-          if vars[pos].positionVar <> nil then raiseEvaluationError('err:XPST0003', 'at and pattern cannot be combined');
+          if TXQTermFlowerFor(letclause).positionVar <> nil then raiseEvaluationError('err:XPST0003', 'at and pattern cannot be combined');
                //tempContext.temporaryVariables.add(vars[pos].positionVarname, xqvalue(index), vars[pos].positionVarNamespace);
           pushContextItem;
           tempContext.temporaryVariables.pushAll;
-          for i := 0 to high(vars[pos].pattern.vars) do
-            tempContext.temporaryVariables.add(vars[pos].pattern.vars[i].value, xqvalue(), vars[pos].pattern.vars[i].namespaceURL);
+          for i := 0 to high(letclause.pattern.vars) do
+            tempContext.temporaryVariables.add(letclause.pattern.vars[i].value, xqvalue(), letclause.pattern.vars[i].namespaceURL);
 
           for i := 0 to log.count - 1 do begin
             if log.getName(i) = '$' then begin
               replaceContextItem(log[i]);
-              evaluateForLoop(pos+1);
+              evaluateForLoop(pos+1, tuplepos);
               popContextItem;
             end
             else begin
               tempContext.temporaryVariables.pushAll;
               tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
-              evaluateForLoop(pos+1);
+              evaluateForLoop(pos+1, tuplepos);
               tempContext.temporaryVariables.popAll();
             end;
           end;
@@ -1102,51 +1238,62 @@ var
 
    var tempSeq: IXQValue;
        i:integer;
-       tuple: TOrderedTuple;
+       clause: TXQTermFlowerSubClause;
    begin
-     if pos = length(vars) then begin
-       if (where <> nil) and not where.evaluate(tempContext).toBoolean then
-         exit;
-
-       if sortingCache = nil then begin
-         xqvalueSeqAdd(finalResult, returned.evaluate(tempContext));
-         exit;
-       end else begin
-         tuple := TOrderedTuple.Create;
-         tuple.result := returned.evaluate(tempContext);
-         setlength(tuple.orders, length(orders));
-         for i:= 0 to high(orders) do
-           tuple.orders[i] := orders[i].expr.evaluate(tempContext);
-         sortingCache.Add(tuple);
-         exit;
+     if pos = high(children) then begin
+       if currentTuple = nil then
+         xqvalueSeqAdd(finalResult, children[pos].evaluate(tempContext))
+        else begin
+         currentTuple.result := children[pos].evaluate(tempContext);
+         sortingCache.Add(currentTuple);
+         currentTuple := nil;
+        end;
+        exit;
+     end;
+     clause := TXQTermFlowerSubClause(children[pos]);
+     clausekind := clause.kind;
+     case clausekind of
+       xqtfcLet, xqtfcFor: begin
+         letclause := TXQTermFlowerLet(clause);
+         tempSeq:=letclause.expr.evaluate(tempContext);
+         if letclause.pattern = nil then begin
+           if clausekind = xqtfcLet then
+             continueWithValue(tempSeq)
+           else case tempSeq.kind of
+             pvkUndefined:;
+             pvkSequence:
+               for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
+                 continueWithValue((tempSeq as TXQValueSequence).seq[i], i + 1);
+             else continueWithValue(tempSeq);
+           end;
+         end else if clausekind = xqtfcLet then
+           continueWithValues(patternMatcherMatch(letclause.pattern.node, tempSeq.toNode, context, true))
+         else case tempSeq.kind of
+           pvkUndefined:;
+           pvkSequence:
+             for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
+               continueWithValues(patternMatcherMatch(letclause.pattern.node, (tempSeq as TXQValueSequence).seq[i].toNode, context, true){, i + 1});
+           else continueWithValues(patternMatcherMatch(letclause.pattern.node, tempSeq.toNode, context, true));
+         end;
+       end;
+       xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(tempContext).toBoolean then begin
+         if currentTuple <> nil then FreeAndNil(currentTuple);
+         evaluateForLoop(pos + 1, tuplepos);
+       end;
+       xqtfcOrder: begin
+         if currentTuple = nil then begin
+           currentTuple := TOrderedTuple.Create;
+           setlength(currentTuple.orders, length(orders));
+         end;
+         currentTuple.orders[tuplepos] := TXQTermFlowerOrder(clause).expr.evaluate(tempContext);
+         evaluateForLoop(pos + 1, tuplepos + 1);
        end;
      end;
 
-     tempSeq:=vars[pos].expr.evaluate(tempContext);
 
-     if vars[pos].pattern = nil then begin
-       if vars[pos].kind = xqfkLet then
-         continueWithValue(tempSeq)
-       else case tempSeq.kind of
-         pvkUndefined:;
-         pvkSequence:
-           for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
-             continueWithValue((tempSeq as TXQValueSequence).seq[i], i + 1);
-         else continueWithValue(tempSeq);
-       end;
-     end else if vars[pos].kind = xqfkLet then
-       continueWithValues(patternMatcherMatch(vars[pos].pattern.node, tempSeq.toNode, context, true))
-     else case tempSeq.kind of
-       pvkUndefined:;
-       pvkSequence:
-         for i:=0 to (tempSeq as TXQValueSequence).seq.Count-1 do
-           continueWithValues(patternMatcherMatch(vars[pos].pattern.node, (tempSeq as TXQValueSequence).seq[i].toNode, context, true){, i + 1});
-       else continueWithValues(patternMatcherMatch(vars[pos].pattern.node, tempSeq.toNode, context, true));
-     end;
    end;
 var i: Integer;
     sortingData: TFlowerSortingData;
-
 begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
@@ -1156,6 +1303,12 @@ begin
   //oldVarCount := tempContext.temporaryVariables.count;
 
   finalResult := nil;
+  setlength(orders, 0);
+  for i := 0 to high(children) - 1 do
+    if TXQTermFlowerSubClause(children[i]).kind = xqtfcOrder then begin
+      SetLength(orders, length(orders) + 1);
+      orders[high(orders)] := TXQTermFlowerOrder(children[i]);
+    end;
   if length(orders) = 0 then sortingCache := nil
   else sortingCache := tfplist.Create;
 
@@ -1166,12 +1319,14 @@ begin
       tempContext.temporaryVariables.add(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
   end;}
   try
-    evaluateForLoop(0);
+    currentTuple := nil;
+    evaluateForLoop(0,0);
     //setlength(tempContext.temporaryVariables.vars, oldlen);
 
     if sortingCache <> nil then begin
       if sortingCache.Count > 0 then begin
-        sortingData.flower:=self;
+        //sortingData.flower:=self;
+        sortingData.orders := orders;
         sortingData.context:=@tempContext;
         setlength(sortingData.collations, length(orders));
         for i := 0 to high(orders) do
@@ -1196,99 +1351,75 @@ begin
 end;
 
 function TXQTermFlower.getContextDependencies: TXQContextDependencies;
-var
-  i: Integer;
 begin
   result := getChildrenContextDependencies;
-  if where <> nil then result += where.getContextDependencies;
-  if returned <> nil then Result += returned.getContextDependencies;
-  if Result = ALL_CONTEXT_DEPENDENCIES then exit;
-  for i:=0 to high(vars) do
-    result += vars[i].expr.getContextDependencies;
-  for i:=0 to high(orders) do
-    result += orders[i].expr.getContextDependencies;
 end;
 
 function TXQTermFlower.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   i, j: Integer;
+  clause: TXQTermFlowerSubClause;
+  letclause: TXQTermFlowerLet;
 begin
-  for i := 0 to high(vars) do begin
-    result := visitor.simpleTermVisit(@vars[i].expr, self);
-    case result of xqtvaAbort: exit; end;
+  for i := 0 to high(children) - 1 do begin
+    clause := TXQTermFlowerSubClause(children[i]);
+    case clause.kind of
+      xqtfcFor, xqtfcLet: begin
+        letclause := TXQTermFlowerLet(clause);
+        result := visitor.simpleTermVisit(@letclause.expr, self);
+        case result of xqtvaAbort: exit; end;
 
-    visitor.parent := self;
-    if vars[i].pattern = nil then begin
-      visitor.declare(@vars[i].loopvar);
-      if vars[i].positionVar <> nil then
-        visitor.declare(@vars[i].positionVar);
-    end else begin
-      for j := 0 to high(vars[i].pattern.vars) do
-        visitor.declare(@vars[i].pattern.vars[j]);
-      visitor.simpleTermVisit(@vars[i].pattern, self);
+        visitor.parent := self;
+        if letclause.pattern = nil then begin
+          visitor.declare(@letclause.loopvar);
+          if (clause.kind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then
+            visitor.declare(@TXQTermFlowerFor(letclause).positionVar);
+        end else begin
+          for j := 0 to high(letclause.pattern.vars) do
+            visitor.declare(@letclause.pattern.vars[j]);
+          visitor.simpleTermVisit(@letclause.pattern, self);
+        end;
+      end;
+      xqtfcWhere: begin
+        result := visitor.simpleTermVisit(@TXQTermFlowerWhere(clause).test, self);
+        case result of xqtvaAbort: exit; end;
+      end;
+      xqtfcOrder: begin
+        result := visitor.simpleTermVisit(@TXQTermFlowerOrder(clause).expr, self);
+        case result of xqtvaAbort: exit; end;
+      end;
     end;
   end;
-  if where <> nil then begin
-    result := visitor.simpleTermVisit(@where, self);
-    case result of xqtvaAbort: exit; end;
-  end;
-  for i := 0 to high(orders) do begin
-    result := visitor.simpleTermVisit(@orders[i].expr, self);
-    case result of xqtvaAbort: exit; end;
-  end;
-  result := visitor.simpleTermVisit(@returned,self);
+  result := visitor.simpleTermVisit(@children[high(children)],self);
   case result of xqtvaAbort: exit; end;
 
   visitor.parent := self;
-  for i := high(vars) downto 0 do begin
-    if vars[i].pattern = nil then begin
-      if vars[i].positionVar <> nil then
-        visitor.undeclare(@vars[i].positionVar);
-      visitor.undeclare(@vars[i].loopvar);
-    end else for j := high(vars[i].pattern.vars) downto 0 do
-      visitor.undeclare(@vars[i].pattern.vars[j]);
+  for i := high(children) - 1 downto 0 do begin
+    clause := TXQTermFlowerSubClause(children[i]);
+    case clause.kind of
+      xqtfcFor, xqtfcLet: begin
+        letclause := TXQTermFlowerLet(clause);
+
+        if letclause.pattern = nil then begin
+          if (clause.kind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then
+            visitor.undeclare(@TXQTermFlowerFor(letclause).positionVar);
+          visitor.undeclare(@letclause.loopvar);
+        end else begin
+          for j := high(letclause.pattern.vars) downto 0 do
+            visitor.undeclare(@letclause.pattern.vars[j]);
+        end;
+      end;
+    end;
   end;
 end;
 
 function TXQTermFlower.clone: TXQTerm;
-var
-  i: Integer;
 begin
   Result:=inherited clone;
-  with TXQTermFlower(result) do begin
-    vars := self.vars;
-    setlength(vars, length(vars));
-    for i := 0 to high(vars) do
-      with vars[i] do begin
-        if loopvar <> nil then loopvar := TXQTermVariable(loopvar.clone);
-        if pattern <> nil then pattern := TXQTermPatternMatcher(pattern.clone);
-        if positionVar <> nil then positionVar := TXQTermVariable(positionVar.clone);
-        if expr <> nil then expr := expr.clone;
-      end;
-    if self.where <> nil then where := self.where.clone;
-    orders := self.orders;
-    SetLength(orders, length(orders));
-    for i := 0 to high(orders) do
-      orders[i].expr := orders[i].expr.clone;
-    returned := self.returned.clone;
-  end;
 end;
 
 destructor TXQTermFlower.destroy;
-var
-  i: Integer;
 begin
-  for i:=0 to high(vars) do begin
-    vars[i].expr.Free;
-    vars[i].sequenceTyp.Free;
-    vars[i].pattern.Free;
-    vars[i].loopvar.free;
-    vars[i].positionVar.free;
-  end;
-  for i:= 0 to high(orders) do
-    orders[i].expr.Free;
-  where.Free;
-  returned.Free;
   inherited destroy;
 end;
 
@@ -2779,14 +2910,16 @@ begin
     tempVisitor.simpleTermVisit(@temp.body, nil);
     if tempVisitor.uncertainVariables <> nil then begin
       tempterm := TXQTermFlower.Create;
-      tempterm.returned := temp.body;
-      temp.body := tempterm;
-      setlength(tempterm.vars, tempVisitor.uncertainVariables.count);
+      setlength(tempterm.children, tempVisitor.uncertainVariables.count + 1);
       for i := 0 to tempVisitor.uncertainVariables.count - 1 do begin
-        tempterm.vars[i].kind := xqfkLet;
-        tempterm.vars[i].loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.vars[i].name, tempVisitor.uncertainVariables.vars[i].namespaceURL);
-        tempterm.vars[i].expr := TXQTermConstant.Create(context.getVariable(tempterm.vars[i].loopvar));
+        tempterm.children[i] := TXQTermFlowerLet.Create;
+        with TXQTermFlowerLet(tempterm.children[i]) do begin
+          loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.vars[i].name, tempVisitor.uncertainVariables.vars[i].namespaceURL);
+          expr := TXQTermConstant.Create(context.getVariable(loopvar));
+        end;
       end;
+      tempterm.children[high(tempterm.children)] := temp.body;
+      temp.body := tempterm;
     end;
   finally
     tempVisitor.free;

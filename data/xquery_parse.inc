@@ -542,14 +542,16 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
   procedure parseVarBinding;
   var temp: string;
+    clause: TXQTermFlowerLet;
   begin
-    setlength(result.vars, length(result.vars) + 1);
-    with result.vars[high(result.vars)] do begin
-      if akind = 'for' then kind := xqfkFor
-      else if akind = 'let' then kind := xqfkLet
+    case akind of
+      'for': result.push(TXQTermFlowerFor.Create);
+      'let': result.push(TXQTermFlowerLet.Create);
       else raiseParsingError('XPST0003', 'Invalid flower: '+akind);
-
-      if (kind = xqfkLet) and (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
+    end;
+    clause := TXQTermFlowerLet(result.children[high(result.children)]);
+    with clause do begin
+      if (kind = xqtfcLet) and (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
 
       skipWhitespaceAndComment();
       if pos^ = '<' then
@@ -563,7 +565,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
         temp := nextToken;
       end else sequenceTyp := nil;
 
-      if kind = xqfkFor then begin
+      if kind = xqtfcFor then begin
 
         {if temp = 'allowing' then begin
           requireXQuery3;
@@ -573,7 +575,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
         if temp = 'at' then begin
           requireXQuery;
-          positionvar := parseVariable;
+          TXQTermFlowerFor(clause).positionvar := parseVariable;
           temp := nextToken;
         end;
 
@@ -589,9 +591,12 @@ var
   token: String;
 
   procedure parseOrderSpecAndNextToken;
+  var
+    clause: TXQTermFlowerOrder;
   begin
-    setlength(result.orders, length(result.orders) + 1);
-    with result.orders[high(result.orders)] do begin
+    clause := TXQTermFlowerOrder.Create;
+    result.push(clause);
+    with clause do begin
       expr := parse();
       token := nextToken;
 
@@ -637,7 +642,8 @@ begin
       requireXQuery;
 
       if token = 'where' then begin
-        result.where := parse;
+        result.push(TXQTermFlowerWhere.Create);
+        TXQTermFlowerWhere(result.children[high(result.children)]).test := parse;
         token := nextToken();
       end;
 
@@ -652,7 +658,7 @@ begin
       if token <> 'return' then raiseParsingError('XPST0003', 'Expected return');
     end;
 
-    result.returned := parse;
+    result.push(parse);
   except
     on EXQParsingException do begin result.free; raise; end;
   end;
