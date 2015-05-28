@@ -1511,6 +1511,7 @@ type
   TXQTermPatternMatcher = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
     node: TTreeNode;
     vars: array of TXQTermVariable;
+    hasDefaultVariable: boolean;
     function clone: TXQTerm; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     destructor destroy; override;

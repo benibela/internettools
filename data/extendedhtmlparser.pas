@@ -652,7 +652,7 @@ THtmlTemplateParser=class
     function getTemplateTree: TTreeNode;
     function GetTemplateNamespace: TNamespaceList;
     function GetTemplateHasRealVariableDefinitions: boolean;
-    procedure GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray);
+    procedure GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray; out hasDefaultVariable: Boolean);
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -1068,7 +1068,7 @@ begin
   end;
 end;
 
-procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray);
+procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray; out hasDefaultVariable: Boolean);
   function arrayContains(t: TXQTermVariable): boolean;
   var
     i: Integer;
@@ -1081,26 +1081,30 @@ procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTe
     result := false;
   end;
 
-  procedure stest(const t: TXQTerm);
+  function stest(const t: TXQTerm): boolean;
   var
     i: Integer;
   begin
-    if not assigned(t) then exit;
-    if (t is TXQTermDefineVariable) and (TXQTermDefineVariable(t).variable is TXQTermVariable) and
-        (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t).variable))) then begin
-          SetLength(vars, length(vars) + 1);
-          vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t).variable);
-        end;
+    if not assigned(t) then exit(false);
+    result := (t is TXQTermDefineVariable) and (TXQTermDefineVariable(t).variable is TXQTermVariable);
+
+    if result and (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t).variable))) then begin
+      SetLength(vars, length(vars) + 1);
+      vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t).variable);
+    end;
     if t is TXQTermWithChildren then
       for i := 0 to high(TXQTermWithChildren(t).children) do
-        stest(TXQTermWithChildren(t).children[i]);
+        result := result or stest(TXQTermWithChildren(t).children[i]);
   end;
 var
   cur: TTemplateElement;
 begin
   cur := TTemplateElement(FTemplate.getLastTree.next);
+  hasDefaultVariable := false;
   while cur <> nil do begin
-    if cur.source <> nil then stest(cur.source.Term);
+    if cur.source <> nil then
+      if (not stest(cur.source.Term)) and (cur.templateType = tetCommandShortRead) then
+        hasDefaultVariable := true;
     cur := cur.templateNext;
   end;
 end;
@@ -2149,7 +2153,7 @@ begin
   temp.initializeCaches;
   result := TXQTermPatternMatcher.Create;
   result.node := temp.TemplateTree;
-  temp.GetTemplateRealVariableDefinitions(result.vars);
+  temp.GetTemplateRealVariableDefinitions(result.vars, result.hasDefaultVariable);
   temp.FTemplate.OwnedTrees.Clear;
   temp.FQueryEngine := nil;
   temp.free;

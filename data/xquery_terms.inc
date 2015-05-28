@@ -1183,7 +1183,6 @@ var
 
     procedure addPatternVariableBinding(node: IXQValue);
     var oldContextItem: IXQValue;
-        contextValue: TXQValue;
         oldSeqIndex: Integer;
         oldSeqLength: Integer;
 
@@ -1206,10 +1205,23 @@ var
           tempContext.SeqLength:= 1;
         end;
     var
+        patternClause: TXQTermFlowerLetPattern;
+        function hasStaticVariable(const name, url: string): boolean;
+        var
+          i: Integer;
+        begin
+          for i := 0 to high(patternClause.pattern.vars) do //todo: optimize stringhash
+            if (patternClause.pattern.vars[i].value = name)
+               and (patternClause.pattern.vars[i].namespaceURL = url) then exit(true);
+          result := false;
+        end;
+
+    var
         oldLog: TXQVariableChangeLog;
         i: Integer;
         log: TXQVariableChangeLog;
-        patternClause: TXQTermFlowerLetPattern;
+        hasContextItem: Boolean;
+        value: TXQValue;
     begin
       patternClause := TXQTermFlowerLetPattern(children[pos]);
       log := patternMatcherMatch(patternClause.pattern.node, node.toNode, context, true);
@@ -1225,46 +1237,49 @@ var
             if not (patternClause.sequenceTyp.instanceOf(log[i], context)) then
               raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+patternClause.sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
 
-        if clausekind = xqtfcLetPattern then begin
-          contextValue := nil;
-          if log.hasVariable('$', @contextValue) then begin
-            if contextValue.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Only singletons can be assigned to .');
-            replaceContextItem(contextValue);
-            pushContextItem;
-          end;
-          oldLog := tempContext.temporaryVariables;
-          log.parentLog := tempContext.temporaryVariables;
-          tempContext.temporaryVariables := log;
-          for i := 0 to high(patternClause.pattern.vars) do
-            if not log.hasVariable(patternClause.pattern.vars[i], nil) then
-              tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
-          try
-            evaluateForLoop(pos+1, tuplepos);
-          finally
-            tempContext.temporaryVariables := oldLog;
-            if contextValue <> nil then
-              popContextItem;
-          end;
+        hasContextItem := patternClause.pattern.hasDefaultVariable;
 
-        end else begin // for
+        if hasContextItem then begin
           pushContextItem;
-          tempContext.temporaryVariables.pushAll;
-          for i := 0 to high(patternClause.pattern.vars) do
-            tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
+          replaceContextItem(xqvalue());
+        end;
+        tempContext.temporaryVariables.pushAll;
+        try
+          if clausekind = xqtfcLetPattern then begin
+            if hasContextItem and log.hasVariable('$', @value) then begin
+              if value.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Only singletons can be assigned to .');
+              replaceContextItem(value);
+            end;
+            for i := 0 to high(patternClause.pattern.vars) do
+              if log.hasVariable(patternClause.pattern.vars[i], @value) then
+                tempContext.temporaryVariables.add(patternClause.pattern.vars[i], value)
+               else
+                tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
+            evaluateForLoop(pos+1, tuplepos);
+          end else begin // for
+            for i := 0 to high(patternClause.pattern.vars) do
+              tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
 
-          for i := 0 to log.count - 1 do begin
-            if log.getName(i) = '$' then begin
-              replaceContextItem(log[i]);
-              evaluateForLoop(pos+1, tuplepos);
-              popContextItem;
-            end else begin
-              tempContext.temporaryVariables.pushAll;
-              tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
-              evaluateForLoop(pos+1, tuplepos);
-              tempContext.temporaryVariables.popAll();
+            for i := 0 to log.count - 1 do begin
+              if log.getName(i) = '$' then begin
+                if hasContextItem then begin
+                  replaceContextItem(log[i]);
+                  evaluateForLoop(pos+1, tuplepos);
+                  replaceContextItem(xqvalue());
+                end;
+              end else begin
+                if hasStaticVariable(log.getName(i), log.vars[i].namespaceURL) then begin
+                  tempContext.temporaryVariables.pushAll;
+                  tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
+                  evaluateForLoop(pos+1, tuplepos);
+                  tempContext.temporaryVariables.popAll();
+                end;
+              end;
             end;
           end;
+        finally
           tempContext.temporaryVariables.popAll;
+          if hasContextItem then popContextItem;
         end;
       finally
         log.free;
