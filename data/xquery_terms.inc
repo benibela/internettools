@@ -1145,7 +1145,7 @@ begin
 
   result := 0;
 
-  for i := 0 to high(orders) do begin
+  for i := high(orders) downto 0 do begin
     order := orders[i];
     emptyLeast := (order.emptyOrder = xqeoEmptyLeast) or ((order.emptyOrder = xqeoStatic) and (meta^.context^.staticContext.emptyOrderSpec = xqeoEmptyLeast));
     if isGreaterThan(a.orders[i], b.orders[i], emptyLeast, meta^.collations[i]) then result := 1

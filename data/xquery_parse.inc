@@ -613,36 +613,51 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 var
   token: String;
 
-  procedure parseOrderSpecAndNextToken;
+  procedure parseOrderClauseAndNextToken;
   var
     clause: TXQTermFlowerOrder;
+    temp: TXQTerm;
+    i, j: Integer;
   begin
-    clause := TXQTermFlowerOrder.Create;
-    result.push(clause);
-    with clause do begin
-      expr := parse();
-      token := nextToken;
-
-      if (token = 'ascending') or (token = 'descending') then begin
-        descending := token = 'descending';
+    if token = 'stable' then expect('order'); //always be stable
+    expect('by');
+    i := length(Result.children);
+    repeat
+      clause := TXQTermFlowerOrder.Create;
+      result.push(clause);
+      with clause do begin
+        expr := parse();
         token := nextToken;
+
+        if (token = 'ascending') or (token = 'descending') then begin
+          descending := token = 'descending';
+          token := nextToken;
+        end;
+
+        emptyOrder := xqeoStatic;
+        if token = 'empty' then begin
+          token := nextToken;
+          if token = 'greatest' then emptyOrder := xqeoEmptyGreatest
+          else if token = 'least' then emptyOrder := xqeoEmptyLeast
+          else raiseSyntaxError('Expected "greatest" or "least"');
+          token := nextToken;
+        end;
+
+        if token = 'collation' then begin
+          collation := nextToken;
+          if (collation = '') or not (collation[1] in ['''', '"']) or (collation[1] <> collation[length(collation)]) then raiseParsingError('XPST0003', 'Invalid collation');
+          collation := copy(collation, 2, length(collation) - 2);
+          token := nextToken;
+        end
       end;
-
-      emptyOrder := xqeoStatic;
-      if token = 'empty' then begin
-        token := nextToken;
-        if token = 'greatest' then emptyOrder := xqeoEmptyGreatest
-        else if token = 'least' then emptyOrder := xqeoEmptyLeast
-        else raiseParsingError('XPST0003', 'Expected "greatest" or "least"');
-        token := nextToken;
-      end;
-
-      if token = 'collation' then begin
-        collation := nextToken;
-        if (collation = '') or not (collation[1] in ['''', '"']) or (collation[1] <> collation[length(collation)]) then raiseParsingError('XPST0003', 'Invalid collation');
-        collation := copy(collation, 2, length(collation) - 2);
-        token := nextToken;
-      end
+    until token <> ',';
+    //reverse order sub clauses
+    j := high(result.children);
+    while j > i do begin
+      temp := result.children[i];
+      result.children[i] := result.children[j] ;
+      result.children[j] := temp;
+      inc(i); dec(j);
     end;
   end;
 begin
@@ -670,13 +685,8 @@ begin
         token := nextToken();
       end;
 
-      if (token = 'stable') or (token = 'order') then begin
-        if token = 'stable' then expect('order'); //always be stable
-        expect('by');
-        repeat
-          parseOrderSpecAndNextToken;
-        until token <> ',';
-      end;
+      if (token = 'stable') or (token = 'order') then
+        parseOrderClauseAndNextToken;
 
       if token <> 'return' then raiseParsingError('XPST0003', 'Expected return');
     end;
