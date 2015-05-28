@@ -1289,6 +1289,7 @@ var
    var tempv: IXQValue;
        i:integer;
        clause: TXQTermFlowerSubClause;
+       tempSeq: IXQValue;
    begin
      if pos = high(children) then begin
        if currentTuple = nil then
@@ -1306,10 +1307,17 @@ var
        xqtfcLet:
          addVariableBinding(TXQTermFlowerLet(clause).expr.evaluate(tempContext));
        xqtfcFor: begin
-         i := 1;
-         for tempv in TXQTermFlowerFor(clause).expr.evaluate(tempContext) do begin
-           addVariableBinding(tempv, i);
-           inc(i);
+         tempSeq := TXQTermFlowerFor(clause).expr.evaluate(tempContext);
+         case tempSeq.getSequenceCount of
+           0: if TXQTermFlowerFor(clause).allowingEmpty then addVariableBinding(xqvalue(), 0);
+           1: addVariableBinding(tempSeq, 1);
+           else begin
+             i := 1;
+             for tempv in tempSeq do begin
+               addVariableBinding(tempv, i);
+               inc(i);
+             end;
+           end;
          end;
        end;
        xqtfcLetPattern: addPatternVariableBinding(TXQTermFlowerLetPattern(clause).expr.evaluate(tempContext));

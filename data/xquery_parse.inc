@@ -569,11 +569,12 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
         if kind = xqtfcFor then begin
 
-          {if temp = 'allowing' then begin
+          if temp = 'allowing' then begin
             requireXQuery3;
-            allowingEmpty := nextToken;
+            expect('empty');
+            TXQTermFlowerFor(clause).allowingEmpty := true;
             temp := nextToken;
-          end;}
+          end;
 
           if temp = 'at' then begin
             requireXQuery;

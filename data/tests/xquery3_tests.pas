@@ -306,6 +306,12 @@ begin
   m('<r><a xmlns="f">text</a></r>/Q{f}*', 'text');
   m('<r><a xmlns="f   a ">text</a></r>/Q{f              a   '#13#10'}*', 'text');
 
+  //new flowers
+  t('for $i allowing empty in (1,2,3) return $i', '1 2 3');
+  t('for $i allowing empty in () return "x"', 'x');
+  t('for $i allowing empty at $p in (4,5,6) return $i || $p', '41 52 63');
+  t('for $i allowing empty at $p in () return "x" || $p', 'x0');
+
   //try/catch
   m('try { "a" cast as xs:integer } catch * { 1 }', '1');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { "a" cast as xs:integer } catch err:FORG0001 { 2 }', '2');

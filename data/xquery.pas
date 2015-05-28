@@ -1587,7 +1587,7 @@ type
     destructor destroy; override;
   end;
   TXQTermFlowerFor = class(TXQTermFlowerLet)
-    //allowingEmpty: boolean;
+    allowingEmpty: boolean;
     positionVar: TXQTermVariable;
     class function kind: TXQTermFlowerSubClauseKind; override;
     function clone: TXQTerm; override;

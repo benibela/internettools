@@ -265,6 +265,9 @@ begin
   t('for $i in (1,2,3,4,5) order by $i < 3 descending return $i', '1 2 3 4 5');
   t('for $i in (1,2,3,4,5) order by $i < 3 descending, $i return $i', '1 2 3 4 5');
   t('for $i in (1,2,3,4,5) order by $i < 3 descending, $i descending return $i', '2 1 5 4 3');
+  t('for $i in (1,2,3,4,5) order by 1, $i < 3 descending, $i descending return $i', '2 1 5 4 3');
+  t('for $i in (1,2,3,4,5) order by 1, 2, $i < 3 descending, $i descending return $i', '2 1 5 4 3');
+  t('for $i in (1,2,3,4,5) order by 1, 2, 3, $i < 3 descending, $i descending return $i', '2 1 5 4 3');
 
   t('for $i in ("a","z","AB","abc","ab", "A") return $i', 'a z AB abc ab A');
   t('for $i in ("a","z","AB","abc","ab", "A") order by $i return $i', 'a A AB ab abc z');            //everything is case insensitive!
