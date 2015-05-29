@@ -1290,14 +1290,17 @@ var
        i:integer;
        clause: TXQTermFlowerSubClause;
        tempSeq: IXQValue;
+       newTuple: TOrderedTuple;
    begin
      if pos = high(children) then begin
        if currentTuple = nil then
          xqvalueSeqAdd(finalResult, children[pos].evaluate(tempContext))
         else begin
-         currentTuple.result := children[pos].evaluate(tempContext);
-         sortingCache.Add(currentTuple);
-         currentTuple := nil;
+         newTuple := TOrderedTuple.Create;
+         newTuple.orders := currentTuple.orders;
+         SetLength(newTuple.orders, length(newTuple.orders));
+         newTuple.result := children[pos].evaluate(tempContext);
+         sortingCache.Add(newTuple);
         end;
         exit;
      end;
@@ -1324,14 +1327,9 @@ var
        xqtfcForPattern:
          for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(tempContext) do
            addPatternVariableBinding(tempv);
-       xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(tempContext).toBoolean then begin
+       xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(tempContext).toBoolean then
          evaluateForLoop(pos + 1, tuplepos);
-       end else if currentTuple <> nil then FreeAndNil(currentTuple);
        xqtfcOrder: begin
-         if currentTuple = nil then begin
-           currentTuple := TOrderedTuple.Create;
-           setlength(currentTuple.orders, length(orders));
-         end;
          currentTuple.orders[tuplepos] := TXQTermFlowerOrder(clause).expr.evaluate(tempContext);
          evaluateForLoop(pos + 1, tuplepos + 1);
        end;
@@ -1356,8 +1354,14 @@ begin
       SetLength(orders, length(orders) + 1);
       orders[high(orders)] := TXQTermFlowerOrder(children[i]);
     end;
-  if length(orders) = 0 then sortingCache := nil
-  else sortingCache := tfplist.Create;
+  if length(orders) = 0 then begin
+    sortingCache := nil;
+    currentTuple := nil;
+  end else begin
+    sortingCache := tfplist.Create;
+    currentTuple := TOrderedTuple.Create;
+    SetLength(currentTuple.orders, length(orders));
+  end;
 
   {oldlen := length(tempContext.temporaryVariables.vars);
   for i := 0 to high(vars) do begin
@@ -1366,7 +1370,6 @@ begin
       tempContext.temporaryVariables.add(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
   end;}
   try
-    currentTuple := nil;
     evaluateForLoop(0,0);
     //setlength(tempContext.temporaryVariables.vars, oldlen);
 
@@ -1394,6 +1397,7 @@ begin
   finally
     if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables); //iff context.temporaryVariables = nil, we created the change log here
     FreeAndNil(sortingCache);
+    FreeAndNil(currentTuple);
   end;
 end;
 

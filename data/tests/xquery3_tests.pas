@@ -316,6 +316,9 @@ begin
   t('for $i in (3, 2, 1) where $i > 1 order by $i return $i', '2 3');
   t('for $i in (3, 2, 1) order by $i where $i > 1 return $i', '2 3');
   t('for $i in (5, 4, 3, 2, 1) where $i > 1 order by $i order by -$i where true() where $i < 4 return $i', '3 2');
+  t('for $i in (3, 2, 1) order by $i let $j := 7 order by $j return $i||$j', '17 27 37');
+  t('for $i in (3, 2, 1) order by $i for $j in (7, 8) order by $j return $i||$j', '17 27 37 18 28 38');
+  t('for $i in (3, 2, 1) order by $i for $j at $k in (7, 8) order by $j return $i||$j||$k', '171 271 371 182 282 382');
 
 
   //try/catch
