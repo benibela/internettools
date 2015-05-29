@@ -1325,9 +1325,8 @@ var
          for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(tempContext) do
            addPatternVariableBinding(tempv);
        xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(tempContext).toBoolean then begin
-         if currentTuple <> nil then FreeAndNil(currentTuple);
          evaluateForLoop(pos + 1, tuplepos);
-       end;
+       end else if currentTuple <> nil then FreeAndNil(currentTuple);
        xqtfcOrder: begin
          if currentTuple = nil then begin
            currentTuple := TOrderedTuple.Create;

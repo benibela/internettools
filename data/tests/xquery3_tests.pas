@@ -311,6 +311,12 @@ begin
   t('for $i allowing empty in () return "x"', 'x');
   t('for $i allowing empty at $p in (4,5,6) return $i || $p', '41 52 63');
   t('for $i allowing empty at $p in () return "x" || $p', 'x0');
+  t('for $i in (3, 2, 1) where $i > 1 where $i < 3 return $i', '2');
+  t('for $i at $j in (3, 2, 1) where $i > 1 where $j < 3 return $i', '3 2');
+  t('for $i in (3, 2, 1) where $i > 1 order by $i return $i', '2 3');
+  t('for $i in (3, 2, 1) order by $i where $i > 1 return $i', '2 3');
+  t('for $i in (5, 4, 3, 2, 1) where $i > 1 order by $i order by -$i where true() where $i < 4 return $i', '3 2');
+
 
   //try/catch
   m('try { "a" cast as xs:integer } catch * { 1 }', '1');

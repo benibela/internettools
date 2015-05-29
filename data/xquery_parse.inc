@@ -613,7 +613,8 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
 var
   token: String;
-
+  hadOrder: boolean;
+  hadWhere: Boolean;
   procedure parseOrderClauseAndNextToken;
   var
     clause: TXQTermFlowerOrder;
@@ -663,35 +664,39 @@ var
   end;
 begin
   result := TXQTermFlower.Create;
+  hadOrder := false;
+  hadWhere := false;
   try
-    parseVarBinding;
-
-    token := nextToken();
-
-    while (token = ',') or (token = 'for') or (token = 'let') do begin
-      if token <> ',' then begin
-        requireXQuery;
-        akind := token;;
+    token := akind;
+    while token <> 'return' do begin
+      case token of
+        'let', 'for': begin
+          if Length(Result.children) > 0 then requireXQuery();
+          akind := token;
+          parseVarBinding;
+          token := nextToken();
+          while token = ',' do begin
+            parseVarBinding;
+            token := nextToken();
+          end;
+        end;
+        'where': begin
+          if hadOrder or hadWhere then requireXQuery3()
+          else requireXQuery();
+          hadWhere := true;
+          result.push(TXQTermFlowerWhere.Create);
+          TXQTermFlowerWhere(result.children[high(result.children)]).test := parse;
+          token := nextToken();
+        end;
+        'stable', 'order': begin
+          if hadOrder then requireXQuery3()
+          else requireXQuery();
+          hadOrder := true;
+          parseOrderClauseAndNextToken;
+        end;
+        '': raiseSyntaxError('Expected return');
       end;
-      parseVarBinding;
-      token := nextToken();
     end;
-
-    if token <> 'return' then begin
-      requireXQuery;
-
-      if token = 'where' then begin
-        result.push(TXQTermFlowerWhere.Create);
-        TXQTermFlowerWhere(result.children[high(result.children)]).test := parse;
-        token := nextToken();
-      end;
-
-      if (token = 'stable') or (token = 'order') then
-        parseOrderClauseAndNextToken;
-
-      if token <> 'return' then raiseParsingError('XPST0003', 'Expected return');
-    end;
-
     result.push(parse);
   except
     on EXQParsingException do begin result.free; raise; end;

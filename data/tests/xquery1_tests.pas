@@ -1878,6 +1878,12 @@ begin
   f('typeswitch (123) case xs:string | xs:integer return "union" default return "flag"', 'err:XPST0003');
   f('try { "a" cast as xs:integer } catch * { 1 }', 'XPST0003');
 
+  f('for $i in (3, 2, 1) where $i > 1 where $i < 3 return $i', 'XPST0003');
+  f('for $i at $j in (3, 2, 1) where $i > 1 where $j < 3 return $i', 'XPST0003');
+  f('for $i in (3, 2, 1) order by $i where $i > 1 return $i', 'XPST0003');
+  f('for $i in (5, 4, 3, 2, 1) where $i > 1 order by $i order by -$i where true() where $i < 4 return $i', 'XPST0003');
+
+
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
