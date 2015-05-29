@@ -5,21 +5,28 @@ program tests;
 uses
   //bbheaptrc,
   heaptrc,
-  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests, extendedhtmlparser, sysutils, xquery1_tests
+  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests, extendedhtmlparser,  sysutils, xquery1_tests,
 
-  , xquery_utf8, internetaccess_tests, xpath3_tests, xquery3_tests, utf8tools, bigdecimal_tests, parsertests, simpleinternet_tests,
+  simplehtmltreeparser, xquery, xquery_utf8, internetaccess_tests, xpath3_tests, xquery3_tests, utf8tools, bigdecimal_tests, parsertests, simpleinternet_tests,
 commontestutils;
 
 var
   start: TDateTime;
   testerrors: boolean = false;
 begin
+  testerrors := true;
+  if testerrors then begin
+    try raise EXQEvaluationException.create('pxp:INTERNAL', 'These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EXQEvaluationException do ; end;
+    try raise EXQParsingException.create('pxp:INTERNAL', 'These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EXQParsingException do ; end;
+    //try raise EHTMLParseException.create('These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EHTMLParseException do ; end;
+    try raise EHTMLParseMatchingException.create('These tests test several error conditions. These exceptions should be disabled in the debugger.', nil); except on EHTMLParseMatchingException do ; end;
+    //try raise ETreeParseException.create('These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on ETreeParseException do ; end;
+  end;
 
   start := now;
  // bigdecimal_tests.unittests;
   bbutils_tests.unitTests;
   internetaccess_tests.unittests;
-  testerrors := true; //better disable since they drive the lazarus debugger mad
   parsertests.unittests(testerrors);
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);

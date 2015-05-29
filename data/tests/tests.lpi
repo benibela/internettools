@@ -80,6 +80,7 @@
       <Unit7>
         <Filename Value="xquery3_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="xquery3_tests"/>
       </Unit7>
       <Unit8>
         <Filename Value="bigdecimal_tests.pas"/>
