@@ -333,6 +333,11 @@ begin
   t('for $i in (3, 2, 1) count $c order by $i count $d for $j at $k in (4,5,6) count $e return join(($i,$c,$d,$j,$k,$e),"")', '131411 131522 131633 222414 222525 222636 313417 313528 313639');
   t('for $i in (3, 2, 1) count $c order by $i count $d for $j at $k in (4,5,6) count $e order by $k count $f return join(($i,$c,$d,$j,$k,$e,$f),"")', '1314111 2224142 3134173 1315224 2225255 3135286 1316337 2226368 3136399');
 
+  t('let <a>{$i}</a> := <a>X</a> count $c count $d return join(($i,$c,$d),"")', 'X11');
+  t('let <a>{$i}</a> := <a>X</a> count $c order by $i count $d return join(($i,$c,$d),"")', 'X11');
+  t('for <a>{$i}</a> in (<a>3</a>, <a>2</a>, <a>1</a>) count $c count $d return join(($i,$c,$d),"")', '311 222 133');
+  t('for <a>{$i}</a> in (<a>3</a>, <a>2</a>, <a>1</a>) count $c order by $i count $d return join(($i,$c,$d),"")', '131 222 313');
+
 
 
   //try/catch

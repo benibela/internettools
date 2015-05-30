@@ -1237,14 +1237,14 @@ var
         end;
     var
         patternClause: TXQTermFlowerLetPattern;
-        function hasStaticVariable(const name, url: string): boolean;
+        function hasStaticVariable(const name, url: string): integer;
         var
           i: Integer;
         begin
           for i := 0 to high(patternClause.pattern.vars) do //todo: optimize stringhash
             if (patternClause.pattern.vars[i].value = name)
-               and (patternClause.pattern.vars[i].namespaceURL = url) then exit(true);
-          result := false;
+               and (patternClause.pattern.vars[i].namespaceURL = url) then exit(i);
+          result := -1;
         end;
 
     var
@@ -1252,6 +1252,7 @@ var
         i: Integer;
         log: TXQVariableChangeLog;
         hasContextItem: Boolean;
+        varIndex: integer;
         value: TXQValue;
     begin
       patternClause := TXQTermFlowerLetPattern(children[pos]);
@@ -1282,14 +1283,20 @@ var
               replaceContextItem(value);
             end;
             for i := 0 to high(patternClause.pattern.vars) do
-              if log.hasVariable(patternClause.pattern.vars[i], @value) then
-                tempContext.temporaryVariables.add(patternClause.pattern.vars[i], value)
-               else
+              if log.hasVariable(patternClause.pattern.vars[i], @value) then begin
+                tempContext.temporaryVariables.add(patternClause.pattern.vars[i], value);
+                if needFullTuple then currentTuple.vars[clauseIndex[pos]+i] := value;
+              end else begin
                 tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
+                if needFullTuple then currentTuple.vars[clauseIndex[pos]+i] := xqvalue();
+              end;
             evaluateForLoop(pos+1);
           end else begin // for
             for i := 0 to high(patternClause.pattern.vars) do
               tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
+            if needFullTuple then
+              for i := 0 to high(patternClause.pattern.vars) do
+                currentTuple.vars[clauseIndex[pos]+i] := xqvalue();
 
             for i := 0 to log.count - 1 do begin
               if log.getName(i) = '$' then begin
@@ -1299,9 +1306,12 @@ var
                   replaceContextItem(xqvalue());
                 end;
               end else begin
-                if hasStaticVariable(log.getName(i), log.vars[i].namespaceURL) then begin
+                varIndex := hasStaticVariable(log.getName(i), log.vars[i].namespaceURL);
+                if varIndex > -1 then begin
                   tempContext.temporaryVariables.pushAll;
                   tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
+                  if needFullTuple then
+                    currentTuple.vars[clauseIndex[pos]+varIndex] := log.get(i);
                   evaluateForLoop(pos+1);
                   tempContext.temporaryVariables.popAll();
                 end;
