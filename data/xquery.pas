@@ -1569,7 +1569,7 @@ type
   end;
 
   { TXQTermFlower }
-  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount);
+  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount);
   TXQTermFlowerSubClause = class(TXQTerm)
     class function kind: TXQTermFlowerSubClauseKind; virtual;
 
@@ -1589,6 +1589,18 @@ type
   TXQTermFlowerFor = class(TXQTermFlowerLet)
     allowingEmpty: boolean;
     positionVar: TXQTermVariable;
+    class function kind: TXQTermFlowerSubClauseKind; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
+  end;
+  TXQTermFlowerWindowVarsAndCondition = record
+    currentItem, positionVar, previousItem, nextItem: TXQTermVariable;
+    expr: TXQTerm;
+  end;
+  TXQTermFlowerWindowFlags = set of (xqtfwSliding {default tumbling}, xqtfwEndConditionAbsent, xqtfwEndOnlyWhen);
+  TXQTermFlowerWindow = class(TXQTermFlowerLet)
+    flags: TXQTermFlowerWindowFlags;
+    startCondition, endCondition: TXQTermFlowerWindowVarsAndCondition;
     class function kind: TXQTermFlowerSubClauseKind; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
@@ -2555,6 +2567,21 @@ var
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+class function TXQTermFlowerWindow.kind: TXQTermFlowerSubClauseKind;
+begin
+  Result:=inherited kind;
+end;
+
+function TXQTermFlowerWindow.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+end;
+
+destructor TXQTermFlowerWindow.destroy;
+begin
+  inherited destroy;
+end;
 
 
 

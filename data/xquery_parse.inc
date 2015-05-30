@@ -540,79 +540,83 @@ end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
-  procedure parseVarBinding;
+var token: String;
+  procedure parseInitialClauseAndNextToken;
   var temp: string;
     clause: TXQTermFlowerLet;
     patternclause: TXQTermFlowerLetPattern;
+    isfor: boolean;
   begin
-    case akind of
-      'let': if (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
-      'for': ;
-      else raiseParsingError('XPST0003', 'Invalid flower: '+akind);
+    case token of
+      'let': begin
+         isfor:=false;
+         if (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
+      end;
+      'for': isfor:=true;
+      else raiseParsingError('XPST0003', 'Invalid flower: '+token);
     end;
     skipWhitespaceAndComment();
-    if pos^ <> '<' then begin
-      case akind of
-        'let': result.push(TXQTermFlowerLet.Create);
-        'for': result.push(TXQTermFlowerFor.Create);
-      end;
-      clause := TXQTermFlowerLet(result.children[high(result.children)]);
-      with clause do begin
-        loopvar := parseVariable;
+    repeat
+      if pos^ <> '<' then begin
+        if isfor then result.push(TXQTermFlowerFor.Create)
+        else result.push(TXQTermFlowerLet.Create);
+        clause := TXQTermFlowerLet(result.children[high(result.children)]);
+        with clause do begin
+          loopvar := parseVariable;
 
-        temp := nextToken;
-        if temp = 'as' then begin
-          requireXQuery;
-          sequenceTyp := parseSequenceType([]);
           temp := nextToken;
-        end else sequenceTyp := nil;
-
-        if kind = xqtfcFor then begin
-
-          if temp = 'allowing' then begin
-            requireXQuery3;
-            expect('empty');
-            TXQTermFlowerFor(clause).allowingEmpty := true;
-            temp := nextToken;
-          end;
-
-          if temp = 'at' then begin
+          if temp = 'as' then begin
             requireXQuery;
-            TXQTermFlowerFor(clause).positionvar := parseVariable;
+            sequenceTyp := parseSequenceType([]);
             temp := nextToken;
-          end;
+          end else sequenceTyp := nil;
 
-          if temp <> 'in' then raiseSyntaxError('Expected "in".')
-        end else
-          if temp <> ':=' then raiseSyntaxError('Expected ":=".');
+          if kind = xqtfcFor then begin
 
-        expr := parse();
-      end;
-    end else begin
-      case akind of
-        'let': patternclause := TXQTermFlowerLetPattern.Create;
-        'for': patternclause := TXQTermFlowerForPattern.Create;
-      end;
-      result.push(patternclause);
-      with patternclause do begin
-        patternclause.pattern := parsePatternMatcher;
-        temp := nextToken;
-        if temp = 'as' then begin
-          requireXQuery;
-          sequenceTyp := parseSequenceType([]);
-          temp := nextToken;
-        end else sequenceTyp := nil;
-        case kind of
-          xqtfcLetPattern: if temp <> ':=' then raiseSyntaxError('Expected ":=".');
-          xqtfcForPattern: if temp <> 'in' then raiseSyntaxError('Expected "in".');
+            if temp = 'allowing' then begin
+              requireXQuery3;
+              expect('empty');
+              TXQTermFlowerFor(clause).allowingEmpty := true;
+              temp := nextToken;
+            end;
+
+            if temp = 'at' then begin
+              requireXQuery;
+              TXQTermFlowerFor(clause).positionvar := parseVariable;
+              temp := nextToken;
+            end;
+
+            if temp <> 'in' then raiseSyntaxError('Expected "in".')
+          end else
+            if temp <> ':=' then raiseSyntaxError('Expected ":=".');
+
+          expr := parse();
         end;
-        expr := parse();
+      end else begin
+        if isfor then patternclause := TXQTermFlowerForPattern.Create
+        else patternclause := TXQTermFlowerLetPattern.Create;
+        result.push(patternclause);
+        with patternclause do begin
+          patternclause.pattern := parsePatternMatcher;
+          temp := nextToken;
+          if temp = 'as' then begin
+            requireXQuery;
+            sequenceTyp := parseSequenceType([]);
+            temp := nextToken;
+          end else sequenceTyp := nil;
+          case kind of
+            xqtfcLetPattern: if temp <> ':=' then raiseSyntaxError('Expected ":=".');
+            xqtfcForPattern: if temp <> 'in' then raiseSyntaxError('Expected "in".');
+          end;
+          expr := parse();
+        end;
       end;
-    end;
+      token := nextToken();
+      skipWhitespaceAndComment();
+    until token <> ',';
   end;
 
 var
-  token: String;
   hadOrder: boolean;
   hadWhere: Boolean;
   procedure parseOrderClauseAndNextToken;
@@ -672,13 +676,7 @@ begin
       case token of
         'let', 'for': begin
           if Length(Result.children) > 0 then requireXQuery();
-          akind := token;
-          parseVarBinding;
-          token := nextToken();
-          while token = ',' do begin
-            parseVarBinding;
-            token := nextToken();
-          end;
+          parseInitialClauseAndNextToken;
         end;
         'where': begin
           if hadOrder or hadWhere then requireXQuery3()
