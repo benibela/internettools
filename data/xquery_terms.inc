@@ -1092,13 +1092,34 @@ begin
   inherited destroy;
 end;
 
+class function TXQTermFlowerCount.kind: TXQTermFlowerSubClauseKind;
+begin
+  Result:=xqtfcCount;
+end;
+
+function TXQTermFlowerCount.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermFlowerCount(result).countvar := TXQTermVariable(countvar.clone);
+
+end;
+
+destructor TXQTermFlowerCount.destroy;
+begin
+  countvar.free;
+  inherited destroy;
+end;
+
+
 
 type TOrderedTuple = class
   orders: array of IXQValue;
+  vars: array of IXQValue;
   result: IXQValue;
 end;
   TFlowerSortingData = record
     //flower: TXQTermFlower;
+    minOrderIndex, maxOrderIndex: integer;
     orders: array of TXQTermFlowerOrder;
     collations: array of TXQCollation;
     context: ^TXQEvaluationContext;
@@ -1145,7 +1166,7 @@ begin
 
   result := 0;
 
-  for i := high(orders) downto 0 do begin
+  for i := meta^.maxOrderIndex downto meta^.minOrderIndex do begin
     order := orders[i];
     emptyLeast := (order.emptyOrder = xqeoEmptyLeast) or ((order.emptyOrder = xqeoStatic) and (meta^.context^.staticContext.emptyOrderSpec = xqeoEmptyLeast));
     if isGreaterThan(a.orders[i], b.orders[i], emptyLeast, meta^.collations[i]) then result := 1
@@ -1162,12 +1183,18 @@ var
   finalResult: IXQValue;
   currentTuple: TOrderedTuple;
   orders: array of TXQTermFlowerOrder;
+  variables: array of TXQTermVariable;
+  counts: array of integer;
+  needFullTuple: Boolean;
 
-  procedure evaluateForLoop(const pos, tuplepos: Integer);
+  interruptionPos, interruptionVarTuplePos, interruptionTuplePos, interruptionCountPos: integer;
+
+  procedure evaluateForLoop(const pos, vartuplepos, tuplepos, countpos: Integer);
   var clausekind: TXQTermFlowerSubClauseKind;
     procedure addVariableBinding(v: IXQValue; index: integer = 1);
     var
       letclause: TXQTermFlowerLet;
+      vtp: Integer;
     begin
       letclause := TXQTermFlowerLet(children[pos]);
       if (letclause.sequenceTyp <> nil) and not (letclause.sequenceTyp.instanceOf(v, context)) then
@@ -1175,9 +1202,19 @@ var
 
       tempContext.temporaryVariables.pushAll;
       tempContext.temporaryVariables.add(letclause.loopvar, v);
-      if (clausekind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then
+      vtp := vartuplepos;
+      if needFullTuple then begin
+        currentTuple.vars[vartuplepos] := v;
+        inc(vtp);
+      end;
+      if (clausekind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then begin
         tempContext.temporaryVariables.add(TXQTermFlowerFor(letclause).positionVar, xqvalue(index));
-      evaluateForLoop(pos+1, tuplepos);
+        if needFullTuple then begin
+          currentTuple.vars[vtp] := tempContext.temporaryVariables.vars[high(tempContext.temporaryVariables.vars)].value;
+          inc(vtp);
+        end;
+      end;
+      evaluateForLoop(pos+1, vtp, tuplepos, countpos);
       tempContext.temporaryVariables.popAll();
     end;
 
@@ -1255,7 +1292,7 @@ var
                 tempContext.temporaryVariables.add(patternClause.pattern.vars[i], value)
                else
                 tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
-            evaluateForLoop(pos+1, tuplepos);
+            evaluateForLoop(pos+1, vartuplepos, tuplepos, countpos);
           end else begin // for
             for i := 0 to high(patternClause.pattern.vars) do
               tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
@@ -1264,14 +1301,14 @@ var
               if log.getName(i) = '$' then begin
                 if hasContextItem then begin
                   replaceContextItem(log[i]);
-                  evaluateForLoop(pos+1, tuplepos);
+                  evaluateForLoop(pos+1, vartuplepos, tuplepos, countpos);
                   replaceContextItem(xqvalue());
                 end;
               end else begin
                 if hasStaticVariable(log.getName(i), log.vars[i].namespaceURL) then begin
                   tempContext.temporaryVariables.pushAll;
                   tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
-                  evaluateForLoop(pos+1, tuplepos);
+                  evaluateForLoop(pos+1, vartuplepos, tuplepos, countpos);
                   tempContext.temporaryVariables.popAll();
                 end;
               end;
@@ -1328,10 +1365,29 @@ var
          for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(tempContext) do
            addPatternVariableBinding(tempv);
        xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(tempContext).toBoolean then
-         evaluateForLoop(pos + 1, tuplepos);
+         evaluateForLoop(pos + 1, vartuplepos, tuplepos, countpos);
        xqtfcOrder: begin
          currentTuple.orders[tuplepos] := TXQTermFlowerOrder(clause).expr.evaluate(tempContext);
-         evaluateForLoop(pos + 1, tuplepos + 1);
+         evaluateForLoop(pos + 1, vartuplepos, tuplepos + 1, countpos);
+       end;
+       xqtfcCount: if needFullTuple then begin
+         interruptionPos := pos;
+         interruptionVarTuplePos := vartuplepos;
+         interruptionCountPos := countpos;
+         interruptionTuplePos := tuplepos;
+
+         newTuple := TOrderedTuple.Create;
+         newTuple.orders := currentTuple.orders;
+         SetLength(newTuple.orders, length(newTuple.orders));
+         newTuple.vars := currentTuple.vars;
+         SetLength(newTuple.vars, length(newTuple.vars));
+         sortingCache.Add(newTuple);
+       end else begin
+         counts[countpos] += 1;
+         tempContext.temporaryVariables.pushAll;
+         tempContext.temporaryVariables.add(TXQTermFlowerCount(clause).countvar, xqvalue(counts[countpos]));
+         evaluateForLoop(pos + 1, vartuplepos, tuplepos, countpos + 1);
+         tempContext.temporaryVariables.popAll();
        end;
      end;
 
@@ -1339,6 +1395,14 @@ var
    end;
 var i: Integer;
     sortingData: TFlowerSortingData;
+    orderCount: Integer;
+    varCount: Integer;
+    countCount: Integer;
+    j: Integer;
+    oldSortingCache: TFPList;
+    oldInterruptionPos: Integer;
+    oldInterruptionTuplePos: Integer;
+    oldInterruptionVarTuplePos: Integer;
 begin
   tempContext:=context;
   if context.temporaryVariables=nil then begin
@@ -1348,20 +1412,89 @@ begin
   //oldVarCount := tempContext.temporaryVariables.count;
 
   finalResult := nil;
-  setlength(orders, 0);
+  oldSortingCache := nil;
+  orderCount := 0;
+  varCount := 0;
+  countCount := 0;
+  needFullTuple := false;
   for i := 0 to high(children) - 1 do
-    if TXQTermFlowerSubClause(children[i]).kind = xqtfcOrder then begin
-      SetLength(orders, length(orders) + 1);
-      orders[high(orders)] := TXQTermFlowerOrder(children[i]);
+    case TXQTermFlowerSubClause(children[i]).kind of
+      xqtfcLet: inc(varCount);
+      xqtfcFor: begin
+        inc(varCount);
+        if assigned(TXQTermFlowerFor(children[i]).positionVar) then inc(varCount);
+      end;
+      xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
+        inc(varCount, length(vars));
+        if hasDefaultVariable then inc(varCount);
+      end;
+      xqtfcWhere: ;
+      xqtfcOrder: inc(orderCount);
+      xqtfcCount: begin
+        if orderCount > 0 then needFullTuple := true;
+        inc(varCount);
+        inc(countCount);
+      end;
     end;
-  if length(orders) = 0 then begin
-    sortingCache := nil;
-    currentTuple := nil;
-  end else begin
+
+  currentTuple := nil;
+  if orderCount > 0 then begin
+    SetLength(orders, orderCount);
+    orderCount := 0;
+    for i := 0 to high(children) - 1 do
+      case TXQTermFlowerSubClause(children[i]).kind of
+        xqtfcOrder: begin
+          orders[orderCount] := TXQTermFlowerOrder(children[i]);
+          inc(orderCount);
+        end;
+      end;
+    sortingData.orders := orders;
+    sortingData.context:=@tempContext;
+    sortingData.minOrderIndex:=0;
+    sortingData.maxOrderIndex:=-1;
+    setlength(sortingData.collations, length(orders));
+    for i := 0 to high(orders) do
+      if orders[i].collation = '' then sortingData.collations[i] := nil
+      else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation, context.staticContext.baseURI);
+
     sortingCache := tfplist.Create;
     currentTuple := TOrderedTuple.Create;
-    SetLength(currentTuple.orders, length(orders));
-  end;
+    SetLength(currentTuple.orders, orderCount);
+  end else sortingCache := nil;
+  if needFullTuple then begin
+    SetLength(variables, varCount);
+    varCount := 0;
+    for i := 0 to high(children) - 1 do
+      case TXQTermFlowerSubClause(children[i]).kind of
+        xqtfcLet: begin
+          variables[varCount] := TXQTermFlowerLet(children[i]).loopvar;
+          inc(varCount);
+        end;
+        xqtfcFor: begin
+          variables[varCount] := TXQTermFlowerLet(children[i]).loopvar;
+          inc(varCount);
+          if assigned(TXQTermFlowerFor(children[i]).positionVar) then begin
+            variables[varCount] := TXQTermFlowerFor(children[i]).positionVar;
+            inc(varCount);
+          end;
+        end;
+        xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
+          if hasDefaultVariable then raiseEvaluationError('XQTS0003', 'Too complex flowr expression for pattern changing .');
+          for j := 0 to high(vars) do
+            variables[varCount + j] := vars[j];
+          inc(varCount, length(vars));
+        end;
+        //xqtfcWhere: ;
+        //xqtfcOrder: inc(orderCount);
+        xqtfcCount: begin
+          variables[varCount] := TXQTermFlowerCount(children[i]).countvar;
+          inc(varCount);
+        end;
+      end;
+    if currentTuple = nil then currentTuple := TOrderedTuple.Create;
+    SetLength(currentTuple.vars, varCount);
+  end else SetLength(counts, countCount);
+
 
   {oldlen := length(tempContext.temporaryVariables.vars);
   for i := 0 to high(vars) do begin
@@ -1370,26 +1503,53 @@ begin
       tempContext.temporaryVariables.add(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
   end;}
   try
-    evaluateForLoop(0,0);
-    //setlength(tempContext.temporaryVariables.vars, oldlen);
-
-    if sortingCache <> nil then begin
-      if sortingCache.Count > 0 then begin
-        //sortingData.flower:=self;
-        sortingData.orders := orders;
-        sortingData.context:=@tempContext;
-        setlength(sortingData.collations, length(orders));
-        for i := 0 to high(orders) do
-          if orders[i].collation = '' then sortingData.collations[i] := nil
-          else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation, context.staticContext.baseURI);
-        stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
-        for i := 0 to sortingCache.Count - 1 do begin
-          xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
-          TOrderedTuple(sortingCache[i]).Free;
+    interruptionPos := high(children);
+    interruptionTuplePos := length(orders);
+    evaluateForLoop(0,0,0,0);
+    if (interruptionTuplePos - 1 > sortingData.maxOrderIndex) and (sortingCache.Count > 0) then begin
+      sortingData.minOrderIndex := sortingData.maxOrderIndex + 1;
+      sortingData.maxOrderIndex := interruptionTuplePos - 1;
+      stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
+    end;
+    while interruptionPos < high(children) do begin
+      case TXQTermFlowerSubClause(children[interruptionPos]).kind of
+        xqtfcCount: begin
+          for i := 0 to sortingCache.Count-1 do
+            TOrderedTuple(sortingCache[i]).vars[interruptionVarTuplePos] := xqvalue(i+1);
+          inc(interruptionCountPos);
+          inc(interruptionVarTuplePos);
         end;
       end;
-      FreeAndNil(sortingCache);
+    //setlength(tempContext.temporaryVariables.vars, oldlen);
+      inc(interruptionPos);
+      oldSortingCache := sortingCache;
+      sortingCache := TFPList.Create;
+      oldInterruptionPos := interruptionPos;
+      oldInterruptionTuplePos := interruptionTuplePos;
+      oldInterruptionVarTuplePos := interruptionVarTuplePos;
+      interruptionPos := high(children);
+      interruptionTuplePos := length(orders);
+      for i := 0 to oldSortingCache.Count-1 do begin
+        tempContext.temporaryVariables.pushAll;
+        currentTuple.free;
+        currentTuple := TOrderedTuple(oldSortingCache[i]);
+        for j := 0 to oldInterruptionVarTuplePos - 1 do
+          tempContext.temporaryVariables.add(variables[j], currentTuple.vars[j]);
+        evaluateForLoop(oldInterruptionPos,oldInterruptionVarTuplePos, oldInterruptionTuplePos, interruptionCountPos);
+        tempContext.temporaryVariables.popAll();
+      end;
+      oldSortingCache.free;
+      if (interruptionTuplePos - 1 > sortingData.maxOrderIndex) and (sortingCache.Count > 0) then begin
+        sortingData.minOrderIndex := sortingData.maxOrderIndex + 1;
+        sortingData.maxOrderIndex := interruptionTuplePos - 1;
+        stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
+      end;
     end;
+    if sortingCache <> nil then
+      for i := 0 to sortingCache.Count - 1 do begin
+        xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
+        TOrderedTuple(sortingCache[i]).Free;
+      end;
 
     if finalResult = nil then result := xqvalue()
     else result := finalResult;
@@ -1445,6 +1605,10 @@ begin
         result := visitor.simpleTermVisit(@TXQTermFlowerOrder(clause).expr, self);
         case result of xqtvaAbort: exit; end;
       end;
+      xqtfcCount: begin
+        visitor.parent := self;
+        visitor.declare(@TXQTermFlowerCount(clause).countvar);
+      end;
     end;
   end;
   result := visitor.simpleTermVisit(@children[high(children)],self);
@@ -1464,6 +1628,10 @@ begin
         with TXQTermFlowerLetPattern(clause) do
           for j := high(pattern.vars) downto 0 do
             visitor.undeclare(@pattern.vars[j]);
+      xqtfcCount: begin
+        visitor.parent := self;
+        visitor.undeclare(@TXQTermFlowerCount(clause).countvar);
+      end;
     end;
   end;
 end;

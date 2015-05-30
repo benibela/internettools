@@ -1569,7 +1569,7 @@ type
   end;
 
   { TXQTermFlower }
-  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder);
+  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount);
   TXQTermFlowerSubClause = class(TXQTerm)
     class function kind: TXQTermFlowerSubClauseKind; virtual;
 
@@ -1621,6 +1621,13 @@ type
     collation: string;
     class function kind: TXQTermFlowerSubClauseKind; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
+  end;
+  TXQTermFlowerCount = class(TXQTermFlowerSubClause)
+    countvar: TXQTermVariable;
+
+    class function kind: TXQTermFlowerSubClauseKind; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
   end;

@@ -320,6 +320,20 @@ begin
   t('for $i in (3, 2, 1) order by $i for $j in (7, 8) order by $j return $i||$j', '17 27 37 18 28 38');
   t('for $i in (3, 2, 1) order by $i for $j at $k in (7, 8) order by $j return $i||$j||$k', '171 271 371 182 282 382');
 
+  t('for $i in (3, 2, 1) count $c return $i||$c', '31 22 13');
+  t('for $i in (3, 2, 1) count $c count $d return $i||$c||$d', '311 222 133');
+  t('for $i in (3, 2, 1) count $c where $i != 2 count $d return $i||$c||$d', '311 132');
+  t('for $i in (3, 2, 1) count $c where $i != 2 count $d order by $i return $i||$c||$d', '132 311');
+  t('for $i in (3, 2, 1) order by $i count $c return $i||$c', '11 22 33');
+  t('for $i in 1 to 5 count $c order by -$i count $d return x"{$i}{$c}{$d}"', '551 442 333 224 115');
+  t('for $i in 1 to 5 count $c order by -$i count $d order by $i count $e where $i mod 2 = 0 count $f return x"{$i}{$c}{$d}{$e}{$f}"', '22421 44242');
+  t('for $i in (3, 2, 1) count $c order by $i count $d let $j := 4 return $i||$c||$d||$j', '1314 2224 3134');
+  t('for $i in (3, 2, 1) count $c order by $i count $d for $j in (4,5,6) return $i||$c||$d||$j', '1314 1315 1316 2224 2225 2226 3134 3135 3136');
+  t('for $i in (3, 2, 1) count $c order by $i count $d let $j := 4 count $e return join(($i,$c,$d,$j,$e),"")', '13141 22242 31343');
+  t('for $i in (3, 2, 1) count $c order by $i count $d for $j at $k in (4,5,6) count $e return join(($i,$c,$d,$j,$k,$e),"")', '131411 131522 131633 222414 222525 222636 313417 313528 313639');
+  t('for $i in (3, 2, 1) count $c order by $i count $d for $j at $k in (4,5,6) count $e order by $k count $f return join(($i,$c,$d,$j,$k,$e,$f),"")', '1314111 2224142 3134173 1315224 2225255 3135286 1316337 2226368 3136399');
+
+
 
   //try/catch
   m('try { "a" cast as xs:integer } catch * { 1 }', '1');

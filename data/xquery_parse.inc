@@ -694,6 +694,13 @@ begin
           hadOrder := true;
           parseOrderClauseAndNextToken;
         end;
+        'count': begin
+          requireXQuery3();
+          result.push(TXQTermFlowerCount.Create);
+          TXQTermFlowerCount(result.children[high(result.children)]).countvar := parseVariable;
+
+          token := nextToken();
+        end;
         '': raiseSyntaxError('Expected return');
       end;
     end;
@@ -2000,7 +2007,7 @@ begin
     while true do begin
       word := nextToken(true);
       case word of
-        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default':
+        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default', 'count':
           exit(astroot);
         '[': begin
           expect('[');

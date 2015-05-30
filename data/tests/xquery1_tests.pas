@@ -1882,6 +1882,7 @@ begin
   f('for $i at $j in (3, 2, 1) where $i > 1 where $j < 3 return $i', 'XPST0003');
   f('for $i in (3, 2, 1) order by $i where $i > 1 return $i', 'XPST0003');
   f('for $i in (5, 4, 3, 2, 1) where $i > 1 order by $i order by -$i where true() where $i < 4 return $i', 'XPST0003');
+  f('for $i in (1,2) count $i return $i', 'XPST0003');
 
 
   //interface tests
