@@ -948,7 +948,7 @@ end;
 function TXQTermFlowerSubClause.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   ignore(visitor);
-  raiseEvaluationError('pxp:INTERNAL', 'A flower subclause cannot be visited');
+  raiseEvaluationError('pxp:INTERNAL', 'An abstract flower subclause cannot be visited');
   Result:=xqtvaAbort;
 end;
 
@@ -985,6 +985,18 @@ begin
   inherited destroy;
 end;
 
+function TXQTermFlowerLet.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  result := visitor.simpleTermVisit(@expr, self);
+  case result of xqtvaAbort: exit; end;
+  visitor.declare(@loopvar);
+end;
+
+procedure TXQTermFlowerLet.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
+begin
+  visitor.undeclare(@loopvar);
+end;
+
 { TXQTermFlowerFor }
 
 class function TXQTermFlowerFor.kind: TXQTermFlowerSubClauseKind;
@@ -1002,6 +1014,143 @@ destructor TXQTermFlowerFor.destroy;
 begin
   positionVar.Free;
   inherited destroy;
+end;
+
+function TXQTermFlowerFor.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  Result:=inherited visitchildren(visitor);
+  if (positionVar <> nil) then
+   visitor.declare(@positionVar);
+end;
+
+procedure TXQTermFlowerFor.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
+begin
+  if (positionVar <> nil) then
+   visitor.undeclare(@positionVar);
+  inherited visitchildrenToUndeclare(visitor);
+end;
+
+procedure TXQTermFlowerWindowVarsAndCondition.assign(const other: TXQTermFlowerWindowVarsAndCondition);
+begin
+  if assigned(other.when) then begin
+    when := other.when.clone;
+    if Assigned(other.currentItem) then currentItem := TXQTermVariable(other.currentItem.clone);
+    if Assigned(other.positionVar) then positionVar := TXQTermVariable(other.positionVar.clone);
+    if Assigned(other.previousItem) then previousItem := TXQTermVariable(other.previousItem.clone);
+    if Assigned(other.nextItem) then nextItem := TXQTermVariable(other.nextItem.clone);
+  end;
+end;
+
+function TXQTermFlowerWindowVarsAndCondition.visitchildren(visitor: TXQTerm_Visitor; parent: txqterm): TXQTerm_VisitAction;
+begin
+  if assigned(when) then begin
+    visitor.parent := parent;
+    if Assigned(currentItem) then visitor.declare(@currentItem);
+    if Assigned(positionVar) then visitor.declare(@positionVar);
+    if Assigned(previousItem) then visitor.declare(@previousItem);
+    if Assigned(nextItem) then visitor.declare(@nextItem);
+    result := visitor.simpleTermVisit(@when, parent);
+  end;
+end;
+
+procedure TXQTermFlowerWindowVarsAndCondition.visitchildrenToUndeclare(visitor: TXQTerm_Visitor; parent: txqterm);
+begin
+  if assigned(when) then begin
+    visitor.parent := parent;
+    if Assigned(nextItem) then visitor.declare(@nextItem);
+    if Assigned(previousItem) then visitor.declare(@previousItem);
+    if Assigned(positionVar) then visitor.declare(@positionVar);
+    if Assigned(currentItem) then visitor.declare(@currentItem);
+  end;
+end;
+
+procedure TXQTermFlowerWindowVarsAndCondition.freeAll;
+begin
+  when.free;
+  currentItem.Free;
+  positionVar.Free;
+  previousItem.Free;
+  nextItem.Free;
+end;
+
+class function TXQTermFlowerWindow.kind: TXQTermFlowerSubClauseKind;
+begin
+  Result:=xqtfcWindow;
+end;
+
+function TXQTermFlowerWindow.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermFlowerWindow(result).flags := flags;
+  TXQTermFlowerWindow(result).startCondition.assign(startCondition);
+  TXQTermFlowerWindow(result).endCondition.assign(endCondition);
+end;
+
+destructor TXQTermFlowerWindow.destroy;
+begin
+  startCondition.freeAll;
+  endCondition.freeAll;
+  inherited destroy;
+end;
+
+function TXQTermFlowerWindow.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  result := visitor.simpleTermVisit(@expr, self);
+  case result of xqtvaAbort: exit; end;
+
+  startCondition.visitchildren(visitor, self);
+  endCondition.visitchildren(visitor, self);
+
+  visitor.declare(@loopvar);
+end;
+
+procedure TXQTermFlowerWindow.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
+begin
+  endCondition.visitchildrenToUndeclare(visitor, self);
+  startCondition.visitchildrenToUndeclare(visitor, self);
+
+  visitor.undeclare(@loopvar);
+end;
+
+type TXQTerm_VisitorFindDuplicatedVariable = class(TXQTerm_VisitorTrackKnownVariables)
+  duplicate: TXQTermVariable;
+  procedure declare(v: PXQTermVariable); override;
+end;
+
+procedure TXQTerm_VisitorFindDuplicatedVariable.declare(v: PXQTermVariable);
+begin
+  if overridenVariables.hasVariable(v^) then duplicate := v^;
+  inherited declare(v);
+end;
+
+function TXQTermFlowerWindow.findDuplicatedVariable: TXQTermVariable;
+var
+  temp: TXQTerm_VisitorFindDuplicatedVariable;
+begin
+  temp := TXQTerm_VisitorFindDuplicatedVariable.create;
+  temp.simpleTermVisit(@self, nil);
+  result := temp.duplicate;
+  temp.free;
+end;
+
+type TXQTerm_VisitorCountVariables = class(TXQTerm_Visitor)
+  count: integer;
+  procedure declare(v: PXQTermVariable); override;
+end;
+
+procedure TXQTerm_VisitorCountVariables.declare(v: PXQTermVariable);
+begin
+  inc(count);
+end;
+
+function TXQTermFlowerWindow.variableCount: integer;
+var
+  temp: TXQTerm_VisitorCountVariables;
+begin
+  temp := TXQTerm_VisitorCountVariables.create;
+  temp.simpleTermVisit(@self, nil);
+  result := temp.count;
+  temp.free;
 end;
 
 { TXQTermFlowerLetPattern }
@@ -1212,6 +1361,96 @@ var
       tempContext.temporaryVariables.popAll();
     end;
 
+    procedure addWindowVariableBinding();
+    var
+      variableIndex: integer;
+      procedure addVar(const v: TXQTermVariable; const value: IXQValue);
+      begin
+        tempContext.temporaryVariables.add(v, value);
+        if needFullTuple and (variableIndex <> -1) then begin
+         currentTuple.vars[variableIndex] := value;
+         inc(variableIndex);
+        end;
+      end;
+
+    var
+      binding: IXQValue;
+      function subsequence(const from, toi: integer): IXQValue;
+      var
+        seq: TXQValueSequence;
+        i: Integer;
+      begin
+        if from = toi then exit(binding.get(from));
+        seq := TXQValueSequence.create(toi-from+1);
+        for i := from to toi do
+          seq.seq.add(binding.get(i));
+        result := seq;
+      end;
+
+      function checkCondition(at: integer; const condition: TXQTermFlowerWindowVarsAndCondition; forceTrue: boolean = false): boolean;
+      var
+        oldIndex: Integer;
+      begin
+        oldIndex := variableIndex;
+        tempContext.temporaryVariables.pushAll;
+        with condition do begin
+          if Assigned(currentItem) then addVar(currentItem, binding.get(at));
+          if Assigned(positionVar) then addVar(positionVar, xqvalue(at));
+          if Assigned(previousItem) then addVar(previousItem, binding.get(at-1));
+          if Assigned(nextItem) then addVar(nextItem, binding.get(at+1));
+          result := forceTrue or when.evaluate(tempContext).toBooleanEffective;
+        end;
+        if not result then begin
+          tempContext.temporaryVariables.popAll();
+          variableIndex := oldIndex;
+        end;
+      end;
+
+    var
+      window: TXQTermFlowerWindow;
+      length: Integer;
+      tempIndex: Integer;
+      start, endi: Integer;
+    begin
+      window := TXQTermFlowerWindow(children[pos]);
+      binding := window.expr.evaluate(tempContext);
+      start := 1;
+      endi := -1;
+      length := binding.getSequenceCount;
+      if needFullTuple then
+        variableIndex := clauseIndex[pos];
+
+      while start <= length do begin
+        if checkCondition(start, window.startCondition, (not Assigned(window.endCondition.when)) and (start = endi + 1) and (start < length)  ) then begin
+           endi := start;
+           if Assigned(window.endCondition.when) then begin
+             while (endi < length) and not checkCondition(endi, window.endCondition) do inc(endi);
+             if endi = length then if not checkCondition(endi, window.endCondition, not (xqtfwEndOnlyWhen in window.flags) ) then
+               inc(endi);
+           end else begin
+             inc(endi);
+             tempIndex := variableIndex;
+             variableIndex := -1;
+             while (endi < length) and not checkCondition(endi, window.startCondition)  do inc(endi);
+             if endi = length then if not checkCondition(endi, window.startCondition ) then
+               inc(endi);
+             dec(endi); //it was next start, not end
+             variableIndex := tempIndex;
+           end;
+           if endi <= length then begin
+             addVar(window.loopvar, subsequence(start, endi));
+             evaluateForLoop(pos+1);
+           end;
+           tempContext.temporaryVariables.popAll();
+           if Assigned(window.endCondition.when) then
+             tempContext.temporaryVariables.popAll();
+           if xqtfwSliding in window.flags then inc(start)
+           else start := endi + 1;
+           if needFullTuple then variableIndex := clauseIndex[pos];
+        end else inc(start);
+      end;
+    end;
+
     procedure addPatternVariableBinding(node: IXQValue);
     var oldContextItem: IXQValue;
         oldSeqIndex: Integer;
@@ -1364,6 +1603,7 @@ var
            end;
          end;
        end;
+       xqtfcWindow: addWindowVariableBinding();
        xqtfcLetPattern: addPatternVariableBinding(TXQTermFlowerLetPattern(clause).expr.evaluate(tempContext));
        xqtfcForPattern:
          for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(tempContext) do
@@ -1408,6 +1648,22 @@ var i: Integer;
     variables[varCount] := v;
     inc(varCount);
   end;
+  procedure initialAddWindowVariables(w: TXQTermFlowerWindow);
+    procedure addCondition(const condition: TXQTermFlowerWindowVarsAndCondition);
+    begin
+      with condition do begin
+        if not Assigned(when) then exit;
+        if Assigned(currentItem) then initialAddVariable(currentItem);
+        if Assigned(positionVar) then initialAddVariable(positionVar);
+        if Assigned(previousItem) then initialAddVariable(previousItem);
+        if Assigned(nextItem) then initialAddVariable(nextItem);
+      end;
+    end;
+  begin
+    addCondition(w.startCondition);
+    addCondition(w.endCondition);
+    initialAddVariable(w.loopvar);
+  end;
 
 begin
   tempContext:=context;
@@ -1441,6 +1697,7 @@ begin
         inc(varCount);
         if assigned(TXQTermFlowerFor(children[i]).positionVar) then inc(varCount);
       end;
+      xqtfcWindow: inc(varCount, TXQTermFlowerWindow(children[i]).variableCount);
       xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
         inc(varCount, length(vars));
         if hasDefaultVariable then inc(varCount);
@@ -1456,7 +1713,7 @@ begin
 
   currentTuple := nil;
   if needFullTuple or (orderCount > 0) or (countCount > 0) then SetLength(clauseIndex, length(children) - 1);
-  if orderCount > 0 then begin
+  if needFullTuple or (orderCount > 0) then begin
     SetLength(orders, orderCount);
     orderCount := 0;
     for i := 0 to high(children) - 1 do
@@ -1495,6 +1752,7 @@ begin
           if assigned(TXQTermFlowerFor(children[i]).positionVar) then
             initialAddVariable(TXQTermFlowerFor(children[i]).positionVar);
         end;
+        xqtfcWindow: initialAddWindowVariables(TXQTermFlowerWindow(children[i]));
         xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
           clauseIndex[i] := varCount;
           if hasDefaultVariable then raiseEvaluationError('XQTS0003', 'Too complex flowr expression for pattern changing .');
@@ -1600,33 +1858,24 @@ begin
   for i := 0 to high(children) - 1 do begin
     clause := TXQTermFlowerSubClause(children[i]);
     case clause.kind of
-      xqtfcFor, xqtfcLet: begin
-        letclause := TXQTermFlowerLet(clause);
-        result := visitor.simpleTermVisit(@letclause.expr, self);
-        case result of xqtvaAbort: exit; end;
-
-        visitor.parent := self;
-        visitor.declare(@letclause.loopvar);
-        if (clause.kind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then
-          visitor.declare(@TXQTermFlowerFor(letclause).positionVar);
-      end;
+      xqtfcFor, xqtfcLet, xqtfcWindow: visitor.simpleTermVisit(@children[i], self);
       xqtfcLetPattern, xqtfcForPattern: begin
         patternclause := TXQTermFlowerLetPattern(clause);
-        result := visitor.simpleTermVisit(@patternclause.expr, self);
+        result := visitor.simpleTermVisit(@patternclause.expr, clause);
         case result of xqtvaAbort: exit; end;
 
         for j := 0 to high(patternclause.pattern.vars) do
           visitor.declare(@patternclause.pattern.vars[j]);
 
-        result := visitor.simpleTermVisit(@patternclause.pattern, self);
+        result := visitor.simpleTermVisit(@patternclause.pattern, clause);
         case result of xqtvaAbort: exit; end;
       end;
       xqtfcWhere: begin
-        result := visitor.simpleTermVisit(@TXQTermFlowerWhere(clause).test, self);
+        result := visitor.simpleTermVisit(@TXQTermFlowerWhere(clause).test, clause);
         case result of xqtvaAbort: exit; end;
       end;
       xqtfcOrder: begin
-        result := visitor.simpleTermVisit(@TXQTermFlowerOrder(clause).expr, self);
+        result := visitor.simpleTermVisit(@TXQTermFlowerOrder(clause).expr, clause);
         case result of xqtvaAbort: exit; end;
       end;
       xqtfcCount: begin
@@ -1642,12 +1891,7 @@ begin
   for i := high(children) - 1 downto 0 do begin
     clause := TXQTermFlowerSubClause(children[i]);
     case clause.kind of
-      xqtfcFor, xqtfcLet: begin
-        letclause := TXQTermFlowerLet(clause);
-        if (clause.kind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then
-          visitor.undeclare(@TXQTermFlowerFor(letclause).positionVar);
-        visitor.undeclare(@letclause.loopvar);
-      end;
+      xqtfcFor, xqtfcLet, xqtfcWindow: TXQTermFlowerSubClause(children[i]).visitchildrenToUndeclare(visitor);
       xqtfcLetPattern, xqtfcForPattern:
         with TXQTermFlowerLetPattern(clause) do
           for j := high(pattern.vars) downto 0 do

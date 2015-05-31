@@ -542,6 +542,63 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
 var token: String;
   procedure parseInitialClauseAndNextToken;
+    procedure parseWindow;
+      procedure parseWindowVars(out vars: TXQTermFlowerWindowVarsAndCondition);
+      begin
+        skipWhitespaceAndComment();
+        if pos^ = '$' then vars.currentItem := parseVariable;
+        if nextToken(true) = 'at' then begin
+          expect('at');
+          vars.positionVar := parseVariable;
+        end;
+        if nextToken(true) = 'previous' then begin
+          expect('previous');
+          vars.previousItem := parseVariable;
+        end;
+        if nextToken(true) = 'next' then begin
+          expect('next');
+          vars.nextItem := parseVariable;
+        end;
+        expect('when');
+        vars.when := parse;
+      end;
+
+    var flags: TXQTermFlowerWindowFlags;
+      window: TXQTermFlowerWindow;
+      duplicate: TXQTermVariable;
+    begin
+      token := nextToken();
+      case token of
+        'tumbling': flags := [];
+        'sliding': flags := [xqtfwSliding];
+        else raiseSyntaxError('Expected variable, sliding/tumbling window or pattern in flowr expression, but got: '+token);
+      end;
+      requireXQuery3();
+      expect('window');
+      window := TXQTermFlowerWindow.Create;
+      result.push(window);
+      window.flags := flags;
+      window.loopvar := parseVariable;
+      if nextToken(true) = 'as' then begin
+        expect('as');
+        window.sequenceTyp := parseSequenceType([]);
+      end;
+      expect('in');
+      window.expr := parse();
+      expect('start');
+      parseWindowVars(window.startCondition);
+      if nextToken(true) = 'only' then begin
+        expect('only');
+        Include(window.flags, xqtfwEndOnlyWhen);
+      end;
+      if nextToken(true) = 'end' then begin
+        expect('end');
+        parseWindowVars(window.endCondition);
+      end else if xqtfwSliding in window.flags then expect('end');
+      duplicate := window.findDuplicatedVariable;
+      if duplicate <> nil then raiseParsingError('XQST0103', 'Duplicated variable name: '+duplicate.ToString);
+    end;
+
   var temp: string;
     clause: TXQTermFlowerLet;
     patternclause: TXQTermFlowerLetPattern;
@@ -556,6 +613,11 @@ var token: String;
       else raiseParsingError('XPST0003', 'Invalid flower: '+token);
     end;
     skipWhitespaceAndComment();
+    if pos^ in ['s', 't'] then begin
+      parseWindow;
+      token := nextToken();
+      exit;
+    end;
     repeat
       if pos^ <> '<' then begin
         if isfor then result.push(TXQTermFlowerFor.Create)
@@ -699,7 +761,8 @@ begin
 
           token := nextToken();
         end;
-        '': raiseSyntaxError('Expected return');
+        'return': exit;
+        else raiseSyntaxError('Expected return ');
       end;
     end;
     result.push(parse);
@@ -1868,6 +1931,9 @@ begin
             raiseParsingError('XQST0075', 'Schema validation is not supported');
           end;
         end;
+        'for': case nextToken(true) of
+           'tumbling', 'sliding': exit(parseFlower(word));
+         end;
       end;
 
     if (word = '') or (word[1] in [',', ';', ':', ')', ']', '}']) then //todo: check if valid xml node name
@@ -2005,7 +2071,7 @@ begin
     while true do begin
       word := nextToken(true);
       case word of
-        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'ascending', 'descending', 'empty', 'collation', 'case', 'default', 'count':
+        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'end', 'only', 'ascending', 'descending', 'start', 'empty', 'collation', 'case', 'default', 'count':
           exit(astroot);
         '[': begin
           expect('[');

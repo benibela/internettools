@@ -1574,7 +1574,9 @@ type
     class function kind: TXQTermFlowerSubClauseKind; virtual;
 
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); virtual; abstract;
   end;
   TXQTermFlowerLet = class(TXQTermFlowerSubClause)
     loopvar: TXQTermVariable;
@@ -1585,6 +1587,9 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
+
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
   end;
   TXQTermFlowerFor = class(TXQTermFlowerLet)
     allowingEmpty: boolean;
@@ -1592,18 +1597,31 @@ type
     class function kind: TXQTermFlowerSubClauseKind; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
+
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
   end;
   TXQTermFlowerWindowVarsAndCondition = record
     currentItem, positionVar, previousItem, nextItem: TXQTermVariable;
-    expr: TXQTerm;
+    when: TXQTerm;
+    procedure assign(const other: TXQTermFlowerWindowVarsAndCondition);
+    function visitchildren(visitor: TXQTerm_Visitor; parent: txqterm): TXQTerm_VisitAction;
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor; parent: txqterm);
+    procedure freeAll;
   end;
-  TXQTermFlowerWindowFlags = set of (xqtfwSliding {default tumbling}, xqtfwEndConditionAbsent, xqtfwEndOnlyWhen);
+  TXQTermFlowerWindowFlags = set of (xqtfwSliding {default tumbling}, xqtfwEndOnlyWhen);
   TXQTermFlowerWindow = class(TXQTermFlowerLet)
     flags: TXQTermFlowerWindowFlags;
     startCondition, endCondition: TXQTermFlowerWindowVarsAndCondition;
     class function kind: TXQTermFlowerSubClauseKind; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
+
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
+  private
+    function findDuplicatedVariable: TXQTermVariable;
+    function variableCount: integer;
   end;
   TXQTermFlowerLetPattern = class(TXQTermFlowerSubClause)
     pattern: TXQTermPatternMatcher;
@@ -2567,22 +2585,6 @@ var
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
-
-class function TXQTermFlowerWindow.kind: TXQTermFlowerSubClauseKind;
-begin
-  Result:=inherited kind;
-end;
-
-function TXQTermFlowerWindow.clone: TXQTerm;
-begin
-  Result:=inherited clone;
-end;
-
-destructor TXQTermFlowerWindow.destroy;
-begin
-  inherited destroy;
-end;
-
 
 
 { TXQFunctionParameter }

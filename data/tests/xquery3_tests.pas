@@ -338,6 +338,18 @@ begin
   t('for <a>{$i}</a> in (<a>3</a>, <a>2</a>, <a>1</a>) count $c count $d return join(($i,$c,$d),"")', '311 222 133');
   t('for <a>{$i}</a> in (<a>3</a>, <a>2</a>, <a>1</a>) count $c order by $i count $d return join(($i,$c,$d),"")', '131 222 313');
 
+    //window example from standard
+  m('join(for tumbling window $w in (2, 4, 6, 8, 10) start $s at $spos previous $sprev next $snext when true() end $e at $epos previous $eprev next $enext when true() return join(($w, $s, $spos, $sprev, $snext, $e, $epos, $eprev, $enext)), "; ")', '2 2 1 4 2 1 4; 4 4 2 2 6 4 2 2 6; 6 6 3 4 8 6 3 4 8; 8 8 4 6 10 8 4 6 10; 10 10 5 8 10 5 8');
+  m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14) start at $s when fn:true() only end at $e when $e - $s eq 2 return join($w), "; ")', '2 4 6; 8 10 12');
+  t('for tumbling window $w in (2, 4, 6, 8, 10, 12, 14) start at $s when fn:true() only end at $e when $e - $s eq 2 return avg($w)', '4 10');
+  m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)   start $first at $s when fn:true()  only end $last at $e when $e - $s eq 2  return $first ||" "|| $last, "; ")', '2 6; 8 12');
+  m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)   start at $s when fn:true()   end at $e when $e - $s eq 2  return join($w), "; " )', '2 4 6; 8 10 12; 14');
+  m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)    start at $s when $s mod 3 = 1   return <window>{ $w }</window>, "; ")', '2 4 6; 8 10 12; 14');
+  m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)    start $first when $first mod 3 = 0  return <window>{ $w }</window>, "; ")', '6 8 10; 12 14');
+
+  m('join(for sliding window $w in (2, 4, 6, 8, 10, 12, 14)    start at $s when fn:true()    only end at $e when $e - $s eq 2  return <window>{ $w }</window>, "; ")', '2 4 6; 4 6 8; 6 8 10; 8 10 12; 10 12 14');
+  t('for sliding window $w in (2, 4, 6, 8, 10, 12, 14)    start at $s when fn:true()    only end at $e when $e - $s eq 2 return avg($w)', '4 6 8 10 12');
+  m('join(for sliding window $w in (2, 4, 6, 8, 10, 12, 14)     start at $s when fn:true()    end at $e when $e - $s eq 2  return <window>{ $w }</window>, "; ")', '2 4 6; 4 6 8; 6 8 10; 8 10 12; 10 12 14; 12 14; 14');
 
 
   //try/catch
