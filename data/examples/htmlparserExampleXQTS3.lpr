@@ -613,7 +613,7 @@ end;
 type PIXQValue = ^IXQValue;
 function comparison(data: TObject; a, b: PIXQValue): integer;
 begin
-  if not xqvalueComparableTypes(a^, b^) then
+  if not xq.StaticContext.comparableTypes(a^ as TXQValue, b^ as TXQValue) then
     exit(strCompareClever(a^.typeName, b^.typeName));
   result := xq.StaticContext.compareAtomic(a^, b^, nil);
 end;

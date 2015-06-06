@@ -448,41 +448,6 @@ begin
   result := xqvalue(a.toString + b.toString);
 end;
 
-//Returns if the eq operator is defined for the types of a and b
-function xqvalueComparableTypes(const a, b: IXQValue): boolean;
-{  function decidedByUniqueTypeClass(const c: TXQValueClass): boolean;
-  var
-    ais, bis: boolean;
-  begin
-    ais := a is c;
-    bis := b is c;
-    result := ais or bis;
-    if result then
-      xqvalueComparableTypes := ais and bis;
-  end;}
-
-var
-  ak: TXQValueKind;
-  bk: TXQValueKind;
-  ac: TXSType;
-  bc: TXSType;
-  ct: TXSType;
-begin
-  ak := a.kind;
-  bk := b.kind;
-  if ((ak in [pvkInt64, pvkFloat, pvkBigDecimal]) and (bk in [pvkInt64, pvkFloat, pvkBigDecimal]))
-     or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
-    exit(true);
-
-  ac := a.typeAnnotation;
-  if ac.derivedFrom(baseSchema.node) then ac := baseSchema.string_;
-  bc := b.typeAnnotation;
-  if bc.derivedFrom(baseSchema.node) then bc := baseSchema.string_;
-
-  //check if a and b are in the same branch of the type hierarchy (which is the case if their common parent is not the root of the hierarchy)
-  ct := TXSType.commonType(ac, bc);
-  result := (ct <> nil) and (ct <> baseSchema.anyAtomicType) and (ct <> baseSchema.anySimpleType) and (ct <> baseSchema.anyType);;
-end;
 
 
 
@@ -2741,14 +2706,14 @@ begin
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := nil;
   if args[0].kind <> pvkSequence then begin
-    if xqvalueComparableTypes(args[0], args[1]) and context.staticContext.equalAtomic(args[0], args[1], collation) then result := xqvalue(1)
+    if context.staticContext.equalDeepAtomic(args[0], args[1], collation) then result := xqvalue(1)
     else result := xqvalue();
   end else begin
     i := 0;
     result := nil;
     for v in args[0] do begin
       i += 1;
-      if xqvalueComparableTypes(v, args[1]) and context.staticContext.equalAtomic(v, args[1], collation) then
+      if context.staticContext.equalDeepAtomic(v, args[1], collation) then
         xqvalueSeqAdd(result, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
@@ -2812,7 +2777,7 @@ begin
   for v in atom do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if xqvalueComparableTypes(resseq.seq[i], v) and context.staticContext.equalDeepAtomic(resseq.seq[i], v, collation) then begin
+      if context.staticContext.equalDeepAtomic(resseq.seq[i], v, collation) then begin
         found := true;
         break;
       end;
@@ -2958,8 +2923,7 @@ begin
 
     if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
       if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
-         or not xqvalueComparableTypes(enum1.Current, enum2.Current)
-         or not context.staticContext.equalDeepAtomic(enum1.Current, enum2.Current, collation) then //todo:   nodes?
+         or not context.staticContext.equalDeepAtomic(enum1.Current, enum2.Current, collation) then
         exit(false);
     end else begin
       if enum1.Current.kind = pvkFunction then raiseFOTY0015(enum1.Current);

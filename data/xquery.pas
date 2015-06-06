@@ -190,6 +190,8 @@ type
     function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer; inline;
     function equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
     function equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean; inline;
+    //**internally used (Returns if the eq operator is defined for the types of a and b)
+    class function comparableTypes(const a, b: TXQValue): boolean; static;
   property
     NodeCollation: TXQCollation read getNodeCollation write FNodeCollation;
   end;
@@ -2543,7 +2545,6 @@ procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer =
 procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
 
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;  //needed for switch, tests
-function xqvalueComparableTypes(const a, b: IXQValue): boolean; //internally used, needed for xqts
 
   const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
   const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
@@ -3542,6 +3543,8 @@ var
   ak: TXQValueKind;
   bk: TXQValueKind;
 begin
+  if not comparableTypes(a, b) then exit(-2); //todo:   nodes?
+
   ak := a.kind; bk := b.kind;
   if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) then begin
     if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(0)
@@ -3571,6 +3574,30 @@ end;
 function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
 begin
   result := equalDeepAtomic(a as txqvalue, b as txqvalue, overrideCollation);
+end;
+
+class function TXQStaticContext.comparableTypes(const a, b: TXQValue): boolean;
+var
+  ak: TXQValueKind;
+  bk: TXQValueKind;
+  ac: TXSType;
+  bc: TXSType;
+  ct: TXSType;
+begin
+  ak := a.kind;
+  bk := b.kind;
+  if ((ak in [pvkInt64, pvkFloat, pvkBigDecimal]) and (bk in [pvkInt64, pvkFloat, pvkBigDecimal]))
+     or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
+    exit(true);
+
+  ac := a.typeAnnotation;
+  if ac.derivedFrom(baseSchema.node) then ac := baseSchema.string_;
+  bc := b.typeAnnotation;
+  if bc.derivedFrom(baseSchema.node) then bc := baseSchema.string_;
+
+  //check if a and b are in the same branch of the type hierarchy (which is the case if their common parent is not the root of the hierarchy)
+  ct := TXSType.commonType(ac, bc);
+  result := (ct <> nil) and (ct <> baseSchema.anyAtomicType) and (ct <> baseSchema.anySimpleType) and (ct <> baseSchema.anyType);;
 end;
 
 { TXQTermModule }

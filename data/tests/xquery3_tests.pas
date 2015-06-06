@@ -358,6 +358,7 @@ begin
   t('for $j in (3,3,1,1,2,3,3) group by $i := $j return $i||count($j)', '12 21 34');
   t('for $j in (3,3,1,1,2,3,3) group by $t := "foo", $i as xs:integer := $j return $i||count($j)', '12 21 34');
   t('let $i := ("a", "b") for $j in (1,2,1) group by $j return $i', 'a b a b a b');
+  t('for $i in ("true", xs:QName("true")) group by $i return $i', 'true true');
   //from standard
   t('for $t in ("S101|P78395", "S102|P94738", "S101|P41653", "S102|P70421") let $storeno := substring-before($t, "|"), $itemno := substring-after($t, "|") group by $storeno return x"{$storeno}: {$itemno};"', 'S101: P78395 P41653; S102: P94738 P70421;');
   t('for $t in ("S101|P78395", "S102|P94738", "S101|P41653", "S102|P70421") let $storeno := substring-before($t, "|"), $itemno := substring-after($t, "|") group by $storeno order by $storeno descending return x"{$storeno}: {$itemno};"', 'S102: P94738 P70421; S101: P78395 P41653;');
