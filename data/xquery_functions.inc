@@ -2698,6 +2698,12 @@ begin
 end;
 
 function xqFunctionIndex_of(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+  function equal(const a,b: IXQValue): boolean; inline;
+  begin
+    with context.staticContext do
+      result :=comparableTypes(a as txqvalue, b as txqvalue) and equalAtomic(a, b, collation);
+  end;
+
 var  i: Integer;
      collation: TXQCollation;
      v: IXQValue;
@@ -2706,14 +2712,14 @@ begin
   if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := nil;
   if args[0].kind <> pvkSequence then begin
-    if context.staticContext.equalDeepAtomic(args[0], args[1], collation) then result := xqvalue(1)
+    if equal(args[0], args[1]) then result := xqvalue(1)
     else result := xqvalue();
   end else begin
     i := 0;
     result := nil;
     for v in args[0] do begin
       i += 1;
-      if context.staticContext.equalDeepAtomic(v, args[1], collation) then
+      if equal(v, args[1]) then
         xqvalueSeqAdd(result, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
