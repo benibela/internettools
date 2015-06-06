@@ -540,24 +540,31 @@ end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
+var usedVariables: TfpList;
+  function parseFlowerVariable: TXQTermVariable;
+  begin
+    result := parseVariable;
+    usedVariables.add(result);
+  end;
+
 var token: String;
   procedure parseInitialClauseAndNextToken;
     procedure parseWindow;
       procedure parseWindowVars(out vars: TXQTermFlowerWindowVarsAndCondition);
       begin
         skipWhitespaceAndComment();
-        if pos^ = '$' then vars.currentItem := parseVariable;
+        if pos^ = '$' then vars.currentItem := parseFlowerVariable;
         if nextToken(true) = 'at' then begin
           expect('at');
-          vars.positionVar := parseVariable;
+          vars.positionVar := parseFlowerVariable;
         end;
         if nextToken(true) = 'previous' then begin
           expect('previous');
-          vars.previousItem := parseVariable;
+          vars.previousItem := parseFlowerVariable;
         end;
         if nextToken(true) = 'next' then begin
           expect('next');
-          vars.nextItem := parseVariable;
+          vars.nextItem := parseFlowerVariable;
         end;
         expect('when');
         vars.when := parse;
@@ -578,7 +585,7 @@ var token: String;
       window := TXQTermFlowerWindow.Create;
       result.push(window);
       window.flags := flags;
-      window.loopvar := parseVariable;
+      window.loopvar := parseFlowerVariable;
       if nextToken(true) = 'as' then begin
         expect('as');
         window.sequenceTyp := parseSequenceType([]);
@@ -624,7 +631,7 @@ var token: String;
         else result.push(TXQTermFlowerLet.Create);
         clause := TXQTermFlowerLet(result.children[high(result.children)]);
         with clause do begin
-          loopvar := parseVariable;
+          loopvar := parseFlowerVariable;
 
           temp := nextToken;
           if temp = 'as' then begin
@@ -644,7 +651,7 @@ var token: String;
 
             if temp = 'at' then begin
               requireXQuery;
-              TXQTermFlowerFor(clause).positionvar := parseVariable;
+              TXQTermFlowerFor(clause).positionvar := parseFlowerVariable;
               temp := nextToken;
             end;
 
@@ -685,6 +692,7 @@ var token: String;
     procedure parseSpec;
     var
       let: TXQTermFlowerLet;
+      i: Integer;
     begin
       SetLength(group.vars, length(group.vars) + 1);
       SetLength(group.seqtypes, length(group.seqtypes) + 1);
@@ -703,6 +711,10 @@ var token: String;
         SetLength(result.children, length(result.children) + 1);
         result.children[high(result.children) - 1] := let;
         result.children[high(result.children)] := group;
+      end else with group.vars[high(group.vars)] do begin
+        for i := 0 to usedVariables.Count - 1 do
+          if equalsVariable(TXQTermVariable(usedVariables[i])) then exit;
+        raiseParsingError('XQST0094', 'Variable unknown');
       end;
     end;
 
@@ -775,6 +787,7 @@ var
   end;
 begin
   result := TXQTermFlower.Create;
+  usedVariables := tfplist.Create;
   hadOrder := false;
   hadWhere := false;
   try
@@ -802,7 +815,7 @@ begin
         'count': begin
           requireXQuery3();
           result.push(TXQTermFlowerCount.Create);
-          TXQTermFlowerCount(result.children[high(result.children)]).countvar := parseVariable;
+          TXQTermFlowerCount(result.children[high(result.children)]).countvar := parseFlowerVariable;
 
           token := nextToken();
         end;
@@ -816,8 +829,9 @@ begin
     end;
     result.push(parse);
   except
-    on EXQParsingException do begin result.free; raise; end;
+    on EXQParsingException do begin result.free; usedVariables.free; raise; end;
   end;
+  usedVariables.free;
 end;
 
 function TXQParsingContext.parseSomeEvery(const akind: string): TXQTermSomeEvery;

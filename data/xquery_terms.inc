@@ -1398,9 +1398,13 @@ begin
   result := 0;
   for i := 0 to high(groupingIndices) do begin
     k := groupingIndices[i];
-    if a.vars[k].getSequenceCount <> b.vars[k].getSequenceCount then
-      if a.vars[k].getSequenceCount < b.vars[k].getSequenceCount then exit(-1)
-      else exit(1);
+    case a.vars[k].getSequenceCount of
+      0: case b.vars[k].getSequenceCount of
+        0: exit(0);
+        1: exit(-1); //randomly choosen
+      end;
+      1: if b.vars[k].getSequenceCount = 0 then exit(1);
+    end;
     result :=  context^.staticContext.compareDeepAtomic(a.vars[k], b.vars[k], collation);
     if result <> 0 then exit;
   end;
