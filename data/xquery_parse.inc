@@ -678,6 +678,51 @@ var token: String;
     until token <> ',';
   end;
 
+  procedure parseGroupClauseAndNextToken;
+  var
+    group: TXQTermFlowerGroup;
+
+    procedure parseSpec;
+    var
+      let: TXQTermFlowerLet;
+    begin
+      SetLength(group.vars, length(group.vars) + 1);
+      SetLength(group.seqtypes, length(group.seqtypes) + 1);
+      group.vars[high(group.vars)] := parseVariable;
+      skipWhitespaceAndComment();
+      if pos^ in ['a', ':'] then begin
+        let := TXQTermFlowerLet.Create;
+        let.loopvar := TXQTermVariable(group.vars[high(group.vars)].clone);
+        if pos^ = 'a' then begin
+          expect('as');
+          //let.sequenceTyp := parseSequenceType([]);
+          group.seqtypes[high(group.seqtypes)] := parseSequenceType([]); //need to test the atomized value, let would test the original
+        end;
+        expect(':=');
+        let.expr := parse;
+        SetLength(result.children, length(result.children) + 1);
+        result.children[high(result.children) - 1] := let;
+        result.children[high(result.children)] := group;
+      end;
+    end;
+
+  begin
+    expect('by');
+
+    group := TXQTermFlowerGroup.Create;
+    result.push(group);
+    parseSpec;
+    while pos^ = ',' do begin
+      inc(pos);
+      parseSpec;
+    end;
+    token := nextToken();
+    if token = 'collation' then begin
+      group.collation := parseString;
+      token := nextToken();
+    end;
+  end;
+
 var
   hadOrder: boolean;
   hadWhere: Boolean;
@@ -760,6 +805,10 @@ begin
           TXQTermFlowerCount(result.children[high(result.children)]).countvar := parseVariable;
 
           token := nextToken();
+        end;
+        'group': begin
+          requireXQuery3();
+          parseGroupClauseAndNextToken;
         end;
         'return': exit;
         else raiseSyntaxError('Expected return ');
@@ -2071,7 +2120,7 @@ begin
     while true do begin
       word := nextToken(true);
       case word of
-        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'end', 'only', 'ascending', 'descending', 'start', 'empty', 'collation', 'case', 'default', 'count':
+        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'end', 'only', 'ascending', 'descending', 'start', 'empty', 'group', 'collation', 'case', 'default', 'count':
           exit(astroot);
         '[': begin
           expect('[');
