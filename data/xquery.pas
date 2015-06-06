@@ -1574,7 +1574,7 @@ type
   end;
 
   { TXQTermFlower }
-  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount);
+  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount, xqtfcGroup);
   TXQTermFlowerSubClause = class(TXQTerm)
     class function kind: TXQTermFlowerSubClauseKind; virtual;
 
@@ -1663,6 +1663,17 @@ type
     countvar: TXQTermVariable;
 
     class function kind: TXQTermFlowerSubClauseKind; override;
+    function clone: TXQTerm; override;
+    destructor destroy; override;
+  end;
+  TXQTermFlowerGroup = class(TXQTermFlowerSubClause)
+    vars: array of TXQTermVariable;
+    seqtypes: array of TXQTermSequenceType;
+    collation: string;
+    class function kind: TXQTermFlowerSubClauseKind; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
+    function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
   end;
@@ -2344,7 +2355,7 @@ public
   function xqvalue(sl: TStringList): IXQValue; //**< Creates an sequence of strings (does *not* free the list)
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes a IXQValue (single element seq => single element, empty seq => undefined)
-  procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add )
+  procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add ) @br Warning: If  pointer(list) = pointer(add) it will crash
   //function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
 
 
@@ -2590,6 +2601,7 @@ var
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
 
 
 { TXQFunctionParameter }

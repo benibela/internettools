@@ -1260,6 +1260,62 @@ begin
 end;
 
 
+class function TXQTermFlowerGroup.kind: TXQTermFlowerSubClauseKind;
+begin
+  Result:=xqtfcGroup;
+end;
+
+function TXQTermFlowerGroup.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i: Integer;
+begin
+  for i := 0 to high(vars) do begin
+    visitor.declare(@vars[i], self);
+  end;
+  result := xqtvaContinue;
+end;
+
+procedure TXQTermFlowerGroup.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
+var
+  i: Integer;
+begin
+  visitor.parent := self;
+  for i := high(vars) downto 0 do
+    visitor.undeclare(@vars[i], self);
+end;
+
+function TXQTermFlowerGroup.getContextDependencies: TXQContextDependencies;
+begin
+  result := [xqcdContextCollation, xqcdContextVariables];
+end;
+
+function TXQTermFlowerGroup.clone: TXQTerm;
+var
+  i: Integer;
+begin
+  Result:=inherited clone;
+  TXQTermFlowerGroup(result).collation := collation;
+  SetLength(TXQTermFlowerGroup(result).vars, length(vars) );
+  for i:= 0 to high(vars) do
+    TXQTermFlowerGroup(result).vars[i] := TXQTermVariable(vars[i]);
+  SetLength(TXQTermFlowerGroup(result).seqtypes, length(seqtypes) );
+  for i:= 0 to high(seqtypes) do
+    TXQTermFlowerGroup(result).seqtypes[i] := TXQTermSequenceType(seqtypes[i]);
+end;
+
+destructor TXQTermFlowerGroup.destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to high(vars) do
+    vars[i].free;
+  for i := 0 to high(seqtypes) do
+    seqtypes[i].free;
+  inherited destroy;
+end;
+
+
+
 
 type TOrderedTuple = class
   orders: array of IXQValue;
@@ -1324,6 +1380,39 @@ begin
     if result <> 0 then exit;
   end;
 end;
+
+type TFlowerGroupingData = record
+  //flower: TXQTermFlower;
+  groupingIndices: array of integer;
+  collation: TXQCollation;
+  context: ^TXQEvaluationContext;
+  function compareTuples(a, b: TOrderedTuple): integer; inline;
+end;
+PFlowerGroupingData = ^TFlowerGroupingData;
+
+function TFlowerGroupingData.compareTuples(a, b: TOrderedTuple): integer;
+var
+  i: Integer;
+  k: LongInt;
+begin
+  result := 0;
+  for i := 0 to high(groupingIndices) do begin
+    k := groupingIndices[i];
+    if a.vars[k].getSequenceCount <> b.vars[k].getSequenceCount then
+      if a.vars[k].getSequenceCount < b.vars[k].getSequenceCount then exit(-1)
+      else exit(1);
+    result :=  context^.staticContext.compareDeepAtomic(a.vars[k], b.vars[k], collation);
+    if result <> 0 then exit;
+  end;
+end;
+
+function flowerTupleGroupCompareFunction(data: TObject; xa, xb: pointer): longint;
+var meta: PFlowerGroupingData;
+begin
+  meta := PFlowerGroupingData(data);
+  result := meta^.compareTuples(TOrderedTuple(ppointer(xa)^), TOrderedTuple(ppointer(xb)^));
+end;
+
 
 function TXQTermFlower.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
@@ -1628,10 +1717,99 @@ var
          evaluateForLoop(pos + 1);
          tempContext.temporaryVariables.popAll();
        end;
+       xqtfcGroup: begin
+         newTuple := TOrderedTuple.Create;
+         newTuple.orders := currentTuple.orders;
+         SetLength(newTuple.orders, length(newTuple.orders));
+         newTuple.vars := currentTuple.vars;
+         SetLength(newTuple.vars, length(newTuple.vars));
+         sortingCache.Add(newTuple);
+       end;
      end;
 
 
    end;
+
+  procedure groupTuple(pos: integer);
+  var data: TFlowerGroupingData;
+    group: TXQTermFlowerGroup;
+    varindex: LongInt;
+    i, j: Integer;
+    tuple: TOrderedTuple;
+    k: LongInt;
+    oldSortingCache: TFPList;
+    lastTuple: TOrderedTuple;
+    nonGroupingVars: array of integer;
+
+    procedure newGroupedTuple;
+    var j,k: integer;
+    begin
+      if lastTuple <> nil then for k in nonGroupingVars do xqvalueSeqSqueeze(lastTuple.vars[k]);
+      sortingCache.Add(oldSortingCache[i]);
+      lastTuple := TOrderedTuple(oldSortingCache[i]);
+      for j := 0 to high(nonGroupingVars) do begin
+        k := nonGroupingVars[j];
+        lastTuple.vars[k] := TXQValueSequence.create(lastTuple.vars[k]); //need to create new sequences as the old ones are immutable
+      end;
+    end;
+
+  begin
+    if sortingCache.Count = 0 then exit;
+    group := TXQTermFlowerGroup(children[pos]);
+    data.context := @context;
+    if group.collation = '' then data.collation := nil
+    else data.collation := TXQueryEngine.getCollation(group.collation, context.staticContext.baseURI);
+    varindex := clauseIndex[pos];
+    with group do begin
+      SetLength(data.groupingIndices, length(vars));
+      for i := 0 to high(vars) do
+        for j := varindex - 1 downto 0 do
+          if vars[i].equalsVariable(variables[j]) then begin
+            data.groupingIndices[i] := j;
+            break;
+          end;
+      SetLength(nonGroupingVars, varindex - length(vars));
+      j := 0;
+      for i := 0 to high(nonGroupingVars) do begin
+        while arrayContains(data.groupingIndices, j) do inc(j);
+        nonGroupingVars[i] := j;
+        inc(j);
+      end;
+
+      for i := 0 to sortingCache.Count - 1 do begin
+        tuple := TOrderedTuple(sortingCache[i]);
+        for j := 0 to high(vars) do begin
+          k := data.groupingIndices[j];
+          if tuple.vars[k].getSequenceCount > 1 then raiseTypeError0004('singleton', tuple.vars[k]);
+          tuple.vars[k] := xqvalueAtomize(tuple.vars[k]);
+          if (group.seqtypes[j] <> nil) and not group.seqtypes[j].instanceOf(tuple.vars[k], context) then
+            raiseTypeError0004(group.seqtypes[j].serialize, tuple.vars[k]);
+        end;
+      end;
+
+      stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleGroupCompareFunction, TObject(@data));
+
+
+      oldSortingCache := sortingCache;
+      sortingCache := TFPList.Create;
+      i := 0;
+      lastTuple := nil;
+      newGroupedTuple;
+      i := 1;
+      while i < oldSortingCache.Count do begin
+        if data.compareTuples(lastTuple, TOrderedTuple(oldSortingCache[i])) = 0 then begin
+          for k in nonGroupingVars do
+            xqvalueSeqAdd(lastTuple.vars[k], TOrderedTuple(oldSortingCache[i]).vars[k]);
+          tobject(oldSortingCache[i]).free;
+        end else newGroupedTuple;
+        inc(i);
+      end;
+      for k in nonGroupingVars do xqvalueSeqSqueeze(lastTuple.vars[k]);
+      oldSortingCache.free;
+    end;
+
+  end;
+
 var i: Integer;
     sortingData: TFlowerSortingData;
     orderCount: Integer;
@@ -1709,6 +1887,7 @@ begin
         inc(varCount);
         inc(countCount);
       end;
+      xqtfcGroup: needFullTuple := true;
     end;
 
   currentTuple := nil;
@@ -1766,6 +1945,7 @@ begin
           clauseIndex[i] := varCount;
           initialAddVariable(TXQTermFlowerCount(children[i]).countvar);
         end;
+        xqtfcGroup: clauseIndex[i] := varCount;
       end;
     if currentTuple = nil then currentTuple := TOrderedTuple.Create;
     SetLength(currentTuple.vars, varCount);
@@ -1792,7 +1972,7 @@ begin
     evaluateForLoop(0);
     if needFullTuple then
     for i := 0 to high(children) - 1 do begin
-      isJoinClause := TXQTermFlowerSubClause(children[i]).kind = xqtfcCount;
+      isJoinClause := TXQTermFlowerSubClause(children[i]).kind in [xqtfcCount, xqtfcGroup];
       if not isJoinClause then begin
         case TXQTermFlowerSubClause(children[i]).kind of
           xqtfcOrder: sortingData.maxOrderIndex := clauseIndex[i];
@@ -1807,6 +1987,11 @@ begin
           xqtfcCount: begin
             for j := 0 to sortingCache.Count-1 do
               TOrderedTuple(sortingCache[j]).vars[joinVar] := xqvalue(j+1);
+          end;
+          xqtfcGroup: begin
+            joinVar -= 1;
+            //joinVar += high(TXQTermFlowerGroup(children[i]).specs);
+            groupTuple(i);
           end;
         end;
         oldSortingCache := sortingCache;
@@ -1852,13 +2037,12 @@ function TXQTermFlower.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAct
 var
   i, j: Integer;
   clause: TXQTermFlowerSubClause;
-  letclause: TXQTermFlowerLet;
   patternclause: TXQTermFlowerLetPattern;
 begin
   for i := 0 to high(children) - 1 do begin
     clause := TXQTermFlowerSubClause(children[i]);
     case clause.kind of
-      xqtfcFor, xqtfcLet, xqtfcWindow: visitor.simpleTermVisit(@children[i], self);
+      xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcGroup: visitor.simpleTermVisit(@children[i], self);
       xqtfcLetPattern, xqtfcForPattern: begin
         patternclause := TXQTermFlowerLetPattern(clause);
         result := visitor.simpleTermVisit(@patternclause.expr, clause);
@@ -1891,7 +2075,7 @@ begin
   for i := high(children) - 1 downto 0 do begin
     clause := TXQTermFlowerSubClause(children[i]);
     case clause.kind of
-      xqtfcFor, xqtfcLet, xqtfcWindow: TXQTermFlowerSubClause(children[i]).visitchildrenToUndeclare(visitor);
+      xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcGroup: TXQTermFlowerSubClause(children[i]).visitchildrenToUndeclare(visitor);
       xqtfcLetPattern, xqtfcForPattern:
         with TXQTermFlowerLetPattern(clause) do
           for j := high(pattern.vars) downto 0 do

@@ -351,6 +351,17 @@ begin
   t('for sliding window $w in (2, 4, 6, 8, 10, 12, 14)    start at $s when fn:true()    only end at $e when $e - $s eq 2 return avg($w)', '4 6 8 10 12');
   m('join(for sliding window $w in (2, 4, 6, 8, 10, 12, 14)     start at $s when fn:true()    end at $e when $e - $s eq 2  return <window>{ $w }</window>, "; ")', '2 4 6; 4 6 8; 6 8 10; 8 10 12; 10 12 14; 12 14; 14');
 
+  //group by
+  t('for $i in (1,2,3,3) group by $i return $i', '1 2 3');
+  t('for $i in (3,2,1,2,3,3) group by $i return $i', '1 2 3');
+  t('for $i in (3,3,1,1,2,3,3) let $j := $i group by $i return $i||count($j)', '12 21 34');
+  t('for $j in (3,3,1,1,2,3,3) group by $i := $j return $i||count($j)', '12 21 34');
+  t('for $j in (3,3,1,1,2,3,3) group by $t := "foo", $i as xs:integer := $j return $i||count($j)', '12 21 34');
+  t('let $i := ("a", "b") for $j in (1,2,1) group by $j return $i', 'a b a b a b');
+  //from standard
+  t('for $t in ("S101|P78395", "S102|P94738", "S101|P41653", "S102|P70421") let $storeno := substring-before($t, "|"), $itemno := substring-after($t, "|") group by $storeno return x"{$storeno}: {$itemno};"', 'S101: P78395 P41653; S102: P94738 P70421;');
+  t('for $t in ("S101|P78395", "S102|P94738", "S101|P41653", "S102|P70421") let $storeno := substring-before($t, "|"), $itemno := substring-after($t, "|") group by $storeno order by $storeno descending return x"{$storeno}: {$itemno};"', 'S102: P94738 P70421; S101: P78395 P41653;');
+  t('for $t in ("S101|P78395", "S102|P94738", "S101|P41653", "S102|P70421") let $storeno := substring-before($t, "|"), $itemno := substring-after($t, "|") order by $itemno group by $storeno order by $storeno descending return x"{$storeno}: {$itemno};"', 'S102: P70421 P94738; S101: P41653 P78395;');
 
   //try/catch
   m('try { "a" cast as xs:integer } catch * { 1 }', '1');
