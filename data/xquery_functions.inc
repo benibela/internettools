@@ -2812,7 +2812,7 @@ begin
   for v in atom do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if xqvalueComparableTypes(resseq.seq[i], v) and context.staticContext.equalAtomic(resseq.seq[i], v, collation, true) then begin
+      if xqvalueComparableTypes(resseq.seq[i], v) and context.staticContext.equalDeepAtomic(resseq.seq[i], v, collation) then begin
         found := true;
         break;
       end;
@@ -2959,7 +2959,7 @@ begin
     if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
       if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
          or not xqvalueComparableTypes(enum1.Current, enum2.Current)
-         or not context.staticContext.equalAtomic(enum1.Current, enum2.Current, collation, true) then //todo:   nodes?
+         or not context.staticContext.equalDeepAtomic(enum1.Current, enum2.Current, collation) then //todo:   nodes?
         exit(false);
     end else begin
       if enum1.Current.kind = pvkFunction then raiseFOTY0015(enum1.Current);

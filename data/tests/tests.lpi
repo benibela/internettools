@@ -76,6 +76,7 @@
       <Unit6>
         <Filename Value="xpath3_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="xpath3_tests"/>
       </Unit6>
       <Unit7>
         <Filename Value="xquery3_tests.pas"/>

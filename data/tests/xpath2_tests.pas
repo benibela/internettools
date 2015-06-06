@@ -2915,7 +2915,6 @@ begin
   t('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("23:12:23.867-12:37")', 'true', '');
   //             ,('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("24:12:23.867-11:37")', 'true', '') should this work?
   t('xs:dateTime("2002-11-23T22:12:23.867-13:37") eq xs:time("11:49:23.867Z")', 'false', ''); //day overflow?
-  t('xs:untypedAtomic("NaN") eq xs:double("NaN")', 'false'); //todo should be error
   ps.StaticContext.strictTypeChecking:=strictTypeChecking;
   t('(xs:gYear("2005-12:00") eq xs:gYear("2005+12:00"))', 'false', '');
   t('(xs:gDay("---12") eq xs:gDay("---12Z"))', 'false', '');
@@ -3573,18 +3572,21 @@ begin
   t('type-of(xs:untypedAtomic("1.0") - 7)', 'double');
   t('type-of(xs:untypedAtomic("1") - 7)', 'double');
   t('type-of(1 - 7)', 'integer');
-
   if strictTypeChecking then begin
     f('1 eq xs:untypedAtomic("1")', 'XPTY0004');
     f('1 eq xs:untypedAtomic("1.0")', 'XPTY0004');
     f('0 eq xs:untypedAtomic("fooo")', 'XPTY0004');
     f('"false" eq false()', 'XPTY0004');
     f('xs:untypedAtomic("true") eq true()', 'XPTY0004');
+    f('xs:untypedAtomic("10") eq xs:double("10")', 'XPTY0004');
+    f('xs:untypedAtomic("NaN") eq xs:double("NaN")', 'XPTY0004');
   end else begin
     t('1 eq xs:untypedAtomic("1")', 'true');
     t('1 eq xs:untypedAtomic("1.0")', 'false');
     t('0 eq xs:untypedAtomic("fooo")', 'false');
     t('"false" eq false()', 'true');
+    t('xs:untypedAtomic("10") eq xs:double("10")', 'true');
+    t('xs:untypedAtomic("NaN") eq xs:double("NaN")', 'true');
   end;
   t('1 = xs:untypedAtomic("1")', 'true');
   t('1 = xs:untypedAtomic("1.0")', 'true');

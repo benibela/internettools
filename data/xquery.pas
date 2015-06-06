@@ -176,8 +176,8 @@ type
     //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
     function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation = nil): integer; inline;
     procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
-    function equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation; acceptNAN: boolean = false): boolean;
-    function equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation; acceptNAN: boolean = false): boolean;
+    function equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
+    function equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
     //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
     //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
     function compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
@@ -185,6 +185,11 @@ type
     //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
     function compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
     procedure compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
+    //**Compares two atomic values and returns 0 as the deepEqual function would if equal, -1 for a < b, and +1 for a > b; -2 for unknown
+    function compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+    function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer; inline;
+    function equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
+    function equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean; inline;
   property
     NodeCollation: TXQCollation read getNodeCollation write FNodeCollation;
   end;
@@ -3457,21 +3462,14 @@ begin
     result := xqvalue();
 end;
 
-function TXQStaticContext.equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation; acceptNAN: boolean): boolean;
-var
-  ak: TXQValueKind;
-  bk: TXQValueKind;
+function TXQStaticContext.equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result:=false;
-  ak := a.kind; bk := b.kind;
-  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
-    exit(acceptNAN and ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)));
-  result := compareAtomic(a,b,overrideCollation)=0;
+  result:=compareAtomic(a,b,overrideCollation)=0;
 end;
 
-function TXQStaticContext.equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation; acceptNAN: boolean): boolean;
+function TXQStaticContext.equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result := equalAtomic(a as txqvalue,b as txqvalue,overrideCollation, acceptNAN);
+  result := equalAtomic(a as txqvalue,b as txqvalue,overrideCollation);
 end;
 
 function TXQStaticContext.compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
@@ -3525,6 +3523,42 @@ end;
 procedure TXQStaticContext.compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
 begin
   result := xqvalue(compareGeneral(a,b, nil, accept1,accept2));
+end;
+
+function TXQStaticContext.compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+var
+  ak: TXQValueKind;
+  bk: TXQValueKind;
+begin
+  ak := a.kind; bk := b.kind;
+  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) then begin
+    if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(0)
+    else exit(-1); //randomly choosen
+  end else if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(1);
+  result := compareAtomic(a,b,overrideCollation);
+end;
+
+function TXQStaticContext.compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
+begin
+  result := compareDeepAtomic(a as txqvalue, b as txqvalue, overrideCollation);
+end;
+
+function TXQStaticContext.equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
+begin
+  result := compareDeepAtomic(a,b,overrideCollation) = 0;
+{var
+  ak: TXQValueKind;
+  bk: TXQValueKind;
+begin
+  result:=false;
+  ak := a.kind; bk := b.kind;
+  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
+    exit(acceptNAN and ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)));}
+end;
+
+function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
+begin
+  result := equalDeepAtomic(a as txqvalue, b as txqvalue, overrideCollation);
 end;
 
 { TXQTermModule }

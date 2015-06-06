@@ -25,12 +25,14 @@ begin
 
   start := now;
  // bigdecimal_tests.unittests;
+
+
   bbutils_tests.unitTests;
   internetaccess_tests.unittests;
   parsertests.unittests(testerrors);
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
-  xpath3_tests.unittests(testerrors);
+  xpath3_tests.unittests(testerrors); //}
   xquery3_tests.unittests(testerrors);
   extendedhtmlparser_tests.unitTests(testerrors);
   simpleinternet_tests.unittests();
