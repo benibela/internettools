@@ -811,6 +811,10 @@ begin
     for i := 0 to high(children) do
       tempSeq.add(children[i].evaluate(context));
     result := tempSeq;
+    case tempseq.seq.count of
+      0: result := xqvalue;
+      1: result := result.get(1);//this crashes: tempSeq.seq[0]; ??
+    end;
   except
     tempSeq.free;
     raise;
