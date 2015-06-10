@@ -45,7 +45,7 @@ end;
 
 procedure TXQTerm.raiseEvaluationError(const errcode, s: string);
 begin
-  raise EXQEvaluationException.Create(errcode, s);
+  raise EXQEvaluationException.Create(errcode, s, nil, nil, self);
 end;
 
 procedure TXQTerm.raiseTypeError0004(const s: string);
@@ -55,7 +55,7 @@ end;
 
 procedure TXQTerm.raiseTypeError0004(const s: string; const got: IXQValue);
 begin
-  raiseTypeError0004(s + ' GOT: '+ got.debugAsStringWithTypeAnnotation());
+  raise EXQEvaluationException.Create('XPTY0004', s + ' GOT: '+ got.debugAsStringWithTypeAnnotation(), nil, got, self);
 end;
 
 function TXQTerm.toQueryCommand: TXQPathMatchingStep;
@@ -2139,14 +2139,14 @@ function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQ
 var
   evilkids: TXQVArray;
   t: TXSType;
+  i: Integer;
   {$ifdef checkreturntypes}version: Integer;{$endif}
 begin
   evaluateChildren(context, evilkids);
-
   assert((kind = xqfkUnknown) or (func <> nil));
 
   if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
-    {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(evilkids, context)
+    {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(evilkids, context, self)
    {$ifdef checkreturntypes}
    else
     version := -1{$endif};
@@ -2176,11 +2176,11 @@ begin
     end;
     xqfkNativeInterpreted: begin
       init(context.staticContext);
-      result := interpretedFunction.evaluateInContext(context, evilkids);
+      result := interpretedFunction.evaluateInContext(context, evilkids, self);
     end;
     xqfkUnknown: begin
       init(context.staticContext);
-      result := interpretedFunction.evaluate(evilkids);
+      result := interpretedFunction.evaluate(evilkids, self);
     end;
   end;
 
@@ -2218,6 +2218,20 @@ function TXQTermNamedFunction.clone: TXQTerm;
 begin
   Result:=inherited clone;
   TXQTermNamedFunction(result).assignWithoutChildren(self);
+end;
+
+function TXQTermNamedFunction.ToString: ansistring;
+var
+  i: Integer;
+begin
+  result := '';
+  if namespaceUrl <> '' then result := 'Q{'+ namespaceUrl+'}';
+  result += funcname + '(';
+  for i := 0 to high(children) do begin
+    if i <> 0 then result += ', ';
+    result += children[i].ToString;
+  end;
+  result += ')';
 end;
 
 class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
@@ -2371,7 +2385,7 @@ begin
     setlength(evilkids, length(children)-1);
     for i:=1 to high(children) do
       evilkids[i-1] := children[i].evaluate(context);
-    exit((func as TXQValueFunction).evaluate(evilkids));
+    exit((func as TXQValueFunction).evaluate(evilkids, self));
   end;
 
   if length(children) = 1 then begin
@@ -2487,7 +2501,7 @@ begin
         case evilkids[i].kind of
           pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toFloatChecked(context.staticContext) );
         end;
-    op.checkOrConvertTypes(evilkids, context);
+    op.checkOrConvertTypes(evilkids, context, self);
     result := op.func(context, evilkids[0], evilkids[1]);
   end;
 end;

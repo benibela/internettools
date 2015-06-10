@@ -149,7 +149,7 @@ begin
     newargs[0] := args[1];
     for v in args[0] do begin
       newargs[1] := v;
-      newargs[0] := func.evaluate(newargs);
+      newargs[0] := func.evaluate(newargs, nil);
     end;
     result := newargs[0];
   end else begin
@@ -157,7 +157,7 @@ begin
     newargs[1] := args[1];
     for i := count downto 1 do begin
       newargs[0] := args[0].get(i);
-      newargs[1] := func.evaluate(newargs);
+      newargs[1] := func.evaluate(newargs, nil);
     end;
     result := newargs[1];
   end;
@@ -196,7 +196,7 @@ begin
   for i := 1 to count do begin
     newargs[0] := seq1.get(i);
     newargs[1] := seq2.get(i);
-    resseq.add(func.evaluate(newargs));
+    resseq.add(func.evaluate(newargs, nil));
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);

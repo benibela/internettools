@@ -1846,7 +1846,7 @@ begin
 end;
 
 
-function TXQValueFunction.evaluate(const args: TXQVArray): IXQValue;
+function TXQValueFunction.evaluate(const args: TXQVArray; const term: TXQTerm): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
   j: Integer;
@@ -1856,15 +1856,15 @@ begin
   tempcontext.temporaryVariables := TXQVariableChangeLog.create();
   try
     for j := 0 to high(parameters) do
-      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context));
+      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context, term));
     result := body.evaluate(tempcontext);
-    result := TXQAbstractFunctionInfo.convertType(result, resulttype, context);
+    result := TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);
   finally
     tempcontext.temporaryVariables.free;
   end;
 end;
 
-function TXQValueFunction.evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function TXQValueFunction.evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
   j: Integer;
@@ -1875,9 +1875,9 @@ begin
   else tempcontext.temporaryVariables.pushAll;
   try
     for j := 0 to high(parameters) do
-      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, inContext));
+      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, inContext, term));
     result := body.evaluate(tempcontext);
-    result := TXQAbstractFunctionInfo.convertType(result, resulttype, inContext);
+    result := TXQAbstractFunctionInfo.convertType(result, resulttype, inContext, term);
   finally
     if inContext.temporaryVariables = nil then tempcontext.temporaryVariables.free
     else tempcontext.temporaryVariables.popAll();

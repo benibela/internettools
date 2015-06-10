@@ -832,8 +832,8 @@ type
 
     function toBooleanEffective: boolean; override;
 
-    function evaluate(const args: TXQVArray): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
-    function evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    function evaluate(const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    function evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
@@ -1214,9 +1214,9 @@ type
   TXQAbstractFunctionInfo = class
     minArgCount, maxArgCount: word;
     versions: array of TXQFunctionParameterTypes;
-    class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): IXQValue; static;
+    class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm): IXQValue; static;
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
-    function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext): integer;
+    function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext; term: TXQTerm): integer;
     destructor Destroy; override;
   private
     procedure guessArgCount;
@@ -1544,6 +1544,7 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     procedure assignWithoutChildren(source: TXQTermNamedFunction);
     function clone: TXQTerm; override;
+    function ToString: ansistring; override;
   private
     interpretedFunction: TXQValueFunction;
     functionStaticContext: TXQStaticContext; //used for variable cycle detection
@@ -1850,8 +1851,9 @@ type
     namespace: INamespace;
     constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
   private
+    rawMessageLength: integer;
     function messagePrefix: string;
-    function rawMessage: string; virtual;
+    function rawMessage: string;
   end;
 
   //**Exception raised during the parsing of an expression
@@ -1865,8 +1867,8 @@ type
 
   EXQEvaluationException = class(EXQException)
     value: IXQValue;
-    constructor create(aerrcode, amessage: string; anamespace: INamespace = nil; avalue: IXQValue = nil);
-    function rawMessage: string; override;
+    term: TXQTerm;
+    constructor create(aerrcode, amessage: string; anamespace: INamespace = nil; avalue: IXQValue = nil; aterm: TXQTerm = nil);
   end;
 
   (***
@@ -2660,18 +2662,15 @@ end;
 
 { EXQEvaluationException }
 
-constructor EXQEvaluationException.create(aerrcode, amessage: string; anamespace: INamespace; avalue: IXQValue);
+constructor EXQEvaluationException.create(aerrcode, amessage: string; anamespace: INamespace; avalue: IXQValue; aterm: TXQTerm);
 begin
   inherited create(aerrcode, amessage, anamespace);
   value := avalue;
   if value <> nil then
     message := message + ':'+LineEnding+value.debugAsStringWithTypeAnnotation();
-end;
-
-function EXQEvaluationException.rawMessage: string;
-begin
-  Result:=inherited rawMessage;
-  if value <> nil then result := copy(result, 1, length(result) - length( ':'+LineEnding+value.debugAsStringWithTypeAnnotation() ) );
+  term := aterm;
+  if term <> nil then
+    message := message + ' in '+LineEnding+term.ToString;
 end;
 
 
@@ -2688,6 +2687,7 @@ end;
 
 constructor EXQException.create(aerrcode, amessage: string; anamespace: INamespace = nil);
 begin
+  rawMessageLength := length(amessage);
   if strBeginsWith(aerrcode, 'pxp:') then begin
     delete(aerrcode, 1, 4);
     namespace := TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
@@ -2714,6 +2714,7 @@ function EXQException.rawMessage: string;
 begin
   result := Message;
   delete(result, 1, length(messagePrefix));
+  result := copy(result, 1, rawMessageLength);
 end;
 
 var collations: TStringList;
@@ -4347,8 +4348,7 @@ function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQVal
 
 { TXQAbstractFunctionInfo }
 
-class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext
-  ): IXQValue;
+class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm): IXQValue;
 
   function conversionSingle(const w: IXQValue): IXQValue;
   var
@@ -4357,7 +4357,7 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
   begin
     result := w;
     if typ.kind = tikFunctionTest then begin
-      if w.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.debugAsStringWithTypeAnnotation());
+      if w.kind <> pvkFunction then term.raiseTypeError0004('Expected function', result);
       if context.staticContext.strictTypeChecking then result := typ.functionCoercion(w);
       exit;
     end;
@@ -4379,7 +4379,7 @@ class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ:
     else
       if w.kind <> pvkFunction then errCode := 'XPTY0004'
       else errCode := 'FOTY0013';
-    raise EXQEvaluationException.Create(errCode, 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
+    term.raiseEvaluationError(errCode, 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
   end;
 
 var
@@ -4390,11 +4390,11 @@ begin
   if typ = nil then exit;
   if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
   case result.getSequenceCount of
-    0:  if not typ.allowNone then raise EXQEvaluationException.Create('XPTY0004', 'Expected value, but got empty sequence.')
+    0:  if not typ.allowNone then term.raiseTypeError0004('Expected value, but got empty sequence.')
         else exit;
     1: ; //later
     else if (not typ.allowMultiple) then
-      raise EXQEvaluationException.Create('XPTY0004', 'Expected singleton, but got sequence: '+result.debugAsStringWithTypeAnnotation());
+      term.raiseTypeError0004('Expected singleton', result);
   end;
   if typ.kind in [tikAtomic, tikFunctionTest] then begin
     if not (result is TXQValueSequence) then
@@ -4403,12 +4403,10 @@ begin
     for i := 0 to seq.Count - 1 do
       seq[i] := conversionSingle(seq[i]);
   end else if typ.kind = tikElementTest then
-    raise EXQEvaluationException.Create('XPTY0004', 'Expected '+typ.serialize+', but got : '+result.debugAsStringWithTypeAnnotation());
-    ;
+    term.raiseTypeError0004('Expected '+typ.serialize, result);
 end;
 
-class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext
-  ): boolean;
+class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean;
   function checkSingle(const wpre: IXQValue): boolean;
   var w: IXQValue;
     st: TXSType;
@@ -4447,7 +4445,7 @@ begin
 end;
 
 
-function TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext): integer;
+function TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext; term: TXQTerm): integer;
 var
   i, j, countMatch: Integer;
   matches: Boolean;
@@ -4467,7 +4465,7 @@ begin
     if matches then begin
      for j := 0 to high(values) do
        if versions[i].types[j].kind = tikFunctionTest then
-         values[j] := convertType(values[j], versions[i].types[j], context);
+         values[j] := convertType(values[j], versions[i].types[j], context, term);
       result := i;
       exit;
     end;
@@ -4476,7 +4474,7 @@ begin
 
   //print a nice error message
   if countMatch = -1 then
-    raise EXQEvaluationException.create('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
+    term.raiseEvaluationError('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
   errCode := 'XPTY0004';
   for i := 0 to high(values) do
     if not (versions[countMatch].types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
@@ -4505,7 +4503,7 @@ begin
     errMessage += ')';
   end;
 
-  raise EXQEvaluationException.create(errCode, errMessage);
+  term.raiseEvaluationError(errCode, errMessage);
 end;
 
 destructor TXQAbstractFunctionInfo.Destroy;
