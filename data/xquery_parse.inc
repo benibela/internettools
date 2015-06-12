@@ -652,6 +652,7 @@ var token: String;
             if temp = 'at' then begin
               requireXQuery;
               TXQTermFlowerFor(clause).positionvar := parseFlowerVariable;
+              if loopvar.equalsVariable(TXQTermFlowerFor(clause).positionvar) then raiseEvaluationError('XQST0089', 'Duplicated variable name');
               temp := nextToken;
             end;
 
