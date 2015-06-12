@@ -1443,7 +1443,7 @@ var
     begin
       letclause := TXQTermFlowerLet(children[pos]);
       if (letclause.sequenceTyp <> nil) and not (letclause.sequenceTyp.instanceOf(v, context)) then
-        raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+letclause.sequenceTyp.serialize+' got value '+v.debugAsStringWithTypeAnnotation());
+        raiseTypeError0004('Invalid variable type, expected: type '+letclause.sequenceTyp.serialize, v);
 
       tempContext.temporaryVariables.pushAll;
       tempContext.temporaryVariables.add(letclause.loopvar, v);
@@ -1468,6 +1468,13 @@ var
          currentTuple.vars[variableIndex] := value;
          inc(variableIndex);
         end;
+      end;
+
+      procedure addVarAs(const v: TXQTermVariable; st: TXQTermSequenceType; const value: IXQValue);
+      begin
+        if (st <> nil) and not (st.instanceOf(value, context)) then
+          raiseTypeError0004('Invalid variable type, expected: type '+st.serialize, value);
+        addVar(v, value);
       end;
 
     var
@@ -1535,7 +1542,7 @@ var
              variableIndex := tempIndex;
            end;
            if endi <= length then begin
-             addVar(window.loopvar, subsequence(start, endi));
+             addVarAs(window.loopvar, window.sequenceTyp, subsequence(start, endi));
              evaluateForLoop(pos+1);
            end;
            tempContext.temporaryVariables.popAll();
