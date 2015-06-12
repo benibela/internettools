@@ -1116,9 +1116,20 @@ begin
   visitor.undeclare(@loopvar);
 end;
 
-type TXQTerm_VisitorFindDuplicatedVariable = class(TXQTerm_VisitorTrackKnownVariables)
-  duplicate: TXQTermVariable;
-  procedure declare(v: PXQTermVariable); override;
+procedure TXQTermFlowerWindow.visitlocalvariables(callback: TXQTermFlowerWindowVariableCallback; data: pointer);
+  procedure subcondition(const c: TXQTermFlowerWindowVarsAndCondition);
+  begin
+    with c do begin
+      if assigned(currentItem) then callback(data, currentItem);
+      if assigned(positionVar) then callback(data, positionVar);
+      if assigned(previousItem) then callback(data, previousItem);
+      if assigned(nextItem) then callback(data, nextItem);
+    end;
+  end;
+begin
+  callback(data, loopvar);
+  subcondition(startCondition);
+  if assigned(endCondition.when) then subcondition(endCondition);
 end;
 
 
