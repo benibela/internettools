@@ -2884,17 +2884,21 @@ end;
 { TXQTermTypeSwitch }
 
 function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
-  function evaluateWithChangedVariable(eval, vari: TXQTerm; const value: IXQValue): IXQValue;
+  function evaluateWithChangedVariable(clause: TXQTermSequence; const value: IXQValue): IXQValue;
   var
     tempContext: TXQEvaluationContext;
+    hasVariableDeclaration: Boolean;
+    eval: TXQTerm;
   begin
+    eval := clause.children[high(clause.children)];
+    hasVariableDeclaration := (length(clause.children) > 1) and (clause.children[0] is TXQTermVariable);
     tempContext := context;
-    if vari is TXQTermVariable then begin
+    if hasVariableDeclaration then begin
       tempContext.beginSubContextWithVariables;
-      tempContext.temporaryVariables.add(TXQTermVariable(vari).value, value);
+      tempContext.temporaryVariables.add(TXQTermVariable(clause.children[0]).value, value);
     end;
     result := eval.evaluate(tempContext);
-    if vari is TXQTermVariable then tempContext.endSubContextWithVariables(context);
+    if hasVariableDeclaration then tempContext.endSubContextWithVariables(context);
   end;
   function evaluateWithChangedVariableLog(eval: TXQTerm; log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
   var
@@ -2946,12 +2950,12 @@ begin
     else start := 0;
     for j := start to high(seq.children) - 1 do
       if (seq.children[j] as TXQTermSequenceType).instanceOf(v, context) then
-        exit(evaluateWithChangedVariable(seq.children[high(seq.children)], seq.children[0], v));
+        exit(evaluateWithChangedVariable(seq, v));
   end;
   i := high(children);
   if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
   seq := TXQTermSequence(children[i]);
-  result := evaluateWithChangedVariable(seq.children[high(seq.children)], seq.children[0], v);
+  result := evaluateWithChangedVariable(seq, v);
 end;
 
 function TXQTermTypeSwitch.getContextDependencies: TXQContextDependencies;
