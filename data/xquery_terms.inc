@@ -1121,40 +1121,38 @@ type TXQTerm_VisitorFindDuplicatedVariable = class(TXQTerm_VisitorTrackKnownVari
   procedure declare(v: PXQTermVariable); override;
 end;
 
-procedure TXQTerm_VisitorFindDuplicatedVariable.declare(v: PXQTermVariable);
+
+procedure XQTermFlowerWindowVariableCallbackFindDuplicatedVariable(data: pointer; v: TXQTermVariable);
 begin
-  if overridenVariables.hasVariable(v^) then duplicate := v^;
-  inherited declare(v);
+  TFPList(data).Add(v);
 end;
 
 function TXQTermFlowerWindow.findDuplicatedVariable: TXQTermVariable;
 var
-  temp: TXQTerm_VisitorFindDuplicatedVariable;
+  l: TFPList;
+  i,j: Integer;
 begin
-  temp := TXQTerm_VisitorFindDuplicatedVariable.create;
-  temp.simpleTermVisit(@self, nil);
-  result := temp.duplicate;
-  temp.free;
+  l := TFPList.Create;
+  try
+    visitlocalvariables(@XQTermFlowerWindowVariableCallbackFindDuplicatedVariable, l);
+    for i := 0 to l.Count - 1 do
+      for j := 0 to i - 1 do
+        if TXQTermVariable(l[i]).equalsVariable(TXQTermVariable(l[j])) then
+          exit(TXQTermVariable(l[j]));
+    result := nil;
+  finally
+    l.free;
+  end;
 end;
 
-type TXQTerm_VisitorCountVariables = class(TXQTerm_Visitor)
-  count: integer;
-  procedure declare(v: PXQTermVariable); override;
-end;
-
-procedure TXQTerm_VisitorCountVariables.declare(v: PXQTermVariable);
+procedure XQTermFlowerWindowVariableCallbackCount(data: pointer; v: TXQTermVariable);
 begin
-  inc(count);
+  inc(PInteger(data)^);
 end;
 
 function TXQTermFlowerWindow.variableCount: integer;
-var
-  temp: TXQTerm_VisitorCountVariables;
 begin
-  temp := TXQTerm_VisitorCountVariables.create;
-  temp.simpleTermVisit(@self, nil);
-  result := temp.count;
-  temp.free;
+  visitlocalvariables(@XQTermFlowerWindowVariableCallbackCount, @result);
 end;
 
 { TXQTermFlowerLetPattern }

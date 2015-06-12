@@ -1618,6 +1618,7 @@ type
     procedure freeAll;
   end;
   TXQTermFlowerWindowFlags = set of (xqtfwSliding {default tumbling}, xqtfwEndOnlyWhen);
+  TXQTermFlowerWindowVariableCallback = procedure (data: pointer; v: TXQTermVariable);
   TXQTermFlowerWindow = class(TXQTermFlowerLet)
     flags: TXQTermFlowerWindowFlags;
     startCondition, endCondition: TXQTermFlowerWindowVarsAndCondition;
@@ -1628,6 +1629,7 @@ type
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
     procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
   private
+    procedure visitlocalvariables(callback: TXQTermFlowerWindowVariableCallback; data: pointer);
     function findDuplicatedVariable: TXQTermVariable;
     function variableCount: integer;
   end;
