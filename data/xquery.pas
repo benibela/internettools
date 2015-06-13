@@ -2805,7 +2805,7 @@ end;
 {$I restoreRangeOverflowChecks.inc}
 
 
-function compareValue(a, b: xqfloat;const EPSILON: extended = 1e-17): integer;
+function compareValue(a, b: xqfloat): integer;
 var
   t: extended;
 begin
@@ -2818,10 +2818,8 @@ begin
     if isNegInf(a) and isNegInf(b) then exit(0)
     else if isNegInf(b) then exit(1)
     else exit(-1);
-  if a = b then exit(0);
-  t := extended(a) - extended(b); //do not want overflow
-  if t < -EPSILON then exit(-1);
-  if t > EPSILON then exit(1);
+  if a < b then exit(-1);
+  if a > b then exit(1);
   exit(0);
 end;
 
@@ -3341,7 +3339,7 @@ var ak, bk: TXQValueKind;
         if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
           result := compareValue(TXQValueDateTime(a).toMonths(), TXQValueDateTime(b).toMonths());
           if result <> 0 then exit;
-          result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime(), 1e-6);
+          result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime());
         end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
           result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
       end;

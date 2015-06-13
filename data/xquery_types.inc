@@ -1102,7 +1102,7 @@ begin
   else if not IsNan(implicitTimezone) then bdelta -= implicitTimezone;
 
   adt+=adelta; bdt+=bdelta;
-  result := CompareValue(xqfloat(adt),xqfloat(bdt),0.000001/SecsPerDay);
+  result := CompareValue(xqfloat(adt),xqfloat(bdt));
 end;
 
 
