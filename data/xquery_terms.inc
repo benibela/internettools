@@ -1536,7 +1536,7 @@ var
       while start <= length do begin
         if checkCondition(start, window.startCondition, (not Assigned(window.endCondition.when)) and (start = endi + 1) and (start < length)  ) then begin
            endi := start;
-           if Assigned(window.endCondition.when) then begin
+          if Assigned(window.endCondition.when) then begin
              while (endi < length) and not checkCondition(endi, window.endCondition) do inc(endi);
              if endi = length then if not checkCondition(endi, window.endCondition, not (xqtfwEndOnlyWhen in window.flags) ) then
                inc(endi);
@@ -1547,16 +1547,18 @@ var
              while (endi < length) and not checkCondition(endi, window.startCondition)  do inc(endi);
              if endi = length then if not checkCondition(endi, window.startCondition ) then
                inc(endi);
+             if endi <= length then
+               tempContext.temporaryVariables.popAll();
              dec(endi); //it was next start, not end
              variableIndex := tempIndex;
            end;
            if endi <= length then begin
              addVarAs(window.loopvar, window.sequenceTyp, subsequence(start, endi));
              evaluateForLoop(pos+1);
+            if Assigned(window.endCondition.when) then
+              tempContext.temporaryVariables.popAll(); //end condition, only if matched
            end;
-           tempContext.temporaryVariables.popAll();
-           if Assigned(window.endCondition.when) then
-             tempContext.temporaryVariables.popAll();
+           tempContext.temporaryVariables.popAll(); //start condition
            if xqtfwSliding in window.flags then inc(start)
            else start := endi + 1;
            if needFullTuple then variableIndex := clauseIndex[pos];

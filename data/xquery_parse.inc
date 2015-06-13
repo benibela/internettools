@@ -598,10 +598,10 @@ var token: String;
         expect('only');
         Include(window.flags, xqtfwEndOnlyWhen);
       end;
-      if nextToken(true) = 'end' then begin
+      if ( xqtfwSliding in window.flags ) or (nextToken(true) = 'end')  then begin
         expect('end');
         parseWindowVars(window.endCondition);
-      end else if xqtfwSliding in window.flags then expect('end');
+      end;
       duplicate := window.findDuplicatedVariable;
       if duplicate <> nil then raiseParsingError('XQST0103', 'Duplicated variable name: '+duplicate.ToString);
     end;

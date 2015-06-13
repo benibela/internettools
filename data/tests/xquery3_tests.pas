@@ -346,10 +346,12 @@ begin
   m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)   start at $s when fn:true()   end at $e when $e - $s eq 2  return join($w), "; " )', '2 4 6; 8 10 12; 14');
   m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)    start at $s when $s mod 3 = 1   return <window>{ $w }</window>, "; ")', '2 4 6; 8 10 12; 14');
   m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)    start $first when $first mod 3 = 0  return <window>{ $w }</window>, "; ")', '6 8 10; 12 14');
+  m('join(for tumbling window $w in (2, 4, 6, 8, 10, 12, 14)    start at $first when $first mod 3 = 0  return <window>{ $first, ":", $w }</window>, "; ")', '3 : 6 8 10; 6 : 12 14');
 
   m('join(for sliding window $w in (2, 4, 6, 8, 10, 12, 14)    start at $s when fn:true()    only end at $e when $e - $s eq 2  return <window>{ $w }</window>, "; ")', '2 4 6; 4 6 8; 6 8 10; 8 10 12; 10 12 14');
   t('for sliding window $w in (2, 4, 6, 8, 10, 12, 14)    start at $s when fn:true()    only end at $e when $e - $s eq 2 return avg($w)', '4 6 8 10 12');
   m('join(for sliding window $w in (2, 4, 6, 8, 10, 12, 14)     start at $s when fn:true()    end at $e when $e - $s eq 2  return <window>{ $w }</window>, "; ")', '2 4 6; 4 6 8; 6 8 10; 8 10 12; 10 12 14; 12 14; 14');
+  t('let $MAX_DIFF := 2 for sliding window $w in (1 to 10)  start when true() only end $a when $a  mod $MAX_DIFF = 0 return avg( $w ) ', '1.5 2 3.5 4 5.5 6 7.5 8 9.5 10'); //failed xqts
 
   //group by
   t('for $i in (1,2,3,3) group by $i return $i', '1 2 3');

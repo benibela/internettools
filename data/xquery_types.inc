@@ -1144,7 +1144,7 @@ begin
     1: exit(seq[0].toBooleanEffective);
     else begin
       if (seq[0] is TXQValueNode) or (seq[0] is TXQValueObject) or (seq[0] is TXQValueJSONArray) then exit(true);
-      raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used a boolean');
+      raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean');
     end;
   end;
 end;
