@@ -877,7 +877,8 @@ begin
     end;
   FreeAndNil(xq.StaticContext.namespaces);
   contexttree := nil;
-  for i := 0 to environments.count - 1 do
+  if environments.Count = 0 then loadEnvironment(nil)
+  else for i := 0 to environments.count - 1 do
     contexttree :=  loadEnvironment(TEnvironment(environments[i]));
   xq.OnImportModule:=@importModule;
   {for i := 0 to modules.Count - 1 do
@@ -1269,48 +1270,59 @@ var
 begin
   SetExceptionMask([exInvalidOp, exDenormalized, {exZeroDivide,}
                    exOverflow, exUnderflow, exPrecision]);
-  if env.definition <> nil then env.init;
+  if (env <> nil) and (env.definition <> nil) then env.init;
   result := nil;
 //  idx := environments.IndexOf(id);
 //  env := TEnvironment(environments.Objects[idx]);
-  if env.refed <> nil then
+  if (env <> nil) and (env.refed <> nil) then
     exit(loadEnvironment(env.refed));
   sc := xq.StaticContext;
-  if env.staticBaseUri = '#UNDEFINED' then sc.baseURI:=''
- // else if env.staticBaseUri = '' then sc.baseURI := currentfile
-  else sc.baseURI := env.staticBaseUri;
-
-  collationsSame := (env.collations.Count = 0) or (TXQueryEngine.collationsInternal.Count = env.collations.Count);
-  for i := 0 to env.collations.Count-1 do begin
-    if TXQueryEngine.collationsInternal.IndexOf(env.collations[i]) < 0 then collationsSame:=false;
-    if not collationsSame then break;
-  end;
-  if not collationsSame then begin
+  if env <> nil then begin
+    if env.staticBaseUri = '#UNDEFINED' then sc.baseURI:=''
+   // else if env.staticBaseUri = '' then sc.baseURI := currentfile
+    else sc.baseURI := env.staticBaseUri;
+    collationsSame := ( (env.collations.Count = 0) or (TXQueryEngine.collationsInternal.Count = env.collations.Count) );
+    for i := 0 to env.collations.Count-1 do begin
+      if TXQueryEngine.collationsInternal.IndexOf(env.collations[i]) < 0 then collationsSame:=false;
+      if not collationsSame then break;
+    end;
+    if not collationsSame then begin
+      TXQueryEngine.collationsInternal.Clear;
+      TXQueryEngine.collationsInternal.Assign(env.collations);
+    end;
+    if (env.defaultCollation <> '') and (TXQueryEngine.collationsInternal[0] <> env.defaultCollation) then
+      TXQueryEngine.collationsInternal.Exchange(0, TXQueryEngine.collationsInternal.IndexOf(env.defaultCollation));
+  end else if (TXQueryEngine.collationsInternal.Count = 0)
+              or (TXQueryEngine.collationsInternal.Count > 1)
+              or ((TXQueryEngine.collationsInternal.Count = 1) and (TXQueryEngine.collationsInternal.Objects[0] <> xqtsCollations.Objects[0])) then begin
     TXQueryEngine.collationsInternal.Clear;
-    TXQueryEngine.collationsInternal.Assign(env.collations);
+    TXQueryEngine.collationsInternal.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
   end;
-  if (env.defaultCollation <> '') and (TXQueryEngine.collationsInternal[0] <> env.defaultCollation) then
-    TXQueryEngine.collationsInternal.Exchange(0, TXQueryEngine.collationsInternal.IndexOf(env.defaultCollation));
-
 
 
   xq.VariableChangelog.clear;
 
-  for i := 0 to env.sources.Count-1 do
-    if TSource(env.sources[i]).role = '.' then result := TSource(env.sources[i]).tree
-    else if TSource(env.sources[i]).role <> '' then xq.VariableChangelog.add(TSource(env.sources[i]).role, TSource(env.sources[i]).tree)
-    else TSource(env.sources[i]).tree; //the query should load it itself, but we need to load it in the cache, because the url does not actually exist
+  if env <> nil then begin
+    for i := 0 to env.sources.Count-1 do
+      if TSource(env.sources[i]).role = '.' then result := TSource(env.sources[i]).tree
+      else if TSource(env.sources[i]).role <> '' then xq.VariableChangelog.add(TSource(env.sources[i]).role, TSource(env.sources[i]).tree)
+      else TSource(env.sources[i]).tree; //the query should load it itself, but we need to load it in the cache, because the url does not actually exist
 
-  xq.OnCollection:=@env.getCollection;
-  xq.OnDeclareExternalVariable:=@env.getExternalVariable;
+    xq.OnCollection:=@env.getCollection;
+    xq.OnDeclareExternalVariable:=@env.getExternalVariable;
 
-  if env.namespaces = nil then FreeAndNil(sc.namespaces)
-  else begin
-    sc.namespaces := env.namespaces.clone;
+    if env.namespaces = nil then FreeAndNil(sc.namespaces)
+    else begin
+      sc.namespaces := env.namespaces.clone;
+    end;
+    for i := 0 to high(env.params) do
+      if not env.params[i].declared then
+        xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
+  end else begin
+    xq.OnCollection:=nil;
+    xq.OnDeclareExternalVariable:=nil;
+    FreeAndNil(sc.namespaces)
   end;
-  for i := 0 to high(env.params) do
-    if not env.params[i].declared then
-      xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
 
 end;
 

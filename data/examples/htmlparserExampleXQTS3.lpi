@@ -31,7 +31,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --test-set cast --test-case K2-SeqExprCast-479"/>
+        <CommandLineParams Value="--mode xquery1  --print-failed-inputs  --print-test-cases fe  --test-set func --test-case functx-functx-index-of-string-1"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
     </RunParams>
