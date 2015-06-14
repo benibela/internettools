@@ -2070,9 +2070,10 @@ begin
 
   if e[1] = '#' then exit(ekCSS);
 
-  if checkWords('xquery', ['version']) or checkWords('typeswitch', []) or checkWords('import', ['module', 'schema']) or
+  if checkWords('xquery', ['version', 'encoding']) or checkWords('typeswitch', []) or checkWords('import', ['module', 'schema']) or
      checkWords('module', ['namespace']) or
-     checkWords('declare', ['function', 'variable', 'namespace', 'default', 'boundary-space', 'base-uri', 'option', 'construction', 'copy-namespace'])
+     checkWords('declare', ['function', 'variable', 'namespace', 'default', 'boundary-space', 'base-uri', 'option', 'construction', 'copy-namespace']) or
+     checkWords('for', ['sliding', 'tumbling'])
      then
     exit(ekXQuery3);
 
