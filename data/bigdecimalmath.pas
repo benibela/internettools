@@ -322,9 +322,9 @@ begin
     signed := s[1] = '-';
     lastDigitHidden := false;
     if dot <> 0 then trueexponent -= intend - dot;
-    if trueexponent >= 0 then exponent := trueexponent div DIGITS_PER_ELEMENT
-    else exponent := (trueexponent - (DIGITS_PER_ELEMENT - 1)) div DIGITS_PER_ELEMENT;
-    totalintlength := intend - intstart + 1  + (trueexponent - exponent * DIGITS_PER_ELEMENT);
+    exponent := trueexponent div DIGITS_PER_ELEMENT;
+    if (trueexponent < 0) and (int64(exponent) * DIGITS_PER_ELEMENT <> trueexponent) then exponent -= 1; //truncate to negative infinity
+    totalintlength := intend - intstart + 1  + (trueexponent - int64(exponent) * DIGITS_PER_ELEMENT);
     if dot <> 0 then totalintlength -= 1;
     SetLength(digits, (totalintlength + DIGITS_PER_ELEMENT - 1) div DIGITS_PER_ELEMENT);
     p := high(digits);
