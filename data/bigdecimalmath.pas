@@ -1089,7 +1089,7 @@ begin
       if temp < 2*ELEMENT_OVERFLOW then temp -= ELEMENT_OVERFLOW
       else begin
         d := temp div ELEMENT_OVERFLOW;
-        temp := temp - d * ELEMENT_OVERFLOW;
+        temp := temp - BigDecimalBinSquared(d) * ELEMENT_OVERFLOW;
       end;
       if j + 1 > high(r.digits) then begin
         SetLength(r.digits, length(r.digits) + 1);
@@ -1126,7 +1126,7 @@ begin
       if temp > -ELEMENT_OVERFLOW then temp += ELEMENT_OVERFLOW
       else begin
         d := (temp - (ELEMENT_OVERFLOW - 1)) div ELEMENT_OVERFLOW ;
-        temp := temp - d * ELEMENT_OVERFLOW;
+        temp := temp - BigDecimalBinSquared(d) * ELEMENT_OVERFLOW;
       end;
       r.digits[j + 1] += d;
     end;
