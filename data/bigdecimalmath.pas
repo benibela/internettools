@@ -1563,6 +1563,7 @@ end;
 
 
 function round(const v: BigDecimal; toDigit: integer; roundingMode: TBigDecimalRoundingMode): BigDecimal;
+const SAFETY_MARGIN = 1024; //do not attemp to round to maxint digit precision, but keep a safety margin to unrepresentable value
 var
   highskip: integer;
   lowskip: integer;
@@ -1571,17 +1572,25 @@ var
   toDigitInBin: Integer;
   i: Integer;
   additionalBin: Integer;
+  exponentDelta: Integer;
 begin
   skipZeros(v, highskip, lowskip);
 
-  if toDigit >= 0 then result.exponent := toDigit div DIGITS_PER_ELEMENT
-  else result.exponent := (toDigit - (DIGITS_PER_ELEMENT - 1)) div DIGITS_PER_ELEMENT;
+  if toDigit >= 0 then begin
+    if toDigit > high(Integer) - SAFETY_MARGIN then toDigit := high(Integer) - SAFETY_MARGIN;
+    result.exponent := toDigit div DIGITS_PER_ELEMENT;
+  end else begin
+    if toDigit < Low(Integer) + SAFETY_MARGIN then toDigit := Low(Integer) + SAFETY_MARGIN;
+    result.exponent := (toDigit - (DIGITS_PER_ELEMENT - 1)) div DIGITS_PER_ELEMENT;
+  end;
   toDigitInBin := toDigit - DIGITS_PER_ELEMENT * result.exponent;
   if (length(v.digits) = 0)
      or  (v.exponent > result.exponent)
      or ((v.exponent = result.exponent) and (v.digits[0] mod powersOf10[toDigitInBin] = 0)) then
     exit(v);
   result.lastDigitHidden := false;
+
+  exponentDelta := result.exponent - v.exponent;
 
   case roundingMode of //example: 2.5, -2.5
     bfrmTrunc: increment := false; //2 ; - 2
@@ -1592,31 +1601,31 @@ begin
       lastDigit := getDigit(v, toDigit - 1);
       if lastDigit < 5 then increment := false
       else if lastDigit > 5 then increment := true
-      else if lowskip + v.exponent <> result.exponent - ifthen(toDigitInBin = 0, 1, 0) then
-        increment := lowskip + v.exponent < result.exponent - ifthen(toDigitInBin = 0, 1, 0) //if the bins following the bin containing toDigit are not skipped, they are not zero, and the number is > 0.5xx
+      else if exponentDelta <> lowskip + ifthen(toDigitInBin = 0, 1, 0) then
+        increment := exponentDelta > lowskip + ifthen(toDigitInBin = 0, 1, 0) //if the bins following the bin containing toDigit are not skipped, they are not zero, and the number is > 0.5xx
       else if not v.signed then increment := true //round positive (absolute) up
       else if toDigitInBin = 1 then increment := false //if the rounded-to digit is the 2nd last in its bin (so 5 is last), incrementing depends on the next block which was checked above
-      else if toDigitInBin = 0 then increment := v.digits[result.exponent - v.exponent - 1] > ELEMENT_OVERFLOW div 2 //if the rounded-to digit is the last in its bin, it depends on the next block after removing its first digit (e.g. 50000 => no increment, 5000x000 => increment)
-      else increment := v.digits[result.exponent - v.exponent] mod powersOf10[toDigitInBin - 1] > 0; //otherwise it depends on the digits in the same after the removing the rounded-to digit and next digits
+      else if toDigitInBin = 0 then increment := v.digits[exponentDelta - 1] > ELEMENT_OVERFLOW div 2 //if the rounded-to digit is the last in its bin, it depends on the next block after removing its first digit (e.g. 50000 => no increment, 5000x000 => increment)
+      else increment := v.digits[exponentDelta] mod powersOf10[toDigitInBin - 1] > 0; //otherwise it depends on the digits in the same after the removing the rounded-to digit and next digits
     end;
     bfrmRoundHalfToEven: begin //2; 2
       lastDigit := getDigit(v, toDigit - 1);
       if lastDigit < 5 then increment := false
       else if lastDigit > 5 then increment := true
-      else if lowskip + v.exponent <> result.exponent - ifthen(toDigitInBin = 0, 1, 0) then
-        increment := lowskip + v.exponent < result.exponent - ifthen(toDigitInBin = 0, 1, 0) //if the bins following the bin containing toDigit are not skipped, they are not zero, and the number is > 0.5xx
+      else if exponentDelta <> lowskip + ifthen(toDigitInBin = 0, 1, 0) then
+        increment := exponentDelta > lowskip + ifthen(toDigitInBin = 0, 1, 0) //if the bins following the bin containing toDigit are not skipped, they are not zero, and the number is > 0.5xx
       else if odd(getDigit(v, toDigit)) then increment := true //round away from odd
       else if toDigitInBin = 1 then increment := false //if the rounded-to digit is the 2nd last in its bin (so 5 is last), incrementing depends on the next block which was checked above
-      else if toDigitInBin = 0 then increment := v.digits[result.exponent - v.exponent - 1] > ELEMENT_OVERFLOW div 2 //if the rounded-to digit is the last in its bin, it depends on the next block after removing its first digit (e.g. 50000 => no increment, 5000x000 => increment)
-      else increment := v.digits[result.exponent - v.exponent] mod powersOf10[toDigitInBin - 1] > 0; //otherwise it depends on the digits in the same after the removing the rounded-to digit and next digits
+      else if toDigitInBin = 0 then increment := v.digits[exponentDelta - 1] > ELEMENT_OVERFLOW div 2 //if the rounded-to digit is the last in its bin, it depends on the next block after removing its first digit (e.g. 50000 => no increment, 5000x000 => increment)
+      else increment := v.digits[exponentDelta] mod powersOf10[toDigitInBin - 1] > 0; //otherwise it depends on the digits in the same after the removing the rounded-to digit and next digits
     end;
   end;
 
   if v.digits[high(v.digits) - highskip] = ELEMENT_OVERFLOW-1 then additionalBin := 1
   else additionalBin :=  0;
-  SetLength(result.digits, additionalBin + max(0, length(v.digits) - highskip - max(0, result.exponent - v.exponent)));
+  SetLength(result.digits, additionalBin + max(0, length(v.digits) - highskip - max(0, exponentDelta)));
   for i := 0 to high(result.digits) - additionalBin do
-    result.digits[i] := v.digits[i - v.exponent + result.exponent];
+    result.digits[i] := v.digits[i + exponentDelta];
   if length(result.digits) > 0 then begin
     if toDigitInBin <> 0 then
       Result.digits[0] -= Result.digits[0] mod powersOf10[toDigitInBin];
