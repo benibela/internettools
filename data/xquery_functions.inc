@@ -1732,7 +1732,7 @@ begin
       pvkInt64: begin
         temp64 := args[2].toInt64;
         if temp64 < 0 then unti := from
-        else if temp64 > high(integer) - from then unti := maxlen + 1
+        else if (temp64 > high(integer))  or ( (from > 0) and (temp64 > high(integer) - from) ) then unti := maxlen + 1
         else unti := from + temp64;
       end;
       pvkFloat: begin
@@ -1745,7 +1745,7 @@ begin
       else begin
         temp := round(args[2].toDecimal);
         if temp.signed then unti := from
-        else if temp > high(Integer) - from then unti := maxLen + 1
+        else if (temp > high(integer)) or ( (from > 0) and (temp > high(Integer) - from ) ) then unti := maxLen + 1
         else unti := from + BigDecimalToLongint(temp);
       end;
     end;
