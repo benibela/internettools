@@ -4277,20 +4277,31 @@ end;
 
 function strResolveURI(rel, base: RawByteString): RawByteString;
 var
-    schemaLength: SizeInt;
+  schemaLength: SizeInt;
   baseIsAbsolute: Boolean;
   isWindowsFileUrl: Boolean;
+  fileSchemaPrefixLength: Integer;
 begin
   if strIsAbsoluteURI(rel) or (base = '') then begin result := rel; exit; end;
 
-  schemaLength := pos(':', base);
-  isWindowsFileUrl := (schemaLength = 2) and (length(base) >= 3) and (base[3] in ['/', '\']) and ((length(base) = 3) or (base[4] <> '/'));;
+  fileSchemaPrefixLength := 0;
+  if stribeginswith(base, 'file:///') then fileSchemaPrefixLength := 8
+  else if stribeginswith(base, 'file://') then fileSchemaPrefixLength := 7;
+
+  isWindowsFileUrl := (length(base) >= fileSchemaPrefixLength + 3) and (base[fileSchemaPrefixLength + 2] = ':') and (base[fileSchemaPrefixLength + 3] in ['/', '\']) and ((length(base) = fileSchemaPrefixLength + 3) or (base[fileSchemaPrefixLength + 4] <> '/'));;
+  if isWindowsFileUrl and (fileSchemaPrefixLength <> 0) then delete(base, 1, fileSchemaPrefixLength); //normalize
   if isWindowsFileUrl and (pos('\', base) > 0) or (pos('\', rel) > 0) then begin
     //handle paths with \ by replacing all \ with /, handling that normal, and then replace back by \, if there were \ in base (i.e. result will have same separators as base)
     result := strResolveURI(StringReplace(rel, '\', '/', [rfReplaceAll]), StringReplace(base, '\', '/', [rfReplaceAll]));
     if pos('/', base) = 0 then result := StringReplace(result, '/', '\', [rfReplaceAll]);
+    case fileSchemaPrefixLength of
+      7: result := 'file://' + result;
+      8: result := 'file:///' + result;
+      else ;
+    end;
     exit;
   end;
+  schemaLength := pos(':', base);
   if (schemaLength = 0)  or (pos('/', base) < schemaLength)  //no schema
     or isWindowsFileUrl then begin //or c:/foo/bar
 
@@ -4298,7 +4309,13 @@ begin
       if baseIsAbsolute then base := 'file://' + base
       else base := 'file:///' + base;
       result := strResolveURIReal(rel, base);
-      if baseIsAbsolute or (strbeginswith(rel, '/') and not isWindowsFileUrl) then
+      if isWindowsFileUrl then begin
+        case fileSchemaPrefixLength of
+          0: result := strcopyfrom(result, length('file:///') + 1); // c:\...
+          7: result := 'file://' + strcopyfrom(result, length('file:///') + 1); // file://c:\...
+          else ; // file:///c:\...
+        end;
+      end else if baseIsAbsolute or strbeginswith(rel, '/')  then
         result := strcopyfrom(result, length('file:///'))
        else
         result := strcopyfrom(result, length('file:///') + 1);
@@ -4327,6 +4344,7 @@ begin
   if strContains(rel, '://') then exit;
   result := 'file://' + result;
 end;
+
 
 function strSimilarity(const s, t: RawByteString): integer;
 //see http://en.wikipedia.org/wiki/Levenshtein_distance

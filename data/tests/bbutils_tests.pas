@@ -49,6 +49,8 @@ end;
 //{$DEFINE NO_ARRAY_UNITTEST}
 {%END-REPEAT}
 
+procedure testStrResolveURI; forward;
+
 
 {$IFDEF FPC}
 procedure intArrayUnitTests;
@@ -1189,6 +1191,28 @@ begin
   arrayPrependFast(sa, i, 'b'); test(strJoin(sa, '|'), 'b|c|z'); test(i, 2);
   arrayPrependFast(sa, i, 'a'); test(strJoin(sa, '|'), 'a|b|c'); test(i, 3);
 
+  testStrResolveURI;
+
+end;
+
+procedure testStrResolveURI;
+  function s2bs(const mode: integer; const s: string): string;
+  begin
+    case mode of
+      0: result := s;
+      -1: result := StringReplace(s, '/', '\', [rfReplaceAll]);
+    end;
+  end;
+
+var
+  filePrefixMode: Integer;
+  resultFilePrefix: String;
+  slashAbs: Integer;
+  slashRel: Integer;
+  filePrefix: String;
+  slashRes: Integer;
+begin
+
   //Url resolving
 
   test(strResolveURI('/foobar', 'http://example.org'), 'http://example.org/foobar');
@@ -1395,128 +1419,59 @@ begin
   test(strResolveURI('foobar/', '/tmp/xyz/'), '/tmp/xyz/foobar/');
   test(strResolveURI('../foobar/', '/tmp/xyz/'), '/tmp/foobar/');
 
-    //Windows local path resolving
+  //Windows local path resolving
 
-  test(strResolveURI('/foobar', 'file:///c:/'), 'file:///c:/foobar');
-  test(strResolveURI('foobar', 'file:///c:/'), 'file:///c:/foobar');
-  test(strResolveURI('../foobar', 'file:///c:/'), 'file:///c:/foobar');
-  test(strResolveURI('/foobar/', 'file:///c:/'), 'file:///c:/foobar/');
-  test(strResolveURI('foobar/', 'file:///c:/'), 'file:///c:/foobar/');
-  test(strResolveURI('../foobar/', 'file:///c:/'), 'file:///c:/foobar/');
-  test(strResolveURI('../../foobar/', 'file:///c:/'), 'file:///c:/foobar/');
-  test(strResolveURI('../.././../foobar/', 'file:///c:/'), 'file:///c:/foobar/');
-  test(strResolveURI('../../.././../../././foobar/', 'file:///c:/'), 'file:///c:/foobar/');
+  for filePrefixMode := 1 to 3 do begin
+    case filePrefixMode of
+      1: begin filePrefix := 'file:///'; resultFilePrefix := 'file:///' ; end;
+      2: begin filePrefix := 'file://';  resultFilePrefix := 'file://' ; end;
+      3: begin filePrefix := '';         resultFilePrefix := '' ; end;
+    end;
 
-  test(strResolveURI('/foobar', 'file:///c:/tmp'), 'file:///c:/foobar');
-  test(strResolveURI('foobar', 'file:///c:/tmp'), 'file:///c:/foobar');
-  test(strResolveURI('../foobar', 'file:///c:/tmp'), 'file:///c:/foobar');
-  test(strResolveURI('/foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
-  test(strResolveURI('foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
-  test(strResolveURI('../foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
-  test(strResolveURI('../../foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
-  test(strResolveURI('../.././../foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
-  test(strResolveURI('../../.././../../././foobar/', 'file:///c:/tmp'), 'file:///c:/foobar/');
+    for slashAbs := -1 to 0 do begin
+      slashRes := slashAbs;
 
-  test(strResolveURI('/foobar', 'file:///c:/tmp/xyz'), 'file:///c:/foobar');
-  test(strResolveURI('foobar', 'file:///c:/tmp/xyz'), 'file:///c:/tmp/foobar');
-  test(strResolveURI('../foobar', 'file:///c:/tmp/xyz'), 'file:///c:/foobar');
-  test(strResolveURI('/foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
-  test(strResolveURI('foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/tmp/foobar/');
-  test(strResolveURI('../foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
-  test(strResolveURI('../../foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
-  test(strResolveURI('../.././../foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
-  test(strResolveURI('../../.././../../././foobar/', 'file:///c:/tmp/xyz'), 'file:///c:/foobar/');
+      for slashRel := - 1 to 0 do begin
+        test(strResolveURI(s2bs(slashRel, '/foobar'),                      filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, 'foobar'),                       filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, '../foobar'),                    filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, '/foobar/'),                     filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, 'foobar/'),                      filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../foobar/'),                   filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../../foobar/'),                filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../.././../foobar/'),           filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../../.././../../././foobar/'), filePrefix + s2bs(slashAbs, 'c:/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
 
-  test(strResolveURI('/foobar', 'file:///c:/tmp/xyz/'), 'file:///c:/foobar');
-  test(strResolveURI('foobar', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/xyz/foobar');
-  test(strResolveURI('../foobar', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/foobar');
-  test(strResolveURI('/foobar/', 'file:///c:/tmp/xyz/'), 'file:///c:/foobar/');
-  test(strResolveURI('foobar/', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/xyz/foobar/');
-  test(strResolveURI('../foobar/', 'file:///c:/tmp/xyz/'), 'file:///c:/tmp/foobar/');
+        test(strResolveURI(s2bs(slashRel, '/foobar'),                      filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, 'foobar'),                       filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, '../foobar'),                    filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, '/foobar/'),                     filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, 'foobar/'),                      filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../foobar/'),                   filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../../foobar/'),                filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../.././../foobar/'),           filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../../.././../../././foobar/'), filePrefix + s2bs(slashAbs, 'c:/tmp')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
 
+        test(strResolveURI(s2bs(slashRel, '/foobar'),                      filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, 'foobar'),                       filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/tmp/foobar'));
+        test(strResolveURI(s2bs(slashRel, '../foobar'),                    filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, '/foobar/'),                     filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, 'foobar/'),                      filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/tmp/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../foobar/'),                   filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../../foobar/'),                filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../.././../foobar/'),           filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../../.././../../././foobar/'), filePrefix + s2bs(slashAbs, 'c:/tmp/xyz')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
 
-  test(strResolveURI('/foobar', 'c:/'), 'c:/foobar');
-  test(strResolveURI('foobar', 'c:/'), 'c:/foobar');
-  test(strResolveURI('../foobar', 'c:/'), 'c:/foobar');
-  test(strResolveURI('/foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('../foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('../../foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('../.././../foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('../../.././../../././foobar/', 'c:/'), 'c:/foobar/');
+        test(strResolveURI(s2bs(slashRel, '/foobar'),                      filePrefix + s2bs(slashAbs, 'c:/tmp/xyz/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar'));
+        test(strResolveURI(s2bs(slashRel, 'foobar'),                       filePrefix + s2bs(slashAbs, 'c:/tmp/xyz/')), resultFilePrefix + s2bs(slashRes, 'c:/tmp/xyz/foobar'));
+        test(strResolveURI(s2bs(slashRel, '../foobar'),                    filePrefix + s2bs(slashAbs, 'c:/tmp/xyz/')), resultFilePrefix + s2bs(slashRes, 'c:/tmp/foobar'));
+        test(strResolveURI(s2bs(slashRel, '/foobar/'),                     filePrefix + s2bs(slashAbs, 'c:/tmp/xyz/')), resultFilePrefix + s2bs(slashRes, 'c:/foobar/'));
+        test(strResolveURI(s2bs(slashRel, 'foobar/'),                      filePrefix + s2bs(slashAbs, 'c:/tmp/xyz/')), resultFilePrefix + s2bs(slashRes, 'c:/tmp/xyz/foobar/'));
+        test(strResolveURI(s2bs(slashRel, '../foobar/'),                   filePrefix + s2bs(slashAbs, 'c:/tmp/xyz/')), resultFilePrefix + s2bs(slashRes, 'c:/tmp/foobar/'));
+      end;
+    end;
+  end;
 
-  test(strResolveURI('/foobar', 'c:/tmp/xyz'), 'c:/foobar');
-  test(strResolveURI('foobar', 'c:/tmp/xyz'), 'c:/tmp/foobar');
-  test(strResolveURI('../foobar', 'c:/tmp/xyz'), 'c:/foobar');
-  test(strResolveURI('/foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('foobar/', 'c:/tmp/xyz'), 'c:/tmp/foobar/');
-  test(strResolveURI('../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('../../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('../.././../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('../../.././../../././foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-
-
-  test(strResolveURI('\foobar', 'c:\'), 'c:\foobar');
-  test(strResolveURI('foobar', 'c:\'), 'c:\foobar');
-  test(strResolveURI('..\foobar', 'c:\'), 'c:\foobar');
-  test(strResolveURI('\foobar\', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('foobar\', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('..\foobar\', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('..\..\foobar\', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('..\..\.\..\foobar\', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('..\..\..\.\..\..\.\.\foobar\', 'c:\'), 'c:\foobar\');
-
-  test(strResolveURI('\foobar', 'c:\tmp\xyz'), 'c:\foobar');
-  test(strResolveURI('foobar', 'c:\tmp\xyz'), 'c:\tmp\foobar');
-  test(strResolveURI('..\foobar', 'c:\tmp\xyz'), 'c:\foobar');
-  test(strResolveURI('\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('foobar\', 'c:\tmp\xyz'), 'c:\tmp\foobar\');
-  test(strResolveURI('..\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('..\..\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('..\..\.\..\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('..\..\..\.\..\..\.\.\foobar\', 'c:\tmp\xyz'), 'c:\foobar\');
-
-
-  test(strResolveURI('/foobar', 'c:\'), 'c:\foobar');
-  test(strResolveURI('foobar', 'c:\'), 'c:\foobar');
-  test(strResolveURI('../foobar', 'c:\'), 'c:\foobar');
-  test(strResolveURI('/foobar/', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('foobar/', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('../foobar/', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('../../foobar/', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('../.././../foobar/', 'c:\'), 'c:\foobar\');
-  test(strResolveURI('../../.././../../././foobar/', 'c:\'), 'c:\foobar\');
-
-  test(strResolveURI('/foobar', 'c:\tmp\xyz'), 'c:\foobar');
-  test(strResolveURI('foobar', 'c:\tmp\xyz'), 'c:\tmp\foobar');
-  test(strResolveURI('../foobar', 'c:\tmp\xyz'), 'c:\foobar');
-  test(strResolveURI('/foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('foobar/', 'c:\tmp\xyz'), 'c:\tmp\foobar\');
-  test(strResolveURI('../foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('../../foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('../.././../foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
-  test(strResolveURI('../../.././../../././foobar/', 'c:\tmp\xyz'), 'c:\foobar\');
-
-
-  test(strResolveURI('\foobar', 'c:/'), 'c:/foobar');
-  test(strResolveURI('foobar', 'c:/'), 'c:/foobar');
-  test(strResolveURI('..\foobar', 'c:/'), 'c:/foobar');
-  test(strResolveURI('\foobar\', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('foobar\', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('..\foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('..\..\foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('..\..\.\..\foobar/', 'c:/'), 'c:/foobar/');
-  test(strResolveURI('..\..\..\.\..\..\.\.\foobar/', 'c:/'), 'c:/foobar/');
-
-  test(strResolveURI('\foobar', 'c:/tmp/xyz'), 'c:/foobar');
-  test(strResolveURI('foobar', 'c:/tmp/xyz'), 'c:/tmp/foobar');
-  test(strResolveURI('..\foobar', 'c:/tmp/xyz'), 'c:/foobar');
-  test(strResolveURI('\foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('foobar/', 'c:/tmp/xyz'), 'c:/tmp/foobar/');
-  test(strResolveURI('..\foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('..\../foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('..\..\.\..\foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
-  test(strResolveURI('..\..\..\.\..\..\.\./foobar/', 'c:/tmp/xyz'), 'c:/foobar/');
 end;
 
 

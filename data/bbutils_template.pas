@@ -454,8 +454,6 @@ function strIsAbsoluteURI(const s: RawByteString): boolean;
 //**Or.  strResolveURI('foo/bar', 'http://example.org/abc/def/') returns 'http://example.org/abc/def/foo/bar'@br
 //**base may be relative itself (e.g. strResolveURI('foo/bar', 'test/') becomes 'test/foo/bar')
 function strResolveURI(rel, base: RawByteString): RawByteString;
-//**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
-function strIsAbsoluteURI(const s: RawByteString): boolean;
 //**Expands a path to an absolute path, if it not already is one
 function fileNameExpand(const rel: string): string;
 //**Expands a path to an absolute path starting with file://
@@ -2522,20 +2520,31 @@ end;
 
 function strResolveURI(rel, base: RawByteString): RawByteString;
 var
-    schemaLength: SizeInt;
+  schemaLength: SizeInt;
   baseIsAbsolute: Boolean;
   isWindowsFileUrl: Boolean;
+  fileSchemaPrefixLength: Integer;
 begin
   if strIsAbsoluteURI(rel) or (base = '') then begin result := rel; exit; end;
 
-  schemaLength := pos(':', base);
-  isWindowsFileUrl := (schemaLength = 2) and (length(base) >= 3) and (base[3] in ['/', '\']) and ((length(base) = 3) or (base[4] <> '/'));;
+  fileSchemaPrefixLength := 0;
+  if stribeginswith(base, 'file:///') then fileSchemaPrefixLength := 8
+  else if stribeginswith(base, 'file://') then fileSchemaPrefixLength := 7;
+
+  isWindowsFileUrl := (length(base) >= fileSchemaPrefixLength + 3) and (base[fileSchemaPrefixLength + 2] = ':') and (base[fileSchemaPrefixLength + 3] in ['/', '\']) and ((length(base) = fileSchemaPrefixLength + 3) or (base[fileSchemaPrefixLength + 4] <> '/'));;
+  if isWindowsFileUrl and (fileSchemaPrefixLength <> 0) then delete(base, 1, fileSchemaPrefixLength); //normalize
   if isWindowsFileUrl and (pos('\', base) > 0) or (pos('\', rel) > 0) then begin
     //handle paths with \ by replacing all \ with /, handling that normal, and then replace back by \, if there were \ in base (i.e. result will have same separators as base)
     result := strResolveURI(StringReplace(rel, '\', '/', [rfReplaceAll]), StringReplace(base, '\', '/', [rfReplaceAll]));
     if pos('/', base) = 0 then result := StringReplace(result, '/', '\', [rfReplaceAll]);
+    case fileSchemaPrefixLength of
+      7: result := 'file://' + result;
+      8: result := 'file:///' + result;
+      else ;
+    end;
     exit;
   end;
+  schemaLength := pos(':', base);
   if (schemaLength = 0)  or (pos('/', base) < schemaLength)  //no schema
     or isWindowsFileUrl then begin //or c:/foo/bar
 
@@ -2543,7 +2552,13 @@ begin
       if baseIsAbsolute then base := 'file://' + base
       else base := 'file:///' + base;
       result := strResolveURIReal(rel, base);
-      if baseIsAbsolute or (strbeginswith(rel, '/') and not isWindowsFileUrl) then
+      if isWindowsFileUrl then begin
+        case fileSchemaPrefixLength of
+          0: result := strcopyfrom(result, length('file:///') + 1); // c:\...
+          7: result := 'file://' + strcopyfrom(result, length('file:///') + 1); // file://c:\...
+          else ; // file:///c:\...
+        end;
+      end else if baseIsAbsolute or strbeginswith(rel, '/')  then
         result := strcopyfrom(result, length('file:///'))
        else
         result := strcopyfrom(result, length('file:///') + 1);
