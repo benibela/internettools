@@ -4275,12 +4275,14 @@ begin
   result := strJoin(basesplit, '/') + '/' + relparams;
 end;
 
+
 function strResolveURI(rel, base: RawByteString): RawByteString;
 var
   schemaLength: SizeInt;
   baseIsAbsolute: Boolean;
-  isWindowsFileUrl: Boolean;
   fileSchemaPrefixLength: Integer;
+  returnBackslashes: Boolean;
+  i: Integer;
 begin
   if strIsAbsoluteURI(rel) or (base = '') then begin result := rel; exit; end;
 
@@ -4288,38 +4290,43 @@ begin
   if stribeginswith(base, 'file:///') then fileSchemaPrefixLength := 8
   else if stribeginswith(base, 'file://') then fileSchemaPrefixLength := 7;
 
-  isWindowsFileUrl := (length(base) >= fileSchemaPrefixLength + 3) and (base[fileSchemaPrefixLength + 2] = ':') and (base[fileSchemaPrefixLength + 3] in ['/', '\']) and ((length(base) = fileSchemaPrefixLength + 3) or (base[fileSchemaPrefixLength + 4] <> '/'));;
-  if isWindowsFileUrl and (fileSchemaPrefixLength <> 0) then delete(base, 1, fileSchemaPrefixLength); //normalize
-  if isWindowsFileUrl and (pos('\', base) > 0) or (pos('\', rel) > 0) then begin
-    //handle paths with \ by replacing all \ with /, handling that normal, and then replace back by \, if there were \ in base (i.e. result will have same separators as base)
-    result := strResolveURI(StringReplace(rel, '\', '/', [rfReplaceAll]), StringReplace(base, '\', '/', [rfReplaceAll]));
-    if pos('/', base) = 0 then result := StringReplace(result, '/', '\', [rfReplaceAll]);
-    case fileSchemaPrefixLength of
-      7: result := 'file://' + result;
-      8: result := 'file:///' + result;
-      else ;
-    end;
-    exit;
-  end;
-  schemaLength := pos(':', base);
-  if (schemaLength = 0)  or (pos('/', base) < schemaLength)  //no schema
-    or isWindowsFileUrl then begin //or c:/foo/bar
+  if (length(base) >= fileSchemaPrefixLength + 3)
+      and (base[fileSchemaPrefixLength + 2] = ':')
+      and (base[fileSchemaPrefixLength + 3] in ['/', '\'])
+      and ((length(base) = fileSchemaPrefixLength + 3) or (base[fileSchemaPrefixLength + 4] <> '/')) then begin
+      //windows file path
+      //normalize: start with file:/// and use slashes instead backslashes
+      if (fileSchemaPrefixLength <> 8) then begin
+        delete(base, 1, fileSchemaPrefixLength);
+        base := 'file:///' + base;
+      end;
+      rel := StringReplace(rel, '\', '/', [rfReplaceAll]);
+      returnBackslashes := pos('\', base) > 0;
+      if returnBackslashes then base := StringReplace(base, '\', '/', [rfReplaceAll]);
 
-      baseIsAbsolute := strbeginswith(base, '/');
-      if baseIsAbsolute then base := 'file://' + base
-      else base := 'file:///' + base;
       result := strResolveURIReal(rel, base);
-      if isWindowsFileUrl then begin
-        case fileSchemaPrefixLength of
-          0: result := strcopyfrom(result, length('file:///') + 1); // c:\...
-          7: result := 'file://' + strcopyfrom(result, length('file:///') + 1); // file://c:\...
-          else ; // file:///c:\...
-        end;
-      end else if baseIsAbsolute or strbeginswith(rel, '/')  then
-        result := strcopyfrom(result, length('file:///'))
-       else
-        result := strcopyfrom(result, length('file:///') + 1);
+
+      //denormalize to return the same format as the original base
+      if returnBackslashes then for i := 9 to length(result) do if result[i] = '/' then result[i] := '\'; //skip file:///
+      case fileSchemaPrefixLength of
+        0: result := strcopyfrom(result, length('file:///') + 1); // c:\...
+        7: result := 'file://' + strcopyfrom(result, length('file:///') + 1); // file://c:\...
+        else ; // file:///c:\...
+      end;
       exit;
+  end;
+
+  schemaLength := pos(':', base);
+  if (schemaLength = 0)  or (pos('/', base) < schemaLength)  {no schema}    then begin
+     baseIsAbsolute := strbeginswith(base, '/');
+     if baseIsAbsolute then base := 'file://' + base
+     else base := 'file:///' + base;
+     result := strResolveURIReal(rel, base);
+     if baseIsAbsolute or strbeginswith(rel, '/')  then
+       result := strcopyfrom(result, length('file:///'))
+      else
+       result := strcopyfrom(result, length('file:///') + 1);
+     exit;
   end;
 
   if strbeginswith(rel, '//') and (schemaLength > 0) then
