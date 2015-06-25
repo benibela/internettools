@@ -19,8 +19,42 @@
     <VersionInfo>
       <StringTable ProductVersion=""/>
     </VersionInfo>
-    <BuildModes Count="1">
+    <BuildModes Count="2">
       <Item1 Name="Default" Default="True"/>
+      <Item2 Name="32 bit">
+        <CompilerOptions>
+          <Version Value="11"/>
+          <Target>
+            <Filename Value="tests"/>
+          </Target>
+          <SearchPaths>
+            <IncludeFiles Value="$(ProjOutDir)"/>
+            <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;/home/benito/hg/components/pascal/internet/;../../import;.;../../../components/pascal/import/bigint;.."/>
+            <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+          </SearchPaths>
+          <Parsing>
+            <SyntaxOptions>
+              <IncludeAssertionCode Value="True"/>
+            </SyntaxOptions>
+          </Parsing>
+          <CodeGeneration>
+            <Checks>
+              <IOChecks Value="True"/>
+              <RangeChecks Value="True"/>
+              <OverflowChecks Value="True"/>
+              <StackChecks Value="True"/>
+            </Checks>
+            <TargetCPU Value="i386"/>
+          </CodeGeneration>
+          <Linking>
+            <Options>
+              <Win32>
+                <GraphicApplication Value="True"/>
+              </Win32>
+            </Options>
+          </Linking>
+        </CompilerOptions>
+      </Item2>
     </BuildModes>
     <PublishOptions>
       <Version Value="2"/>
@@ -53,11 +87,11 @@
       <Unit1>
         <Filename Value="bbutils_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="bbutils_tests"/>
       </Unit1>
       <Unit2>
         <Filename Value="../extendedhtmlparser.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="extendedhtmlparser"/>
       </Unit2>
       <Unit3>
         <Filename Value="xpath2_tests.pas"/>
@@ -67,7 +101,6 @@
       <Unit4>
         <Filename Value="xquery1_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="xquery1_tests"/>
       </Unit4>
       <Unit5>
         <Filename Value="internetaccess_tests.pas"/>
@@ -76,7 +109,6 @@
       <Unit6>
         <Filename Value="xpath3_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="xpath3_tests"/>
       </Unit6>
       <Unit7>
         <Filename Value="xquery3_tests.pas"/>
@@ -86,6 +118,7 @@
       <Unit8>
         <Filename Value="bigdecimal_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="bigdecimal_tests"/>
       </Unit8>
       <Unit9>
         <Filename Value="parsertests.pas"/>
@@ -94,7 +127,6 @@
       <Unit10>
         <Filename Value="extendedhtmlparser_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="extendedhtmlparser_tests"/>
       </Unit10>
       <Unit11>
         <Filename Value="../xquery_functions3.inc"/>
@@ -107,6 +139,7 @@
       <Unit13>
         <Filename Value="commontestutils.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="commontestutils"/>
       </Unit13>
     </Units>
   </ProjectOptions>
