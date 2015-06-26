@@ -143,7 +143,10 @@ uses bbutils, math {$IFDEF CD_Android}, customdrawnint{$endif};
 function needJ: TJavaEnv;
 var attachArgs: JavaVMAttachArgs;
 begin
-  {$IFDEF CD_Android}if jvmref = nil then jvmref:=javaVMRef;{$endif}
+  if jvmref = nil then begin
+    {$IFDEF CD_Android}jvmref:=javaVMRef;{$endif}
+    if jvmref = nil then raise EAndroidInterfaceException.create('bbjniutils.jvmref is not set. It must be set to the value passed to JNI_OnLoad.');
+  end;
   //debugln(inttostr( ThreadID)+' needJ: '+strFromPtr(j.env));
   if j.env = nil then begin
     attachArgs.version:=JNI_VERSION_1_2;
