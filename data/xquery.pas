@@ -2543,6 +2543,8 @@ end;
 
 //**Returns a "..." string for use in json (internally used)
 function jsonStrEscape(s: string):string;
+//**Escapes for an URL (internally used)
+function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
 //**Checks the length of the args array (internally used)
 procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
 //**Calculates starting position / length from a range definition (checks for things like NaN, INF, ...) (internally used)
