@@ -128,8 +128,8 @@ var onUnload: procedure;
 function needJ: TJavaEnv;
 
 
-function JNI_OnLoad(vm:PJavaVM;reserved:pointer):jint; cdecl;
-procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); cdecl;
+function JNI_OnLoad(vm:PJavaVM;reserved:pointer):jint; {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
+procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
 
 
 //do not use (they are here just for testing)
@@ -163,14 +163,14 @@ begin
   result := j;
 end;
 
-function JNI_OnLoad(vm: PJavaVM; reserved: pointer): jint; cdecl;
+function JNI_OnLoad(vm: PJavaVM; reserved: pointer): jint; {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
 begin
   jvmref := vm;
   if assigned(onLoad) then result := onload()
   else result := JNI_VERSION_1_4;
 end;
 
-procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); cdecl;
+procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
 begin
   if assigned(onUnload) then onUnload();
 end;
