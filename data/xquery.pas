@@ -1519,6 +1519,7 @@ type
     node: TTreeNode;
     vars: array of TXQTermVariable;
     hasDefaultVariable: boolean;
+    contextDependancies: TXQContextDependencies;
     function clone: TXQTerm; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     destructor destroy; override;
@@ -1624,6 +1625,7 @@ type
     startCondition, endCondition: TXQTermFlowerWindowVarsAndCondition;
     class function kind: TXQTermFlowerSubClauseKind; override;
     function clone: TXQTerm; override;
+    function getContextDependencies: TXQContextDependencies; override;
     destructor destroy; override;
 
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
@@ -1668,6 +1670,7 @@ type
     countvar: TXQTermVariable;
 
     class function kind: TXQTermFlowerSubClauseKind; override;
+    function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
   end;

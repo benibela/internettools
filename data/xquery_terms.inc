@@ -1090,6 +1090,12 @@ begin
   TXQTermFlowerWindow(result).endCondition.assign(endCondition);
 end;
 
+function TXQTermFlowerWindow.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=(inherited getContextDependencies) + startCondition.when.getContextDependencies;
+  if Assigned(endCondition.when) then result += endCondition.when.getContextDependencies;
+end;
+
 destructor TXQTermFlowerWindow.destroy;
 begin
   startCondition.freeAll;
@@ -1258,6 +1264,11 @@ end;
 class function TXQTermFlowerCount.kind: TXQTermFlowerSubClauseKind;
 begin
   Result:=xqtfcCount;
+end;
+
+function TXQTermFlowerCount.getContextDependencies: TXQContextDependencies;
+begin
+  result := [xqcdContextVariables];
 end;
 
 function TXQTermFlowerCount.clone: TXQTerm;
@@ -2802,6 +2813,8 @@ begin
     node := self.node.clone;
     vars := self.vars;
     setlength(vars, length(vars));
+    hasDefaultVariable := self.hasDefaultVariable;
+    contextDependancies:=self.contextDependancies;
   end;
 end;
 
@@ -2825,8 +2838,7 @@ end;
 
 function TXQTermPatternMatcher.getContextDependencies: TXQContextDependencies;
 begin
-  raiseEvaluationError('pxp:INTERNAL', 'TXQTermPatternMatcher.getContextDependencies');
-  result := [];
+  result := contextDependancies;
 end;
 
 { TXQTermVariable }

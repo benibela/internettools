@@ -43,6 +43,7 @@ var
       else context.RootElement:=nil;
     end;
     ps.parseXPath2(s1);
+    if ps.LastQuery.getTerm <> nil then ps.LastQuery.getTerm.getContextDependencies;
 //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
     context.ParentElement := xml.getLastTree;
 //    writeln(s1);

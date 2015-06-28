@@ -760,6 +760,7 @@ var previoushtml: string;
       got: String;
     begin
       query := extParser.QueryEngine.parseXQuery1(template);
+      query.getTerm.getContextDependencies;
       //if html <> '' then extParser.parseh;
       got := query.evaluate(extParser.HTMLTree).toString;
       if got <> expected then
@@ -1082,6 +1083,8 @@ begin
   q( 'for <abc>{.}</abc> in <abc>foobar</abc> return .', 'foobar');
   q('join(for <a>{.}</a>+ in <x><a>1</a><a>2</a></x> return join(.), ",")', '1,2');
   q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  </ul> return concat("li: ", .), "; ")', 'li: 1; li: 2');
+  q('join(for <a>{$abc}</a>+ in <x><a>1</a><a>2</a></x> order by $abc return join($abc), ",")', '1,2');
+  q('join(for <a>{$abc}</a>+ in <x><a>1</a><a>2</a></x> order by $abc descending return join($abc), ",")', '2,1');
 
   q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> where . mod 2 = 0 return ., "; ")', '2; 6');
   q('let <a>{$a}</a> := <a>1</a>, <b>{$b}</b> := <b>3</b> let <c>{$c}</c> := <c>5</c> return join(($a,$b,$c))', '1 3 5');

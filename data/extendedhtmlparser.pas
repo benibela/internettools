@@ -653,6 +653,7 @@ THtmlTemplateParser=class
     function GetTemplateNamespace: TNamespaceList;
     function GetTemplateHasRealVariableDefinitions: boolean;
     procedure GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray; out hasDefaultVariable: Boolean);
+    function GetTemplateContextDependencies: TXQContextDependencies;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
     //FCurrentStack: TStringList;
@@ -1105,6 +1106,26 @@ begin
     if cur.source <> nil then
       if (not stest(cur.source.Term)) and (cur.templateType = tetCommandShortRead) then
         hasDefaultVariable := true;
+    cur := cur.templateNext;
+  end;
+end;
+
+function THtmlTemplateParser.GetTemplateContextDependencies: TXQContextDependencies;
+var
+  cur: TTemplateElement;
+begin
+  //perhaps better to replace this with the visitor?
+  result := [];
+  cur := TTemplateElement(FTemplate.getLastTree.next);
+  while cur <> nil do begin
+    if cur.source <> nil then result += cur.source.getTerm.getContextDependencies;
+    if cur.test <> nil then result += cur.test.getTerm.getContextDependencies;
+    if cur.condition <> nil then result += cur.condition.getTerm.getContextDependencies;
+    if cur.valuepxp <> nil then result += cur.valuepxp.getTerm.getContextDependencies;
+    if cur.min <> nil then result += cur.min.getTerm.getContextDependencies;
+    if cur.max <> nil then result += cur.max.getTerm.getContextDependencies;
+    if cur.varname <> nil then result += cur.varname.getTerm.getContextDependencies;
+    if cur.ignoreSelfTest <> nil then result += cur.ignoreSelfTest.getTerm.getContextDependencies;
     cur := cur.templateNext;
   end;
 end;
@@ -2155,6 +2176,7 @@ begin
   result := TXQTermPatternMatcher.Create;
   result.node := temp.TemplateTree;
   temp.GetTemplateRealVariableDefinitions(result.vars, result.hasDefaultVariable);
+  result.contextDependancies := temp.GetTemplateContextDependencies - [xqcdFocusDocument,xqcdFocusOther]{<-focus is the matched document, not the outside document};
   temp.FTemplate.OwnedTrees.Clear;
   temp.FQueryEngine := nil;
   temp.free;
