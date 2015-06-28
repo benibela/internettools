@@ -258,6 +258,191 @@ begin
   result := xqFunctionParse_Common(context, args, 'html');
 end;
 
+type TSerializationParams = record
+  isAbsentMarker: string;
+
+  method, version, encoding: string;
+  htmlVersion, doctypePublic, doctypeSystem: string;
+  omitXmlDeclaration: boolean;
+  standalone: string;
+  itemSeparator: string;
+  procedure setDefault;
+  procedure setFromNode(paramNode: TTreeNode);
+end;
+
+procedure TSerializationParams.setDefault;
+begin
+  isAbsentMarker := #0;
+  method := 'xml';
+  version := '1.1';
+  encoding := 'UTF-8';
+  htmlVersion := '5.0';
+  doctypePublic := isAbsentMarker;
+  doctypeSystem := isAbsentMarker;
+  omitXmlDeclaration := true;
+  standalone := 'omit';
+  itemSeparator := isAbsentMarker;
+end;
+
+procedure TSerializationParams.setFromNode(paramNode: TTreeNode);
+  function tobool(const s:string): boolean;
+  begin
+    case s of
+      'yes': result := true;
+      'no': result := false;
+      else raise EXQEvaluationException.create('SEPM0016', 'Expected boolean, got '+s);
+    end;
+  end;
+
+
+
+const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
+begin
+  if paramNode = nil then exit;
+  if not equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output)
+     or (paramNode.value <> 'serialization-parameters')
+     or (paramNode.typ <> tetOpen) then exit;
+   paramNode := paramNode.getFirstChild();
+   while paramNode <> nil do begin
+     if (paramNode.typ = tetOpen) and equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output) then
+       case paramNode.value of
+         //'allow-duplicate-names': todo 3.1
+         'byte-order-mark': ; //todo
+         'cdata-section-elements': ;//todo
+         'doctype-public': doctypePublic := paramNode.getAttribute('value');
+         'doctype-system': doctypeSystem := paramNode.getAttribute('value');
+         'encoding':       encoding := paramNode.getAttribute('value');
+         'escape-uri-attributes': ;//todo
+         'html-version':   htmlVersion := paramNode.getAttribute('value');
+         'include-content-type': ;//todo
+         'indent': ;//todo
+         'item-separator': itemSeparator := paramNode.getAttribute('value');
+         //'json-node-output-method': todo 3.1
+         'media-type': ;//todo
+         'method':         method := paramNode.getAttribute('value');
+         'normalization-form': ;//todo
+         'omit-xml-declaration': omitXmlDeclaration := tobool(paramNode.getAttribute('value'));
+         'standalone':     standalone := paramNode.getAttribute('value');
+         'suppress-indentation': ;//todo
+         'undeclare-prefixes': ;//todo
+         'use-character-maps': ;//todo
+         'version':        version := paramNode.getAttribute('value');
+         else raise EXQEvaluationException.create('SEPM0017', 'Invalid serialization parameter: '+paramNode.value);
+       end;
+     paramNode:= paramNode.getNextSibling();
+   end;
+end;
+
+
+function xqFunctionSerialize(const args: TXQVArray): IXQValue;
+var
+  v, arg: IXQValue;
+  params: TSerializationParams;
+  strres: String;
+  wasNodeOrFirst: Boolean;
+  hasItemSeparator: Boolean;
+  n: TTreeNode;
+  firstElement: TTreeNode;
+
+  procedure addAtomicString(const s: string);
+  begin
+    if not hasItemSeparator then begin
+      if not wasNodeOrFirst then strres += ' ';
+      wasNodeOrFirst := false;
+    end;
+    strres += s;
+  end;
+
+begin
+  //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
+  requiredArgCount(args, 1, 2);
+  arg := args[0];
+  params.setDefault;
+  if length(args) = 2 then params.setFromNode(args[1].toNode);
+
+  firstElement := nil;
+  for v in arg do with params do begin
+    n := v.toNode;
+    if n = nil then continue;
+    if n.typ = tetDocument then n := n.getFirstChild();
+    if n.typ = tetAttribute then break; //fail later
+    while (n <> nil) and (firstElement = nil) do begin
+      if n.typ = tetOpen then firstElement := n
+      else n := n.getNextSibling();
+    end;
+    if firstElement <> nil then break;
+  end;
+
+  strres := '';
+
+  with params do begin
+    case params.method of
+      'xml', 'xhtml', 'html': begin
+        //initialize missing default parameters
+        if (method = 'html') then begin
+          if (htmlVersion = isAbsentMarker) then htmlVersion := version;
+          if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
+        end else if version = isAbsentMarker then version := '1.1';
+
+        //headers
+        if (method <> 'html') and not omitXmlDeclaration then begin
+          strres += '<?xml version="'+version+'" encoding="'+encoding+'"';
+          if standalone <> 'omit' then strres += ' standalone="'+standalone+'"';
+          strres += '?>';
+        end;
+        if (htmlVersion = '5.0') and (doctypeSystem = isAbsentMarker)
+           and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
+           and ( (method = 'xhtml') or ( (method = 'html') and (doctypePublic = isAbsentMarker) )) then begin
+           if method = 'html' then strres += '<!DOCTYPE html>'
+           else strres += '<!DOCTYPE '+firstElement.value+'>'
+        end else if doctypeSystem <> isAbsentMarker then begin
+          if method = 'html' then strres += '<!DOCTYPE html '
+          else begin
+            if firstElement = nil then raise EXQEvaluationException.create('SEPM0016', 'No element given');
+            strres += '<!DOCTYPE '+firstElement.value + ' ';
+          end;
+          if doctypePublic <> isAbsentMarker then strres += 'PUBLIC "' + doctypePublic + '" '
+          else strres += 'SYSTEM ';
+          strres += '"'+doctypeSystem+'">';
+        end else if (method = 'html') and (doctypePublic <> isAbsentMarker) then
+          strres += '<!DOCTYPE html PUBLIC "'+doctypePublic+'">';
+
+        if method = 'xhtml' then method := 'xml';
+      end;
+      'text': begin
+        //encoding: string;
+      end;
+    end;
+  end;
+
+  hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
+  wasNodeOrFirst := true;
+  for v in arg do with params do begin
+    if hasItemSeparator then begin
+      if not wasNodeOrFirst then strres += params.itemSeparator;
+      wasNodeOrFirst := false;
+    end;
+    case v.kind of
+      pvkNode: begin
+        //this might be incomplete
+        n := v.toNode;
+        if n.typ in [tetAttribute] then raise EXQEvaluationException.create('SENR0001', 'Cannot serialize attribute');
+        case method of
+          'xml': strres += n.outerXML();
+         // 'xhtml':;
+          'html': strres += n.outerHTML();
+          'text': strres += v.toString;
+        end;
+        if not hasItemSeparator then wasNodeOrFirst := true;
+      end;
+      pvkObject, pvkArray, pvkNull: raiseXPTY0004TypeError(v, 'serialization');
+      pvkFunction: raise EXQEvaluationException.create('SENR0001', 'Cannot serialize function');
+      else addAtomicString(v.toString);
+    end;
+  end;
+  result := xqvalue(strres);
+end;
+
 function xqFunctionUnparsed_Text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   url: String;

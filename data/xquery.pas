@@ -7285,6 +7285,7 @@ fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Env
 fn3.registerFunction('parse-xml', @xqFunctionParse_XML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
 fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
 {pxp3}pxp.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
+fn3.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '( 	$arg 	 as item()*,  $params 	 as element(Q{http://www.w3.org/2010/xslt-xquery-serialization}serialization-parameters)?) as xs:string']);
 
 fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, ['($href as xs:string?) as xs:string?', '($href as xs:string?, $encoding as xs:string) as xs:string?'], []);
 fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, ['($href as xs:string?) as xs:boolean', '($href as xs:string?, $encoding as xs:string) as xs:boolean'], []);

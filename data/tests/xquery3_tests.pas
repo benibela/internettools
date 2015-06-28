@@ -386,6 +386,18 @@ begin
   m('outer-xml($test-doc!transform(function($x) { if ($x/@id eq "foo") then <a id="foo" href=".."/> else if ($x instance of comment()) then () else $x  }))', '<r> <a id="foo" href=".."/> <span class="bar"><a class="foo" href="index.html">...</a></span>  </r>');
   //that is not working because and is not shortcutted TODO m('outer-xml($test-doc!transform(function($x) { if ($x instance of text()) then normalize-space($x) else $x  }))', '<r><a id="foo">text</a><span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span></r>');
 
+  //serialization
+  m('serialize(<abc>123</abc>)', '<abc>123</abc>');
+  m('serialize((<abc>123&amp;</abc>, text { "foobar"} , <t/>, 1 to 3, "foo", <end/>))', '<abc>123&amp;</abc>foobar<t/>1 2 3 foo<end/>');
+  m('serialize((<abc>123&amp;</abc>, text { "foobar"} , <t/>, 1 to 3, "foo", <end/>), <o:serialization-parameters xmlns:o="http://www.w3.org/2010/xslt-xquery-serialization"><o:method value="text"/></o:serialization-parameters>)', '123&foobar1 2 3 foo');
+  m('serialize((<abc>123</abc>, text { "foobar"} , <t/>, 1 to 3, "foo", <end/>))', '<abc>123</abc>foobar<t/>1 2 3 foo<end/>');
+  m('serialize((<a xmlns="foobar">hallo</a>), <o:serialization-parameters xmlns:o="http://www.w3.org/2010/xslt-xquery-serialization"><o:omit-xml-declaration value="no"/></o:serialization-parameters>)', '<?xml version="1.1" encoding="UTF-8"?><a xmlns="foobar">hallo</a>');
+  m('serialize((<a xmlns="foobar">hallo</a>), <o:serialization-parameters xmlns:o="http://www.w3.org/2010/xslt-xquery-serialization"><o:omit-xml-declaration value="no"/><o:standalone value="yes"/><o:doctype-system value="123"/></o:serialization-parameters>)', '<?xml version="1.1" encoding="UTF-8" standalone="yes"?><!DOCTYPE a SYSTEM "123"><a xmlns="foobar">hallo</a>');
+  m('serialize((<a href="foobar">hallo</a>), <o:serialization-parameters xmlns:o="http://www.w3.org/2010/xslt-xquery-serialization"><o:method value="html"/><o:omit-xml-declaration value="no"/><o:standalone value="yes"/><o:doctype-system value="123"/></o:serialization-parameters>)', '<!DOCTYPE html SYSTEM "123"><a href="foobar">hallo</a>');
+  m('serialize((<a href="foobar">hallo</a>), <o:serialization-parameters xmlns:o="http://www.w3.org/2010/xslt-xquery-serialization"><o:method value="html"/></o:serialization-parameters>)', '<a href="foobar">hallo</a>');
+  m('serialize((<html><a href="foobar">hallo</a></html>), <o:serialization-parameters xmlns:o="http://www.w3.org/2010/xslt-xquery-serialization"><o:method value="html"/></o:serialization-parameters>)', '<!DOCTYPE html><html><a href="foobar">hallo</a></html>');
+
+
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
