@@ -1158,6 +1158,7 @@ end;
 
 procedure XQTermFlowerWindowVariableCallbackCount(data: pointer; v: TXQTermVariable);
 begin
+  ignore(v);
   inc(PInteger(data)^);
 end;
 
@@ -2157,7 +2158,6 @@ function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQ
 var
   evilkids: TXQVArray;
   t: TXSType;
-  i: Integer;
   {$ifdef checkreturntypes}version: Integer;{$endif}
 begin
   evaluateChildren(context, evilkids);

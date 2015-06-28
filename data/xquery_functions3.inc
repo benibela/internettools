@@ -43,7 +43,7 @@ function xqFunctionPath(const context: TXQEvaluationContext; const args: TXQVArr
     end;
     function getQualifiedName: string;
     begin
-      result += n.value;
+      result := n.value;
     end;
 
   var

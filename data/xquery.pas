@@ -2808,8 +2808,6 @@ end;
 
 
 function compareValue(a, b: xqfloat): integer;
-var
-  t: extended;
 begin
   if IsNan(a) or IsNan(b) then exit(-2);
   if isPosInf(a) or isPosInf(b) then
