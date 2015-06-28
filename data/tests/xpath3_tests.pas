@@ -100,6 +100,7 @@ begin
 
   t('let $s := "foobar" return xs:QName($s)', 'foobar');
   f('let $s := base64Binary("bbbb") return xs:QName($s)', 'err:XPTY0004');
+  t('let $seq := ("a", "A") return (index-of($seq, "a"), "|",index-of($seq, "A"), "|", index-of($seq, "A", "http://www.w3.org/2005/xpath-functions/collation/codepoint/"))', '1 2 | 1 2 | 2');
 
   //Xquery 3 only
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');

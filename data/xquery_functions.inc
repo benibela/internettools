@@ -2698,19 +2698,20 @@ begin
 end;
 
 function xqFunctionIndex_of(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  collationOverride: TXQCollation;
   function equal(const a,b: IXQValue): boolean; inline;
   begin
     with context.staticContext do
-      result :=comparableTypes(a as txqvalue, b as txqvalue) and equalAtomic(a, b, collation);
+      result :=comparableTypes(a as txqvalue, b as txqvalue) and equalAtomic(a, b, collationOverride);
   end;
 
 var  i: Integer;
-     collation: TXQCollation;
      v: IXQValue;
 begin
   requiredArgCount(args, 2, 3);
-  if length(args) = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
-  else collation := nil;
+  if length(args) = 3 then collationOverride := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
+  else collationOverride := nil;
   if args[0].kind <> pvkSequence then begin
     if equal(args[0], args[1]) then result := xqvalue(1)
     else result := xqvalue();
