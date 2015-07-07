@@ -1,20 +1,15 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <Package Version="4">
     <Name Value="internettools"/>
+    <Type Value="RunAndDesignTime"/>
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
-        <IncludeFiles Value="data;/home/benito/hg/components/lazarus/dialogs/"/>
+        <IncludeFiles Value="data;../lazarus/dialogs"/>
         <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system"/>
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
-      <Other>
-        <CompilerMessages>
-          <MsgFileName Value=""/>
-        </CompilerMessages>
-        <CompilerPath Value="$(CompPath)"/>
-      </Other>
     </CompilerOptions>
     <Files Count="24">
       <Item1>
@@ -114,7 +109,6 @@
         <Type Value="Include"/>
       </Item24>
     </Files>
-    <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="1">
       <Item1>
         <PackageName Value="FCL"/>
@@ -128,4 +122,3 @@
     </PublishOptions>
   </Package>
 </CONFIG>
-
