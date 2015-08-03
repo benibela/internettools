@@ -14,16 +14,19 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
-{**This unit contains the wrapper for synapse}
+{**This unit contains the wrapper for Android.}
 unit androidinternetaccess;
 
 
 {$mode objfpc}{$H+}
-
 {$IFDEF ANDROID}
 {$DEFINE COMPILE_ANDROID_INTERNETACCESS} //If this unit should be compiled.
 {$ENDIF}
 
+
+{$IFDEF PASDOCRUN} //for documentation purposes
+{$DEFINE COMPILE_ANDROID_INTERNETACCESS}
+{$ENDIF}
 
 
 interface
@@ -36,20 +39,13 @@ uses
   ;
 
 type
-
-{ TSynapseInternetAccess }
-//**@abstract(Internet access class using the synapse library)
-//**Set defaultInternetAccessClass to TSynapseInternetAccess if
-//**you want to use wininet to connect to internet@br
-//**You also have to install the synapse package@br
-//**In contrast to native synapse this will automatically load openssl
-//**if it is called for the https protocal
-
 { TAndroidInternetAccess }
 
+//**@abstract(Internet access class using the Apache HttpComponents on Android.)
+//**Set defaultInternetAccessClass to TAndroidInternetAccess if you want to use this class on Android.@br
+//**Additionally bbjniutils.jvmref must be set to the Java VM reference.@br
 TAndroidInternetAccess=class(TInternetAccess)
 protected
-  //synapse will automatically handle keep alive
   lastConnectedUrl: TDecodedUrl;
   jhttpclient: jobject;
   FLastHTTPHeaders: TStringList;
@@ -64,7 +60,7 @@ public
 
   function internalHandle: TObject; override;
 
-  //sets username and password for an host
+  //**sets username and password for an host
   procedure setCredentials(const username, password: string; const host: string);
 end;
 TAndroidInternetAccessClass = class of TAndroidInternetAccess;

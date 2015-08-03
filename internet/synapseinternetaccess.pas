@@ -40,12 +40,10 @@ uses
 type
 
 { TSynapseInternetAccess }
-//**@abstract(Internet access class using the synapse library)
-//**Set defaultInternetAccessClass to TSynapseInternetAccess if
-//**you want to use wininet to connect to internet@br
-//**You also have to install the synapse package@br
-//**In contrast to native synapse this will automatically load openssl
-//**if it is called for the https protocal
+//**@abstract(Internet access class using the Synapse library)
+//**Set defaultInternetAccessClass to TSynapseInternetAccess to use it.@br
+//**You also have to install the Synapse package.@br
+//**In contrast to native Synapse this will automatically load openssl, if it is called on HTTPS URLs.
 TSynapseInternetAccess=class(TInternetAccess)
   procedure connectionStatus(Sender: TObject; Reason: THookSocketReason;
     const Value: String);

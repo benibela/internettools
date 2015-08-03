@@ -119,7 +119,7 @@ end;
 const javaEnvRef: cardinal = $deadbeef; //block access to CustomDrawnInt.javaEnvRef because it is not thread safe
 threadvar j: TJavaEnv; //this is an object to reduce the overhead caused by being a threadvar (i.e. you can write with j ...)
 
-var jvmref: PJavaVM;
+var jvmref: PJavaVM; //**< Java VM reference as passed to JNI_OnLoad.
     jContextObject: jobject;
 
 var onLoad: function: integer;

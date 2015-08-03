@@ -14,10 +14,9 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
-{** @abstract(You can use this unit to configure and create internet connections)
+{** @abstract(You can use this unit to configure and create internet connections.)
 
-    In the moment it only supports http/s connections, but perhaps this will change
-    in the future (e.g. to also support ftp)}
+    Currently it only supports http/s connections, but this might change in future (e.g. to also support ftp)}
 unit internetaccess;
 
 {$mode objfpc}{$H+}
@@ -77,7 +76,8 @@ type
   end;
   PMIMEMultipartSubData = ^TMIMEMultipartSubData;
 
-  TMIMEMultipartData = record //encodes the data corresponding to RFC 1341 (preliminary)
+  //**encodes the data corresponding to RFC 1341 (preliminary)
+  TMIMEMultipartData = record
     data: array of TMIMEMultipartSubData;
     function getFormDataIndex(const name: string): integer;
     procedure add(const sdata: string; const headers: string = '');
@@ -102,18 +102,19 @@ type
   //**@abstract(Abstract base class for connections)
   //**This class defines the interface methods for http requests, like get, post or request.@br
   //**If a method fails, it will raise a EInternetException@br@br
-  //**Since this is an abstract class, you cannot use it directly, but need one of the implementing child classes
+  //**Since this is an abstract class, you cannot use it directly, but need to use one of the implementing child classes
   //**TW32InternetAccess, TSynapseInternetAccess, TAndroidInternetAccess or TMockInternetAccess. @br
   //**The recommended usage is to assign one of the child classes to defaultInternetAccessClass and
   //**then create an actual internet access class with @code(defaultInternetAccessClass.create()). @br
   //**Then it is trivial to swap between different implementations on different platforms, and the depending units
-  //**(e.g. simpleinternet or xquery) will use the implementation you have choosen.
+  //**(e.g. simpleinternet or xquery ) will use the implementation you have choosen.
   TInternetAccess=class
   private
     FOnTransferEnd: TTransferEndEvent;
     FOnTransferStart: TTransferStartEvent;
   protected
     FOnProgress:TProgressEvent;
+    //**Override this if you want to sub class it
     function doTransfer(method: string; const url: TDecodedUrl;  data:string):string;virtual;abstract;
     function GetLastHTTPHeaders: TStringList; virtual; abstract;
   protected
@@ -129,25 +130,24 @@ type
     class function parseHeaderForLocation(header: string): string; static;
   public
     //in
-    internetConfig: PInternetConfig;
+    internetConfig: PInternetConfig; //**< Configuration to use. Defaults to defaultInternetConfig
     additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
     ContentTypeForData: string; //**< Defines the Content-Type that is used to transmit data. Usually @code(application/x-www-form-urlencoded) or @code(multipart/form-data; boundary=...). @br This is overriden by a Content-Type set in additionalHeaders.
     multipartFormData: TMIMEMultipartData;
     function getFinalMultipartFormData: string;
   public
     //out
-    lastHTTPResultCode: longint;    //**< HTTP Status code of the last request
-    lastUrl: String;
-    property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last request
-    function getLastHTTPHeader(header: string): string; //**< Reads a certain HTTP header received by the last request
+    lastHTTPResultCode: longint;    //**< HTTP Status code of the last @noAutoLink(request)
+    lastUrl: String; //**< Last retrieved URL
+    property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last @noAutoLink(request)
+    function getLastHTTPHeader(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
     function getLastContentType: string; //**< Same as getLastHTTPHeader('Content-Type') but easier to remember and without magic string
   public
     constructor create();virtual;
-    //**post the (url encoded) data to the given url and returns the resulting document
+    //**post the (raw) data to the given url and returns the resulting document
     //**as string
     function post(totalUrl: string; data:string):string;
-    //**post the (url encoded) data to the url given as three parts and returns the page as string
-    //** (override this if you want to sub class it)
+    //**post the (raw) data to the url given as three parts and returns the page as string
     function post(protocol,host,url: string; data:string):string;
     //**get the url as stream
     procedure get(totalUrl: string; stream:TStream);
@@ -158,9 +158,11 @@ type
     //**get the url as string
     function get(protocol,host,url: string):string;
 
-    //**performs a http request
+    //**performs a http @noAutoLink(request)
     function request(method, fullUrl, data:string):string;
+    //**performs a http @noAutoLink(request)
     function request(method, protocol,host,url, data:string):string;
+    //**performs a http @noAutoLink(request)
     function request(method: string; url: TDecodedUrl; data:string):string;
 
 
@@ -198,22 +200,22 @@ type
 
 //procedure decodeURL(const totalURL: string; out protocol, host, url: string);
 //** Splits a url into parts
-//** normalize performs some normalizations (e.g. foo//bar -> foo/bar)
+//** @param(normalize performs some normalizations (e.g. foo//bar -> foo/bar))
 function decodeURL(const totalURL: string; normalize: boolean = true): TDecodedUrl;
 
 type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML, rtJSON);
 
 (***
-  Guesses the type of given string@br@br
+  Guesses the type of a given string@br@br
 
-  E.g. for 'http://' it returns rtRemoteURL, for '/tmp' rtFile and for '<abc/>' rtXML@br.
-  Internally used by simpleinternet.retrieve to determine how to actually retrieve the data.
+  E.g. for 'http://' it returns rtRemoteURL, for '/tmp' rtFile and for '<abc/>' rtXML.@br
+  Internally used by simpleinternet.retrieve to determine how to actually @noAutoLink(retrieve) the data.
 *)
 function guessType(const data: string): TRetrieveType;
 
 
-var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all our classes
-  defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access, here you can store which internet library the program should use
+var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all internet access classes
+  defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access. This controls which internet library the program will use
 
 const ContentTypeUrlEncoded: string = 'application/x-www-form-urlencoded';
 const ContentTypeMultipart: string = 'multipart/form-data'; //; boundary=
