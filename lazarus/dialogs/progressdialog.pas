@@ -69,4 +69,4 @@ initialization
   {$I progressdialog.lrs}
 
 end.
-
+

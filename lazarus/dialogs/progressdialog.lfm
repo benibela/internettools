@@ -16,12 +16,12 @@ object ProgressBarDialog: TProgressBarDialog
   ClientHeight = 62
   ClientWidth = 501
   FormStyle = fsStayOnTop
-  LCLVersion = '0.9.29'
+  LCLVersion = '1.5'
   object Label1: TLabel
     Left = 9
-    Height = 19
+    Height = 1
     Top = 9
-    Width = 6
+    Width = 1
     BorderSpacing.Around = 6
     ParentColor = False
   end
@@ -31,10 +31,10 @@ object ProgressBarDialog: TProgressBarDialog
     AnchorSideTop.Control = ProgressBar1
     AnchorSideTop.Side = asrCenter
     AnchorSideRight.Side = asrBottom
-    Left = 453
-    Height = 18
-    Top = 37
-    Width = 48
+    Left = 462
+    Height = 15
+    Top = 21
+    Width = 39
     Anchors = [akTop, akRight]
     BorderSpacing.Around = 6
     Caption = '??? % '
@@ -48,12 +48,12 @@ object ProgressBarDialog: TProgressBarDialog
     AnchorSideRight.Control = barLabel
     Left = 8
     Height = 25
-    Top = 34
-    Width = 439
+    Top = 16
+    Width = 448
     Anchors = [akTop, akLeft, akRight]
     BorderSpacing.Around = 6
     Smooth = True
     TabOrder = 0
     BarShowText = True
   end
-end
+end
