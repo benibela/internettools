@@ -244,9 +244,9 @@ type
   TMultipageTemplateReader = class
   protected
     template:TMultiPageTemplate;
-    lastURL: string;
+    lastData, lastContentType: string;
     procedure setTemplate(atemplate: TMultiPageTemplate);
-    procedure processPage(page, cururl, contenttype: string); virtual;
+    procedure applyPattern(pattern, name: string); virtual;
   public
     //** Object used to send requests and download pages
     internet:TInternetAccess;
@@ -298,17 +298,24 @@ type
 
   { TTemplateActionLoadPage }
 
-  TTemplateActionLoadPage = class(TTemplateAction)
+  TTemplateActionPage = class(TTemplateAction)
     url:string;
-    templateFile:string;
-    template:string;
     headers, postparams:array of TProperty;
     condition, method: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
+  end;
+
+  { TTemplateActionLoadPage }
+
+  TTemplateActionPattern = class(TTemplateAction)
+    pattern:string;
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
   private
-    templateName: string;
+    name, sourcefile: string;
   end;
 
   { TTemplateActionCallAction }
@@ -375,6 +382,25 @@ type
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
   function getVariable(name: string): IXQValue;
+end;
+
+procedure TTemplateActionPattern.initFromTree(t: TTreeNode);
+begin
+  inherited initFromTree(t);
+end;
+
+procedure TTemplateActionPattern.perform(reader: TMultipageTemplateReader);
+begin
+  if Assigned(reader.onLog) then reader.onLog(reader, 'Apply pattern: '+name + ' to '+reader.internet.lastUrl, 2);
+  reader.applyPattern(pattern, name);
+end;
+
+function TTemplateActionPattern.clone: TTemplateAction;
+begin
+  Result:=TTemplateActionPattern.Create;
+  TTemplateActionPattern(result).pattern := pattern;
+  TTemplateActionPattern(result).name := name;
+  TTemplateActionPattern(result).sourcefile := sourcefile;
 end;
 
 { TTemplateActionShort }
@@ -602,45 +628,57 @@ end;
 
 { TTemplateActionLoadPage }
 
-procedure TTemplateActionLoadPage.initFromTree(t: TTreeNode);
+procedure TTemplateActionPage.initFromTree(t: TTreeNode);
 begin
   SetLength(postparams, 0);
   url := t.getAttribute('url', url);
-  templateFile := t.getAttribute('templateFile', templateFile);
-  templateName := templateFile;
   condition := t['test'];
   method:='';
+
+  if t.hasAttribute('templateFile') then begin //DEPRECATED pattern import syntax
+    SetLength(children, length(children)+1);
+    children[high(children)] := TTemplateActionPattern.create();
+    TTemplateActionPattern(children[high(children)]).sourcefile := t.getAttribute('templateFile');
+    TTemplateActionPattern(children[high(children)]).name := TTemplateActionPattern(children[high(children)]).sourcefile;
+  end;
 
   t := t.getFirstChild();
   while t <> nil do begin
     if t.typ = tetOpen then begin
-      if SameText(t.value, 'post') then begin
-        setlength(postparams, length(postparams)+1);
-        postparams[high(postparams)].name:=t['name'];
-        if t.hasAttribute('value') then postparams[high(postparams)].value:=t['value']
-        else postparams[high(postparams)].value:=t.deepNodeText(); //support old for a while
-      end else if SameText(t.value, 'template') then
-        template:=t.innerXML()
-      else if SameText(t.value, 'header') then begin
-        setlength(headers, length(headers)+1);
-        if t.hasAttribute('value') then headers[high(headers)].value:=t['value']
-        else headers[high(headers)].value:=t.deepNodeText();
-        if t.hasAttribute('name') then headers[high(headers)].name:=t['name']
-        else if pos(':', headers[high(headers)].value) > 0 then begin
-          headers[high(headers)].name := strSplitGet(':', headers[high(headers)].value);
-          headers[high(headers)].name := trim(headers[high(headers)].name);
-          headers[high(headers)].value := trim(headers[high(headers)].value);
+      case LowerCase(t.value) of
+        'post': begin
+          setlength(postparams, length(postparams)+1);
+          postparams[high(postparams)].name:=t['name'];
+          if t.hasAttribute('value') then postparams[high(postparams)].value:=t['value']
+          else postparams[high(postparams)].value:=t.deepNodeText(); //support old for a while
         end;
-      end else if SameText(t.value, 'method') then begin
-        if t.hasAttribute('value') then method:=t['value']
-        else method:=t.deepNodeText();
+        'template': begin //DEPRECATED pattern direct syntax
+          SetLength(children, length(children)+1);
+          children[high(children)] := TTemplateActionPattern.create();
+          TTemplateActionPattern(children[high(children)]).pattern := TrimLeft(t.innerXML());
+        end;
+        'header': begin
+          setlength(headers, length(headers)+1);
+          if t.hasAttribute('value') then headers[high(headers)].value:=t['value']
+          else headers[high(headers)].value:=t.deepNodeText();
+          if t.hasAttribute('name') then headers[high(headers)].name:=t['name']
+          else if pos(':', headers[high(headers)].value) > 0 then begin
+            headers[high(headers)].name := strSplitGet(':', headers[high(headers)].value);
+            headers[high(headers)].name := trim(headers[high(headers)].name);
+            headers[high(headers)].value := trim(headers[high(headers)].value);
+          end;
+        end;
+        'method': begin
+          if t.hasAttribute('value') then method:=t['value']
+          else method:=t.deepNodeText();
+        end;
       end;
     end;
     t := t.getNextSibling();
   end;
 end;
 
-procedure TTemplateActionLoadPage.perform(reader: TMultipageTemplateReader);
+procedure TTemplateActionPage.perform(reader: TMultipageTemplateReader);
 var
   cachedCondition: IXQuery;
   cururl: String;
@@ -656,11 +694,6 @@ begin
   if condition <> '' then begin
     cachedCondition := reader.parser.parseQuery(condition); //TODO: long term cache
     if not cachedCondition.evaluate().toBoolean then exit;
-  end;
-
-  if template<>'' then begin
-    if Assigned(reader.onLog) then reader.onLog(reader, 'Parse Template From File: '+reader.template.path+templateFile, 2);
-    reader.parser.parseTemplate(template, templateName);
   end;
 
   cururl := url;
@@ -699,30 +732,32 @@ begin
     else curmethod:='POST';
   end;
 
-  if Assigned(reader.onLog) then reader.onLog(reader, 'Get/Post ('+curmethod+') internet page '+cururl+#13#10'Post: '+post);
+  if Assigned(reader.onLog) then reader.onLog(reader, curmethod+' internet page '+cururl+#13#10'Post: '+post);
 
   if guessType(cururl) = rtFile then
-    cururl := strResolveURI(cururl, reader.lastUrl);
+    cururl := strResolveURI(cururl, reader.internet.lastUrl);
 
 
+  reader.lastContentType := '';
   case guessType(cururl) of
     rtRemoteURL: begin
       for j := 0 to high(headers) do
         reader.internet.additionalHeaders.Values[trim(headers[j].name)] := trim (reader.parser.replaceEnclosedExpressions(headers[j].value));
 
       page:=reader.internet.request(curmethod, cururl, post);
-      reader.lastURL:=reader.internet.lastURL;
+
+      reader.lastContentType := reader.internet.getLastContentType;
 
       reader.internet.additionalHeaders.Text := oldHeaders;
     end;
     rtFile: begin
       page := strLoadFromFileUTF8(cururl);
-      reader.lastURL:=cururl;
+      reader.internet.lastURL:=cururl;
     end;
     rtXML: begin
       page := cururl;
       cururl:='';
-      reader.lastURL:=cururl;
+      reader.internet.lastURL:=cururl;
     end
     else raise ETemplateReader.create('Unknown url type: '+cururl);
   end;
@@ -731,26 +766,24 @@ begin
 
   if page='' then raise EInternetException.Create(url +' konnte nicht geladen werden');
 
-  if template<>'' then begin
-    if Assigned(reader.onLog) then reader.onLog(reader, 'parse page: '+reader.lastURL, 1);
+  reader.lastData := page;
 
-    reader.processPage(page, reader.lastURL, reader.internet.getLastHTTPHeader('Content-Type'));
-  end;
+  performChildren(reader);
+
   if Assigned(reader.onLog) then reader.onLog(reader, 'page finished', 2);
 end;
 
-function TTemplateActionLoadPage.clone: TTemplateAction;
+function TTemplateActionPage.clone: TTemplateAction;
 begin
-  Result:=cloneChildren(TTemplateActionLoadPage.Create);
-  TTemplateActionLoadPage(result).url := url;
-  TTemplateActionLoadPage(result).templateFile := templateFile;
-  TTemplateActionLoadPage(result).template:=template;
-  TTemplateActionLoadPage(result).headers := headers;
-  SetLength(TTemplateActionLoadPage(result).headers, length(headers));
-  TTemplateActionLoadPage(result).postparams := postparams;
-  SetLength(TTemplateActionLoadPage(result).postparams, length(postparams));
-  TTemplateActionLoadPage(result).condition:=condition;
-  TTemplateActionLoadPage(result).method:=method;
+  Result:=cloneChildren(TTemplateActionPage.Create);
+  TTemplateActionPage(result).url := url;
+  TTemplateActionPage(result).headers := headers;
+  SetLength(TTemplateActionPage(result).headers, length(headers));
+  TTemplateActionPage(result).postparams := postparams;
+  SetLength(TTemplateActionPage(result).postparams, length(postparams));
+  TTemplateActionPage(result).condition:=condition;
+  TTemplateActionPage(result).method:=method;
+  result := cloneChildren(result);
 end;
 
 { TTemplateActionVariable }
@@ -822,19 +855,21 @@ procedure TTemplateAction.addChildFromTree(t: TTreeNode);
 
 begin
   if t.typ <> tetOpen then exit;
-  if SameText(t.value, 'variable') then addChild(TTemplateActionVariable)
-  else if SameText(t.value, 'action') then addChild(TTemplateActionMain)
-  else if SameText(t.value, 'actions') then addChildrenFromTree(t)
-  else if SameText(t.value, 'page') then addChild(TTemplateActionLoadPage)
-  else if SameText(t.value, 'call') then addChild(TTemplateActionCallAction)
-  else if SameText(t.value, 'choose') then addChild(TTemplateActionChoose)
-  else if SameText(t.value, 'when') then addChild(TTemplateActionChooseWhen)
-  else if SameText(t.value, 'otherwise') then addChild(TTemplateActionChooseOtherwise)
-  else if SameText(t.value, 'loop') then addChild(TTemplateActionLoop)
-  else if SameText(t.value, 'meta') then addChild(TTemplateActionMeta)
-  else if SameText(t.value, 'if') then addChild(TTemplateActionIf)
-  else if SameText(t.value, 's') then addChild(TTemplateActionShort)
-  else raise Exception.Create('Unknown template node: '+t.outerXML);
+  case LowerCase(t.value) of
+    'variable': addChild(TTemplateActionVariable);
+    'action': addChild(TTemplateActionMain);
+    'actions': addChildrenFromTree(t);
+    'page': addChild(TTemplateActionPage);
+    'call': addChild(TTemplateActionCallAction);
+    'choose': addChild(TTemplateActionChoose);
+    'when': addChild(TTemplateActionChooseWhen);
+    'otherwise': addChild(TTemplateActionChooseOtherwise);
+    'loop': addChild(TTemplateActionLoop);
+    'meta': addChild(TTemplateActionMeta);
+    'if': addChild(TTemplateActionIf);
+    's': addChild(TTemplateActionShort);
+    else raise Exception.Create('Unknown template node: '+t.outerXML);
+  end;
 end;
 
 procedure TTemplateAction.performChildren(reader: TMultipageTemplateReader);
@@ -909,17 +944,18 @@ begin
   baseActions:=TTemplateAction.Create;
 end;
 
-procedure setTemplateNames(a: TTemplateAction; baseName: string='');
+procedure setPatternNames(a: TTemplateAction; baseName: string='');
 var
   i: Integer;
 begin
-  if a is TTemplateActionLoadPage then begin
-    baseName+=' page:'+TTemplateActionLoadPage(a).url;
-    if TTemplateActionLoadPage(a).templateName = '' then TTemplateActionLoadPage(a).templateName:='(template of'+baseName+')';
+  if a is TTemplateActionPage then begin
+    baseName+=' page:'+TTemplateActionPage(a).url;
+  end else if a is TTemplateActionPattern then begin
+    if TTemplateActionPattern(a).name = '' then TTemplateActionPattern(a).name:='(pattern of'+baseName+')';
   end else if a is TTemplateActionMain then
       baseName+=' action:'+TTemplateActionMain(a).name;
   for i := 0 to high(a.children) do
-    setTemplateNames(a.children[i], baseName);
+    setPatternNames(a.children[i], baseName);
 end;
 
 procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
@@ -942,23 +978,23 @@ begin
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
   tree.TargetEncoding:=eUTF8;
   readTree(tree.parseTree(template));
-  setTemplateNames(baseActions);
+  setPatternNames(baseActions);
   tree.Free;
 end;
 
 procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string);
   procedure loadTemplates(a: TTemplateAction);
   var i:longint;
-    b: TTemplateActionLoadPage;
+    b: TTemplateActionPattern;
   begin
     for i:=0 to high(a.children) do
       loadTemplates(a.children[i]);
-    if a is TTemplateActionLoadPage then begin
-      b := TTemplateActionLoadPage(a);
-      if b.templateFile = '' then exit;
-      b.template:=loadSomething(_dataPath+b.templateFile);
-      if b.template='' then
-        raise ETemplateReader.create('Template-Datei "'+self.path+b.templateFile+'" konnte nicht geladen werden');
+    if a is TTemplateActionPattern then begin
+      b := TTemplateActionPattern(a);
+      if b.sourcefile = '' then exit;
+      b.pattern:=loadSomething(_dataPath+b.sourcefile);
+      if b.pattern='' then
+        raise ETemplateReader.create('Template-Datei "'+self.path+b.sourcefile+'" konnte nicht geladen werden');
     end
   end;
 var
@@ -975,7 +1011,7 @@ begin
     tree.TargetEncoding:=eUTF8;
     readTree(tree.parseTree(loadSomething(_dataPath+'template'), 'template'));
     loadTemplates(baseActions);
-    setTemplateNames(baseActions);
+    setPatternNames(baseActions);
   finally
     tree.free;
   end;
@@ -1044,15 +1080,19 @@ begin
       atemplate.baseActions.children[i].perform(self);
 end;
 
-procedure TMultipageTemplateReader.processPage(page, cururl, contenttype: string);
+procedure TMultipageTemplateReader.applyPattern(pattern, name: string);
+var
+  curUrl: String;
 begin
+  curUrl := internet.lastUrl;
   parser.variableChangeLog.add('url', cururl);
-  parser.variableChangeLog.add('raw', page);
+  parser.variableChangeLog.add('raw', lastData);
 
-  if not strContains(cururl, '://') then
+  if not strContains(cururl, '://') then //todo: is this still needed?
     cururl := strResolveURI(cururl, 'file://' + strPrependIfMissing(GetCurrentDir, '/'));
 
-  parser.parseHTML(page, cururl, contenttype);
+  parser.parseTemplate(pattern, name);
+  parser.parseHTML(lastData, curUrl, lastContentType);
 
   if Assigned(onPageProcessed) then
     onPageProcessed(self, parser);
@@ -1113,4 +1153,4 @@ end;
 
 end.
 
-
+h
