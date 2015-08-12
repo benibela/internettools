@@ -16,9 +16,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
 
 (***
-  @abstract(This unit contains classes to handle multi-page templates. A collection of single-page templates that can be applied to different pages.)@br@br
+  @abstract(This unit contains classes to handle multi-page template scripts. A collection of single-page patterns (previously also called templates) that can be applied to different pages.)@br@br
 
-  The class TMultiPageTemplate can be used to load a template (and there is also the documentation of the template syntax/semantic).
+  The class TMultiPageTemplate can be used to load a template script (and there is also the documentation of the template syntax/semantic).
 
   The class TMultipageTemplateReader can be used to run the template.
 *)
@@ -76,27 +76,25 @@ type
   (***@abstract(A multi page template, which defines which and how pages are processed. @br )
 
     A multi page template defines a list of actions, each listing variables to set as well as pages to download and
-    process with single-page templates. @br
+    process with single-page patterns (previously also called templates). @br
     You can then call an action, let it process the elements defined in the template and then read the resulting variables.
 
-   (Notice: Although both the multi-page and single-page templates are called templates, they are actually something
-    *entirely* different:
-       A multi-page template is a list of explicit actions that are performed in order, like an algorithm;
-       A single-page template is an implicit pattern that is matched against the page, like a regular expression)
+   (In the past patterns were called templates, too, but they are very different from the multi-page template of this unit. @br
+       A multi-page template is a list of explicit actions that are performed in order, like an algorithm; @br
+       A pattern (single-page template) is an implicit pattern that is matched against the page, like a regular expression)
 
-    The xml file of such a multi-page template looks like this:
+    The syntax of a multi-page template is inspired by the XSLT syntax and looks like this:
    @longCode(
    <actions>
    <action id="action-1">
      <variable name="foobar" value="xyz"/>
 
-     <page url="url to send the request to"
-           templateFile="File containing a single page template (optional)"  >
-       <header name="header name">value (optional) </header>
-       <post name="post variable name"> value (optional) </post>
-       ...
-       <template>A single page template (optional) </template>
+     <page url="url to send the request to">
+       <header name="header name">value...</header>
+       <post name="post variable name"> value... </post>
      </page>
+     <pattern> ...to apply to the previous page (inline)... </pattern>
+     <pattern href="to apply to the previous page (from a file)"/>
 
      ...
 
@@ -111,38 +109,28 @@ type
     <actions> contains a list/map of named actions, each <action> can contain:
 
     @unorderedList(
+      @item(@code(<page>)      Downloads a page )
+      @item(@code(<pattern>)   Processes the last page with pattern matching )
       @item(@code(<variable>)  Sets an variable, either to a string value or to an evaluated XPath expression )
-      @item(@code(<page>)     Downloads a page and processes it with a single-page template )
       @item(@code(<loop>)      Repeats the children of the loop element )
       @item(@code(<call>)      Calls another action )
-      @item(@code(<if>)      Tests, if a condition is satisfied )
+      @item(@code(<if>)        Tests, if a condition is satisfied )
       @item(@code(<choose><when><otherwise>)      Switches depending on a value  )
-      @item(@code(<s>)      Evaluated an XPath/XQuery expression )
+      @item(@code(<s>)         Evaluates an XPath/XQuery expression )
     )
 
     Details for each element:
 
     @definitionList(
 
-    @itemLabel(@code(<variable name="name" value="str value">xpath expression</variable>))
+    @itemLabel(@code(<page url="request url">))
     @item(
-
-      This sets the value of the variable with name $name.
-      If the value attribute is given, it is set to the string value of the attribute, otherwise the xpath expression
-      is evaluated its result is used.
-      (there is no document loaded for node reading, but the xpath expression is still useful for computations on the other
-       variables.)
-
-    )
-    @itemLabel(@code(<page url="request url" templateFile="single page template file">))
-    @item(
-
       A page to download and process. @br
       You can use @code(<post name="..name.." value="..value..">..value..</post>) elements in the <page> to add
       variables for a post request to send to the url. @br
-      If the name attribute exists, the content is url encoded, otherwise not. @br @code()
+      If the name attribute exists, the content is url encoded, otherwise not. @br
       (currently the value attribute and the contained text are treated as string to send.
-       In future versions, the contained text will be evaluated as xpath expression.)  @br
+       In future versions, the contained text will be evaluated as XPath expression.)  @br
       If no <post> children exist, a GET request is send.
 
       The template that should be applied to the downloaded page, can be given directly in a <template> element, or
@@ -151,6 +139,25 @@ type
 
       There is also a @code(test="xpath") attribute that can define a condition, which will skip a page,
       if the condition evaluates to false().
+
+    )
+    @itemLabel(@code(<pattern href="file" name="..">  inline pattern  </variable>))
+    @item(
+      This applies a pattern to the last page.
+
+      The pattern can be given inline or loaded from a file in the src attribute.
+
+      The name attribute is basically ignored, but useful for debugging.
+
+    )
+    @itemLabel(@code(<variable name="name" value="str value">xpath expression</variable>))
+    @item(
+
+      This sets the value of the variable with name $name.
+      If the value attribute is given, it is set to the string value of the attribute, otherwise the xpath expression
+      is evaluated its result is used.
+      (there is no document loaded for node reading, but the xpath expression is still useful for computations on the other
+       variables.)
 
     )
     @itemLabel(@code(<loop var="variable name" list="list (xpath)" test="condition (xpath)">))
@@ -315,7 +322,7 @@ type
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   private
-    name, sourcefile: string;
+    name, href: string;
   end;
 
   { TTemplateActionCallAction }
@@ -386,7 +393,10 @@ end;
 
 procedure TTemplateActionPattern.initFromTree(t: TTreeNode);
 begin
-  inherited initFromTree(t);
+  href := t.getAttribute('href'); //Is loaded later
+  name := t.getAttribute('name');
+  pattern := t.innerXML();
+  if (href <> '') and (pattern <> '') then raise ETemplateReader.create('Cannot mix href attribute with direct pattern text');
 end;
 
 procedure TTemplateActionPattern.perform(reader: TMultipageTemplateReader);
@@ -400,7 +410,7 @@ begin
   Result:=TTemplateActionPattern.Create;
   TTemplateActionPattern(result).pattern := pattern;
   TTemplateActionPattern(result).name := name;
-  TTemplateActionPattern(result).sourcefile := sourcefile;
+  TTemplateActionPattern(result).href := href;
 end;
 
 { TTemplateActionShort }
@@ -638,8 +648,8 @@ begin
   if t.hasAttribute('templateFile') then begin //DEPRECATED pattern import syntax
     SetLength(children, length(children)+1);
     children[high(children)] := TTemplateActionPattern.create();
-    TTemplateActionPattern(children[high(children)]).sourcefile := t.getAttribute('templateFile');
-    TTemplateActionPattern(children[high(children)]).name := TTemplateActionPattern(children[high(children)]).sourcefile;
+    TTemplateActionPattern(children[high(children)]).href := t.getAttribute('templateFile');
+    TTemplateActionPattern(children[high(children)]).name := TTemplateActionPattern(children[high(children)]).href;
   end;
 
   t := t.getFirstChild();
@@ -860,6 +870,7 @@ begin
     'action': addChild(TTemplateActionMain);
     'actions': addChildrenFromTree(t);
     'page': addChild(TTemplateActionPage);
+    'pattern': addChild(TTemplateActionPattern);
     'call': addChild(TTemplateActionCallAction);
     'choose': addChild(TTemplateActionChoose);
     'when': addChild(TTemplateActionChooseWhen);
@@ -967,7 +978,23 @@ begin
   loadTemplateWithCallback(@strLoadFromFileUTF8, aname);
 end;
 
+procedure loadPatterns(a: TTemplateAction; loadSomething: TLoadTemplateFile; dataPath: string = '');
+var i:longint;
+ b: TTemplateActionPattern;
+begin
+ for i:=0 to high(a.children) do
+   loadPatterns(a.children[i],loadSomething, dataPath);
+ if a is TTemplateActionPattern then begin
+   b := TTemplateActionPattern(a);
+   if b.href = '' then exit;
+   b.pattern:=loadSomething(dataPath+b.href);
+   if b.pattern='' then
+     raise ETemplateReader.create('Template-Datei "'+dataPath+b.href+'" konnte nicht geladen werden');
+ end
+end;
+
 procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string);
+
 var
   tree: TTreeParser;
 begin
@@ -978,25 +1005,13 @@ begin
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
   tree.TargetEncoding:=eUTF8;
   readTree(tree.parseTree(template));
+  loadPatterns(baseActions, @strLoadFromFileUTF8);
   setPatternNames(baseActions);
   tree.Free;
 end;
 
 procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string);
-  procedure loadTemplates(a: TTemplateAction);
-  var i:longint;
-    b: TTemplateActionPattern;
-  begin
-    for i:=0 to high(a.children) do
-      loadTemplates(a.children[i]);
-    if a is TTemplateActionPattern then begin
-      b := TTemplateActionPattern(a);
-      if b.sourcefile = '' then exit;
-      b.pattern:=loadSomething(_dataPath+b.sourcefile);
-      if b.pattern='' then
-        raise ETemplateReader.create('Template-Datei "'+self.path+b.sourcefile+'" konnte nicht geladen werden');
-    end
-  end;
+
 var
   tree: TTreeParser;
 begin
@@ -1010,7 +1025,7 @@ begin
     tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
     tree.TargetEncoding:=eUTF8;
     readTree(tree.parseTree(loadSomething(_dataPath+'template'), 'template'));
-    loadTemplates(baseActions);
+    loadPatterns(baseActions,loadSomething,path);
     setPatternNames(baseActions);
   finally
     tree.free;
@@ -1090,7 +1105,7 @@ begin
 
   if not strContains(cururl, '://') then //todo: is this still needed?
     cururl := strResolveURI(cururl, 'file://' + strPrependIfMissing(GetCurrentDir, '/'));
-
+writeln(stderr, pattern);flush(stderr);
   parser.parseTemplate(pattern, name);
   parser.parseHTML(lastData, curUrl, lastContentType);
 
