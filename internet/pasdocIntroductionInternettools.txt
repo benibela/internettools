@@ -4,11 +4,24 @@
 @section(1 AnchorNameInstallation Installation)
 
 
-Since the Internet Tools and their XQuery-Engine consist of a set of simple Pascal units they do not require installation.
+Since the Internet Tools and their XQuery-Engine consist of a set of plain Pascal units they do not require installation. 
+You just need to extract all files from the .zip package and ensure that FPC can find the .pas files.
 
-Just set the search paths of the project, so that all necessary units are found. Important paths: data/, internet/ and import/regexpr/source.
+You can do one of the following to set the paths:
 
-There is also a Lazarus package internettools.lpk, which can be installed in Lazarus to set these paths with project dependencies. But this is optional.
+@unorderedList( 
+  @item(Put this in your @code(fpc.cfg) or @code(~/.fpc.cfg)
+@longCode(
+-Fu<PATH>/data/
+-Fu<PATH>/internet/
+-Fu<PATH>/system/)(replace <PATH> with the directory you have extracted everything to))
+
+  @item(Set the search paths of your project to the extracted files. The important directories are data/, internet/ and system/ )
+
+  @item(Install the package internettools.lpk in Lazarus.)
+)
+
+On Linux you also need to install Synapse and OpenSSL devel. For Android you need the standard Android SDK/NDK and initialize the JVM reference in bbjniutils.
 
 @section(1 AnchorNameStarted Getting Started)
 
