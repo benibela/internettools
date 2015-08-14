@@ -588,7 +588,7 @@ var
   context: TXQEvaluationContext;
 begin
   if list <> '' then begin
-    if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
+    if varname = '' then raise ETemplateReader.Create('A list attribute at a loop node requires a var attribute');
     listx := evaluateQuery(reader, list); //TODO: parse only once
   end else listx := nil;
   if test <> '' then begin
@@ -633,7 +633,7 @@ begin
     if not evaluateQuery(reader, test).toBooleanEffective then
       exit;
   act := reader.findAction(action);
-  if act = nil then raise Exception.Create('Could not find action: '+action);
+  if act = nil then raise ETemplateReader.Create('Could not find action: '+action);
   act.perform(reader);
 end;
 
@@ -958,9 +958,9 @@ var  u: TTreeNode;
 begin
   baseActions.clear;
 
-  if not (t.typ in [tetOpen, tetDocument]) then raise Exception.Create('Empty template');
+  if not (t.typ in [tetOpen, tetDocument]) then raise ETemplateReader.Create('Empty template');
   u := t.findChild(tetOpen,'action',[tefoIgnoreText]);
-  if u = nil then raise Exception.Create('Empty template');
+  if u = nil then raise ETemplateReader.Create('Empty template');
   baseActions.addChildrenFromTree(u.getParent());
 end;
 
@@ -987,7 +987,7 @@ end;
 procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
 begin
   if not FileExists(_dataPath+'template') then
-    raise Exception.Create('Template '+_dataPath+' nicht gefunden');
+    raise ETemplateReader.Create('Template '+_dataPath+' nicht gefunden');
   IncludeTrailingPathDelimiter(_dataPath);
   self.path:=_dataPath;
   loadTemplateWithCallback(@strLoadFromFileUTF8, aname);
