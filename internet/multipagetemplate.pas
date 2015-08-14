@@ -43,6 +43,7 @@ type
     procedure performChildren(reader: TMultipageTemplateReader);
     function cloneChildren(theResult: TTemplateAction): TTemplateAction;
     function parseQuery(reader: TMultipageTemplateReader; query: string): IXQuery;
+    function evaluateQuery(reader: TMultipageTemplateReader; query: string): IXQValue;
   public
     children: array of TTemplateAction;
     procedure initFromTree(t: TTreeNode); virtual;
@@ -252,6 +253,8 @@ type
   protected
     template:TMultiPageTemplate;
     lastData, lastContentType: string;
+    dataLoaded: boolean;
+    procedure needLoadedData;
     procedure setTemplate(atemplate: TMultiPageTemplate);
     procedure applyPattern(pattern, name: string); virtual;
   public
@@ -424,9 +427,9 @@ end;
 procedure TTemplateActionShort.perform(reader: TMultipageTemplateReader);
 begin
   if test <> '' then
-    if not parseQuery(reader, test).evaluate().toBooleanEffective then
+    if not evaluateQuery(reader, test).toBooleanEffective then
       exit;
-  parseQuery(reader, query).evaluate();
+  evaluateQuery(reader, query);
 end;
 
 function TTemplateActionShort.clone: TTemplateAction;
@@ -446,7 +449,7 @@ procedure TTemplateActionIf.perform(reader: TMultipageTemplateReader);
 var
   i: Integer;
 begin
-  if parseQuery(reader, test).evaluate().toBooleanEffective then
+  if evaluateQuery(reader, test).toBooleanEffective then
     for i := 0 to high(children) do
       children[i].perform(reader);
 end;
@@ -547,7 +550,7 @@ var
 begin
   for i := 0 to high(children) do
     if (children[i] is TTemplateActionChooseWhen) then begin
-       if (TTemplateActionChooseWhen(children[i]).parseQuery(reader, TTemplateActionChooseWhen(children[i]).test).evaluate().toBoolean) then begin
+       if (TTemplateActionChooseWhen(children[i]).evaluateQuery(reader, TTemplateActionChooseWhen(children[i]).test).toBoolean) then begin
          for j := 0 to high(children[i].children) do
            children[i].children[j].perform(reader);
          exit;
@@ -582,21 +585,25 @@ procedure TTemplateActionLoop.perform(reader: TMultipageTemplateReader);
 var
   listx, x: IXQValue;
   testx: IXQuery;
+  context: TXQEvaluationContext;
 begin
   if list <> '' then begin
     if varname = '' then raise Exception.Create('A list attribute at a loop node requires a var attribute');
-    listx := reader.parser.parseQuery(list).evaluate(); //TODO: parse only once
+    listx := evaluateQuery(reader, list); //TODO: parse only once
   end else listx := nil;
-  if test <> '' then testx := reader.parser.parseQuery(test)
-  else testx := nil;
+  if test <> '' then begin
+    reader.needLoadedData;
+    testx := parseQuery(reader, test);
+    context := reader.parser.QueryContext;
+  end else testx := nil;
 
   if listx = nil then begin
     if testx <> nil then
-      while testx.evaluate().toBoolean do
+      while testx.evaluate(context).toBoolean do
         performChildren(reader);
   end else for x in listx do begin
     reader.parser.variableChangeLog.add(varname, x);
-    if (testx <> nil) and (not testx.evaluate().toBoolean) then
+    if (testx <> nil) and (not testx.evaluate(context).toBoolean) then
       break;
     performChildren(reader);
   end;
@@ -623,7 +630,7 @@ var
   act: TTemplateAction;
 begin
   if test <> '' then
-    if not parseQuery(reader, test).evaluate().toBooleanEffective then
+    if not evaluateQuery(reader, test).toBooleanEffective then
       exit;
   act := reader.findAction(action);
   if act = nil then raise Exception.Create('Could not find action: '+action);
@@ -701,10 +708,10 @@ var
   tempvi: IXQValue;
   oldHeaders: String;
 begin
-  if condition <> '' then begin
-    cachedCondition := reader.parser.parseQuery(condition); //TODO: long term cache
-    if not cachedCondition.evaluate().toBoolean then exit;
-  end;
+  if (condition <> '') and not evaluateQuery(reader, condition).toBoolean then
+    exit;
+  reader.dataLoaded := false;
+  reader.lastData := '';
 
   cururl := url;
   curmethod := method;
@@ -744,8 +751,11 @@ begin
 
   if Assigned(reader.onLog) then reader.onLog(reader, curmethod+' internet page '+cururl+#13#10'Post: '+post);
 
-  if guessType(cururl) = rtFile then
+  if guessType(cururl) = rtFile then  begin
+    if (reader.internet.lastUrl = '') then
+      reader.internet.lastUrl := IncludeTrailingPathDelimiter( 'file://' + strPrependIfMissing(GetCurrentDir, '/') );
     cururl := strResolveURI(cururl, reader.internet.lastUrl);
+  end;
 
 
   reader.lastContentType := '';
@@ -807,14 +817,13 @@ end;
 
 procedure TTemplateActionVariable.perform(reader: TMultipageTemplateReader);
 var
-  pxp: IXQuery;
+  v: IXQValue;
 begin
   if hasValueStr then
     reader.parser. variableChangeLog.ValuesString[name] := reader.parser.replaceEnclosedExpressions(value);
   if valuex <> '' then begin
-    pxp := reader.parser.parseQuery(valuex);
-    if name <> '' then reader.parser.variableChangeLog.add(name, pxp.evaluate())
-    else pxp.evaluate();
+    v := evaluateQuery(reader, valuex);
+    if name <> '' then reader.parser.variableChangeLog.add(name, v);
   end;
 
 end;
@@ -903,6 +912,12 @@ end;
 function TTemplateAction.parseQuery(reader: TMultipageTemplateReader; query: string): IXQuery;
 begin
   result := reader.parser.parseQuery(query);
+end;
+
+function TTemplateAction.evaluateQuery(reader: TMultipageTemplateReader; query: string): IXQValue;
+begin
+  reader.needLoadedData;
+  result := parseQuery(reader, query).evaluate(reader.parser.HTMLTree);
 end;
 
 procedure TTemplateAction.addChildrenFromTree(t: TTreeNode);
@@ -1085,6 +1100,19 @@ begin
   result.baseActions:=baseActions.clone;
 end;
 
+procedure TMultipageTemplateReader.needLoadedData;
+var
+  curUrl: String;
+begin
+  if dataLoaded then exit;
+  curUrl := internet.lastUrl;
+  parser.variableChangeLog.add('url', cururl);
+  parser.variableChangeLog.add('raw', lastData);
+
+  parser.parseHTMLSimple(lastData, curUrl, lastContentType);
+  dataLoaded := true;
+end;
+
 procedure TMultipageTemplateReader.setTemplate(atemplate: TMultiPageTemplate);
 var
   i: Integer;
@@ -1096,18 +1124,10 @@ begin
 end;
 
 procedure TMultipageTemplateReader.applyPattern(pattern, name: string);
-var
-  curUrl: String;
 begin
-  curUrl := internet.lastUrl;
-  parser.variableChangeLog.add('url', cururl);
-  parser.variableChangeLog.add('raw', lastData);
-
-  if not strContains(cururl, '://') then //todo: is this still needed?
-    cururl := strResolveURI(cururl, 'file://' + strPrependIfMissing(GetCurrentDir, '/'));
-writeln(stderr, pattern);flush(stderr);
+  needLoadedData;
   parser.parseTemplate(pattern, name);
-  parser.parseHTML(lastData, curUrl, lastContentType);
+  parser.matchLastTrees;
 
   if Assigned(onPageProcessed) then
     onPageProcessed(self, parser);

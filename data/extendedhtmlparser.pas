@@ -669,8 +669,9 @@ THtmlTemplateParser=class
     procedure resetAttributeMatching;
     function matchTemplateTree(htmlParent, htmlStart, htmlEnd:TTreeNode; templateStart, templateEnd: TTemplateElement): boolean;
 
-    procedure parseHTMLSimple(html, uri, contenttype: string);
     procedure initializeCaches;
+  public
+    procedure parseHTMLSimple(html, uri, contenttype: string); //**< Parses a HTML file without performing matching. For internal use,
     function matchLastTrees: Boolean;
   public
     constructor create;
@@ -714,6 +715,7 @@ THtmlTemplateParser=class
     property TemplateParser: TTreeParser read FTemplate; //**< X/HTML parser used to read the templates (public so you can change the parsing behaviour, if you really need it)
     property HTMLParser: TTreeParser read FHTML; //**< X/HTML parser used to read the pages (public so you can change the parsing behaviour, if you really need it)
     property QueryEngine: TXQueryEngine read FQueryEngine; //**< XQuery engine used for evaluating query expressions contained in the template
+    property QueryContext: TXQEvaluationContext read FQueryContext; //**< Context used to evaluate XQuery expressions. For internal use.
 
   end;
 
@@ -1658,6 +1660,7 @@ begin
 
   FQueryContext := FQueryEngine.getEvaluationContext(FQueryEngine.StaticContext);
   FQueryContext.RootElement := FHtmlTree;
+  if FHtmlTree = nil then exit;
   if FHtmlTree.document is TTreeDocument then
     FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI; //todo: what was this for?
 
