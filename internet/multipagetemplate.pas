@@ -110,14 +110,15 @@ type
     <actions> contains a list/map of named actions, each <action> can contain:
 
     @unorderedList(
-      @item(@code(<page>)      Downloads a page )
-      @item(@code(<pattern>)   Processes the last page with pattern matching )
-      @item(@code(<variable>)  Sets an variable, either to a string value or to an evaluated XPath expression )
-      @item(@code(<loop>)      Repeats the children of the loop element )
-      @item(@code(<call>)      Calls another action )
-      @item(@code(<if>)        Tests, if a condition is satisfied )
+      @item(@code(<page>)        Downloads a page )
+      @item(@code(<pattern>)     Processes the last page with pattern matching )
+      @item(@code(<variable>)    Sets an variable, either to a string value or to an evaluated XPath expression )
+      @item(@code(<loop>)        Repeats the children of the loop element )
+      @item(@code(<call>)        Calls another action )
+      @item(@code(<if>)          Tests, if a condition is satisfied )
       @item(@code(<choose><when><otherwise>)      Switches depending on a value  )
-      @item(@code(<s>)         Evaluates an XPath/XQuery expression )
+      @item(@code(<s>)           Evaluates an XPath/XQuery expression )
+      @item(@code(<try><catch>)  Catch errors )
     )
 
     Details for each element:
@@ -191,11 +192,21 @@ type
 
     )
 
-    @itemLabel(@code(<s>..</s>))
+    @itemLabel(@code(<s>...</s>))
     @item(
       Evaluates an XPath/XQuery expression (which can set global variables with :=).
     )
-  )
+
+    @itemLabel(@code(<try> ... <catch errors="...">...</catch> </s>))
+    @item(
+      Iff an error occurs during the evaluation of the non-<catch> children of the <try>-element, the children of matching <catch>-element are evaluated.
+      This behaves similar to the try-except statement in Pascal and <try><catch> in XSLT. @br@br
+
+      The errors attribute is a whitespace separated list of error codes caught by that <catch> element. XPath/XQuery errors have the form @code( err:* ) with the value of * given in the XQuery standard.@br
+      HTTP errors have the form @code( pxp:http123 ) (pxp: is optional). x can be used to accept multiple digits, e.g. @code(http4xx) for all errors in the 400 to 499 range.@br
+      @code(pxp:pattern) is used for pattern matching failures.
+    )
+   )
 
    Within all string attributes you can access the previously defined variables by writing @code({$variable}) .@br
    Within an XPath expression you can access the variables as usually with @code($variable).
@@ -388,10 +399,164 @@ type
     function clone: TTemplateAction; override;
   end;
 
+  { TTemplateActionShort }
+
+  TTemplateActionTry = class(TTemplateAction)
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
+
+  TTemplateActionCatch = class(TTemplateAction)
+    errNamespaces, errCodes: TStringArray;
+    procedure initFromTree(t: TTreeNode); override;
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+    function checkError(reader: TMultipageTemplateReader; const namespace, prefix, code: string): boolean;
+  end;
+
 { THtmlTemplateParserBreaker }
 
  THtmlTemplateParserBreaker = class(THtmlTemplateParser)
   function getVariable(name: string): IXQValue;
+end;
+
+procedure TTemplateActionTry.initFromTree(t: TTreeNode);
+var
+  hadCatch: Boolean;
+  i: Integer;
+begin
+  addChildrenFromTree(t);
+  hadCatch := false;
+  for i := 0 to high(children) do
+    if children[i] is TTemplateActionCatch then hadCatch := true
+    else if hadCatch then raise ETemplateReader.create('Cannot have non-catch element after catch element');
+end;
+
+procedure TTemplateActionTry.perform(reader: TMultipageTemplateReader);
+   function checkError(namespace, prefix, errCode: string): boolean;
+   var
+     i: Integer;
+   begin
+    for i := 0 to high(children) do
+      if children[i] is TTemplateActionCatch then
+        if TTemplateActionCatch(children[i]).checkError(reader, namespace, prefix, errCode) then
+          exit(true);
+    exit(false);
+   end;
+
+begin
+  try
+    performChildren(reader);
+  except
+    on e:EXQException do  begin
+      if (e.namespace <> nil) and checkError(e.namespace.getURL, e.namespace.getPrefix, e.errorCode) then exit;
+      if (e.namespace = nil) and checkError('', '', e.errorCode) then exit;
+      raise;
+    end;
+    on e:EInternetException do begin
+      if checkError(XMLNamespaceURL_MyExtensions, 'pxp', 'http' + IntToStr(e.errorCode)) then exit;
+      raise;
+    end;
+    on e: EHTMLParseMatchingException do begin
+      if checkError(XMLNamespaceURL_MyExtensions, 'pxp', 'pattern') then exit;
+      raise;
+    end;
+  end;
+end;
+
+function TTemplateActionTry.clone: TTemplateAction;
+begin
+  Result:=TTemplateActionTry.Create;
+  result := cloneChildren(result);
+end;
+
+procedure TTemplateActionCatch.initFromTree(t: TTreeNode);
+var
+  errors: TStringArray;
+  i: Integer;
+  temp: TStringArray;
+begin
+  if not t.hasAttribute('errors') then begin
+    SetLength(errNamespaces, 1);
+    errNamespaces[0] := '*';
+    errCodes := errNamespaces;
+  end else begin
+    errors := strSplit(strTrimAndNormalize(t.getAttribute('errors')), ' ', false);
+    SetLength(errNamespaces, length(errors));
+    SetLength(errCodes, length(errors));
+    for i := 0 to high(errors) do begin
+      if strBeginsWith(errors[i], 'Q{') then begin
+        errNamespaces[i] := strDecodeHTMLEntities(strBetween(errors[i], 'Q{','}'),eUTF8);
+        errCodes[i] := strAfter(errors[i], '{');
+      end else if strContains(errors[i], ':') then begin
+        temp := strSplit(errors[i], ':');
+        errNamespaces[i] := temp[0];
+        errCodes[i] := temp[1];
+        case errNamespaces[i] of
+          'err': errNamespaces[i] := XMLNamespaceURL_XQTErrors;
+          'pxp': errNamespaces[i] := XMLNamespaceURL_MyExtensions;
+          'local': errNamespaces[i] := XMLNamespaceURL_XQueryLocalFunctions;
+          '*': errNamespaces[i] := '*';
+          else begin
+            raise ETemplateReader.create('Unknown namespace prefix: '+errNamespaces[i] + ' (only err, pxp and local are known)');
+          end
+        end;
+      end else begin
+        errNamespaces[i] := XMLNamespaceURL_MyExtensions;
+        errCodes[i] := errors[i];
+        if errCodes[i] = '*' then errNamespaces[i] := '*';
+      end;
+      if errCodes[i] <> '*' then
+        baseSchema.NCName.createValue(errCodes[i]); //ensure err code is valid
+    end;
+  end;
+  addChildrenFromTree(t);
+end;
+
+procedure TTemplateActionCatch.perform(reader: TMultipageTemplateReader);
+begin
+  ;
+end;
+
+function TTemplateActionCatch.clone: TTemplateAction;
+begin
+  Result:=TTemplateActionCatch.Create;
+  TTemplateActionCatch(result).errNamespaces := errNamespaces;
+  TTemplateActionCatch(result).errCodes := errCodes;
+  with TTemplateActionCatch(result) do begin
+    SetLength(errNamespaces, length(errNamespaces));
+    SetLength(errCodes, length(errCodes));
+  end;
+end;
+
+function TTemplateActionCatch.checkError(reader: TMultipageTemplateReader; const namespace, prefix, code: string): boolean;
+  function check: boolean;
+  var
+    i, j: Integer;
+    ok: Boolean;
+  begin
+    for i := 0 to high(errCodes) do begin
+      if (errNamespaces[i] <> namespace) and (errNamespaces[i] <> '*') then continue;
+      if (errCodes[i] = code) or (errCodes[i] = '*') then exit(true);
+      if (errNamespaces[i] = XMLNamespaceURL_MyExtensions) and (strBeginsWith(errCodes[i], 'http')) and (strBeginsWith(code, 'http')) then begin
+        if length(errCodes[i]) = 4 { = 'http' } then exit(true);
+        if length(errCodes[i]) <> length(code) then continue;
+        ok := true;
+        for j := 5 to length(code) do
+          if (code[j] <> errCodes[i][j]) and not (errCodes[i][j] in ['X','x']) then begin ok := false; break; end;
+        if ok then exit(true);
+      end;
+    end;
+    result := false;
+  end;
+begin
+  result := check;
+  if result then begin
+    reader.parser.variableChangeLog.add('code', TXQValueQName.create(namespace,prefix,code), XMLNamespaceURL_XQTErrors);
+    //description, value, ...
+    performChildren(reader);
+  end;
 end;
 
 procedure TTemplateActionPattern.initFromTree(t: TTreeNode);
@@ -888,7 +1053,9 @@ begin
     'meta': addChild(TTemplateActionMeta);
     'if': addChild(TTemplateActionIf);
     's': addChild(TTemplateActionShort);
-    else raise Exception.Create('Unknown template node: '+t.outerXML);
+    'try': addChild(TTemplateActionTry);
+    'catch': addChild(TTemplateActionCatch);
+    else raise ETemplateReader.Create('Unknown template node: '+t.outerXML);
   end;
 end;
 
