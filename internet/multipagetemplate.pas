@@ -268,6 +268,9 @@ type
     procedure needLoadedData;
     procedure setTemplate(atemplate: TMultiPageTemplate);
     procedure applyPattern(pattern, name: string); virtual;
+    procedure setVariable(name: string; value: IXQValue; namespace: string = ''); virtual;
+    procedure setVariable(name: string; value: string; namespace: string = '');
+    function evaluateQuery(const query: IXQuery): IXQValue; virtual;
   public
     //** Object used to send requests and download pages
     internet:TInternetAccess;
@@ -415,12 +418,6 @@ type
     function checkError(reader: TMultipageTemplateReader; const namespace, prefix, code: string): boolean;
   end;
 
-{ THtmlTemplateParserBreaker }
-
- THtmlTemplateParserBreaker = class(THtmlTemplateParser)
-  function getVariable(name: string): IXQValue;
-end;
-
 procedure TTemplateActionTry.initFromTree(t: TTreeNode);
 var
   hadCatch: Boolean;
@@ -553,7 +550,7 @@ function TTemplateActionCatch.checkError(reader: TMultipageTemplateReader; const
 begin
   result := check;
   if result then begin
-    reader.parser.variableChangeLog.add('code', TXQValueQName.create(namespace,prefix,code), XMLNamespaceURL_XQTErrors);
+    reader.setVariable('code', TXQValueQName.create(namespace,prefix,code), XMLNamespaceURL_XQTErrors);
     //description, value, ...
     performChildren(reader);
   end;
@@ -733,11 +730,6 @@ begin
   result := cloneChildren(TTemplateActionChoose.Create);
 end;
 
-function THtmlTemplateParserBreaker.getVariable(name: string): IXQValue;
-begin
-  result := variableChangeLog.get(name);
-end;
-
 procedure TTemplateActionLoop.initFromTree(t: TTreeNode);
 begin
   varname:=t['var'];
@@ -767,7 +759,7 @@ begin
       while testx.evaluate(context).toBoolean do
         performChildren(reader);
   end else for x in listx do begin
-    reader.parser.variableChangeLog.add(varname, x);
+    reader.setVariable(varname, x);
     if (testx <> nil) and (not testx.evaluate(context).toBoolean) then
       break;
     performChildren(reader);
@@ -985,10 +977,10 @@ var
   v: IXQValue;
 begin
   if hasValueStr then
-    reader.parser. variableChangeLog.ValuesString[name] := reader.parser.replaceEnclosedExpressions(value);
+    reader.setVariable(name, reader.parser.replaceEnclosedExpressions(value));
   if valuex <> '' then begin
     v := evaluateQuery(reader, valuex);
-    if name <> '' then reader.parser.variableChangeLog.add(name, v);
+    if name <> '' then reader.setVariable(name, v);
   end;
 
 end;
@@ -1084,7 +1076,8 @@ end;
 function TTemplateAction.evaluateQuery(reader: TMultipageTemplateReader; query: string): IXQValue;
 begin
   reader.needLoadedData;
-  result := parseQuery(reader, query).evaluate(reader.parser.HTMLTree);
+  //result := parseQuery(reader, query).evaluate(reader.parser.HTMLTree);
+  result := reader.evaluateQuery(parseQuery(reader, query));
 end;
 
 procedure TTemplateAction.addChildrenFromTree(t: TTreeNode);
@@ -1273,8 +1266,8 @@ var
 begin
   if dataLoaded then exit;
   curUrl := internet.lastUrl;
-  parser.variableChangeLog.add('url', cururl);
-  parser.variableChangeLog.add('raw', lastData);
+  setVariable('url', cururl);
+  setVariable('raw', lastData);
 
   parser.parseHTMLSimple(lastData, curUrl, lastContentType);
   dataLoaded := true;
@@ -1298,6 +1291,21 @@ begin
 
   if Assigned(onPageProcessed) then
     onPageProcessed(self, parser);
+end;
+
+procedure TMultipageTemplateReader.setVariable(name: string; value: IXQValue; namespace: string);
+begin
+  parser.variableChangeLog.add(name, value, namespace);
+end;
+
+procedure TMultipageTemplateReader.setVariable(name: string; value: string; namespace: string);
+begin
+  setVariable(name, xqvalue(value), namespace);
+end;
+
+function TMultipageTemplateReader.evaluateQuery(const query: IXQuery): IXQValue;
+begin
+  result := query.evaluate(parser.HTMLTree);
 end;
 
 constructor TMultipageTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
