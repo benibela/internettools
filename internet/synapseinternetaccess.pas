@@ -53,6 +53,7 @@ protected
   connection: THTTPSend;
   lastProgressLength,contentLength:longint;
   forwardProgressEvent: TProgressEvent;
+  lastHTTPSFallbackHost: string;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
   function doTransferRec(method:string; url: TDecodedUrl; data:string; redirectionCount:longint): string;
@@ -157,6 +158,10 @@ function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; d
        connection.Headers.add(additionalHeaders[i])
      else
        connection.MimeType := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
+   //fallback to TLS 1 for servers where auto detection fails
+   if striequal(url.protocol, 'https') then
+     if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := LT_TLSv1
+     else connection.Sock.SSL.SSLType := LT_all;
   end;
 
 var newurl: string;
@@ -181,6 +186,12 @@ begin
   ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
 
   if (not ok) and (checkEtcResolv) then begin
+    initConnection;
+    ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+  end;
+
+  if (not ok) and (lastHTTPSFallbackHost <> url.host) then begin
+    lastHTTPSFallbackHost := url.host;
     initConnection;
     ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
   end;
