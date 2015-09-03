@@ -281,6 +281,9 @@ type
     //** Event to access the changed variable state after each processed <page> element
     onPageProcessed: TPageProcessed;
 
+
+    retryOnConnectionFailures: boolean;
+
     //** Creates a reader using a certain template (atemplate is mandatory, ainternet optional)
     constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
     destructor destroy();override;
@@ -920,8 +923,16 @@ begin
     rtRemoteURL: begin
       for j := 0 to high(headers) do
         reader.internet.additionalHeaders.Values[trim(headers[j].name)] := trim (reader.parser.replaceEnclosedExpressions(headers[j].value));
-
-      page:=reader.internet.request(curmethod, cururl, post);
+      try
+        page := reader.internet.request(curmethod, cururl, post);
+      except
+        on e: EInternetException do
+          if reader.retryOnConnectionFailures and (e.errorCode <= 0) then begin
+            if Assigned(reader.onLog) then reader.onLog(reader, 'Retry after error: ' + e.Message);
+            Sleep(2500);
+            page := reader.internet.request(curmethod, cururl, post);
+          end else raise;
+      end;
 
       reader.lastContentType := reader.internet.getLastContentType;
 
@@ -1315,6 +1326,7 @@ begin
   parser.KeepPreviousVariables:=kpvKeepValues;
   parser.variableChangeLog.caseSensitive:=false;
   setTemplate(atemplate);
+  retryOnConnectionFailures := true;
 end;
 
 destructor TMultipageTemplateReader.destroy();
