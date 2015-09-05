@@ -203,7 +203,7 @@ type
       This behaves similar to the try-except statement in Pascal and <try><catch> in XSLT. @br@br
 
       The errors attribute is a whitespace separated list of error codes caught by that <catch> element. XPath/XQuery errors have the form @code( err:* ) with the value of * given in the XQuery standard.@br
-      HTTP errors have the form @code( pxp:http123 ) (pxp: is optional). x can be used to accept multiple digits, e.g. @code(http4xx) for all errors in the 400 to 499 range.@br
+      HTTP errors have the internal form @code( pxp:http123 ) where pxp: is the default prefix. Nevertheless they can be matched using the namespace prefix http as @code(http:123). Partial wildcards are accepted like @code(http:4* ) to match the range 400 to 499. @br
       @code(pxp:pattern) is used for pattern matching failures.
     )
    )
@@ -445,6 +445,8 @@ procedure TTemplateActionTry.perform(reader: TMultipageTemplateReader);
     exit(false);
    end;
 
+var
+  tempcode: String;
 begin
   try
     performChildren(reader);
@@ -455,7 +457,10 @@ begin
       raise;
     end;
     on e:EInternetException do begin
-      if checkError(XMLNamespaceURL_MyExtensions, 'pxp', 'http' + IntToStr(e.errorCode)) then exit;
+      if e.errorCode >= 0 then tempcode := IntToStr(e.errorCode)
+      else tempcode := '000';
+      while length(tempcode) < 3 do tempcode := '0' + tempcode;
+      if checkError(XMLNamespaceURL_MyExtensions, 'pxp', 'http' + tempcode)  then exit;
       raise;
     end;
     on e: EHTMLParseMatchingException do begin
@@ -497,6 +502,15 @@ begin
           'err': errNamespaces[i] := XMLNamespaceURL_XQTErrors;
           'pxp': errNamespaces[i] := XMLNamespaceURL_MyExtensions;
           'local': errNamespaces[i] := XMLNamespaceURL_XQueryLocalFunctions;
+          'http': begin
+            errNamespaces[i] := XMLNamespaceURL_MyExtensions;
+            errCodes[i] := 'http' + errCodes[i];
+            case length(errCodes[i]) of
+              length('http12*'): errCodes[i] := StringReplace(errCodes[i], '*', 'x', []);
+              length('http1*'): errCodes[i] := StringReplace(errCodes[i], '*', 'xx', []);
+              length('http*'): errCodes[i] := StringReplace(errCodes[i], '*', 'xxx', []);
+            end;
+          end;
           '*': errNamespaces[i] := '*';
           else begin
             raise ETemplateReader.create('Unknown namespace prefix: '+errNamespaces[i] + ' (only err, pxp and local are known)');
@@ -537,6 +551,8 @@ function TTemplateActionCatch.checkError(reader: TMultipageTemplateReader; const
     ok: Boolean;
   begin
     for i := 0 to high(errCodes) do begin
+      reader.onLog(reader,'Testing '+namespace+ ' '+prefix+' '+code,3);
+      reader.onLog(reader,'Against '+errNamespaces[i]+ ' '+errCodes[i],3);
       if (errNamespaces[i] <> namespace) and (errNamespaces[i] <> '*') then continue;
       if (errCodes[i] = code) or (errCodes[i] = '*') then exit(true);
       if (errNamespaces[i] = XMLNamespaceURL_MyExtensions) and (strBeginsWith(errCodes[i], 'http')) and (strBeginsWith(code, 'http')) then begin
