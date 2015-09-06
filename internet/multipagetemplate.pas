@@ -551,8 +551,6 @@ function TTemplateActionCatch.checkError(reader: TMultipageTemplateReader; const
     ok: Boolean;
   begin
     for i := 0 to high(errCodes) do begin
-      reader.onLog(reader,'Testing '+namespace+ ' '+prefix+' '+code,3);
-      reader.onLog(reader,'Against '+errNamespaces[i]+ ' '+errCodes[i],3);
       if (errNamespaces[i] <> namespace) and (errNamespaces[i] <> '*') then continue;
       if (errCodes[i] = code) or (errCodes[i] = '*') then exit(true);
       if (errNamespaces[i] = XMLNamespaceURL_MyExtensions) and (strBeginsWith(errCodes[i], 'http')) and (strBeginsWith(code, 'http')) then begin
