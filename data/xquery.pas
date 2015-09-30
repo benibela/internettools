@@ -77,7 +77,7 @@ type
   TXQValueEnumerator = record
   private
     fcurrentidx: integer;
-    fcurrent: IXQValue;
+    fcurrent, fguardian: IXQValue;
     flist: TXQVList;
   public
     function MoveNext: Boolean;

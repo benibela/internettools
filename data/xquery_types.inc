@@ -1225,6 +1225,7 @@ end;
 function TXQValueSequence.GetEnumerator: TXQValueEnumerator;
 begin
   result.fcurrentidx:=-1;
+  result.fguardian := self;
   result.flist:=seq;
 end;
 
