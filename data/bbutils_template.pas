@@ -3567,7 +3567,7 @@ end;
 
 function dateTimeEncode(const y, m, d, h, n, s: integer; const secondFraction: double): TDateTime;
 begin
-  result := dateEncode(y,m,d) + EncodeTime(h,m,d,0) + secondFraction / SecsPerDay;
+  result := dateEncode(y,m,d) + EncodeTime(h,n,s,0) + secondFraction / SecsPerDay;
 end;
 
 procedure timeParseParts(const input, mask: RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble; outtimezone: PDateTime);

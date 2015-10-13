@@ -692,6 +692,8 @@ begin
     end;
   end;
   }
+  test(dateEncode(1,2,3) = EncodeDate(1,2,3));
+  test(dateTimeEncode(1,2,3,4,5,6) = EncodeDate(1,2,3) + EncodeTime(4,5,6,0));
 
 
   //basic string tests
