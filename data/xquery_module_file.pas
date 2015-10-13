@@ -393,6 +393,7 @@ var
   rangeErr: Boolean;
 begin
   from := 0;
+  len := -1;
   rangeErr := false;
   if length(args) >= 2 then rangeErr := rangeErr or not xqToUInt64(args[1], from);
   if length(args) >= 3 then rangeErr := rangeErr or not xqToUInt64(args[2], len);
