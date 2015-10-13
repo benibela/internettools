@@ -17,7 +17,7 @@ unit xquery_module_file;
 interface
 
 uses
-  Classes, SysUtils, xquery, simplehtmltreeparser, FileUtil, LazUTF8, LazFileUtils, bbutils, strutils, bigdecimalmath, base64, math;
+  Classes, SysUtils, xquery, simplehtmltreeparser, FileUtil, LazUTF8, LazFileUtils, bbutils, strutils, bigdecimalmath, base64, math, Masks;
 
 type rawbytestring = string;
 
@@ -40,6 +40,34 @@ procedure raiseFileError(code, message: string; const item: IXQValue = nil);
 begin
   if item <> nil then message += '("'+item.toJoinedString()+'")';
   raise EXQEvaluationException.create(code, message, XMLNamespace_Expath_File, item);
+end;
+
+function xqToInt64(const v: IXQValue; out res: int64): boolean;
+var
+  temp: BigDecimal;
+begin
+  result := true;
+  case v.kind of
+    pvkInt64: res := v.toInt64;
+    pvkFloat: begin
+      if IsNan(v.toFloat) or (IsInfinite(v.toFloat) and (v.toFloat < 0)) then begin
+        exit(false);
+      end else if IsInfinite(v.toFloat) then begin
+        res := high(res);
+      end else res := round(v.toFloat);
+    end;
+    {pvkBigDecimal:}else begin
+      temp := round(v.toDecimal);
+      if not isInt64(temp) then exit(false);
+      res := BigDecimalToInt64(temp);
+    end;
+  end;
+end;
+
+function xqToUInt64(const v: IXQValue; out res: int64): boolean;
+begin
+  result := xqToInt64(v, res);
+  if res < 0 then result := false;
 end;
 
 function normalizePath(const path: IXQValue): UTF8String;
@@ -76,17 +104,20 @@ function size(const args: TXQVArray): IXQValue;
 var
   s: Int64;
   code: String;
+  path: UTF8String;
 begin
-  s := FileSizeUtf8(normalizePath(args[0]));
+  path := normalizePath(args[0]);
+  if DirectoryExistsUTF8(path) then exit(xqvalue(0));
+  s := FileSizeUtf8(path);
   if s < 0 then begin
-    if FileExistsUTF8(normalizePath(args[0])) then code := Error_Io_Error
+    if FileExistsUTF8(path) then code := Error_Io_Error
     else code := Error_Not_Found;
     raiseFileError(code, 'Failed to get size', args[0]);
   end;
   result := xqvalue(s);
 end;
 
-function writeOrAppendSomething(const filename: IXQValue; append: boolean; data: rawbytestring): IXQValue;
+function writeOrAppendSomething(const filename: IXQValue; append: boolean; data: rawbytestring; offset: int64 = -1): IXQValue;
 var f: TFileStream;
     mode: word;
     path: AnsiString;
@@ -96,9 +127,11 @@ begin
   if append then mode := fmOpenReadWrite
   else mode := fmCreate;
   f := TFileStream.Create(path, mode);
-  if append then f.position := f.size;
+  if offset >= 0 then f.Position := offset
+  else if append then f.position := f.size;
   try
-    f.WriteBuffer(data[1], length(data));
+    if length(data) > 0 then
+      f.WriteBuffer(data[1], length(data));
   finally                                               //todo errors
     f.free;
   end;
@@ -140,7 +173,7 @@ begin
 end;
 function append_Binary(const args: TXQVArray): IXQValue;
 begin
-  result := writeOrAppendSomething(args[0], true, (args[0] as TXQValueString).toRawBinary);
+  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueString).toRawBinary);
 end;
 function append_Text(const args: TXQVArray): IXQValue;
 begin
@@ -156,8 +189,12 @@ begin
   result := writeOrAppendSerialized(args, false);
 end;
 function write_Binary(const args: TXQVArray): IXQValue;
+var
+  offset: int64;
 begin
-  result := writeOrAppendSomething(args[0], false, (args[0] as TXQValueString).toRawBinary);
+  offset := -1;
+  if length(args) >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
+  result := writeOrAppendSomething(args[0], length(args) >= 3, (args[1] as TXQValueString).toRawBinary, offset);
 end;
 function write_Text(const args: TXQVArray): IXQValue;
 begin
@@ -210,7 +247,7 @@ begin
   else dir := GetTempDir();
   dir := dir + DirectorySeparator + args[0].toString + IntToHex(Random($FFFFFFFF),8) + args[1].toString;
   if not ForceDirectoriesUTF8(dir) then raiseFileError(Error_Io_Error, 'Failed');
-  result := xqvalue();
+  result := xqvalue(dir);
 end;
 
 function create_temp_file(const args: TXQVArray): IXQValue;
@@ -224,9 +261,9 @@ begin
   end
   else dir := GetTempDir();
   dir := dir + DirectorySeparator + args[0].toString + IntToHex(Random($FFFFFFFF),8) + args[1].toString;
-  if not ForceDirectoriesUTF8(ChompPathDelim(dir)) then raiseFileError(Error_Io_Error, 'Failed');
+  if not ForceDirectoriesUTF8(strResolveURI('/', dir)) then raiseFileError(Error_Io_Error, 'Failed');
   strSaveToFileUTF8(dir, '');
-  result := xqvalue();
+  result := xqvalue(dir);
 end;
 
 function delete(const args: TXQVArray): IXQValue;
@@ -236,11 +273,12 @@ var
 begin
   path := normalizePath(args[0]);
   recursive := (length(args) = 2) and args[1].toBoolean;
-  if not FileExistsUTF8(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[1]);
+  if not FileExistsUTF8(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
   if not DirectoryExistsUTF8(path) then begin
     DeleteFileUTF8(path);
   end else if recursive then DeleteDirectory(path, false)
   else RemoveDirUTF8(path);
+  result := xqvalue();
 end;
 
 
@@ -248,6 +286,7 @@ type TListFilesAndDirs = class(TFileSearcher)
   res: TXQValueSequence;
 private
   pathOffset: integer;
+  masks: tmasklist;
 protected
   procedure DoFileFound; override;
   procedure DoDirectoryFound; override;
@@ -269,6 +308,7 @@ var
   l: Integer;
   i: Integer;
 begin
+  if (masks <> nil) and not (masks.{$ifdef windows}MatchesWindowsMask{$else}Matches{$endif}(FileInfo.Name)) then exit;
   if pathOffset = 0 then begin
     l := level;
     for i := length(Path) downto 1 do begin
@@ -287,20 +327,25 @@ end;
 function list(const args: TXQVArray): IXQValue;
 var
   dir: UTF8String;
-  pattern: String;
   recurse: Boolean;
   lister: TListFilesAndDirs;
 begin
   requiredArgCount(args,1,3);
   dir := normalizePath(args[0]);
   recurse := (length(args) >= 2) and args[1].toBoolean;
-  if Length(args) >= 3 then pattern := args[2].toString
-  else pattern := '';
+
   lister := TListFilesAndDirs.Create;
+  if Length(args) >= 3 then begin
+    lister.masks := TMaskList.Create(args[2].toString, '|', {$ifdef windows}false{$else}true{$endif});
+    if lister.masks.Count = 0 then
+      FreeAndNil(lister.masks);
+  end;
   lister.res := TXQValueSequence.create();
-  lister.Search(dir, pattern, recurse);
+  lister.Search(dir, '', recurse);
   result := lister.res;
   xqvalueSeqSqueeze(result);
+  FreeAndNil(lister.masks);
+  FreeAndNil(lister);
 end;
 
 function move(const args: TXQVArray): IXQValue;
@@ -320,40 +365,23 @@ begin
   result := xqvalue();
 end;
 
-function xqToInt64(const v: IXQValue; out res: int64): boolean;
-var
-  temp: BigDecimal;
-begin
-  result := true;
-  case v.kind of
-    pvkInt64: res := v.toInt64;
-    pvkFloat: begin
-      if IsNan(v.toFloat) or (IsInfinite(v.toFloat) and (v.toFloat < 0)) then begin
-        exit(false);
-      end else if IsInfinite(v.toFloat) then begin
-        res := high(res);
-      end else res := round(v.toFloat);
-    end;
-    {pvkBigDecimal:}else begin
-      temp := round(v.toDecimal);
-      if not isInt64(temp) then exit(false);
-      res := BigDecimalToInt64(temp);
-    end;
-  end;
-end;
 
 function readFromFile(const fn: String; from: int64 = 0; length: int64 = -1): rawbytestring;
 var
   stream: TFileStream;
 begin
   stream := TFileStream.Create(fn, fmOpenRead);
-  if from < 0 then raiseFileError(Error_Out_Of_Range, IntToStr(from) + ' < 0');
-  if length = -1 then length := stream.Size - from;
-  if length + from > stream.Size then raiseFileError(Error_Out_Of_Range, IntToStr(from)+' + ' +IntToStr(length) + ' > ' + IntToStr(stream.Size));
-  SetLength(result, length);
-  stream.Position := from;
-  stream.ReadBuffer(result[1], length);
-  stream.free;
+  try
+    if from < 0 then raiseFileError(Error_Out_Of_Range, IntToStr(from) + ' < 0');
+    if length = -1 then length := stream.Size - from;
+    if length + from > stream.Size then raiseFileError(Error_Out_Of_Range, IntToStr(from)+' + ' +IntToStr(length) + ' > ' + IntToStr(stream.Size));
+    SetLength(result, length);
+    stream.Position := from;
+    if length > 0 then
+      stream.ReadBuffer(result[1], length);
+  finally
+    stream.free;
+  end;
 end;
 
 
@@ -366,10 +394,8 @@ var
 begin
   from := 0;
   rangeErr := false;
-  if length(args) >= 2 then rangeErr := rangeErr or not xqToInt64(args[1], from);
-  len := 0;
-  if length(args) >= 3 then rangeErr := rangeErr or not xqToInt64(args[2], len);
-  if len < 0 then rangeErr := true;
+  if length(args) >= 2 then rangeErr := rangeErr or not xqToUInt64(args[1], from);
+  if length(args) >= 3 then rangeErr := rangeErr or not xqToUInt64(args[2], len);
   if rangeErr then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
   result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
 end;
@@ -449,6 +475,7 @@ begin
   module.registerFunction('append-text', @append_text, ['($file as xs:string, $value as xs:string) as empty-sequence()','($file as xs:string, $value as xs:string, $encoding as xs:string) as empty-sequence()']);
   module.registerFunction('append-text-lines', @append_text_lines, ['($file as xs:string, $values as xs:string*) as empty-sequence()', '($file as xs:string, $lines as xs:string*, $encoding as xs:string) as empty-sequence()']);
   module.registerFunction('copy', @copy, ['($source as xs:string, $target as xs:string) as empty-sequence()']);
+  module.registerFunction('create-dir', @create_dir, ['($dir as xs:string) as empty-sequence()']);
   module.registerFunction('create-temp-dir', @create_temp_dir, ['($prefix as xs:string, $suffix as xs:string) as xs:string', '($prefix as xs:string, $suffix as xs:string, $dir as xs:string) as xs:string']);
   module.registerFunction('create-temp-file', @create_temp_file, ['($prefix as xs:string, $suffix as xs:string) as xs:string', '($prefix as xs:string, $suffix as xs:string, $dir as xs:string) as xs:string']);
   module.registerFunction('delete', @delete, ['($path as xs:string) as empty-sequence()', '($path as xs:string, $recursive as xs:boolean) as empty-sequence()']);
