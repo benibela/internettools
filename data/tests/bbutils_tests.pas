@@ -440,6 +440,12 @@ begin
   test(striindexof('short', 'short'#0) = 0);
   test(striindexof('short'#0, 'short') = 1);
 
+  test(strlsIndexOf('foobar', ['a'..'b'], 6) = 3);
+  test(strIndexOf('foobar', ['a'..'b']) = 4);
+  test(strIndexOf('foobar', ['a'..'b'], 5) = 5);
+  test(strContains('foobar', ['a'..'b'], 5) = true);
+  test(strContains('foobar', ['a'..'b'], 6) = false);
+
   sa:=strSplit('',',');
   test(length(sa) = 1);
   test(sa[0] = '');

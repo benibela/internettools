@@ -535,24 +535,37 @@ function strRpos(c:ansichar;s:RawByteString):longint;
 function strCount(const str: RawByteString; const searched: ansichar; from: longint = 1): longint; overload;
 //**Counts all occurrences of searched in searchIn (case sensitive)
 function strCount(const str: RawByteString; const searched: TCharSet; from: longint = 1): longint; overload;
+
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
 function strlsIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+function strlsIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
 function strlsiIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
 function strIndexOf(const str,searched:RawByteString):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strIndexOf(const str: RawByteString; const searched: TCharSet):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
 function striIndexOf(const str,searched:RawByteString):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
 function strIndexOf(const str,searched:RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strIndexOf(const str: RawByteString; const searched: TCharSet; from: longint):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
 function striIndexOf(const str,searched:RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
 function strContains(const str,searched:RawByteString):boolean;overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strContains(const str:RawByteString; const searched: TCharSet):boolean;overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
 function striContains(const str,searched:RawByteString):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
 function strContains(const str,searched:RawByteString; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+function strContains(const str:RawByteString; const searched: TCharSet; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
 function striContains(const str,searched:RawByteString; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 
@@ -2479,6 +2492,21 @@ begin
   result:=-1;
 end;
 
+function strlsIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint;
+var last: pansichar;
+begin
+  if length<1 then begin result := -1; exit; end;
+  last:=str+(length-1);
+  result:=0;
+  while str <= last do begin
+    if str^ in searched then
+      exit;
+    inc(str);
+    inc(result);
+  end;
+  result:=-1;
+end;
+
 function strlsiIndexOf(str, searched: pansichar; l1, l2: longint): longint;
 var last: pansichar;
 begin
@@ -2501,6 +2529,11 @@ begin
   result := strIndexOf(str, searched, 1);      //no default paramert, so you can take the address of both functions
 end;
 
+function strIndexOf(const str: RawByteString; const searched: TCharSet): longint;
+begin
+  result := strIndexOf(str, searched, 1);
+end;
+
 function striIndexOf(const str, searched: RawByteString): longint;
 begin
   result := striIndexOf(str, searched, 1);
@@ -2512,6 +2545,18 @@ begin
   result := strlsIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
   if result < 0 then begin result := 0; exit; end;
   inc(result,  from);
+end;
+
+function strIndexOf(const str: RawByteString; const searched: TCharSet; from: longint): longint;
+var
+  i: LongInt;
+begin
+  for i := from to length(str) do
+    if str[i] in searched then begin
+      result := i;
+      exit;
+    end;
+  result := 0;
 end;
 
 function striindexof(const str, searched: RawByteString; from: longint): longint;
@@ -2527,12 +2572,22 @@ begin
   result := strContains(str, searched, 1);
 end;
 
+function strContains(const str: RawByteString; const searched: TCharSet): boolean;
+begin
+  result := strContains(str, searched, 1);
+end;
+
 function striContains(const str, searched: RawByteString): boolean;
 begin
   result := striContains(str, searched, 1);
 end;
 
 function strcontains(const str, searched: RawByteString; from: longint): boolean;
+begin
+  result:=strindexof(str, searched, from) > 0;
+end;
+
+function strContains(const str: RawByteString; const searched: TCharSet; from: longint): boolean;
 begin
   result:=strindexof(str, searched, from) > 0;
 end;
