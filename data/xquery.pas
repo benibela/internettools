@@ -7094,7 +7094,7 @@ pxp.registerFunction('form',1,2,@xqFunctionForm, []);
 pxp.registerFunction('resolve-html',1,2,@xqFunctionResolve_Html, []);
 pxp.registerFunction('random',0,0,@xqFunctionRandom, []);
 pxp.registerFunction('sleep',1,1,@xqFunctionSleep, []);
-pxp.registerFunction('eval',1,1,@xqFunctionEval, []);
+pxp.registerFunction('eval',1,2,@xqFunctionEval, []);
 pxp.registerFunction('css',1,1,@xqFunctionCSS, []);
 pxp.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string) as item()*','($name as xs:string, $def as item()*) as item()*'], [xqcdContextVariables]);
 pxp.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);

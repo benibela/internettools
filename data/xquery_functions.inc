@@ -2089,11 +2089,24 @@ end;
 
 function xqFunctionEval(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var term: TXQuery;
+  model: TXQParsingModel;
 begin
-  requiredArgCount(args, 1);
+  requiredArgCount(args, 1, 2);
   //result := context.staticContext.sender.evaluateXPath2(args[0].toString);
   if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:eval without a xquery engine (e.g. from an interpreted function in a native module)');
-  term := context.staticContext.sender.parseTerm(args[0].toString, xqpmXPath2);
+  model := xqpmXPath2;
+  if length(args) = 2 then begin
+    if args[1].kind <> pvkObject then raiseXPTY0004TypeError(args[1], 'object');
+    case args[1].getProperty('language').toString of
+      'xquery', 'xquery3', 'xquery3.0': model := xqpmXQuery3;
+      'xquery1', 'xquery1.0': model := xqpmXQuery1;
+      'xpath', 'xpath3', 'xpath3.0': model := xqpmXPath3;
+      'xpath2': model := xqpmXPath2;
+      '':;
+      else raise EXQEvaluationException.create('PXP:EVAL','Invalid language');
+    end;
+  end;
+  term := context.staticContext.sender.parseTerm(args[0].toString, model);
   try
     result := term.evaluate(context);
   finally
