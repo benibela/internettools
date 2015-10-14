@@ -79,22 +79,22 @@ begin
   result := FileExistsUTF8(Filename) and not DirectoryExistsUTF8(Filename); //does this work?
 end;
 
-function exists(const args: TXQVArray): IXQValue;
+function exists(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := xqvalue(FileExistsUTF8(normalizePath(args[0])));
 end;
 
-function is_dir(const args: TXQVArray): IXQValue;
+function is_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := xqvalue(DirectoryExistsUTF8(normalizePath(args[0])));
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function is_file(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := xqvalue(FileExistsAsTrueFileUTF8(args[0].toString));
 end;
 
-function last_modified(const args: TXQVArray): IXQValue;
+function last_modified(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   temp: LongInt;
   dateTime: TDateTime;
@@ -105,7 +105,7 @@ begin
   result := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
 end;
 
-function size(const args: TXQVArray): IXQValue;
+function size(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   s: Int64;
   code: String;
@@ -172,28 +172,28 @@ begin
   result := writeOrAppendSomething(args[0], append, data);
 end;
 
-function append(const args: TXQVArray): IXQValue;
+function append(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := writeOrAppendSerialized(args, true);
 end;
-function append_Binary(const args: TXQVArray): IXQValue;
+function append_Binary(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueString).toRawBinary);
 end;
-function append_Text(const args: TXQVArray): IXQValue;
+function append_Text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := writeOrAppendText(args, true, args[1].toString);
 end;
-function append_Text_Lines(const args: TXQVArray): IXQValue;
+function append_Text_Lines(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := writeOrAppendText(args, true, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
-function write(const args: TXQVArray): IXQValue;
+function write(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := writeOrAppendSerialized(args, false);
 end;
-function write_Binary(const args: TXQVArray): IXQValue;
+function write_Binary(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   offset: int64;
 begin
@@ -201,16 +201,16 @@ begin
   if length(args) >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
   result := writeOrAppendSomething(args[0], length(args) >= 3, (args[1] as TXQValueString).toRawBinary, offset);
 end;
-function write_Text(const args: TXQVArray): IXQValue;
+function write_Text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := writeOrAppendText(args, false, args[1].toString);
 end;
-function write_Text_Lines(const args: TXQVArray): IXQValue;
+function write_Text_Lines(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := writeOrAppendText(args, false, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
-function copy(const args: TXQVArray): IXQValue;
+function copy(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   source: UTF8String;
   dest: UTF8String;
@@ -230,7 +230,7 @@ begin
   result := xqvalue();
 end;
 
-function create_dir(const args: TXQVArray): IXQValue;
+function create_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   dir: UTF8String;
 begin
@@ -240,7 +240,7 @@ begin
   result := xqvalue();
 end;
 
-function create_temp_dir(const args: TXQVArray): IXQValue;
+function create_temp_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   dir: String;
 begin
@@ -255,7 +255,7 @@ begin
   result := xqvalue(dir);
 end;
 
-function create_temp_file(const args: TXQVArray): IXQValue;
+function create_temp_file(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   dir: String;
 begin
@@ -271,7 +271,7 @@ begin
   result := xqvalue(dir);
 end;
 
-function delete(const args: TXQVArray): IXQValue;
+function delete(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   path: UTF8String;
   recursive: Boolean;
@@ -351,7 +351,7 @@ begin
   FreeAndNil(lister);
 end;
 
-function list(const args: TXQVArray): IXQValue;
+function list(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   dir, mask: UTF8String;
   recurse: Boolean;
@@ -364,7 +364,7 @@ begin
   result := myList(args[0], true, (length(args) >= 2) and args[1].toBoolean, mask)
 end;
 
-function move(const args: TXQVArray): IXQValue;
+function move(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   source: UTF8String;
   dest: UTF8String;
@@ -402,7 +402,7 @@ end;
 
 
 
-function read_binary(const args: TXQVArray): IXQValue;
+function read_binary(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   from: int64;
   len: int64;
@@ -417,7 +417,7 @@ begin
   result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
 end;
 
-function read_text(const args: TXQVArray): IXQValue;
+function read_text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   data: rawbytestring;
   enc: TEncoding;
@@ -444,7 +444,7 @@ begin
 end;
 
 
-function resolve_path(const args: TXQVArray): IXQValue;
+function resolve_path(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   path: String;
 begin
@@ -452,24 +452,24 @@ begin
   result := xqvalue(path);
 end;
 
-function parent(const args: TXQVArray): IXQValue;
+function parent(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   path: UTF8String;
   lastSep: LongInt;
 begin
-  path := resolve_path(args).toString;
+  path := resolve_path(context,args).toString;
   lastSep := strLastIndexOf(path, AllowDirectorySeparators);
   if lastSep <= 0 then path := ''
   else path := system.copy(path, 1, lastSep - 1);
   result := xqvalue(path);
 end;
 
-function children(const args: TXQVArray): IXQValue;
+function children(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   Result := myList(args[0], false, false);
 end;
 
-function path_to_native(const args: TXQVArray): IXQValue;
+function path_to_native(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   dir: String;
 begin
@@ -478,7 +478,7 @@ begin
   result := xqvalue(dir);
 end;
 
-function path_to_uri(const args: TXQVArray): IXQValue;
+function path_to_uri(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   result := xqvalue(fileNameExpandToURI(normalizePath(args[0])));
 end;
