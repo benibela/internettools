@@ -67,6 +67,9 @@ end;
 function normalizePath(const path: IXQValue): UTF8String;
 begin
   result := path.toString;
+  if strBeginsWith(result, 'file:///') then begin
+    delete(result, 1, {$ifdef windows}8{$else}7{$endif});
+  end;
 end;
 
 function normalizePathToSys(const path: IXQValue): UTF8String;
