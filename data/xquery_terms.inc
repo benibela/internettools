@@ -3448,7 +3448,7 @@ begin
     typ := self.typ;
     if self.nameValue <> nil then
       nameValue := self.nameValue.clone;
-    if implicitNamespaces <> nil then
+    if self.implicitNamespaces <> nil then
       implicitNamespaces := Self.implicitNamespaces.clone;
   end;
 end;
