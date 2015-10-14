@@ -3,12 +3,6 @@ unit xquery_module_file;
 {**
  This unit implements the file module of http://expath.org/spec/file .
 
- {not implemented:
- file:last-modified($path as xs:string) as xs:dateTime
- 5 Paths
- 6 System Properties
- }
-
  not much tested
 }
 
@@ -98,6 +92,17 @@ end;
 function is_file(const args: TXQVArray): IXQValue;
 begin
   result := xqvalue(FileExistsAsTrueFileUTF8(args[0].toString));
+end;
+
+function last_modified(const args: TXQVArray): IXQValue;
+var
+  temp: LongInt;
+  dateTime: TDateTime;
+begin
+  temp := FileAgeUTF8(normalizePath(args[0]));
+  if temp < 0 then raiseFileError(ifthen(FileExistsUTF8(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
+  dateTime := FileDateToDateTime(temp); //todo: time zone?
+  result := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
 end;
 
 function size(const args: TXQVArray): IXQValue;
@@ -324,28 +329,39 @@ begin
   res.add(xqvalue(strCopyFrom(path, pathOffset) + FileInfo.Name));
 end;
 
-function list(const args: TXQVArray): IXQValue;
+function myList(const path: IXQValue; relative, recurse: boolean; mask: string = '*'): IXQValue;
 var
   dir: UTF8String;
-  recurse: Boolean;
   lister: TListFilesAndDirs;
 begin
-  requiredArgCount(args,1,3);
-  dir := normalizePath(args[0]);
-  recurse := (length(args) >= 2) and args[1].toBoolean;
+  dir := normalizePath(path);
 
   lister := TListFilesAndDirs.Create;
-  if Length(args) >= 3 then begin
-    lister.masks := TMaskList.Create(args[2].toString, '|', {$ifdef windows}false{$else}true{$endif});
+  if (mask <> '*') then begin
+    lister.masks := TMaskList.Create(mask, '|', {$ifdef windows}false{$else}true{$endif});
     if lister.masks.Count = 0 then
       FreeAndNil(lister.masks);
   end;
   lister.res := TXQValueSequence.create();
+  if not relative then lister.pathOffset := 1;
   lister.Search(dir, '', recurse);
   result := lister.res;
   xqvalueSeqSqueeze(result);
   FreeAndNil(lister.masks);
   FreeAndNil(lister);
+end;
+
+function list(const args: TXQVArray): IXQValue;
+var
+  dir, mask: UTF8String;
+  recurse: Boolean;
+  lister: TListFilesAndDirs;
+begin
+  requiredArgCount(args,1,3);
+  dir := normalizePath(args[0]);
+  if Length(args) >= 3 then mask := args[2].toString
+  else mask := '*';
+  result := myList(args[0], true, (length(args) >= 2) and args[1].toBoolean, mask)
 end;
 
 function move(const args: TXQVArray): IXQValue;
@@ -413,53 +429,80 @@ begin
     if enc = eUnknown then raiseFileError(error_unknown_encoding, error_unknown_encoding, args[1]);
     result := xqvalue(strChangeEncoding(data,  enc, eUTF8));
   end;
-end;                                         {
-
-function is_file(const args: TXQVArray): IXQValue;
-begin
-  result := normalizePath(args[0]);
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function name(const args: TXQVArray): IXQValue;
+var
+  path: UTF8String;
+  lastSep: LongInt;
 begin
-  result := normalizePath(args[0]);
+  path := normalizePath(args[0]);
+  lastSep := strlastIndexOf(path, AllowDirectorySeparators);
+  if lastSep <= 0 then path := ''
+  else path := strCopyFrom(path, lastSep + 1);
+  result := xqvalue(path);
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+
+function resolve_path(const args: TXQVArray): IXQValue;
+var
+  path: String;
 begin
-  result := normalizePath(args[0]);
+  path := fileNameExpand(normalizePath(args[0]));
+  result := xqvalue(path);
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function parent(const args: TXQVArray): IXQValue;
+var
+  path: UTF8String;
+  lastSep: LongInt;
 begin
-  result := normalizePath(args[0]);
+  path := resolve_path(args).toString;
+  lastSep := strLastIndexOf(path, AllowDirectorySeparators);
+  if lastSep <= 0 then path := ''
+  else path := system.copy(path, 1, lastSep - 1);
+  result := xqvalue(path);
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function children(const args: TXQVArray): IXQValue;
 begin
-  result := normalizePath(args[0]);
+  Result := myList(args[0], false, false);
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function path_to_native(const args: TXQVArray): IXQValue;
+var
+  dir: String;
 begin
-  result := normalizePath(args[0]);
+  dir := ResolveDots(fileNameExpand(normalizePath(args[0])));
+  if not strEndsWith(dir, DirectorySeparator) and DirectoryExistsUTF8(dir) then dir += DirectorySeparator;
+  result := xqvalue(dir);
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function path_to_uri(const args: TXQVArray): IXQValue;
 begin
-  result := normalizePath(args[0]);
+  result := xqvalue(fileNameExpandToURI(normalizePath(args[0])));
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function dir_separator(const args: TXQVArray): IXQValue;
 begin
-  result := normalizePath(args[0]);
+  result := xqvalue(DirectorySeparator);
 end;
 
-function is_file(const args: TXQVArray): IXQValue;
+function line_separator(const args: TXQVArray): IXQValue;
 begin
-  result := normalizePath(args[0]);
+  result := xqvalue(LineEnding);
 end;
-                                          }
+
+function path_separator(const args: TXQVArray): IXQValue;
+begin
+  result := xqvalue(PathSeparator);
+end;
+
+function temp_dir(const args: TXQVArray): IXQValue;
+begin
+  result := xqvalue(GetTempDir());
+end;
+
 
 
 procedure registerModuleFile;
@@ -470,7 +513,9 @@ begin
   module.registerFunction('exists', @exists, ['($path as xs:string) as xs:boolean']);
   module.registerFunction('is-dir', @is_dir, ['($path as xs:string) as xs:boolean']);
   module.registerFunction('is-file', @is_file, ['($path as xs:string) as xs:boolean']);
+  module.registerFunction('last-modified', @last_modified, ['($path as xs:string) as xs:dateTime']);
   module.registerFunction('size', @size, ['($file as xs:string) as xs:integer']);
+
   module.registerFunction('append', @append, ['($file as xs:string, $items as item()*) as empty-sequence()', '($file as xs:string, $items as item()*, $params as element(output:serialization-parameters)) as empty-sequence()']);
   module.registerFunction('append-binary', @append_binary, ['($file as xs:string, $value as xs:base64Binary) as empty-sequence()']);
   module.registerFunction('append-text', @append_text, ['($file as xs:string, $value as xs:string) as empty-sequence()','($file as xs:string, $value as xs:string, $encoding as xs:string) as empty-sequence()']);
@@ -491,6 +536,19 @@ begin
   module.registerFunction('write-text', @write_text, ['($file as xs:string, $value as xs:string) as empty-sequence()', '($file as xs:string, $value as xs:string, $encoding as xs:string) as empty-sequence()']);
   module.registerFunction('write-text-lines', @write_text_lines, ['($file as xs:string, $values as xs:string*) as empty-sequence()', '($file as xs:string, $values as xs:string*, $encoding as xs:string) as empty-sequence()']);
 
+  module.registerFunction('name', @name, ['($path as xs:string) as xs:string']);
+  module.registerFunction('parent', @parent, ['($path as xs:string) as xs:string?']);
+  module.registerFunction('path-to-native', @path_to_native, ['($path as xs:string) as xs:string']);
+  module.registerFunction('children', @children, ['($path as xs:string) as xs:string*']);
+  module.registerFunction('path-to-uri', @path_to_uri, ['($path as xs:string) as xs:anyURI']);
+  module.registerFunction('resolve-path', @resolve_path, ['($path as xs:string) as xs:string']);
+
+  module.registerFunction('dir-separator', @dir_separator, ['() as xs:string']);
+  module.registerFunction('line-separator', @line_separator, ['() as xs:string']);
+  module.registerFunction('path-separator', @path_separator, ['() as xs:string']);
+  module.registerFunction('temp-dir', @temp_dir, ['() as xs:string']);
+  module.registerInterpretedFunction('base-dir', '() as xs:string', 'Q{http://expath.org/ns/file}parent(static-base-uri())');
+  module.registerInterpretedFunction('current-dir', '() as xs:string', 'Q{http://expath.org/ns/file}resolve-path(".")');
 
 
   TXQueryEngine.registerNativeModule(module);
