@@ -556,6 +556,27 @@ function strIndexOf(const str: RawByteString; const searched: TCharSet; from: lo
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
 function striIndexOf(const str,searched:RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
+//**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence  (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+function strlsLastIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+//**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+function strlsLastIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint;
+//**Searchs @code(searched) in @code(str), case-insensitive, returns -1 on no occurrence (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
+function strlsiLastIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+function strLastIndexOf(const str: RawByteString; const searched: RawByteString):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+function strLastIndexOf(const str: RawByteString; const searched: RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+function strLastIndexOf(const str: RawByteString; const searched: TCharSet):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+function strLastIndexOf(const str: RawByteString; const searched: TCharSet; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+function striLastIndexOf(const str: RawByteString; const searched: RawByteString):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+function striLastIndexOf(const str: RawByteString; const searched: RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
 function strContains(const str,searched:RawByteString):boolean;overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
@@ -2566,6 +2587,101 @@ begin
   if result < 0 then begin result := 0; exit; end;
   inc(result,  from);
 end;
+
+function strlsLastIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+var last: pansichar;
+begin
+  if l2<=0 then begin result := 0; exit; end;
+  if l1<l2 then begin result := -1; exit; end;
+  last:=str+(l1-l2);
+  result:=l1-l2;
+  while str <= last do begin
+    if last^ = searched^ then
+      if strlsequal(last, searched, l2) then
+        exit;
+    dec(last);
+    dec(result);
+  end;
+  result:=-1;
+end;
+
+function strlsLastIndexOf(str: pansichar; const searched: TCharSet; length: longint): longint;
+var last: pansichar;
+begin
+  if length<1 then begin result := -1; exit; end;
+  last:=str+(length-1);
+  result:=length-1;
+  while str <= last do begin
+    if last^ in searched then
+      exit;
+    dec(last);
+    dec(result);
+  end;
+  result:=-1;
+end;
+
+function strlsiLastIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+var last: pansichar;
+begin
+  if l2<=0 then begin result := 0; exit; end;
+  if l1<l2 then begin result := -1; exit; end;
+  last:=str+(l1-l2);
+  result:=l1-l2;
+  while str <= last do begin
+    if upcase(last^) = upcase(searched^) then
+      if strlsiequal(last+1, searched+1, l2-1, l2-1) then
+        exit;
+    dec(last);
+    dec(result);
+  end;
+  result:=-1;
+end;
+
+
+function strLastIndexOf(const str: RawByteString; const searched: RawByteString; from: longint): longint;
+begin
+  if from > length(str) then begin result := 0; exit; end;
+  result := strlsLastIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
+  if result < 0 then begin result := 0; exit; end;
+  inc(result,  from);
+end;
+
+function strLastIndexOf(const str: RawByteString; const searched: TCharSet; from: longint): longint;
+var
+  i: LongInt;
+begin
+  for i := length(str) downto from do
+    if str[i] in searched then begin
+      result := i;
+      exit;
+    end;
+  result := 0;
+end;
+
+function striLastIndexOf(const str: RawByteString; const searched: RawByteString; from: longint): longint;
+begin
+  if from > length(str) then begin result := 0; exit; end;
+  result := strlsiLastIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
+  if result < 0 then begin result := 0; exit; end;
+  inc(result,  from);
+end;
+
+
+function strLastIndexOf(const str: RawByteString; const searched: RawByteString): longint;
+begin
+  result := strLastIndexOf(str, searched, 1);
+end;
+
+function striLastIndexOf(const str: RawByteString; const searched: RawByteString): longint;
+begin
+  result := striLastIndexOf(str, searched, 1);
+end;
+
+function strLastIndexOf(const str: RawByteString; const searched: TCharSet): longint;
+begin
+  result := strLastIndexOf(str, searched, 1);
+end;
+
 
 function strContains(const str, searched: RawByteString): boolean;
 begin

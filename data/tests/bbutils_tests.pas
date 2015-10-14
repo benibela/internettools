@@ -446,6 +446,22 @@ begin
   test(strContains('foobar', ['a'..'b'], 5) = true);
   test(strContains('foobar', ['a'..'b'], 6) = false);
 
+  test(strlsLastIndexOf(pchar('foobarbar'), pchar('BAR'), 9, 3) = -1);
+  test(strlsLastIndexOf(pchar('foobarbar'), pchar('foo'), 9, 3) = 0);
+  test(strlsLastIndexOf(pchar('foobarbar'), pchar('bar'), 9, 3) = 6);
+  test(strlsiLastIndexOf(pchar('foobarbar'), pchar('xyz'), 9, 3) = -1);
+  test(strlsiLastIndexOf(pchar('foobarbar'), pchar('fOo'), 9, 3) = 0);
+  test(strlsiLastIndexOf(pchar('foobarbar'), pchar('BaR'), 9, 3) = 6);
+  test(strlsLastIndexOf('foobar', ['a'..'b'], 6) = 4);
+  test(strLastIndexOf('foobar', ['a'..'b']) = 5);
+  test(strLastIndexOf('foobar', ['a'..'b'], 5) = 5);
+  test(strlsLastIndexOf('foobar', ['x'], 6) = -1);
+  test(strLastIndexOf('foobar', ['x']) = 0);
+  test(strLastIndexOf('foobarbar', 'BAR') = 0);
+  test(strLastIndexOf('foobarbar', 'bar', 2) = 7);
+  test(striLastIndexOf('foobarbar', 'BAR') = 7);
+  test(striLastIndexOf('foobarbar', 'bar', 2) = 7);
+
   sa:=strSplit('',',');
   test(length(sa) = 1);
   test(sa[0] = '');
