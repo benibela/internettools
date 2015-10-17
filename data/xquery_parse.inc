@@ -179,7 +179,7 @@ procedure TXQParsingContext.expect(c: char);
 begin
   skipWhitespaceAndComment;
     if pos^ <> c then
-      raise EXQParsingException.Create('XPST0003', '"'+c+'"'+' expected, but "'+pos^+'" found'#13#10+strslice(@str[1],pos));
+      raiseSyntaxError('"'+c+'"'+' expected, but "'+nextToken()+'" found');
     pos+=1;
 end;
 
@@ -190,7 +190,7 @@ begin
   skipWhitespaceAndComment;
   for i:=1 to length(s) do begin
     if pos^ <> s[i] then
-      raise EXQParsingException.Create('XPST0003', '"'+ s+'" expected, but "'+pos^+'" found'#13#10+strslice(@str[1],pos));
+      raiseSyntaxError('"'+ s+'" expected, but "'+nextToken()+'" found');
     pos+=1;
   end;
 end;
