@@ -1347,6 +1347,7 @@ type
     function visitchildren(intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
     function clone: TXQTerm; virtual;
   end;
+  TXQTermClass = class of TXQTerm;
 
   TXQTermWithChildren = class(TXQTerm)
     children: array of TXQTerm;
@@ -1855,11 +1856,13 @@ type
     errorCode: string;
     namespace: INamespace;
     constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+    class function searchClosestFunction(const addr: pointer): string;
   private
     rawMessageLength: integer;
     function messagePrefix: string;
     function rawMessage: string;
   end;
+  TXQExceptionEvent = procedure (exception: EXQException) of object;
 
   //**Exception raised during the parsing of an expression
   EXQParsingException = class(EXQException)
@@ -2576,6 +2579,7 @@ var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are k
     patternMatcherParse: TXQInternalPatternMatcherParse;
     patternMatcherMatch: TXQInternalPatternMatcherMatch;
     patternMatcherVisit: TXQInternalPatternMatcherVisit;
+
 implementation
 uses base64, strutils;
 
@@ -2710,6 +2714,41 @@ begin
   inherited create(messagePrefix + amessage);
 end;
 
+var collations: TStringList;
+    nativeModules: TStringList;
+
+
+class function EXQException.searchClosestFunction(const addr: pointer): string;
+const terms: array[1..39] of TXQTermClass = (TXQTermWithChildren, TXQTermVariable, TXQTermSequenceType, TXQTermDefineFunction, TXQTerm, TXQTermWithChildren, TXQTermConstant, TXQTermSequence, TXQTermJSONArray, TXQTermSequenceType, TXQTermVariable, TXQTermDefineVariable, TXQTermDefineFunction, TXQTermNodeMatcher, TXQTermFilterSequence, TXQTermPatternMatcher, TXQTermNamedFunction, TXQTermDynamicFunctionCall, TXQTermBinaryOp  , TXQTermFlowerSubClause, TXQTermFlowerLet, TXQTermFlowerFor, TXQTermFlowerWindow, TXQTermFlowerLetPattern, TXQTermFlowerForPattern, TXQTermFlowerWhere, TXQTermFlowerOrder, TXQTermFlowerCount, TXQTermFlowerGroup, TXQTermFlower, TXQTermSomeEvery, TXQTermIf, TXQTermTypeSwitch, TXQTermSwitch, TXQTermReadObjectProperty, TXQTermConstructor, TXQTermJSONObjectConstructor, TXQTermTryCatch, TXQTermModule);
+var
+  i, j: Integer;
+  module: TXQNativeModule;
+  delta: PtrUInt;
+  procedure checkAddr(tocheck: pointer; name: string); inline;
+  begin
+    if (tocheck <= addr) and ( addr - tocheck < delta ) then begin
+      delta := addr - tocheck;
+      result := name + ' + ' + IntToStr(delta);
+    end;
+  end;
+begin
+  result := '?';
+  delta := PtrUInt(addr);
+  for i := low(terms) to high(terms) do
+    checkAddr( TMethod(@terms[i].evaluate).Code,  terms[i].ClassName);
+
+  for i := 0 to nativeModules.Count - 1 do begin
+    module := TXQNativeModule(nativeModules.Objects[i]);
+    for j := 0 to module.basicFunctions.Count - 1 do
+      checkAddr( TXQBasicFunctionInfo(module.basicFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.basicFunctions[j]);
+    for j := 0 to module.complexFunctions.Count - 1 do
+    checkAddr( TXQComplexFunctionInfo(module.complexFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.complexFunctions[j]);
+    for j := 0 to module.binaryOpFunctions.Count - 1 do
+      checkAddr( TXQOperatorInfo(module.binaryOpFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.binaryOpFunctions[j]);
+  end;
+  if delta > 2048 then result := 'perhaps ' + result + ' ? but unlikely';
+end;
+
 function EXQException.messagePrefix: string;
 begin
   result := '';
@@ -2724,8 +2763,6 @@ begin
   result := copy(result, 1, rawMessageLength);
 end;
 
-var collations: TStringList;
-    nativeModules: TStringList;
 
 
 

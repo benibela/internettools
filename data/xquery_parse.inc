@@ -1112,6 +1112,7 @@ begin
       isNamespaceNode := strBeginsWith(token, 'xmlns:') or (token = 'xmlns');
       parseCommonContent(attribute, marker^, false, isNamespaceNode);
       expect(marker^);
+
       if isNamespaceNode then begin
         if token = 'xmlns' then prefix := ''
         else prefix := strCopyFrom(token, length('xmlns:')+1);
