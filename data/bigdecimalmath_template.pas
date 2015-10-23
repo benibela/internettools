@@ -137,7 +137,8 @@ operator :=(const a: T_NativeInt_): BigDecimal;
 //operator :=(const a: BigDecimal): Extended; auto conversion of bigdecimal to extended is possible, but it confuses fpc overload resolution. Then e.g. power calls either math or bigdecimalbc depending on the unit order in the uses clause
 //** Converts an extended to a BigDecimal @br
 //** Marked as deprecated, because it may lead to rounding errors. FloatToBigDecimal is exact, but probably some magnitudes slower. For constant values StrToBigDecimal should be used instead.
-operator :=(const a: Extended): BigDecimal; deprecated;
+operator :=(const a: Extended): BigDecimal; deprecated 'Direct casting of float to bigdecimal might lead to rounding errors. Consider using StrToBigDecimal.';
+
 
 //** Standard operator unary -
 operator -(const a: BigDecimal): BigDecimal;
