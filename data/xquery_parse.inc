@@ -2226,6 +2226,8 @@ begin
 end;        }
 
 function TXQParsingContext.parsePrimaryLevel: TXQTerm;
+var
+  temp: TXQTerm;
 begin
   result := parse;
   try
@@ -2233,7 +2235,9 @@ begin
       result := TXQTermSequence.Create.push([result]);
       while nextToken(true) = ',' do begin
         expect(',');
-        TXQTermSequence(result).push(parse);
+        temp := parse();
+        if temp = nil then raiseSyntaxError('Expression missing');
+        TXQTermSequence(result).push(temp);
       end;
     end;
   except
