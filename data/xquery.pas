@@ -4081,6 +4081,7 @@ function TXQEvaluationContext.parseDoc(const data, url, contenttype: string): TT
 var
   tempnode: TTreeNode;
   parser: TTreeParser;
+  oldModel: TParsingModel;
 begin
   if not Assigned(staticContext) or not assigned(staticContext.sender) then raisePXPInternalError;
   with staticContext.sender do begin
@@ -4099,7 +4100,10 @@ begin
         parser := defaultParser;
       end;
 
+      oldModel := parser.parsingModel;
+      if guessFormat(data, url, contenttype) = itfHTML then parser.parsingModel := pmHTML;
       result := parser.parseTree(data, url, contenttype);
+      parser.parsingModel := oldModel;
     end;
   end
 end;
