@@ -18,6 +18,7 @@ begin
   if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
 end;
 
+procedure newinterfacetests; forward;
 
 procedure unittests(testerrors: boolean);
 var
@@ -408,6 +409,7 @@ begin
   equal(TXQueryEngine.evaluateStaticXQuery3('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
 
 
+  newinterfacetests;
 
   writeln('XQuery 3: ', count, ' completed');
 
@@ -417,6 +419,31 @@ begin
   end;
 end;
 
+
+procedure test(a: IXQValue; b: string);
+begin
+  equal(a.toJoinedString(), b, 'ni');
+end;
+
+procedure newinterfacetests;
+begin
+  //writeln(process('http://example.org', '//a').toJoinedString(LineEnding));
+  test(query('1+2+3+$_1+$_2',['17', '30']), '53');
+  test(query('10').map('. + 17'), '27');
+  test(query('()').map('. + 17'), '');
+  test(query('()').filter('. + 17'), '');
+  test(query('(1,2,3)').map('. + 17'), '18 19 20');
+  test(query('(1,2,3)').filter('2'), '2');
+  test(query('(1,2,3)').filter('. >= 2'), '2 3');
+  test(query('"foo"').filter('string-length(.) >= 5'), '');
+  test(query('"hallo"').filter('string-length(.) >= 5'), 'hallo');
+  test(xqvalue(['a','b','c','d']).map('. || ":"').map('. || $_1', [' ']).filter('position() = (1, $_1)', ['3']).map('.||$_1', [xqvalue('x')]), 'a: x c: x');
+  test(xqvalue(['a','b','c','d']).query('join($_, $_1)', [':']), 'a:b:c:d');
+  test(xqvalue(['1','2','3','100']).query('sum($_)'), '106');
+  test(xqvalue(['1','2','3','100']).filter('. < 10').query('sum($_)'), '6');
+  test(xqvalue().query('count($_)'), '0' );
+
+end;
 
 end.
 

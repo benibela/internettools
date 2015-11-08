@@ -22,6 +22,7 @@ unit synapseinternetaccess;
 
 {$IFNDEF WINDOWS}
 {$DEFINE COMPILE_SYNAPSE_INTERNETACCESS} //If this unit should be compiled. Not enabled on windows, since you can use w32internetaccess there
+{$DEFINE USE_SYNAPSE_WRAPPER}
 {$ENDIF}
 
 
@@ -288,8 +289,14 @@ begin
  result:=connection;
 end;
 
-{$ifndef WINDOWS}
 initialization
+
+{$IFDEF USE_SYNAPSE_WRAPPER}
+defaultInternetAccessClass := TSynapseInternetAccess;
+{$ENDIF}
+
+
+{$ifndef WINDOWS}
 InitCriticalSection(resolvConfCS);
 finalization
 DoneCriticalsection(resolvConfCS);

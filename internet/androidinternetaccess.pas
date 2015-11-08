@@ -21,6 +21,7 @@ unit androidinternetaccess;
 {$mode objfpc}{$H+}
 {$IFDEF ANDROID}
 {$DEFINE COMPILE_ANDROID_INTERNETACCESS} //If this unit should be compiled.
+{$DEFINE USE_ANDROID_WRAPPER}
 {$ENDIF}
 
 
@@ -582,6 +583,11 @@ end;
 
 {$ENDIF}
 
+
+initialization
+{$IFDEF USE_ANDROID_WRAPPER}
+defaultInternetAccessClass := TAndroidInternetAccess;
+{$ENDIF}
 
 end.
 

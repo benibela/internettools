@@ -25,6 +25,7 @@ interface
 //{$DEFINE DELPHI_WININET} //If you use the Delphi wininet unit. Search for   "unit wininet" inurl:wininet.pas   to find one. (and then add {$mode delphi} there)
 {$IFDEF WINDOWS}
 {$DEFINE COMPILE_W32_INTERNETACCESS}  //If this unit should be compiled
+{$DEFINE USE_WININET_WRAPPER}
 {$ENDIF}
 
 {$IFDEF PASDOCRUN}
@@ -538,6 +539,12 @@ function TW32InternetAccess.internalHandle: TObject;
 begin
   result:=tobject(hLastConnection);
 end;
+{$ENDIF}
+
+initialization
+
+{$IFDEF USE_WININET_WRAPPER}
+defaultInternetAccessClass := TW32InternetAccess;
 {$ENDIF}
 
 end.

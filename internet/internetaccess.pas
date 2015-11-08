@@ -215,10 +215,27 @@ function guessType(const data: string): TRetrieveType;
 
 
 var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all internet access classes
-  defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access. This controls which internet library the program will use
+    defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access. This controls which internet library the program will use.
 
 const ContentTypeUrlEncoded: string = 'application/x-www-form-urlencoded';
 const ContentTypeMultipart: string = 'multipart/form-data'; //; boundary=
+
+
+//**Make a http GET request to a certain url.
+function httpRequest(url: string): string; overload;
+//**Make a http POST request to a certain url, sending the data in rawpostdata unmodified to the server.
+function httpRequest(url: string; rawpostdata: string): string; overload;
+//**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it.
+function httpRequest(url: string; postdata: TStringList): string; overload;
+//**Make a http request to a certain url, sending the data in rawdata unmodified to the server.
+function httpRequest(const method, url, rawdata: string): string; overload;
+
+
+//**This provides a thread-safe default internet
+function defaultInternet: TInternetAccess;
+//**If you use the procedural interface from different threads, you have to call freeThreadVars
+//**before the thread terminates to prevent memory leaks @br
+procedure freeThreadVars;
 implementation
 
 //==============================================================================
@@ -868,5 +885,46 @@ begin
   end;
 end;
 
+
+threadvar theDefaultInternet: TInternetAccess;
+
+function httpRequest(url: string): string;
+begin
+  result:=defaultInternet.get(url);
+end;
+
+function httpRequest(url: string; rawpostdata: string): string;
+begin
+  result:=defaultInternet.post(url, rawpostdata);
+end;
+
+function httpRequest(url: string; postdata: TStringList): string;
+begin
+  result := httpRequest(url, TInternetAccess.urlEncodeData(postdata));
+end;
+
+function httpRequest(const method, url, rawdata: string): string;
+begin
+  result := defaultInternet.request(method, url, rawdata);
+end;
+
+function defaultInternet: TInternetAccess;
+begin
+  if theDefaultInternet <> nil then exit(theDefaultInternet);
+  if defaultInternetAccessClass = nil then
+    raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse, wininet or android. Or you can add one of the units synapseinternetaccess, androidinternetaccecss or w32internetaccess to your uses clauses (if that unit actually will be compiled depends on the active defines).');
+  theDefaultInternet := defaultInternetAccessClass.create;
+  result := theDefaultInternet;
+end;
+
+
+procedure freeThreadVars;
+begin
+  FreeAndNil(theDefaultInternet);
+end;
+
+
+finalization
+  freeThreadVars;
 end.
 

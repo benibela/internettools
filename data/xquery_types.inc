@@ -47,6 +47,36 @@ begin
   Result:='<'+sequenceTag+'/>';
 end;
 
+function TXQValueUndefined.map(const q: string): IXQValue;
+begin
+  Result:=xqvalue();
+end;
+
+function TXQValueUndefined.map(const q: string; const vs: array of ixqvalue): IXQValue;
+begin
+  Result:=xqvalue();
+end;
+
+function TXQValueUndefined.map(const q: string; const vs: array of string): IXQValue;
+begin
+  Result:=xqvalue();
+end;
+
+function TXQValueUndefined.filter(const q: string): IXQValue;
+begin
+  Result:=xqvalue();
+end;
+
+function TXQValueUndefined.filter(const q: string; const vs: array of ixqvalue): IXQValue;
+begin
+  Result:=xqvalue();
+end;
+
+function TXQValueUndefined.filter(const q: string; const vs: array of string): IXQValue;
+begin
+  Result:=xqvalue();
+end;
+
 
 { TXQValueUndefined }
 
@@ -255,6 +285,73 @@ function TXQValue.clone: IXQValue;
 begin
   raise EXQEvaluationException.Create('pxp:INTERNAL', 'Clone on "abstract" base class called.');
   result := nil;
+end;
+
+function TXQValue.query(const q: string): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.add('_', self);
+  result := xquery.query(q);
+  defaultQueryEngine.VariableChangelog.removeLast;
+end;
+
+function TXQValue.query(const q: string; const vs: array of ixqvalue): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.add('_', self);
+  result := xquery.query(q, vs);
+  defaultQueryEngine.VariableChangelog.removeLast;
+end;
+
+function TXQValue.query(const q: string; const vs: array of string): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.add('_', self);
+  result := xquery.query(q, vs);
+  defaultQueryEngine.VariableChangelog.removeLast;
+end;
+
+function TXQValue.map(const q: string): IXQValue;
+begin
+  result := defaultQueryEngine.evaluateXQuery3(q, self);
+end;
+
+function TXQValue.map(const q: string; const vs: array of ixqvalue): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
+  result := map(q);
+  defaultQueryEngine.VariableChangelog.popAll();
+end;
+
+function TXQValue.map(const q: string; const vs: array of string): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
+  result := map(q);
+  defaultQueryEngine.VariableChangelog.popAll();
+end;
+
+function TXQValue.filter(const q: string): IXQValue;
+var
+  term: TXQuery;
+begin
+  result := self;
+  term := defaultQueryEngine.parseTerm(q, xqpmXQuery3, defaultQueryEngine.StaticContext);
+  try
+    TXQueryEngine.filterSequence(result, term.getTerm, defaultQueryEngine.getEvaluationContext());
+  finally
+    term.free;
+  end;
+end;
+
+function TXQValue.filter(const q: string; const vs: array of ixqvalue): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
+  result := filter(q);
+  defaultQueryEngine.VariableChangelog.popAll();
+end;
+
+function TXQValue.filter(const q: string; const vs: array of string): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
+  result := filter(q);
+  defaultQueryEngine.VariableChangelog.popAll();
 end;
 
 { TXQValueBoolean }
@@ -1227,6 +1324,24 @@ begin
   result.fcurrentidx:=-1;
   result.fguardian := self;
   result.flist:=seq;
+end;
+
+function TXQValueSequence.map(const q: string): IXQValue;
+var
+  term: TXQuery;
+  resseq: TXQValueSequence;
+  i: Integer;
+begin
+  term := defaultQueryEngine.parseTerm(q, xqpmXQuery3, defaultQueryEngine.StaticContext);
+  try
+    resseq := TXQValueSequence.create(getSequenceCount);
+    for i := 0 to seq.Count - 1 do
+      resseq.add(term.evaluate(seq[i]));
+    result := resseq;
+    xqvalueSeqSqueeze(result);
+  finally
+    term.free;
+  end;
 end;
 
 function TXQValueSequence.clone: IXQValue;

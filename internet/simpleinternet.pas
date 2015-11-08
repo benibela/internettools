@@ -59,18 +59,20 @@ function retrieve(data: string): string;
 
 
 //**Make a http GET request to a certain url.
-function httpRequest(url: string): string;
+function httpRequest(url: string): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
 //**Make a http POST request to a certain url, sending the data in rawpostdata unmodified to the server.
-function httpRequest(url: string; rawpostdata: string): string;
+function httpRequest(url: string; rawpostdata: string): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
 //**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it.
-function httpRequest(url: string; postdata: TStringList): string;
+function httpRequest(url: string; postdata: TStringList): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
+//**Make a http request to a certain url, sending the data in rawdata unmodified to the server.
+function httpRequest(const method, url, rawdata: string): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
+
+
 //**Make a http request to an address given in an IXQValue.  @br
 //**node: if a link (a), download @@href. If a resource (img, frame), download @@src. Otherwise download the text@br.
 //**object: Download obj.url, possibly sending obj.post as postdata.
 //**else: Download the string value.
-function httpRequest(const destination: xquery.IXQValue): string;
-//**Make a http request to a certain url, sending the data in rawdata unmodified to the server.
-function httpRequest(const method, url, rawdata: string): string;
+function httpRequest(const destination: xquery.IXQValue): string;  overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
 
 (***
 Processes data with a certain query.@br@br
@@ -102,14 +104,14 @@ function processedTree: TTreeNode;
 function processedVariables: TXQVariableChangeLog;
 
 //**If you use the functions in this unit from different threads, you have to call freeThreadVars
-//**before the thread terminates to prevent memory leaks
+//**before the thread terminates to prevent memory leaks @br
+//**This also calls freeThreadVars of the xquery and internetaccess units
 procedure freeThreadVars;
 
-threadvar defaultInternet: TInternetAccess;
-function defaultQueryEngine: TXQueryEngine;
+function defaultInternet: TInternetAccess; inline;
+function defaultQueryEngine: TXQueryEngine; inline;
 
-//**Initializes the defaultInternet variable
-procedure needInternetAccess;
+procedure needInternetAccess; deprecated 'This procedure no longer does anything';
 
 implementation
 
@@ -152,7 +154,6 @@ uses bbutils, extendedhtmlparser
 threadvar
   tree: TTreeParser;
   templateParser: THtmlTemplateParser;
-  pxpParser: TXQueryEngine;
   lastQueryWasPXP: boolean;
   lastRetrievedType: TRetrieveType;
 
@@ -164,7 +165,7 @@ begin
   lastRetrievedType:=guessType(data);
   case lastRetrievedType of
     rtEmpty:;
-    rtRemoteURL: exit(httpRequest(trimmed));
+    rtRemoteURL: exit(internetaccess.httpRequest(trimmed));
     rtFile: exit(strLoadFromFileUTF8(trimmed));
     else exit(data);
   end;
@@ -183,6 +184,7 @@ var dataFileName: string;
   context: TXQEvaluationContext;
   format: TInternetToolsFormat;
   querykind: TExtractionKind;
+  pxpParser: TXQueryEngine;
 begin
   result := xqvalue();
   if query = '' then exit();
@@ -218,7 +220,7 @@ begin
     end;
     else begin
       lastQueryWasPXP := true;
-      if pxpParser = nil then pxpParser := TXQueryEngine.create;
+      pxpParser := defaultQueryEngine;
       pxpparser.StaticContext.baseURI:=dataFileName;
       case querykind of
         ekXQuery1, ekXQuery3: begin
@@ -227,7 +229,7 @@ begin
         end;
         ekXPath2, ekXPath3: begin
           pxpParser.ParsingOptions.StringEntities := xqseIgnoreLikeXPath;
-          pxpParser.parseXQuery3(query, pxpParser.StaticContext) //no point in using a less power language.
+          pxpParser.parseXQuery3(query, pxpParser.StaticContext) //no point in using a less powerful language.
         end;
         ekCSS: pxpParser.parseCSS3(query);
         else raise Exception.Create('internal error 21412466');
@@ -271,52 +273,44 @@ end;
 
 procedure freeThreadVars;
 begin
-  pxpParser.Free; pxpParser := nil;
-  defaultInternet.Free; defaultInternet := nil;
   templateParser.Free; templateParser := nil;
   tree.Free; tree := nil;
+  xquery.freeThreadVars;
+end;
+
+function defaultInternet: TInternetAccess;
+begin
+  result := internetaccess.defaultInternet;
 end;
 
 function defaultQueryEngine: TXQueryEngine;
 begin
-  result := pxpParser;
+  result := xquery.defaultQueryEngine;
 end;
 
 procedure needInternetAccess;
 begin
-  if defaultInternet <> nil then exit;
-  if defaultInternetAccessClass = nil then begin
-    {$IFDEF USE_SYNAPSE_WRAPPER}
-    defaultInternetAccessClass := TSynapseInternetAccess;
-    {$ENDIF}
-    {$IFDEF USE_WININET_WRAPPER}
-    defaultInternetAccessClass := TW32InternetAccess;
-    {$ENDIF}
-    {$IFDEF USE_ANDROID_WRAPPER}
-    defaultInternetAccessClass := TAndroidInternetAccess;
-    {$ENDIF}
-    if defaultInternetAccessClass = nil then
-      raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse, wininet or android');
-  end;
-  defaultInternet := defaultInternetAccessClass.create;
 end;
+
 
 function httpRequest(url: string): string;
 begin
-  needInternetAccess();
-  //writeln(stderr, url);
   result:=defaultInternet.get(url);
 end;
 
 function httpRequest(url: string; rawpostdata: string): string;
 begin
-  needInternetAccess();
   result:=defaultInternet.post(url, rawpostdata);
 end;
 
 function httpRequest(url: string; postdata: TStringList): string;
 begin
-  result := httpRequest(url, TInternetAccess.urlEncodeData(postdata));
+  result := internetaccess.httpRequest(url, TInternetAccess.urlEncodeData(postdata));
+end;
+
+function httpRequest(const method, url, rawdata: string): string;
+begin
+  result := defaultInternet.request(method, url, rawdata);
 end;
 
 function httpRequest(const destination: xquery.IXQValue): string;
@@ -328,32 +322,27 @@ var dest: IXQValue;
 begin
   if destination.kind = pvkSequence then dest := destination.get(1)
   else dest := destination;
-  dest := pxpParser.evaluateXPath3('pxp:resolve-html(.)', dest);
+  dest := defaultQueryEngine.evaluateXPath3('pxp:resolve-html(.)', dest);
   if dest.kind = pvkSequence then dest := dest.get(1);
 
   case dest.kind of
     pvkUndefined: exit('');
     pvkNode: raise EXQEvaluationException.Create('pxp:ASSERT', 'Got '+dest.debugAsStringWithTypeAnnotation()+', but expected resolved url');
     pvkObject: begin
-      needInternetAccess;
       tempHeaders := defaultInternet.additionalHeaders.Text;
       TXQValueObject.prepareInternetRequest(dest, method, url, post, defaultInternet);
-      result := httpRequest(method, url, post);
+      result := internetaccess.httpRequest(method, url, post);
       defaultInternet.additionalHeaders.Text := tempHeaders;
     end;
     pvkSequence: raise EXQEvaluationException.Create('pxp:ASSERT', 'Impossible (nested) sequence');
-    else result := httpRequest(dest.toString);
+    else result := internetaccess.httpRequest(dest.toString);
   end;
 end;
 
-function httpRequest(const method, url, rawdata: string): string;
-begin
-  needInternetAccess();
-  result := defaultInternet.request(method, url, rawdata);
-end;
+
 
 finalization
-freeThreadVars;
+  freeThreadVars;
 
 end.
 

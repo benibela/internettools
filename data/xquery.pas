@@ -307,6 +307,16 @@ type
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
     function GetEnumerator: TXQValueEnumerator; //**< Returns an enumerator for @code(for var in value). For a sequence the enumerator runs over all values contained in the sequence, for other values it will do one iteration over the value of that value. The iterated values have the IXQValue interface type
 
+    function query(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(query) whereby self is stored in $v
+    function query(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like query, sets the additional arguments as variables $v1, $v2, ...
+    function query(const q: string; const vs: array of string): IXQValue; //**< Like query, sets the additional arguments as variables $v1, $v2, ...
+    function map(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(self ! query) (i.e. all values in self simply mapped through query)
+    function map(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like map, sets the additional arguments as variables $v1, $v2, ...
+    function map(const q: string; const vs: array of string): IXQValue; //**< Like map, sets the additional arguments as variables $v1, $v2, ...
+    function filter(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(self [query]) (i.e. all values in self filtered through query)
+    function filter(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like filter, sets the additional arguments as variables $v1, $v2, ...
+    function filter(const q: string; const vs: array of string): IXQValue; //**< Like filter, sets the additional arguments as variables $v1, $v2, ...
+
     function instanceOf(const typ: TXSType): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
 
     property Count: integer read getSequenceCount;
@@ -361,6 +371,15 @@ type
 
     function clone: IXQValue; virtual;
 
+    function query(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(query) whereby self is stored in $v
+    function query(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like query, sets the additional arguments as variables $v1, $v2, ...
+    function query(const q: string; const vs: array of string): IXQValue; //**< Like query, sets the additional arguments as variables $v1, $v2, ...
+    function map(const q: string): IXQValue; virtual; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(self ! query) (i.e. all values in self simply mapped through query)
+    function map(const q: string; const vs: array of ixqvalue): IXQValue; virtual; //**< Like map, sets the additional arguments as variables $v1, $v2, ...
+    function map(const q: string; const vs: array of string): IXQValue; virtual; //**< Like map, sets the additional arguments as variables $v1, $v2, ...
+    function filter(const q: string): IXQValue; virtual; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(self [query]) (i.e. all values in self filtered through query)
+    function filter(const q: string; const vs: array of ixqvalue): IXQValue; virtual; //**< Like filter, sets the additional arguments as variables $v1, $v2, ...
+    function filter(const q: string; const vs: array of string): IXQValue; virtual; //**< Like filter, sets the additional arguments as variables $v1, $v2, ...
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
@@ -381,6 +400,12 @@ type
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
+    function map(const q: string): IXQValue; override;
+    function map(const q: string; const vs: array of ixqvalue): IXQValue; override;
+    function map(const q: string; const vs: array of string): IXQValue; override;
+    function filter(const q: string): IXQValue; override;
+    function filter(const q: string; const vs: array of ixqvalue): IXQValue; override;
+    function filter(const q: string; const vs: array of string): IXQValue; override;
   private
     function GetEnumerator: TXQValueEnumerator;override;
   end;
@@ -628,6 +653,8 @@ type
     function getSequenceCount: integer; override;
     function get(i: integer): IXQValue; override;
     function GetEnumerator: TXQValueEnumerator; override;
+    function map(const q: string): IXQValue; override;
+
 
     function takeFirst: IXQValue;
 
@@ -2277,9 +2304,6 @@ public
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
-    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
-    FInternet: TInternetAccess;
-    {$endif}
     FModules: TInterfaceList;
 
   protected
@@ -2365,6 +2389,8 @@ public
   function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Raises an exception (to prevent xquery(TDateTime) from using xquery(float))
   function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates an node TXQValue
   function xqvalue(sl: TStringList): IXQValue; //**< Creates an sequence of strings (does *not* free the list)
+  function xqvalue(const sl: array of string): IXQValue; //**< Creates an sequence of untyped strings
+  function xqvalue(const sl: array of IXQValue): IXQValue; //**< Creates a sequence
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes a IXQValue (single element seq => single element, empty seq => undefined)
   procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add ) @br Warning: If  pointer(list) = pointer(add) it will crash
@@ -2464,6 +2490,9 @@ type
     vars: array of TXQVariable;
     history: array of integer;
     procedure removeLast;
+
+    procedure pushOpenArray(const vs: array of IXQValue);
+    procedure pushOpenArray(const untypedStrings: array of string);
   end;
 
 
@@ -2579,6 +2608,18 @@ var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are k
     patternMatcherParse: TXQInternalPatternMatcherParse;
     patternMatcherMatch: TXQInternalPatternMatcherMatch;
     patternMatcherVisit: TXQInternalPatternMatcherVisit;
+
+
+function query(q: string): IXQValue; overload;
+function query(q: string; const vs: array of ixqvalue): IXQValue; overload;
+function query(q: string; const vs: array of string): IXQValue; overload;
+
+
+function defaultQueryEngine: TXQueryEngine;
+//**If you use the default query engine from different threads, you have to call freeThreadVars
+//**before the thread terminates to prevent memory leaks @br
+//**This also calls freeThreadVars of internetaccess
+procedure freeThreadVars;
 
 implementation
 uses base64, strutils;
@@ -3278,18 +3319,13 @@ begin
     contenttype := '';
     exit(strLoadFromFileUTF8(url));
   end;
-  if sender.FInternet = nil then begin
-    if defaultInternetAccessClass = nil then
-      raise EXQEvaluationException.Create(failErrCode, 'To use fn:doc with remote documents (i.e. http://..), you need to activate either the synapse or wininet wrapper, e.g. by assigning defaultInternetAccessClass := TSynapseInternetAccess (see units internetaccess/synapseinternetaccess)');
-    sender.FInternet := defaultInternetAccessClass.create();
-  end;
   try
-    result := sender.FInternet.get(url);
+    result := defaultInternet.get(url);
   except
     on e: EInternetException do
       raise EXQEvaluationException.create(failErrCode, e.Message);
   end;
-  contenttype := sender.FInternet.getLastHTTPHeader('Content-Type');
+  contenttype := defaultInternet.getLastHTTPHeader('Content-Type');
 end;
 
 function TXQStaticContext.retrieveFromFile(url: string; out contenttype: string; failErrCode: string): string;
@@ -4253,6 +4289,31 @@ begin
     xqvalueSeqAdd(result, xqvalue(sl[i]));
 end;
 
+function xqvalue(const sl: array of string): IXQValue;
+var
+  resseq: TXQValueSequence;
+  i: Integer;
+begin
+  resseq := TXQValueSequence.create(length(sl));
+  for i := 0 to high(sl) do
+    resseq.add(TXQValueString.create(baseSchema.untypedAtomic, sl[i]));
+  result := resseq;
+  xqvalueSeqSqueeze(result);
+end;
+
+function xqvalue(const sl: array of IXQValue): IXQValue;
+var
+  resseq: TXQValueSequence;
+  i: Integer;
+begin
+  resseq := TXQValueSequence.create(length(sl));
+  for i := 0 to high(sl) do
+    resseq.add(sl[i]);
+  result := resseq;
+  xqvalueSeqSqueeze(result);
+
+end;
+
 {function xqvalue(v: TDateTime): IXQValue;
 begin
   result := TXQValueDateTime.Create(v);
@@ -5175,6 +5236,24 @@ begin
 
 end;
 
+procedure TXQVariableChangeLog.pushOpenArray(const vs: array of IXQValue);
+var
+  i: Integer;
+begin
+  pushAll;
+  for i := 0 to high(vs) do
+    defaultQueryEngine.VariableChangelog.add('_'+IntToStr(i+1), vs[i]);
+end;
+
+procedure TXQVariableChangeLog.pushOpenArray(const untypedStrings: array of string);
+var
+  i: Integer;
+begin
+  pushAll;
+  for i := 0 to high(untypedStrings) do
+    defaultQueryEngine.VariableChangelog.add('_'+IntToStr(i+1), TXQValueString.create(baseSchema.untypedAtomic, untypedStrings[i]));
+end;
+
 {class function TXQVariableChangeLog.splitName(const variable: string; out base, varname: string): boolean;
 var
   i: SizeInt;
@@ -5560,7 +5639,6 @@ var
   i: Integer;
 begin
   VariableChangelog.Free;
-  {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}FInternet.Free;{$endif}
   DefaultParser.Free;
   clear;
   if FInternalDocuments <> nil then begin;
@@ -7059,6 +7137,40 @@ begin
   result := nil;
 end;
 
+
+threadvar theDefaultQueryEngine: TXQueryEngine;
+
+function query(q: string): IXQValue;
+begin
+  result := defaultQueryEngine.evaluateXQuery3(q);
+end;
+
+function query(q: string; const vs: array of ixqvalue): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
+  result := defaultQueryEngine.evaluateXQuery3(q);
+  defaultQueryEngine.VariableChangelog.popAll();
+end;
+
+function query(q: string; const vs: array of string): IXQValue;
+begin
+  defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
+  result := defaultQueryEngine.evaluateXQuery3(q);
+  defaultQueryEngine.VariableChangelog.popAll();
+end;
+
+function defaultQueryEngine: TXQueryEngine;
+begin
+  if theDefaultQueryEngine = nil then theDefaultQueryEngine := TXQueryEngine.create;
+  result := theDefaultQueryEngine;
+end;
+
+procedure freeThreadVars;
+begin
+  internetaccess.freeThreadVars;
+  FreeAndNil(theDefaultQueryEngine);
+end;
+
 var fn3, fn, pxp, op, xs: TXQNativeModule;
 initialization
 collations:=TStringList.Create;
@@ -7409,6 +7521,7 @@ baseSchema.hide('numeric');
 
 InitCriticalSection(interpretedFunctionSynchronization)
 finalization
+freeThreadVars;
 DoneCriticalsection(interpretedFunctionSynchronization);
 xs.free;
 pxp.free;
