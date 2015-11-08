@@ -3986,7 +3986,7 @@ end;
 function TXQEvaluationContext.getRootHighest: TTreeNode;
 begin
   if (SeqValue <> nil) then begin
-    if (SeqValue.kind = pvkNode) then result := SeqValue.toNode.document
+    if (SeqValue.kind = pvkNode) then exit(SeqValue.toNode.document)
     else raise EXQEvaluationException.Create('XPTY0004' {<- fn:root needs this}, 'Need context item that is a node to get root element');
   end;
   if ParentElement <> nil then exit(ParentElement.getRootHighest)
