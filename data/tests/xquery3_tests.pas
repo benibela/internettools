@@ -427,7 +427,6 @@ end;
 
 procedure newinterfacetests;
 begin
-  //writeln(process('http://example.org', '//a').toJoinedString(LineEnding));
   test(query('1+2+3+$_1+$_2',['17', '30']), '53');
   test(query('10').map('. + 17'), '27');
   test(query('()').map('. + 17'), '');
@@ -437,12 +436,26 @@ begin
   test(query('(1,2,3)').filter('. >= 2'), '2 3');
   test(query('"foo"').filter('string-length(.) >= 5'), '');
   test(query('"hallo"').filter('string-length(.) >= 5'), 'hallo');
+  test(query('1 to 10').filter('. mod 2 = 0').map('. * 10').query('sum($_)').toJoinedString(' '), '300');
   test(xqvalue(['a','b','c','d']).map('. || ":"').map('. || $_1', [' ']).filter('position() = (1, $_1)', ['3']).map('.||$_1', [xqvalue('x')]), 'a: x c: x');
   test(xqvalue(['a','b','c','d']).query('join($_, $_1)', [':']), 'a:b:c:d');
   test(xqvalue(['1','2','3','100']).query('sum($_)'), '106');
   test(xqvalue(['1','2','3','100']).filter('. < 10').query('sum($_)'), '6');
   test(xqvalue().query('count($_)'), '0' );
-
+  test(xqvalue(10).orderby('10 div 0'), '10');
+  test(query('1 to 3').orderby('-$_'), '3 2 1');
+  test(query('1 to 4').orderby('$_ ascending'), '1 2 3 4');
+  test(query('1 to 5').orderby('$_ descending'), '5 4 3 2 1');
+{
+writeln(query('doc($_1)//a',['http://example.org']).toString);
+writeln(query('doc("http://freepascal.org")//title').toJoinedString());
+writeln(xqvalue('http://example.org').retrieve().map('//title').toJoinedString());
+writeln(xqvalue(['http://example.org', 'http://freepascal.org']).retrieve().map('//title').toJoinedString());
+writeln(xqvalue('file:///etc/passwd').retrieve().map('":::"||.||"<<<"').toJoinedString());
+writeln(xqvalue('http://example.org').retrieve().map('//a').retrieve().map('subsequence(//a, 2, 4)').retrieve().map('//title').toJoinedString(LineEnding));
+writeln(xqvalue('file:///tmp/foo.json').retrieve().query('$_("a")').toJoinedString());
+writeln(xqvalue('http://google.de').retrieve().map('form(//form, {"q": $_1})', ['peppermint']).retrieve().map('//a').toJoinedString(' '));
+}
 end;
 
 end.

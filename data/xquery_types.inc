@@ -360,6 +360,12 @@ begin
   defaultQueryEngine.VariableChangelog.popAll();
 end;
 
+function TXQValue.orderby(const q: string): IXQValue;
+begin
+  ignore(q);
+  result := self; //singleton is always ordered
+end;
+
 function TXQValue.retrieve: IXQValue;
 var tempContext: TXQEvaluationContext;
   function dataToXQV(const data, uri, contenttype: string): ixqvalue;
@@ -1408,6 +1414,11 @@ begin
   finally
     term.free;
   end;
+end;
+
+function TXQValueSequence.orderby(const q: string): IXQValue;
+begin
+  result := self.query('for $_ in $_ order by ' + q + ' return $_');
 end;
 
 function TXQValueSequence.clone: IXQValue;

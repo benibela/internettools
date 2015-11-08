@@ -68,7 +68,7 @@ function httpRequest(const method, url, rawdata: string): string; overload; depr
 //**node: if a link (a), download @@href. If a resource (img, frame), download @@src. Otherwise download the text@br.
 //**object: Download obj.url, possibly sending obj.post as postdata.
 //**else: Download the string value.
-function httpRequest(const destination: xquery.IXQValue): string;  overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
+function httpRequest(const destination: xquery.IXQValue): string;  overload; deprecated 'Use destination.retrieve() instead.';
 
 (***
 Processes data with a certain query.@br@br
