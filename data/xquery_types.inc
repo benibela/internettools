@@ -49,31 +49,37 @@ end;
 
 function TXQValueUndefined.map(const q: string): IXQValue;
 begin
+  ignore(q);
   Result:=xqvalue();
 end;
 
 function TXQValueUndefined.map(const q: string; const vs: array of ixqvalue): IXQValue;
 begin
+  ignore(q); ignore(vs);
   Result:=xqvalue();
 end;
 
 function TXQValueUndefined.map(const q: string; const vs: array of string): IXQValue;
 begin
+  ignore(q); ignore(vs);
   Result:=xqvalue();
 end;
 
 function TXQValueUndefined.filter(const q: string): IXQValue;
 begin
+  ignore(q);
   Result:=xqvalue();
 end;
 
 function TXQValueUndefined.filter(const q: string; const vs: array of ixqvalue): IXQValue;
 begin
+  ignore(q); ignore(vs);
   Result:=xqvalue();
 end;
 
 function TXQValueUndefined.filter(const q: string; const vs: array of string): IXQValue;
 begin
+  ignore(q); ignore(vs);
   Result:=xqvalue();
 end;
 
@@ -352,6 +358,66 @@ begin
   defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
   result := filter(q);
   defaultQueryEngine.VariableChangelog.popAll();
+end;
+
+function TXQValue.retrieve: IXQValue;
+var tempContext: TXQEvaluationContext;
+  function dataToXQV(const data, uri, contenttype: string): ixqvalue;
+  var
+    f: TInternetToolsFormat;
+    p: PChar;
+    l: Integer;
+  begin
+    f := guessFormat(data, uri, contenttype);
+    if (f = itfJSON) and (defaultQueryEngine.ParsingOptions.AllowJSON) then
+      exit ( defaultQueryEngine.findNativeModule('http://jsoniq.org/functions').findBasicFunction('parse-json', 1).func(arrayToXQValueArray([xqvalue(data)])));
+    if f = itfXML then begin
+      if data = '' then exit(TXQValueString.create(baseSchema.untypedAtomic, ''));
+      //default
+      p := @data[1];
+      l := length(data);
+      strlTrimLeft(p, l);
+      if (l = 0) or (p^ <> '<') then exit(TXQValueString.create(baseSchema.untypedAtomic, data));
+    end;
+    result := xqvalue(tempContext.parseDoc(data, uri, contenttype));
+  end;
+
+  procedure handle(const v: IXQValue);
+  var
+    contenttype: string;
+    uri: String;
+    method: string;
+    post: string;
+    tempHeaders: String;
+    data: string;
+  begin
+    case v.kind of
+      pvkObject: begin
+         tempHeaders := defaultInternet.additionalHeaders.Text;
+         TXQValueObject.prepareInternetRequest(v, method, uri, post, defaultInternet);
+         data := internetaccess.httpRequest(method, uri, post);
+         defaultInternet.additionalHeaders.Text := tempHeaders;
+         xqvalueSeqAdd(result, dataToXQV (data, uri, defaultInternet.getLastContentType));
+      end;
+      else begin
+        uri := v.toString;
+        if not strIsAbsoluteURI(uri) then raise EXQEvaluationException.create('pxp:RETRIEVE', 'Need absolute URI to retrieve, got: '+uri);
+        data := defaultQueryEngine.StaticContext.retrieveFromURI(uri, contenttype, 'pxp:RETRIEVE');
+        xqvalueSeqAdd(result, dataToXQV(data, uri, contenttype));
+      end;
+    end;
+  end;
+
+var v: IXQValue;
+    i: Integer;
+begin
+  tempContext := defaultQueryEngine.getEvaluationContext();
+  result := xqvalue();
+  for i := 1 to getSequenceCount do begin
+    v := get(i);
+    if v.kind = pvkNode then handle(xqFunctionResolve_Html(tempContext, arrayToXQValueArray([v])))
+    else handle(v);
+  end;
 end;
 
 { TXQValueBoolean }

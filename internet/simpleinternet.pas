@@ -58,13 +58,9 @@ function retrieve(data: string): string;
 
 
 
-//**Make a http GET request to a certain url.
 function httpRequest(url: string): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
-//**Make a http POST request to a certain url, sending the data in rawpostdata unmodified to the server.
 function httpRequest(url: string; rawpostdata: string): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
-//**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it.
 function httpRequest(url: string; postdata: TStringList): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
-//**Make a http request to a certain url, sending the data in rawdata unmodified to the server.
 function httpRequest(const method, url, rawdata: string): string; overload; deprecated 'The httpRequest functions have been moved to the internetaccess unit.';
 
 

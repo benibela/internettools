@@ -246,7 +246,7 @@ begin
 end;
 
 
-function xqFunctionParseJson(const args: TXQVArray): IXQValue;
+function xqFunctionParseJson(const args: TXQVArray): IXQValue; //must be simple due to being in retrieve
 var
   multipleTopLevelItems: Boolean;
   value: TXQValue;
