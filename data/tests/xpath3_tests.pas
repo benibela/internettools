@@ -171,11 +171,11 @@ begin
   t('(let $f := function-lookup(xs:QName("fn:abs"), 1) return $f)(-12.3)', '12.3');
   t('function ($temp) { (let $f := function-lookup(xs:QName("fn:abs"), 1) return $f)(-12.3) } (0)', '12.3');
 
-  f('unparsed-text-lines("http://example.org")', 'FOUT1170');
-  f('(let $f := unparsed-text-lines#1 return $f)("http://example.org")', 'FOUT1170');
-  f('(let $f := unparsed-text-lines(?, "utf-8") return $f)("http://example.org")', 'FOUT1170');
-  f('(let $f := unparsed-text-lines(?) return $f(?))("http://example.org")', 'FOUT1170');
-  f('(let $f := function-lookup(xs:QName("fn:unparsed-text-lines"), 1) return $f(?))("http://example.org")', 'FOUT1170');
+  f('unparsed-text-lines(":::invalid:url")', 'FOUT1170');
+  f('(let $f := unparsed-text-lines#1 return $f)(":::")', 'FOUT1170');
+  f('(let $f := unparsed-text-lines(?, "utf-8") return $f)(":::")', 'FOUT1170');
+  f('(let $f := unparsed-text-lines(?) return $f(?))(":::")', 'FOUT1170');
+  f('(let $f := function-lookup(xs:QName("fn:unparsed-text-lines"), 1) return $f(?))(":::")', 'FOUT1170');
 
   //higher order functions
   t('join(for-each((1,2,3), function($x) {$x * 10}))', '10 20 30');
