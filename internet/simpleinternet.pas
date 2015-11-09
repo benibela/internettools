@@ -34,7 +34,7 @@ uses
 //{$DEFINE USE_WININET_WRAPPER}
 //{$DEFINE USE_NO_WRAPPER}
 
-//** IXQValue from the xquery unit. Just a wrapper, so that no other unit needs to be included
+//** IXQValue from the xquery unit. Just a wrapper, so that no other unit needs to be included @noAutoLinkHere
 type IXQValue = xquery.IXQValue;
 
 (***

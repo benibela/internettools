@@ -1,10 +1,19 @@
-unit xquery_module_file;
-
-{**
+(***
  This unit implements the file module of http://expath.org/spec/file .
 
+ Call registerModuleFile to register it.
+ Afterwards you can use e.g. @code(query('Q{http://expath.org/ns/file}exists("/tmp/")')) to test for the existence of a file.
+ If you add the namespace to the namespaces in the static context, you can write it simpler as @code(query('f:exists("/tmp/")')).
+
+
+
+
+
  not much tested
-}
+*)
+
+unit xquery_module_file;
+
 
 {$mode objfpc}{$H+}
 
@@ -15,6 +24,7 @@ uses
 
 type rawbytestring = string;
 
+//**Registers the module to the XQuery engine
 procedure registerModuleFile;
 
 const XMLNamespaceURL_Expath_File = 'http://expath.org/ns/file';

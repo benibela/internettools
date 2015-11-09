@@ -23,26 +23,26 @@ You can do one of the following to set the paths:
 
 On Linux you also need to install Synapse and OpenSSL devel. For Android you need the standard Android SDK/NDK and initialize the JVM reference in bbjniutils.
 
+The Internet Tools is modularly structured and you can activate different features, depending on which units are included in the unit clause of your project. You need one of synapseinternetaccess, w32internetaccess or androidinternetaccess, so it knows, which underlying library to use for internet access. You do not need to use anything of these units, just including them in the unit clause already activates them. 
+
 @section(1 AnchorNameStarted Getting Started)
 
-If you just want to download things, you can use the function @link(simpleinternet.retrieve retrieve) of the unit simpleinternet.@br@br
-
-You can also further @noAutoLink(process) the data with the function @link(simpleinternet.process process) of the same unit.@br@br
+The most important unit is @link(xquery), which contains the XPath/XQuery interpreter from which you can call most of the other units.
 
 For example, this will write the title of a webpage:
 
 @longCode(#
-  uses simpleinternet;
-  writeln(process('http://example.org', '//title').toString);
+  uses xquery;
+  writeln(query('doc("http://example.org")//title').toString);
 #)
 
-This will write the destination of all links there:
+This will write the destination of all the links there:
 
 @longCode(#
-  uses simpleinternet;
+  uses xquery;
   var v: IXQValue;
   begin
-    for v in process('http://example.org', '//a/@href') do
+    for v in query('doc("http://example.org")//a/@href') do
       writeln(v.toString);      
   end.
 #)
@@ -50,50 +50,107 @@ This will write the destination of all links there:
 And this will write the destination and name of all links :
 
 @longCode(#
-  uses simpleinternet;
+  uses xquery;
   var v: IXQValue;
   begin
-    for v in process('http://example.org', '//a/concat(., ": ", @href)') do
+    for v in query('doc("http://example.org")//a/concat(., ": ", @href)') do
       writeln(v.toString);      
   end.
 #)
 
+The examples use the XQuery function @code(doc) to download the HTML page, and hard codes the URL in the call of query. Often you need to   @noAutoLink(query) a webpage that is only know at runtime. For that you can call query with additional variables in an open array, which will be put in @code($_1), @code($_2), ...: 
+
+@longCode(#
+  uses xquery;
+  var v: IXQValue;
+  begin
+    for v in query('doc($_1)//a/concat(., ": ", @href)', ['http://example.org']) do
+      writeln(v.toString);      
+  end.
+#)
+
+Or, alternatively, do not use query at all, but store the url in an ixqvalue, then download and transform that value:
+
+@longCode(#
+  uses xquery;
+  var v: IXQValue;
+  begin
+    for v in xqvalue('http://example.org').retrieve().map('//a/concat(., ": ", @href)') do
+      writeln(v.toString);      
+  end.
+#)
+
+There is also the unit simpleinternet, which provides a function simpleinternet.process to directly run a @noAutoLink(query) on a webpage, i.e. @code(process('http://example.org', '//a/concat(., ": ", @href)')). Although this is simpler for trivial queries, it does not generalize well and thus is now deprecated.
+
+The @link(xquery.IXQValue IXQValue) transformation methods generalize extremely well to multiple pages. For example you can start on a search page, fill in a search term on the form field "q", download all links and get the title of every page referenced by a link:
+
+@longCode(#
+  uses xquery;
+  var v: IXQValue;
+  begin
+    for v in xqvalue('http://www.google.com').retrieve()
+             .map('form(//form, {"q": $_1})', ['search term']).retrieve()
+             .map('//a').retrieve()
+             .map('//title') do
+      writeln(v.toString);      
+  end.
+#)
+
+
+The two most important units are internetaccess and xquery. Internetaccess provides the functions to download things and xquery the functions to understand them. 
+
+ The unit xquery_json enables JSONiq support.  Another unit xquery_module_file contains the EXPath file module. Just including the module .
+
+
+
 @section(1 AnchorNameXYZ Accessing the internet/downloading things)
 
-The class TInternetAccess for accessing the internet is defined in the unit internetaccess, and contains several abstract methods to get/post http-data (other internet services like ftp/smtp might be added in future versions). @br 
+The primary unit for accessing the internet is the unit internetaccess. It contains the functions httpRequest for GET/POST HTTP-requests as well as  the abstract base class TInternetAccess that implements them. (other internet services like ftp/smtp might be added in future versions). 
 
-Inherited from TInternetAccess are TSynapseInternetAccess and TW32InternetAccess (in the units synapseinternetaccess and w32internetaccess) which provide wrappers around synapse and wininet.  So you can easily switch between the two libraries and choose the most appropriate (wininet integrates better with windows systems, because it does not require openssl, but synapse it platform independent).
+httpRequest can be used as a simple function call and returns the webpage as string: 
+
+@longCode(#
+  uses internetaccess;
+  begin
+    writeln(httpRequest('http://www.example.org')); 
+  end.
+#)
+
+The 1-parameter function sends a GET request, the 2-parameter function a POST-request. Multiple calls to the functions keep a session active (i.e. cookies, referrers), and are thread-safe.
+
+If TInternetAccess is used, every object has its own session. However, you cannot use TInternetAccess itself, and you need to use one of its implementing classes TSynapseInternetAccess, TW32InternetAccess or TAndroidInternetAccess. In the unit internetaccess there is a global variable defaultInternetAccessClass which should be set to one of the implementing classes. You can then create the object from this class variable, so you can easily switch between the implementations and choose the most appropriate (wininet integrates better with windows systems, because it does not require openssl, but synapse it platform independent).
 
 
 @section(1 AnchorNameXYZABC Data processing)
 
-There are several ways to actually process a downloaded html/xml-document.@br
-It is implemented as a hierarchy of data processing classes, from a high level template language to a low level tokenizer, where each levels uses the things from the lower level.
+There are several ways to actually process a downloaded HTML/XML-document.@br
+It is implemented as a hierarchy of data processing classes, from high level languages to a low level tokenizer, where each levels uses the things from the lower level. Only the high level interface is stable. The low level classes are used internally to implement the higher level ones.
 
-@section(2 AnchorNameTemplate High-Level: (Pattern-matching) template processing)
+@section(2 AnchorNameTemplate Transcendent-Level: Multi-page Template)
 
-The most powerful processing language is implemented by the THtmlTemplateParser-class in the unit extendedhtmlparser.@br
+On the utmost highest level there is the multi-page template, but as standalone programming language it is floating so far above usual libraries, that you might want to skip to the next section.
 
-To create a template, you can take the document you want to process and remove all unimportant things, which results in a pattern template that can be matched against the page to find the relevant elements.
-These elements can then be read into variables, by annotating them with the corresponding variable names.@br
+The template is an XML file containing a set of actions. Each action is like a procedure that can contain control structures like if and loop as XML-elements and also call other actions. Thus the XML-elements of the template are Turing-complete (although actual calculations need to be done with XPath/XQuery expressions included in the template). The actions also contain lists of webpages and HTML-patterns. All the webpages are downloaded and then pattern matched against the HTML-patterns, leading to a list of matched HTML-elements or data read from those elements stored in a list/changelog of variables. These variables are the output of the template, and send to the Pascal site. If used as intended, the entire program logic is moved to the template, and the Pascal program is only used to display its output. 
+
+The entire template can be loaded with the TMultipageTemplate class and evaluated by the TMultipageTemplateReader class.
 
 
-A collection of such single-page templates can be stored in a multi-page template file, which can be loaded with the TMultipageTemplate class and applied to the these pages by the TMultipageTemplateReader class.
+@section(2 AnchorNamePXP High-Level: XQuery/XPath-Expression processing and pattern matching)
 
-   (Notice: Although both the multi-page and single-page templates are called templates, they are actually something
-    *entirely* different:
-       A multi-page template is a list of explicit actions that are performed in order, like an algorithm;
-       A single-page template is an implicit pattern that is matched against the page, like a regular expression)
+The class TXQueryEngine in the unit xquery implements an XQuery/XPath 3 interpreter, interpreting Turing complete programming languages. The function query can be used to evaluate an expression, which returns the results of the evaluation as @link(xquery.IXQValue IXQValue) which can be chained through a LINQ-like pipeline.
 
-@section(2 AnchorNamePXP High-Mid-Level: XQuery/XPath/Expression processing)
+All the other functions and methods can be accessed from within the interpreted language. Not all features are enabled at default. Add the units xquery_json and xquery_utf8 to a uses clause of any unit to activate JSONiq and UTF-8 support. Their presence in the unit clause is enough to activate them. Another unit xquery_module_file implements the EXPath file module. It will be activated by calling the register function of that unit. 
 
-The XQuery expression language which can be used within the templates is implemented by the class TXQueryEngine in the unit @link(xquery).
 
-It is an almost complete implementation of the XPath 2 and XQuery standard (missing schemas, error codes and static type checking) + some  extensions (e.g. objects and global variable assignments).
+
+The unit extendedhtmlparser contains an XML/HTML-pattern matcher. A pattern is a stripped-down, annotated version of the data that should be parsed. To create a pattern, you take the document you want to process, remove all unimportant things and mark the things of interest. The class THtmlTemplateParser is used to match the pattern against the data and return all matches in a variable changelog. Including the unit in a uses clause also registers the pattern matcher to the XQuery interpreter, so you can call pattern matching functionality from evaluated XQuery expressions. And the other way around the pattern can also contain arbitrary XQuery expressons.
+
+
+
 
 @section(2 AnchorNameTree Mid-Level: Tree/DOM-like processing)
 
-To @noAutoLink(process) a html file directly in fpc, without using another, interpreted language, you can use the class TTreeParser  in the unit simplehtmltreeparser.. @br
+To @noAutoLink(process) a html file directly in fpc, without using another, interpreted language, you can use the class TTreeParser  in the unit simplehtmltreeparser. @br
 
 It creates a tree of TTreeElement-s from the  html document text (you know such trees from DOM, but this tree has nothing to do with do(o)m).@br
 
@@ -111,6 +168,7 @@ A similar function, parseXML, exists for xml data in the unit simplexmlparser (i
 
 @unorderedList(
 @item(The unit autoupdate contains the TAutoUpdater class which can look online for an available update for the current system architecture and then download/install it)
+@item(The unit bigdecimalmath contains functions to do calculations with arbitrary precision decimals.)
 @item(The unit int65math contains functions to do calculations with 65-bit integers.)
 @item(The unit bbutils contains low-level functions, that are way below the simplehtmlparser and should actually be in the fpc rtl, but are not.  )
 @item(The unit pastemplate implements a very simple template language for pascal units (such a template is used to generate bbutils) )

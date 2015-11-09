@@ -4,8 +4,6 @@
   If this unit is included in any uses clause it overrides the default string-length, substring, translate, string-to-codepoints XQuery functions
   with utf8-aware functions.
 
-  It also defines a normalize-unicode function.
-
   It depends on the utf8tools (http://wiki.lazarus.freepascal.org/Theodp)
 
   @author Benito van der Zander (http://www.benibela.de)

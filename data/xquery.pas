@@ -1,7 +1,22 @@
 {**
-  @abstract(This unit contains a XPath 2 / XQuery interpreter)
+  @abstract(This unit contains a modern XPath / XQuery interpreter)
 
-  The most important class is TXQueryEngine, which implements it, and IXQValue, which is the variant used to store the results.
+  The most important class is TXQueryEngine, which implements the interpreter, and IXQValue, which is the variant used to store the results.
+
+  The simplest way to evaluate an expression is to use the global function @code(query).
+
+  For example, if you want to find all links on a webpage, you can do one of the following:
+
+  @code( query('doc("http://example.org")//a') )
+
+  @code( query('"http://example.org"').retrieve().map('//a') )
+
+  @code( xqvalue('http://example.org').retrieve().map('//a') )
+
+  @code( query('doc($_1)//a', ['http://example.org']) )
+
+  The first example is the simplest, the third demonstrates the functional interface of IXQValue, and the last how to use variables with query.
+
 
   @author Benito van der Zander (http://www.benibela.de)
 *}
@@ -245,8 +260,10 @@ type
 
   This is the base interface used to access the various values occuring during the evaluation of an XQuery expression.
 
-  You can read its value with the methods toBoolean, toInt64, toDecimal, toString, toDateTime, toNode, toArray,
+  You can read its value with methods like toBoolean, toInt64, toDecimal, toString, toDateTime, toNode, toArray,
   which convert the returned value to the requested type.
+
+
 
 
 
@@ -255,7 +272,17 @@ type
   Or assign it to another value2 just by writing @code(value2 := value).
 
   An IXQValue can store a sequence of IXQValue-s which can be iterated with a for each loop @code(for valueIterator in valueSequence)
-  or using @code(count) and @code(get).
+  or using @code(count) and @code(get). An IXQValue can also store an object, whose properties can be accessed with @code(getProperty).
+
+  IXQValue provides a chainable functional interface with its map, filter, query, retrieve and orderby methods. These method evaluate an XQuery expression, whereby the current IXQValue is stored in @code(.) (for a single value) or @code($_) (for a sequence of values) @br
+  For example you can use @code(seq.map('. + 1')) to increment all values stored in a sequence seq. Or @code(seq.map('. || "append"')) to append a string to all values.
+  Or @code(filter('. >= 10')) to drop all values below 10.
+  Or @code(query('reverse($_)')) to reverse a sequence.
+  A combined example is @code(query('1 to 10').filter('. mod 2 = 0').map('. * 10').query('sum($_)').toString), which will return 300, the sum of all even numbers times 10.
+
+  Retrieve will download and parse the resource referenced in this IXQValue.
+  For example @code(query('"http://example.org"').retrieve().map('//title')) to get the title of a webpage.
+
 
   IXQValue are usually returned by the evaluation of a query, so you don't have to create your own, but if you want, you can
   use the xqvalue() functions which return a IXQValue corresponding to the type of their parameter.
@@ -316,6 +343,7 @@ type
     function filter(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(self [query]) (i.e. all values in self filtered through query)
     function filter(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like filter, sets the additional arguments as variables $_1, $_2, ...
     function filter(const q: string; const vs: array of string): IXQValue; //**< Like filter, sets the additional arguments as variables $_1, $_2, ...
+    function orderby(const q: string): IXQValue; //**< Orders the sequence, equivalent to query @code(for $_ in self order by (....) return $_) . The current value is in $_. Append @code( ascending) or @code( descending) to set the sorting direction.  Kind of slow
     function retrieve(): IXQValue; //**< Retrieves referenced resources. This is primarily used for HTTP requests, but can also retrieve files. It will parse the resource as HTML/XML/JSON if possible. It will retrieve each value in a sequence individually
 
     function instanceOf(const typ: TXSType): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
@@ -381,6 +409,7 @@ type
     function filter(const q: string): IXQValue; virtual; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(self [query]) (i.e. all values in self filtered through query)
     function filter(const q: string; const vs: array of ixqvalue): IXQValue; virtual; //**< Like filter, sets the additional arguments as variables $_1, $_2, ...
     function filter(const q: string; const vs: array of string): IXQValue; virtual; //**< Like filter, sets the additional arguments as variables $_1, $_2, ...
+    function orderby(const q: string): IXQValue; virtual; //**< Orders the sequence, equivalent to query @code(for $_ in self order by (....) return $_) . The current value is in $_. Kind of slow
     function retrieve(): IXQValue; //**< Retrieves referenced resources. This is primarily used for HTTP requests, but can also retrieve files. It will parse the resource as HTML/XML/JSON if possible. It will retrieve each value in a sequence individually
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
@@ -656,6 +685,7 @@ type
     function get(i: integer): IXQValue; override;
     function GetEnumerator: TXQValueEnumerator; override;
     function map(const q: string): IXQValue; override;
+    function orderby(const q: string): IXQValue; override;
 
 
     function takeFirst: IXQValue;
@@ -665,8 +695,8 @@ type
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
-    procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence can not contain another sequence, so they will be merged)
-    procedure addOrdered(const node: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that a xpath sequence can not contain another sequence, so they will be merged)
+    procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence cannot contain another sequence, so they will be merged)
+    procedure addOrdered(const node: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that a xpath sequence cannot contain another sequence, so they will be merged)
 
     destructor Destroy; override;
   end;
@@ -1959,9 +1989,9 @@ type
     @abstract(@bold(This is the XPath/XQuery-engine))
 
     You can use this class to evaluate a XPath/XQuery-expression on a certain document tree.@br
-    For example, @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) returns the value of the evaluation of expression.@br@br
+    For example, @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) returns the value of the evaluation of expression.
 
-
+    A simple functional interface is provided by the function query.@br@br
 
     @bold(Syntax of a XQuery / XPath / Pseudo-XPath-Expression)
 
@@ -1981,7 +2011,7 @@ type
       @item(@code(concat("a","b","c")) @br This concatenates the strings a,b and c.@br
             There are many more functions than @code(concat), a list of extension functions is given below.
             Standard functions are described at  http://www.w3.org/TR/xquery-operators/ and http://www.w3.org/TR/xpath-functions-30/ )
-      @item(@code((1,2,3)) @br This returns a sequence (1,2,3). @br Sequences can not be nested.)
+      @item(@code((1,2,3)) @br This returns a sequence (1,2,3). @br Sequences cannot be nested.)
       @item(@code((1,2,3)[. mod 2 = 1]) @br This returns the sequence (1,3) of all odd numbers.)
 
       @item(@code(@@attrib) @br This is the value of the attribute @code(attrib) of the current tag)
@@ -2046,7 +2076,7 @@ type
           @br The additional module xquery_json implements all JSONiq functions, except JSONiq update and roundtrip-serialization.
           @br Using it also activates the JSONiq literal mode, in which @code(true, false, null) evaluate to @code(true(), false(), jn:null()). (option: json-literals).
           )
-    @item(Element tests based on types of the xml are not supported (since it can not read schemas ) )
+    @item(Element tests based on types of the xml are not supported (since it cannot read schemas ) )
     @item(Regex remarks (it might be changed to standard compatible matching in future): @unorderedList(
       @item(The usual s/i/m/x-flags are allowed, and you can also use '-g' to disable greedy matching.)
       @item($0 and $& can be used as substitute for the
@@ -2136,7 +2166,7 @@ type
                   @br If unnamed and named variables are mixed, the unnamed variables are treated like variables with the name @code(_result).
                   @br The template can be a node or a string. Written as string the example above would be @code(match("<a>{.}</a>", <x><a>FOO</a><a>BAR</a></x>)).
                   @br You can pass multiple templates and nodes, in which case each template is applied to each node, and the result of all matching calls is returned in a single sequence.
-                  @br If the template can not be matched, an error is raised.
+                  @br If the template cannot be matched, an error is raised.
                   @br see THtmlTemplateParser for the full template reference.
                   (This function is not actually declared in xquery.pas, but in extendedhtmlparser.pas, so it is only available if latter unit is included in any uses clause. )
                   )
@@ -2166,15 +2196,17 @@ type
 
     @bold(Using the class in FPC)
 
-    You can evaluate XQuery/XPath-expressions by just calling the class methods, e.g. @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
+    The simplest way to use it with the function query and the defaultQueryEngine.
+
+    You can evaluate XQuery/XPath-expressions by calling the class methods, e.g. @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
     If you want to process a html/xml document, you have to pass the root TTreeNode (obtained by TTreeParser) instead of nil.@br@br@br
     If you call @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) without a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br
-    With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeNode or @code(toDecimal) an extended. @br@br
+    With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeNode or @code(toFloat) an extended. @br@br
 
     You can also create a TXQueryEngine instance and then call @code(parseXPath2('expression')) and @code(evaluateXPath2()). @br
     This is not as easy, but you have more options.
 
-    The unit simpleinternet provides a simpler procedural interface with its function simpleinternet.process .
+    The unit simpleinternet provided a simpler procedural interface which is now deprecated.
 
 
     @br@br@bold(Compatibility to previous version)@br
@@ -2223,9 +2255,7 @@ type
 
     VariableChangelog: TXQVariableChangeLog;  //**< All global variables that have been set (if a variable was overriden, it stores the old and new value)
 
-    //OnEvaluateVariable: TXQEvaluateVariableEvent;  Event called if a variable has to be read. (Defaults to @VariableChangelog.evaluateVariable, but can be changed)
-    //OnDefineVariable: TXQDefineVariableEvent;  Event called if a variable is set (Defaults to @VariableChangelog.defineVariable, but can be changed)
-    OnDeclareExternalVariable: TXQDeclareExternalVariableEvent; //**< Event called to import a variable that is declared as "declare variable ... external" in a XQuery expression
+    OnDeclareExternalVariable: TXQDeclareExternalVariableEvent;
     OnDeclareExternalFunction: TXQDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression.
     OnImportModule: TXQImportModuleEvent;  //**< Event called to import a XQuery module that has not previously be defined
 
@@ -2612,13 +2642,24 @@ var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are k
     patternMatcherVisit: TXQInternalPatternMatcherVisit;
 
 
+//**Evaluates an XQuery 3 query using the defaultQueryEngine.
+//**
+//**For example @code(query('1 to 10')) to get all numbers from 1 to 10. Or @code(query('doc("http://example.org")//title')) to get the title of a webpage.
 function query(q: string): IXQValue; overload;
+//**Evaluates an XQuery 3 query using the defaultQueryEngine. All values in vs are available as $_1, $_2, $_3, ...
 function query(q: string; const vs: array of ixqvalue): IXQValue; overload;
+//**Evaluates an XQuery 3 query using the defaultQueryEngine. All values in vs are available as $_1, $_2, $_3, ...
+//**
+//**For example @code(query('$_1 to $_2', ['10', '100'])) to get all numbers from 10 to 100. @br
+//**Or @code(query('doc($_1)//title', ['http://example.org'])) to get the title of a webpage. @br
+//**Or @code(query('form(doc($_1)//form, {"q": $_2})', ['http://google.com', 'search term']).retrieve()) to fill in a formular on a webpage/search something on Google.
 function query(q: string; const vs: array of string): IXQValue; overload;
 
 
+//**This is a thread local global query engine. You must call freeThreadVars, after having using it from different threads.
+//**When loading additional XML/HTML documents (e.g. with doc or retrieve) they are also only freed by freeThreadVars.
 function defaultQueryEngine: TXQueryEngine;
-//**If you use the default query engine from different threads, you have to call freeThreadVars
+//**If you use the default query engine from different threads, you have to call freeThreadVars.
 //**before the thread terminates to prevent memory leaks @br
 //**This also calls freeThreadVars of internetaccess
 procedure freeThreadVars;
@@ -2834,6 +2875,7 @@ procedure ignore(const intentionallyUnusedParameter: bigDecimal); inline; begin 
 procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: array of string); {inline; }begin end;
 procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: array of IXQValue); { inline; } begin end;
 
 function arrayToXQValueArray(a: array of IXQValue): TXQVArray;
 var
@@ -4641,6 +4683,7 @@ begin
 end;
 
 function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings
+function xqFunctionResolve_Html(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue; forward; //needed for retrieve
 
 {$I xquery_parse.inc}
 {$I xquery_terms.inc}

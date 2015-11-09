@@ -436,7 +436,7 @@ begin
   test(query('(1,2,3)').filter('. >= 2'), '2 3');
   test(query('"foo"').filter('string-length(.) >= 5'), '');
   test(query('"hallo"').filter('string-length(.) >= 5'), 'hallo');
-  test(query('1 to 10').filter('. mod 2 = 0').map('. * 10').query('sum($_)').toJoinedString(' '), '300');
+  test(query('1 to 10').filter('. mod 2 = 0').map('. * 10').query('sum($_)'), '300');
   test(xqvalue(['a','b','c','d']).map('. || ":"').map('. || $_1', [' ']).filter('position() = (1, $_1)', ['3']).map('.||$_1', [xqvalue('x')]), 'a: x c: x');
   test(xqvalue(['a','b','c','d']).query('join($_, $_1)', [':']), 'a:b:c:d');
   test(xqvalue(['1','2','3','100']).query('sum($_)'), '106');
