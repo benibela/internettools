@@ -4127,6 +4127,7 @@ var
   tempnode: TTreeNode;
   parser: TTreeParser;
   oldModel: TParsingModel;
+  startTags: Boolean;
 begin
   if not Assigned(staticContext) or not assigned(staticContext.sender) then raisePXPInternalError;
   with staticContext.sender do begin
@@ -4146,9 +4147,14 @@ begin
       end;
 
       oldModel := parser.parsingModel;
-      if guessFormat(data, url, contenttype) = itfHTML then parser.parsingModel := pmHTML;
+      startTags := parser.repairMissingStartTags;
+      if guessFormat(data, url, contenttype) = itfHTML then begin
+        parser.parsingModel := pmHTML;
+        parser.repairMissingStartTags := true;
+      end;
       result := parser.parseTree(data, url, contenttype);
       parser.parsingModel := oldModel;
+      parser.repairMissingStartTags := startTags;
     end;
   end
 end;
