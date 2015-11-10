@@ -97,9 +97,9 @@ The @link(xquery.IXQValue IXQValue) transformation methods generalize extremely 
 #)
 
 
-The two most important units are internetaccess and xquery. Internetaccess provides the functions to download things and xquery the functions to understand them. 
+The two most important units are internetaccess and @link(xquery). Internetaccess provides the functions to download things and xquery the functions to understand them. 
 
- The unit xquery_json enables JSONiq support.  Another unit xquery_module_file contains the EXPath file module. Just including the module .
+ 
 
 
 
@@ -124,13 +124,13 @@ If TInternetAccess is used, every object has its own session. However, you canno
 @section(1 AnchorNameXYZABC Data processing)
 
 There are several ways to actually process a downloaded HTML/XML-document.@br
-It is implemented as a hierarchy of data processing classes, from high level languages to a low level tokenizer, where each levels uses the things from the lower level. Only the high level interface is stable. The low level classes are used internally to implement the higher level ones.
+It is implemented as a hierarchy of data processing classes, from high level languages to a low level tokenizer, where each levels uses the things from the lower level. Only the high level interface is stable. The lower level classes are used internally to implement the higher level ones.
 
 @section(2 AnchorNameTemplate Transcendent-Level: Multi-page Template)
 
 On the utmost highest level there is the multi-page template, but as standalone programming language it is floating so far above usual libraries, that you might want to skip to the next section.
 
-The template is an XML file containing a set of actions. Each action is like a procedure that can contain control structures like if and loop as XML-elements and also call other actions. Thus the XML-elements of the template are Turing-complete (although actual calculations need to be done with XPath/XQuery expressions included in the template). The actions also contain lists of webpages and HTML-patterns. All the webpages are downloaded and then pattern matched against the HTML-patterns, leading to a list of matched HTML-elements or data read from those elements stored in a list/changelog of variables. These variables are the output of the template, and send to the Pascal site. If used as intended, the entire program logic is moved to the template, and the Pascal program is only used to display its output. 
+The template is an XML file containing a set of actions. Each action is like a procedure that can contain control structures like if and loop as XML-elements and also call other actions. Thus the XML-elements of the template are Turing-complete (although actual calculations need to be done with XPath/XQuery expressions included in the template). The actions also contain lists of webpages and HTML-patterns. All the webpages are downloaded and then pattern matched against the HTML-patterns, leading to a list of matched HTML-elements or data read from those elements stored in a list/changelog of variables. These variables are the output of the template, and send to the Pascal side. If used as intended, the entire program logic is moved to the template, and the Pascal program is only used to display its output. 
 
 The entire template can be loaded with the TMultipageTemplate class and evaluated by the TMultipageTemplateReader class.
 
