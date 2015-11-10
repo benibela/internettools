@@ -1829,12 +1829,12 @@ begin
     end;
 
     '{': begin
-      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension, to create a json like object) ');
+      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension (e.g. by including xquery_json), to create a json like object) ');
       inc(pos);
       exit(parseJSONLikeObjectConstructor);
     end;
     '[': begin
-      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension, to create a json like array) ');
+      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension (e.g. by including xquery_json), to create a json like array) ');
       inc(pos);
       exit(parseJSONLikeArray());
     end;
