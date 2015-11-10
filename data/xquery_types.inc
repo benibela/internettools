@@ -360,7 +360,7 @@ begin
   defaultQueryEngine.VariableChangelog.popAll();
 end;
 
-function TXQValue.orderby(const q: string): IXQValue;
+function TXQValue.order(const q: string): IXQValue;
 begin
   ignore(q);
   result := self; //singleton is always ordered
@@ -1416,7 +1416,7 @@ begin
   end;
 end;
 
-function TXQValueSequence.orderby(const q: string): IXQValue;
+function TXQValueSequence.order(const q: string): IXQValue;
 begin
   result := self.query('for $_ in $_ order by ' + q + ' return $_');
 end;
