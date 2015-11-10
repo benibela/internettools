@@ -32,6 +32,7 @@ var XMLNamespace_Expath_File: INamespace;
 implementation
 
 const Error_NoDir = 'no-dir';
+      Error_IsDir = 'is-dir';
       Error_Exists = 'exists';
       Error_Io_Error = 'io-error';
       Error_Not_Found =  'not-found';
@@ -139,18 +140,36 @@ function writeOrAppendSomething(const filename: IXQValue; append: boolean; data:
 var f: TFileStream;
     mode: word;
     path: AnsiString;
+    errcode: String;
 begin
   path := normalizePathToSys(filename);
   if append then if not FileExistsUTF8(path) then append := false;
   if append then mode := fmOpenReadWrite
   else mode := fmCreate;
-  f := TFileStream.Create(path, mode);
+  try
+    f := TFileStream.Create(path, mode);
+  except
+    on e: EStreamError do begin
+      errcode := Error_Io_Error;
+      if DirectoryExists(path) then errcode := Error_IsDir
+      else begin
+        path := strBeforeLast(path, AllowDirectorySeparators);
+        if (path <> '') and  not DirectoryExistsUTF8(path) then errcode := Error_NoDir;      ;
+      end;
+      raiseFileError(errcode, 'Failed to open file for writing/appending', filename);
+    end;
+  end;
   if offset >= 0 then f.Position := offset
   else if append then f.position := f.size;
   try
     if length(data) > 0 then
-      f.WriteBuffer(data[1], length(data));
-  finally                                               //todo errors
+      try
+        f.WriteBuffer(data[1], length(data));
+      except
+        on e: EStreamError do
+          raiseFileError(Error_Io_Error, 'Failed to write', filename);
+      end;
+  finally
     f.free;
   end;
   result := xqvalue();
@@ -232,12 +251,17 @@ begin
   requiredArgCount(args,1,2);
   source := normalizePath(args[0]);
   dest := normalizePath(args[1]);
-  if DirectoryExistsUTF8(source) then begin
-    if FileExistsUTF8(dest) and not DirectoryExistsUTF8(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
-    ok := CopyDirTree(source, dest, [cffCreateDestDirectory, cffOverwriteFile]);
-  end else begin
-    if not FileExistsUTF8(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
-    ok := CopyFile(source, dest);
+  ok := false;
+  try
+    if DirectoryExistsUTF8(source) then begin
+      if FileExistsUTF8(dest) and not DirectoryExistsUTF8(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
+        ok := CopyDirTree(source, dest, [cffCreateDestDirectory, cffOverwriteFile]);
+    end else begin
+      if not FileExistsUTF8(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
+      ok := CopyFile(source, dest);
+    end;
+  except
+    on EStreamError do ;
   end;
   if not ok then raiseFileError(Error_Io_Error, 'Copying failed', args[0]);
   result := xqvalue();
@@ -288,14 +312,16 @@ function delete(const context: TXQEvaluationContext; const args: TXQVArray): IXQ
 var
   path: UTF8String;
   recursive: Boolean;
+  ok: Boolean;
 begin
   path := normalizePath(args[0]);
   recursive := (length(args) = 2) and args[1].toBoolean;
   if not FileExistsUTF8(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
   if not DirectoryExistsUTF8(path) then begin
-    DeleteFileUTF8(path);
-  end else if recursive then DeleteDirectory(path, false)
-  else RemoveDirUTF8(path);
+    ok := DeleteFileUTF8(path);
+  end else if recursive then ok := DeleteDirectory(path, false)
+  else ok := RemoveDirUTF8(path); //todo: raise is-dir if not empty
+  if not ok then raiseFileError(Error_Io_Error, 'Failed to delete', args[0]);
   result := xqvalue();
 end;
 
@@ -362,6 +388,9 @@ begin
   xqvalueSeqSqueeze(result);
   FreeAndNil(lister.masks);
   FreeAndNil(lister);
+  if result.Count = 0 then begin
+    if not DirectoryExistsUTF8(dir) then raiseFileError(Error_NoDir, 'Could not list', path); //todo: other errors?
+  end;
 end;
 
 function list(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -398,18 +427,28 @@ end;
 function readFromFile(const fn: String; from: int64 = 0; length: int64 = -1): rawbytestring;
 var
   stream: TFileStream;
+  errcode: String;
 begin
-  stream := TFileStream.Create(fn, fmOpenRead);
   try
-    if from < 0 then raiseFileError(Error_Out_Of_Range, IntToStr(from) + ' < 0');
-    if length = -1 then length := stream.Size - from;
-    if length + from > stream.Size then raiseFileError(Error_Out_Of_Range, IntToStr(from)+' + ' +IntToStr(length) + ' > ' + IntToStr(stream.Size));
-    SetLength(result, length);
-    stream.Position := from;
-    if length > 0 then
-      stream.ReadBuffer(result[1], length);
-  finally
-    stream.free;
+    stream := TFileStream.Create(UTF8ToSys(fn), fmOpenRead);
+    try
+      if from < 0 then raiseFileError(Error_Out_Of_Range, IntToStr(from) + ' < 0');
+      if length = -1 then length := stream.Size - from;
+      if length + from > stream.Size then raiseFileError(Error_Out_Of_Range, IntToStr(from)+' + ' +IntToStr(length) + ' > ' + IntToStr(stream.Size));
+      SetLength(result, length);
+      stream.Position := from;
+      if length > 0 then
+        stream.ReadBuffer(result[1], length);
+    finally
+      stream.free;
+    end;
+  except
+    on e: EStreamError do begin
+      errcode := Error_Io_Error;
+      if DirectoryExistsUTF8(fn) then errcode := Error_IsDir
+      else if not FileExistsUTF8(fn) then errcode := Error_Not_Found;
+      raiseFileError(errcode, 'Failed to open file for reading', xqvalue(fn));
+    end;
   end;
 end;
 
@@ -470,10 +509,7 @@ var
   path: UTF8String;
   lastSep: LongInt;
 begin
-  path := resolve_path(context,args).toString;
-  lastSep := strLastIndexOf(path, AllowDirectorySeparators);
-  if lastSep <= 0 then path := ''
-  else path := system.copy(path, 1, lastSep - 1);
+  path := strBeforeLast(resolve_path(context,args).toString, AllowDirectorySeparators);
   result := xqvalue(path);
 end;
 
@@ -488,6 +524,7 @@ var
 begin
   dir := ResolveDots(fileNameExpand(normalizePath(args[0])));
   if not strEndsWith(dir, DirectorySeparator) and DirectoryExistsUTF8(dir) then dir += DirectorySeparator;
+  if not FileExistsUTF8(dir) then raiseFileError(Error_Not_Found, 'Path does not exists: ', args[0]);
   result := xqvalue(dir);
 end;
 
