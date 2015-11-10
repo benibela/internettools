@@ -541,7 +541,6 @@ begin
   test(strEscapeToHex('abcbc+', ['b','c', '+'], ''), 'a626362632B');
   test(strUnescapeHex('\xFF'), #$FF);
 
-
   test(strJoin(stableSort(strSplit('a|b|c|aa','|')), '|'), 'a|aa|b|c');
   test(strJoin(stableSort(strSplit('a|b|c|a20|aa|A20|A3','|')), '|'), 'a|A3|a20|A20|aa|b|c');
   test(strJoin(stableSort(strSplit('a|b|c|a20|aa|A20|A3','|'),@stringCompareReverseFunction), '|'), 'c|b|aa|A3|a20|A20|a');
@@ -840,16 +839,47 @@ begin
 
   test(strBefore('hallo', 'a'), 'h');
   test(strBefore('hallo', 'A'), '');
+  test(strBefore('hallo', 'l'), 'ha');
   test(striBefore('hallo', 'l'), 'ha');
   test(striBefore('hallo', 'A'), 'h');
   test(striBefore('hallo', 'x'), '');
   test(strAfter('hallo', 'a'), 'llo');
   test(strAfter('hallo', 'A'), '');
-  test(striAfter('hallo', 'l'), 'lo');
+  test(strAfter('hallo', 'l'), 'lo');
+  test(striAfter('hallo', 'L'), 'lo');
   test(striAfter('hallo', 'A'), 'llo');
   test(striAfter('hallo', 'x'), '');
   test(strBetween('a="b"', '="', '"'), 'b');
   test(striBetween('hallo', 'A', 'O'), 'll');
+  test(strBetween('hallo', 'H', 'l'), '');
+  test(strBetween('hallo', 'h', 'L'), '');
+  test(striBetween('hallo', 'A', 'L'), '');
+  test(striBetween('hallo', 'H', 'l'), 'a');
+  test(striBetween('hallo', 'h', 'L'), 'a');
+
+  test(strBeforeLast('hallo', 'a'), 'h');
+  test(strBeforeLast('hallo', 'A'), '');
+  test(strBeforeLast('hallo', 'l'), 'hal');
+  test(striBeforeLast('hallo', 'l'), 'hal');
+  test(striBeforeLast('hallo', 'A'), 'h');
+  test(striBeforeLast('hallo', 'x'), '');
+  test(strAfterLast('hallo', 'a'), 'llo');
+  test(strAfterLast('hallo', 'A'), '');
+  test(strAfterLast('hallo', 'l'), 'o');
+  test(striAfterLast('hallo', 'L'), 'o');
+  test(striAfterLast('hallo', 'A'), 'llo');
+  test(striAfterLast('hallo', 'x'), '');
+
+
+  test(strBeforeLast('/foo/bar', AllowDirectorySeparators), '/foo');
+  test(strBeforeLast('/', AllowDirectorySeparators), '');
+  test(strBeforeLast('c:\foo\bar', AllowDirectorySeparators), 'c:\foo');
+  test(strBeforeLast('c:\foo', AllowDirectorySeparators), 'c:');
+
+  test(strAfterLast('/foo/bar', AllowDirectorySeparators), 'bar');
+  test(strAfterLast('/', AllowDirectorySeparators), '');
+  test(strAfterLast('c:\foo\bar', AllowDirectorySeparators), 'bar');
+  test(strAfterLast('c:\foo', AllowDirectorySeparators), 'foo');
 
   //trimming
   test(strTrimLeft('  ABC  DEF '#9) = 'ABC  DEF '#9);

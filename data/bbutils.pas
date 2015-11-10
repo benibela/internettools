@@ -639,17 +639,37 @@ function strSplitGetBetweenBrackets(var text: RawByteString; const openBracket, 
 
 //** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
 function strBetween(const s, from, till: RawByteString): RawByteString;
+
 //** If the string s has the form 'STARTsep...' it returns 'START'
 function strBefore(const s, sep: RawByteString): RawByteString;
 //** If the string s has the form '...sepEND' it returns 'END'
 function strAfter(const s, sep: RawByteString): RawByteString;
 
+//** If the string s has the form 'STARTsep...' it returns 'START'
+function strBeforeLast(const s, sep: RawByteString): RawByteString;
+//** If the string s has the form '...sepEND' it returns 'END'
+function strAfterLast(const s, sep: RawByteString): RawByteString;
+
+
 //** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
 function striBetween(const s, from, till: RawByteString): RawByteString;
+
 //** If the string s has the form 'STARTsep...' it returns 'START'
 function striBefore(const s, sep: RawByteString): RawByteString;
 //** If the string s has the form '...sepEND' it returns 'END'
 function striAfter(const s, sep: RawByteString): RawByteString;
+
+//** If the string s has the form 'STARTsep...' it returns 'START'
+function striBeforeLast(const s, sep: RawByteString): RawByteString;
+//** If the string s has the form '...sepEND' it returns 'END'
+function striAfterLast(const s, sep: RawByteString): RawByteString;
+
+
+
+//** If the string s has the form 'STARTsep...' it returns 'START'. E.g. for /foo/bar it returns /foo with AllowDirectorySeparators do
+function strBeforeLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+//** If the string s has the form '...sepEND' it returns 'END'. E.g. for /foo/bar it returns bar with AllowDirectorySeparators
+function strAfterLast(const s: RawByteString; const sep: TCharSet): RawByteString;
 
 
 //**Joins all string list items to a single string separated by @code(sep).@br
@@ -4081,6 +4101,8 @@ begin
   end;
 end;
 
+
+
 function strBefore(const s, sep: RawByteString): RawByteString;
 var
   i: Integer;
@@ -4101,6 +4123,27 @@ end;
 
 
 
+function strBeforeLast(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := strLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := copy(s, 1, i-1);
+end;
+
+function strAfterLast(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := strLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := strcopyfrom(s, i + length(sep));
+end;
+
+
+
+
 
 function striBetween(const s, from, till: RawByteString): RawByteString;
 var
@@ -4115,6 +4158,8 @@ begin
     else result := strslice(s, i, j - 1);
   end;
 end;
+
+
 
 function striBefore(const s, sep: RawByteString): RawByteString;
 var
@@ -4132,6 +4177,47 @@ begin
   i := striIndexOf(s, sep);
   if i = 0 then result := ''
   else result := strcopyfrom(s, i + length(sep));
+end;
+
+
+
+function striBeforeLast(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := striLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := copy(s, 1, i-1);
+end;
+
+function striAfterLast(const s, sep: RawByteString): RawByteString;
+var
+  i: Integer;
+begin
+  i := striLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := strcopyfrom(s, i + length(sep));
+end;
+
+
+
+
+
+function strBeforeLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+var i: Integer;
+begin
+  i := strLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := copy(s, 1, i-1);
+end;
+
+function strAfterLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+var
+  i: Integer;
+begin
+  i := strLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := strcopyfrom(s, i + 1);
 end;
 
 

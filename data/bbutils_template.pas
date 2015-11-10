@@ -399,11 +399,19 @@ function strSplitGetBetweenBrackets(var text: RawByteString; const openBracket, 
 {%REPEAT _CASESENSITIVEMODIFIER_, [, i]}
 //** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
 function str_CASESENSITIVEMODIFIER_Between(const s, from, till: RawByteString): RawByteString;
+{%REPEAT _LASTMODIFIER_, [, Last]}
 //** If the string s has the form 'STARTsep...' it returns 'START'
-function str_CASESENSITIVEMODIFIER_Before(const s, sep: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
 //** If the string s has the form '...sepEND' it returns 'END'
-function str_CASESENSITIVEMODIFIER_After(const s, sep: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
 {%END-REPEAT}
+{%END-REPEAT}
+
+//** If the string s has the form 'STARTsep...' it returns 'START'. E.g. for /foo/bar it returns /foo with AllowDirectorySeparators do
+function strBeforeLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+//** If the string s has the form '...sepEND' it returns 'END'. E.g. for /foo/bar it returns bar with AllowDirectorySeparators
+function strAfterLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+
 
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
@@ -2354,26 +2362,49 @@ begin
   end;
 end;
 
-function str_CASESENSITIVEMODIFIER_Before(const s, sep: RawByteString): RawByteString;
+{%REPEAT _LASTMODIFIER_, [, Last]}
+
+function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
 var
   i: Integer;
 begin
-  i := str_CASESENSITIVEMODIFIER_IndexOf(s, sep);
+  i := str_CASESENSITIVEMODIFIER__LASTMODIFIER_IndexOf(s, sep);
   if i = 0 then result := ''
   else result := copy(s, 1, i-1);
 end;
 
-function str_CASESENSITIVEMODIFIER_After(const s, sep: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
 var
   i: Integer;
 begin
-  i := str_CASESENSITIVEMODIFIER_IndexOf(s, sep);
+  i := str_CASESENSITIVEMODIFIER__LASTMODIFIER_IndexOf(s, sep);
   if i = 0 then result := ''
   else result := strcopyfrom(s, i + length(sep));
 end;
 
+{%END-REPEAT}
 
 {%END-REPEAT}
+
+function strBeforeLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+var i: Integer;
+begin
+  i := strLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := copy(s, 1, i-1);
+end;
+
+function strAfterLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+var
+  i: Integer;
+begin
+  i := strLastIndexOf(s, sep);
+  if i = 0 then result := ''
+  else result := strcopyfrom(s, i + 1);
+end;
+
+
+
 
 function strJoin(const sl: TStrings; const sep: RawByteString  = ', '; limit: Integer=0; const limitStr: RawByteString='...'): RawByteString; overload;
 var i:longint;
