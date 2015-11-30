@@ -1729,6 +1729,8 @@ begin
 
   temp := FHtmlTree;
   if temp is TTreeDocument then temp := temp.next;
+  if temp = nil then raise EHTMLParseMatchingException.create('No HTML tree', self);
+  if FTemplate.getLastTree = nil then raise EHTMLParseMatchingException.create('No template tree', self);
   result:=matchTemplateTree(FHtmlTree, temp, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
 
   //delete functions, so multiple parsing attempts do not intermix
