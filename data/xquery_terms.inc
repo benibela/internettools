@@ -2535,6 +2535,17 @@ begin
   end;
 end;
 
+function TXQTermBinaryOp.debugTermToString: string;
+var
+  i: Integer;
+begin
+  result := '(' + ClassName + ' ';
+  if length(children) >= 1 then result += children[0].debugTermToString();
+  result += ' ' + op.name;
+  for i:= 1 to high(children) do result += ' ' + children[1].debugTermToString();
+  result += ')';
+end;
+
 function TXQTermBinaryOp.getContextDependencies: TXQContextDependencies;
 begin
     result := op.contextDependencies + getChildrenContextDependencies;

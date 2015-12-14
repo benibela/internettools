@@ -1631,6 +1631,7 @@ type
     constructor create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
     constructor create(opinfo: TXQOperatorInfo);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function debugTermToString: string; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
   protected
