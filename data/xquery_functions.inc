@@ -1312,6 +1312,13 @@ var replaceNames, replaceValues: TStringArray;
         if nodeToFormData(temp, cmp, false, name, value) then begin
           addToRequest(name, value);
           temp := temp.reverse;
+        end else if (cmp(temp.value, 'input') or cmp(temp.value, 'button')) and cmp(temp.getAttribute('type'), 'submit') then begin
+          name := temp.getAttribute('name');
+          if (name <> '') then begin
+            i := arrayIndexOf(replaceNames, name);
+            if (i >= 0) and (replaceValues[i] = temp.getAttribute('value')) and (used.IndexOf(name) < 0) then
+              addToRequest(name, '');
+          end;
         end;
         temp := temp.next;
       end;

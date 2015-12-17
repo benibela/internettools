@@ -807,6 +807,12 @@ begin
   t('form(<form><select name="s"><option selected="selected" value="1">a</option><option value="2">b</option></select></form>).url', 'pseudo://test?s=1');
   t('form(<form><select name="s"><option value="1">a</option><option selected="selected" value="2">b</option></select></form>).url', 'pseudo://test?s=2');
 
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>).url', 'pseudo://test?xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "XYZ"}).url', 'pseudo://test?xxx=yyy&a=XYZ');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "BV"}).url', 'pseudo://test?xxx=yyy&a=BV');
+  t('form(<form><input name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
+
   t('uri-combine(<input name="c" value="foo"/>, <input name="d" value="bar"/>)', 'c=foo&d=bar');
   t('uri-combine(<input name="c" value="foo"/>, (<input name="d" value="bar"/>, <input name="e+" value="xyz"/>))', 'c=foo&d=bar&e%2B=xyz');
 
