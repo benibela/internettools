@@ -442,11 +442,11 @@ begin
   test(xqvalue(['1','2','3','100']).query('sum($_)'), '106');
   test(xqvalue(['1','2','3','100']).filter('. < 10').query('sum($_)'), '6');
   test(xqvalue().query('count($_)'), '0' );
-  test(xqvalue(10).orderby('10 div 0'), '10');
-  test(query('1 to 3').orderby('-$_'), '3 2 1');
-  test(query('1 to 4').orderby('$_ ascending'), '1 2 3 4');
-  test(query('1 to 5').orderby('$_ descending'), '5 4 3 2 1');
-{
+  test(xqvalue(10).order('10 div 0'), '10');
+  test(query('1 to 3').order('-$_'), '3 2 1');
+  test(query('1 to 4').order('$_ ascending'), '1 2 3 4');
+  test(query('1 to 5').order('$_ descending'), '5 4 3 2 1');
+(*
 writeln(query('doc($_1)//a',['http://example.org']).toString);
 writeln(query('doc("http://freepascal.org")//title').toJoinedString());
 writeln(xqvalue('http://example.org').retrieve().map('//title').toJoinedString());
@@ -455,7 +455,7 @@ writeln(xqvalue('file:///etc/passwd').retrieve().map('":::"||.||"<<<"').toJoined
 writeln(xqvalue('http://example.org').retrieve().map('//a').retrieve().map('subsequence(//a, 2, 4)').retrieve().map('//title').toJoinedString(LineEnding));
 writeln(xqvalue('file:///tmp/foo.json').retrieve().query('$_("a")').toJoinedString());
 writeln(xqvalue('http://google.de').retrieve().map('form(//form, {"q": $_1})', ['peppermint']).retrieve().map('//a').toJoinedString(' '));
-}
+*)
 end;
 
 end.
