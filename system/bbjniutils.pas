@@ -594,7 +594,7 @@ var i: integer;
     pushUnicodeChar(strDecodeUTF8Character(s, i));
   end;
 
-var t, lead, trail: integer;
+
 begin
   setlength(res, length(s));
   p := 1;
@@ -702,7 +702,6 @@ end;
 function TJavaEnv.arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
 var
   i: Integer;
-  temp: jobject;
   sc: jclass;
 begin
   sc := stringClass;
