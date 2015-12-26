@@ -806,8 +806,8 @@ begin
   if test <> '' then
     if not evaluateQuery(reader, test).toBooleanEffective then
       exit;
-  act := reader.findAction(action);
-  if act = nil then raise ETemplateReader.Create('Could not find action: '+action);
+  act := reader.findAction(reader.parser.replaceEnclosedExpressions(action));
+  if act = nil then raise ETemplateReader.Create('Could not find action: '+action + ' ('+reader.parser.replaceEnclosedExpressions(action)+')');
   act.perform(reader);
 end;
 
