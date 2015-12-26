@@ -358,6 +358,7 @@ type
 
   TTemplateActionIf = class(TTemplateAction)
     test: string;
+    &else: TTemplateAction;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
@@ -622,21 +623,21 @@ begin
   inherited initFromTree(t);
   test := t['test'];
   addChildrenFromTree(t);
+  //else is handled separately
 end;
 
 procedure TTemplateActionIf.perform(reader: TMultipageTemplateReader);
-var
-  i: Integer;
 begin
-  if evaluateQuery(reader, test).toBooleanEffective then
-    for i := 0 to high(children) do
-      children[i].perform(reader);
+  if evaluateQuery(reader, test).toBooleanEffective then performChildren(reader)
+  else if &else <> nil then &else.performChildren(reader);
 end;
 
 function TTemplateActionIf.clone: TTemplateAction;
 begin
   result := cloneChildren(TTemplateActionIf.Create);
   TTemplateActionIf(result).test := test;
+  if &else <> nil then TTemplateActionIf(result).&else := &else.clone;
+
 end;
 
 { TTemplateActionMeta }
@@ -1069,6 +1070,12 @@ begin
     'loop': addChild(TTemplateActionLoop);
     'meta': addChild(TTemplateActionMeta);
     'if': addChild(TTemplateActionIf);
+    'else':
+      if (length(children) = 0 ) or not (children[high(children)] is TTemplateActionIf) then raise ETemplateReader.create('<else> must follow <if>')
+      else begin
+        TTemplateActionIf(children[high(children)]).&else := TTemplateAction.Create;
+        TTemplateActionIf(children[high(children)]).&else.addChildrenFromTree(t);
+      end;
     's': addChild(TTemplateActionShort);
     'try': addChild(TTemplateActionTry);
     'catch': addChild(TTemplateActionCatch);
