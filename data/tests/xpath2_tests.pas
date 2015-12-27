@@ -3195,6 +3195,12 @@ begin
   t('form(//form).url', 'abs://hallo?abc=cba', '!<html><form action="abs://hallo"><input name="abc" value="cba"/></form></html>');
   t('form(//form).url', 'abs://foo/bar?abcdef=on', '!<html><form action="abs://foo/bar"><input name="abcdef" type="checkbox" checked/></form></html>');
 
+  {$ifdef cpu32}
+  {$else}
+  t('join((random(), random(), random(), random(10), random(10), random(10.5)))', '0.286139338742942 0.428470924962312 0.226851454935968 0 3 5.15674879238941');
+  t('join((random(), random-seed(123), random(),  random-seed(123), random(), random(10), random(10), random(10.5)))', '0.423106460599229 0.69646918727085 0.69646918727085 1 0 7.25429093954153');
+  {$endif}
+
   //Newer tests
 
   t('QName("", "x") eq QName("","x")', 'true');

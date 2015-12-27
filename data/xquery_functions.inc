@@ -2083,8 +2083,19 @@ end;
 function xqFunctionRandom(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   ignore(context);
-  requiredArgCount(args, 0);
-  result := xqvalue(xqfloat(Random));
+  requiredArgCount(args, 0, 1);
+  if length(args) = 0 then exit(xqvalue(xqfloat(Random)))
+  else if args[0].instanceOf(baseSchema.integer) then exit(xqvalue(random(args[0].toInt64)))
+  else exit(xqvalue(xqfloat(Random * args[0].toFloat)));
+end;
+
+function xqFunctionRandom_Seed(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  ignore(context);
+  requiredArgCount(args, 0, 1);
+  if length(args) = 0 then Randomize
+  else RandSeed := args[0].toInt64;
+  result := xqvalue();
 end;
 
 function xqFunctionSleep(const args: TXQVArray): IXQValue;

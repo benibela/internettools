@@ -2185,8 +2185,10 @@ type
                   @br Returns a hex binary representation of $data with the given $encoding)
       @item(@code(string-to-base64Binary($data as xs:string[, $encoding as xs:string]) as xs:base64Binary)
                   @br Returns a base64 binary representation of $data with the given $encoding)
-      @item(@code(random())
+      @item(@code(random([$max]))
                   @br Returns a random number)
+      @item(@code(random-seed([$seed]))
+                  @br Initializes the random number generator)
       @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions",
             which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
 
@@ -7298,7 +7300,8 @@ pxp.registerFunction('outer-html',0,1,@xqFunctionOuter_HTML, []);
 pxp.registerFunction('inner-html',0,1,@xqFunctionInner_HTML, []);
 pxp.registerFunction('form',1,2,@xqFunctionForm, []);
 pxp.registerFunction('resolve-html',1,2,@xqFunctionResolve_Html, []);
-pxp.registerFunction('random',0,0,@xqFunctionRandom, []);
+pxp.registerFunction('random',0,1,@xqFunctionRandom, []);
+pxp.registerFunction('random-seed',0,1,@xqFunctionRandom_Seed, []);
 pxp.registerFunction('sleep',1,1,@xqFunctionSleep, []);
 pxp.registerFunction('eval',1,2,@xqFunctionEval, []);
 pxp.registerFunction('css',1,1,@xqFunctionCSS, []);
