@@ -1956,7 +1956,7 @@ begin
           xqvalueSeqAdd(result, xqvalue(regex.Match[v.toInt64]));
       end else
         xqvalueSeqAdd(result, xqvalue(regEx.Match[0]));
-    until not regex.ExecNext;
+    until not all or not regex.ExecNext;
 
 
   finally

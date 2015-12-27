@@ -273,6 +273,7 @@ begin
   t('string-join( extract(''hallo welt foo bar'', ''(.*) (.*) (.*) (.*)'', (1,3,4,1,2,1) ), ":")', 'hallo:foo:bar:hallo:welt:hallo');
   t('join(extract("foo bar", "[ao]", 0, "*"))', 'o o a');
   t('join(extract("foo bar", "[^ ](.(.))", (1, 2), "*"))', 'oo o ar r');
+  t('join(extract("foo bar", "[^ ](.(.))", (1, 2)))', 'oo o');
 
                 //Replace
   t('replace("abracadabra", "bra", "*")', 'a*cada*', '');
