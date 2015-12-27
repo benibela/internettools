@@ -1932,21 +1932,33 @@ function xqFunctionExtract(const args: TXQVArray): IXQValue;
 var
  regEx: TRegExpr;
  v: IXQValue;
+ temp: String;
+ all: Boolean;
 begin
   requiredArgCount(args, 2,4);
   //TODO: cache regex
   regEx:=TRegExpr.Create(args[1].toString);
   try
     regEx.ModifierS := false;
-    if length(args) >= 4 then
-      regEx.ModifierStr := args[3].toString;
-    regEx.Exec(args[0].toString);
-    if length(args) >= 3 then begin
-      result := xqvalue;
-      for v in args[2] do
-        xqvalueSeqAdd(result, xqvalue(regex.Match[v.toInt64]));
-    end else
-      result := xqvalue(regEx.Match[0]);
+    all := false;
+    if length(args) >= 4 then begin
+      temp := args[3].toString;
+      all := strContains(temp, '*');
+      if all then temp := StringReplace(temp, '*', '',[]);
+      regEx.ModifierStr := temp;
+    end;
+    if not regEx.Exec(args[0].toString) then exit(xqvalue('')); //better empty sequence ?
+
+    result := xqvalue();
+    repeat
+      if length(args) >= 3 then begin
+        for v in args[2] do
+          xqvalueSeqAdd(result, xqvalue(regex.Match[v.toInt64]));
+      end else
+        xqvalueSeqAdd(result, xqvalue(regEx.Match[0]));
+    until not regex.ExecNext;
+
+
   finally
     regEx.free;
   end;

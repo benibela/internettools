@@ -2095,6 +2095,7 @@ type
       @item(@code(extract($string as xs:string, $regex as xs:string [, $match as xs:integer *,[$flags as xs:string]])) @br
             This applies the regex $regex to $string and returns only the matching part.
             @br If the $match argument is provided, only the $match-th submatch will be returned. This can be a sequence of several integers.
+            @br If flags contains *, all occurrences are returned
             @br (This functions used to be called filter, but was renamed to due to XQuery 3))
       @item(@code(eval($query as xs:string)) @br This evaluates $query as a XQuery-expression. )
       @item(@code(css($css as xs:string)) @br This evaluates the $css string as a css selector. )
