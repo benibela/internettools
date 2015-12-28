@@ -1190,6 +1190,8 @@ begin
 
   q('let <r><t:meta-attribute name="x" case-sensitive="true"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '2');
   q('let <r><t:meta-attribute name="x" case-sensitive="false"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '1');
+  q('let <a>{$b := (1,2), $c := $b, $c := $b}</a> := <a>10</a> return join(($b))', '1 2');
+
 
   xstring('hallo"''"''world', 'hallo"''"''world');
   xstring('foo{1+2}bar', 'foo3bar');
