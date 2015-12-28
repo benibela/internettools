@@ -224,7 +224,7 @@ begin
   requiredArgCount(args, 0);
   result := xqvalue();
   for i:=1 to GetEnvironmentVariableCount do
-    xqvalueSeqAdd(result, xqvalue(strBefore(GetEnvironmentString(i), '=')));
+    xqvalueSeqAddMove(result, xqvalue(strBefore(GetEnvironmentString(i), '=')));
 end;
 
 function xqFunctionParse_Common(const context: TXQEvaluationContext; const args: TXQVArray; typ: string): IXQValue;

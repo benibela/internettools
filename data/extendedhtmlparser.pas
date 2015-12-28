@@ -2125,47 +2125,53 @@ var temp: THtmlTemplateParser;
     cols: TXQVariableChangeLog;
     tempobj: TXQValueObject;
     i: Integer;
+    list: TXQVList;
 begin
   requiredArgCount(args, 2);
-  result := nil;
-  temp := THtmlTemplateParser.create; //TODO: optimize
+  list := TXQVList.create();
   try
-    temp.TemplateParser.parsingModel:=pmHTML;
-    temp.TemplateParser.repairMissingStartTags:=false;
+    temp := THtmlTemplateParser.create; //TODO: optimize
+    try
+      temp.TemplateParser.parsingModel:=pmHTML;
+      temp.TemplateParser.repairMissingStartTags:=false;
 
-    temp.QueryEngine.StaticContext.Free;
-    temp.QueryEngine.StaticContext := context.staticContext.clone();
-    temp.QueryEngine.staticContext.sender := temp.QueryEngine;
-    temp.KeepPreviousVariables:=kpvForget;
-    temp.OutputEncoding:=context.staticContext.stringEncoding;
-    for template in args[0] do begin
-      if template is TXQValueString then temp.parseTemplate(template.toString)
-      else if template is TXQValueNode then temp.parseTemplate(template.toNode.outerXML())
-      else raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for patter. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
-      for html in args[1] do begin
-        if not (html is TXQValueNode) then
-          raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
-        temp.FHtmlTree := html.toNode;
-        if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match pattern to html');
-        cols := temp.VariableChangeLogCondensed.collected;
-        try
-          if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
-            xqvalueSeqAdd(result, cols.get(0))
-          else begin
-            tempobj := TXQValueObject.create();
-            for i := 0 to cols.count - 1 do
-              tempobj.setMutable(cols.getName(i), cols.get(i));
-            xqvalueSeqAdd(result, tempobj);
+      temp.QueryEngine.StaticContext.Free;
+      temp.QueryEngine.StaticContext := context.staticContext.clone();
+      temp.QueryEngine.staticContext.sender := temp.QueryEngine;
+      temp.KeepPreviousVariables:=kpvForget;
+      temp.OutputEncoding:=context.staticContext.stringEncoding;
+      for template in args[0] do begin
+        if template is TXQValueString then temp.parseTemplate(template.toString)
+        else if template is TXQValueNode then temp.parseTemplate(template.toNode.outerXML())
+        else raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for patter. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
+        for html in args[1] do begin
+          if not (html is TXQValueNode) then
+            raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
+          temp.FHtmlTree := html.toNode;
+          if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match pattern to html');
+          cols := temp.VariableChangeLogCondensed.collected;
+          try
+            if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
+              list.add(cols.get(0))
+            else begin
+              tempobj := TXQValueObject.create();
+              for i := 0 to cols.count - 1 do
+                tempobj.setMutable(cols.getName(i), cols.get(i));
+              list.add(tempobj);
+            end;
+          finally
+            cols.free;
           end;
-        finally
-          cols.free;
         end;
       end;
+    finally
+      temp.free;
     end;
-  finally
-    temp.free;
+  except
+    list.free;
+    raise;
   end;
-  if result = nil then result := xqvalue;
+  result := xqvalueSeqSqueezed(list);
 end;
 
 function patternMatcherParse(const context: TXQStaticContext; data: string): TXQTermPatternMatcher;

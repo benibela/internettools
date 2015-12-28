@@ -237,7 +237,7 @@ begin
     result := parse();
     if multipleTopLevelItems then begin
       while nextToken <> tkEOF do
-        xqvalueSeqAdd(result, parse(true));
+        xqvalueSeqAddMove(result, parse(true));
     end else if nextToken <> tkEOF then
       raiseError('Unexpected values after json data');
   finally
@@ -321,15 +321,17 @@ var
   v: IXQValue;
   ara: TXQValueJSONArray;
   i: Integer;
+  list: TXQVList;
 begin
   requiredArgCount(args, 1);
-  result := xqvalue();
+  list := TXQVList.create();
   for v in args[0] do
     if v is TXQValueJSONArray then begin
       ara := v as TXQValueJSONArray;
       for i := 0 to ara.seq.Count-1 do
-        xqvalueSeqAdd(result, ara.seq[i]);
+        list.add(ara.seq[i]);
     end;
+  result := xqvalueSeqSqueezed(list);
 end;
 
 function xqFunctionSize(const args: TXQVArray): IXQValue;

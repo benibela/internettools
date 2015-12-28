@@ -403,13 +403,13 @@ var tempContext: TXQEvaluationContext;
          TXQValueObject.prepareInternetRequest(v, method, uri, post, defaultInternet);
          data := internetaccess.httpRequest(method, uri, post);
          defaultInternet.additionalHeaders.Text := tempHeaders;
-         xqvalueSeqAdd(result, dataToXQV (data, uri, defaultInternet.getLastContentType));
+         xqvalueSeqAddMove(result, dataToXQV (data, uri, defaultInternet.getLastContentType));
       end;
       else begin
         uri := v.toString;
         if not strIsAbsoluteURI(uri) then raise EXQEvaluationException.create('pxp:RETRIEVE', 'Need absolute URI to retrieve, got: '+uri);
         data := defaultQueryEngine.StaticContext.retrieveFromURI(uri, contenttype, 'pxp:RETRIEVE');
-        xqvalueSeqAdd(result, dataToXQV(data, uri, contenttype));
+        xqvalueSeqAddMove(result, dataToXQV(data, uri, contenttype));
       end;
     end;
   end;
@@ -1290,6 +1290,12 @@ begin
   seq.add(firstChild);
 end;
 
+constructor TXQValueSequence.create(list: TXQVList);
+begin
+  inherited create(baseSchema.sequence);
+  seq := list;
+end;
+
 class function TXQValueSequence.classKind: TXQValueKind;
 begin
   Result:=pvkSequence;
@@ -1465,6 +1471,7 @@ procedure TXQValueSequence.addOrdered(const node: IXQValue);
 begin
   seq.addOrdered(node);
 end;
+
 
 function TXQValueSequence.takeFirst: IXQValue;
 begin
@@ -1881,6 +1888,8 @@ end;
 
 function TXQValueJSONArray.GetEnumeratorMembers: TXQValueEnumerator;
 begin
+  if self.RefCount > 0 then
+    result.fguardian := self;
   result.fcurrentidx:=-1;
   result.flist:=seq;
 end;

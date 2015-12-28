@@ -241,16 +241,17 @@ end;
 function TXQTermReadObjectProperty.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   obj, v: IXQValue;
+  seq: TXQVList;
 begin
   if length(children) = 0 then raiseEvaluationError('pxp:OBJ', 'Found no term to read property from');
   if length(children) > 1 then raiseEvaluationError('pxp:OBJ', 'Can only read property from one term');
   obj:=children[0].evaluate(context);
 
-  result := nil;
+  seq := TXQVList.create(obj.getSequenceCount);
   for v in obj do
     if v is TXQValueObject then
-       xqvalueSeqAdd(result, v.getProperty(propname));
-  if result = nil then result := xqvalue();
+       seq.add(v.getProperty(propname));
+  result := xqvalueSeqSqueezed(seq);
 //  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
 //  result := (obj as TXQValueObject).getProperty(propname);
 end;
@@ -439,7 +440,11 @@ begin
       if not context.hasVariable(varname, value, varnamespace) then value := xqvalue;
       applyProperties;
       if (arrayIndex = 1) and (value.getSequenceCount <= 1) then value := result
-      else if arrayIndex > value.getSequenceCount then xqvalueSeqAdd(value, result)
+      else if arrayIndex > value.getSequenceCount then begin
+        seq := TXQValueSequence.create(value);
+        seq.add(result);
+        value := seq;
+      end
       else begin
         seq := TXQValueSequence.create(max(arrayIndex, value.getSequenceCount));
         if arrayIndex = 0 then seq.seq.add(result);
@@ -461,7 +466,9 @@ begin
         value := Result
       else begin
        applyProperties;
-       xqvalueSeqAdd(value, result);
+       seq := TXQValueSequence.create(value);
+       seq.add(result);
+       value := seq;
      end;
   end;
 
@@ -1447,7 +1454,7 @@ function TXQTermFlower.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   tempContext: TXQEvaluationContext;
   sortingCache: TFPList;
-  finalResult: IXQValue;
+  finalResult: TXQValueSequence;
   currentTuple: TOrderedTuple;
   orders: array of TXQTermFlowerOrder;
   variables: array of TXQTermVariable;
@@ -1701,7 +1708,7 @@ var
    begin
      if pos = high(children) then begin
        if currentTuple = nil then
-         xqvalueSeqAdd(finalResult, children[pos].evaluate(tempContext))
+         finalResult.add(children[pos].evaluate(tempContext))
         else begin
          newTuple := TOrderedTuple.Create;
          newTuple.orders := currentTuple.orders;
@@ -1837,7 +1844,7 @@ var
       while i < oldSortingCache.Count do begin
         if data.compareTuples(lastTuple, TOrderedTuple(oldSortingCache[i])) = 0 then begin
           for k in nonGroupingVars do
-            xqvalueSeqAdd(lastTuple.vars[k], TOrderedTuple(oldSortingCache[i]).vars[k]);
+            (lastTuple.vars[k] as TXQValueSequence).add(TOrderedTuple(oldSortingCache[i]).vars[k]);
           tobject(oldSortingCache[i]).free;
         end else newGroupedTuple;
         inc(i);
@@ -1889,7 +1896,8 @@ begin
 
   //oldVarCount := tempContext.temporaryVariables.count;
 
-  finalResult := nil;
+  finalResult := TXQValueSequence.create();
+  result := finalResult;
   oldSortingCache := nil;
   orderCount := 0;
   varCount := 0;
@@ -2052,12 +2060,10 @@ begin
         stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
 
       for i := 0 to sortingCache.Count - 1 do begin
-        xqvalueSeqAdd(finalResult, TOrderedTuple(sortingCache[i]).result);
+        finalResult.add(TOrderedTuple(sortingCache[i]).result);
         TOrderedTuple(sortingCache[i]).Free;
       end;
     end;
-    if finalResult = nil then result := xqvalue()
-    else result := finalResult;
     xqvalueSeqSqueeze(result);
   finally
     if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables); //iff context.temporaryVariables = nil, we created the change log here
@@ -2402,6 +2408,7 @@ var
   i: Integer;
   sl: TStringList;
   evilkids: TXQVArray;
+  resultSeq: TXQVList;
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -2418,38 +2425,37 @@ begin
   end;
 
   if length(children) = 1 then begin
-    result := nil;
+    resultSeq := TXQVList.create();
     for v in func do begin
       if v is TXQValueObject then begin
         sl := TStringList.Create;
         (v as TXQValueObject).enumerateKeys(sl);
-        xqvalueSeqAdd(result, xqvalue(sl));
+        resultSeq.add(xqvalue(sl));
         sl.free;
       end else if v is TXQValueJSONArray then begin
         ara := v as TXQValueJSONArray;;
         for i := 0 to ara.seq.Count-1 do
-          xqvalueSeqAdd(result, ara.seq[i]);
+          resultSeq.add(ara.seq[i]);
       end else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v.debugAsStringWithTypeAnnotation());
     end;
-    if result = nil then result := xqvalue();
+    result := xqvalueSeqSqueezed(resultSeq);
     exit;
   end;
 
   if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices or object prop given');
   index := children[1].evaluate(context);
-  result := nil;
+  resultSeq := TXQVList.create();
   for v in func do begin
     if v is TXQValueJSONArray then begin
       if (index.toInt64 < 1) or (index.toInt64 > (v as TXQValueJSONArray).seq.Count) then continue;
-      xqvalueSeqAdd(result, (v as TXQValueJSONArray).seq[index.toInt64-1]);
+      resultSeq.add((v as TXQValueJSONArray).seq[index.toInt64-1]);
     end else if v is TXQValueObject then begin
-      xqvalueSeqAdd(result, v.getProperty(index.ToString));
+      resultSeq.add(v.getProperty(index.ToString));
     end else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
     //end else
       raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
   end;
-  //this returns a sequence of a single value instead that value, if func is a sequence with multiple values (from which only one has that property). Does it matter?
-  if result = nil then result := xqvalue();
+  result := xqvalueSeqSqueezed(resultSeq);
 
 end;
 
@@ -2487,18 +2493,24 @@ function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue
   var
     tempContext: TXQEvaluationContext;
     seq: IXQValue;
+    list: TXQVList;
   begin
-    result := nil;
     seq := children[0].evaluate(context);
     tempContext := context;
     tempContext.ParentElement := nil;
     tempContext.SeqIndex := 1;
     tempContext.SeqLength := seq.getSequenceCount;
-    for tempContext.SeqValue in seq do begin
-      xqvalueSeqAdd(result, children[1].evaluate(tempContext));
-      tempContext.SeqIndex += 1;
+    list := TXQVList.create(tempContext.SeqLength);
+    try
+      for tempContext.SeqValue in seq do begin
+        list.add(children[1].evaluate(tempContext));
+        tempContext.SeqIndex += 1;
+      end;
+      result := xqvalueSeqSqueezed(list);
+    except
+      list.free;
+      raise;
     end;
-    if result = nil then result := xqvalue();
   end;
 
 var evilkids: TXQVArray;
@@ -2679,7 +2691,7 @@ begin
         and ((nsCheck <> xqnmURL) or ( attrib.getNamespaceURL() = readnamespace))
         and not attrib.isNamespaceNode
         then
-      xqvalueSeqAdd(result, xqvalue(tempEl.attributes.Items[i]));
+      xqvalueSeqAddMove(result, xqvalue(tempEl.attributes.Items[i]));
   end;
   if result = nil then result:=xqvalue();
 end;

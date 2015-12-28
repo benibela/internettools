@@ -98,6 +98,7 @@ type
     function MoveNext: Boolean;
     property Current: IXQValue read FCurrent;
     function CurrentIndex: Integer;
+    function GetEnumerator: TXQValueEnumerator;
   end;
 
 
@@ -663,6 +664,7 @@ type
 
     constructor create(capacity: integer = 0);
     constructor create(firstChild: IXQValue);
+    constructor create(list: TXQVList);
 
     class function classKind: TXQValueKind; override;
 
@@ -2421,15 +2423,19 @@ public
   function xqvalue(v: Integer):IXQValue; inline; //**< Creates an integer IXQValue
   function xqvalue(v: xqfloat):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   function xqvalue(const v: BigDecimal):IXQValue; inline; //**< Creates an BigDecimal IXQValue
-  function xqvalue(v: string):IXQValue; inline; //**< Creates an string IXQValue
+  function xqvalue(v: string):IXQValue; inline; //**< Creates a string IXQValue
   function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Raises an exception (to prevent xquery(TDateTime) from using xquery(float))
-  function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates an node TXQValue
-  function xqvalue(sl: TStringList): IXQValue; //**< Creates an sequence of strings (does *not* free the list)
-  function xqvalue(const sl: array of string): IXQValue; //**< Creates an sequence of untyped strings
+  function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates a node TXQValue
+  function xqvalue(sl: TStringList): IXQValue; //**< Creates a sequence of strings (does *not* free the list)
+  function xqvalue(const sl: array of string): IXQValue; //**< Creates a sequence of untyped strings
   function xqvalue(const sl: array of IXQValue): IXQValue; //**< Creates a sequence
 
-  procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes a IXQValue (single element seq => single element, empty seq => undefined)
-  procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue); //**< Adds a value to an implicit sequence list. (i.e. if list is not a list, a list with both is created; if list is undefined it just becomes add ) @br Warning: If  pointer(list) = pointer(add) it will crash
+  procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
+  function xqvalueSeqSqueezed(l: TXQVList): IXQValue; //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
+  //** Adds a value to an implicit sequence list.
+  //**(i.e. if list is not a list, a list with both is created; if @code(list) is undefined it just becomes @code(add) ) @br
+  //**Warning: this is a dangerous function. If @code(list) becomes @code(add) you must not call it again on @code(list) or you modify the previous @code(add). If there is a reference to @code(add) anywhere else (e.g. variable, object property), it can break everything.
+  procedure xqvalueSeqAddMove(var list: IXQValue; add: IXQValue);
   //function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
 
 
@@ -4002,6 +4008,11 @@ begin
   result := fcurrentidx;
 end;
 
+function TXQValueEnumerator.GetEnumerator: TXQValueEnumerator;
+begin
+  result := self;
+end;
+
 
 { TXQEvaluationContext }
 
@@ -4340,12 +4351,15 @@ end;
 function xqvalue(sl: TStringList): IXQValue;
 var
   i: Integer;
+  list: TXQVList;
 begin
   if sl.Count = 0 then exit(xqvalue());
   if sl.Count = 1 then exit(xqvalue(sl[0]));
-  result := xqvalue();
+
+  list := TXQVList.create(sl.Count);
   for i:=0 to sl.Count - 1 do
-    xqvalueSeqAdd(result, xqvalue(sl[i]));
+    list.add(xqvalue(sl[i]));
+  result := xqvalueSeqSqueezed(list);
 end;
 
 function xqvalue(const sl: array of string): IXQValue;
@@ -4402,7 +4416,17 @@ begin
   else v := xqvalue();
 end;
 
-procedure xqvalueSeqAdd(var list: IXQValue; add: IXQValue);
+function xqvalueSeqSqueezed(l: TXQVList): IXQValue;
+begin
+  case l.Count of
+    0: result := xqvalue();
+    1: result := l[0];
+    else exit(TXQValueSequence.create(l));
+  end;
+  l.free;
+end;
+
+procedure xqvalueSeqAddMove(var list: IXQValue; add: IXQValue);
 var
   temp: TXQValueSequence;
 begin
@@ -4414,7 +4438,7 @@ begin
     pvkUndefined: list := add;
     pvkSequence: (list as TXQValueSequence).add(add);
     else begin
-      temp := TXQValueSequence.create(list);  //don't use xqvalueAssign, as result is moved in the list
+      temp := TXQValueSequence.create(list);
       temp.add(add);
       list := temp;
     end;
@@ -5232,16 +5256,19 @@ end;
 function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
 var
   i: Integer;
+  list: TXQVList;
 begin
   result := xqvalue();
+  list := TXQVList.create();
   if caseSensitive then begin
     for i:=0 to high(vars) do
       if (vars[i].name = name) and (equalNamespaces(vars[i].namespaceURL, namespaceURL)) then
-        xqvalueSeqAdd(result, vars[i].value);
+        list.add(vars[i].value);
   end else
     for i:=0 to high(vars) do
       if striequal(vars[i].name, name) and (equalNamespaces(vars[i].namespaceURL, namespaceURL)) then
-        xqvalueSeqAdd(result, vars[i].value);
+        list.add(vars[i].value);
+  result := xqvalueSeqSqueezed(list);
 end;
 
 procedure TXQVariableChangeLog.clear;
@@ -5383,8 +5410,10 @@ begin
     if oldid < 0 then begin
       setlength(result.Vars, length(result.vars) + 1);
       result.vars[high(result.vars)] := vars[i];
+      if vars[i].value.kind = pvkSequence then
+        result.vars[high(result.vars)].value := TXQValueSequence.create(vars[i].value); //must not change vars[i].value later
     end else begin
-      xqvalueSeqAdd(result.vars[oldid].value, vars[i].value);
+      xqvalueSeqAddMove(result.vars[oldid].value, vars[i].value);
     end;
   end;
 end;
@@ -6388,6 +6417,7 @@ var
  v, previous: IXQValue;
  i: Integer;
  value: IXQValue;
+ list: TXQVList;
 begin
   if (result = nil) or (result.getSequenceCount = 0) then exit;
 
@@ -6415,18 +6445,23 @@ begin
   previous := result;
   tempContext.SeqLength:=previous.getSequenceCount;
 
-  result := nil;
-  i := 1;
-  for v in previous do begin
-    tempContext.SeqValue:=v;
-    tempContext.SeqIndex:=i;
-    if v is TXQValueNode then tempContext.ParentElement:=v.toNode
-    else tempContext.ParentElement := context.ParentElement;
-    if sequenceFilterConditionSatisfied(filter.evaluate(tempContext), i) then
-      xqvalueSeqAdd(result, v);
-    i+=1;
+  list := TXQVList.create(tempContext.SeqLength);
+  try
+    i := 1;
+    for v in previous do begin
+      tempContext.SeqValue:=v;
+      tempContext.SeqIndex:=i;
+      if v is TXQValueNode then tempContext.ParentElement:=v.toNode
+      else tempContext.ParentElement := context.ParentElement;
+      if sequenceFilterConditionSatisfied(filter.evaluate(tempContext), i) then
+        list.add(v);
+      i+=1;
+    end;
+    result := xqvalueSeqSqueezed(list);
+  except
+    list.free;
+    raise;
   end;
-  if result = nil then result := xqvalue();
 end;
 
 class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: array of TXQTerm; const context: TXQEvaluationContext);
@@ -6439,7 +6474,7 @@ end;
 
 class function TXQueryEngine.expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; const context: TXQEvaluationContext): IXQValue;
 var oldnode,newnode: TTreeNode;
-    newSequence: IXQValue;
+    newList: TXQVList;
     nodeCondition: TXQPathNodeCondition;
 
 procedure jsoniqDescendants(const node: IXQValue; const searchedProperty: string);
@@ -6460,8 +6495,8 @@ begin
     pvkObject: begin
       obj := (node as TXQValueObject);
       if searchedProperty <> '' then begin
-        if obj.hasProperty(searchedProperty, @temp) then xqvalueSeqAdd(newSequence, temp);
-      end else xqvalueSeqAdd(newSequence, obj.enumerateValues);
+        if obj.hasProperty(searchedProperty, @temp) then newList.add(temp);
+      end else newList.add(obj.enumerateValues);
 
       for tempprop in obj.getPropertyEnumerator do
         jsoniqDescendants(tempprop.Value, searchedProperty);
@@ -6477,14 +6512,15 @@ var
   j: Integer;
   tempContext: TXQEvaluationContext;
   onlyNodes: boolean;
-  n : IXQValue;
-  newSequenceSeq: TXQVList;
+  n: IXQValue;
   resultSeq: TXQValueSequence;
   tempNamespace: INamespace;
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
   tempProp: TXQValue;
   namespaceMatching: TXQNamespaceMode;
+  tempSeq: IXQValue;
+  tempList: TXQVList;
 
   procedure add(const v: IXQValue); inline;
   begin
@@ -6520,19 +6556,18 @@ begin
       namespaceMatching := xqnmURL;
     end else namespaceMatching := xqnmNone;
 
-    newSequence := nil;
+    newList := TXQVList.create();
     nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
     onlyNodes := false;
     for n in previous do begin
       if command.typ = qcFunctionSpecialCase then begin
         if not (n.kind in [pvkNode, pvkObject, pvkArray]) then
           raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
-        if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
-        else newSequence := nil;
+        newList.clear;
         tempContext.SeqIndex += 1;
         tempContext.SeqValue := n;
         if n is TXQValueNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
-        xqvalueSeqAdd(newSequence, command.specialCase.evaluate(tempContext));
+        newList.add(command.specialCase.evaluate(tempContext));
       end else begin
         tempKind := n.kind;
         case tempKind of
@@ -6547,18 +6582,16 @@ begin
             newnode := getNextQueriedNode(nil, nodeCondition);
             if newnode = nil then continue;
             j:=0;
-            if (newSequence = nil) or not (newSequence is TXQValueSequence) then newSequence := TXQValueSequence.create(0);
-            newSequenceSeq := (newSequence as TXQValueSequence).seq;
-            newSequenceSeq.count := 0;
+            newList.count := 0;
             while newnode <> nil do begin
               if (namespaceMatching <> xqnmPrefix)
                  or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
                  or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
-              newSequenceSeq.add(xqvalue(newnode));
+              newList.add(xqvalue(newnode));
               newnode := getNextQueriedNode(newnode, nodeCondition);
             end;
             if command.typ = qcPrecedingSibling then
-              newSequenceSeq.revert;
+              newList.revert;
           end;
           pvkObject, pvkArray: begin
             if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extensions are disabled');
@@ -6568,39 +6601,29 @@ begin
                or ((command.typ = qcSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
                then
                  raise EXQEvaluationException.create('pxp:JSON', 'too complex query for JSON object');
-            if newSequence is TXQValueSequence then (newSequence as TXQValueSequence).seq.Count:=0
-            else newSequence := nil;
+            newList.Count:=0;
             case command.typ of
               qcDirectChild: begin
                 if qmValue in command.matching then begin //read named property
                   //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
-                  if tempKind = pvkObject then begin
-                    if (n as TXQValueObject).hasProperty(command.value, @tempProp) then
-                      xqvalueSeqAdd(newSequence, tempProp);
-                  end else begin
-                    newSequenceSeq := (n as TXQValueJSONArray).seq;
-                    for j := 0 to newSequenceSeq.Count - 1 do
-                      if not (newSequenceSeq[j] is TXQValueObject) then
-                        raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+newSequenceSeq[j].debugAsStringWithTypeAnnotation()+'"')
-                      else if (newSequenceSeq[j] as TXQValueObject).hasProperty(command.value, @tempProp) then
-                        xqvalueSeqAdd(newSequence, tempProp);
+                  if tempKind = pvkObject then newList.add(n.getProperty(command.value))
+                  else for n in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
+                    if n.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+n.debugAsStringWithTypeAnnotation()+'"');
+                    newList.add(n.getProperty(command.value));
                   end;
                 end else begin
                   //get all properties
-                  if tempKind = pvkObject then xqvalueSeqAdd(newSequence, (n as TXQValueObject).enumerateValues())
-                  else begin
-                    newSequenceSeq := (n as TXQValueJSONArray).seq;
-                    for j := 0 to newSequenceSeq.Count - 1 do
-                      if not (newSequenceSeq[j] is TXQValueObject) then
-                        raise EXQEvaluationException.create('pxp:JSON', 'The /* operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+newSequenceSeq[j].debugAsStringWithTypeAnnotation()+'"')
-                      else xqvalueSeqAdd(newSequence, (newSequenceSeq[j] as TXQValueObject).enumerateValues());
+                  if tempKind = pvkObject then newList.add((n as TXQValueObject).enumerateValues())
+                  else for n in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
+                    if n.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+n.debugAsStringWithTypeAnnotation()+'"');
+                    newList.add((n as TXQValueObject).enumerateValues());
                   end;
                 end;
               end;
               qcDescendant:
                 jsoniqDescendants(n as TXQValue, command.value);
               qcSameNode:
-                newSequence := n;
+                newList.add(n);
             end;
 
           end;
@@ -6608,25 +6631,35 @@ begin
         end;
       end;
 
-      filterSequence(newSequence, command.filters, context);
+      case newList.Count of
+        0: continue;
+        1: tempSeq := newList[0];
+        else begin
+          tempSeq := TXQValueSequence.create(newList);
+          newList := TXQVList.create();
+        end;
+      end;
+      filterSequence(tempSeq, command.filters, context);
 
-      if (newSequence = nil) or (newSequence.getSequenceCount = 0) then
+      if (tempSeq.getSequenceCount = 0) then
         continue;
 
-      if newSequence is TXQValueSequence then begin
-        newSequenceSeq := (newSequence as TXQValueSequence).seq;
+      if tempSeq is TXQValueSequence then begin
+        tempList := (tempSeq as TXQValueSequence).seq;
         if (command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling]) then
-          newSequenceSeq.revert;
+          tempList.revert;
 
-        for j := 0 to newSequenceSeq.Count-1 do
-          add(newSequenceSeq[j]);
-      end else add(newSequence);
+        for j := 0 to tempList.Count-1 do
+          add(tempList[j]);
+      end else add(tempSeq);
     end;
 
   except
     resultSeq.free;
+    newList.Free;
     raise;
   end;
+  newList.Free;
 
   result := resultSeq;
 end;

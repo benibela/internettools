@@ -2264,6 +2264,20 @@ begin
   t('$optest2[0][] := 2', '2');
   t('join($optest2)', '2 3');
 
+  //sequences in properties
+  t('serialize-json($objwithseq := {"a": (1,2)})', '{"a": [1, 2]}');
+  t('join(( $objwithseq, {"a": 3} ).a)', '1 2 3');
+  t('join(( $objwithseq, {"a": 3} )("a"))', '1 2 3');
+  t('join(( $objwithseq, {"a": 3} )/a)', '1 2 3');
+  t('serialize-json($objwithseq)', '{"a": [1, 2]}');
+  t('join($props := $objwithseq("a"))', '1 2');
+  t('join($props[10] := 17)', '17');
+  t('join($props)', '1 2 17');
+  t('join($props := $objwithseq("a"))', '1 2');
+  t('join($props[] := 17)', '17');
+  t('join($props)', '1 2 17');
+  t('serialize-json($objwithseq)', '{"a": [1, 2]}');
+
   //():= operator for json arrays + objects
   t('serialize-json($artest := [])', '[]');
   t('serialize-json($artest(1) := 100)', '100');

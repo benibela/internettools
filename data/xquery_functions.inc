@@ -1369,7 +1369,7 @@ begin
 
   result := nil;
   for v in args[0] do
-    xqvalueSeqAdd(result, encodeForm(v.toNode));
+    xqvalueSeqAddMove(result, encodeForm(v.toNode));
   if result = nil then result := xqvalue;
 
 end;
@@ -1503,7 +1503,7 @@ var res: IXQValue;
 
   procedure addString(const s: string);
   begin
-    xqvalueSeqAdd(res, xqvalue(strResolveURI(s, baseUri)));
+    xqvalueSeqAddMove(res, xqvalue(strResolveURI(s, baseUri)));
   end;
 
   procedure resolve(const seq: IXQValue);
@@ -1559,9 +1559,9 @@ var res: IXQValue;
               tempobj := TXQValueObject.create();
               tempobj.prototype := iv;
               tempobj.values.add('url', resolvedUri);
-              xqvalueSeqAdd(res, tempobj);
-            end else xqvalueSeqAdd(res, iv);
-          end else xqvalueSeqAdd(res, iv);
+              xqvalueSeqAddMove(res, tempobj);
+            end else xqvalueSeqAddMove(res, iv);
+          end else xqvalueSeqAddMove(res, iv);
         end;
         else addString(iv.toString);
       end;
@@ -1953,9 +1953,9 @@ begin
     repeat
       if length(args) >= 3 then begin
         for v in args[2] do
-          xqvalueSeqAdd(result, xqvalue(regex.Match[v.toInt64]));
+          xqvalueSeqAddMove(result, xqvalue(regex.Match[v.toInt64]));
       end else
-        xqvalueSeqAdd(result, xqvalue(regEx.Match[0]));
+        xqvalueSeqAddMove(result, xqvalue(regEx.Match[0]));
     until not all or not regex.ExecNext;
 
 
@@ -2764,7 +2764,7 @@ begin
     for v in args[0] do begin
       i += 1;
       if equal(v, args[1]) then
-        xqvalueSeqAdd(result, xqvalue(i));
+        xqvalueSeqAddMove(result, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
   end;
@@ -3430,7 +3430,7 @@ begin
         for attrib in node.attributes do
           if context.staticContext.nodeCollation.equal(attrib.value, 'id') then
             if isSearchedId(attrib.realvalue) then begin
-              xqvalueSeqAdd(result, xqvalue(node));
+              xqvalueSeqAddMove(result, xqvalue(node));
               break;
             end;
       node := node.next;
