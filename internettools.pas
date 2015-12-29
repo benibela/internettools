@@ -8,7 +8,7 @@ interface
 
 uses
   bbutils, extendedhtmlparser, dregexpr, simpleinternet, internetaccess, simplehtmlparser, simplehtmltreeparser, simplexmlparser, 
-  int65math, xquery, synapseinternetaccess, w32internetaccess, simplexmltreeparserfpdom, xquery_json, mockinternetaccess, 
+  int65math, xquery, synapseinternetaccess, w32internetaccess, simplexmltreeparserfpdom, xquery_json, mockinternetaccess, xquery__regex, 
   LazarusPackageIntf;
 
 implementation

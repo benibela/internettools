@@ -724,7 +724,8 @@ begin
   inherited Create(aname, aparent, TXQValueString);
   subType:=asubtype;
   if pattern <> '' then begin
-    lexicalSpaceRegex := TRegExpr.Create(pattern);
+    lexicalSpaceRegex := TRegExpr.Create();
+    lexicalSpaceRegex.Expression := pattern;
     InitCriticalSection(lexicalSpaceRegexCS);
   end;
 end;

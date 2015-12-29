@@ -52,8 +52,7 @@ interface
 
 uses
    Classes, SysUtils,
-   dregexpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page was dead, I create a mirror on benibela.de, but it is reachable again) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr. although nowadays fpc also included this unit)
-             //ATTENTION: You must use my version of it, OR set NSUBEXP = 90, otherwise it will crash with an "TRegExpr(comp): ParseReg Unmatched ()" error everytime you use the anyURI type
+   regexpr, //this should contain Sorokin's TRegExpr library. It is contained in new fpc version, for older ones, there this package contains a copy in dregexpr.pas
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif};
 
@@ -2675,7 +2674,7 @@ function defaultQueryEngine: TXQueryEngine;
 procedure freeThreadVars;
 
 implementation
-uses base64, strutils;
+uses base64, strutils, xquery__regex;
 
 var
   XQFormats : TFormatSettings = (

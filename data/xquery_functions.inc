@@ -1928,41 +1928,6 @@ begin
   result := xqvalue(temp);
 end;
 
-function xqFunctionExtract(const args: TXQVArray): IXQValue;
-var
- regEx: TRegExpr;
- v: IXQValue;
- temp: String;
- all: Boolean;
-begin
-  requiredArgCount(args, 2,4);
-  //TODO: cache regex
-  regEx:=TRegExpr.Create(args[1].toString);
-  try
-    regEx.ModifierS := false;
-    all := false;
-    if length(args) >= 4 then begin
-      temp := args[3].toString;
-      all := strContains(temp, '*');
-      if all then temp := StringReplace(temp, '*', '',[]);
-      regEx.ModifierStr := temp;
-    end;
-    if not regEx.Exec(args[0].toString) then exit(xqvalue('')); //better empty sequence ?
-
-    result := xqvalue();
-    repeat
-      if length(args) >= 3 then begin
-        for v in args[2] do
-          xqvalueSeqAddMove(result, xqvalue(regex.Match[v.toInt64]));
-      end else
-        xqvalueSeqAddMove(result, xqvalue(regEx.Match[0]));
-    until not all or not regex.ExecNext;
-
-
-  finally
-    regEx.free;
-  end;
-end;
 
 function xqFunctionSplitEqual(const cxt: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
@@ -1986,88 +1951,7 @@ begin
   result := xqvalueFalse;
 end;
 
-function xqFunctionReplace(const args: TXQVArray): IXQValue;
-var
- regEx: TRegExpr;
-begin
-  requiredArgCount(args, 3,4);
-  //TODO: cache regex
-  regEx:=TRegExpr.Create(args[1].toString);
-  try
-  try
-    regEx.ModifierS := false;
-    if length(args) >= 4 then
-      regEx.ModifierStr:=args[3].toString;
-    result := xqvalue(regEx.Replace(args[0].toString, args[2].toString, true));
-  except
-    on e: ERegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
-  end;
-  finally
-    regEx.free;
-  end;
 
-end;
-
-function xqFunctionMatches(const args: TXQVArray): IXQValue;
-var
- regEx: TRegExpr;
-begin
-  requiredArgCount(args, 2,3);
-  //TODO: cache regex
-  regEx:=TRegExpr.Create(args[1].toString);
-  try
-  try
-    regEx.ModifierS := false;
-    if length(args) >= 3 then
-      regEx.ModifierStr:=args[2].toString;
-    result := xqvalue(regEx.Exec(args[0].toString));
-  except
-    on e: ERegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
-  end;
-  finally
-    regEx.free;
-  end;
-end;
-
-function xqFunctionTokenize(const args: TXQVArray): IXQValue;
-var
-  regEx: TRegExpr;
-  sl: TStringList;
-  lastMatchEnd: Integer;
-  input,pattern: String;
-begin
-  requiredArgCount(args, 2, 3);
-  input := args[0].toString;
-  pattern := args[1].toString;
-  if input = '' then
-    exit(xqvalue);
-
-  //TODO: cache regex
-  regEx:=TRegExpr.Create(pattern);
-  sl := TStringList.Create;
-  try
-  try
-    regEx.ModifierS := false;
-    if length(args) >= 3 then
-      regEx.ModifierStr:=args[2].toString;
-    if regEx.Exec(input) then begin
-      lastMatchEnd := 1;
-      repeat
-        sl.add(copy(regex.InputString, lastMatchEnd, regEx.MatchPos[0] - lastMatchEnd));
-        lastMatchEnd := regEx.MatchPos[0] + regEx.MatchLen[0];
-      until not regEx.ExecNext;
-      sl.add(copy(regex.InputString, lastMatchEnd, length(regex.InputString) - lastMatchEnd + 1));
-    end else sl.add(regex.InputString);
-    if sl.Count = 0 then exit(xqvalue)
-    else result := xqvalue(sl);
-  except
-    on e: ERegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
-  end;
-  finally
-    regEx.free;
-    sl.free;
-  end;
-end;
 
 function xqFunctionTranslate(const args: TXQVArray): IXQValue;
 var

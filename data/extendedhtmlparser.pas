@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 uses
   Classes, SysUtils,simplehtmltreeparser,xquery,
-    dRegExpr, //this should contain TRegExpr from  Andrey V. Sorokin (regexpstudio.com -- page dead, I create a mirror on benibela.de) (his file is named regexpr, but you should rename is to differentiate it from fpc regexpr)
+    regExpr, //this should contain Sorokin's TRegExpr library. It is contained in new fpc version, for older ones, there this package contains a copy in dregexpr.pas
     bbutils;
 
 
@@ -903,8 +903,10 @@ begin
     if s.ignoreSelfTest <> nil then ignoreSelfTest := s.ignoreSelfTest.clone;
 
     setlength(textRegexs, length(s.textRegexs));
-    for i := 0 to high(textRegexs) do
-      textRegexs[i] := TRegExpr.Create(textRegexs[i].Expression);
+    for i := 0 to high(textRegexs) do begin
+      textRegexs[i] := TRegExpr.Create();
+      textRegexs[i].Expression := s.textRegexs[i].Expression;
+    end;
   end;
 end;
 
@@ -933,7 +935,8 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     if escape then r := prefix + strEscapeRegex(r) + suffix
     else r := prefix + r + suffix;
     SetLength(textRegexs, length(textRegexs) + 1);
-    textRegexs[high(textRegexs)] := TRegExpr.Create(r);
+    textRegexs[high(textRegexs)] := TRegExpr.Create();
+    textRegexs[high(textRegexs)].Expression := r;
     i := templateAttributes.IndexOfName('case-sensitive');
     if i < 0 then textRegexs[high(textRegexs)].ModifierI := true
     else begin
@@ -1785,7 +1788,8 @@ begin
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
-  FRepetitionRegEx:=TRegExpr.Create('^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *');
+  FRepetitionRegEx:=TRegExpr.Create();
+  FRepetitionRegEx.Expression := '^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *';
   FUnnamedVariableName:='_result';
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
