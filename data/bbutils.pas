@@ -1025,6 +1025,24 @@ function arrayBinarySearch(a: TInt64Array; value: int64; choosen: TBinarySearchC
 function arrayBinarySearch(a: TFloatArray; value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
 
 
+
+
+//** Ignores the parameter to suppress warnings
+procedure ignore(const intentionallyUnusedParameter: string); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+//** Ignores the parameter to suppress warnings
+procedure ignore(const intentionallyUnusedParameter: boolean); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+//** Ignores the parameter to suppress warnings
+procedure ignore(const intentionallyUnusedParameter: Int64); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+//** Ignores the parameter to suppress warnings
+procedure ignore(const intentionallyUnusedParameter: TObject); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+//** Ignores the parameter to suppress warnings
+procedure ignore(const intentionallyUnusedParameter: pointer); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+
 implementation
 
 const MinsPerDay = 24 * 60;
@@ -6007,7 +6025,6 @@ begin
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
 
-
 function TLongintArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^longint;
 begin
@@ -6028,7 +6045,6 @@ begin
   if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
-
 
 function TLongwordArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^longword;
@@ -6051,7 +6067,6 @@ begin
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
 
-
 function TInt64ArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^int64;
 begin
@@ -6072,7 +6087,6 @@ begin
   if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
-
 
 function TFloatArrayCompare(searched: TObject; current: pointer): integer;
 type ptemp = ^float;
@@ -6096,6 +6110,39 @@ begin
 end;
 
 
+{$HINTS OFF}
+
+procedure ignore(const intentionallyUnusedParameter: string); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+begin
+
+end;
+
+
+procedure ignore(const intentionallyUnusedParameter: boolean); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+begin
+
+end;
+
+
+procedure ignore(const intentionallyUnusedParameter: Int64); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+begin
+
+end;
+
+
+procedure ignore(const intentionallyUnusedParameter: TObject); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+begin
+
+end;
+
+
+procedure ignore(const intentionallyUnusedParameter: pointer); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+begin
+
+end;
+
+
+{$HINTS ON}
 
 (*
 { TSet }

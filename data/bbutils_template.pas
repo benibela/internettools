@@ -735,6 +735,12 @@ function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearc
 function arrayBinarySearch(a: T__ArrayType__; value: T__ElementType__; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
 {%END-REPEAT}
 
+
+{%REPEAT T_Ignore, [string, boolean, Int64, TObject, pointer]}
+//** Ignores the parameter to suppress warnings
+procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+{%END-REPEAT}
+
 implementation
 
 const MinsPerDay = 24 * 60;
@@ -4159,8 +4165,17 @@ begin
   if element = nil then begin result := -1; exit; end;
   result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
 end;
+{%END-REPEAT}
+
+{$HINTS OFF}
+{%REPEAT T_Ignore, [string, boolean, Int64, TObject, pointer]}
+procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+begin
+
+end;
 
 {%END-REPEAT}
+{$HINTS ON}
 
 (*
 { TSet }
