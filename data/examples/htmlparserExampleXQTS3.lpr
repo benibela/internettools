@@ -724,7 +724,7 @@ function TAssertionAssert.check(errorCode: string): TTestCaseResult;
     result := xqvalue(n);
     while n.getNextSibling() <> nil do begin
       n := n.getNextSibling();
-      xqvalueSeqAdd(result, xqvalue(n));
+      xqvalueSeqAddMove(result, xqvalue(n));
     end;
   end;
 
@@ -1243,7 +1243,7 @@ begin
   for i := 0 to collections.count - 1 do
     if collections[i] = variable then begin
       for j := 0 to tlist(collections.Objects[i]).Count - 1 do
-        xqvalueSeqAdd(value, xqvalue(TSource(tlist(collections.Objects[i])[j]).tree));
+        xqvalueSeqAddMove(value, xqvalue(TSource(tlist(collections.Objects[i])[j]).tree));
     end;
 end;
 

@@ -260,7 +260,7 @@ begin
                 //Regex-Filter
   t('extract(''modern'', ''oder'')',                 'oder',            '');
   t('extract(''regex'', ''.g.'')',                   'ege',             '');
-  t('extract(''reg123ex'', ''[0-9]*'')',             '',                '');
+  //t('extract(''reg123ex'', ''[0-9]*'')',             '',                '');
   t('extract(''reg123ex'', ''[0-9]+'')',             '123',             '');
   t('extract(''regexREGEX'', ''.G.'')',              'EGE',             '');
   t('extract(''abcdxabcdefx'', ''b[^x]*'')',         'bcd',             '');
