@@ -274,6 +274,10 @@ begin
   t('join(extract("foo bar", "[ao]", 0, "*"))', 'o o a');
   t('join(extract("foo bar", "[^ ](.(.))", (1, 2), "*"))', 'oo o ar r');
   t('join(extract("foo bar", "[^ ](.(.))", (1, 2)))', 'oo o');
+  t('count(extract("foo bar", "NOMATCH", (1, 2), "*"))', '0');
+  t('count(extract("foo bar", "NOMATCH", (1, 2), ""))', '2');
+  t('count(extract("foo bar", "NOMATCH", (-2), "*"))', '0');
+  t('count(extract("foo bar", "NOMATCH", (-2), ""))', '1');
 
                 //Replace
   t('replace("abracadabra", "bra", "*")', 'a*cada*', '');
@@ -281,7 +285,7 @@ begin
   t('replace("abracadabra", "a.*?a", "*")', '*c*bra', '');
   t('replace("abracadabra", "a", "")', 'brcdbr', '');
   t('replace("abracadabra", "a(.)", ''a$1$1'')', 'abbraccaddabbra', '');
-  t('replace("abracadabra", ".*?", ''$1'')', 'abracadabra', ''); //in contrast to w3c tests where it causes an error
+  //t('replace("abracadabra", ".*?", ''$1'')', 'abracadabra', ''); //should cause error
   t('replace("AAAA", "A+", "b")', 'b', '');
   t('replace("AAAA", "A+?", "b")', 'bbbb', '');
   t('replace("darted", ''^(.*?)d(.*)$'', ''$1c$2'')', 'carted', '');
