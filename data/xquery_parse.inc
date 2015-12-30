@@ -95,6 +95,7 @@ type
   //**e.g. from @code(1 + 2) it will parse @code(1) (since @code(1) is complete), from @code(function(1,2,3)) it will parse everything (since @code(function) can not be evaluated without its parameters))@br
   //**(observation: that kind of looks like it parses everything except binary operators)
   function parseValue: TXQTerm;        //left most token of an ExprSingle
+  function parseOrExpr: TXQTerm;       //OrExpr
   function parse: TXQTerm;             //ExprSingle
   function parsePrimaryLevel: TXQTerm; //Expr
   function parseModule(): TXQTerm;
@@ -869,6 +870,7 @@ begin
   requireXQuery('for typeswitch statement');
   result := TXQTermTypeSwitch.Create;
   try
+    expect('(');
     result.push(parsePrimaryLevel());
     expect(')');
 
@@ -906,6 +908,7 @@ var
   tempSeq: TXQTermSequence;
 begin
   requireXQuery3('for switch statement');
+  expect('(');
   result := TXQTermSwitch.Create;
   result.push(parsePrimaryLevel());
   expect(')');
@@ -1870,19 +1873,6 @@ begin
         expect('(');
         if namespacePrefix = '' then begin
           case word of
-            'if': begin
-              result := TXQTermIf.Create();
-              with TXQTermIf(result) do begin
-                push(parsePrimaryLevel);
-                expect(')'); expect('then');
-                push(parse());
-                expect('else');
-                push(parse());
-              end;
-              exit;
-            end;
-            'typeswitch': exit(parseTypeSwitch);
-            'switch': if parsingModel in [xqpmXPath3, xqpmXQuery3] then exit(parseSwitch); //switch is not a xpath 3 statement, but still not allowed as function name
             'function': if parsingModel in [xqpmXQuery3, xqpmXPath3] then exit(parseFunctionDeclaration(nil, true));
           end;
 
@@ -1943,20 +1933,12 @@ begin
         end else lookupNamedFunction(TXQTermWithChildren(result).children[0] as TXQTermNamedFunction);
         exit();
       end;
-      '$', '<': case word of
-        'for', 'let': exit(parseFlower(word));
-        'some', 'every': exit(parseSomeEvery(word));
-      end;
       '{': case word of
         'unordered', 'ordered': begin //TODO: actually use that
            requireXQuery();
            expect('{'); result := parse(); expect('}');
            exit;
          end;
-        'try': begin
-          requireXQuery3('try');
-          exit(parseTryCatch);
-        end;
       end;
       '#': begin
         require3('Named Function Reference');
@@ -1996,9 +1978,6 @@ begin
             raiseParsingError('XQST0075', 'Schema validation is not supported');
           end;
         end;
-        'for': case nextToken(true) of
-           'tumbling', 'sliding': exit(parseFlower(word));
-         end;
       end;
 
     if (word = '') or (word[1] in [',', ';', ':', ')', ']', '}']) then //todo: check if valid xml node name
@@ -2023,10 +2002,66 @@ begin
   end;
 end;
 
-
-
-
 function TXQParsingContext.parse: TXQTerm;
+  function checkForPatternMatching: boolean; //i really abused the grammar there
+  var
+    submarker: PChar;
+  begin
+    submarker := pos;
+    result := false;
+    if nextToken() = '<' then begin
+      nextToken();
+      result := nextToken() = '>';
+    end;
+    pos := submarker;
+  end;
+
+var
+  marker: PChar;
+  token: String;
+begin
+  skipWhitespaceAndComment();
+  marker := pos;
+  token := nextToken(false);
+  case token of
+    'for': case nextToken(true) of
+      '$','tumbling', 'sliding': exit(parseFlower(token));
+      '<': if checkForPatternMatching then exit(parseFlower(token));
+    end;
+    'let': if (parsingModel in [xqpmXPath3, xqpmXQuery1, xqpmXQuery3] ) then
+      case nextToken(true) of
+        '$': exit(parseFlower(token));
+        '<': if checkForPatternMatching then exit(parseFlower(token));
+      end;
+    'some', 'every': if nextToken(true) = '$' then
+      exit(parseSomeEvery(token));
+    'switch': if (parsingModel = xqpmXQuery3) and (nextToken(true) = '(') then
+      exit(parseSwitch);
+    'typeswitch': if parsingModel in PARSING_MODEL_XQUERY then
+      exit(parseTypeSwitch);
+    'if': if nextToken(true) = '(' then begin
+      expect('(');
+      result := TXQTermIf.Create();
+      with TXQTermIf(result) do begin
+        push(parsePrimaryLevel);
+        expect(')'); expect('then');
+        push(parse());
+        expect('else');
+        push(parse());
+      end;
+      exit;
+    end;
+    'try': if (parsingModel = xqpmXQuery3) and (nextToken(true) = '{') then
+      exit(parseTryCatch);
+  end;
+  pos := marker;
+  result := parseOrExpr;
+end;
+
+
+
+
+function TXQParsingContext.parseOrExpr: TXQTerm;
   //searchs the term to split
   //e.g.
   //          to                          to

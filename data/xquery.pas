@@ -2706,6 +2706,7 @@ var
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
+  PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
