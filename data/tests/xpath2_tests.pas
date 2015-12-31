@@ -279,6 +279,18 @@ begin
   t('count(extract("foo bar", "NOMATCH", (-2), "*"))', '0');
   t('count(extract("foo bar", "NOMATCH", (-2), ""))', '1');
 
+  t('matches("foo|barXr", "foo \| bar\Dr", "x")', 'true');
+  t('extract("abc_-123.·:+", "\c+")', 'abc_-123.·:');
+  t('extract("foobarfoobarrrbaba1", "foo(ba)r+\1\11")', 'foobarrrbaba1');
+  t('extract("a-aa-ba-c", "[abcde][^a-z][abc-[abc-[c]]]")', 'a-c');
+  t('extract("^ay---", "[^^][a-k-z][\--x][x\--[x]]")', 'y---');
+  //t('extract("^ay-- --y--", "[x--[x]]")', '-'); //not sure about this one
+
+  f('matches("", "[^]")', 'FORX0002');
+  f('matches("", "[--x]")', 'FORX0002');
+  f('matches("", "[x--]")', 'FORX0002');
+  f('matches("", "[---]")', 'FORX0002');
+
                 //Replace
   t('replace("abracadabra", "bra", "*")', 'a*cada*', '');
   t('replace("abracadabra", "a.*a", "*")', '*', '');

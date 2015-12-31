@@ -4757,7 +4757,6 @@ end;
 
 function xqFunctionResolve_Html(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue; forward; //needed for retrieve
 
-{$I xquery_parse.inc}
 {$I xquery_terms.inc}
 {$I xquery_types.inc}
 {$I xquery_schemas.inc}
