@@ -311,7 +311,7 @@ begin
   equal(ps.evaluateXPath3('let $a  := "&quot;" return $a').toString, '&quot;', 'evaluateXPath3 failed');
   equal(ps.evaluateXPath3('let $x := 2*. return $x', xqvalue(7)).toString, '14', 'evaluateXPath3(ixqvalue) failed');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(TXQueryEngine.evaluateStaticXPath3('1 + 1 + let $t := 10 return $t').toString, '12', 'evaluateStaticXPath3 a failed');
+  equal(TXQueryEngine.evaluateStaticXPath3('1 + 1 + (let $t := 10 return $t)').toString, '12', 'evaluateStaticXPath3 a failed');
 
 
   writeln('XPath 3: ', count, ' completed');

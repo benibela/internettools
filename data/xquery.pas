@@ -1166,13 +1166,15 @@ type
     constructor Create;
     destructor Destroy; override;
     function findType(const typeName: string): TXSType;
-  private
-    typeList, hiddenTypeList: TStringList;
+
+    //for internal use
     function isValidNCName(const s: string): boolean;
     function isValidQName(s: string): boolean;
-    procedure hide(const s: string);
-    function isAbstractType(t: TXSType): boolean;
     function isValidationOnlyType(t: TXSType): boolean;
+    function isAbstractType(t: TXSType): boolean;
+  private
+    typeList, hiddenTypeList: TStringList;
+    procedure hide(const s: string);
   end;
 
   { TJSSchema }
@@ -1381,10 +1383,10 @@ type
     function leave (intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction; virtual;
 
     class function startVisiting(term: PXQTerm): TXQTerm_VisitAction;
+    function simpleTermVisit (term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction; //do not call, for internal use
   protected
     procedure replace(term: PXQTerm; newterm: TXQTerm); inline;
   private
-    function simpleTermVisit (term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction;
     procedure declare(v: PXQTermVariable; theparent: TXQTerm); inline;
     procedure undeclare(v: PXQTermVariable; theparent: TXQTerm); inline;
   end;
@@ -1395,7 +1397,8 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; virtual; abstract;
     function getContextDependencies: TXQContextDependencies; virtual; abstract;
     function debugTermToString: string; virtual;
-  protected
+  public
+    //for internal use
     procedure raiseParsingError(const errcode, s: string);
     procedure raiseEvaluationError(const errcode, s: string);
     procedure raiseTypeError0004(const s: string);
@@ -1414,12 +1417,14 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
     destructor destroy; override;
-  protected
+
+    //for internal use
     procedure push(t: TXQTerm);
     function push(t: array of TXQTerm): TXQTerm;
+  protected
     procedure evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
     function getChildrenContextDependencies: TXQContextDependencies; virtual;
-
+  public
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
   end;
@@ -1473,7 +1478,8 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function serialize: string;
-  protected
+  public
+    //for internal use
     function clone: TXQTerm; override;
 
     function isSingleType(): boolean; //test if ti is SingleType(XPATH) = AtomicType(XPATH) "?" ?
@@ -1557,7 +1563,7 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
     function clone: TXQTerm; override;
-  protected
+
     function toQueryCommand: TXQPathMatchingStep; override;
     procedure assignNamespaceToMatchingStep(var step: TXQPathMatchingStep);
   end;
@@ -1568,7 +1574,7 @@ type
     constructor create(seq: TXQTerm; filter: TXQTerm = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
-  protected
+
     function toQueryCommand: TXQPathMatchingStep; override;
     procedure addToQueryList(var path: TXQPathMatching); override;
   end;
@@ -1607,10 +1613,13 @@ type
     procedure assignWithoutChildren(source: TXQTermNamedFunction);
     function clone: TXQTerm; override;
     function ToString: ansistring; override;
+
+    //for internal usage
+    class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+
   private
     interpretedFunction: TXQValueFunction;
     functionStaticContext: TXQStaticContext; //used for variable cycle detection
-    class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
     procedure init(const context: TXQStaticContext);
   end;
 
@@ -1635,7 +1644,7 @@ type
     function debugTermToString: string; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
-  protected
+
     procedure addToQueryList(var path: TXQPathMatching); override;
   end;
 
@@ -1692,9 +1701,11 @@ type
 
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
     procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
+
+    //for internal use
+    function findDuplicatedVariable: TXQTermVariable;
   private
     procedure visitlocalvariables(callback: TXQTermFlowerWindowVariableCallback; data: pointer);
-    function findDuplicatedVariable: TXQTermVariable;
     function variableCount: integer;
   end;
   TXQTermFlowerLetPattern = class(TXQTermFlowerSubClause)
@@ -1900,11 +1911,13 @@ type
     function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 
     destructor Destroy; override;
-  private
+  public
+    //for internal use
     fterm: txqterm;
     staticContextInitialized, staticContextShared: boolean;
     staticContext: TXQStaticContext;
     procedure initializeStaticContext(const context: TXQEvaluationContext);
+  private
     function getTerm: TXQTerm;
     procedure setTerm(aterm: TXQTerm);
   end;
@@ -2341,7 +2354,8 @@ public
     FLastQuery: IXQuery;
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
-    FModules: TInterfaceList;
+  public
+    FModules: TInterfaceList; //internal used
 
   protected
     DefaultParser: TTreeParser; //used by fn:doc if no context node is there
@@ -2377,7 +2391,7 @@ public
 
     //** Last parsed query
     property LastQuery: IXQuery read FLastQuery;
-  protected
+  //for internal use
     function findNamespace(const nsprefix: string): INamespace;
     class function findOperator(const pos: pchar): TXQOperatorInfo;
   end;
@@ -2613,8 +2627,8 @@ protected
   basicFunctions, complexFunctions, interpretedFunctions: TStringList;
   binaryOpLists: TStringList;
   binaryOpFunctions: TStringList;
-  procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
   class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
+  procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
 end;
 
 //**Returns a "..." string for use in json (internally used)
@@ -2673,8 +2687,34 @@ function defaultQueryEngine: TXQueryEngine;
 //**This also calls freeThreadVars of internetaccess
 procedure freeThreadVars;
 
+
+type TXQAbstractParsingContext = class
+protected
+ engine: TXQueryEngine;
+
+ options: TXQParsingOptions;
+ parsingModel: TXQParsingModel;
+ encoding: TEncoding;
+ staticContext: TXQStaticContext;
+
+ str: string;
+ pos: pchar;
+ resultquery: TXQuery;
+ function parseModule(): TXQTerm; virtual; abstract;
+ function parseXStringOnly(nullTerminatedString: boolean = false): TXQTerm; virtual; abstract;
+ procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); virtual; abstract;
+
+end;
+
+var XMLNamespace_MyExtensions: INamespace;
+function convertElementTestToPathMatchingStep(const select: string; const children: TXQTermArray): TXQPathMatchingStep;
+
+function xqFunctionConcat(const args: TXQVArray): IXQValue;
+function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+
 implementation
-uses base64, strutils, xquery__regex;
+uses base64, strutils, xquery__regex, xquery__parse;
 
 var
   XQFormats : TFormatSettings = (
@@ -2706,7 +2746,7 @@ var
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
-  PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
+
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
@@ -2861,7 +2901,7 @@ end;
 
 
 
-var   XMLNamespace_XPathFunctions, XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_MyExtensions, XMLNamespace_MyExtensionOperators, XMLNamespace_XQuery: INamespace;
+var   XMLNamespace_XPathFunctions, XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_MyExtensionOperators, XMLNamespace_XQuery: INamespace;
 
 
 function namespaceReverseLookup(const url: string): INamespace;
@@ -2871,7 +2911,7 @@ begin
   else result := TNamespace.create(url, 'prefix');
 end;
 
-
+{$HINTS OFF}
 procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: string); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: boolean); inline; begin end;
@@ -2886,6 +2926,7 @@ procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begi
 procedure ignore(const intentionallyUnusedParameter: array of string); {inline; }begin end;
 procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: array of IXQValue); { inline; } begin end;
+{$HINTS ON}
 
 function arrayToXQValueArray(a: array of IXQValue): TXQVArray;
 var
@@ -4525,8 +4566,6 @@ begin
 end;
 }
 
-function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
-function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue; forward;
 
 
 
@@ -4716,7 +4755,6 @@ begin
   end;
 end;
 
-function xqFunctionConcat(const args: TXQVArray): IXQValue; forward;  //need for extended strings
 function xqFunctionResolve_Html(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue; forward; //needed for retrieve
 
 {$I xquery_parse.inc}
@@ -5966,7 +6004,7 @@ begin
       result.staticContextShared := staticContextShared;
       cxt.resultquery := result;
       result.fterm := cxt.parseModule();
-      if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
+
     finally
       cxt.free;
     end;
@@ -5999,8 +6037,7 @@ begin
       cxt.str := str;
       cxt.pos := @cxt.str[1];
       result := TXQuery.Create(cxt.staticContext);
-      result.fterm := cxt.parseXString(true);
-      if cxt.nextToken() <> '' then cxt.raiseParsingError('XPST0003', 'Unexpected characters after end of expression (possibly an additional closing bracket)');
+      result.fterm := cxt.parseXStringOnly(true);
     finally
       cxt.free;
     end;
@@ -6517,7 +6554,6 @@ var
   tempNamespace: INamespace;
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
-  tempProp: TXQValue;
   namespaceMatching: TXQNamespaceMode;
   tempSeq: IXQValue;
   tempList: TXQVList;
@@ -7053,7 +7089,7 @@ begin
   temp := TXQBasicFunctionInfo.Create;
   temp.func := func;
   basicFunctions.AddObject(name, temp);
-  parseTypeChecking(temp, typeChecking);
+   parseTypeChecking(temp, typeChecking);
   if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
   if minArgCount <> high(Integer) then begin
      temp.minArgCount := minArgCount;
@@ -7168,41 +7204,8 @@ end;
 var globalTypeParsingContext: TXQParsingContext;
 
 procedure TXQNativeModule.parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
-var
-  i, j: Integer;
 begin
-  SetLength(info.versions, length(typeChecking));
-  for i:= 0 to high(typeChecking) do
-    with globalTypeParsingContext  do begin
-      //AllowJSON:=AllowJSONDefaultInternal; //todo: improve json modularization?
-      str:=typeChecking[i];
-      pos:=@globalTypeParsingContext.str[1];
-      skipWhitespaceAndComment();
-      if pos^ <> '(' then info.versions[i].name:=nextTokenNCName();
-      expect('(');
-      skipWhitespaceAndComment();
-      if pos^ <> ')' then begin
-        SetLength(info.versions[i].types, strCount(str, ',') + 1); //guess for parameter count (does not work for function types)
-        for j := 0 to high(info.versions[i].types) do begin
-          skipWhitespaceAndComment();
-          case pos^ of
-            ')': begin
-              SetLength(info.versions[i].types, j);
-              break;
-            end;
-            ',': expect(',');
-          end;
-          expect('$'); nextTokenNCName(); expect('as');
-          info.versions[i].types[j] := parseSequenceType([]);
-        end;
-      end;
-      expect(')');
-       //if nextToken() = 'as' then
-      expect('as');
-      skipWhitespaceAndComment();
-      if not ((pos^ = 'n') and strlEqual(pos, 'none', 4)) then
-        info.versions[i].returnType := parseSequenceType([]);
-    end;
+  globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking);
 end;
 
 class function TXQNativeModule.findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;

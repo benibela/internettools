@@ -616,7 +616,7 @@ begin
   f('declare variable $foo := test(); declare function test() { test() + $foo }; 2', 'XQST0054');
 
   //some realworld examples from stackoverflow
-  t('let $x := 1, $seq := (2,4,7,11,16) for $temp at $pos in $seq return $seq[$pos] - if ($pos eq 1) then $x else $seq[$pos - 1]', '1 2 3 4 5');
+  t('let $x := 1, $seq := (2,4,7,11,16) for $temp at $pos in $seq return $seq[$pos] - (if ($pos eq 1) then $x else $seq[$pos - 1])', '1 2 3 4 5');
   t('let $pVal := 1, $vList := (2,4,7,11,16), $vList2 := ($pVal, subsequence($vList, 1, count($vList)-1)) return for $i in 1 to count($vList) return $vList[$i] - $vList2[$i]', '1 2 3 4 5');
 
 
@@ -1721,10 +1721,10 @@ begin
 
 
 
-  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html return local-name($i)', 'html');
-  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg:* return local-name($i)', 'a b');
-  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg2:* return local-name($i)', 'a b');
-  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / for $i in html/svg:abc/svg3:* return local-name($i)', 'c');
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / (for $i in html return local-name($i))', 'html');
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / (for $i in html/svg:abc/svg:* return local-name($i))', 'a b');
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / (for $i in html/svg:abc/svg2:* return local-name($i))', 'a b');
+  t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / (for $i in html/svg:abc/svg3:* return local-name($i))', 'c');
 
   m('declare option pxp:extended-strings "on"; let $a := 17 return x">{$a}<" ', '>17<');
   f('declare option pxp:extended-strings "off"; let $a := 17 return x">{$a}<" ', 'err:XPST0003');

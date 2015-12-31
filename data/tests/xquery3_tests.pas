@@ -373,7 +373,7 @@ begin
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { "a" cast as xs:integer } catch err:FORG0001 { 2 }', '2');
   f('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { "a" cast as xs:integer } catch err:XPTY0004 { 2 }', 'FORG0001');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { "a" cast as xs:integer } catch unknown { 0 } catch *:unk  { 0 } catch *:FORG0001 | err:XPTY0004 { 3 }', '3');
-  m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { "a" cast as xs:integer } catch Q{http://www.w3.org/2005/xqt-errors}FORG0001 { function () { "Code: " || $err:code || ":" || count(($err:description, $err:value, $err:module, $err:line-number, $err:column-number, $err:additional)) } } ()', 'Code: err:FORG0001:1');
+  m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; (try { "a" cast as xs:integer } catch Q{http://www.w3.org/2005/xqt-errors}FORG0001 { function () { "Code: " || $err:code || ":" || count(($err:description, $err:value, $err:module, $err:line-number, $err:column-number, $err:additional)) } }) ()', 'Code: err:FORG0001:1');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000")) } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 error function called');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000"), "sometext") } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 sometext');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000"), "foo", "bar") } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 foo bar');

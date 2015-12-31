@@ -91,7 +91,6 @@
       <Unit2>
         <Filename Value="../extendedhtmlparser.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="extendedhtmlparser"/>
       </Unit2>
       <Unit3>
         <Filename Value="xpath2_tests.pas"/>
@@ -101,6 +100,7 @@
       <Unit4>
         <Filename Value="xquery1_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="xquery1_tests"/>
       </Unit4>
       <Unit5>
         <Filename Value="internetaccess_tests.pas"/>
@@ -123,7 +123,6 @@
       <Unit9>
         <Filename Value="parsertests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="parsertests"/>
       </Unit9>
       <Unit10>
         <Filename Value="extendedhtmlparser_tests.pas"/>
@@ -136,7 +135,6 @@
       <Unit12>
         <Filename Value="simpleinternet_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="simpleinternet_tests"/>
       </Unit12>
       <Unit13>
         <Filename Value="commontestutils.pas"/>
@@ -151,7 +149,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/import/regexpr/Source/;/home/benito/hg/components/pascal/internet/;../../import;.;../../../components/pascal/import/bigint;.."/>
+      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/internet/;../../import;.;..;../../../../../components/pascal/import/flre/src"/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>

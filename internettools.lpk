@@ -7,11 +7,11 @@
       <Version Value="11"/>
       <SearchPaths>
         <IncludeFiles Value="data;../lazarus/dialogs"/>
-        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system"/>
+        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system;../../../components/pascal/import/flre/src"/>
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="25">
+    <Files Count="26">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -112,6 +112,10 @@
         <Filename Value="data/xquery__regex.pas"/>
         <UnitName Value="xquery__regex"/>
       </Item25>
+      <Item26>
+        <Filename Value="data/xquery__parse.pas"/>
+        <UnitName Value="xquery__parse"/>
+      </Item26>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>
