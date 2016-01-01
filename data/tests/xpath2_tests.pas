@@ -285,6 +285,10 @@ begin
   t('extract("a-aa-ba-c", "[abcde][^a-z][abc-[abc-[c]]]")', 'a-c');
   t('extract("^ay---", "[^^][a-k-z][\--x][x\--[x]]")', 'y---');
   //t('extract("^ay-- --y--", "[x--[x]]")', '-'); //not sure about this one
+  t('fn:matches("helloworld", "hello world", "x") ' , 'true');
+  t('fn:matches("helloworld", "hello[ ]world", "x") ' , 'false');
+  t('fn:matches("hello world", "hello\ sworld", "x") ' , 'true');
+  t('fn:matches("hello world", "hello world", "x") ' , 'false');
 
   f('matches("", "[^]")', 'FORX0002');
   f('matches("", "[--x]")', 'FORX0002');
