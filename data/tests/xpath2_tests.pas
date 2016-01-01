@@ -13,7 +13,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser, bbutils, xquery_json;
+uses xquery, simplehtmltreeparser, bbutils, xquery_json, xquery__regex;
 
 procedure equal(const s1, s2, testname: string);
 begin
@@ -279,21 +279,23 @@ begin
   t('count(extract("foo bar", "NOMATCH", (-2), "*"))', '0');
   t('count(extract("foo bar", "NOMATCH", (-2), ""))', '1');
 
-  t('matches("foo|barXr", "foo \| bar\Dr", "x")', 'true');
-  t('extract("abc_-123.·:+", "\c+")', 'abc_-123.·:');
-  t('extract("foobarfoobarrrbaba1", "foo(ba)r+\1\11")', 'foobarrrbaba1');
-  t('extract("a-aa-ba-c", "[abcde][^a-z][abc-[abc-[c]]]")', 'a-c');
-  t('extract("^ay---", "[^^][a-k-z][\--x][x\--[x]]")', 'y---');
-  //t('extract("^ay-- --y--", "[x--[x]]")', '-'); //not sure about this one
-  t('fn:matches("helloworld", "hello world", "x") ' , 'true');
-  t('fn:matches("helloworld", "hello[ ]world", "x") ' , 'false');
-  t('fn:matches("hello world", "hello\ sworld", "x") ' , 'true');
-  t('fn:matches("hello world", "hello world", "x") ' , 'false');
+  if xquery__regex.UsingFLRE then begin
+    t('matches("foo|barXr", "foo \| bar\Dr", "x")', 'true');
+    t('extract("abc_-123.·:+", "\c+")', 'abc_-123.·:');
+    t('extract("foobarfoobarrrbaba1", "foo(ba)r+\1\11")', 'foobarrrbaba1');
+    t('extract("a-aa-ba-c", "[abcde][^a-z][abc-[abc-[c]]]")', 'a-c');
+    t('extract("^ay---", "[^^][a-k-z][\--x][x\--[x]]")', 'y---');
+    //t('extract("^ay-- --y--", "[x--[x]]")', '-'); //not sure about this one
+    t('fn:matches("helloworld", "hello world", "x") ' , 'true');
+    t('fn:matches("helloworld", "hello[ ]world", "x") ' , 'false');
+    t('fn:matches("hello world", "hello\ sworld", "x") ' , 'true');
+    t('fn:matches("hello world", "hello world", "x") ' , 'false');
 
-  f('matches("", "[^]")', 'FORX0002');
-  f('matches("", "[--x]")', 'FORX0002');
-  f('matches("", "[x--]")', 'FORX0002');
-  f('matches("", "[---]")', 'FORX0002');
+    f('matches("", "[^]")', 'FORX0002');
+    f('matches("", "[--x]")', 'FORX0002');
+    f('matches("", "[x--]")', 'FORX0002');
+    f('matches("", "[---]")', 'FORX0002');
+  end;
 
                 //Replace
   t('replace("abracadabra", "bra", "*")', 'a*cada*', '');
