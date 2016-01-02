@@ -196,11 +196,12 @@ begin
   querykind := guessExtractionKind(query);
 
   case querykind of
-    ekTemplate: begin
+    ekPatternHTML, ekPatternXML: begin
       lastQueryWasPXP := false;
       if templateParser = nil then begin
         templateParser := THtmlTemplateParser.create;
-        templateParser.TemplateParser.parsingModel:= pmHTML;
+        if querykind = ekPatternXML then templateParser.TemplateParser.parsingModel:= pmStrict
+        else templateParser.TemplateParser.parsingModel:= pmHTML;
         templateParser.TemplateParser.repairMissingStartTags := false;
         templateParser.HTMLParser.repairMissingStartTags := format = itfHTML;
       end;
