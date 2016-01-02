@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 uses
   Classes, SysUtils,simplehtmltreeparser,xquery,
-    regExpr, //this should contain Sorokin's TRegExpr library. It is contained in new fpc version, for older ones, there this package contains a copy in dregexpr.pas
+   xquery__regex,
     bbutils;
 
 
@@ -99,7 +99,7 @@ TTemplateElement=class(TTreeNode)
 
   //"caches"
   test, condition, valuepxp, source, min, max, varname, ignoreSelfTest: IXQuery; //when adding, remember to update all the references
-  textRegexs: array of TRegExpr;
+  textRegexs: array of TWrappedRegExpr;
 
   function templateReverse: TTemplateElement; inline;
   function templateNext: TTemplateElement; inline;
@@ -626,7 +626,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 THtmlTemplateParser=class
   protected
     //FObjects: boolean;
-    FRepetitionRegEx: TRegExpr;
+    FRepetitionRegEx: TWrappedRegExpr;
     FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
     FVeryShortNotation: boolean;
     FUnnamedVariableName: string;
@@ -727,7 +727,7 @@ function guessExtractionKind(e: string): TExtractionKind;
 
 implementation
 
-uses math;
+uses math,strutils;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchText;
@@ -903,10 +903,8 @@ begin
     if s.ignoreSelfTest <> nil then ignoreSelfTest := s.ignoreSelfTest.clone;
 
     setlength(textRegexs, length(s.textRegexs));
-    for i := 0 to high(textRegexs) do begin
-      textRegexs[i] := TRegExpr.Create();
-      textRegexs[i].Expression := s.textRegexs[i].Expression;
-    end;
+    for i := 0 to high(textRegexs) do
+      textRegexs[i] := wregexprClone(s.textRegexs[i]);
   end;
 end;
 
@@ -924,6 +922,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
   var i: integer;
    r: String;
    cs: String;
+   flags: string;
   begin
     i := templateAttributes.IndexOfName(name);
     if i < 0 then exit();
@@ -935,14 +934,14 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     if escape then r := prefix + strEscapeRegex(r) + suffix
     else r := prefix + r + suffix;
     SetLength(textRegexs, length(textRegexs) + 1);
-    textRegexs[high(textRegexs)] := TRegExpr.Create();
-    textRegexs[high(textRegexs)].Expression := r;
+    flags := 's';
     i := templateAttributes.IndexOfName('case-sensitive');
-    if i < 0 then textRegexs[high(textRegexs)].ModifierI := true
+    if i < 0 then flags += 'i'
     else begin
       cs := templateAttributes.ValueFromIndex[i];
-      textRegexs[high(textRegexs)].ModifierI := (cs = 'false') or (cs = 'case-insensitive') or (cs = 'insensitive') ;
+      if (cs = 'false') or (cs = 'case-insensitive') or (cs = 'insensitive') then flags += 'i';
     end;
+    textRegexs[high(textRegexs)] := wregexprParse(r, flags);
   end;
 
   function isVariableName(t: TXQTerm): boolean;
@@ -1008,7 +1007,7 @@ var
  i: Integer;
 begin
   for i:=0 to high(textRegexs) do
-    FreeAndNil(textRegexs[i]);
+    wregexprFree(textRegexs[i]);
   setlength(textRegexs, 0);
   {FreeAndNil(test);
   FreeAndNil(condition);
@@ -1192,7 +1191,7 @@ var
   found: Boolean;
   attrib: TTreeAttribute;
   tempContext: TXQEvaluationContext;
-  regexp: TRegExpr;
+  regexp: TWrappedRegExpr;
   caseSensitive: Boolean;
 
   function fi(cs, csi: TXQCollationBoolFunction): TXQCollationBoolFunction;inline;
@@ -1234,13 +1233,11 @@ begin
       'ends-with':   if not fi(@strEndsWith, @striEndsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
       'contains':    if not fi(@strContains, @striContains)(html.getAttribute(name), attrib.realvalue) then exit(false);
       'matches':     begin
-        regexp:=TRegExpr.Create;
+        regexp:=wregexprParse(attrib.realvalue, ifthen(caseSensitive, '', 'is'));
         try
-          regexp.Expression:=attrib.realvalue; //todo cache
-          regexp.ModifierI := not caseSensitive;
-          if not regexp.Exec(html.getAttribute(name)) then exit(false);
+          if not wregexprMatches(regexp, html.getAttribute(name)) then exit(false);
         finally
-          regexp.free;
+          wregexprFree(regexp);
         end;
       end;
       else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind', self);
@@ -1325,17 +1322,19 @@ var xpathText: TTreeNode;
    ok: Boolean;
   begin
     //if we find a text match we can assume it is a true match
-    ok := true;
-    for i := 0 to high(templateStart.textRegexs) do
-      if not templateStart.textRegexs[i].Exec(htmlStart.value) then begin
-        ok := false;
-        break;
+    if htmlStart.typ = tetText then begin
+      ok := true;
+      for i := 0 to high(templateStart.textRegexs) do
+        if not wregexprMatches(templateStart.textRegexs[i], htmlStart.value) then begin
+          ok := false;
+          break;
+        end;
+      if ok and (templateStart.condition <> nil) then
+        ok := performPXPEvaluation(templateStart.condition).toBoolean;
+      if ok then begin
+        templateStart.match := htmlStart;
+        templateStart := templateStart.templateNext;
       end;
-    if ok and (templateStart.condition <> nil) then
-      ok := performPXPEvaluation(templateStart.condition).toBoolean;
-    if ok then begin
-      templateStart.match := htmlStart;
-      templateStart := templateStart.templateNext;
     end;
     htmlStart := htmlStart.next;
   end;
@@ -1373,7 +1372,6 @@ var xpathText: TTreeNode;
   procedure HandleCommandRead;
   var
    value:IXQValue;
-   regexp: TRegExpr;
    oldvarcount: Integer;
    attribs: tStringAttributeList;
    submatch: Integer;
@@ -1387,14 +1385,9 @@ var xpathText: TTreeNode;
     value:=performPXPEvaluation(templateStart.source);
 
     regex := attribs.Values['regex'];
-    if regex<>'' then begin
-      regexp:=TRegExpr.Create;
-      regexp.Expression:=regex;
-      regexp.Exec(value.toString);
-      submatch := StrToIntDef(templateStart.templateAttributes.Values['submatch'],0);
-      value:=xqvalue(regexp.Match[submatch]);
-      regexp.free;
-    end;
+    if regex<>'' then
+      value := xqFunctionExtract(xqvalueArray([value, xqvalue(regex), xqvalue(StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)), xqvalue('i')]));
+
 
 
     if templateStart.varname <> nil then begin
@@ -1788,8 +1781,7 @@ begin
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
-  FRepetitionRegEx:=TRegExpr.Create();
-  FRepetitionRegEx.Expression := '^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *';
+  FRepetitionRegEx:=wregexprParse('^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *', 's');
   FUnnamedVariableName:='_result';
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
@@ -1813,7 +1805,7 @@ destructor THtmlTemplateParser.destroy;
 begin
   FQueryEngine.Free;
   FAttributeMatching.Free;
-  FRepetitionRegEx.Free;
+  wregexprFree(FRepetitionRegEx);
   FreeAndNil(FVariables);
   FVariableLogCondensed.free;
   FOldVariableLog.Free;
@@ -1841,6 +1833,7 @@ var el: TTemplateElement;
     i: Integer;
     looper: TTemplateElement;
     temp: TTemplateElement;
+    matches: TWrappedMatchArray;
 begin
    //read template
   FTemplate.parseTree(template, templateName);
@@ -1884,17 +1877,17 @@ begin
           if temp.typ = tetClose then temp := temp.templateReverse;
           temp.flags += [tefOptional];
         end;
-        if (el.value <> '') and ((el.value[1] in ['*', '+']) or ((el.value[1] = '{') and FRepetitionRegEx.Exec(el.value))) then begin
+        if (el.value <> '') and ((el.value[1] in ['*', '+']) or ((el.value[1] = '{') and wregexprExtract(FRepetitionRegEx, el.value, matches))) then begin
           looper := TTemplateElement.create(tetCommandLoopOpen);
           TTemplateElement(el.getPrevious()).insertSurrounding(looper, TTemplateElement.create(tetCommandLoopClose));
           if el.value[1] <> '{' then begin
             if el.value[1] = '+' then looper.setTemplateAttribute('min', '1');
             delete(el.value,1,1);
           end else begin
-            looper.setTemplateAttribute('min', FRepetitionRegEx.Match[1]);
-            if FRepetitionRegEx.MatchLen[3] <= 0 then looper.setTemplateAttribute('max', FRepetitionRegEx.Match[1])
-            else looper.setTemplateAttribute('max', FRepetitionRegEx.Match[3]);
-            delete(el.value,1,FRepetitionRegEx.MatchLen[0]);
+            looper.setTemplateAttribute('min', matches[1]);
+            if (length(matches) < 4) or (length(matches[3]) <= 0) then looper.setTemplateAttribute('max', matches[1])
+            else looper.setTemplateAttribute('max', matches[3]);
+            delete(el.value,1,length(matches[0]));
           end;
         end;
         if el.value = '' then el.templateType := tetIgnore
