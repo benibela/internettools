@@ -722,7 +722,7 @@ THtmlTemplateParser=class
 //** xml compatible namespace url to define new template prefixes
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 
-type TExtractionKind = (ekAuto, ekXPath2, ekXPath3, ekTemplate, ekCSS, ekXQuery1, ekXQuery3, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
+type TExtractionKind = (ekAuto, ekXPath2, ekXPath3, ekPatternHTML, ekPatternXML, ekCSS, ekXQuery1, ekXQuery3, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
 function guessExtractionKind(e: string): TExtractionKind;
 
 implementation
@@ -2096,7 +2096,7 @@ begin
 
   if (e = '') or (e = '.' {just context item}) then exit(ekXPath3);
   if e[1] in [#0..#32] then e := trim(e);
-  if (e[1] = '<') then exit(ekTemplate);
+  if (e[1] = '<') then exit(ekPatternHTML);
 
   if e[1] = '#' then exit(ekCSS);
 
