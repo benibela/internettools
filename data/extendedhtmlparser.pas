@@ -922,7 +922,7 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
   var i: integer;
    r: String;
    cs: String;
-   flags: string;
+   flags: TWrappedRegExprFlags;
   begin
     i := templateAttributes.IndexOfName(name);
     if i < 0 then exit();
@@ -934,12 +934,12 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     if escape then r := prefix + strEscapeRegex(r) + suffix
     else r := prefix + r + suffix;
     SetLength(textRegexs, length(textRegexs) + 1);
-    flags := 's';
+    flags := [wrfSingleLine];
     i := templateAttributes.IndexOfName('case-sensitive');
-    if i < 0 then flags += 'i'
+    if i < 0 then include(flags, wrfIgnoreCase)
     else begin
       cs := templateAttributes.ValueFromIndex[i];
-      if (cs = 'false') or (cs = 'case-insensitive') or (cs = 'insensitive') then flags += 'i';
+      if (cs = 'false') or (cs = 'case-insensitive') or (cs = 'insensitive') then include(flags, wrfIgnoreCase)
     end;
     textRegexs[high(textRegexs)] := wregexprParse(r, flags);
   end;
@@ -1233,7 +1233,8 @@ begin
       'ends-with':   if not fi(@strEndsWith, @striEndsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
       'contains':    if not fi(@strContains, @striContains)(html.getAttribute(name), attrib.realvalue) then exit(false);
       'matches':     begin
-        regexp:=wregexprParse(attrib.realvalue, ifthen(caseSensitive, '', 'is'));
+        if caseSensitive then regexp:=wregexprParse(attrib.realvalue, [wrfSingleLine])
+        else regexp:=wregexprParse(attrib.realvalue,  [wrfIgnoreCase,wrfSingleLine]);
         try
           if not wregexprMatches(regexp, html.getAttribute(name)) then exit(false);
         finally
@@ -1781,7 +1782,7 @@ begin
   outputEncoding:=eUTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
-  FRepetitionRegEx:=wregexprParse('^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *', 's');
+  FRepetitionRegEx:=wregexprParse('^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *', [wrfSingleLine]);
   FUnnamedVariableName:='_result';
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
