@@ -2451,6 +2451,7 @@ public
   procedure xqvalueSeqAddMove(var list: IXQValue; add: IXQValue);
   //function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
 
+  function xqvalueArray(a: array of IXQValue): TXQVArray;
 
 type
   (***
@@ -2927,14 +2928,6 @@ procedure ignore(const intentionallyUnusedParameter: array of string); {inline; 
 procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: array of IXQValue); { inline; } begin end;
 {$HINTS ON}
-
-function arrayToXQValueArray(a: array of IXQValue): TXQVArray;
-var
-  i: Integer;
-begin
-  setlength(result, length(a));
-  for i := 0 to high(a) do Result[i] := a[i];
-end;
 
 {$I disableRangeOverflowChecks.inc}
 
@@ -4484,6 +4477,14 @@ begin
       list := temp;
     end;
   end;
+end;
+
+function xqvalueArray(a: array of IXQValue): TXQVArray;
+var
+  i: Integer;
+begin
+  setlength(result, length(a));
+  for i := 0 to high(a) do Result[i] := a[i];
 end;
 
 const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];

@@ -1547,7 +1547,7 @@ var res: IXQValue;
             'object':
               addString(n['data']);
             'form':
-              resolve(xqFunctionForm(context, arrayToXQValueArray([iv])))
+              resolve(xqFunctionForm(context, xqvalueArray([iv])))
             else addString(n.deepNodeText());
           end;
         end;

@@ -376,7 +376,7 @@ var tempContext: TXQEvaluationContext;
   begin
     f := guessFormat(data, uri, contenttype);
     if (f = itfJSON) and (defaultQueryEngine.ParsingOptions.AllowJSON) then
-      exit ( defaultQueryEngine.findNativeModule('http://jsoniq.org/functions').findBasicFunction('parse-json', 1).func(arrayToXQValueArray([xqvalue(data)])));
+      exit ( defaultQueryEngine.findNativeModule('http://jsoniq.org/functions').findBasicFunction('parse-json', 1).func(xqvalueArray([xqvalue(data)])));
     if f = itfXML then begin
       if data = '' then exit(TXQValueString.create(baseSchema.untypedAtomic, ''));
       //default
@@ -421,7 +421,7 @@ begin
   result := xqvalue();
   for i := 1 to getSequenceCount do begin
     v := get(i);
-    if v.kind = pvkNode then handle(xqFunctionResolve_Html(tempContext, arrayToXQValueArray([v])))
+    if v.kind = pvkNode then handle(xqFunctionResolve_Html(tempContext, xqvalueArray([v])))
     else handle(v);
   end;
 end;
