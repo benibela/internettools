@@ -295,6 +295,19 @@ begin
     f('matches("", "[--x]")', 'FORX0002');
     f('matches("", "[x--]")', 'FORX0002');
     f('matches("", "[---]")', 'FORX0002');
+
+    t('matches("axax", "(a\p{Lu})\1", "i")', 'false');
+    t('matches("aXax", "(a\p{Lu})\1", "i")', 'true');
+
+    t('matches("axbcde", "((a\p{Lu}bcde)\2)", "i")', 'false');
+    t('matches("aXbcdeaxbcde", "((a\p{Lu}bcde)\2)", "i")', 'true');
+    t('matches("aXbcdeabcde", "((a\p{Lu}bcde)\2)", "i")', 'false');
+
+    t('matches("12aubcdfoobareaubcdfoobaredfoobar", "12((a\p{Lu}bc(dfoobar)e)\2)\3", "i")', 'false');
+    t('matches("12aUbcdfoobareaubcdfooBAReDFOOBAR", "12((a\p{Lu}bc(dfoobar)e)\2)\3", "i")', 'true');
+    t('matches("12aUbcdfoobareaubcdfooBAReDFOOBAR---aa", "12((a\p{Lu}bc(dfoobar)e)\2)\3---(((\p{Lu})))\5", "i")', 'false');
+    t('matches("12aUbcdfoobareaubcdfooBAReDFOOBAR---Aa", "12((a\p{Lu}bc(dfoobar)e)\2)\3---(((\p{Lu})))\5", "i")', 'true');
+
   end;
 
                 //Replace
