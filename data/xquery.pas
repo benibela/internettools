@@ -5744,6 +5744,7 @@ begin
   ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
   ParsingOptions.AllowJSON:=AllowJSONDefaultInternal;
   ParsingOptions.AllowJSONLiterals:=true;
+  ParsingOptions.LineEndingNormalization := xqlenXML1;
   VariableChangelog := TXQVariableChangeLog.create();
   //OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   //OnDefineVariable:= @VariableChangelog.defineVariable;
@@ -5989,7 +5990,6 @@ begin
     result.staticContextShared := staticContextShared;
     exit;
   end;
-  if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.options := ParsingOptions;
@@ -6025,7 +6025,6 @@ begin
     result := TXQuery.Create(context, TXQTermSequence.Create);
     exit;
   end;
-  if pos(#13, str) > 0 then str := strNormalizeLineEndings(str);
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.options :=ParsingOptions;
