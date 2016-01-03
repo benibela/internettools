@@ -943,7 +943,7 @@ end;
 
 function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer; slice2: integer): boolean;
 begin
-  result := arrayIndexOf(a, e) >= 0;
+  result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
 procedure arrayInvert(a: T__ArrayType__; slice1: integer; slice2: integer);
@@ -1180,7 +1180,6 @@ end;
 
 //equal comparison, case insensitive, ignoring #0-bytes
 function strlsiequal(const p1, p2: pansichar; const l1, l2: longint): boolean;
-var i:integer;
 begin
   result:=(l1=l2) and strlsiequal(p1, p2, l1);
 end;
@@ -1509,8 +1508,7 @@ end;
 
 
 procedure strMoveRef(var source: string; var dest: string; const size: longint); {$IFDEF HASINLINE} inline; {$ENDIF}
-var ps, pd: PAnsiChar;
-    clearFrom: PAnsiChar;
+var clearFrom: PAnsiChar;
     clearTo: PAnsiChar;
     countHighSize: integer;
 begin
@@ -2964,6 +2962,8 @@ var
 begin
   r := n;
   e := 0;
+  d := 0;
+  m := 0;
   DivMod(r,p,d,m);
   while m = 0 do begin
     r := d;
@@ -3313,12 +3313,12 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
 
 function readNumber(const s:RawByteString; var ip: integer; const count: integer): integer;
 begin
-  result := StrToIntDef(copy(input, ip, count), -1);
+  result := StrToIntDef(copy(s, ip, count), -1);
   inc(ip,  count);
 end;
 
 var
-  i,j: Integer;
+  i: Integer;
 
   prefix, mid, suffix: RawByteString;
   p, formatChars: Integer;
@@ -3752,7 +3752,6 @@ function dateTimeFormat(const mask: RawByteString; const dateTime: TDateTime): R
 var
   y,m,d: Integer;
   h,n,s,ms: word;
-  part: RawByteString;
 begin
   dateDecode(dateTime, @y, @m, @d);
   DecodeTime(dateTime, h, n, s, ms);
@@ -3812,7 +3811,6 @@ end;
 function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
 var leap: boolean;
     century, yearincent: int64;
-    centuryi: integer;
 begin
   leap := dateIsLeapYear(year);
   result := (year <> 0) and //jumps from -1 to 1

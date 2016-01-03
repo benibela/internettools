@@ -1239,7 +1239,7 @@ end;
 
 function arrayContains(const a: array of string; const e: string; slice1: integer; slice2: integer): boolean;
 begin
-  result := arrayIndexOf(a, e) >= 0;
+  result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
 procedure arrayInvert(a: TStringArray; slice1: integer; slice2: integer);
@@ -1462,7 +1462,7 @@ end;
 
 function arrayContains(const a: array of longint; const e: longint; slice1: integer; slice2: integer): boolean;
 begin
-  result := arrayIndexOf(a, e) >= 0;
+  result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
 procedure arrayInvert(a: TLongintArray; slice1: integer; slice2: integer);
@@ -1685,7 +1685,7 @@ end;
 
 function arrayContains(const a: array of longword; const e: longword; slice1: integer; slice2: integer): boolean;
 begin
-  result := arrayIndexOf(a, e) >= 0;
+  result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
 procedure arrayInvert(a: TLongwordArray; slice1: integer; slice2: integer);
@@ -1908,7 +1908,7 @@ end;
 
 function arrayContains(const a: array of int64; const e: int64; slice1: integer; slice2: integer): boolean;
 begin
-  result := arrayIndexOf(a, e) >= 0;
+  result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
 procedure arrayInvert(a: TInt64Array; slice1: integer; slice2: integer);
@@ -2131,7 +2131,7 @@ end;
 
 function arrayContains(const a: array of float; const e: float; slice1: integer; slice2: integer): boolean;
 begin
-  result := arrayIndexOf(a, e) >= 0;
+  result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
 procedure arrayInvert(a: TFloatArray; slice1: integer; slice2: integer);
@@ -2431,7 +2431,6 @@ end;
 
 //equal comparison, case insensitive, ignoring #0-bytes
 function strlsiequal(const p1, p2: pansichar; const l1, l2: longint): boolean;
-var i:integer;
 begin
   result:=(l1=l2) and strlsiequal(p1, p2, l1);
 end;
@@ -2765,8 +2764,7 @@ end;
 
 
 procedure strMoveRef(var source: string; var dest: string; const size: longint); {$IFDEF HASINLINE} inline; {$ENDIF}
-var ps, pd: PAnsiChar;
-    clearFrom: PAnsiChar;
+var clearFrom: PAnsiChar;
     clearTo: PAnsiChar;
     countHighSize: integer;
 begin
@@ -2950,6 +2948,50 @@ begin
   setlength(result, p{ + 1 - 1});
   {str := StringReplace(str, #13#10, #10, [rfReplaceAll]);
   sr := StringReplace(str, #13, #10, [rfReplaceAll]);}
+end;
+
+function strNormalizeLineEndingsUTF8(const s: RawByteString): RawByteString;
+var
+  i, p: Integer;
+begin
+  //utf 8 $2028 = e280a8, $85 = C285
+  result := s;
+  if s = '' then exit;
+  p := 1;
+  i := 1;
+  while i <= length(result) do begin
+    case result[i] of
+      #13: begin
+        result[p] := #10;
+        if (i + 1 <= length(Result)) then
+          case result[i + 1] of
+            #10: inc(i);
+            #$C2: if (i + 2 <= length(Result)) and (result[i + 2] = #$85)  then inc(i, 2);
+          end;
+      end;
+      #$C2: begin
+        result[p] := result[i];
+        inc(i);
+        if (i <= length(result)) then
+          case result[i] of
+            #$85: result[p] := #10;
+            else begin
+              inc(p);
+              result[p] := result[i];
+            end;
+          end;
+      end;
+      #$E2: if (i + 2 <= length(result)) and (result[i + 1] = #$80) and (result[i + 2] = #$A8) then begin
+        result[p] := #10;
+        inc(i, 2);
+      end else result[p] := result[i];
+      else result[p] := result[i];
+    end;
+    inc(i);
+    inc(p);
+  end;
+
+  setlength(result, p - 1)
 end;
 
 function strPrependIfMissing(const s: RawByteString; const expectedStart: RawByteString): RawByteString;
@@ -4749,6 +4791,8 @@ var
 begin
   r := n;
   e := 0;
+  d := 0;
+  m := 0;
   DivMod(r,p,d,m);
   while m = 0 do begin
     r := d;
@@ -5138,12 +5182,12 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
 
 function readNumber(const s:RawByteString; var ip: integer; const count: integer): integer;
 begin
-  result := StrToIntDef(copy(input, ip, count), -1);
+  result := StrToIntDef(copy(s, ip, count), -1);
   inc(ip,  count);
 end;
 
 var
-  i,j: Integer;
+  i: Integer;
 
   prefix, mid, suffix: RawByteString;
   p, formatChars: Integer;
@@ -5577,7 +5621,6 @@ function dateTimeFormat(const mask: RawByteString; const dateTime: TDateTime): R
 var
   y,m,d: Integer;
   h,n,s,ms: word;
-  part: RawByteString;
 begin
   dateDecode(dateTime, @y, @m, @d);
   DecodeTime(dateTime, h, n, s, ms);
@@ -5637,7 +5680,6 @@ end;
 function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
 var leap: boolean;
     century, yearincent: int64;
-    centuryi: integer;
 begin
   leap := dateIsLeapYear(year);
   result := (year <> 0) and //jumps from -1 to 1
