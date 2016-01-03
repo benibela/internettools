@@ -1429,6 +1429,8 @@ begin
   xq.ParsingOptions.AllowJSON:=false;
   xq.ParsingOptions.AllowJSONLiterals:=false;
   xq.ParsingOptions.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+  if config.version in [xqpmXPath2, xqpmXPath3] then xq.ParsingOptions.LineEndingNormalization := xqlenNone
+  else xq.ParsingOptions.LineEndingNormalization := xqlenXML11;
   xq.StaticContext.collation := xq.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
