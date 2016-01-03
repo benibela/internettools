@@ -123,6 +123,9 @@ begin
   t('''Test''',                  'Test',                             '');
   t(#9'   ''xyz''     '#13#10,   'xyz',                              '');
   t(''''#9'xyz'#13'''',           #9'xyz'#10,                        '');
+  ps.ParsingOptions.LineEndingNormalization := xqlenNone;
+  t(''''#9'xyz'#13'''',           #9'xyz'#13,                        '');
+  ps.ParsingOptions.LineEndingNormalization := xqlenXML1;
   t('"abc"',                     'abc',                              '');
   t('"''"',                      '''',                               '');
   t('"He said, ""I don''t like it."""', 'He said, "I don''t like it."', '');

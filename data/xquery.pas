@@ -1991,6 +1991,7 @@ type
     AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
     AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
     StringEntities: (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery); //**< XQuery is almost a super set of XPath, except for the fact that they parse string entities differently. This option lets you change the parsing behaviour.
+    LineEndingNormalization: (xqlenNone, xqlenXML1, xqlenXML11); //**< If all line breaks (#$D or #$D,#$85,#$2028) should be replaced by #$A
   end;
 
 

@@ -609,6 +609,8 @@ function strTrimAndNormalize(const s: RawByteString; const trimCharacters: TChar
 
 //**<Replaces all #13#10 or #13 by #10
 function strNormalizeLineEndings(const s: RawByteString): RawByteString;
+//**<Replaces all #$D#$A, #$D #$85, #$85, #$2028, or #13 by #10. Experimental, behaviour might change in future
+function strNormalizeLineEndingsUTF8(const s: RawByteString): RawByteString;
 
 //**< Prepends expectedStart, if s does not starts with expectedStart
 function strPrependIfMissing(const s: RawByteString; const expectedStart: RawByteString): RawByteString;

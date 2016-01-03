@@ -823,6 +823,17 @@ begin
       test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(0, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(0, f)+strGetUnicodeCharacter($1D11F, f));
     end;
 
+
+  test(strNormalizeLineEndings(#13#10), #10);
+  test(strNormalizeLineEndings('foo'#10'b'#13'ar'#13#10), 'foo'#10'b'#10'ar'#10);
+
+  test(strNormalizeLineEndingsUTF8(#13#10), #10);
+  test(strNormalizeLineEndingsUTF8('foo'#10'b'#13'ar'#13#10), 'foo'#10'b'#10'ar'#10);
+  test(strNormalizeLineEndingsUTF8('foo' + strGetUnicodeCharacter($85)), 'foo'#10);
+  test(strNormalizeLineEndingsUTF8('foo'#13 + strGetUnicodeCharacter($85)), 'foo'#10);
+  test(strNormalizeLineEndingsUTF8('foo'#13 + strGetUnicodeCharacter($2028)), 'foo'#10#10);
+  test(strNormalizeLineEndingsUTF8('foo'#13 + strGetUnicodeCharacter($2028) + strGetUnicodeCharacter($2027) + strGetUnicodeCharacter($2029) + 'xyz' + strGetUnicodeCharacter($85) + 'äöüÄÖÜ'), 'foo'#10#10+strGetUnicodeCharacter($2027)+strGetUnicodeCharacter($2029)+'xyz'#10'äöüÄÖÜ');
+
   //splitting
   test(strSplit('hallo,welt,maus')[1] = 'welt');
 

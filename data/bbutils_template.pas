@@ -369,6 +369,8 @@ function strTrimAndNormalize(const s: RawByteString; const trimCharacters: TChar
 
 //**<Replaces all #13#10 or #13 by #10
 function strNormalizeLineEndings(const s: RawByteString): RawByteString;
+//**<Replaces all #$D#$A, #$D #$85, #$85, #$2028, or #13 by #10. Experimental, behaviour might change in future
+function strNormalizeLineEndingsUTF8(const s: RawByteString): RawByteString;
 
 //**< Prepends expectedStart, if s does not starts with expectedStart
 function strPrependIfMissing(const s: RawByteString; const expectedStart: RawByteString): RawByteString;
@@ -1692,6 +1694,50 @@ begin
   setlength(result, p{ + 1 - 1});
   {str := StringReplace(str, #13#10, #10, [rfReplaceAll]);
   sr := StringReplace(str, #13, #10, [rfReplaceAll]);}
+end;
+
+function strNormalizeLineEndingsUTF8(const s: RawByteString): RawByteString;
+var
+  i, p: Integer;
+begin
+  //utf 8 $2028 = e280a8, $85 = C285
+  result := s;
+  if s = '' then exit;
+  p := 1;
+  i := 1;
+  while i <= length(result) do begin
+    case result[i] of
+      #13: begin
+        result[p] := #10;
+        if (i + 1 <= length(Result)) then
+          case result[i + 1] of
+            #10: inc(i);
+            #$C2: if (i + 2 <= length(Result)) and (result[i + 2] = #$85)  then inc(i, 2);
+          end;
+      end;
+      #$C2: begin
+        result[p] := result[i];
+        inc(i);
+        if (i <= length(result)) then
+          case result[i] of
+            #$85: result[p] := #10;
+            else begin
+              inc(p);
+              result[p] := result[i];
+            end;
+          end;
+      end;
+      #$E2: if (i + 2 <= length(result)) and (result[i + 1] = #$80) and (result[i + 2] = #$A8) then begin
+        result[p] := #10;
+        inc(i, 2);
+      end else result[p] := result[i];
+      else result[p] := result[i];
+    end;
+    inc(i);
+    inc(p);
+  end;
+
+  setlength(result, p - 1)
 end;
 
 function strPrependIfMissing(const s: RawByteString; const expectedStart: RawByteString): RawByteString;
