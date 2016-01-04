@@ -633,7 +633,7 @@ type
 
     function clone: IXQValue; override;
   protected
-    class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): boolean; static;
+    class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): TDateTimeParsingResult; static;
 
     procedure multiplyComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure divideComponents(fac: xqfloat); //Multiply all components of value with fac
@@ -974,7 +974,7 @@ type
   { TXSType }
 
   TXSNumericType = class;
-  TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001, xsceFOCA0002);
+  TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001, xsceFOCA0002, xsceFODT0001, xsceFODT0002);
   //** General XML schema type
   TXSType = class
     name: string;

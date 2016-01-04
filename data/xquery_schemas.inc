@@ -260,6 +260,8 @@ begin
     xsceFORG0001: temp := 'FORG0001';
     xsceXPTY0004: temp := 'XPTY0004';
     xsceFOCA0002: temp := 'FOCA0002';
+    xsceFODT0001: temp := 'FODT0001';
+    xsceFODT0002: temp := 'FODT0002';
   end;
   raise EXQEvaluationException.create('err:'+temp, 'Cannot cast '+from+' to '+to_);
 end;
@@ -871,7 +873,11 @@ function TXSDateTimeType.tryCreateValueInternal(const v: string; outv: PXQValue)
 var
   tvd: TXQValueDateTimeData;
 begin
-  if not TXQValueDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd) then exit(xsceFORG0001);
+  case TXQValueDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd) of
+    dtprFailure: exit(xsceFORG0001);
+    dtprFailureValueTooHigh: exit(xsceFODT0001);
+    dtprFailureValueTooHigh2: exit(xsceFODT0002);
+  end;
   result := xsceNoError;
   if (outv <> nil) then
     outv^ := TXQValueDateTime.create(self, truncated(tvd))
@@ -1087,7 +1093,7 @@ begin
   boolean := primitiveBaseType(TXSBooleanType.create('boolean', AnyAtomicType, TXQValueBoolean));
 
   DateTime := primitiveBaseType(TXSDateTimeType.create('dateTime', AnyAtomicType, 'yyyy+-mm-ddThh:nn:ss[.z+][Z]$'));
-  Date := primitiveBaseType(TXSDateTimeType.create('date', AnyAtomicType, 'yyyy-mm-dd[Z]$', xqdttTime));
+  Date := primitiveBaseType(TXSDateTimeType.create('date', AnyAtomicType, 'yyyy+-mm-dd[Z]$', xqdttTime));
   time := primitiveBaseType(TXSDateTimeType.create('time', AnyAtomicType, 'hh:nn:ss[.z+][Z]$', xqdttDate));
   GDay := primitiveBaseType(TXSDateTimeType.create('gDay', AnyAtomicType, '---dd[Z]$', xqdttTime));
   GMonth := primitiveBaseType(TXSDateTimeType.create('gMonth', AnyAtomicType, '--mm[Z]$', xqdttTime));

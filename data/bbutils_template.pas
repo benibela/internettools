@@ -585,6 +585,9 @@ function dateWeekOfYear(const date:TDateTime):word;
 //**@returns if year is a leap year (supports negative years, i think)
 function dateIsLeapYear(const year: integer): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 type EDateTimeParsingException = class(Exception);
+type TDateTimeParsingFlag = (dtpfStrict);
+     TDateTimeParsingFlags = set of TDateTimeParsingFlag;
+     TDateTimeParsingResult = (dtprSuccess, dtprFailureValueTooHigh, dtprFailureValueTooHigh2, dtprFailure);
 //**Reads a date time string given a certain mask (mask is case-sensitive)@br
 //**The uses the same mask types as FormatDate:@br
 //**s or ss for a second  @br
@@ -607,7 +610,7 @@ type EDateTimeParsingException = class(Exception);
 //**If a part is not found, it returns high(integer) there@br@br
 //**There are old and new functions, because the signature has changed from double to int. Do not use the OLD functions unless you are porting existing code.@br@br
 //**@return(If input could be matched with mask. It does not check, if the returned values are valid (e.g. month = 13 is allowed, in case you have to match durations))
-function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): TDateTimeParsingResult;
 //**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
 procedure dateTimeParsePartsNew(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
 procedure dateTimeParsePartsOld(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
@@ -650,9 +653,6 @@ function dateEncode(year, month, day: integer): TDateTime;
 //**Encodes a date as datetime (supports negative years)
 procedure dateDecode(date: TDateTime; year, month, day: PInteger);
 
-
-
-const WHITE_SPACE=[#9,#10,#13,' '];
 
 (*
 //----------------------------Templates-------------------------------
@@ -3296,9 +3296,10 @@ end;
 
 //const DATETIME_PARSING_FORMAT_CHARS = ['h','n','s','d','y','Z','z'];
 
+
 type T9Ints = array[1..9] of integer;
 
-function dateTimeParsePartsTryInternal(input,mask:RawByteString; var parts: T9Ints): boolean;
+function dateTimeParsePartsTryInternal(input,mask:RawByteString; var parts: T9Ints; options: TDateTimeParsingFlags): TDateTimeParsingResult;
 type THumanReadableName = record
   n: RawByteString;
   v: integer;
@@ -3322,7 +3323,13 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
   (n:'m'#$C3#$A4'rz';v:3));
 
 function readNumber(const s:RawByteString; var ip: integer; const count: integer): integer;
+var
+  temp: String;
 begin
+  if (dtpfStrict in options) and ((ip > length(s)) or not (s[ip] in ['0'..'9'])) then begin
+    result := -1;
+    exit;
+  end;
   result := StrToIntDef(copy(s, ip, count), -1);
   inc(ip,  count);
 end;
@@ -3341,6 +3348,7 @@ var
   positive: Boolean;
   backup: T9Ints;
   truecount: Integer;
+  newres: TDateTimeParsingResult;
 
 
 begin
@@ -3351,8 +3359,8 @@ begin
     mid := strSplitGetBetweenBrackets(suffix, '[', ']', true);
 
     backup := parts;
-    result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts);
-    if not result then parts := backup
+    result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts, options);
+    if result <> dtprSuccess then parts := backup
     else  exit;
     {if pos('[', mid) = 0 then begin
       formatChars:=0;
@@ -3370,8 +3378,11 @@ begin
         else parts := backup;
       end;
     end;}
-    result := dateTimeParsePartsTryInternal(input, prefix+suffix, parts);
-    if not result then parts := backup;
+    newres := dateTimeParsePartsTryInternal(input, prefix+suffix, parts, options);
+    if newres <> dtprSuccess then begin
+      parts := backup;
+      if result = dtprFailure then result := newres;
+    end else result := newres;
     exit;
   end;
 
@@ -3390,11 +3401,15 @@ begin
             while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do inc(count);
             if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then dec(count);
             inc(mp);
+            if count > 9 then begin
+              result := dtprFailureValueTooHigh;
+              exit;
+            end;
           end;
         end else begin //am/pm special case
           if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then inc(mp, 5)
           else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then inc(mp, 3)
-          else if (ip > length(input)) or (input[ip] <> 'a') then begin result := false; exit; end
+          else if (ip > length(input)) or (input[ip] <> 'a') then begin result := dtprFailure; exit; end
           else begin inc(mp); inc(ip); continue; end;
         end;
 
@@ -3408,13 +3423,13 @@ begin
           else assert(false);
         end;
 
-        if (ip+count-1 > length(input)) or (count >= 10) then begin result := false; exit; end;
+        if (ip+count-1 > length(input)) or (count >= 10) then begin result := dtprFailure; exit; end;
 
         case base of
           'y': if (input[ip] = '-') then begin //special case: allow negative years
             inc(ip);
             parts[index] := - readNumber(input,ip,count);
-            if parts[index] = --1 then begin result := false; exit; end;
+            if parts[index] = --1 then begin result := dtprFailure; exit; end;
             continue;
           end;
           'm': case truecount of
@@ -3440,7 +3455,7 @@ begin
                    end;
               {$ENDIF}
               if parts[2] <> high(parts[2]) then continue;
-              begin result := false; exit; end
+              begin result := dtprFailure; exit; end
             end;
             4: begin
               //special month name handling
@@ -3461,37 +3476,38 @@ begin
                 end;
               {$ENDIF}
               if parts[2] <> high(parts[2]) then continue;
-              begin result := false; exit; end
+              begin result := dtprFailure; exit; end
             end;
           end;
           'Z': begin //timezone
-            if ip > length(input) then begin result := false; exit; end;
+            if ip > length(input) then begin result := dtprFailure; exit; end;
             if input[ip] = 'Z' then begin parts[index] := 0; inc(ip); end //timezone = utc
             else if (input[ip] in ['-','+']) then begin
               parts[index]  := 0;
               positive := input[ip] = '+';
               inc(ip);
               parts[index] := 60 * readNumber(input, ip, 2);
-              if parts[index] = -1 then begin result := false; exit; end;
+              if parts[index] = -1 then begin result := dtprFailure; exit; end;
               if ip <= length(input) then begin
-                if input[ip] = ':' then inc(ip);
+                if input[ip] = ':' then inc(ip)
+                else if dtpfStrict in options then begin result := dtprFailure; exit; end;
                 if input[ip] in ['0'..'9'] then begin
                   i := readNumber(input, ip, 2);
-                  if (i = -1) or (i > 59) then begin result := false; exit; end;
+                  if (i = -1) or (i > 59) then begin result := dtprFailure; exit; end;
                   parts[index] := parts[index] +  i;
                 end;
-              end;
+              end else if dtpfStrict in options then begin result := dtprFailure; exit; end;
               if not positive then parts[index] := - parts[index];
-            end else begin result := false; exit; end;
+            end else begin result := dtprFailure; exit; end;
             continue;
           end;
           'a': begin //am/pm or a/p
             if (input[ip] in ['a', 'A']) then parts[index] := 0
             else if (input[ip] in ['p', 'P']) then parts[index] := 12
-            else begin result := false; exit; end;
+            else begin result := dtprFailure; exit; end;
             inc(ip);
             if mask[mp-1] = 'm' then begin
-              if not (input[ip] in ['m', 'M']) then begin result := false; exit; end;
+              if not (input[ip] in ['m', 'M']) then begin result := dtprFailure; exit; end;
               inc(ip);
             end;
             continue;
@@ -3499,7 +3515,7 @@ begin
         end;
 
         parts[index] := readNumber(input, ip, count);
-        if parts[index] = -1 then begin result := false; exit; end;
+        if parts[index] = -1 then begin result := dtprFailure; exit; end;
 
         if base = 'z' then
           for i:=count + 1 to 9 do
@@ -3516,30 +3532,31 @@ begin
           inc(ip);
           inc(mp);
         end;
-        if (mp > length(mask)) or (mask[mp] <> '"') then begin result := false; exit; end;
+        if (mp > length(mask)) or (mask[mp] <> '"') then begin result := dtprFailure; exit; end;
         inc(mp);
       end;
       ' ',#9: begin //skip whitespace
-        if ip > length(input) then begin result := false; exit; end;
+        if ip > length(input) then begin result := dtprFailure; exit; end;
         while (mp <= length(mask)) and (mask[mp] in [' ',#9]) do inc(mp);
-        if not (input[ip] in [' ',#9]) then begin result := false; exit; end;
+        if not (input[ip] in [' ',#9]) then begin result := dtprFailure; exit; end;
         while (ip <= length(input)) and (input[ip] in [' ',#9]) do inc(ip);
       end
       else if (mask[mp] = '$') and (mp  = length(mask)) then begin
-        result := ip = length(input) + 1;
+        if ip = length(input) + 1 then result := dtprSuccess
+        else result := dtprFailure;
         exit;
-      end else if (ip > length(input)) or (mask[mp]<>input[ip]) then begin result := false; exit; end
+      end else if (ip > length(input)) or (mask[mp]<>input[ip]) then begin result := dtprFailure; exit; end
       else begin
         inc(mp);
         inc(ip);
       end;
     end;
   end;
-  result := true;
+  result := dtprSuccess;
 end;
 
 
-function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): TDateTimeParsingResult;
 var parts: T9Ints;
   i: Integer;
   mask2: RawByteString;
@@ -3551,8 +3568,8 @@ begin
     if strlcount(singleletters[i], pansichar(mask2), length(mask2)) <> 1 then continue;
     mask2 := StringReplace(mask2, singleletters[i], '['+singleletters[i]+']'+singleletters[i],[]);
   end;
-  result := dateTimeParsePartsTryInternal(trim(input), mask2, parts);
-  if not result then exit;
+  result := dateTimeParsePartsTryInternal(trim(input), mask2, parts, options);
+  if result <> dtprSuccess then exit;
   if assigned(outYear) then outYear^:=parts[1];
   if assigned(outMonth) then outMonth^:=parts[2];
   if assigned(outDay) then outDay^:=parts[3];
@@ -3568,7 +3585,7 @@ end;
 
 procedure dateTimeParsePartsNew(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
 begin
-  if not dateTimeParsePartsTry(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone) then
+  if dateTimeParsePartsTry(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone) <> dtprSuccess then
     raise Exception.Create('The date time ' + input + ' does not correspond to the date time format ' + mask);
 end;
 

@@ -891,17 +891,23 @@ begin
 end;
 
 constructor TXQValueDateTime.create(atypeAnnotation: TXSDateTimeType; const str: string);
+var
+  res: TDateTimeParsingResult;
 begin
-  if not tryCreateFromString(str,  atypeAnnotation.fixedDateTimePattern, @value) then
-    raise EXQEvaluationException.Create('FORG0001', 'Invalid conversion from '+str+' to date format ' + atypeAnnotation.fixedDateTimePattern);
+  res := tryCreateFromString(str,  atypeAnnotation.fixedDateTimePattern, @value);
+  if res <> dtprSuccess then;
+    raise EXQEvaluationException.Create(IfThen(res = dtprFailureValueTooHigh, 'FODT0001', 'FORG0001' ), 'Invalid conversion from '+str+' to date format ' + atypeAnnotation.fixedDateTimePattern);
   ftypeAnnotation := atypeAnnotation;
 end;
 
 
 constructor TXQValueDateTime.create(atypeAnnotation: TXSType; const str, format: string);
+var
+  res: TDateTimeParsingResult;
 begin
-  if not tryCreateFromString(str, format, @value) then
-    raise EXQEvaluationException.Create('FORG0001', 'Invalid conversion from '+str+' to date format ' + format);
+  res := tryCreateFromString(str, format, @value);
+  if res <> dtprSuccess then;
+    raise EXQEvaluationException.Create(IfThen(res = dtprFailureValueTooHigh, 'FODT0001', 'FORG0001' ), 'Invalid conversion from '+str+' to date format ' + format);
   ftypeAnnotation := atypeAnnotation;
 end;
 
@@ -1022,7 +1028,7 @@ begin
   result := TXQValueDateTimeClass(self.ClassType).Create(typeAnnotation, value);
 end;
 
-class function TXQValueDateTime.tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): boolean;
+class function TXQValueDateTime.tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): TDateTimeParsingResult;
 var
   tempData: TXQValueDateTimeData;
   formats: TStringArray;
@@ -1043,22 +1049,19 @@ const componentChars: string = 'ymdhns';
 begin
   if data = nil then data := @tempData;
   duration := strBeginsWith(format, '[-]P');
-  if duration and ((length(s) <= 2) or strEndsWith(s, 'T')) then exit(false);
+  if duration and ((length(s) <= 2) or strEndsWith(s, 'T')) then exit(dtprFailure);
   formats := strSplit(format, '|');
   for i:=0 to high(formats) do begin
     usedFormat:=formats[i];
     result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone, [dtpfStrict]);
-    if result then begin
+    if result = dtprSuccess then begin
       if ( (not duration) and ((data^.year = 0) or (((abs(data^.year) < 10000) and not strBeginsWith(s, strFromInt(data^.year, 4))  ))))
          or ((data^.hour = 24) and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs)))
          or ((data^.timezone <> high(Integer)) and ((data^.timezone < -14 * 60) or (data^.timezone > 14 * 60)))
          then
-        result := false
-       else begin
-
-       end;
+        result := dtprFailure;
     end;
-    if not result then continue;
+    if result <> dtprSuccess then continue;
     if data^.microsecs = high(data^.microsecs) then data^.microsecs := 0
     else if data^.microsecs <> 0 then data^.microsecs := (data^.microsecs + 500) div 1000;
     if duration and strBeginsWith(s, '-') then begin
@@ -1066,17 +1069,18 @@ begin
     end;
     break;
   end;
-  if not result then
+  if (result = dtprFailureValueTooHigh) and duration then result := dtprFailureValueTooHigh2;
+  if result <> dtprSuccess then
     exit();
   if not duration then begin
     for i:=1 to 6 do
       if (i <= 3) and (data^.values[i] = 0) then begin
-        if pos(componentChars[i], usedFormat) > 0 then exit(false);
+        if pos(componentChars[i], usedFormat) > 0 then exit(dtprFailure);
       end else begin
         compMax := componentMax[i];
         if (i = 3) and componentNonZero(data^.month) then compMax := MonthDays[dateIsLeapYear(data^.year), data^.month]+ 1;
         if data^.values[i] >= compMax then begin
-          if pos(componentChars[i], usedFormat) > 0 then exit(false);
+          if pos(componentChars[i], usedFormat) > 0 then exit(dtprFailure);
           data^.values[i] := componentFiller[i];
         end;
       end;
