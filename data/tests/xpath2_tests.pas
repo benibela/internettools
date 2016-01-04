@@ -103,7 +103,7 @@ begin
   ps.ParsingOptions.AllowJSONLiterals:=false;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.StaticContext.useLocalNamespaces:=false;
-  ps.ImplicitTimezone:=-5 / HoursPerDay;
+  ps.ImplicitTimezoneInMinutes:=-5 * 60;
 
   ps.VariableChangelog.add('abc', 'alphabet');
   ps.VariableChangelog.add('test', 'tset');
@@ -899,6 +899,7 @@ begin
   t('month-from-date(parse-date("1899-Dec-31", "yyyy-mmm-d")) ', '12', '');
   t('month-from-date(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '7', '');
   t('day-from-date(parse-date("1899-Jul-31", "yyyy-mmm-d")) ', '31', '');
+
   t('parse-date("1899-Dec-31", "yyyy-mmm-d") - parse-date("1899-Dec-29", "yyyy-mmm-d")', 'P2D', '');
                 //Sequences
   t('index-of ((10, 20, 30, 40), 35)', '', '');

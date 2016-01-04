@@ -87,6 +87,7 @@
       <Unit1>
         <Filename Value="bbutils_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="bbutils_tests"/>
       </Unit1>
       <Unit2>
         <Filename Value="../extendedhtmlparser.pas"/>
@@ -141,6 +142,7 @@
       <Unit13>
         <Filename Value="commontestutils.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="commontestutils"/>
       </Unit13>
     </Units>
   </ProjectOptions>

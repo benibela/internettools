@@ -190,7 +190,7 @@ begin
   count:=0;
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
-  ps.ImplicitTimezone:=-5 / HoursPerDay;
+  ps.ImplicitTimezoneInMinutes:=-5 * 60;
   //ps.OnEvaluateVariable:=@vars.evaluateVariable;
   //ps.OnDefineVariable:=@vars.defineVariable;
   ps.ParsingOptions.AllowJSONLiterals:=false;

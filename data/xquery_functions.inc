@@ -131,7 +131,6 @@ end;
 function xqvalueSubtract(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var
   ak, bk: TXQValueKind;
-  tempdt: TDateTime;
   ad, bd: xqfloat;
   xqtempdt: TXQValueDateTime;
   btemp: IXQValue;
@@ -163,17 +162,17 @@ begin
     if not (b.typeAnnotation as TXSDateTimeType).isDuration then begin
       if (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
       xqtempdt := a as TXQValueDateTime;
-      tempdt := xqtempdt.toDateTime;
-      if IsNan(xqtempdt.value.timezone) and not IsNan(cxt.staticContext.ImplicitTimezone) then tempdt -= cxt.staticContext.ImplicitTimezone;
+      ai := xqtempdt.value.toMicroSecondStamp();
+      if (xqtempdt.value.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai -= cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
       xqtempdt := b as TXQValueDateTime;
-      tempdt -= xqtempdt.toDateTime;
-      if IsNan(xqtempdt.value.timezone) and not IsNan(cxt.staticContext.ImplicitTimezone) then tempdt += cxt.staticContext.ImplicitTimezone;
+      ai -= xqtempdt.value.toMicroSecondStamp();
+      if (xqtempdt.value.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai += cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
 
-      xqtempdt := TXQValueDateTime.create(baseSchema.dayTimeDuration, abs(tempdt));
+      xqtempdt := TXQValueDateTime.create(baseSchema.dayTimeDuration);//, abs(tempdt));
       xqtempdt.value.year:=0;
       xqtempdt.value.month:=0;
-      xqtempdt.value.day:=trunc(abs(tempdt));
-      if tempdt < 0 then xqtempdt.multiplyComponents(-1);
+      xqtempdt.value.day := xqtempdt.value.initFromMicroSecondStampTimeOnly(abs(ai));
+      if ai < 0 then xqtempdt.multiplyComponents(-1);
       exit(xqtempdt);
     end else begin
       btemp := b.clone; //need to keep reference to the clone
@@ -323,9 +322,9 @@ begin
     if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
     if (b is TXQValueDateTime) and (a.typeAnnotation as TXSDateTimeType).isDuration then begin
       if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then begin
-        ex := (b as TXQValueDateTime ).toDayTime();
-        if ex = 0 then raiseDivisionBy0NotAllowed;
-        exit(baseSchema.decimal.createValue((a as TXQValueDateTime).toDayTime() / ex));
+        bd := (b as TXQValueDateTime ).toDayTime();
+        if isZero(bd) then raiseDivisionBy0NotAllowed;
+        exit(baseSchema.decimal.createValue((a as TXQValueDateTime).toDayTime() / bd));
       end;
       if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then begin
         i := (b as TXQValueDateTime).toMonths();
@@ -2154,10 +2153,10 @@ begin
   resdt := TXQValueDateTime.create(baseSchema.dateTime, dt0.value);
   resdt.value.hour := dt1.value.hour;
   resdt.value.min := dt1.value.min;
-  resdt.value.sec := dt1.value.sec;
-  resdt.value.secfraction := dt1.value.secfraction;
-  if IsNan(dt0.value.timezone) then resdt.value.timezone := dt1.value.timezone
-  else if IsNan(dt1.value.timezone) then resdt.value.timezone := dt0.value.timezone
+  resdt.value.seconds := dt1.value.seconds;
+  resdt.value.microsecs := dt1.value.microsecs;
+  if dt0.value.timezone = high(integer) then resdt.value.timezone := dt1.value.timezone
+  else if dt1.value.timezone = high(integer) then resdt.value.timezone := dt0.value.timezone
   else if dt0.value.timezone <> dt1.value.timezone then raise EXQEvaluationException.Create('FORG0008','Different timezones in: ' + args[0].toString + ' <> ' + args[1].toString);
   result := resdt;
 end;
@@ -2194,8 +2193,8 @@ begin
   if not (xqv.instanceOf(baseSchema.duration)) then xqv := baseSchema.duration.createValue(xqv);
   tempValue := (xqv as TXQValueDateTime).value;
   TXQValueDateTime.setDayTime(tempValue, (xqv as TXQValueDateTime).toDayTime());
-  if (v <> 6) or (tempValue.secfraction = 0) then result := xqvalue(tempValue.values[v])
-  else  result := xqvalue(tempValue.sec + FloatToBigDecimal(RoundTo(tempValue.secfraction, -6)));
+  if (v <> 6) or (tempValue.microsecs = 0) then result := xqvalue(tempValue.values[v])
+  else  result := xqvalue( tempValue.seconds + shifted10(bigdecimal(tempValue.microsecs), -6) );
 end;
 
 function xqFunctionDay_From_Duration(const args: TXQVArray): IXQValue;
@@ -2220,42 +2219,51 @@ end;
 
 
 function xqFunctionAdjustDateTimeToTimeZone(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-var tz: double;
+const SCALE = 60 * MicroSecsPerSec;
+var tz: integer;
   resdt: TXQValueDateTime;
+  stamp: Int64;
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 2 then begin
-    if args[1].isUndefined then tz := getNaN
-    else if args[1] is TXQValueDateTime then tz := (args[1] as TXQValueDateTime).toDayTime() / SecsPerDay
-    else tz := (baseSchema.duration.createValue(args[1]) as TXQValueDateTime).toDayTime() / SecsPerDay;
-  end else tz := context.staticContext.ImplicitTimezone;
+    if args[1].isUndefined then tz := high(integer)
+    else begin
+      if args[1] is TXQValueDateTime then stamp :=  (args[1] as TXQValueDateTime).toDayTime()
+      else stamp := TXQValueDateTime.getDayTime( (baseSchema.duration.createValue(args[1]) as TXQValueDateTime).value );
+      if (stamp mod SCALE <> 0)
+         or (stamp < -14*60*SCALE) or (stamp > 14*60*SCALE)
+         then raise EXQEvaluationException.create('FODT0003', 'Invalid timezone: ' + args[1].debugAsStringWithTypeAnnotation());
+      tz := stamp div SCALE;
+    end;
+  end else tz := context.staticContext.ImplicitTimezoneInMinutes;
 
   result := args[0].clone;
   if result.isUndefined then exit();
   if not (result is TXQValueDateTime) then result := baseSchema.duration.createValue(result);
   resdt := Result as TXQValueDateTime;
-  if (IsNan(tz) and isnan((resdt as TXQValueDateTime).value.timezone)) then exit();
-  if isNan(tz) or isnan(resdt.value.timezone)  then
+  if tz = (resdt as TXQValueDateTime).value.timezone then exit();
+  if (tz = high(integer)) or (resdt.value.timezone = high(integer))  then
     resdt.value.timezone := tz
-  else if resdt.value.timezone <> tz  then begin
-    resdt.setDateTime(resdt.toDateTime + tz);
-    resdt.value.timezone:=tz;
-  end;
+  else if resdt.value.timezone <> tz  then
+    resdt.value.initFromMicroSecondStamp(resdt.value.toMicroSecondStamp() + tz * SCALE, tz);
 end;
 
 function xqFunctionImplicit_Timezone(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0);
-  if isnan(context.staticContext.ImplicitTimezone) then exit(xqvalue);
+  if context.staticContext.ImplicitTimezoneInMinutes = high(Integer) then exit(xqvalue);
   result := TXQValueDateTime.create(baseSchema.dayTimeDuration);
-  (result as TXQValueDateTime).value.sec:=round(context.staticContext.ImplicitTimezone * SecsPerDay);
+  with (result as TXQValueDateTime).value do begin
+    min  := context.staticContext.ImplicitTimezoneInMinutes;
+    hour := min div 60;    min := min mod 60;
+  end;
 end;
 
 function xqFunctionCurrent_Datetime(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0);
   result := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //stable during evaluation
-  if not IsNan(context.staticContext.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezone;
+  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
 function xqFunctionCurrent_Date(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2265,7 +2273,7 @@ begin
   requiredArgCount(args, 0);
   temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //force auto free
   result := baseSchema.Date.createValue(temp);
-  if not IsNan(context.staticContext.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezone;
+  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
 function xqFunctionCurrent_Time(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2275,7 +2283,7 @@ begin
   requiredArgCount(args, 0);
   temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //force auto free
   result := baseSchema.Time.createValue(temp);
-  if not IsNan(context.staticContext.ImplicitTimezone) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezone;
+  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
 function xqFunctionTrace(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

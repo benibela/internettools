@@ -859,7 +859,7 @@ type EDateTimeParsingException = class(Exception);
 //**am/pm or a/p match am/pm or a/p
 //**yy, yyyy or [yy]yy for the year. (if the year is < 90, it will become 20yy, else if it is < 100, it will become 19yy, unless you use uppercase Y instead of y)  @br
 //**YY, YYYY or [YY]YY for the year  @br
-//**z, zz, zzz, zzzz for milliseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional ms with up to 6 digit precision)
+//**z, zz, zzz, zzzz for microseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional µs with up to 6 digit precision)
 //**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format ansichar (except mmm) matching several characters)
 //**The letter formats d/y/h/n/s matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
@@ -868,31 +868,41 @@ type EDateTimeParsingException = class(Exception);
 //**"something" can be used to match the input verbatim@br
 //**whitespace is matched against whitespace (i.e. [ #9#10#13]+ matches [ #9#10#13]+)
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names@br
-//**If a part is not found, it returns high(integer), except for outSecondFraction which will be 0 at not found, and outtimezone which will be NaN@br
+//**If a part is not found, it returns high(integer) there@br@br
+//**There are old and new functions, because the signature has changed from double to int. Do not use the OLD functions unless you are porting existing code.@br@br
 //**@return(If input could be matched with mask. It does not check, if the returned values are valid (e.g. month = 13 is allowed, in case you have to match durations))
-function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil): boolean;
 //**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
-procedure dateTimeParseParts(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+procedure dateTimeParsePartsNew(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
+procedure dateTimeParsePartsOld(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads date/time from a input matching a given mask (@see dateTimeParsePartsTry)
-function dateTimeParse(const input,mask:RawByteString; outtimezone: PDateTime = nil): TDateTime;
+function dateTimeParseNew(const input,mask:RawByteString; outtimezone: PInteger = nil): TDateTime;
+function dateTimeParseOld(const input,mask:RawByteString; outtimezone: PDateTime = nil): TDateTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function dateTimeFormat(const mask: RawByteString; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; overload;
+function dateTimeFormatNEW(const mask: RawByteString; y, m,d, h, n, s: Integer; nanoseconds: integer; timezone: integer = high(integer)): RawByteString; overload;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function dateTimeFormat(const mask: RawByteString; const dateTime: TDateTime): RawByteString; overload;
+
+
 //**Encodes a date time
-function dateTimeEncode(const y,m,d,h,n,s:integer; const secondFraction: double = 0): TDateTime;
+function dateTimeEncodeOLD(const y,m,d,h,n,s:integer; const secondFraction: double = 0): TDateTime;
+
+//**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
+function dateTimeFormatOLD(const mask: RawByteString; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; overload; deprecated;
 
 
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry)@br
-procedure timeParseParts(const input,mask:RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+procedure timeParsePartsNew(const input,mask:RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
+procedure timeParsePartsOld(const input,mask:RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry).@br This function checks, if the time is valid.
 function timeParse(const input,mask:RawByteString): TTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function timeFormat(const mask: RawByteString; const h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString;
+function timeFormatOld(const mask: RawByteString; const h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; deprecated;
 
 
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br
-procedure dateParseParts(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil);
+procedure dateParsePartsNew(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PInteger = nil);
+procedure dateParsePartsOLD(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil); deprecated;
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br This function checks, if the date is valid.
 function dateParse(const input,mask:RawByteString): longint;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
@@ -5336,7 +5346,7 @@ begin
                 if input[ip] = ':' then inc(ip);
                 if input[ip] in ['0'..'9'] then begin
                   i := readNumber(input, ip, 2);
-                  if i = -1 then begin result := false; exit; end;
+                  if (i = -1) or (i > 59) then begin result := false; exit; end;
                   parts[index] := parts[index] +  i;
                 end;
               end;
@@ -5398,7 +5408,7 @@ begin
 end;
 
 
-function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil): boolean;
 var parts: T9Ints;
   i: Integer;
   mask2: RawByteString;
@@ -5421,21 +5431,26 @@ begin
   end;
   if assigned(outMinutes) then outMinutes^:=parts[5];
   if assigned(outSeconds) then outSeconds^:=parts[6];
-  if assigned(outSecondFraction) then
-    if parts[7] = high(parts[7]) then outSecondFraction^:=0
-    else outSecondFraction^:= parts[7] / 1000000000.0;
-  if assigned(outTimeZone) then begin
-    {$PUSH}{$Q-}{$R-}
-    if parts[8] = high(integer) then outTimeZone^ := NaN
-    else outTimeZone^ := parts[8] / MinsPerDay;
-    {$POP}
-  end;
+  if assigned(outSecondFraction) then outSecondFraction^:= parts[7];
+  if assigned(outTimeZone) then outtimezone^:= parts[8];
 end;
 
-procedure dateTimeParseParts(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+procedure dateTimeParsePartsNew(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
 begin
   if not dateTimeParsePartsTry(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone) then
     raise Exception.Create('The date time ' + input + ' does not correspond to the date time format ' + mask);
+end;
+
+function timeZoneOldToNew(const tz: Double): integer;
+begin
+  if IsNan(tz) then result := high(integer)
+  else result := round(tz * MinsPerDay);
+end;
+
+function timeZoneNewToOld(const tz: integer): double;
+begin
+  if tz = high(integer) then result := NaN
+  else result := tz / MinsPerDay;
 end;
 
 const TryAgainWithRoundedSeconds: RawByteString = '<TryAgainWithRoundedSeconds>';
@@ -5451,7 +5466,7 @@ begin
 end;
 {$ENDIF}
 
-function dateTimeFormatInternal(const mask: RawByteString; const y, m, d, h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString;
+function dateTimeFormatInternal(const mask: RawByteString; const y, m, d, h, n, s, nanoseconds, timezone: integer): RawByteString;
 var mp: integer;
   function nextMaskPart: RawByteString;
   function isValid(const c: ansichar): boolean;
@@ -5463,8 +5478,8 @@ var mp: integer;
       'h': result := (h <> 0) and (h <> high(integer));
       'n': result := (n <> 0) and (n <> high(integer));
       's': result := (s <> 0) and (s <> high(integer));
-      'z': result := not IsNan(secondFraction) and (secondFraction <> 0);
-      'Z': result := not IsNan(timezone);
+      'z': result := (nanoseconds <> 0) and (nanoseconds <> high(integer));
+      'Z': result := (timezone <> high(Integer));
       else raise exception.Create('impossible');
     end;
   end;
@@ -5487,7 +5502,7 @@ var mp: integer;
           break;
         end;
       if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then begin
-        result := dateTimeFormatInternal(result, y, m, d, h, n, s, secondFraction, timezone);
+        result := dateTimeFormatInternal(result, y, m, d, h, n, s, nanoseconds, timezone);
         if pointer(result) = pointer(TryAgainWithRoundedSeconds) then exit;
         result := '"' + result + '"';
         exit;
@@ -5538,18 +5553,22 @@ begin
       'z': begin
         if (mask[mp-1] = '+') and (length(part) < 6) then len := 6
         else len := length(part);
-        scale := powersOf10[len];
-        temp := round(secondFraction*scale);
-        if temp >= scale then begin result := TryAgainWithRoundedSeconds; exit; end;
+        if len > 9 then len := 9 //do not have those digits
+        else if len < 9 then begin
+          scale := powersOf10[9 - len];
+          temp := nanoseconds div scale;
+          if nanoseconds mod scale >= scale div 2 then inc(temp); //round
+        end;
+        if temp >= powersOf10[len] then begin result := TryAgainWithRoundedSeconds; exit; end; //rounding overflowed
         toadd := strTrimRight(strFromInt(temp, len), ['0']);
         result := result +  toadd;
         if length(toadd) < length(part) then result := result +  strDup('0', length(part) - length(toadd));
       end;
-      'Z': if not IsNan(timezone) then begin; //no timezone
+      'Z': if timezone <> high(Integer) then begin; //no timezone
         if timezone = 0 then result := result + 'Z'
         else
-          if timezone > 0 then result := result +  '+' + strFromInt(round(timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(timezone * MinsPerDay) mod 60, 2)
-          else                 result := result +  '-' + strFromInt(round(-timezone * MinsPerDay) div 60, 2) + ':' + strFromInt(round(-timezone * MinsPerDay) mod 60, 2);
+          if timezone > 0 then result := result +  '+' + strFromInt(timezone div 60, 2) + ':' + strFromInt(timezone  mod 60, 2)
+          else                 result := result +  '-' + strFromInt(-timezone div 60, 2) + ':' + strFromInt(-timezone mod 60, 2);
       end;
       '"': result := result +  copy(part, 2, length(part) - 2);
       else result := result +  part;
@@ -5557,13 +5576,24 @@ begin
   end;
 end;
 
-function dateTimeParse(const input, mask: RawByteString; outtimezone: PDateTime): TDateTime;
+procedure dateTimeParsePartsOld(const input, mask: RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes,
+  outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
+var
+  tempns: Integer;
+  tempzone: Integer;
+begin
+  dateTimeParsePartsNew(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, @tempns, @tempzone);
+  if assigned(outSecondFraction) then outSecondFraction^ := tempns / 1000000000.0;
+  if Assigned(outtimezone) then outtimezone^ := timeZoneNewToOld(tempzone);
+end;
+
+function dateTimeParseNew(const input, mask: RawByteString; outtimezone: PInteger): TDateTime;
 var y,m,d: integer;
     hour, minutes, seconds: integer;
-    milliseconds: double;
-    timeZone: TDateTime;
+    nanoseconds: integer;
+    timeZone: integer;
 begin
-  dateTimeParseParts(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @milliseconds, @timeZone);
+  dateTimeParsePartsNew(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @nanoseconds, @outtimezone);
 
   if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
   if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
@@ -5573,15 +5603,26 @@ begin
   if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
 
   result := trunc(EncodeDate(y,m,d)) + EncodeTime(hour,minutes,seconds,0);
-  if not IsNan(milliseconds) then result := result +  milliseconds / SecsPerDay;
+  if nanoseconds <> high(nanoseconds) then result := result +  nanoseconds / (1000000000.0 * SecsPerDay);
   if outtimezone <> nil then outtimezone^ := timeZone
-  else if not IsNan(timeZone) then result := result -  timeZone;
+  else if timeZone <> high(Integer) then result := result -  timeZone * 60 / SecsPerDay;
 end;
 
-function dateTimeFormat(const mask: RawByteString; y, m, d, h, n, s: integer; const secondFraction: double; const timezone: TDateTime): RawByteString;
+function dateTimeParseOld(const input, mask: RawByteString; outtimezone: PDateTime): TDateTime;
+var
+  tempzone: Integer;
+begin
+  if not assigned(outtimezone) then result := dateTimeParseNew(input, mask, nil)
+  else begin
+    result := dateTimeParseNew(input, mask, @tempzone);
+    outtimezone^ := timeZoneNewToOld(tempzone);
+  end;
+end;
+
+function dateTimeFormatNew(const mask: RawByteString; y, m, d, h, n, s: Integer; nanoseconds: integer; timezone: integer): RawByteString;
 const invalid = high(integer);
 begin
-  Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,secondFraction,timezone);
+  Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,nanoseconds,timezone);
   if pointer(Result) = Pointer(TryAgainWithRoundedSeconds) then begin
     inc(s);
     //handle overflow
@@ -5616,6 +5657,16 @@ begin
   end;
 end;
 
+function dateTimeFormatOLD(const mask: RawByteString; y, m, d, h, n, s: integer; const secondFraction: double; const timezone: TDateTime): RawByteString;
+var
+  nanoseconds: Int64;
+begin
+  nanoseconds := 0;
+  if not IsNan(secondFraction) then
+    nanoseconds := round(secondFraction * 1000000000);
+  result := dateTimeFormatNew(mask, y, m, d, h, n, s, nanoseconds, timeZoneOldToNew(timezone));
+end;
+
 
 function dateTimeFormat(const mask: RawByteString; const dateTime: TDateTime): RawByteString;
 var
@@ -5624,48 +5675,62 @@ var
 begin
   dateDecode(dateTime, @y, @m, @d);
   DecodeTime(dateTime, h, n, s, ms);
-  result := dateTimeFormat(mask, y, m, d, h, n, s);
+  result := dateTimeFormatNEW(mask, y, m, d, h, n, s, ms*1000000);
 end;
 
-function dateTimeEncode(const y, m, d, h, n, s: integer; const secondFraction: double): TDateTime;
+function dateTimeEncodeOLD(const y, m, d, h, n, s: integer; const secondFraction: double): TDateTime;
 begin
   result := dateEncode(y,m,d) + EncodeTime(h,n,s,0) + secondFraction / SecsPerDay;
 end;
 
-procedure timeParseParts(const input, mask: RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble; outtimezone: PDateTime);
+procedure timeParsePartsNew(const input, mask: RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger; outtimezone: PInteger);
 begin
-  dateTimeParseParts(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone);
+  dateTimeParsePartsNew(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone);
+end;
+
+procedure timeParsePartsOld(const input, mask: RawByteString; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble;
+  outtimezone: PDateTime);
+begin
+  dateTimeParsePartsOld(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone);
 end;
 
 function timeParse(const input, mask: RawByteString): TTime;
 var
   hour, minutes, seconds: integer;
-  milliseconds: double;
-  timeZone: TDateTime;
+  nanoseconds, timezone: integer;
 begin
-  timeParseParts(input,mask,@hour,@minutes,@seconds,@milliseconds,@timeZone);
+  timeParsePartsNew(input,mask,@hour,@minutes,@seconds,@nanoseconds,@timeZone);
   if hour=high(hour) then raise EDateTimeParsingException.Create('No hour contained in '+input+' with format '+mask+'');
   if minutes=high(minutes) then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
   if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
   result := EncodeTime(hour,minutes,seconds,0);
-  if not IsNan(milliseconds) then result := result +  milliseconds / SecsPerDay;
-  if not IsNan(timeZone) then result := result -  timeZone;
+  if nanoseconds <> high(nanoseconds) then result := result + nanoseconds / 1000000000.0 / SecsPerDay;
+  if timezone <> high(timezone) then result := result -  timeZone * 60 / SecsPerDay;
 end;
 
-function timeFormat(const mask: RawByteString; const h, n, s: integer; const secondFraction: double; const timezone: TDateTime): RawByteString;
+function timeFormatOld(const mask: RawByteString; const h, n, s: integer; const secondFraction: double; const timezone: TDateTime): RawByteString;
 begin
-  result := dateTimeFormat(mask, high(integer), high(integer), high(integer), h, n, s, secondFraction, timezone);
+  result := dateTimeFormatOLD(mask, high(integer), high(integer), high(integer), h, n, s, secondFraction, timezone);
 end;
 
-procedure dateParseParts(const input, mask: RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime);
+procedure dateParsePartsNew(const input, mask: RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PInteger);
 begin
-  dateTimeParseParts(input, mask, outYear, outMonth, outDay, nil, nil, nil, nil, outtimezone);
+  dateTimeParsePartsNew(input, mask, outYear, outMonth, outDay, nil, nil, nil, nil, outtimezone);
+end;
+
+procedure dateParsePartsOLD(const input, mask: RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime);
+var
+  temptimezone: Integer;
+begin
+  dateParsePartsNew(input, mask, outYear, outMonth, outDay, @temptimezone);
+  if assigned(outtimezone) then
+    outtimezone^ := timeZoneNewToOld(temptimezone);
 end;
 
 function dateParse(const input, mask: RawByteString): longint;
 var y,m,d: integer;
 begin
-  dateParseParts(input, mask, @y, @m, @d);
+  dateParsePartsNew(input, mask, @y, @m, @d);
   if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
   if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
   if y=high(y) then raise EDateTimeParsingException.Create('No year contained in '+input+' with format '+mask+'');
@@ -5674,7 +5739,7 @@ end;
 
 function dateFormat(const mask: RawByteString; const y, m, d: integer; const timezone: TDateTime): RawByteString;
 begin
-  result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), timezone);
+  result := dateTimeFormatNEW(mask, y, m, d, high(integer), high(integer), high(integer), timeZoneOldToNew(timezone));
 end;
 
 function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;

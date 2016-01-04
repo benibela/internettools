@@ -179,8 +179,7 @@ type
   protected
     function retrieveFromFile(url: string; out contenttype: string; failErrCode: string): string;
   public
-
-    function ImplicitTimezone: TDateTime; inline;
+    function ImplicitTimezoneInMinutes: integer; inline;
     function CurrentDateTime: TDateTime; inline;
 
   protected
@@ -600,11 +599,13 @@ type
 
   //**Record to store a datetime splitted in years/months/days/hours/minutes/secondes/secondfractions+timezone (because TDateTime is not sufficient to distinguish 1a vs. 12m for durations)
   TXQValueDateTimeData = record
-    secfraction: double; //**< fraction part of sec (always in [0..1[)
-    timezone: TDateTime; //**< timezone, nan for unkown, 0 for utc
+    procedure initFromMicroSecondStamp(mics: int64; const tz: integer = high(integer));
+    function initFromMicroSecondStampTimeOnly(mics: int64; const tz: integer = high(integer)): int64;
+    function toMicroSecondStamp(subtractTimeZone: Boolean = true): int64; //does not include timezone
     case boolean of
-      true: (values: array[1..6] of integer;);
-      false: (year, month, day, hour, min, sec: integer;);
+      true: (values: array[1..7] of integer; );
+      false: (year, month, day, hour, min, seconds, microsecs, timezone: integer;);
+      //microsecs = fraction scaled by 1000000, timezone in minutes or high(integer) if absent
   end;
   PXQValueDateTimeData=^TXQValueDateTimeData;
 
@@ -639,18 +640,18 @@ type
     procedure addDuration(const D: TXQValueDateTimeData); //Adds a duration to the current datetime/duration
     class procedure addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
 
-    //**A duration can be represented as an integer ("months" = 12 * year + months and "dayTime" = day + ... + seconds.fraction * seconds/per/day)
+    //**A duration can be represented as an integer ("months" = 12 * year + months and "dayTime" = "dayTime" = time since midnight in microseconds)
     //**These set these values
     class procedure setMonths(var duration: TXQValueDateTimeData; m: integer; isDuration: boolean); static;
     class function getMonths(const duration: TXQValueDateTimeData): integer; static;
-    class procedure setDayTime(var duration: TXQValueDateTimeData; const dt: extended); static;
-    class function getDayTime(const duration: TXQValueDateTimeData): extended; static;
-    function toDayTime(): extended; inline; //seconds in the duration
+    class procedure setDayTime(var duration: TXQValueDateTimeData; dt: int64); static;
+    class function getDayTime(const duration: TXQValueDateTimeData): int64; static; //microseconds since midnight
+    function toDayTime(): int64; inline;
     function toMonths(): integer; inline;
 
     procedure truncateRange();
 
-    class function compare(const a,b: TXQValueDateTime; implicitTimezone: TDateTime): integer; static;
+    class function compare(const a,b: TXQValueDateTime; implicitTimezone: integer): integer; static;
 //    class procedure subtract(S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
   end;
   TXQValueDateTimeClass = class of TXQValueDateTime;
@@ -2267,7 +2268,7 @@ type
   public
     //Schemas: TList;
     CurrentDateTime: TDateTime; //**< Current time
-    ImplicitTimezone: TDateTime; //**< Local timezone (nan = unknown, 0 = utc).
+    ImplicitTimezoneInMinutes: Integer; //**< Local timezone (high(integer) = unknown, 0 = utc).
 
     StaticContext: TXQStaticContext;  //**< XQuery static context, defining various default values.
 
@@ -2749,8 +2750,35 @@ var
 
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
+  MicroSecsPerSec = int64(1000000);
+
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+procedure TXQValueDateTimeData.initFromMicroSecondStamp(mics: int64; const tz: integer);
+begin
+  mics := initFromMicroSecondStampTimeOnly(mics, tz);
+  dateDecode(mics, @year, @month, @day);
+end;
+
+function TXQValueDateTimeData.initFromMicroSecondStampTimeOnly(mics: int64; const tz: integer): int64;
+begin
+  microsecs := mics mod MicroSecsPerSec; mics := mics div MicroSecsPerSec;
+  seconds   := mics mod 60; mics := mics div 60;
+  min       := mics mod 60; mics := mics div 60;
+  hour      := mics mod 24; mics := mics div 24;
+  result := mics;
+  timezone := tz;
+end;
+
+function TXQValueDateTimeData.toMicroSecondStamp(subtractTimeZone: Boolean = true): int64;
+var
+  tempmin: Integer;
+begin
+  tempmin := min;
+  if subtractTimeZone and (timezone <> high(Integer)) then tempmin -= timezone;
+  result := int64(trunc(dateEncode(year, month, day)) * SecsPerDay + (hour * 3600 + tempmin *60 + seconds)) * MicroSecsPerSec + microsecs;
+end;
 
 
 
@@ -3426,11 +3454,11 @@ begin
   else result := retrieveFromURI('file://./' + url, contenttype, failErrCode);
 end;
 
-function TXQStaticContext.ImplicitTimezone: TDateTime;
+function TXQStaticContext.ImplicitTimezoneInMinutes: Integer;
 begin
   {$PUSH}{$Q-}{$R-}
-  if sender <> nil then result := sender.ImplicitTimezone
-  else result := nan;
+  if sender <> nil then result := sender.ImplicitTimezoneInMinutes
+  else result := high(integer);
   {$POP}
 end;
 
@@ -3507,7 +3535,7 @@ var ak, bk: TXQValueKind;
           if result <> 0 then exit;
           result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime());
         end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
-          result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),implicitTimezone);
+          result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),ImplicitTimezoneInMinutes);
       end;
       pvkQName:
         if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
@@ -5739,7 +5767,7 @@ end;
 constructor TXQueryEngine.create;
 begin
   self.CurrentDateTime:=now;
-  ImplicitTimezone:=getNaN;
+  ImplicitTimezoneInMinutes:=high(Integer);
   ParsingOptions.AllowExtendedStrings:=true;
   ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
   ParsingOptions.AllowJSON:=AllowJSONDefaultInternal;

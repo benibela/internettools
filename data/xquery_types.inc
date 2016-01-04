@@ -887,7 +887,7 @@ constructor TXQValueDateTime.create(atypeAnnotation: TXSType);
 begin
   inherited create(atypeAnnotation);
   fillchar(value, sizeof(value), 0);
-  value.timezone:=nan;
+  value.timezone:=high(integer);
 end;
 
 constructor TXQValueDateTime.create(atypeAnnotation: TXSDateTimeType; const str: string);
@@ -950,17 +950,16 @@ var
   v: TXQValueDateTimeData;
 begin
   if typeAnnotation = baseSchema.dateTime then
-    result := bbutils.dateTimeFormat('yyyy-mm-ddThh:nn:ss[.z+][Z]', value.year, value.month, value.day, value.hour, value.min, value.sec, value.secfraction, value.timezone)
+    result := bbutils.dateTimeFormatNEW('yyyy-mm-ddThh:nn:ss[.z+][Z]', value.year, value.month, value.day, value.hour, value.min, value.seconds, value.microsecs * 1000, value.timezone)
   else begin
     fac := 1;
     if (typeAnnotation as TXSDateTimeType).isDuration then begin
-      for i:=1 to 6 do  if (value.values[i] <> high(integer)) and (value.values[i] < 0) then begin fac:= -1; break; end;
-      if (fac = 1) and (value.secfraction < 0) then fac := -1;
+      for i:=1 to 7 do  if (value.values[i] <> high(integer)) and (value.values[i] < 0) then begin fac:= -1; break; end;
       v := value;
       setDayTime(v, getDayTime(v));
       setMonths(v, getMonths(v), true);
     end else v := value;
-    result := bbutils.dateTimeFormat((typeAnnotation as TXSDateTimeType).fixedDateTimePattern, fac * v.year, fac * v.month, fac * v.day, fac * v.hour, fac * v.min, fac * v.sec, fac * v.secfraction, v.timezone);
+    result := bbutils.dateTimeFormatNEW((typeAnnotation as TXSDateTimeType).fixedDateTimePattern, fac * v.year, fac * v.month, fac * v.day, fac * v.hour, fac * v.min, fac * v.seconds, fac * v.microsecs * 1000, v.timezone);
     if (fac < 0) and (result <> 'P') then result := '-' + result;
   end;
   if (result = 'P') then begin
@@ -972,12 +971,15 @@ begin
 end;
 
 function TXQValueDateTime.toDateTime: TDateTime;
+var
+  tempsecs: TDateTime;
 begin
  if not dateEncodeTry(value.year, value.month, value.day, result) then
    raise EXQEvaluationException.Create('FORG0006', 'Invalid date: '+IntToStr(value.year)+'-'+IntToStr(value.month)+'-'+IntToStr(value.day)+ ' (probably tried to use duration as datetime)');
- result += (value.hour * 3600 + value.min *60 + value.sec)/SecsPerDay;
- if not isNan(value.secfraction) then result += value.secfraction / SecsPerDay;
- if not isnan(value.timezone) then result -= value.timezone;
+ tempsecs := (value.hour * 3600 + value.min *60 + value.seconds);
+ if value.microsecs <> high(integer) then tempsecs += value.microsecs / MicroSecsPerSec;
+ if value.timezone <> high(integer) then tempsecs -= value.timezone * 60 ;
+ result += tempsecs / SecsPerDay;
 end;
 
 procedure TXQValueDateTime.setDateTime(const dateTime: TDateTime);
@@ -992,9 +994,9 @@ begin
   value.day:=d;
   value.hour:=h;
   value.min:=n;
-  value.sec:=s;
-  value.secfraction:=ms/1000.0;
-  value.timezone:=NaN;
+  value.seconds:=s;
+  value.microsecs:=integer(ms)*1000;
+  value.timezone:=high(integer);
   truncateRange;
 end;
 
@@ -1010,9 +1012,9 @@ begin
   v.day:=d;
   v.hour:=h;
   v.min:=n;
-  v.sec:=s;
-  v.secfraction:=ms/1000.0;
-  v.timezone:=NaN;
+  v.seconds:=s;
+  v.microsecs:=ms*1000;
+  v.timezone:=high(integer);
 end;
 
 function TXQValueDateTime.clone: IXQValue;
@@ -1028,6 +1030,12 @@ var
   i: Integer;
   duration: Boolean;
   j: Integer;
+
+  function componentNonZero(c: integer): boolean;
+  begin
+    result := (c <> high(integer)) and (c > 0);
+  end;
+
 const componentMax: array[1..6] of integer = (high(integer), 13, 32, 25, 60, 60);
 const componentFiller: array[1..6] of integer = (1972, 12, 31, 0, 0, 0);
 const componentChars: string = 'ymdhns';
@@ -1037,14 +1045,15 @@ begin
   formats := strSplit(format, '|');
   for i:=0 to high(formats) do begin
     usedFormat:=formats[i];
-    result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.sec, @data^.secfraction, @data^.timezone);
+    result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone);
     if ((data^.year = 0) and (not duration))
-       or ((data^.hour = 24) and (((data^.min <> high(data^.min)) and (data^.min > 0)) or ((data^.sec <> high(data^.sec)) and (data^.sec > 0)))) then
+       or ((data^.hour = 24) and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs))) then
       result := false;
     if not result then continue;
+    if data^.microsecs = high(data^.microsecs) then data^.microsecs := 0
+    else if data^.microsecs <> 0 then data^.microsecs := (data^.microsecs + 500) div 1000;
     if duration and strBeginsWith(s, '-') then begin
       for j:=low(data^.values)  to high(data^.values) do if data^.values[j] <> high(integer) then data^.values[j] := - data^.values[j];
-      data^.secfraction:=-data^.secfraction;
     end;
     break;
   end;
@@ -1090,14 +1099,14 @@ end;
 procedure TXQValueDateTime.multiplyComponents(fac: xqfloat);
 begin
   setMonths(value, integer(xqround(getMonths(value) * fac)), true);
-  setDayTime(value, getDayTime(value) * fac);
+  setDayTime(value, xqround(getDayTime(value) * fac));
   truncateRange();
 end;
 
 procedure TXQValueDateTime.divideComponents(fac: xqfloat);
 begin
   setMonths(value, integer(xqround(getMonths(value) / fac)), true);
-  setDayTime(value, getDayTime(value) / fac);
+  setDayTime(value, xqround(getDayTime(value) / fac));
   truncateRange();
 end;
 
@@ -1126,18 +1135,15 @@ begin
     E.year:=-E.year;
   end;
 
-  E.secfraction := S.secfraction + D.secfraction;
-  E.sec  := S.sec + D.sec;
-  if E.secfraction < 0 then begin E.sec -= floor(E.secfraction); E.secfraction += floor(E.secfraction); end;
-  if E.secfraction < 0.000001 then e.secfraction:=0; //rounding
-  if E.secfraction > 0.999999 then e.secfraction:=1; //rounding
-  if e.secfraction >= 1 then begin e.sec += trunc(e.secfraction); e.secfraction += trunc(e.secfraction); end;;
-  E.min  := fquotient(e.sec, 60);  E.sec := E.sec - E.min * 60;
-  E.min  := S.min + D.min + E.min;
-  E.hour := fquotient(e.min, 60);  E.min := E.min - E.hour * 60;
-  E.hour := S.hour + D.hour + E.hour;
-  E.day  := fquotient(E.hour, 24); E.hour:= E.hour - E.day * 24;
-  E.day  := D.day + E.day + intBound(1, S.day, MonthDays[dateIsLeapYear(E.year), E.month]);
+  E.microsecs := S.microsecs + D.microsecs;
+  E.seconds  := fquotient(E.microsecs, MicroSecsPerSec); E.microsecs := E.microsecs - E.seconds * MicroSecsPerSec;
+  E.seconds  := S.seconds + D.seconds + E.seconds;
+  E.min      := fquotient(e.seconds, 60);  E.seconds := E.seconds - E.min * 60;
+  E.min      := S.min + D.min + E.min;
+  E.hour     := fquotient(e.min, 60);  E.min := E.min - E.hour * 60;
+  E.hour     := S.hour + D.hour + E.hour;
+  E.day      := fquotient(E.hour, 24); E.hour:= E.hour - E.day * 24;
+  E.day      := D.day + E.day + intBound(1, S.day, MonthDays[dateIsLeapYear(E.year), E.month]);
 
   //official w3c algorithm (http://www.w3.org/TR/xmlschema-2/#adding-durations-to-dateTimes, todo: optimize), except that maximumDayInMonthFor(E[year], E[month] - 1) in their pseudo code is undefined for january!
   while (e.day < 1) or (e.day > MonthDays[dateIsLeapYear(e.year), e.month]) do begin
@@ -1182,31 +1188,30 @@ begin
   result := 12 * duration.year + duration.month;
 end;
 
-class procedure TXQValueDateTime.setDayTime(var duration: TXQValueDateTimeData; const dt: extended);
-var
-  dti: Int64;
+class procedure TXQValueDateTime.setDayTime(var duration: TXQValueDateTimeData; dt: int64);
 begin
-  duration.secfraction:=frac(dt);
+  {duration.microsecs:=round(frac(dt) * MicroSecsPerSec);
   dti := trunc(dt);
   if abs(duration.secfraction) < 0.000001 then duration.secfraction:=0;
   if dt > 0 then begin
     if duration.secfraction > 0.999999 then begin duration.secfraction:=0; dti+=1; end;
   end else if dt < 0 then begin
     if duration.secfraction < -0.999999 then begin duration.secfraction:=0; dti-=1; end;
-  end;
+  end;}
 
-  duration.day := dti div (24*60*60); dti := dti mod (24*60*60);
-  duration.hour:= dti div (60*60);    dti := dti mod (60*60);
-  duration.min := dti div (60);       dti := dti mod (60);
-  duration.sec := dti;
+  duration.day       := dt  div (24*60*60*MicroSecsPerSec); dt := dt mod (24*60*60*MicroSecsPerSec);
+  duration.hour      := dt  div (60*60*MicroSecsPerSec);    dt := dt mod (60*60*MicroSecsPerSec);
+  duration.min       := dt  div (60*MicroSecsPerSec);       dt := dt mod (60*MicroSecsPerSec);
+  duration.seconds   := dt  div (MicroSecsPerSec);          dt := dt mod (MicroSecsPerSec);
+  duration.microsecs := dt;
 end;
 
-class function TXQValueDateTime.getDayTime(const duration: TXQValueDateTimeData): extended;
+class function TXQValueDateTime.getDayTime(const duration: TXQValueDateTimeData): int64;
 begin
-  result := duration.secfraction + duration.sec + 60.0 * (duration.min + 60.0 * (duration.hour + 24.0 * extended(duration.day)));
+  result := duration.microsecs + MicroSecsPerSec * (duration.seconds + 60 * (duration.min + 60 * (duration.hour + 24 * int64(duration.day))));
 end;
 
-function TXQValueDateTime.toDayTime: extended;
+function TXQValueDateTime.toDayTime: int64;
 begin
   result := getDayTime(value);
 end;
@@ -1220,20 +1225,19 @@ procedure TXQValueDateTime.truncateRange;
 begin
   case (ftypeAnnotation as TXSDateTimeType).truncation of
     xqdttDate:      begin value.year := 1989; value.month := 12; value.day := 30; end;
-    xqdttTime:      begin value.hour := 0; value.min := 0; value.sec := 0; end;
+    xqdttTime:      begin value.hour := 0; value.min := 0; value.seconds := 0; value.microsecs := 0; end;
     xqdttYearMonth: begin value.year := 0; value.month := 0;   end;
   end;
 end;
 
-class function TXQValueDateTime.compare(const a, b: TXQValueDateTime; implicitTimezone: TDateTime): integer;
+class function TXQValueDateTime.compare(const a, b: TXQValueDateTime; implicitTimezone: integer): integer;
 const formatIds: string = 'ymdhns';
 const componentFiller: array[1..6] of integer = (1972, 1, 1, 0, 0, 0);
 var
   adf, bdf: String;
   av, bv: TXQValueDateTimeData;
-  adt, bdt: TDateTime;
+  amics, bmics: int64;
   i: Integer;
-  adelta,bdelta: Extended;
 
   overlap: Integer;
 begin
@@ -1255,23 +1259,23 @@ begin
     end;}
   end;
   if overlap = 0 then exit(-2); //not comparable
-  //convert to date time
-  adt := dateEncode(av.year, av.month, av.day) + (av.hour * 3600 + av.min *60 + av.sec)/SecsPerDay;
-  bdt := dateEncode(bv.year, bv.month, bv.day) + (bv.hour * 3600 + bv.min *60 + bv.sec)/SecsPerDay;
-  //add secfractions and timezone, if relevant in the formats
-  adelta := 0; bdelta := 0.0;
-  if (pos('z', (a.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) and (pos('z', (b.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) then begin
-    if not IsNan(av.secfraction) then adelta += av.secfraction / SecsPerDay;
-    if not IsNan(bv.secfraction) then bdelta += bv.secfraction / SecsPerDay;
-  end;
-  if not IsNan(av.timezone) then adelta -= av.timezone
-  else if not IsNan(implicitTimezone) then adelta -= implicitTimezone;
-  if not IsNan(bv.timezone) then
-    bdelta -= bv.timezone
-  else if not IsNan(implicitTimezone) then bdelta -= implicitTimezone;
 
-  adt+=adelta; bdt+=bdelta;
-  result := CompareValue(xqfloat(adt),xqfloat(bdt));
+  result := compareValue( TXQValueDateTime.getMonths(av) , TXQValueDateTime.getMonths(bv) );
+  if result = 0 then begin
+    amics := TXQValueDateTime.getDayTime(av);
+    bmics := TXQValueDateTime.getDayTime(bv);
+
+    if av.timezone <> high(integer) then amics -= av.timezone * 60 * MicroSecsPerSec
+    else if implicitTimezone <> high(integer) then amics -= implicitTimezone * 60 * MicroSecsPerSec;
+    if bv.timezone <> high(integer) then bmics -= bv.timezone * 60 * MicroSecsPerSec
+    else if implicitTimezone <> high(integer) then bmics -= implicitTimezone * 60 * MicroSecsPerSec;
+
+    {if (pos('z', (a.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) and (pos('z', (b.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) then begin
+      if av.nanosecs <> high(integer) then ans += av.nanosecs;
+      if bv.nanosecs <> high(integer) then bns += bv.nanosecs;
+    end;}
+    result := CompareValue(amics,bmics);
+  end;
 end;
 
 

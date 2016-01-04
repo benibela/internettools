@@ -1423,7 +1423,7 @@ begin
   tree.repairMissingStartTags:=false;
   tree.parsingModel := pmStrict;
   xq :=  TXQueryEngine.create;
-  xq.ImplicitTimezone:=-5 / HoursPerDay;
+  xq.ImplicitTimezoneInMinutes:=-5 * 60;
   //xq.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
   xq.ParsingOptions.AllowExtendedStrings  := false;
   xq.ParsingOptions.AllowJSON:=false;

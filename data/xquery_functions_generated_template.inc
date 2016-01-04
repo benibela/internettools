@@ -27,6 +27,7 @@ begin
 end;
 {%END-REPEAT}
 
+
 function xqFunctionSeconds_From_Datetime(const args: TXQVArray): IXQValue;
 var v: IXQValue;
 begin
@@ -34,8 +35,8 @@ begin
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
   with (v as TXQValueDateTime) do begin
-    if value.secfraction = 0 then exit(xqvalue(value.sec));
-    result := xqvalue(value.sec + FloatToBigDecimal(RoundTo(value.secfraction, -6)));// RoundTo(xqfloat(value.sec + (v as TXQValueDateTime).value.secfraction), -6));
+    if value.microsecs = 0 then exit(xqvalue(value.seconds));
+    result := xqvalue(value.seconds + shifted10(value.microsecs, -6) );// RoundTo(xqfloat(value.sec + (v as TXQValueDateTime).value.secfraction), -6));
   end;
 end;
 
@@ -46,11 +47,12 @@ begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
-  if IsNan((v as TXQValueDateTime).value.timezone) then exit(xqvalue);
+  if (v as TXQValueDateTime).value.timezone = high(Integer) then exit(xqvalue);
   fillchar(tempCorrectlyInitialized, sizeof(tempCorrectlyInitialized), 0);
-  tempCorrectlyInitialized.min:=round(MinsPerDay*(v as TXQValueDateTime).value.timezone);
+  tempCorrectlyInitialized.min:=(v as TXQValueDateTime).value.timezone;
   tempCorrectlyInitialized.hour:=tempCorrectlyInitialized.min div 60; tempCorrectlyInitialized.min:=tempCorrectlyInitialized.min mod 60;
-  tempCorrectlyInitialized.timezone:=getNaN;
+  tempCorrectlyInitialized.timezone:=high(Integer);
   result := TXQValueDateTime.create(baseSchema.dayTimeDuration, tempCorrectlyInitialized);
 end;
+
 
