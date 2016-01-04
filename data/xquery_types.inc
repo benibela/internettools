@@ -1030,6 +1030,7 @@ var
   i: Integer;
   duration: Boolean;
   j: Integer;
+  compMax: LongInt;
 
   function componentNonZero(c: integer): boolean;
   begin
@@ -1042,13 +1043,21 @@ const componentChars: string = 'ymdhns';
 begin
   if data = nil then data := @tempData;
   duration := strBeginsWith(format, '[-]P');
+  if duration and ((length(s) <= 2) or strEndsWith(s, 'T')) then exit(false);
   formats := strSplit(format, '|');
   for i:=0 to high(formats) do begin
     usedFormat:=formats[i];
-    result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone);
-    if ((data^.year = 0) and (not duration))
-       or ((data^.hour = 24) and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs))) then
-      result := false;
+    result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone, [dtpfStrict]);
+    if result then begin
+      if ( (not duration) and ((data^.year = 0) or (((abs(data^.year) < 10000) and not strBeginsWith(s, strFromInt(data^.year, 4))  ))))
+         or ((data^.hour = 24) and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs)))
+         or ((data^.timezone <> high(Integer)) and ((data^.timezone < -14 * 60) or (data^.timezone > 14 * 60)))
+         then
+        result := false
+       else begin
+
+       end;
+    end;
     if not result then continue;
     if data^.microsecs = high(data^.microsecs) then data^.microsecs := 0
     else if data^.microsecs <> 0 then data^.microsecs := (data^.microsecs + 500) div 1000;
@@ -1060,11 +1069,17 @@ begin
   if not result then
     exit();
   if not duration then begin
-    for i:=1 to 6 do if data^.values[i] >= componentMax[i] then begin
-      if pos(componentChars[i], usedFormat) > 0 then
-        exit(false);
-      data^.values[i] := componentFiller[i];
-    end;
+    for i:=1 to 6 do
+      if (i <= 3) and (data^.values[i] = 0) then begin
+        if pos(componentChars[i], usedFormat) > 0 then exit(false);
+      end else begin
+        compMax := componentMax[i];
+        if (i = 3) and componentNonZero(data^.month) then compMax := MonthDays[dateIsLeapYear(data^.year), data^.month]+ 1;
+        if data^.values[i] >= compMax then begin
+          if pos(componentChars[i], usedFormat) > 0 then exit(false);
+          data^.values[i] := componentFiller[i];
+        end;
+      end;
     if data = @tempData then exit;
     if data^.hour = 24 then begin
       data^.hour:=0;
@@ -1079,11 +1094,12 @@ begin
         end;
       end;
     end;
-  end else
+  end else begin
     for i:=1 to 6 do if data^.values[i] >= high(integer) then begin
       //if pos(componentChars[i], usedFormat) > 0 then exit(false);
       data^.values[i] := 0;
     end;
+  end;
 end;
 
 function fquotient(a, b: integer): integer; inline; //= floor (a/b)

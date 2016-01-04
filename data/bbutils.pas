@@ -849,6 +849,8 @@ function dateWeekOfYear(const date:TDateTime):word;
 //**@returns if year is a leap year (supports negative years, i think)
 function dateIsLeapYear(const year: integer): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 type EDateTimeParsingException = class(Exception);
+type TDateTimeParsingFlag = (dtpfStrict);
+     TDateTimeParsingFlags = set of TDateTimeParsingFlag;
 //**Reads a date time string given a certain mask (mask is case-sensitive)@br
 //**The uses the same mask types as FormatDate:@br
 //**s or ss for a second  @br
@@ -871,7 +873,7 @@ type EDateTimeParsingException = class(Exception);
 //**If a part is not found, it returns high(integer) there@br@br
 //**There are old and new functions, because the signature has changed from double to int. Do not use the OLD functions unless you are porting existing code.@br@br
 //**@return(If input could be matched with mask. It does not check, if the returned values are valid (e.g. month = 13 is allowed, in case you have to match durations))
-function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): boolean;
 //**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
 procedure dateTimeParsePartsNew(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
 procedure dateTimeParsePartsOld(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PDouble = nil; outtimezone: PDateTime = nil);
@@ -5167,7 +5169,7 @@ end;
 
 type T9Ints = array[1..9] of integer;
 
-function dateTimeParsePartsTryInternal(input,mask:RawByteString; var parts: T9Ints): boolean;
+function dateTimeParsePartsTryInternal(input,mask:RawByteString; var parts: T9Ints; options: TDateTimeParsingFlags): boolean;
 type THumanReadableName = record
   n: RawByteString;
   v: integer;
@@ -5191,7 +5193,13 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
   (n:'m'#$C3#$A4'rz';v:3));
 
 function readNumber(const s:RawByteString; var ip: integer; const count: integer): integer;
+var
+  temp: String;
 begin
+  if (dtpfStrict in options) and ((ip > length(s)) or not (s[ip] in ['0'..'9'])) then begin
+    result := -1;
+    exit;
+  end;
   result := StrToIntDef(copy(s, ip, count), -1);
   inc(ip,  count);
 end;
@@ -5220,7 +5228,7 @@ begin
     mid := strSplitGetBetweenBrackets(suffix, '[', ']', true);
 
     backup := parts;
-    result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts);
+    result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts, options);
     if not result then parts := backup
     else  exit;
     {if pos('[', mid) = 0 then begin
@@ -5239,7 +5247,7 @@ begin
         else parts := backup;
       end;
     end;}
-    result := dateTimeParsePartsTryInternal(input, prefix+suffix, parts);
+    result := dateTimeParsePartsTryInternal(input, prefix+suffix, parts, options);
     if not result then parts := backup;
     exit;
   end;
@@ -5343,13 +5351,14 @@ begin
               parts[index] := 60 * readNumber(input, ip, 2);
               if parts[index] = -1 then begin result := false; exit; end;
               if ip <= length(input) then begin
-                if input[ip] = ':' then inc(ip);
+                if input[ip] = ':' then inc(ip)
+                else if dtpfStrict in options then begin result := false; exit; end;
                 if input[ip] in ['0'..'9'] then begin
                   i := readNumber(input, ip, 2);
                   if (i = -1) or (i > 59) then begin result := false; exit; end;
                   parts[index] := parts[index] +  i;
                 end;
-              end;
+              end else if dtpfStrict in options then begin result := false; exit; end;
               if not positive then parts[index] := - parts[index];
             end else begin result := false; exit; end;
             continue;
@@ -5408,7 +5417,7 @@ begin
 end;
 
 
-function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil): boolean;
+function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): boolean;
 var parts: T9Ints;
   i: Integer;
   mask2: RawByteString;
@@ -5420,7 +5429,7 @@ begin
     if strlcount(singleletters[i], pansichar(mask2), length(mask2)) <> 1 then continue;
     mask2 := StringReplace(mask2, singleletters[i], '['+singleletters[i]+']'+singleletters[i],[]);
   end;
-  result := dateTimeParsePartsTryInternal(trim(input), mask2, parts);
+  result := dateTimeParsePartsTryInternal(trim(input), mask2, parts, options);
   if not result then exit;
   if assigned(outYear) then outYear^:=parts[1];
   if assigned(outMonth) then outMonth^:=parts[2];
