@@ -2948,7 +2948,9 @@ begin
       result := args[0].get(1);
       ak := result.kind;
     end;
-    if (ak in [pvkBoolean,pvkString,pvkDateTime]) and not (args[0].instanceOf(baseSchema.duration)) and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
+    if (ak in [pvkBoolean,pvkString,pvkDateTime])
+       and ((args[0].typeAnnotation = baseSchema.duration) or not (args[0].instanceOf(baseSchema.duration)))
+       and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
       raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
     if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
     exit();
@@ -2960,8 +2962,12 @@ begin
   case baseKind of
     pvkDateTime: begin
       result := TXQValueDateTime.create(seq.getPromotedDateTimeType(true));
-      for i:=0 to seq.Count-1 do
-        (result as TXQValueDateTime).addDuration((seq.items[i] as TXQValueDateTime).value);
+      for i:=0 to seq.Count-1 do begin
+        with (seq.items[i] as TXQValueDateTime) do begin
+          if typeAnnotation = baseSchema.duration then raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
+          (result as TXQValueDateTime).addDuration(value);
+        end;
+      end;
     end;
     pvkInt64, pvkBigDecimal: begin
       if baseKind = pvkInt64 then begin
