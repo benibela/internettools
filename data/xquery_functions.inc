@@ -2219,7 +2219,7 @@ end;
 
 
 function xqFunctionAdjustDateTimeToTimeZone(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-const SCALE = 60 * MicroSecsPerSec;
+const SCALE: int64 = 60 * MicroSecsPerSec;
 var tz: integer;
   resdt: TXQValueDateTime;
   stamp: Int64;
@@ -2239,13 +2239,15 @@ begin
 
   result := args[0].clone;
   if result.isUndefined then exit();
-  if not (result is TXQValueDateTime) then result := baseSchema.duration.createValue(result);
+  if not (result is TXQValueDateTime) then result := baseSchema.dateTime.createValue(result); //can this even happen?
   resdt := Result as TXQValueDateTime;
   if tz = (resdt as TXQValueDateTime).value.timezone then exit();
   if (tz = high(integer)) or (resdt.value.timezone = high(integer))  then
     resdt.value.timezone := tz
-  else if resdt.value.timezone <> tz  then
+  else if resdt.value.timezone <> tz  then begin
     resdt.value.initFromMicroSecondStamp(resdt.value.toMicroSecondStamp() + tz * SCALE, tz);
+    resdt.truncateRange();
+  end;
 end;
 
 function xqFunctionImplicit_Timezone(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
