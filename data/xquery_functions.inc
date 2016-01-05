@@ -335,8 +335,7 @@ begin
     end;
     f:= b.toFloat;
     result := a.clone;
-    if isPosInf(f) or isNegInf(f) then (result as TXQValueDateTime).multiplyComponents(0)
-    else if f = 0 then raiseDivisionBy0NotAllowed
+    if IsInfinite(f) then (result as TXQValueDateTime).multiplyComponents(0)
     else (result as TXQValueDateTime).divideComponents(f);
     exit;
   end;

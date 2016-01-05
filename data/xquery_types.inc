@@ -1118,13 +1118,17 @@ end;
 
 procedure TXQValueDateTime.multiplyComponents(fac: xqfloat);
 begin
-  setMonths(value, integer(xqround(getMonths(value) * fac)), true);
+  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + debugAsStringWithTypeAnnotation())
+  else if IsInfinite(fac) then raise EXQEvaluationException.create('FODT0002', 'Cannot multiply INF * ' + debugAsStringWithTypeAnnotation());
+       setMonths(value, integer(xqround(getMonths(value) * fac)), true);
   setDayTime(value, xqround(getDayTime(value) * fac));
   truncateRange();
 end;
 
 procedure TXQValueDateTime.divideComponents(fac: xqfloat);
 begin
+  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + debugAsStringWithTypeAnnotation())
+  else if fac = 0 then raise EXQEvaluationException.create('FODT0002', 'Cannot divide duration by zero: ' + debugAsStringWithTypeAnnotation());
   setMonths(value, integer(xqround(getMonths(value) / fac)), true);
   setDayTime(value, xqround(getDayTime(value) / fac));
   truncateRange();
