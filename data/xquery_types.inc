@@ -895,7 +895,7 @@ var
   res: TDateTimeParsingResult;
 begin
   res := tryCreateFromString(str,  atypeAnnotation.fixedDateTimePattern, @value);
-  if res <> dtprSuccess then;
+  if res <> dtprSuccess then
     raise EXQEvaluationException.Create(IfThen(res = dtprFailureValueTooHigh, 'FODT0001', 'FORG0001' ), 'Invalid conversion from '+str+' to date format ' + atypeAnnotation.fixedDateTimePattern);
   ftypeAnnotation := atypeAnnotation;
 end;
@@ -906,7 +906,7 @@ var
   res: TDateTimeParsingResult;
 begin
   res := tryCreateFromString(str, format, @value);
-  if res <> dtprSuccess then;
+  if res <> dtprSuccess then
     raise EXQEvaluationException.Create(IfThen(res = dtprFailureValueTooHigh, 'FODT0001', 'FORG0001' ), 'Invalid conversion from '+str+' to date format ' + format);
   ftypeAnnotation := atypeAnnotation;
 end;
@@ -1055,7 +1055,7 @@ begin
     usedFormat:=formats[i];
     result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone, [dtpfStrict]);
     if result = dtprSuccess then begin
-      if ( (not duration) and ((data^.year = 0) or (((abs(data^.year) < 10000) and not strBeginsWith(s, strFromInt(data^.year, 4))  ))))
+      if ( (not duration) and ((data^.year = 0) or (((abs(data^.year) < 10000) and strBeginsWith(usedFormat, 'y') and not strBeginsWith(s, strFromInt(data^.year, 4))  ))))
          or ((data^.hour = 24) and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs)))
          or ((data^.timezone <> high(Integer)) and ((data^.timezone < -14 * 60) or (data^.timezone > 14 * 60)))
          then

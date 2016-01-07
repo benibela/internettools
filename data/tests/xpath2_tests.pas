@@ -1874,7 +1874,7 @@ begin
    t('"---05" castable as gDay','true','');
    t('"--12" castable as gMonth','true','');
    t('"--13" castable as gMonth','false','');
-   t('"--12-10" castable as gMonth','true',''); //month in timezone -10
+   t('"--12-10" castable as gMonth','false','');
    t('"--12-29" castable as gMonthDay','true','');
    t('"--13-29" castable as gMonthDay','false','');
    t('"2010" castable as gYear','true','');
@@ -1882,10 +1882,10 @@ begin
    t('"2010Z" castable as gYear','true',''); //2010 in UTC
    t('"2010-12" castable as gYearMonth','true','');
    t('"2010-13" castable as gYearMonth','false','');
-   t('"2010-12-10" castable as gYearMonth','true',''); //2010-12 in timezone -10
-   t('"2010-12+10" castable as gYearMonth','true',''); //2010 in UTC
+   t('"2010-12-10" castable as gYearMonth','false','');
+   t('"2010-12+10:00" castable as gYearMonth','true',''); //with timezone
    t('type-of(xs:gYear("2010Z"))','gYear','');
-   t('type-of(xs:gMonth("--12-10"))','gMonth','');
+   t('type-of(xs:gMonth("--12-10:00"))','gMonth','');
    t('xs:gMonth("--12")','--12','');
    t('xs:gMonthDay("--12-03")','--12-03','');
    t('xs:gDay("---30")','---30','');
@@ -1947,7 +1947,7 @@ begin
   t('xs:date("2012-12-24") - xs:date("2012-12-20")', 'P4D', '');
   t('timezone-from-dateTime(xs:date("2012-12-30+05:30") '+ IfThen(strictTypeChecking, 'cast as xs:dateTime', '')+')', 'PT5H30M', '');
   t('timezone-from-date(xs:date("2012-12-30Z"))', 'PT0S', '');
-  t('timezone-from-time(xs:time("02:18:20-1203"))', '-PT12H3M', '');
+  t('timezone-from-time(xs:time("02:18:20-12:03"))', '-PT12H3M', '');
      {
   t('', '', '');
   t('', '', '');
@@ -2823,8 +2823,8 @@ begin
   t('xs:dateTime("1999-12-30T20:30:40.5")', '1999-12-30T20:30:40.5', '');
   t('xs:date("1999-07-19") - xs:date("1969-11-30")', 'P10823D', '');
   t('(xs:date("1999-07-19") - xs:date("1969-11-30")) eq xs:dayTimeDuration("P10823D")', 'true', '');
-  t('fn:dateTime(date("1999-12-30"), time("20:30:40.23-05"))', '1999-12-30T20:30:40.23-05:00', '');
-  t('fn:dateTime(date("1999-12-30+04"), time("20:30:40.23"))', '1999-12-30T20:30:40.23+04:00', '');
+  t('fn:dateTime(date("1999-12-30"), time("20:30:40.23-05:00"))', '1999-12-30T20:30:40.23-05:00', '');
+  t('fn:dateTime(date("1999-12-30+04:00"), time("20:30:40.23"))', '1999-12-30T20:30:40.23+04:00', '');
   t('op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))', 'P337D', '');
   t('(op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))) + dayTimeDuration("P1D")', 'P338D', '');
   t('dayTimeDuration("P1D") + (op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28")))', 'P338D', '');
