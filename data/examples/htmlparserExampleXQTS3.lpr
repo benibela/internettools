@@ -6,7 +6,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, strutils, xquery, xquery_utf8, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
+  Classes, sysutils, strutils, xquery, xquery_utf8, xquery_module_math, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
   {$ifdef windows}windows{$endif}
   ;
   { you can add units after this }
@@ -1366,6 +1366,8 @@ begin
 end;
 
 begin
+  registerModuleMath;
+
   testsets := TList.Create;
   environments := TStringList.Create;
 

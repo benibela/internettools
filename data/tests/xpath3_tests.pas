@@ -12,7 +12,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser;
+uses xquery, simplehtmltreeparser, xquery_module_math, math;
 
 procedure equal(const s1, s2, testname: string);
 begin
@@ -303,6 +303,22 @@ begin
   t('fn:round(-10.356, 2)', '-10.36');
   t('fn:round(-12550, -2)', '-12500');
   t('fn:round(xs:float(12345.6), 2)', '12345.6');
+
+
+  try raise EInvalidArgument.create('The math tests raises EInvalidArgument exceptions. These exceptions should be disabled in the debugger.'); except on EInvalidArgument do ; end;
+
+  registerModuleMath();
+
+  t('math:pi()', '3.14159265358979');
+  t('math:pow(-2, 3)', '-8');
+  t('math:pow(-2, -3111111111111111111111111111111111111111111)', '0');
+  t('math:pow(-2, 3111111111111111111111111111111111111111111)', '-INF');
+  t('math:pow(-2, 3111111111111111111111111111111111111111112)', 'INF');
+  t('math:pow(-2, 3111111111111111111111111111111111111111111.5)', 'INF');
+  t('math:pow(-2, 3E100)', 'INF');
+  t('math:pow(xs:double("NaN"), 5)', 'NaN');
+  t('let $big := 88888888888 return (math:pow(3, $big), math:pow(3, -$big), math:pow(0.3, $big), math:pow(0.3, -$big))', 'INF 0 0 INF');
+  t('math:atan2(xs:double("INF"), xs:double("-INF"))', '2.35619449019234');
 
 
   //interface tests

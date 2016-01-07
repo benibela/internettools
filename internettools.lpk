@@ -11,7 +11,7 @@
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="25">
+    <Files Count="26">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -112,6 +112,10 @@
         <Filename Value="data/xquery__parse.pas"/>
         <UnitName Value="xquery__parse"/>
       </Item25>
+      <Item26>
+        <Filename Value="data/xquery_module_math.pas"/>
+        <UnitName Value="xquery_module_math"/>
+      </Item26>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>
