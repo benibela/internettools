@@ -1173,9 +1173,12 @@ type
     function isValidQName(s: string): boolean;
     function isValidationOnlyType(t: TXSType): boolean;
     function isAbstractType(t: TXSType): boolean;
+
+
+    procedure show(const s: string); //do not use
+    procedure hide(const s: string); //do not use
   private
     typeList, hiddenTypeList: TStringList;
-    procedure hide(const s: string);
   end;
 
   { TJSSchema }

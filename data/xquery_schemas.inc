@@ -996,6 +996,18 @@ begin
   result := (t = anySimpleType) or (t = NOTATION) or (t = anyAtomicType);
 end;
 
+procedure TXSSchema.show(const s: string);
+var
+  objIdx: Integer;
+begin
+  if hiddenTypeList = nil then exit;
+  objIdx := hiddenTypeList.IndexOf(s);
+  typeList.AddObject(hiddenTypeList[objIdx], hiddenTypeList.Objects[objIdx]);
+  hiddenTypeList.OwnsObjects := false;
+  hiddenTypeList.Delete(objIdx);
+  hiddenTypeList.OwnsObjects := true;
+end;
+
 function TXSSchema.isValidationOnlyType(t: TXSType): boolean;
 begin
   result := (t = anyType) or (t = untyped);
