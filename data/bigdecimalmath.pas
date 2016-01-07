@@ -158,6 +158,7 @@ operator :=(const a: QWord): BigDecimal;
 //** Marked as deprecated, because it may lead to rounding errors. FloatToBigDecimal is exact, but probably some magnitudes slower. For constant values StrToBigDecimal should be used instead.
 operator :=(const a: Extended): BigDecimal; deprecated 'Direct casting of float to bigdecimal might lead to rounding errors. Consider using StrToBigDecimal.';
 
+
 //** Standard operator unary -
 operator -(const a: BigDecimal): BigDecimal;
 //** Standard operator binary +
@@ -234,6 +235,11 @@ function isIntegral(const v: BigDecimal): boolean;
 function isLongint(const v: BigDecimal): boolean;
 //** Returns true iff v has no fractional digits and can be stored within an int64
 function isInt64(const v: BigDecimal): boolean;
+//** Checks if v is odd. A number with fractional digits is never odd (only weird)
+function odd(const v: BigDecimal): boolean; overload;
+//** Checks if v is even. A number with fractional digits is never even (and neither odd, which is odd)
+function even(const v: BigDecimal): boolean; overload;
+
 //** Returns the absolute value of v
 function abs(const v: BigDecimal): BigDecimal; overload;
 
@@ -1261,6 +1267,28 @@ begin
   if not v.signed and (v <= high(Int64)) then exit(true);
   if v.signed and (v >= low(Int64)) then exit(true);
   exit(false);
+end;
+
+function odd(const v: BigDecimal): boolean;
+var
+  i: Integer;
+begin
+  if v.exponent > 0 then exit(false);
+  if v.exponent = 0 then exit(system.odd(v.digits[0]));
+  for i := 0 to min(-v.exponent - 1, high(v.digits)) do
+    if v.digits[i] <> 0 then exit(false);
+  result := (-v.exponent <= high(v.digits)) and system.odd(v.digits[-v.exponent]);
+end;
+
+function even(const v: BigDecimal): boolean;
+var
+  i: Integer;
+begin
+  if v.exponent > 0 then exit(true);
+  if v.exponent = 0 then exit(not system.odd(v.digits[0]));
+  for i := 0 to min(-v.exponent - 1, high(v.digits)) do
+    if v.digits[i] <> 0 then exit(false);
+  result := (-v.exponent > high(v.digits)) or not system.odd(v.digits[-v.exponent]);
 end;
 
 function abs(const v: BigDecimal): BigDecimal;
