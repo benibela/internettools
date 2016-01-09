@@ -243,9 +243,10 @@ type
 
     procedure beginSubContextWithVariables;
     procedure endSubContextWithVariables(const oldContext: TXQEvaluationContext);
+
+    function parseDoc(const data, url, contenttype: string): TTreeNode; //for internal use
   private
     function contextNode(mustExists: boolean = true): TTreeNode;
-    function parseDoc(const data, url, contenttype: string): TTreeNode;
   end;
 
 
@@ -7431,6 +7432,8 @@ fn.registerFunction('translate',@xqFunctionTranslate,['($arg as xs:string?, $map
 fn.registerFunction('replace',@xqFunctionReplace,['($input as xs:string?, $pattern as xs:string, $replacement as xs:string) as xs:string', '($input as xs:string?, $pattern as xs:string, $replacement as xs:string, $flags as xs:string) as xs:string ']);
 fn.registerFunction('matches',@xqFunctionMatches,['($input as xs:string?, $pattern as xs:string) as xs:boolean', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:boolean']);
 fn.registerFunction('tokenize',@xqFunctionTokenize,['($input as xs:string?, $pattern as xs:string) as xs:string*', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:string*']);
+fn3.registerFunction('analyze-string',@xqFunctionAnalyze_String,['( $input as xs:string?, $pattern 	 as xs:string) as element(fn:analyze-string-result)', '($input as xs:string?, $pattern as xs:string,$flags as xs:string) as element(fn:analyze-string-result)'],[]);
+
 
 fn.registerFunction('boolean',@xqFunctionBoolean,['($arg as item()*) as xs:boolean']);
 fn.registerFunction('true',@xqFunctionTrue,['() as xs:boolean']);

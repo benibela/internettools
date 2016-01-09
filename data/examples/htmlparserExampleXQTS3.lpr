@@ -648,13 +648,48 @@ begin
   end;
 end;
 
-function xmlEqual(const a: IXQValue; fragment: string): boolean;
+function killPrefixes(tn: TTreeNode; ns: TStringList; mustExist: boolean): boolean;
+  function checkNode(n: TTreeNode): boolean;
+  begin
+    result := true;
+    if n.namespace <> nil then begin
+      if n.namespace.getURL = 'http://www.w3.org/2000/xmlns/' then n.namespace := XMLNamespace_XMLNS
+      else begin
+        if ns.IndexOf(n.namespace.getURL) < 0 then begin
+          if mustExist then begin
+            writeln(stderr, 'Missing: ', n.namespace.getURL);
+            exit(false);
+          end;
+          ns.AddObject(n.namespace.getURL, TNamespace.create(n.namespace.getURL, 'prf'+IntToStr(ns.Count-1)));
+        end;
+        n.namespace := TNamespace(ns.Objects[ns.IndexOf(n.namespace.getURL)]);
+      end;
+    end;
+  end;
+var
+  i: Integer;
+begin
+  result := true;
+  while tn <> nil do begin
+    if not checkNode(tn) then exit(false);
+    if tn.attributes <> nil then begin
+      for i := tn.attributes.Count - 1 downto 0 do begin
+        if tn.attributes.getAttribute(i).isNamespaceNode then tn.attributes.Delete(i)
+        else if not checkNode(tn.attributes.getAttribute(i)) then exit(false);
+      end;
+    end;
+    tn := tn.next;
+  end;
+end;
+
+function xmlEqual(const a: IXQValue; fragment: string; ignorePrefixes: boolean): boolean;
 var compareTree: TTreeParser;
     x: IXQValue;
     fragment1: String;
     tree1: TTreeDocument;
     tree2: TTreeDocument;
     previousValue: Boolean;
+    list: TStringList;
 begin
   compareTree := TTreeParser.Create;
   fragment1 := '<WRAP>';
@@ -681,10 +716,24 @@ begin
   tree1 := compareTree.parseTree(fragment1);
   //tree1.changeEncoding(eUTF8,eUTF8,true,false);
   sorttree(tree1);
+  if ignorePrefixes then begin
+    list := TStringList.Create;
+    killPrefixes(tree1, list, false);
+  end;
   tree2 := compareTree.parseTree('<WRAP>'+fragment+'</WRAP>');
   //tree2.changeEncoding(eUTF8,eUTF8,true,false);
   sorttree(tree2);
+  if ignorePrefixes then begin
+    if not killPrefixes(tree2, list, true) then begin
+      list.free;
+      exit(false);
+    end;
+    list.free;
+  end;
+  writeln(stderr, '1', tree1.outerXML());
+  writeln(stderr, '2', tree2.outerXML());
   result := tree1.outerXML() = tree2.outerXML();
+
 
   except
     on e: ETreeParseException do
@@ -750,7 +799,7 @@ begin
     end;
     aakCount: result := OK[res.getSequenceCount = StrToInt(value)];
     aakDeepEq: result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
-    aakXml: result := OK[xmlEqual(res, value)];
+    aakXml: result := OK[xmlEqual(res, value, ignorePrefixes)];
     //aakXml: result := OK[xqfunctionDeep_Equal res.getSequenceCount = StrToInt(value)];
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
     aakSerializationMatches: begin//raise exception.Create('assert serialization-matches not supported ');

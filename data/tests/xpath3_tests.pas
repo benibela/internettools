@@ -250,6 +250,13 @@ begin
   t('parse-html("<html><a href=""foobar""/></html>")//a/@href', 'foobar');
 
 
+  t('outer-xml(analyze-string("bc", "b"))', '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions"><match>b</match><non-match>c</non-match></analyze-string-result>');
+  t('outer-xml(analyze-string("abc", "b"))', '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions"><non-match>a</non-match><match>b</match><non-match>c</non-match></analyze-string-result>');
+  t('outer-xml(analyze-string("ab", "b"))', '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions"><non-match>a</non-match><match>b</match></analyze-string-result>');
+  t('outer-xml(analyze-string("bbb", "b"))', '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions"><match>b</match><match>b</match><match>b</match></analyze-string-result>');
+//  t('outer-xml(analyze-string("abc", "(((a)(b)))(c)((d?))"))', '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions"><match><group nr="1"><group nr="2"><group nr="3">a</group><group nr="4">b</group></group></group><group nr="5">c</group><group nr="6"><group nr="7"></group></group></match></analyze-string-result>');
+  t('outer-xml(analyze-string("abc", "(((a)(b)))(c)(d?)(e?)"))', '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions"><match><group nr="1"><group nr="2"><group nr="3">a</group><group nr="4">b</group></group></group><group nr="5">c</group><group nr="6"/><group nr="7"/></match></analyze-string-result>');
+
   f('1 ! root()', 'XPTY0004');
 
   //rounding
