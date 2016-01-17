@@ -1038,6 +1038,11 @@ begin
   Result:=xqtvaAbort;
 end;
 
+procedure TXQTermFlowerSubClause.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
+begin
+
+end;
+
 
 { TXQTermFlowerLet }
 
@@ -1148,10 +1153,10 @@ procedure TXQTermFlowerWindowVarsAndCondition.visitchildrenToUndeclare(visitor: 
 begin
   if assigned(when) then begin
     visitor.parent := parent;
-    if Assigned(nextItem) then visitor.declare(@nextItem);
-    if Assigned(previousItem) then visitor.declare(@previousItem);
-    if Assigned(positionVar) then visitor.declare(@positionVar);
-    if Assigned(currentItem) then visitor.declare(@currentItem);
+    if Assigned(nextItem) then visitor.undeclare(@nextItem);
+    if Assigned(previousItem) then visitor.undeclare(@previousItem);
+    if Assigned(positionVar) then visitor.undeclare(@positionVar);
+    if Assigned(currentItem) then visitor.undeclare(@currentItem);
   end;
 end;
 
@@ -1280,6 +1285,33 @@ begin
   if Assigned(sequenceTyp) then TXQTermFlowerLetPattern(result).sequenceTyp := TXQTermSequenceType(sequenceTyp.clone);
 end;
 
+function TXQTermFlowerLetPattern.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  j: Integer;
+begin
+  result := visitor.simpleTermVisit(@expr, self);
+  case result of xqtvaAbort: exit; end;
+
+  if sequenceTyp <> nil then begin
+    result := visitor.simpleTermVisit(@sequenceTyp, self);
+    case result of xqtvaAbort: exit; end;
+  end;
+
+  for j := 0 to high(pattern.vars) do
+    visitor.declare(@pattern.vars[j]);
+
+  result := visitor.simpleTermVisit(@pattern, self);
+  case result of xqtvaAbort: exit; end;
+end;
+
+procedure TXQTermFlowerLetPattern.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
+var
+  j: Integer;
+begin
+  for j := high(pattern.vars) downto 0 do
+    visitor.undeclare(@pattern.vars[j]);
+end;
+
 destructor TXQTermFlowerLetPattern.destroy;
 begin
   expr.Free;
@@ -1301,6 +1333,11 @@ end;
 class function TXQTermFlowerWhere.kind: TXQTermFlowerSubClauseKind;
 begin
   result := xqtfcWhere;
+end;
+
+function TXQTermFlowerWhere.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  result := visitor.simpleTermVisit(@test, self);
 end;
 
 function TXQTermFlowerWhere.getContextDependencies: TXQContextDependencies;
@@ -1328,6 +1365,11 @@ begin
   result := xqtfcOrder;
 end;
 
+function TXQTermFlowerOrder.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  result := visitor.simpleTermVisit(@expr, self);
+end;
+
 function TXQTermFlowerOrder.getContextDependencies: TXQContextDependencies;
 begin
   result := expr.getContextDependencies;
@@ -1351,6 +1393,16 @@ end;
 class function TXQTermFlowerCount.kind: TXQTermFlowerSubClauseKind;
 begin
   Result:=xqtfcCount;
+end;
+
+function TXQTermFlowerCount.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  visitor.declare(@countvar, self);
+end;
+
+procedure TXQTermFlowerCount.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
+begin
+  visitor.undeclare(@countvar, self);
 end;
 
 function TXQTermFlowerCount.getContextDependencies: TXQContextDependencies;
@@ -2162,62 +2214,19 @@ end;
 
 function TXQTermFlower.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i, j: Integer;
+  i: Integer;
   clause: TXQTermFlowerSubClause;
   patternclause: TXQTermFlowerLetPattern;
 begin
-  for i := 0 to high(children) - 1 do begin
-    clause := TXQTermFlowerSubClause(children[i]);
-    case clause.kind of
-      xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcGroup: visitor.simpleTermVisit(@children[i], self);
-      xqtfcLetPattern, xqtfcForPattern: begin
-        patternclause := TXQTermFlowerLetPattern(clause);
-        result := visitor.simpleTermVisit(@patternclause.expr, clause);
-        case result of xqtvaAbort: exit; end;
+  for i := 0 to high(children) - 1 do
+    visitor.simpleTermVisit(@children[i], self);
 
-        if patternclause.sequenceTyp <> nil then begin
-          result := visitor.simpleTermVisit(@patternclause.sequenceTyp, clause);
-          case result of xqtvaAbort: exit; end;
-        end;
-
-        for j := 0 to high(patternclause.pattern.vars) do
-          visitor.declare(@patternclause.pattern.vars[j]);
-
-        result := visitor.simpleTermVisit(@patternclause.pattern, clause);
-        case result of xqtvaAbort: exit; end;
-      end;
-      xqtfcWhere: begin
-        result := visitor.simpleTermVisit(@TXQTermFlowerWhere(clause).test, clause);
-        case result of xqtvaAbort: exit; end;
-      end;
-      xqtfcOrder: begin
-        result := visitor.simpleTermVisit(@TXQTermFlowerOrder(clause).expr, clause);
-        case result of xqtvaAbort: exit; end;
-      end;
-      xqtfcCount: begin
-        visitor.parent := self;
-        visitor.declare(@TXQTermFlowerCount(clause).countvar);
-      end;
-    end;
-  end;
   result := visitor.simpleTermVisit(@children[high(children)],self);
   case result of xqtvaAbort: exit; end;
 
   visitor.parent := self;
-  for i := high(children) - 1 downto 0 do begin
-    clause := TXQTermFlowerSubClause(children[i]);
-    case clause.kind of
-      xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcGroup: TXQTermFlowerSubClause(children[i]).visitchildrenToUndeclare(visitor);
-      xqtfcLetPattern, xqtfcForPattern:
-        with TXQTermFlowerLetPattern(clause) do
-          for j := high(pattern.vars) downto 0 do
-            visitor.undeclare(@pattern.vars[j]);
-      xqtfcCount: begin
-        visitor.parent := self;
-        visitor.undeclare(@TXQTermFlowerCount(clause).countvar);
-      end;
-    end;
-  end;
+  for i := high(children) - 1 downto 0 do
+    TXQTermFlowerSubClause(children[i]).visitchildrenToUndeclare(visitor);
 end;
 
 function TXQTermFlower.clone: TXQTerm;

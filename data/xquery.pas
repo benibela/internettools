@@ -1692,7 +1692,7 @@ type
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
 
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
-    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); virtual; abstract;
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); virtual;
   end;
   TXQTermFlowerLet = class(TXQTermFlowerSubClause)
     loopvar: TXQTermVariable;
@@ -1752,6 +1752,8 @@ type
     class function kind: TXQTermFlowerSubClauseKind; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
     destructor destroy; override;
   end;
   TXQTermFlowerForPattern = class(TXQTermFlowerLetPattern)
@@ -1760,6 +1762,7 @@ type
   TXQTermFlowerWhere = class(TXQTermFlowerSubClause)
     test: TXQTerm;
     class function kind: TXQTermFlowerSubClauseKind; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
@@ -1771,6 +1774,7 @@ type
     emptyOrder: TXQTermFlowerOrderEmpty;
     collation: string;
     class function kind: TXQTermFlowerSubClauseKind; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
@@ -1779,6 +1783,8 @@ type
     countvar: TXQTermVariable;
 
     class function kind: TXQTermFlowerSubClauseKind; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
+    procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
