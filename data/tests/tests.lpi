@@ -87,12 +87,10 @@
       <Unit1>
         <Filename Value="bbutils_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="bbutils_tests"/>
       </Unit1>
       <Unit2>
         <Filename Value="../extendedhtmlparser.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="extendedhtmlparser"/>
       </Unit2>
       <Unit3>
         <Filename Value="xpath2_tests.pas"/>
@@ -129,7 +127,6 @@
       <Unit10>
         <Filename Value="extendedhtmlparser_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="extendedhtmlparser_tests"/>
       </Unit10>
       <Unit11>
         <Filename Value="../xquery_functions3.inc"/>
@@ -138,11 +135,11 @@
       <Unit12>
         <Filename Value="simpleinternet_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="simpleinternet_tests"/>
       </Unit12>
       <Unit13>
         <Filename Value="commontestutils.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="commontestutils"/>
       </Unit13>
     </Units>
   </ProjectOptions>

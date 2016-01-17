@@ -27,10 +27,24 @@ begin
   SetLength(target, length(target));
   for i := 0 to high(target) do
     with target[i] do begin
+      name := name.clone;
       SetLength(params, length(params));
       for j := 0 to high(params) do
         params[j] := params[j].clone;
     end;
+end;
+
+procedure freeAnnotations(annotations: TXQAnnotations);
+var
+  i: Integer;
+  j: Integer;
+begin
+  for i := 0 to high(annotations) do begin
+    annotations[i].name.Free;
+    for j := 0 to high(annotations[i].params) do
+      annotations[i].params[j].free;
+  end;
+
 end;
 
 function TXQTerm.debugTermToString: string;
@@ -228,6 +242,16 @@ begin
   undeclare(v);
 end;
 
+function TXQTerm_Visitor.simpleTermVisitNoRecurse(term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction;
+begin
+  parent := theparent;
+  result := visit(term);
+  case result of xqtvaAbort: exit;  end;
+
+  parent := theparent;
+  result := leave(term);
+end;
+
 
 
 
@@ -345,7 +369,7 @@ constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
     while t <> nil do begin
       if (t is TXQTermSequence) and (length(TXQTermSequence(t).children) = 1) then
          t := TXQTermSequence(t).children[0]
-      else if (t is TXQTermNodeMatcher) or (t is TXQTermVariable) then
+      else if (t is TXQTermNodeMatcher) or (t is TXQTermVariable) or (t is TXQTermEQNameToken) then
         exit(true)
       else if (t is TXQTermReadObjectProperty) or (t is TXQTermDynamicFunctionCall) then
         t := TXQTermReadObjectProperty(t).children[0]
@@ -413,7 +437,7 @@ begin
       //break;
     end else if v is TXQTermVariable then begin
       varname := TXQTermVariable(v).value;
-      varnamespace := TXQTermVariable(v).namespaceURL;
+      varnamespace := TXQTermVariable(v).namespace;
       break;
     end else if v is TXQTermReadObjectProperty then begin
       arrayPrepend(properties, TXQTermReadObjectProperty(v).propname);
@@ -496,6 +520,40 @@ begin
   result += [xqcdContextVariables];
 end;
 
+function TXQTermDefineVariable.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  v: PXQTerm;
+begin
+  Result:=inherited visitchildren(visitor);
+
+  v := @variable;
+  while result = xqtvaContinue do begin
+    if v^ is TXQTermSequence then begin
+      if length(TXQTermSequence(v^).children) <> 1 then raiseEvaluationError('pxp:VAR', 'Only one variable can be assigned to');
+      v := @TXQTermSequence(v^).children[0];
+    end else if v^ is TXQTermNodeMatcher then begin
+      raiseEvaluationError('pxp:VAR', 'node matcher term as variable name in assignment has been deprecated. (but this error should never occur, since the term type is changed during parsing time)');
+    end else if (v^ is TXQTermVariable) or (v^ is TXQTermPendingEQNameToken {only happens during parsing}) then begin
+      visitor.declare(PXQTermVariable(v), self);
+      result := visitor.simpleTermVisit(v, self);
+      visitor.undeclare(PXQTermVariable(v), self);
+      break;
+    end else begin
+      visitor.simpleTermVisitNoRecurse(v, self);
+      if v^ is TXQTermReadObjectProperty then begin
+        v := @TXQTermReadObjectProperty(v^).children[0];
+      end else if (v^ is TXQTermDynamicFunctionCall) or (v^ is TXQTermFilterSequence) then begin
+        case length(TXQTermWithChildren(v^).children) of
+          0, 1: ;
+          2: visitor.simpleTermVisit(@TXQTermWithChildren(v^).children[1], v^);
+          else raiseEvaluationError('pxp:VAR', 'invalid argument count for object property assignment');
+        end;
+        v := @TXQTermWithChildren(v^).children[0];
+      end else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v^.debugTermToString);
+    end;
+  end;
+end;
+
 function TXQTermDefineVariable.clone: TXQTerm;
 var
   other: TXQTermDefineVariable;
@@ -511,8 +569,7 @@ var
   i: Integer;
   j: Integer;
 begin
-  for i := 0 to high(annotations) do for j := 0 to high(annotations[i].params) do
-    FreeAndNil(annotations[i].params[j]);
+  freeAnnotations(annotations);
   variable.Free;
   inherited destroy;
 end;
@@ -549,6 +606,7 @@ var
   i: Integer;
 begin
   result := name;
+  if (kind = tikAtomic) and (atomicTypeInfo = nil) then result += '(TYPE NOT FOUND)';
   if Result = '' then
     case kind of
       tikNone: result := 'empty-sequence()';
@@ -569,6 +627,15 @@ end;
 function TXQTermSequenceType.getContextDependencies: TXQContextDependencies;
 begin
   result := [];
+end;
+
+function TXQTermSequenceType.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i: Integer;
+begin
+  Result:=inherited visitchildren(visitor);
+  if result <> xqtvaContinue then exit;
+  for i := 0 to high(arguments) do result := visitor.simpleTermVisit(@arguments[i], self);
 end;
 
 function TXQTermSequenceType.isSingleType(): boolean;
@@ -765,7 +832,8 @@ begin
   //see TXQTermDefineFunction.defineDynamicPartialApplication
   f := fun;
   fresult := TXQValueFunction.create();
-  fresult.namespace := f.namespace;
+  fresult.namespaceURL := f.namespaceURL;
+  fresult.namespacePrefix := f.namespacePrefix;
   fresult.name:=f.name;
   copyAnnotations(fresult.annotations, f.annotations);
   fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
@@ -793,6 +861,7 @@ end;
 function TXQTermSequenceType.clone: TXQTerm;
 var
   other: TXQTermSequenceType;
+  i: Integer;
 begin
   result := inherited clone;
   other := TXQTermSequenceType(result);
@@ -802,6 +871,9 @@ begin
   other.kind := kind;
   other.atomicTypeInfo := atomicTypeInfo;
   other.nodeMatching := nodeMatching;
+  SetLength(other.arguments, length(arguments));
+  for i:=0 to high(arguments) do
+    other.arguments[i] := arguments[i].clone as TXQTermSequenceType;
 end;
 
 { TXQTermSequence }
@@ -882,7 +954,7 @@ var tempContext:TXQEvaluationContext;
         if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v, context) then
           raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
       tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespaceURL);
+      tempContext.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
       if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then begin
         tempContext.temporaryVariables.popAll;
         result := not isEvery;
@@ -916,8 +988,11 @@ function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Visit
   begin
     if pos = high(children) then
       exit(visitor.simpleTermVisit(@children[pos], self));
-    if children[pos + 1] is TXQTermSequenceType then typeDelta:=1
-    else typeDelta:=0;
+    if children[pos + 1] is TXQTermSequenceType then begin
+      result := visitor.simpleTermVisit(@children[pos+1], self);
+      case result of xqtvaAbort: exit; end;
+      typeDelta:=1;
+    end else typeDelta:=0;
 
     result := visitor.simpleTermVisit(@children[pos+1+typeDelta], self);
     case result of xqtvaAbort: exit; end;
@@ -998,8 +1073,13 @@ end;
 
 function TXQTermFlowerLet.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
+  if sequenceTyp <> nil then begin
+    result := visitor.simpleTermVisit(@sequenceTyp, self);
+    case result of xqtvaAbort: exit; end;
+  end;
   result := visitor.simpleTermVisit(@expr, self);
   case result of xqtvaAbort: exit; end;
+  //todo: visit loopvar, too?
   visitor.declare(@loopvar);
 end;
 
@@ -1301,9 +1381,12 @@ function TXQTermFlowerGroup.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Vis
 var
   i: Integer;
 begin
-  for i := 0 to high(vars) do begin
+  for i := 0 to high(vars) do
     visitor.declare(@vars[i], self);
-  end;
+  for i := 0 to high(seqtypes) do
+    if seqtypes[i]<> nil then
+      visitor.simpleTermVisit(@seqtypes[i], self);
+
   result := xqtvaContinue;
 end;
 
@@ -1616,7 +1699,7 @@ var
         begin
           for i := 0 to high(patternClause.pattern.vars) do //todo: optimize stringhash
             if (patternClause.pattern.vars[i].value = name)
-               and (patternClause.pattern.vars[i].namespaceURL = url) then exit(i);
+               and (patternClause.pattern.vars[i].namespace = url) then exit(i);
           result := -1;
         end;
 
@@ -2092,6 +2175,11 @@ begin
         result := visitor.simpleTermVisit(@patternclause.expr, clause);
         case result of xqtvaAbort: exit; end;
 
+        if patternclause.sequenceTyp <> nil then begin
+          result := visitor.simpleTermVisit(@patternclause.sequenceTyp, clause);
+          case result of xqtvaAbort: exit; end;
+        end;
+
         for j := 0 to high(patternclause.pattern.vars) do
           visitor.declare(@patternclause.pattern.vars[j]);
 
@@ -2159,8 +2247,7 @@ constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; ar
 begin
   if not findKindIndex(anamespace, alocalname, arity, staticContext, kind, func) then begin
     kind := xqfkUnknown;
-    funcname:=alocalname;
-    namespaceUrl := anamespace;
+    name := TXQEQName.Create.create(anamespace, alocalname);
   end;
 end;
 
@@ -2168,6 +2255,12 @@ constructor TXQTermNamedFunction.create(const anamespace, alocalname: string; ar
 begin
   create(anamespace, alocalname, length(args), staticContext);
   push(args);
+end;
+
+destructor TXQTermNamedFunction.destroy;
+begin
+  name.free;
+  inherited destroy;
 end;
 
 function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -2194,7 +2287,7 @@ begin
     xqfkComplex:
       result := TXQComplexFunctionInfo(func).func(context, evilkids);
     xqfkWrappedOperator: begin
-      if length(evilkids) <> 2 then raiseEvaluationError('XPST0003', 'Need two arguments for function: op:' + funcname);
+      if length(evilkids) <> 2 then raiseEvaluationError('XPST0003', 'Need two arguments for function: op:' + name.localname);
       result := TXQOperatorInfo(func).func(context, evilkids[0], evilkids[1]);
     end;
     xqfkTypeConstructor: begin
@@ -2242,10 +2335,10 @@ end;
 
 procedure TXQTermNamedFunction.assignWithoutChildren(source: TXQTermNamedFunction);
 begin
-  namespaceUrl:=source.namespaceUrl;
+  name := source.name;
+  if name <> nil then name := name.clone;
   kind:=source.kind;
   func:=source.func;
-  funcname:=source.funcname;
   //todo: also clone interpretedFunction?
 end;
 
@@ -2260,8 +2353,7 @@ var
   i: Integer;
 begin
   result := '';
-  if namespaceUrl <> '' then result := 'Q{'+ namespaceUrl+'}';
-  result += funcname + '(';
+  result += name.ToString + '(';
   for i := 0 to high(children) do begin
     if i <> 0 then result += ', ';
     result += children[i].ToString;
@@ -2333,20 +2425,20 @@ procedure TXQTermNamedFunction.init(const context: TXQStaticContext);
   function strSimilar(const s, ref: string): boolean;
   begin
     result := strContains(s, ref) or strContains(ref, s)
-              or (strSimilarity(funcname, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
+              or (strSimilarity(name.localname, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
   end;
   var
     module: TXQNativeModule;
     i: Integer;
   begin
     result := '';
-    module := TXQueryEngine.findNativeModule(namespaceUrl);
+    module := TXQueryEngine.findNativeModule(name.namespaceURL);
     while module <> nil do begin
       for  i := 0 to module.basicFunctions.Count - 1 do
-        if strSimilar(funcname, module.basicFunctions[i]) then
+        if strSimilar(name.localname, module.basicFunctions[i]) then
           result += module.basicFunctions[i]+' ';
       for i := 0 to module.complexFunctions.Count - 1 do
-        if strSimilar(funcname, module.complexFunctions[i]) then
+        if strSimilar(name.localname, module.complexFunctions[i]) then
           result += module.complexFunctions[i]+' ';
       module := module.parent;
     end;
@@ -2359,13 +2451,13 @@ begin
   if not (kind in [xqfkNativeInterpreted, xqfkUnknown]) or (interpretedFunction <> nil) then exit;
   case kind of
     xqfkUnknown: begin
-      functionStaticContext := context.findModuleStaticContext(namespaceUrl);
+      functionStaticContext := context.findModuleStaticContext(name.namespaceURL);
       if functionStaticContext <> nil then
         for i := 0 to high(functionStaticContext.functions) do begin
           f :=  functionStaticContext.functions[i];
-          if (f.name = funcname)
+          if (f.name = name.localname)
              and (length(f.parameters) = length(children))
-             and equalNamespaces(namespaceGetURL(f.namespace), namespaceUrl) then begin
+             and equalNamespaces(f.namespaceURL, name.namespaceURL) then begin
             interpretedFunction := f;
             break;
           end;
@@ -2373,12 +2465,12 @@ begin
       if interpretedFunction <> nil then begin
         if functionStaticContext <> context {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
           for i := 0 to high(interpretedFunction.annotations) do
-            if (interpretedFunction.annotations[i].name = 'private') and (interpretedFunction.annotations[i].namespace = XMLNamespaceUrl_XQuery ) then
+            if interpretedFunction.annotations[i].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
               raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
-        findKindIndex(namespaceUrl, funcname, length(children), context, kind, func);
+        findKindIndex(name.namespaceURL, name.localname, length(children), context, kind, func);
         if kind <> xqfkUnknown then exit();
-        raiseEvaluationError('XPST0017', 'Function Q{'+namespaceUrl+'}'+ funcname+'#'+IntToStr(length(children))+ ' not found. '+suggestions);
+        raiseEvaluationError('XPST0017', 'Function '+name.ToString+'#'+IntToStr(length(children))+ ' not found. '+suggestions);
       end;
     end;
     xqfkNativeInterpreted: begin
@@ -2866,52 +2958,40 @@ end;
 
 { TXQTermVariable }
 
-constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
+{constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
 begin
   value := avalue;
   if value = '' then raiseEvaluationError('XPST0003', 'variable with empty name');
   //if value[1] = '$' then raiseEvaluationError('variable name starts with a double $:  ' + value);
   if value[length(value)] = ';' then delete(value, length(value), 1);
   if staticContext <> nil then staticContext.splitRawQName(namespaceURL, value, xqdnkUnknown);
-end;
+end;}
 
 constructor TXQTermVariable.create(const avalue: string; const anamespace: INamespace);
 begin
   value := avalue;
-  namespaceURL := namespaceGetURL(anamespace);
+  namespace := namespaceGetURL(anamespace);
 end;
 
 constructor TXQTermVariable.create(const alocalname: string; const anamespace: string);
 begin
   value := alocalname;
-  namespaceURL:= anamespace;
+  namespace:= anamespace;
 end;
 
 function TXQTermVariable.equalsVariable(v: TXQTermVariable): boolean;
 begin
-  result := (v.value = value) and equalNamespaces(namespaceURL, v.namespaceURL);
+  result := (v.value = value) and equalNamespaces(namespace, v.namespace);
 end;
 
 function TXQTermVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
-  result := context.getVariable(value, namespaceURL);
+  result := context.getVariable(value, namespace);
 end;
 
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;
 begin
   Result:=[xqcdContextVariables];
-end;
-
-class function TXQTermVariable.splitForDotNotation(v: TXQTermVariable): TXQTerm;
-var
-  name: String;
-  prop: String;
-begin
-  name := v.value;
-  v.value := strSplitGet('.', name);
-  result := v;
-  for prop in strSplit(name, '.') do
-    result := TXQTermReadObjectProperty.create(prop).push([result]);
 end;
 
 function TXQTermVariable.clone: TXQTerm;
@@ -2920,14 +3000,14 @@ var
 begin
   Result:=inherited clone;
   other := TXQTermVariable(result);
-  other.namespaceURL := namespaceURL;
+  other.namespace := namespace;
   other.value := value;
 end;
 
 function TXQTermVariable.ToString: ansistring;
 begin
   result := '$';
-  if namespaceURL <> '' then result += 'Q{'+namespaceURL+'}';
+  if namespace <> '' then result += 'Q{'+namespace+'}';
   result += value;
 end;
 
@@ -3034,8 +3114,13 @@ begin
       visitor.simpleTermVisit(@seq.children[0], self);
     end else if seq.children[0] is TXQTermVariable then
       visitor.declare(@seq.children[0], self);
-    result := visitor.simpleTermVisit(@seq.children[high(seq.children)], self);
-    case result of xqtvaAbort: exit; end;
+
+    for j := 0 to high(seq.children) do begin
+      result := visitor.simpleTermVisit(@seq.children[j], self);
+      case result of xqtvaAbort: exit; end;
+    end;
+
+
     if (seq.children[0] is TXQTermPatternMatcher) then begin
       visitor.parent := self;
       with TXQTermPatternMatcher(seq.children[0]) do
@@ -3483,6 +3568,15 @@ begin
   inherited destroy;
 end;
 
+function TXQTermConstructor.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+begin
+  if nameValue <> nil then begin
+    result := visitor.simpleTermVisit(@nameValue, self);
+    case result of xqtvaAbort: exit; end;
+  end;
+  inherited visitchildren(visitor);
+end;
+
 { TXQTermJSONObjectConstructor }
 
 function TXQTermJSONObjectConstructor.evaluate(const context: TXQEvaluationContext): IXQValue;
@@ -3550,13 +3644,13 @@ end;
 
 procedure TXQTerm_VisitorTrackKnownVariables.declare(v: PXQTermVariable);
 begin
-  overridenVariables.add(v^.value, tempValue, v^.namespaceURL);
+  overridenVariables.add(v^.value, tempValue, v^.namespace);
 end;
 
 procedure TXQTerm_VisitorTrackKnownVariables.undeclare(v: PXQTermVariable);
 begin
   Assert((overridenVariables.vars[overridenVariables.count-1].name = v^.value) and
-         equalNamespaces(overridenVariables.vars[overridenVariables.count-1].namespaceURL, v^.namespaceURL));
+         equalNamespaces(overridenVariables.vars[overridenVariables.count-1].namespaceURL, v^.namespace));
   overridenVariables.removeLast;
 end;
 
@@ -3601,27 +3695,23 @@ end;
 
 { TXQTermDefineFunction }
 
-constructor TXQTermDefineFunction.createReference(const anamespace: INamespace; aname: string; arity: integer);
+constructor TXQTermDefineFunction.createReference(const fun: TXQTermNamedFunction; arity: integer);
 var
-  call: TXQTermNamedFunction;
   i: Integer;
 begin
   parameterCount := arity;
-  funcname:=aname;
-  namespace := anamespace;
-  call := TXQTermNamedFunction.create(anamespace.getURL, aname, arity);
   for i := 1 to arity do begin
     push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
-    call.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
+    fun.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
   end;
-  push(call);
+  push(fun);
   kind := xqtdfNamedReference;
-end;
+end;                                                                               {
 
 constructor TXQTermDefineFunction.createReference(anamespaceUrl: string; aname: string; arity: integer);
 begin
   createReference(TNamespace.create(anamespaceUrl, 'prf'), aname, arity);
-end;
+end;                                                                                }
 
 function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
@@ -3686,8 +3776,11 @@ var
   v: TXQTermVariable;
 begin
   result := TXQValueFunction.create();
-  result.namespace := namespace;
-  result.name:=funcname;
+  if name <> nil then begin
+    result.namespaceURL := name.namespaceURL;
+    result.namespacePrefix := name.namespacePrefix;
+    result.name:=name.localname;
+  end;
   result.annotations := annotations;
   setlength(result.parameters, parameterCount);
   for i := 0 to high(result.parameters) do begin
@@ -3738,14 +3831,22 @@ function TXQTermDefineFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_
 var
   i: Integer;
   subchildren: array of txqterm;
+  varDef: TXQTermDefineVariable;
 begin
   visitor.parent := self;
   case kind of
     xqtdfUserDefined, xqtdfNamedReference: begin
-      for i := 0 to parameterCount - 1 do
-        visitor.declare(@((children[i] as TXQTermDefineVariable).variable));
-      if not (children[high(children)] is TXQTermSequenceType) then
-        result := visitor.simpleTermVisit(@children[high(children)], self);
+      for i := 0 to parameterCount - 1 do begin
+        varDef := children[i] as TXQTermDefineVariable;
+        visitor.declare(@varDef.variable);
+        if length(varDef.children) > 0 then begin
+          result := visitor.simpleTermVisit(@children[i], self);
+          case result of xqtvaAbort: exit; end;
+          visitor.parent := self;
+        end;
+      end;
+      for i := parameterCount to high(children) do
+        result := visitor.simpleTermVisit(@children[i], self);
       visitor.parent := self;
       for i := parameterCount - 1 downto 0 do
         visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
@@ -3771,18 +3872,17 @@ var
 begin
   Result:=inherited clone;
   other := TXQTermDefineFunction(result);
-  other.namespace := namespace;
-  other.funcname := funcname;
+  other.name := name;
+  if name <> nil then other.name := name.clone;
   other.parameterCount := parameterCount;
   copyAnnotations(other.annotations, annotations);
   other.kind := kind;
 end;
 
 destructor TXQTermDefineFunction.destroy;
-var i,j: integer;
 begin
-  for i := 0 to high(annotations) do for j := 0 to high(annotations[i].params) do
-    FreeAndNil(annotations[i].params[j]);
+  freeAnnotations(annotations);
+  name.free;
   inherited destroy;
 end;
 
@@ -3826,6 +3926,8 @@ begin
     version := findNamedFunctionVersion(context);
     f := TXQTermNamedFunction(children[high(children)]);
 
+//    if (name = nil) and (f.name <> nil) then name := f.name.clone;
+
     resulttype := nil;
     if version <> nil then begin
       for i := 0 to parameterCount-1 do
@@ -3867,8 +3969,9 @@ begin
   f := TXQTermNamedFunction(children[high(children)]);
 
   result := TXQValueFunction.create();
-  result.namespace := namespaceReverseLookup(f.namespaceUrl);
-  result.name:=f.funcname;
+  result.namespaceURL := f.name.namespaceURL;
+  result.namespacePrefix := namespaceReverseLookup(result.namespaceURL).getPrefix;
+  result.name := f.name.localname;
   if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
     copyAnnotations(result.annotations, f.interpretedFunction.annotations);
   result.body := TXQTermNamedFunction.create();
@@ -3915,7 +4018,8 @@ begin
   ch := (children[0] as TXQTermWithChildren).children;
   if length(ch) <> length(f.parameters) + 1 then raiseParsingError('XPTY0004', 'Invalid argument count');
   result := TXQValueFunction.create();
-  result.namespace := f.namespace;
+  result.namespaceURL := f.namespaceURL;
+  result.namespacePrefix := f.namespacePrefix;
   result.name:=f.name;
   copyAnnotations(result.annotations, f.annotations);
   result.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
@@ -3973,8 +4077,8 @@ begin
       for i := 0 to high(catches) do begin
         matches := false;
         for j := 0 to high(catches[i].tests) do
-          if ((catches[i].tests[j].local = '*') or (catches[i].tests[j].local = e.errorCode) )  and
-             ((catches[i].tests[j].kind = xqnmNone) or (catches[i].tests[j].namespace = ns) ) then begin
+          if ((catches[i].tests[j].name.localname = '*') or (catches[i].tests[j].name.localname = e.errorCode) )  and
+             ((catches[i].tests[j].ignoreNamespace) or (catches[i].tests[j].name.namespaceURL = ns) ) then begin
             matches := true;
             break;
           end;
@@ -4058,10 +4162,14 @@ end;
 destructor TXQTermTryCatch.Destroy;
 var
   i: Integer;
+  j: Integer;
 begin
   body.free;
-  for i := 0 to high(catches) do
+  for i := 0 to high(catches) do begin
+    for j := 0 to high(catches[i].tests) do
+      catches[i].tests[j].name.free;
     catches[i].expr.free;
+  end;
   inherited Destroy;
 end;
 

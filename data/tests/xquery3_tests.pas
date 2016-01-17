@@ -140,9 +140,9 @@ begin
 
   m('xquery version "3.0"; declare %private function local:foo($x as node()) {type-of($x)}; local:foo(<a>123</a>)', 'node()');
   f('declare %private %private function local:foo($x as node()) {type-of($x)}; local:foo(<a>123</a>)', 'err:XQST0106');
-  f('declare %private %private variable $foo = 123', 'err:XQST0116');
-  f('declare %public %public variable $foo = 123', 'err:XQST0116');
-  f('declare %myobwtf variable $foo = 123', 'err:XQST0045');
+  f('declare %private %private variable $foo := 123; 0', 'err:XQST0116');
+  f('declare %public %public variable $foo := 123; 0', 'err:XQST0116');
+  f('declare %myobwtf variable $foo := 123; 0', 'err:XQST0045');
 
   mr('module namespace test = "pseudo://test-module"; '+
      'declare namespace abcxq = "http://www.w3.org/2012/xquery";'+

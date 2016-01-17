@@ -657,7 +657,7 @@ function killPrefixes(tn: TTreeNode; ns: TStringList; mustExist: boolean): boole
       else begin
         if ns.IndexOf(n.namespace.getURL) < 0 then begin
           if mustExist then begin
-            writeln(stderr, 'Missing: ', n.namespace.getURL);
+            //writeln(stderr, 'Missing: ', n.namespace.getURL);
             exit(false);
           end;
           ns.AddObject(n.namespace.getURL, TNamespace.create(n.namespace.getURL, 'prf'+IntToStr(ns.Count-1)));
@@ -730,8 +730,8 @@ begin
     end;
     list.free;
   end;
-  writeln(stderr, '1', tree1.outerXML());
-  writeln(stderr, '2', tree2.outerXML());
+  //writeln(stderr, '1', tree1.outerXML());
+  //writeln(stderr, '2', tree2.outerXML());
   result := tree1.outerXML() = tree2.outerXML();
 
 

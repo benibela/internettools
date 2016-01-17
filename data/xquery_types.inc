@@ -2056,9 +2056,7 @@ begin
       parameters[i].seqtype.Free;
       parameters[i].variable.Free;
     end;
-    for i := 0 to high(annotations) do
-      for j := 0 to high(annotations[i].params) do
-        annotations[i].params[j].free;
+    freeAnnotations(annotations);
     resulttype.free;
   end;
   inherited Destroy;
@@ -2120,7 +2118,8 @@ var
 begin
   f := TXQValueFunction.create(body);
   f.name := name;
-  f.namespace := namespace;
+  f.namespaceURL := namespaceURL;
+  f.namespacePrefix := namespacePrefix;
   f.annotations := annotations;
   f.parameters := parameters;
   SetLength(f.parameters, length(f.parameters));
@@ -2160,7 +2159,8 @@ begin
     if func.parameters[i].seqtype <> nil then parameters[i].seqtype := func.parameters[i].seqtype.clone as TXQTermSequenceType;
     if func.parameters[i].variable <> nil then parameters[i].variable := func.parameters[i].variable.clone as TXQTermVariable;
   end;
-  if func.resulttype <> nil then resulttype := func.resulttype.clone as TXQTermSequenceType;
+  if func.resulttype <> nil then
+    resulttype := func.resulttype.clone as TXQTermSequenceType;
   copyAnnotations(annotations, func.annotations);
   ownsTerms := true;
 end;

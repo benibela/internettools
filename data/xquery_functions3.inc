@@ -92,12 +92,14 @@ function xqFunctionFunction_lookup(const context: TXQEvaluationContext; const ar
 var
   qname: TXQValueQName;
   temp: TXQTermDefineFunction;
+  arity: Int64;
   //funcbody: TXQTermNamedFunction;
 begin
   requiredArgCount(args, 2);
   requiredArgType(args[0], baseSchema.QName);
   qname := args[0] as TXQValueQName;
-  temp := TXQTermDefineFunction.createReference(TNamespace.create(qname.url, qname.prefix), qname.local, args[1].toInt64);
+  arity := args[1].toInt64;
+  temp := TXQTermDefineFunction.createReference(TXQTermNamedFunction.create(qname.url, {qname.prefix, todo}qname.local, arity), arity);
   try
     result := temp.evaluate(context);
   except
@@ -116,7 +118,7 @@ begin
   if not (args[0] is TXQValueFunction) then raise EXQEvaluationException.create('XPTY0004', 'Expected function, got: '+args[0].debugAsStringWithTypeAnnotation());
   f := args[0] as TXQValueFunction;
   if f.name = '' then exit(xqvalue);
-  result := TXQValueQName.create(f.namespace, f.name);
+  result := TXQValueQName.create(f.namespaceURL, f.namespacePrefix, f.name);
 end;
 
 function xqFunctionFunction_arity(const args: TXQVArray): IXQValue;

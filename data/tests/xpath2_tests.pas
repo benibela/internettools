@@ -156,7 +156,8 @@ begin
   t('get("test")', 'tset');
   t('get("unknown")', '');
   t('get("unknown", 42)', '42');
-  t('concat(test :=123, get("test"))', '123123');
+  t('concat($test :=123, get("test"))', '123123');
+  t('concat(test :=456, get("test"))', '456456');
 
   f('$ABC;', 'err:XPST0003');
   f('$ABC', 'err:XPST0008');
@@ -2130,8 +2131,8 @@ begin
   t('$test.t2', '2', '');
   t('$test.t3', '3', '');
   t('$test.t4', '4', '');
-  t('test.foo:bar := 123', '123', '');
-  {t('$test.foo:bar', '123', '');
+  {t('test.foo:bar := 123', '123', '');
+  t('$test.foo:bar', '123', '');
   t('$test.foo:bar := 456', '456', ''); //good idea to allow both??
   t('$test.foo:bar', '456', '');}
   t('obj := object(("a", "b", "c", 123))', '', '');

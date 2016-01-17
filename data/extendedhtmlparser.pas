@@ -1081,7 +1081,7 @@ procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTe
     for i:=0 to high(vars) do
       if vars[i] = t then exit(true);
     for i:=0 to high(vars) do
-      if (vars[i].value = t.value) and (equalNamespaces(vars[i].namespaceURL, t.namespaceURL)) then
+      if (vars[i].value = t.value) and (equalNamespaces(vars[i].namespace, t.namespace)) then
         exit(true);
     result := false;
   end;

@@ -627,7 +627,8 @@ begin
   m('import module namespace rename = "pseudo://test-module"; $rename:var', '123');
   m('import module namespace rename = "pseudo://test-module"; rename:func()', '456');
   m('import module namespace rename = "pseudo://test-module"; rename:internalref()', '123:456');
-  f('import module namespace rename = "pseudo://test-module"; $test:var', 'err:XPST0008');
+//  f('import module namespace rename = "pseudo://test-module"; $test:var', 'err:XPST0008');
+  f('import module namespace rename = "pseudo://test-module"; $testx:var', 'err:XPST0081');
 
   mr('module namespace test2 = "pseudo://test-module2"; import module "pseudo://test-module"; declare function test2:sumcalc($param){ concat("SUM: ", sum($param)) }; declare function test2:wrapwrap() { test:internalref() };');
   m('import module "pseudo://test-module2"; test2:sumcalc((1,2,3))', 'SUM: 6');
@@ -1720,6 +1721,7 @@ begin
   f('declare function xsi:test(){0}; xsi:test()'  , 'err:XQST0045' );
 
 
+  m('declare namespace xxx="xxx"; declare function xxx:test(){ 123}; <a t="{test()}" xmlns="xxx"></a>/@*:t', '123');
 
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / (for $i in html return local-name($i))', 'html');
   t('<r><html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html></r>  / (for $i in html/svg:abc/svg:* return local-name($i))', 'a b');
