@@ -2543,7 +2543,7 @@ begin
     finalResolving(otherQuery.getTerm, otherQuery.staticContext, options);
     finalizeFunctionsEvenMore(otherQuery.getTerm as TXQTermModule, otherQuery.staticContext, otherQuery.staticContextShared);
   end;
-  result := finalResolving(result, staticContext, options); //can we do it twice?
+  result := finalResolving(result, staticContext, options);
   if result is TXQTermModule then begin
     shared := false; if resultquery <> nil then shared := TXQueryBreaker(resultquery).staticContextShared;
     finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, shared);
