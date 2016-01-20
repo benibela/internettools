@@ -2501,7 +2501,10 @@ begin
   for i := high(sc.functions) downto high(sc.functions) - functionCount + 1 do begin
     overriden := -1;
     for j := i - 1 downto 0 do
-      if equalNamespaces(sc.functions[i].namespaceURL, sc.functions[j].namespaceURL) and (sc.functions[i].name = sc.functions[j].name) then begin
+      if equalNamespaces(sc.functions[i].namespaceURL, sc.functions[j].namespaceURL)
+         and (sc.functions[i].name = sc.functions[j].name)
+         and (length(sc.functions[i].parameters) = length(sc.functions[j].parameters))
+         then begin
         overriden := j;
         break;
       end;
