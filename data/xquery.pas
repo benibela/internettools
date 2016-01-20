@@ -6106,6 +6106,7 @@ var cxt: TXQParsingContext;
   staticContextShared: Boolean;
   oldPendingCount: Integer;
   oldFunctionCount: Integer;
+  i: Integer;
 begin
   staticContextShared := context <> nil;
   if context = nil then context := StaticContext.clone();
@@ -6136,9 +6137,14 @@ begin
       cxt.free;
     end;
   except
+    //not sure if this is needed, but it seems reasonabl
+    for i := oldFunctionCount to high(context.functions) do
+      context.functions[i].free;
+    SetLength(context.functions, oldFunctionCount);
+
+
     if result.RefCount > 0 then result._Release //when it is a module it has a positive ref count and must not be freed directly
     else result.free;
-    SetLength(context.functions, oldFunctionCount); //not sure if this is needed, but it seems reasonabl
     while FPendingModules.Count > oldPendingCount do FPendingModules.Delete(FPendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
     raise;
   end;
