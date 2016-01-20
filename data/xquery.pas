@@ -6104,6 +6104,8 @@ end;
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
 var cxt: TXQParsingContext;
   staticContextShared: Boolean;
+  oldPendingCount: Integer;
+  oldFunctionCount: Integer;
 begin
   staticContextShared := context <> nil;
   if context = nil then context := StaticContext.clone();
@@ -6119,6 +6121,8 @@ begin
   context.model := model;
   cxt.parsingModel:=model;
   cxt.engine := self;
+  oldFunctionCount := length(context.functions);
+  oldPendingCount := FPendingModules.Count;
   try
     try
       cxt.str := str;
@@ -6134,6 +6138,8 @@ begin
   except
     if result.RefCount > 0 then result._Release //when it is a module it has a positive ref count and must not be freed directly
     else result.free;
+    SetLength(context.functions, oldFunctionCount); //not sure if this is needed, but it seems reasonabl
+    while FPendingModules.Count > oldPendingCount do FPendingModules.Delete(FPendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
     raise;
   end;
 end;
