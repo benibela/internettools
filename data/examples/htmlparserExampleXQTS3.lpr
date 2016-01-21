@@ -432,17 +432,21 @@ var
 begin
   FillChar(testCasesToLog, sizeof(testCasesToLog), 0);
   s := clr.readString('print-test-cases');
-  for i := 1 to length(s) do
-    case s[i] of
-      'n': testCasesToLog[tcrNA] := true;
-      'f': testCasesToLog[tcrFail] := true;
-      'p': testCasesToLog[tcrPass] := true;
-      'e': testCasesToLog[tcrWrongError] := true;
-      'd': testCasesToLog[tcrDisputed] := true;
-      'b': testCasesToLog[tcrTooBig] := true;
-      's': testCasesToLog[tcrNotRun] := true;
-      else raise exception.Create('Invalid test case option: '+s[i]);
-    end;
+  if (s = 'all') or (s = '*') then begin
+    for j := low(testCasesToLog) to high(testCasesToLog) do
+      testCasesToLog[j] := true;
+  end else
+    for i := 1 to length(s) do
+      case s[i] of
+        'n': testCasesToLog[tcrNA] := true;
+        'f': testCasesToLog[tcrFail] := true;
+        'p': testCasesToLog[tcrPass] := true;
+        'e': testCasesToLog[tcrWrongError] := true;
+        'd': testCasesToLog[tcrDisputed] := true;
+        'b': testCasesToLog[tcrTooBig] := true;
+        's': testCasesToLog[tcrNotRun] := true;
+        else raise exception.Create('Invalid test case option: '+s[i]);
+      end;
   logAllTestCases := true;
   for j := low(testCasesToLog) to high(testCasesToLog) do
     if not testCasesToLog[j] then begin
@@ -960,7 +964,7 @@ var
 begin
   for i := 0 to modules.Count-1 do
     if (TModule(modules[i]).uri = namespace) and (FileExists(TModule(modules[i]).fn)) then
-      xq.registerModule(xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version));
+      xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);
 end;
 
 { TDependency }
