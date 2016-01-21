@@ -3740,6 +3740,7 @@ begin
          and (length(TXQTermNamedFunction(children[high(children)]).interpretedFunction.parameters) = parameterCount)
          then begin
         temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
+        assert(Assigned(context.staticContext) and Assigned(context.staticContext.sender));
         if temp.context.staticContext.sender = nil then temp.context.staticContext := context.staticContext.sender.StaticContext; //only for native interpreted functions
       end else temp := define(context, false);
     end;
@@ -3978,9 +3979,6 @@ begin
   f := TXQTermNamedFunction(children[high(children)]);
 
   result := TXQValueFunction.create();
-  result.namespaceURL := f.name.namespaceURL;
-  result.namespacePrefix := namespaceReverseLookup(result.namespaceURL).getPrefix;
-  result.name := f.name.localname;
   if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
     copyAnnotations(result.annotations, f.interpretedFunction.annotations);
   result.body := TXQTermNamedFunction.create();
@@ -4027,9 +4025,6 @@ begin
   ch := (children[0] as TXQTermWithChildren).children;
   if length(ch) <> length(f.parameters) + 1 then raiseParsingError('XPTY0004', 'Invalid argument count');
   result := TXQValueFunction.create();
-  result.namespaceURL := f.namespaceURL;
-  result.namespacePrefix := f.namespacePrefix;
-  result.name:=f.name;
   copyAnnotations(result.annotations, f.annotations);
   result.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
   setlength(result.parameters, parameterCount);

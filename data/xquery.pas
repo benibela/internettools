@@ -1494,7 +1494,7 @@ type
     name: string;
     allowNone, allowMultiple: boolean;
     kind: TXQTypeInformationKind;
-    atomicTypeInfo: TXSType; //only for tikAtomic
+    atomicTypeInfo: TXSType; //only for tikAtomic (or tikFunctionTest during parsing)
     nodeMatching: TXQPathMatchingStep; //only for tikElementTest
     arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 

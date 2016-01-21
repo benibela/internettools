@@ -166,6 +166,10 @@ type
  TXQueryBreaker = class(TXQuery) end;
  TXQueryEngineBreaker = class(TXQueryEngine) end;
 
+ TXQAnnotationsInClass = class
+   annotations: TXQAnnotations;
+ end;
+
 function addNamespacesToStaticContext(ns: TNamespaceList; sc: TXQStaticContext): integer;
 var
   i: Integer;
@@ -679,7 +683,8 @@ begin
     end else if hadNoNamespace and (word = 'function') or (word = '%') then begin
       require3('function test');
       if word = '%' then begin
-        freeAnnotations(parseAnnotations); //we do not need this nonsense
+        result.atomicTypeInfo := TXSType(TObject(TXQAnnotationsInClass.Create)); //we do not need them, only check if they are valid. but for that we need to know the namespaces
+        TXQAnnotationsInClass(TObject(result.atomicTypeInfo)).annotations := parseAnnotations;
         expect('function');
       end;
       result.kind:=tikFunctionTest;
@@ -1443,8 +1448,8 @@ begin
             raiseSyntaxError('Cannot use namespace for processing instructions');
         case namespaceMode of
           xqnmPrefix:
-            if namespacePrefix = '' then result.nameValue := TXQTermConstant.create(token)
-            else result.nameValue := TXQTermConstant.create(namespacePrefix + ':' + token);
+            if namespacePrefix = '' then result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token))
+            else result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token));
           xqnmURL:
             result.nameValue := TXQTermConstant.create(TXQValueQName.create(namespaceUrl, namespacePrefix, token)); //is this even valid?
         end;
@@ -3048,6 +3053,31 @@ end;
 
 function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
+  procedure visitAnnotations(var ans: TXQAnnotations; isFunction: boolean; isAnonymousFunction: boolean = false);
+    var
+      i: Integer;
+      hasPrivatePublic: Boolean;
+    begin
+      hasPrivatePublic := false;
+      for i := 0 to high(ans) do begin
+        if ans[i].name is TXQEQNameUnresolved then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext);
+
+        case ans[i].name.namespaceURL of
+          XMLNamespaceUrl_XQuery: begin
+            case ans[i].name.localname of
+              'private', 'public': ; //ok
+              else raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+XMLNamespaceUrl_XQuery);
+            end;
+            if hasPrivatePublic then
+              raiseParsingError(ifthen(isFunction, 'XQST0106', 'XQST0116'), '%private/%public has to be unique');
+            hasPrivatePublic := true;
+            if isAnonymousFunction then raiseParsingError('XQST0125', 'anonymous functions cannot be public or private');
+          end;
+          XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance,
+          XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath: raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL);
+        end;
+      end;
+    end;
 
   procedure visitSequenceType(st: TXQTermSequenceType);
   var
@@ -3068,6 +3098,14 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       pending.free;
       SetLength(st.children, 0);
     end;
+    if st.kind = tikFunctionTest then
+      if st.atomicTypeInfo <> nil then begin
+        with TObject(st.atomicTypeInfo) as TXQAnnotationsInClass do begin
+          visitAnnotations(annotations, false);
+          freeAnnotations(annotations);
+          free;
+        end;
+      end;
   end;
 
 
@@ -3185,32 +3223,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         result := staticallyCastQNameAndNotation(TXQTermNamedFunction(result), TXSType(TObject(func)), staticContext);
   end;
 
-  procedure visitAnnotations(var ans: TXQAnnotations; isFunction: boolean; isAnonymousFunction: boolean = false);
-  var
-    i: Integer;
-    hasPrivatePublic: Boolean;
-  begin
-    hasPrivatePublic := false;
-    for i := 0 to high(ans) do begin
-      if ans[i].name is TXQEQNameUnresolved then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext);
-
-      case ans[i].name.namespaceURL of
-        XMLNamespaceUrl_XQuery: begin
-          case ans[i].name.localname of
-            'private', 'public': ; //ok
-            else raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+XMLNamespaceUrl_XQuery);
-          end;
-          if hasPrivatePublic then
-            raiseParsingError(ifthen(isFunction, 'XQST0106', 'XQST0116'), '%private/%public has to be unique');
-          hasPrivatePublic := true;
-          if isAnonymousFunction then raiseParsingError('XQST0125', 'anonymous functions cannot be public or private');
-        end;
-        XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance,
-        XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath: raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL);
-      end;
-    end;
-  end;
-
   procedure visitDefineFunction(f: TXQTermDefineFunction);
 
   begin
@@ -3269,10 +3281,20 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
   procedure visitConstructor(c: TXQTermConstructor);
+  var
+    qname: TXQValueQName;
   begin
     if c.implicitNamespaces <> nil then begin
       changedDefaultsTypeNamespaces.Add(staticContext.defaultElementTypeNamespace);
       arrayAddFast(implicitNamespaceCounts, implicitNamespaceCountsLength, addNamespacesToStaticContext(c.implicitNamespaces, staticContext));
+    end;
+
+    if (c.nameValue <> nil) and (c.nameValue is TXQTermConstant) and (TXQTermConstant(c.nameValue).value.kind = pvkQName) then begin
+      qname := TXQTermConstant(c.nameValue).value as TXQValueQName;
+      if qname.url = #0'pending' then begin
+        if c.typ = tetAttribute then qname.url := staticContext.findNamespaceURLMandatory(qname.prefix, xqdnkUnknown)
+        else qname.url := staticContext.findNamespaceURLMandatory(qname.prefix, xqdnkElementType);
+      end;
     end;
   end;
 
@@ -3319,18 +3341,20 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitFlower(f: TXQTermFlower);
   var
     i: Integer;
-    localVars: TFPList;
-    duplicate: TXQTermVariable;
     j: Integer;
   begin
     if checker = nil then checker := TFlowerVariableChecker.create;
     checker.knownVars.clear;
     for i := 0 to high(f.children) - 1 do begin
-      if TXQTermFlowerSubClause(f.children[i]).kind = xqtfcGroup then
-        with TXQTermFlowerGroup(f.children[i]) do
-          for j := 0 to high(vars) do
-            if not checker.knownVars.hasVariable(vars[j]) then
-              raiseParsingError('XQST0094', 'Variable unknown: '+vars[j].ToString);
+      case TXQTermFlowerSubClause(f.children[i]).kind of
+        xqtfcGroup:
+          with TXQTermFlowerGroup(f.children[i]) do
+            for j := 0 to high(vars) do
+              if not checker.knownVars.hasVariable(vars[j]) then
+                raiseParsingError('XQST0094', 'Variable unknown: '+vars[j].ToString);
+        xqtfcWindow: if TXQTermFlowerWindow(f.children[i]).findDuplicatedVariable <> nil then
+          raiseParsingError('XQST0103', 'Duplicate variable: '+TXQTermFlowerWindow(f.children[i]).findDuplicatedVariable.ToString);
+      end;
       TXQTermFlowerSubClause(f.children[i]).visitchildrenToUndeclare(checker);
     end;
   end;

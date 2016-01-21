@@ -100,6 +100,10 @@ begin
   qname := args[0] as TXQValueQName;
   arity := args[1].toInt64;
   temp := TXQTermDefineFunction.createReference(TXQTermNamedFunction.create(qname.url, {qname.prefix, todo}qname.local, arity), arity);
+  temp.name := TXQEQNameWithPrefix.create;
+  temp.name.namespaceURL := qname.url;
+  temp.name.namespacePrefix := qname.prefix;
+  temp.name.localname := qname.local;
   try
     result := temp.evaluate(context);
   except
