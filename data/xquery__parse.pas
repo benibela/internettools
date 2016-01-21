@@ -1443,16 +1443,18 @@ begin
         expect('}');
       end else begin
         namespaceMode := nextTokenEQName(namespaceUrl, namespacePrefix, token);
-        if result.typ = tetProcessingInstruction then
+        if result.typ = tetProcessingInstruction then begin
           if (namespaceMode <> xqnmPrefix) or (namespacePrefix <> '') then
             raiseSyntaxError('Cannot use namespace for processing instructions');
-        case namespaceMode of
-          xqnmPrefix:
-            if namespacePrefix = '' then result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token))
-            else result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token));
-          xqnmURL:
-            result.nameValue := TXQTermConstant.create(TXQValueQName.create(namespaceUrl, namespacePrefix, token)); //is this even valid?
-        end;
+          result.nameValue := TXQTermConstant.create(token);
+        end else
+          case namespaceMode of
+            xqnmPrefix:
+              if namespacePrefix = '' then result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token))
+              else result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token));
+            xqnmURL:
+              result.nameValue := TXQTermConstant.create(TXQValueQName.create(namespaceUrl, namespacePrefix, token)); //is this even valid?
+          end;
       end;
     end;
     expect('{');

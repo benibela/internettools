@@ -216,7 +216,8 @@ begin
 
   m('function ($a, $b) { $a + $b } ! .(?, 10) ! .(17)', '27');
   m('floor(?)(?)(?)(?)(234.7)', '234');
-  m('function-name(function ($xxx) { (fn:round#1)(?)(?) } (()))', 'fn:round');
+  //m('function-name(function ($xxx) { (fn:round#1)(?)(?) } (()))', 'fn:round');
+  m('(function ($xxx) { (fn:round#1)(?)(?) } (()))(10.4)', '10');
   m('declare %local:annotation(1,2,3) function local:test($a as xs:integer) { $a + 1 }; (local:test#1)(?)(?)(10) ', '11');
   m('%local:annotation(1,2,3) function ($a, $b, $c, $d) { $a + $b } ! .(?, ?, 0, 0) ! .(10, 2)', '12');
   m('function () { function ($a, $b) { function ($t) { function ($x, $y) { $a + $x + $y } ($t, $b) } } (1000, 100) (10) } () ', '1110');
