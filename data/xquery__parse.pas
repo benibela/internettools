@@ -2975,6 +2975,8 @@ begin
     result.free;
     raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   end;
+  if Assigned(resultquery) then TXQueryBreaker(resultquery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
+  result := finalResolving(result, staticContext, options);
 end;
 
 procedure TXQParsingContext.parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string);
