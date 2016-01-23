@@ -2143,11 +2143,7 @@ begin
         end;
 
 
-        if namespaceURL = '' then
-          namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkFunction);
-        if namespaceURL = '' then raiseParsingError('XPST0017', 'No namespace given for function '+word);
-        //result := TXQTermNamedFunction.createIfExists(namespaceURL, namespa word, parsingModel);
-
+        if (namespacePrefix = '') then refuseReservedFunctionName(word);
         result := TXQTermNamedFunction.create();
         TXQTermNamedFunction(result).name := TXQEQNameUnresolved.makeEQName(namespaceURL, namespacePrefix, word, namespaceMode);
         result := parseFunctionCall(TXQTermNamedFunction(result));
