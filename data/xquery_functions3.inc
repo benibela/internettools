@@ -489,4 +489,16 @@ begin
 end;
 
 
+function xqFunctionGenerateId(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  node: TTreeNode;
+begin
+  requiredArgCount(args, 0, 1);
+  if length(args) = 0 then node := context.contextNode(true)
+  else if args[0].isUndefined then exit(xqvalue(''))
+  else node := args[0].toNode;
+  result := xqvalue('autoid'+strFromPtr(node));
+end;
+
+
 

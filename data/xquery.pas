@@ -7699,6 +7699,8 @@ fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Availab
 fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?) as xs:string*',                          'fn:tokenize(fn:unparsed-text($href           ), "\r\n|\r|\n")[not(position()=last() and .="")]');
 fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?, $encoding as xs:string) as xs:string*',  'fn:tokenize(fn:unparsed-text($href, $encoding), "\r\n|\r|\n")[not(position()=last() and .="")]');
 
+fn3.registerFunction('generate-id', @xqFunctionGenerateId, ['() as xs:string', '($arg as node()?) as xs:string']);
+
 //Operators
 //The type information are just the function declarations of the up-backing functions
 //However, ? were added, since the operators accept empty sequences
