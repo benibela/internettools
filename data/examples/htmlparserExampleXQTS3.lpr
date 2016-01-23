@@ -122,7 +122,7 @@ end;
 { TAssertionList }
 
 TAssertionList = class(TAssertion)
-  kind: (alkAnyOf, alkAllOf);
+  kind: (alkAnyOf, alkAllOf, alkNeither);
   list: TList;
   constructor create();
   function check(errorCode: string): TTestCaseResult; override;
@@ -223,10 +223,13 @@ begin
   for v in xq.parseXPath2('./*').evaluate(e) do begin
     f := v.toNode;
     case f.value of
-      'all-of', 'any-of': begin
+      'all-of', 'any-of', 'not': begin
         a := TAssertionList.Create;
-        if f.value = 'all-of' then TAssertionList(a).kind := alkAllOf
-        else TAssertionList(a).kind := alkAnyOf;
+        case f.value of
+          'all-of': TAssertionList(a).kind := alkAllOf;
+          'any-of': TAssertionList(a).kind := alkAnyOf;
+          'not': TAssertionList(a).kind := alkNeither;
+        end;
         loadAsserts(TAssertionList(a).list, f);
       end;
       'assert': begin
@@ -572,12 +575,21 @@ function TAssertionList.check(errorCode: string): TTestCaseResult;
 var
   i: Integer;
 begin
-  if kind = alkAnyOf then result := tcrFail
-  else result := tcrPass;
+  result := tcrFail;
   for i := 0 to list.Count - 1 do begin
     result := TAssertion(list[i]).check(errorCode);
-    if (kind = alkAnyOf) and (result in [tcrPass]) then exit;
-    if (kind = alkAllOf) and (result in [tcrFail, tcrWrongError]) then exit;
+    if kind = alkNeither then begin
+      case result of
+        tcrPass: result := tcrFail;
+        tcrFail, tcrWrongError: result := tcrPass;
+        else raise Exception.Create('invalid error code for <not>: '+inttostr(ord(result)) );
+      end;
+    end;
+
+    case kind of
+      alkAnyOf: if result in [tcrPass] then exit;
+      alkAllOf, alkNeither: if result in [tcrFail, tcrWrongError] then exit;
+    end;
   end;
 end;
 
@@ -981,6 +993,8 @@ begin
   value := e['value'];
   satisfied := bbutils.StrToBoolDef(e['satisfied'], true);
 
+  if typ = 'spec' then value := strJoin(stableSort(strSplit(value, ' ')), ' ');
+
   if dependencyCacheTrue.IndexOf(typ+#0+value) >= 0 then isSatisfied := satisfied
   else if dependencyCacheFalse.IndexOf(typ+#0+value) >= 0 then isSatisfied := not satisfied
   else raise exception.Create('invalid dependency: '+typ+' = '+value);
@@ -1009,20 +1023,15 @@ begin
   put('spec', 'XQ10+', config.version in [xqpmXQuery1, xqpmXQuery3]);
   put('spec', 'XQ30', config.version in [xqpmXQuery3]);
   put('spec', 'XQ30+', config.version in [xqpmXQuery3]);
+  put('spec', 'XQ10 XQ30', config.version in [xqpmXQuery1, xqpmXQuery3]);
 
   put('spec', 'XP20 XQ10', config.version in [xqpmXPath2, xqpmXQuery1]);
-  put('spec', 'XQ10 XP20', config.version in [xqpmXPath2, xqpmXQuery1]);
   put('spec', 'XP20+ XQ10+', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
-  put('spec', 'XQ10+ XP20+', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
 
+  put('spec', 'XP30 XQ30', config.version in [xqpmXPath3, xqpmXQuery3]);
   put('spec', 'XP30+ XQ10+', config.version in [xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
-  put('spec', 'XQ10+ XP30+', config.version in [xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
   put('spec', 'XP30+ XQ30+', config.version in [xqpmXPath3, xqpmXQuery3]);
-  put('spec', 'XQ30+ XP30+', config.version in [xqpmXPath3, xqpmXQuery3]);
 
-  put('spec', 'XQ30 XP30', config.version in [xqpmXPath3, xqpmXQuery3]);
-
-  put('spec', 'XQ10 XP20 XQ30 XP30', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
   put('spec', 'XP20 XP30 XQ10 XQ30', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
 
 
@@ -1055,11 +1064,19 @@ begin
   put('feature', 'namespace-axis', false);
   put('feature', 'infoset-dtd', false);
   put('feature', 'xpath-1.0-compatibility', false);
+  put('feature', 'fn-format-integer-CLDR', false);
+  put('feature', 'fn-load-xquery-module', false);
+  put('feature', 'fn-transform-XSLT', false);
+  put('feature', 'fn-transform-XSLT30', false);
+  put('feature', 'simple-uca-fallback', false);
 
   put('unicode-normalization-form', 'NFD', true);
   put('unicode-normalization-form', 'NFKD', true);
   put('unicode-normalization-form', 'NFKC', true);
   put('unicode-normalization-form', 'FULLY-NORMALIZED', false);
+  put('unicode-version', '5.2', false);
+  put('unicode-version', '6.0', false);
+  put('unicode-version', '6.2', false);
 
   put('xml-version', '1.0', false);
   put('xml-version', '1.0:4-', false);
@@ -1075,6 +1092,8 @@ begin
   put('language', 'it', false);
   put('language', 'xib', false);
   put('default-language', 'en', true);
+  put('default-language', 'fr.CA', false);
+  put('default-language', 'fr-CA', false);
   put('limits', 'year_lt_0', true);
   put('calendar', 'CB', false);
   put('format-integer-sequence', strGetUnicodeCharacter($661), false);
