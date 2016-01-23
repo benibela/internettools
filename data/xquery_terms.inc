@@ -882,17 +882,26 @@ function TXQTermSequence.evaluate(const context: TXQEvaluationContext): IXQValue
 var
   i: Integer;
   tempSeq: TXQValueSequence;
+  evilkids: TXQVArray;
+  targetLength: Integer;
 begin
   if length(children) = 0 then exit(xqvalue);
   if length(children) = 1 then exit(children[0].evaluate(context));
-  tempSeq := TXQValueSequence.create(length(children));
+  SetLength(evilkids, length(children));
+  targetLength := 0;
+  //precompute target length (at the cost of temporary higher memory usage and worse cache performance)
+  for i := 0 to high(children) do begin
+    evilkids[i] := children[i].evaluate(context);
+    targetLength += evilkids[i].getSequenceCount;
+  end;
+  tempSeq := TXQValueSequence.create(targetLength);
   try
     for i := 0 to high(children) do
-      tempSeq.add(children[i].evaluate(context));
+      tempSeq.add(evilkids[i]);
     result := tempSeq;
     case tempseq.seq.count of
       0: result := xqvalue;
-      1: result := result.get(1);//this crashes: tempSeq.seq[0]; ??
+      1: result := result.get(1);//cannot use tempSeq.seq[0]; as result :=  tempSeq.seq[0]; becomes result.deref; result := tempSeq.seq[0]; result.addref; but deref deletes tempSeq
     end;
   except
     tempSeq.free;

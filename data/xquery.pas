@@ -1230,6 +1230,7 @@ type
   protected
     fcount: integer; // count
     list: TXQVArray; // Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
+                     // Can have higher capaacity than count. for i >= count, list[i] must be nil
     function everyIsNodeOrNot(checkForNode: boolean): boolean; //**< checks: every $n in (self) satisfies (($n is node) = checkForNode)
     procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
     procedure checkIndex(i: integer); inline; //**< Range check
@@ -4999,11 +5000,20 @@ end;
 procedure TXQVList.add(const value: IXQValue);
 var
  v: IXQValue;
+ other: TXQVList;
+ i: Integer;
 begin
   assert(value <> nil);
   case value.kind of
     pvkSequence: begin
-      for v in value do
+      if value is TXQValueSequence then begin
+        other := (value as TXQValueSequence).seq;
+        if other.fcount = 0 then exit;
+        reserve(fcount + other.fcount);
+        for i := 0 to other.fcount - 1 do other.list[i]._AddRef;
+        Move(other.list[0], list[fcount], sizeof(other.list[0]) * other.fcount); //assume list is initialized to nil
+        inc(fcount, other.fcount);
+      end else for v in value do
         Add(v);
     end;
     pvkUndefined: ;
@@ -5063,6 +5073,7 @@ begin
   for j := i to fcount - 2 do //todo: optimize
     list[j] := list[j+1];
   fcount -= 1;
+  list[fcount] := nil;
   compress;
 end;
 
