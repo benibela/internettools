@@ -64,6 +64,7 @@ protected
   procedure require3(s: string = '');
   procedure requireXQuery3(s: string = '');
   function isModel3: boolean;
+  procedure refuseReservedFunctionName(const name: string);
 
   procedure skipWhitespace();
   procedure skipComment();
@@ -343,6 +344,38 @@ end;
 function TXQParsingContext.isModel3: boolean;
 begin
   result := parsingModel in PARSING_MODEL3;
+end;
+
+procedure TXQParsingContext.refuseReservedFunctionName(const name: string);
+var
+  reserved: Boolean;
+begin
+  case name of
+    'attribute',
+    'comment',
+    'document-node',
+    'element',
+    'empty-sequence',
+    'if',
+    'item',
+    'node',
+    'processing-instruction',
+    'schema-attribute',
+    'schema-element',
+    'text',
+    'typeswitch': reserved := true;
+
+
+    'function',
+    'namespace-node',
+    'switch': reserved := isModel3;
+
+
+//    'array', 'map': result := isModel31;
+
+    else reserved := false;
+  end;
+  if reserved then raiseSyntaxError('Reserved function name: ' + name);
 end;
 
 procedure TXQParsingContext.skipWhitespace;
@@ -1601,6 +1634,7 @@ begin
       if result.name is TXQEQNameUnresolved then
         result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
       if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
+      if result.name.namespacePrefix = '' then refuseReservedFunctionName(result.name.localname);
       case result.name.namespaceURL of
         XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
           raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
@@ -2129,6 +2163,7 @@ begin
       '#': begin
         require3('Named Function Reference');
         expect('#');
+        if (namespacePrefix = '') then refuseReservedFunctionName(word);
         result := TXQTermNamedFunction.create();
         TXQTermNamedFunction(result).name := TXQEQNameUnresolved.makeEQName(namespaceURL, namespacePrefix, word, namespaceMode);
         result := TXQTermDefineFunction.CreateReference(TXQTermNamedFunction(result), StrToIntWithError(nextToken()));
