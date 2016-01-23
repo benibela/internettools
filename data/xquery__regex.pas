@@ -784,7 +784,6 @@ var
 
   procedure addMatch(id, from, len: integer);
   begin
-    if len = 0 then inc(from); //does this make sense ?
     if id = 0 then begin
       closeMatches(from, 0);
       if curPos < from then tempStr += '<non-match>' + xmlStrEscape(copy(input, curPos, from - curPos)) + '</non-match>';
