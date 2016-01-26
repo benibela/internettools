@@ -683,71 +683,152 @@ begin
   if a.signed then result := -result;
 end;
 
-function prettiest(const mi, exact, ma: BigDecimal): BigDecimal;
-var
-  mitemp, matemp: Integer;
-  digit: Integer;
-  midigit, madigit: Integer;
-  needNextBin: Boolean;
-  i, j: Integer;
-  bin, micurbin: BigDecimalBin;
-begin
-  result := exact;
-  if (length(mi.digits) > length(ma.digits)) or (length(mi.digits) + 1 < length(ma.digits)) or (mi.exponent <> ma.exponent) then
-    exit();
 
-  i := high(ma.digits);
-  if i <= high(mi.digits) then micurbin := mi.digits[i] else micurbin := 0;
-  while i >= 0 do begin
-    if micurbin <> ma.digits[i] then begin
-      for digit := 1 to DIGITS_PER_ELEMENT do begin
-        mitemp := micurbin div powersOf10[digit];
-        matemp := ma.digits[i] div powersOf10[digit];
-        if mitemp = matemp then begin
-          midigit := (micurbin div powersOf10[digit-1]) mod 10;
-          madigit := (ma.digits[i] div powersOf10[digit-1]) mod 10;
-          needNextBin := false;
-          if midigit + 1 < madigit then begin
-            //easy case
-            //e.g. xxx8xxxxxx
-            //     xxx3xxxxxx  => xxx50000000000
-            bin := (mitemp * 10 + (midigit + madigit) shr 1 ) * powersOf10[digit-1];
-          end else begin
-            //e.g. xxx800000000001
-            //     xxx700000000000  => xxx80000000000
-            //but
-            //e.g. xxx800000000000
-            //     xxx700000000000  => xxx75000000000
-            if (i = 0) and (digit = 1) then exit();
-            bin := (mitemp * 10 + madigit ) * powersOf10[digit-1];
-            needNextBin := (ma.digits[i] mod powersOf10[digit - 1] = 0);
-            for j := i - 1 downto 0 do
-              if ma.digits[j] <> 0 then begin
-                needNextBin := false;
-                break;
-              end;
-            if needNextBin and (digit <> 1) then begin
-              needNextBin := false;
-              bin := bin - powersOf10[digit-1] + 5 * powersOf10[digit+1];
-            end;
-          end;
+//Given mi < exact < ma, truncate exact to a bigdecimal result, such that    @br
+//   mi < result < ma                                                        @br
+//   result has the minimal number of non-zero digits                        @br
+//   | result - exact | is minimized
+function prettiest(mi, exact, ma: BigDecimal): BigDecimal;
+  function safebin(const bd: BigDecimal; bini: Integer): BigDecimalBin; inline;
+  begin
+    bini -= bd.exponent;
+    if (bini < 0) or (bini > high(bd.digits)) then result := 0
+    else result := bd.digits[bini];
+  end;
+  procedure findDifferentDigit(const a, b: BigDecimal; highExp, lowExp: integer; out bin, digit: integer; out digitA, digitB: BigDecimalBin);
+  var aBin,  bbin: BigDecimalBin;
+      atemp, btemp: BigDecimalBin;
+      bini: Integer;
+      digiti: Integer;
+  begin
+    for bini := highExp downto lowExp do begin
+      aBin := safebin(a, bini);
+      bBin := safebin(b, bini);
+      if aBin = bbin then continue; //exact must be in-between
 
-          result := exact;
-          if needNextBin then setlength(result.digits, length(ma.digits) - i + 1)
-          else setlength(result.digits, length(ma.digits) - i);
-          for j := high(ma.digits) downto i + 1 do
-            Result.digits[j - high(ma.digits) + high(result.digits)] := ma.digits[j];
-          Result.digits[i - high(ma.digits) + high(result.digits)] := bin;
-          if needNextBin then
-            result.digits[0] := 5 * powersOf10[DIGITS_PER_ELEMENT-1];
-          result.exponent := ma.exponent + high(ma.digits) - high(result.digits);
+      for digiti := DIGITS_PER_ELEMENT - 1 downto 0 do begin
+        atemp := aBin div powersOf10[digiti];
+        btemp := bbin div powersOf10[digiti];
+        if atemp <> btemp then begin
+          digitA := atemp mod 10;
+          digitB := btemp mod 10;
+          bin := bini;
+          digit := digiti;
           exit;
         end;
       end;
     end;
-    dec(i);
-    micurbin := mi.digits[i]
+    //the numbers should be different
+    assert(false);
+    digit := -1;
   end;
+  function cutoff(bin, digit: integer; digitDelta: BigDecimalBin = 0): BigDecimal;
+  begin
+    result := round(exact, bin * DIGITS_PER_ELEMENT + digit, bfrmTrunc);
+    if digitDelta <> 0 then begin
+      bin -= result.exponent;
+      if (bin < 0) or (bin > high(result.digits)) then begin
+        assert(false); // ??
+        exit;
+      end;
+      result.digits[bin] := result.digits[bin] + powersOf10[digit] * digitDelta; //there should be no overflow, since the function is only called if there is a digit to inc/decrement
+    end;
+  end;
+
+var
+  highestExp, highestBin: integer;
+  digit, bin: Integer;
+  midigit,exdigit,madigit: BigDecimalBin;
+  canUseMaDigit: Boolean;
+  nextdigit: BigDecimalBin;
+  i: Integer;
+  mitemp: BigDecimalBin;
+  extemp: BigDecimalBin;
+  bin2: Integer;
+  mibin: BigDecimalBin;
+  exbin: BigDecimalBin;
+begin
+  //find the first digit pos di such that mi[1..di] < exact[1..di] < ma[1..di]
+  //if exact[di+1] >= 5, round up, otherwise truncate
+  //if that would take it outside the bound, search a later digit
+  result := exact;
+  highestExp := min(min(mi.exponent, exact.exponent), ma.exponent);
+  highestBin := max(max(mi.exponent + high(mi.digits),
+                        exact.exponent + high(exact.digits)),
+                    ma.exponent + high(ma.digits));
+
+  findDifferentDigit(mi,ma,highestBin, highestExp, bin, digit, midigit, madigit);
+  if digit = -1 then exit;
+
+  exdigit := (safebin(exact, bin) div powersOf10[digit]) mod 10;
+  if digit = 0 then nextdigit := safebin(exact, bin-1) div powersOf10[DIGITS_PER_ELEMENT-1]
+  else  nextdigit := (safebin(exact, bin) div powersOf10[digit]) mod 10;
+
+  //we know midigit <= exdigit <= madigit and midigit < madigit
+
+  if (nextdigit < 5) and (midigit < exdigit) and (exdigit < madigit) then
+    exit(cutoff(bin, digit)); //if we do not want to round up and the current digit is in range
+  if exdigit + 1 < madigit then exit(cutoff(bin, digit, + 1)); //if we do want to round up. Or midigit = exdigit so we must round up (we know exdigit < madigit since exdigit + 1 < madigit)
+
+  //so exdigit in \{ madigit - 1, madigit \}    because exdigit + 1 >= madigit, but exdigit + 1 <= madigit + 1
+
+  //check if there is a further non zero in ma. If ma is ...matemp00000000+ then we cannot use madigt
+  canUseMaDigit := safebin(ma, bin)  mod powersOf10[digit] <> 0;
+  if not canUseMaDigit then
+    for i := bin - 1 downto ma.exponent do
+      if safebin(ma, i) <> 0 then begin
+        canUseMaDigit := true;
+        break;
+      end;
+
+  if canUseMaDigit then begin
+    //try exdigit and exdigit + 1, order depending, if we want to round up or not
+    if nextdigit >= 5 then begin
+      if exdigit + 1 <= madigit {we know midigit < exdigit +1 } then exit(cutoff(bin, digit, +1));
+      if midigit < exdigit    {we know exdigit <= madigit} then exit(cutoff(bin, digit));
+    end else begin
+      if midigit < exdigit    {we know exdigit <= madigit} then exit(cutoff(bin, digit));
+      if exdigit + 1 <= madigit {we know midigit < exdigit +1 } then exit(cutoff(bin, digit, +1));
+    end;
+    //now we know exdigit < madigit. Otherwise exdigit = madigit and midigit >= exdigit = madigit, which must not be
+    //Therefore exdigit + 1 <= madigit.
+    Assert(false);
+    exit(exact);
+  end;
+
+  //we cannot round up.. if we could, we would have done so above
+  if (midigit < exdigit) and (exdigit < madigit) then exit(cutoff(bin, digit));
+  //Try to round down
+  if (midigit < exdigit - 1) and (exdigit - 1 < madigit) then exit(cutoff(bin, digit, -1));
+
+  //now either (midigit = exdigit) or (exdigit = madigit)
+  //we know midigit < madigit
+  //if midigit + 1 < madigit, i.e. madigit >= midigit + 2, then
+  //  in the case exdigit = midigit, exdigit + 1 = midigit + 1 < madigit would have been true above
+  //  in the case exdigit = madigit, exdigit - 1 = madigit - 1 > midigit would have been true in the previous if
+  assert(midigit + 1 = madigit);
+
+  //So the situation is like (123, 1235, 124) and we need additional digits
+
+  for bin2 := bin downto highestExp do begin
+    mibin := safebin(mi, bin2);
+    exbin := safebin(exact, bin2);
+    if bin2 = bin then begin
+      //we already know digit is useless, so fill everrything left from it with 9
+      mibin := mibin mod powersOf10[digit] + ((ELEMENT_OVERFLOW - 1) - (ELEMENT_OVERFLOW - 1) mod powersOf10[digit]);
+      exbin := exbin mod powersOf10[digit] + ((ELEMENT_OVERFLOW - 1) - (ELEMENT_OVERFLOW - 1) mod powersOf10[digit]);
+    end;
+    if (mibin = exbin) and (mibin = ELEMENT_OVERFLOW - 1) then continue; //exact must be in-between
+
+    for digit := DIGITS_PER_ELEMENT - 1 downto 0 do begin
+      mitemp := mibin div powersOf10[digit];
+      extemp := exbin div powersOf10[digit];
+      if mitemp <> extemp then exit(cutoff(bin2, digit)) //different digits, use exact
+      else if extemp mod 10 <> 9 then exit(cutoff(bin2, digit, +1));
+    end;
+  end;
+
+  assert(false);
 end;
 
 {$ifdef FPC_HAS_TYPE_Single}
