@@ -219,6 +219,13 @@ type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmR
 //** Rounds v to the precision of a certain digit, subject to a certain rounding mode. @br
 //** Positive toDigit will round to an integer with toDigit trailing zeros, negative toDigit will round to a decimal with -toDigit numbers after the decimal point
 function round(const v: BigDecimal; toDigit: integer = 0; roundingMode: TBigDecimalRoundingMode = bfrmRound): BigDecimal; overload;
+
+//**Given mi < exact < ma, truncate exact to a bigdecimal result, such that    @br
+//**   mi < result < ma                                                        @br
+//**   result has the minimal number of non-zero digits                        @br
+//**   | result - exact | is minimized
+function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
+
 //** Returns the digit-th digit of v. @br
 //** Last integer digit is digit 0, digits at negative indices are behind the decimal point.
 function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
@@ -684,11 +691,7 @@ begin
 end;
 
 
-//Given mi < exact < ma, truncate exact to a bigdecimal result, such that    @br
-//   mi < result < ma                                                        @br
-//   result has the minimal number of non-zero digits                        @br
-//   | result - exact | is minimized
-function prettiest(mi, exact, ma: BigDecimal): BigDecimal;
+function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
   function safebin(const bd: BigDecimal; bini: Integer): BigDecimalBin; inline;
   begin
     bini -= bd.exponent;
@@ -748,6 +751,19 @@ var
   mibin: BigDecimalBin;
   exbin: BigDecimalBin;
 begin
+  if (mi.signed and not isZero(mi)) or ma.signed then begin //if mi is signed 0, treat it as unsigned 0
+    //if ma is signed, mi must be signed and non zero
+    if not ma.signed and not isZero(ma) then setZero(result) //0 has the minimal number of non-zero digits, but can only be returned if 0 < ma. Then we know mi < 0 or we would not be here
+    else begin
+      //possible cases mi signed and ma not signed => ma = 0
+      //               mi signed and ma signed
+      assert(exact.signed);
+      mi.signed := false; exact.signed := false; ma.signed := false;
+      result := roundInRange(ma, exact, mi);
+      result.signed := not isZero(result);
+    end;
+    exit;
+  end;
   //find the first digit pos di such that mi[1..di] < exact[1..di] < ma[1..di]
   //if exact[di+1] >= 5, round up, otherwise truncate
   //if that would take it outside the bound, search a later digit
@@ -762,7 +778,7 @@ begin
 
   exdigit := (safebin(exact, bin) div powersOf10[digit]) mod 10;
   if digit = 0 then nextdigit := safebin(exact, bin-1) div powersOf10[DIGITS_PER_ELEMENT-1]
-  else  nextdigit := (safebin(exact, bin) div powersOf10[digit]) mod 10;
+  else  nextdigit := (safebin(exact, bin) div powersOf10[digit - 1]) mod 10;
 
   //we know midigit <= exdigit <= madigit and midigit < madigit
 
@@ -916,7 +932,7 @@ begin
 {  bdmin := (mantissa * 2 - 1) * bdexphalf;
   bdexact := bdmin + bdexphalf;
   bdmax :=  bdexact + bdexphalf;}
-  result := prettiest(bdmin, bdexact, bdmax);
+  result := roundInRange(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
 {$endif FPC_HAS_TYPE_Double}
@@ -968,7 +984,7 @@ begin
 {  bdmin := (mantissa * 2 - 1) * bdexphalf;
   bdexact := bdmin + bdexphalf;
   bdmax :=  bdexact + bdexphalf;}
-  result := prettiest(bdmin, bdexact, bdmax);
+  result := roundInRange(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
 {$endif FPC_HAS_TYPE_Single}
@@ -1020,7 +1036,7 @@ begin
 {  bdmin := (mantissa * 2 - 1) * bdexphalf;
   bdexact := bdmin + bdexphalf;
   bdmax :=  bdexact + bdexphalf;}
-  result := prettiest(bdmin, bdexact, bdmax);
+  result := roundInRange(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
 {$endif FPC_HAS_TYPE_Extended}

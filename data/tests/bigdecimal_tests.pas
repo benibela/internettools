@@ -73,6 +73,11 @@ begin
   test(equalUpToPrecision(bf, StrToBigDecimal(s)), name + ': ' + BigDecimalToStr(bf) + '<>' + s);
 end;
 
+procedure testRoundInRange(mi,exact,ma,expected: string);
+begin
+  test(BigDecimalToStr(roundInRange(StrToBigDecimal(mi),StrToBigDecimal(exact),StrToBigDecimal(ma))), expected, 'round in range');
+end;
+
 const powersOf10: array[0..16] of Int64 = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,
                                            10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000);
 procedure unittests;
@@ -1000,6 +1005,41 @@ begin
   test(BigDecimalToStr(fastpower5to(-3)), '0.008');
   bd5 := StrToBigDecimal('5');
 
+  testRoundInRange('1','2.5','3' ,'2');
+  testRoundInRange('1','2.5','3.000000000000000000000000000001',  '3');
+  testRoundInRange('1','2.5','4', '3');
+  testRoundInRange('2.11111111111111111111','2.111111111111111111111','3', '2.2');
+  testRoundInRange('111111111','111111111.1','111111112',     '111111111.1');
+  testRoundInRange('999999999','999999999.1','1000000000',  '999999999.1');
+  testRoundInRange('999999998','999999998.1','1000000000',  '999999999');
+  testRoundInRange('999999999','999999999.1','1000000001',  '1000000000');
+  testRoundInRange('10','30','50',  '30');
+  testRoundInRange('10','15','20',  '15' );
+  testRoundInRange('155','156','200',  '160' );
+  testRoundInRange('155','156','210',  '200' );
+  testRoundInRange('15.5','15.6','20',  '16' );
+  testRoundInRange('15.5','15.6','21',  '20' );
+  testRoundInRange('15.5','00000000000000000000000000015.6','21',  '20' );
+  testRoundInRange('15.5','015.6','0000000000000000000000000000000000021',  '20' );
+  testRoundInRange('0000000000000000000000015.5','015.6','21',  '20' );
+  testRoundInRange('0.122','0.1225','0.123', '0.1225');
+  testRoundInRange('0.999999999999999999999', '0.9999999999999999999999', '1', '0.9999999999999999999999');
+  testRoundInRange('-0.1','1','10', '0');
+  testRoundInRange('-10','2','10', '0');
+  testRoundInRange('0','2','10', '2');
+  testRoundInRange('-10','-2','0', '-2');
+  testRoundInRange('-1','2','10', '0');
+  testRoundInRange('-10','-2','-1', '-2');
+  testRoundInRange('-10','-2','1', '0');
+  for i := 1 to 12 do begin
+    temp := strDup('7', i);
+    ds := strDup('0', i);
+    testRoundInRange('12345678999999991' + temp,'12345678999999992' + temp,'12345678999999993' + temp, '12345678999999993' + ds);
+    testRoundInRange('12345678999999991' + temp,'12345678999999992' + temp,'12345678999999993' + ds, '12345678999999992' + ds);
+    testRoundInRange('12345678999999991' + temp,'12345678999999992' + temp,'12345678999999994' + ds, '12345678999999993' + ds);
+  end;
+
+
   test(BigDecimalToStr(FloatToBigDecimal(single(3.14159), bdffExact)), '3.141590118408203125');
   test(BigDecimalToStr(FloatToBigDecimal(single(0.81), bdffExact)), '0.810000002384185791015625');
   test(BigDecimalToStr(FloatToBigDecimal(single(144115188075855877), bdffExact)), '144115188075855872');
@@ -1016,7 +1056,7 @@ begin
   test(BigDecimalToStr(FloatToBigDecimal(single(1 / 3.0), bdffShortest)), '0.33333334');
   test(BigDecimalToStr(FloatToBigDecimal(single(1E-20), bdffShortest)), '0.00000000000000000001');
   test(BigDecimalToStr(FloatToBigDecimal(single(92233720368547758), bdffShortest)), '92233720000000000');
-  test(BigDecimalToStr(FloatToBigDecimal(single(3.4028235E38), bdffShortest)), '340282340000000000000000000000000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(single(3.4028235E38), bdffShortest)), '340282350000000000000000000000000000000');
 
 
   test(BigDecimalToStr(FloatToBigDecimal(double(3.14159), bdffExact)), '3.14158999999999988261834005243144929409027099609375');
@@ -1027,7 +1067,7 @@ begin
 
   test(BigDecimalToStr(FloatToBigDecimal(double(3.14159))), '3.14159');
   test(BigDecimalToStr(FloatToBigDecimal(double(0.81))), '0.81');
-  test(BigDecimalToStr(FloatToBigDecimal(double(144115188075855877))), '144115188075855880');
+  test(BigDecimalToStr(FloatToBigDecimal(double(144115188075855877))), '144115188075855870');
 
   test(BigDecimalToStr(FloatToBigDecimal(double(1E-20))), '0.00000000000000000001');
   test(BigDecimalToStr(FloatToBigDecimal(double(1 / 3.0))), '0.3333333333333333');
