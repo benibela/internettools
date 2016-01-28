@@ -3098,6 +3098,10 @@ function isNegInf(const f: xqfloat): boolean;
 begin
   result := f = -Infinity;
 end;
+function isSignedXQFloat(const v: xqfloat): boolean;
+begin
+  result := PQWord(@v)^ shr 63 = 1;
+end;
 
 function xqround(const f: xqfloat): Int64;
 var tempf: xqfloat;

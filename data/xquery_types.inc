@@ -658,7 +658,7 @@ begin
     if isPosInf(value) then exit('INF')
     else exit('-INF');
   if value = 0 then
-    if PQWord(@value)^ shr 63 = 1 then exit('-0')
+    if isSignedXQFloat(value) then exit('-0')
     else exit('0');
 
   case (typeAnnotation as TXSNumericType).subType of
