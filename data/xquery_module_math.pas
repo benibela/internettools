@@ -202,7 +202,7 @@ var
 begin
   if singleArgMathNNN(args, f, result) then try
     result := xqv(arcsin(f));
-  except on e: EInvalidArgument do result := xqv(NaN); end;
+  except on e: EMathError do result := xqv(NaN); end;
 end;
 function mathAcos(const args: TXQVArray): IXQValue;
 var
@@ -210,7 +210,7 @@ var
 begin
   if singleArgMathNNN(args, f, result) then try
     result := xqv(arccos(f));
-  except on e: EInvalidArgument do result := xqv(NaN); end;
+  except on e: EMathError do result := xqv(NaN); end;
 end;
 function mathAtan(const args: TXQVArray): IXQValue;
 var
@@ -266,14 +266,6 @@ begin
     end;
     ClearExceptions(); //otherwise pow(-2.5, 3333) does not raise the exception here, but somewhere later
   except
-    on EInvalidArgument do begin
-      if a = -1 then result := xqv(1)
-      else if (a < 0) and (frac(b) <> 0) then result := xqv(NaN) //gets imaginary
-      else if IsInfinite(a) or ((b > 0) = (abs(a) > 1))  then begin
-        if (a < 0) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then exit(xqv(-Infinity))
-        else exit(xqv(Infinity));
-      end else result := xqv(0);
-    end;
     on EOverflow do begin
       if a > 0 then result := xqv(Infinity)
       else result := xqv(-Infinity);
@@ -284,6 +276,14 @@ begin
         if (args[1].instanceOf(baseSchema.decimal) and odd(args[1].toDecimal))
            or ((frac(args[1].toFloat) = 0) and odd(args[1].toFloat)) then exit(xqv(-Infinity));
       result := xqv(Infinity);
+    end;
+    on EMathError do begin
+      if a = -1 then result := xqv(1)
+      else if (a < 0) and (frac(b) <> 0) then result := xqv(NaN) //gets imaginary
+      else if IsInfinite(a) or ((b > 0) = (abs(a) > 1))  then begin
+        if (a < 0) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then exit(xqv(-Infinity))
+        else exit(xqv(Infinity));
+      end else result := xqv(0);
     end;
   end;
 end;
