@@ -9,6 +9,10 @@ uses
 
 procedure unittests;
 
+
+const BCD_SLOW_TESTS = false;
+
+
 implementation
 
 function strDup(rep: string; const count: integer): string;
@@ -77,6 +81,8 @@ procedure testRoundInRange(mi,exact,ma,expected: string);
 begin
   test(BigDecimalToStr(roundInRange(StrToBigDecimal(mi),StrToBigDecimal(exact),StrToBigDecimal(ma))), expected, 'round in range');
 end;
+
+procedure floatToDecimalFuzzing; forward;
 
 const powersOf10: array[0..16] of Int64 = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,
                                            10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000);
@@ -1085,33 +1091,7 @@ begin
   test(BigDecimalToStr(FloatToBigDecimal(double(1.2648080533535911530920161097426467149E-321), bdffShortest)), '0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001265');
   test(BigDecimalToStr(FloatToBigDecimal(double(6.9533558078350043221569772416637627063E-310), bdffShortest)), '0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006953355807835');
 
-
-  (*for i := 1 to 1000000 do begin
-    ddd := 0;
-    //different strategies for random float generation
-    //ddd := random();
-    for j := 0 to Random(5) do ddd += Random(2) * power(2, Random(2046) - 1023);
-    //for j := 0 to Random(30) do ddd += Random(10) * power(10, Random(600) - 300);
-    temp := BigDecimalToStr(FloatToBigDecimal(ddd, bdffShortest), bdfExponent);
-    Val(temp, ddd2, j);
-    if ddd2 <> ddd then begin
-      //writeln(IntToHex(PInt64(@ddd2)^, 8),' = ',FloatToStr(ddd2), ' = ', temp, '      <>         ', ddd, ' = ',IntToHex(PInt64(@ddd)^, 8));
-      writeln('test(''',temp,''', $',IntToHex(PQWord(@ddd)^, 8),');');
-    end;
-  end;*)
-  for i := 1 to 1000000 do begin
-    s1 := 0;
-    //different strategies for random float generation
-    //s1 := random();
-    //for j := 0 to Random(5) do s1 += Random(2) * power(2, Random(256) - 127);
-    for j := 0 to Random(30) do s1 += Random(10) * power(10, Random(76) - 38);
-    temp := BigDecimalToStr(FloatToBigDecimal(s1, bdffShortest), bdfExponent);
-    Val(temp, s2, j);
-    if s2 <> s1 then begin
-      //writeln(IntToHex(PInt64(@ddd2)^, 8),' = ',FloatToStr(ddd2), ' = ', temp, '      <>         ', ddd, ' = ',IntToHex(PInt64(@ddd)^, 8));
-      writeln('testsingle(''',temp,''', $',IntToHex(PCardinal(@s1)^, 4),');');
-    end;
-  end;
+  floatToDecimalFuzzing;
 
 
   test(BigDecimalToStr(FloatToBigDecimal(extended(3.14159), bdffExact)), '3.14158999999999999992901511536302905369666405022144317626953125');
@@ -1156,6 +1136,145 @@ begin
 end;
 
 
+procedure floatToDecimalFuzzing;
+  procedure checkSingleRoundTrip(const s: single);
+  var
+    temp: String;
+    tempcode: integer;
+    sr: single;
+  begin
+    temp := BigDecimalToStr(FloatToBigDecimal(s, bdffShortest), bdfExponent);
+    Val(temp, sr, tempcode);
+    if sr <> s then begin
+        //writeln(IntToHex(PInt64(@ddd2)^, 8),' = ',FloatToStr(ddd2), ' = ', temp, '      <>         ', ddd, ' = ',IntToHex(PInt64(@ddd)^, 8));
+      writeln('testsingle(''',temp,''', $',IntToHex(PDWord(@s)^, 4),');');
+    end;
+  end;
+  procedure checkSingleRoundTripPM(const s: single);
+  begin
+    ClearExceptions(false);
+    checkSingleRoundTrip(s);
+    checkSingleRoundTrip(-s);
+    ClearExceptions();
+  end;
+
+  procedure checkDoubleRoundTrip(const d: double);
+  var
+    temp: String;
+    tempcode: integer;
+    dr: double;
+  begin
+    temp := BigDecimalToStr(FloatToBigDecimal(d, bdffShortest), bdfExponent);
+    Val(temp, dr, tempcode);
+    if dr <> d then begin
+        //writeln(IntToHex(PInt64(@ddd2)^, 8),' = ',FloatToStr(ddd2), ' = ', temp, '      <>         ', ddd, ' = ',IntToHex(PInt64(@ddd)^, 8));
+      writeln('test(''',temp,''', $',IntToHex(PQWord(@d)^, 8),');');
+    end;
+  end;
+
+  procedure checkExtendedRoundTrip(const e: Extended);
+  var
+    temp: String;
+    tempcode: integer;
+    er: extended;
+  begin
+    temp := BigDecimalToStr(FloatToBigDecimal(e, bdffShortest), bdfExponent);
+    Val(temp, er, tempcode);
+    if er <> e then begin
+        //writeln(IntToHex(PInt64(@ddd2)^, 8),' = ',FloatToStr(ddd2), ' = ', temp, '      <>         ', ddd, ' = ',IntToHex(PInt64(@ddd)^, 8));
+      writeln('teste(''',temp,''', $',IntToHex(PQWord(@e)^, 8),IntToHex((PByte(@e) + 8)^, 2),');');
+    end;
+  end;
+var d: double;
+    s: single;
+    e: extended;
+  i, j, k, l: Integer;
+  fuzzCount: integer;
+  u32, u32b, u32c, u32d: dword;
+  u64, u64b, u64c, u64d: qword;
+begin
+  //enumerating tests
+  if BCD_SLOW_TESTS then begin
+    for i := 0 to 22 do begin
+      u32 := (1 shl i);
+      for j := 0 to 22 do begin
+        u32b := u32 or (1 shl j);
+        for k := 0 to 22 do begin
+          u32c := u32b or (1 shl k);
+          for l := 0 to $FE do begin
+            u32d := u32c or (l shl 23);
+            checkSingleRoundTrip(PSingle(@u32d)^);
+            u32d := ((not u32c) and $7FFFFF) or (l shl 23);
+            checkSingleRoundTrip(PSingle(@u32d)^);
+          end;
+        end;
+      end;
+    end;
+
+    for i := 0 to 51 do begin
+      u64 := (QWord(1) shl i);
+      for j := 0 to 51 do begin
+        u64b := u64 or (QWord(1) shl j);
+        for k := 0 to 51 do begin
+          u64c := u64b or (QWord(1) shl k);
+          for l := 0 to $7FE do begin
+            u64d := u64c or (QWord(l) shl 52);
+            checkDoubleRoundTrip(PDouble(@u64d)^);
+            u64d := ((not u64c) and QWord($000FFFFFFFFFFFFF)) or (QWord(l) shl 52);
+            checkDoubleRoundTrip(PDouble(@u64d)^);
+          end;
+        end;
+        writeln(stderr, '  progress: ', j);
+      end;
+    end;
+  end;
+
+  fuzzCount := IfThen(BCD_SLOW_TESTS, 1000000, 5000);
+
+  for i := 1 to fuzzCount do
+    checkSingleRoundTripPM(random());
+  for i := 1 to fuzzCount do begin
+    s := 0;
+    try
+      for  j := 0 to Random(5) do s += Random(2) * power(2, Random(256) - 127);
+    except
+      on e: EMathError do continue;
+    end;
+    checkSingleRoundTripPM(s);
+  end;
+  for i := 1 to fuzzCount do begin
+    s := 0; for j := 0 to Random(15) do s += Random(10) * power(10, Random(76) - 38);
+    checkSingleRoundTripPM(s);
+  end;
+
+  for i := 1 to fuzzCount do
+    checkDoubleRoundTrip(random());
+  for i := 1 to fuzzCount do begin
+    d := 0;
+    for j := 0 to Random(5) do d += Random(2) * power(2, Random(2046) - 1023);
+    checkDoubleRoundTrip(d);
+  end;
+  for i := 1 to fuzzCount do begin
+    d := 0; for j := 0 to Random(30) do d += Random(10) * power(10, Random(600) - 300);
+    checkDoubleRoundTrip(d);
+  end;
+
+  for i := 1 to fuzzCount do
+    checkExtendedRoundTrip(random());
+  for i := 1 to fuzzCount do begin
+    e := 0;
+    for  j := 0 to Random(5) do e += Random(2) * power(2, Random(32767) - 16383);
+    checkExtendedRoundTrip(e);
+  end;
+  for i := 1 to fuzzCount do begin
+    try
+      e := 0; for j := 0 to Random(30) do e += Random(10) * power(10, Random(9902) - 4951);
+    except
+      on e: EMathError do continue;
+    end;
+    checkExtendedRoundTrip(e);
+  end;
+end;
 
 
 
