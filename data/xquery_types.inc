@@ -631,20 +631,39 @@ begin
   Result:=value;
 end;
 
+
 function TXQValueFloat.toDecimal: BigDecimal;
 begin
   Result:=value;
 end;
 
 function TXQValueFloat.toString: string;
+  function doubleToString(const v: double): string;
+  begin
+    if ((v >= double(0.000001)) and (v < 1000000)) or ((v > -1000000) and (v <= double(-0.000001)))  then
+      result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExact)
+     else
+      result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExponent);
+  end;
+  function singleToString(const v: single): string;
+  begin
+    if ((v >= single(0.000001)) and (v < 1000000)) or ((v > -1000000) and (v <= single(-0.000001)))  then
+      result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExact)
+     else
+      result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExponent);
+  end;
 begin
   if IsNan(value) then exit('NaN');
   if IsInfinite(value) then
     if isPosInf(value) then exit('INF')
     else exit('-INF');
+  if value = 0 then
+    if PQWord(@value)^ shr 63 = 1 then exit('-0')
+    else exit('0');
+
   case (typeAnnotation as TXSNumericType).subType of
-    xsstDouble: result := myDecimalToStr(double(value));
-    xsstFloat: result := myDecimalToStr(single(value));
+    xsstDouble: result := doubleToString(double(value));
+    xsstFloat: result := singleToString(single(value));
   end;
 end;
 

@@ -507,6 +507,7 @@ function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue):
 var
   pure: Boolean;
   temp: BigDecimal;
+  tempd: xqfloat;
 {  tempintstart, tempintend, tempdot, tempexp: integer;
   tempe: Extended;}
 begin
@@ -534,8 +535,12 @@ begin
       xsstInteger, xsstDecimal:
         if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
         else outv^ := TXQValueDecimal.create(self, temp);
-      xsstFloat:  outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(temp)));
-      xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(temp)));
+      xsstFloat, xsstDouble: begin
+        if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
+        else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
+        else tempd := single(BigDecimalToExtended(temp));
+        outv^ := TXQValueFloat.create(self, tempd);
+      end;
     end
     {result := TryStrDecodeDecimal(v, tempintstart, tempintend, tempdot, tempexp);
     if not result then exit;
