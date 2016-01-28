@@ -6788,16 +6788,16 @@ begin
                 if qmValue in command.matching then begin //read named property
                   //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
                   if tempKind = pvkObject then newList.add(n.getProperty(command.value))
-                  else for n in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
-                    if n.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+n.debugAsStringWithTypeAnnotation()+'"');
-                    newList.add(n.getProperty(command.value));
+                  else for tempSeq in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
+                    if tempSeq.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+tempSeq.debugAsStringWithTypeAnnotation()+'"');
+                    newList.add(tempSeq.getProperty(command.value));
                   end;
                 end else begin
                   //get all properties
                   if tempKind = pvkObject then newList.add((n as TXQValueObject).enumerateValues())
-                  else for n in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
-                    if n.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+n.debugAsStringWithTypeAnnotation()+'"');
-                    newList.add((n as TXQValueObject).enumerateValues());
+                  else for tempSeq in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
+                    if tempSeq.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+tempSeq.debugAsStringWithTypeAnnotation()+'"');
+                    newList.add((tempSeq as TXQValueObject).enumerateValues());
                   end;
                 end;
               end;
