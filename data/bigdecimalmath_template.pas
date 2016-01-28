@@ -200,7 +200,7 @@ function round(const v: BigDecimal; toDigit: integer = 0; roundingMode: TBigDeci
 //**   mi < result < ma                                                        @br
 //**   result has the minimal number of non-zero digits                        @br
 //**   | result - exact | is minimized
-function roundInRange(const mi, exact, ma: BigDecimal): BigDecimal;
+function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
 //** Returns the digit-th digit of v. @br
 //** Last integer digit is digit 0, digits at negative indices are behind the decimal point.
 function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
@@ -689,13 +689,13 @@ function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
     result := round(exact, bin * DIGITS_PER_ELEMENT + digit, bfrmTrunc);
     if digitDelta <> 0 then begin
       bin -= result.exponent;
-      if (bin < 0) or (bin > high(result.digits)) then begin
-        assert(false); // ??
-        exit;
-      end;
+      assert(bin >= 0);
+      if (bin > high(result.digits)) then
+        SetLength(result.digits, bin + 1); //the entire number might have been rounded away, leaving and empty digits array
       result.digits[bin] := result.digits[bin] + powersOf10[digit] * digitDelta; //there should be no overflow, since the function is only called if there is a digit to inc/decrement
     end;
   end;
+
 
 var
   highestExp, highestBin: integer;
@@ -849,11 +849,11 @@ end;
          (Extended, $7FFF, 16383, 63)]}
 {$ifdef FPC_HAS_TYPE_T_NativeFloat_}
 function FloatToBigDecimal(const v: T_NativeFloat_; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal;
-const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (_MANTISSA_BIT_LENGTH_);
+const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl QWord(_MANTISSA_BIT_LENGTH_);
 var
   exponent: Integer;
   mantissa: QWord;
-  bdexphalf: BigDecimal;
+  bdexphalf, bdexpfourth: BigDecimal;
   bdmin, bdexact, bdmax: BigDecimal;
   signed: boolean;
 begin
@@ -886,14 +886,33 @@ begin
     exit;
   end;
 
-  bdexphalf := fastpower2to(exponent - 1);
-  bdexact := mantissa * bdexphalf;
-  bdexact := bdexact + bdexact;
-  bdmin := bdexact - bdexphalf;
-  bdmax := bdexact + bdexphalf;
-{  bdmin := (mantissa * 2 - 1) * bdexphalf;
-  bdexact := bdmin + bdexphalf;
-  bdmax :=  bdexact + bdexphalf;}
+  //calculate ranges  (half way to preceding float, float, half to successing float)
+  case mantissa of
+    _MANTISSA_IMPLICIT_BIT_: begin
+      //if the float is 1.00000000000 * 2^exp the ranges are assymmetric, the next higher number one is at + 2^exp, but the lower one is at 2^(exp-1)
+      bdexpfourth := fastpower2to(exponent - 2);
+      bdexphalf := bdexpfourth + bdexpfourth;
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexpfourth;
+      bdmax := bdexact + bdexphalf;
+    end;
+    (QWord(_MANTISSA_IMPLICIT_BIT_) - QWord(1)) or QWord(_MANTISSA_IMPLICIT_BIT_): begin
+      //if the float is 1.11111111111111 * 2^... the next higher one is at + 2^(exp+1)
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf;
+      bdmax := bdexact + bdexphalf + bdexphalf;
+    end;
+    else begin
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf; //bdmin := (mantissa * 2 - 1) * bdexphalf;, but we cannot multiply mantissa * 2 in extended case
+      bdmax := bdexact + bdexphalf;
+    end;
+  end;
   result := roundInRange(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;

@@ -219,13 +219,11 @@ type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmR
 //** Rounds v to the precision of a certain digit, subject to a certain rounding mode. @br
 //** Positive toDigit will round to an integer with toDigit trailing zeros, negative toDigit will round to a decimal with -toDigit numbers after the decimal point
 function round(const v: BigDecimal; toDigit: integer = 0; roundingMode: TBigDecimalRoundingMode = bfrmRound): BigDecimal; overload;
-
 //**Given mi < exact < ma, truncate exact to a bigdecimal result, such that    @br
 //**   mi < result < ma                                                        @br
 //**   result has the minimal number of non-zero digits                        @br
 //**   | result - exact | is minimized
 function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
-
 //** Returns the digit-th digit of v. @br
 //** Last integer digit is digit 0, digits at negative indices are behind the decimal point.
 function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
@@ -690,7 +688,6 @@ begin
   if a.signed then result := -result;
 end;
 
-
 function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
   function safebin(const bd: BigDecimal; bini: Integer): BigDecimalBin; inline;
   begin
@@ -730,10 +727,9 @@ function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
     result := round(exact, bin * DIGITS_PER_ELEMENT + digit, bfrmTrunc);
     if digitDelta <> 0 then begin
       bin -= result.exponent;
-      if (bin < 0) or (bin > high(result.digits)) then begin
-        assert(false); // ??
-        exit;
-      end;
+      assert(bin >= 0);
+      if (bin > high(result.digits)) then
+        SetLength(result.digits, bin + 1);
       result.digits[bin] := result.digits[bin] + powersOf10[digit] * digitDelta; //there should be no overflow, since the function is only called if there is a digit to inc/decrement
     end;
   end;
@@ -891,7 +887,7 @@ const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (52);
 var
   exponent: Integer;
   mantissa: QWord;
-  bdexphalf: BigDecimal;
+  bdexphalf, bdexpfourth: BigDecimal;
   bdmin, bdexact, bdmax: BigDecimal;
   signed: boolean;
 begin
@@ -924,14 +920,33 @@ begin
     exit;
   end;
 
-  bdexphalf := fastpower2to(exponent - 1);
-  bdexact := mantissa * bdexphalf;
-  bdexact := bdexact + bdexact;
-  bdmin := bdexact - bdexphalf;
-  bdmax := bdexact + bdexphalf;
-{  bdmin := (mantissa * 2 - 1) * bdexphalf;
-  bdexact := bdmin + bdexphalf;
-  bdmax :=  bdexact + bdexphalf;}
+  //calculate ranges  (half way to preceding float, float, half to successing float)
+  case mantissa of
+    _MANTISSA_IMPLICIT_BIT_: begin
+      //if the float is 1.00000000000 * 2^exp the ranges are assymmetric, the next higher number one is at + 2^exp, but the lower one is at 2^(exp-1)
+      bdexpfourth := fastpower2to(exponent - 2);
+      bdexphalf := bdexpfourth + bdexpfourth;
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexpfourth;
+      bdmax := bdexact + bdexphalf;
+    end;
+    (_MANTISSA_IMPLICIT_BIT_ - 1) or _MANTISSA_IMPLICIT_BIT_: begin
+      //if the float is 1.11111111111111 * 2^... the next higher one is at + 2^(exp+1)
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf;
+      bdmax := bdexact + bdexphalf + bdexphalf;
+    end;
+    else begin
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf; //bdmin := (mantissa * 2 - 1) * bdexphalf;, but we cannot multiply mantissa * 2 in extended case
+      bdmax := bdexact + bdexphalf;
+    end;
+  end;
   result := roundInRange(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
@@ -943,7 +958,7 @@ const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (23);
 var
   exponent: Integer;
   mantissa: QWord;
-  bdexphalf: BigDecimal;
+  bdexphalf, bdexpfourth: BigDecimal;
   bdmin, bdexact, bdmax: BigDecimal;
   signed: boolean;
 begin
@@ -976,14 +991,33 @@ begin
     exit;
   end;
 
-  bdexphalf := fastpower2to(exponent - 1);
-  bdexact := mantissa * bdexphalf;
-  bdexact := bdexact + bdexact;
-  bdmin := bdexact - bdexphalf;
-  bdmax := bdexact + bdexphalf;
-{  bdmin := (mantissa * 2 - 1) * bdexphalf;
-  bdexact := bdmin + bdexphalf;
-  bdmax :=  bdexact + bdexphalf;}
+  //calculate ranges  (half way to preceding float, float, half to successing float)
+  case mantissa of
+    _MANTISSA_IMPLICIT_BIT_: begin
+      //if the float is 1.00000000000 * 2^exp the ranges are assymmetric, the next higher number one is at + 2^exp, but the lower one is at 2^(exp-1)
+      bdexpfourth := fastpower2to(exponent - 2);
+      bdexphalf := bdexpfourth + bdexpfourth;
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexpfourth;
+      bdmax := bdexact + bdexphalf;
+    end;
+    (_MANTISSA_IMPLICIT_BIT_ - 1) or _MANTISSA_IMPLICIT_BIT_: begin
+      //if the float is 1.11111111111111 * 2^... the next higher one is at + 2^(exp+1)
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf;
+      bdmax := bdexact + bdexphalf + bdexphalf;
+    end;
+    else begin
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf; //bdmin := (mantissa * 2 - 1) * bdexphalf;, but we cannot multiply mantissa * 2 in extended case
+      bdmax := bdexact + bdexphalf;
+    end;
+  end;
   result := roundInRange(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;
@@ -991,11 +1025,11 @@ end;
 
 {$ifdef FPC_HAS_TYPE_Extended}
 function FloatToBigDecimal(const v: Extended; format: TBigDecimalFloatFormat = bdffShortest): BigDecimal;
-const _MANTISSA_IMPLICIT_BIT_ = QWord(1) shl (63);
+const _MANTISSA_IMPLICIT_BIT_ = QWord(QWord(1) shl (63));
 var
   exponent: Integer;
   mantissa: QWord;
-  bdexphalf: BigDecimal;
+  bdexphalf, bdexpfourth: BigDecimal;
   bdmin, bdexact, bdmax: BigDecimal;
   signed: boolean;
 begin
@@ -1028,14 +1062,33 @@ begin
     exit;
   end;
 
-  bdexphalf := fastpower2to(exponent - 1);
-  bdexact := mantissa * bdexphalf;
-  bdexact := bdexact + bdexact;
-  bdmin := bdexact - bdexphalf;
-  bdmax := bdexact + bdexphalf;
-{  bdmin := (mantissa * 2 - 1) * bdexphalf;
-  bdexact := bdmin + bdexphalf;
-  bdmax :=  bdexact + bdexphalf;}
+  //calculate ranges  (half way to preceding float, float, half to successing float)
+  case mantissa of
+    _MANTISSA_IMPLICIT_BIT_: begin
+      //if the float is 1.00000000000 * 2^exp the ranges are assymmetric, the next higher number one is at + 2^exp, but the lower one is at 2^(exp-1)
+      bdexpfourth := fastpower2to(exponent - 2);
+      bdexphalf := bdexpfourth + bdexpfourth;
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexpfourth;
+      bdmax := bdexact + bdexphalf;
+    end;
+    QWord((_MANTISSA_IMPLICIT_BIT_ - 1) or _MANTISSA_IMPLICIT_BIT_):begin
+      //if the float is 1.11111111111111 * 2^... the next higher one is at + 2^(exp+1)
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf;
+      bdmax := bdexact + bdexphalf + bdexphalf;
+    end;
+    else begin
+      bdexphalf := fastpower2to(exponent - 1);
+      bdexact := mantissa * bdexphalf;
+      bdexact := bdexact + bdexact;
+      bdmin := bdexact - bdexphalf; //bdmin := (mantissa * 2 - 1) * bdexphalf;, but we cannot multiply mantissa * 2 in extended case
+      bdmax := bdexact + bdexphalf;
+    end;
+  end;
   result := roundInRange(bdmin, bdexact, bdmax);
   result.signed := signed;
 end;

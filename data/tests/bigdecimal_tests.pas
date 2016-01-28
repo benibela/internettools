@@ -100,7 +100,7 @@ var
   dbf: BigDecimal;
   ds: String;
   b0: BigDecimal;
-  ddd: Double;
+  ddd, ddd2: Double;
   bd5: BigDecimal;
   bd2: BigDecimal;
   s1, s2: single;
@@ -153,7 +153,7 @@ begin
   test(blarge = 123456789983); test(blarge = 123456789983.0);
 
   blarge += 0.42;
-  test(blarge = 123456789983.42);
+  test(blarge = 123456789983.42, 'blarge <> 123456789983.42');
 
   b1e1000 := StrToBigDecimal('1E1000'); test(BigDecimalToStr(b1e1000, bdfExponent), '1.0E1000');
   bn1e1000 := StrToBigDecimal('-1E1000'); test(BigDecimalToStr(bn1e1000, bdfExponent), '-1.0E1000');
@@ -628,7 +628,9 @@ begin
   test(BigDecimalToStr(StrToBigDecimal('-1.23E3') div 7), '-175');
   test(BigDecimalToStr(StrToBigDecimal('0') div 7), '0');
 
-  bf := 12.34;
+  bf := //12.34; broken in 3.x
+        1234;
+  bf := bf / 100;
   test(BigDecimalToStr(bf), '12.34');
   bf := bf * 1000 - 42;
   test(BigDecimalToStr(bf), '12298');
@@ -1047,6 +1049,8 @@ begin
   test(BigDecimalToStr(FloatToBigDecimal(single(1E-20), bdffExact)), '0.000000000000000000009999999682655225388967887463487205224055287544615566730499267578125');
   test(BigDecimalToStr(FloatToBigDecimal(single(92233720368547758), bdffExact)), '92233718306963456');
   test(BigDecimalToStr(FloatToBigDecimal(single(3.4028235E38), bdffExact)), '340282346638528859811704183484516925440');
+  test(BigDecimalToStr(FloatToBigDecimal(single(9.99999984e+17), bdffExact)), '999999984306749440');
+  test(BigDecimalToStr(FloatToBigDecimal(single(-9.99999962e+35), bdffExact)), '-999999961690316245365415600208216064');
 
 
 
@@ -1057,6 +1061,8 @@ begin
   test(BigDecimalToStr(FloatToBigDecimal(single(1E-20), bdffShortest)), '0.00000000000000000001');
   test(BigDecimalToStr(FloatToBigDecimal(single(92233720368547758), bdffShortest)), '92233720000000000');
   test(BigDecimalToStr(FloatToBigDecimal(single(3.4028235E38), bdffShortest)), '340282350000000000000000000000000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(single(9.99999984e+17), bdffShortest)), '1000000000000000000');
+  test(BigDecimalToStr(FloatToBigDecimal(single(-9.99999962e+35), bdffShortest)), '-1000000000000000000000000000000000000');
 
 
   test(BigDecimalToStr(FloatToBigDecimal(double(3.14159), bdffExact)), '3.14158999999999988261834005243144929409027099609375');
@@ -1079,6 +1085,33 @@ begin
   test(BigDecimalToStr(FloatToBigDecimal(double(1.2648080533535911530920161097426467149E-321), bdffShortest)), '0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001265');
   test(BigDecimalToStr(FloatToBigDecimal(double(6.9533558078350043221569772416637627063E-310), bdffShortest)), '0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006953355807835');
 
+
+  (*for i := 1 to 1000000 do begin
+    ddd := 0;
+    //different strategies for random float generation
+    //ddd := random();
+    for j := 0 to Random(5) do ddd += Random(2) * power(2, Random(2046) - 1023);
+    //for j := 0 to Random(30) do ddd += Random(10) * power(10, Random(600) - 300);
+    temp := BigDecimalToStr(FloatToBigDecimal(ddd, bdffShortest), bdfExponent);
+    Val(temp, ddd2, j);
+    if ddd2 <> ddd then begin
+      //writeln(IntToHex(PInt64(@ddd2)^, 8),' = ',FloatToStr(ddd2), ' = ', temp, '      <>         ', ddd, ' = ',IntToHex(PInt64(@ddd)^, 8));
+      writeln('test(''',temp,''', $',IntToHex(PQWord(@ddd)^, 8),');');
+    end;
+  end;*)
+  for i := 1 to 1000000 do begin
+    s1 := 0;
+    //different strategies for random float generation
+    //s1 := random();
+    //for j := 0 to Random(5) do s1 += Random(2) * power(2, Random(256) - 127);
+    for j := 0 to Random(30) do s1 += Random(10) * power(10, Random(76) - 38);
+    temp := BigDecimalToStr(FloatToBigDecimal(s1, bdffShortest), bdfExponent);
+    Val(temp, s2, j);
+    if s2 <> s1 then begin
+      //writeln(IntToHex(PInt64(@ddd2)^, 8),' = ',FloatToStr(ddd2), ' = ', temp, '      <>         ', ddd, ' = ',IntToHex(PInt64(@ddd)^, 8));
+      writeln('testsingle(''',temp,''', $',IntToHex(PCardinal(@s1)^, 4),');');
+    end;
+  end;
 
 
   test(BigDecimalToStr(FloatToBigDecimal(extended(3.14159), bdffExact)), '3.14158999999999999992901511536302905369666405022144317626953125');
