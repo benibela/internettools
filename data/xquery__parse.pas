@@ -1603,7 +1603,7 @@ begin
           while true do begin
             SetLength(params, length(params) + 1);
             params[high(params)] := parseValue;
-            if not (params[high(params)] is TXQTermConstant) then raiseParsingError('XPST0003', 'Only literals allowed as annotation arguments');
+            if not (params[high(params)] is TXQTermConstant) then raiseSyntaxError('Only literals allowed as annotation arguments');
             if nextToken(true) <> ',' then break;
             expect(',');
           end;
@@ -2013,7 +2013,7 @@ var
 begin
   result := nil;
   skipWhitespaceAndComment();
-  if pos^ = #0 then exit();
+  if pos^ = #0 then raiseSyntaxError('Unexpected query end');
   case pos^ of
     '''', '"':  exit(TXQTermConstant.create(parseString()));
     '$': exit(parseVariableWithDotNotation());
@@ -2036,11 +2036,13 @@ begin
 
     '/': begin
       word := nextToken();
-      if pos^ = '/' then begin expect('/'); word+='/';end;
+      if (pos^ = '/') and (word = '//') then raiseSyntaxError('Invalid ///');
       skipWhitespaceAndComment();
-      if (pos^ in [#0,',',')',']','}','=','!','>','[','|','+',';']) or ((pos^ = '<') and (parsingModel in [xqpmXPath2, xqpmXPath3])) then
+      if (pos^ in [#0,',',')',']','}','=','!','>','[','|','+',';']) or ((pos^ = '<') and (parsingModel in [xqpmXPath2, xqpmXPath3])) then begin
+        if word = '//' then raiseSyntaxError('Invalid //');
         exit(TXQTermNodeMatcher.Create('/')) //leading lone slash (see standard#parse-note-leading-lone-slash)
-      else exit(TXQTermBinaryOp.Create(word, TXQTermNodeMatcher.Create('/'), parseValue()));
+      end;
+      exit(TXQTermBinaryOp.Create(word, TXQTermNodeMatcher.Create('/'), parseValue()));
     end;
 
     '0'..'9': exit(TXQTermConstant.createNumber(nextToken()));
@@ -2345,10 +2347,7 @@ var astroot: TXQTerm;
     replace^ := res;
 
     if res.op.followedBy <> '' then handleCastStrangeness
-    else begin
-      res.push(parseValue());
-      if res.children[high(res.children)] = nil then raiseParsingError('XPST0003', 'Unexpected query end');
-    end;
+    else res.push(parseValue());
   end;
 
   var word: string;
