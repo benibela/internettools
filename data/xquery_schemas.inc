@@ -805,9 +805,11 @@ procedure TXSQNameType.castAllowed(const v: ixqvalue; const s: string; const con
 begin
   if not (context.model in [xqpmXPath3, xqpmXQuery3]) then
     raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
-  if (v.kind <> pvkString) or (not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic)) then
+  if (v.kind <> pvkString) or ((not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic))) then
     raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
-  if not (self <> baseSchema.NOTATION) and (baseSchema.isValidQName(s)) then
+  if self = baseSchema.NOTATION then
+    raise EXQEvaluationException.create('XPST0080', 'Cannot cast to xs:NOTATION');
+  if not (baseSchema.isValidQName(s)) then
     raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
 end;
 
