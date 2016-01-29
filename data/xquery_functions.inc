@@ -700,6 +700,7 @@ begin
       resseq.add(a.seq[i]);
   end;
   result := resseq;
+  xqvalueSeqSqueeze(result);
 end;
 
 //==============================Functions===================================
