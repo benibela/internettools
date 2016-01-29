@@ -685,6 +685,8 @@ begin
   t('(xs:int(4) + xs:int(2)) instance of xs:int', 'false');
   t('abs(xs:byte(0)) instance of xs:byte', 'false');
   t('ceiling(xs:unsignedInt(0)) instance of xs:unsignedInt', 'false'); //zorba returns true, but spec says " If the type of $arg is a type derived from one of the numeric types, the result is an instance of the base numeric type."
+  t('10 cast as xs:integer castable as xs:boolean treat as xs:boolean instance of xs:boolean', 'true');
+  f('10 cast as xs:integer castable as xs:boolean instance of xs:boolean cast as xs:boolean', 'XPST0003');
 
 
   t('type-of(xs:decimal("6.5"))', 'decimal', '');
@@ -1339,7 +1341,7 @@ begin
   t('4 +(: ... ::: :)7', '11', '');
   t('4 - (: Houston, we have a problem :) 7', '-3', '');
   t('4 - (: Houston, (:we have (::)a problem:):) 7', '-3', '');
-  t('(: commenting out a (: comment :) may be confusing, but often helpful :)', '', '');
+  t('(: commenting out a (: comment :) may be confusing, but often helpful :)0', '0', '');
   t('"abc(::)"', 'abc(::)', '');
   t('"abc(::)"(::)   (:(:(::):):)  (:*:)', 'abc(::)', '');
   t('string-join( (:..:) x[1](:x:)/(::)y[2]  , ",")', 'b', '');

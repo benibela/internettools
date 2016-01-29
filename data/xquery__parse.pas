@@ -2307,6 +2307,7 @@ function TXQParsingContext.parseOrExpr: TXQTerm;
       if (xqofAssociativeSyntax in binOp.op.flags) then exit(term);
       raiseSyntaxError('Operator requires parenthesis '+ binOp.op.name);
     end;
+    if binop.op.followedBy <> '' then raiseSyntaxError('Operator requires parenthesis');
     result := ripBinOpApart(@binOp.children[1], prio);
   end;
 var astroot: TXQTerm;
