@@ -1733,16 +1733,18 @@ begin
    t('type-of(xs:NMTOKEN(''abc''))', 'NMTOKEN', '');
    t('xs:Name(''abc'')', 'abc', '');
    t('type-of(xs:Name(''abc''))', 'Name', '');
-   t('xs:NCName(''abc'')', 'abc', '');
-   t('type-of(xs:NCName(''abc''))', 'NCName', '');
-   t('xs:ID(''abc'')', 'abc', '');
-   t('type-of(xs:ID(''abc''))', 'ID', '');
-   t('xs:IDREF(''abc'')', 'abc', '');
-   t('type-of(xs:IDREF(''abc''))', 'IDREF', '');
-   t('xs:ENTITY(''abc'')', 'abc', '');
-   t('type-of(xs:ENTITY(''abc''))', 'ENTITY', '');
-   t('xs:anyURI(''abc'')', 'abc', '');
-   t('type-of(xs:anyURI(''abc''))', 'anyURI', '');
+   if UsingFLRE then begin
+     t('xs:NCName(''abc'')', 'abc', '');
+     t('type-of(xs:NCName(''abc''))', 'NCName', '');
+     t('xs:ID(''abc'')', 'abc', '');
+     t('type-of(xs:ID(''abc''))', 'ID', '');
+     t('xs:IDREF(''abc'')', 'abc', '');
+     t('type-of(xs:IDREF(''abc''))', 'IDREF', '');
+     t('xs:ENTITY(''abc'')', 'abc', '');
+     t('type-of(xs:ENTITY(''abc''))', 'ENTITY', '');
+     t('xs:anyURI(''abc'')', 'abc', '');
+     t('type-of(xs:anyURI(''abc''))', 'anyURI', '');
+   end;
    t('xs:QName(''abc'')', 'abc', '');
    t('type-of(xs:QName(''abc''))', 'QName', '');
    //t('xs:NOTATION(''abc'')', 'abc', '');
@@ -3712,7 +3714,7 @@ begin
 
     for j := 0 to 1 do begin
       if j = 0 then tt := 'xs:string' else tt := 'xs:untypedAtomic';
-      t('xs:NCName("Foobar") cast as ' + tt, 'Foobar');
+      if UsingFLRE then t('xs:NCName("Foobar") cast as ' + tt, 'Foobar');
       t('xs:anyURI("http://www.example.org/äöü !") cast as ' + tt, 'http://www.example.org/äöü !');
       t('xs:QName("xml:foo") cast as ' + tt, 'xml:foo');
       t('xs:integer(123) cast as ' + tt, '123');
@@ -3766,9 +3768,11 @@ begin
     t('"    foo   " castable as xs:QName', 'true');
     t('"    foo   " cast as xs:QName', 'foo');
     t('true() castable as xs:QName', 'false');
-    t('true() castable as xs:NCName', 'true');
-    t('false() castable as xs:NCName', 'true');
-    t('177 castable as xs:NCName', 'false');
+    if UsingFLRE then begin
+      t('true() castable as xs:NCName', 'true');
+      t('false() castable as xs:NCName', 'true');
+      t('177 castable as xs:NCName', 'false');
+    end;
 
     t('"" castable as xs:base64Binary', 'true');
     t('"" cast as xs:base64Binary', '');
@@ -3792,18 +3796,19 @@ begin
     t('"20:00:10"              castable as xs:time', 'true');
     t('"20:00:70"              castable as xs:time', 'false');
 
-    for j := 0 to 3 do begin
-      case j of
-        0: tt := 'xs:NCName';
-        1: tt := 'xs:ID';
-        3: tt := 'xs:IDREF';
-        2: tt := 'xs:ENTITY';
+    if UsingFLRE then
+      for j := 0 to 3 do begin
+        case j of
+          0: tt := 'xs:NCName';
+          1: tt := 'xs:ID';
+          3: tt := 'xs:IDREF';
+          2: tt := 'xs:ENTITY';
+        end;
+        t('"   abc   " castable as ' + tt, 'true');
+        t('" -    " castable as ' + tt, 'false');
+        t('"-" castable as ' + tt, 'false');
+        t('"abc:def" castable as ' + tt, 'false');
       end;
-      t('"   abc   " castable as ' + tt, 'true');
-      t('" -    " castable as ' + tt, 'false');
-      t('"-" castable as ' + tt, 'false');
-      t('"abc:def" castable as ' + tt, 'false');
-    end;
     t('"abc:def" castable as xs:Name', 'true');
     t('"abc: def" castable as xs:Name', 'false');
     t('"  abc:def   " castable as xs:Name', 'true');
@@ -4139,7 +4144,7 @@ begin
   t('(xs:string("a")) and true()', 'true');
   t('(xs:untypedAtomic("s")) and true()', 'true');
   t('(xs:anyURI("d")) and true()', 'true');
-  t('(xs:NCName("e")) and true()', 'true');
+  if UsingFLRE then   t('(xs:NCName("e")) and true()', 'true');
   t('([]) and true()', 'true');
   t('({}) and true()', 'true');
   t('([], 1) and true()', 'true');

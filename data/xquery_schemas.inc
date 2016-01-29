@@ -1,13 +1,3 @@
-//todo: fix this (see http://www.w3.org/TR/REC-xml/#NT-Letter). Problem, our regex engine is not unicode compatible
-const RegExpr_XMLLetter = '[A-Za-z'#$7F'-'#$FF']';
-const RegExpr_XMLNCNameChar = '[^'#1'-'#44'/'#58'-'#64#96']';
-const RegExpr_XMLNameChar = '(('+RegExpr_XMLNCNameChar+')|:)';
-const RegExpr_XMLNameRaw = '('+RegExpr_XMLLetter+'|[_:])('+RegExpr_XMLNameChar+')*';
-const RegExpr_XMLName = '^'+RegExpr_XMLNameRaw+'$';
-const RegExpr_XMLNCNameRaw = '('+RegExpr_XMLLetter+'|_)('+RegExpr_XMLNCNameChar+')*'; //name without :
-const RegExpr_XMLNCName = '^'+RegExpr_XMLNCNameRaw+'$'; //name without :
-const RegExpr_language = '^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$';
-//const RegExpr_XMLQName = '^(('+RegExpr_XMLNCNameRaw+')|('+RegExpr_XMLNCNameRaw+':'+RegExpr_XMLNCNameRaw+'))$'; //name without :
 
 
 { TXSType }
@@ -1195,10 +1185,10 @@ begin
   normalizedString.whiteSpaceFacet:=xsfwReplace;
     token := restrictedStringType('token', normalizedString);
     token.whiteSpaceFacet:=xsfwCollapse;
-      language := restrictedStringType('language', token, RegExpr_language);
-      NMTOKEN := restrictedStringType('NMTOKEN', token, '^('+RegExpr_XMLNameChar+')+$');
-      Name := restrictedStringType('Name', token, RegExpr_XMLName);
-        NCName := restrictedStringType('NCName', name, RegExpr_XMLNCName);
+      language := restrictedStringType('language', token, '^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$');
+      NMTOKEN := restrictedStringType('NMTOKEN', token, '^\c+$');
+      Name := restrictedStringType('Name', token, '^\i\c*$');
+        NCName := restrictedStringType('NCName', name, '^[\i-[:]][\c-[:]]*$');
           ID := restrictedStringType('ID', NCName);
           IDREF := restrictedStringType('IDREF', NCName);
           ENTITY := restrictedStringType('ENTITY', NCName);
