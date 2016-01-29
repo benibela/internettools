@@ -2317,7 +2317,7 @@ begin
           if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(evilkids[0])
           else result := (t as TXSQNameType).cast(evilkids[0], context);
         end
-        else raiseEvaluationError('FORG0001', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
+        else raiseEvaluationError('XPTY0004', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
       end;
     end;
     xqfkNativeInterpreted: begin
