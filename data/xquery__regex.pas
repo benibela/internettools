@@ -57,6 +57,7 @@ type TWrappedRegExpr = TRegExpr;
 type TWrappedRegExpr = TFLRE;
      EWrappedRegExpr = EFLRE;
      TWrappedMatchArray = TFLREStrings;
+{$DEFINE REGEX_SUPPORTS_UNICODE}
 {$ENDIF}
 
 type TWrappedRegExprFlag  = (wrfSingleLine, wrfMultiLine, wrfIgnoreCase, // standard
@@ -233,10 +234,11 @@ var pos: integer;
         addc('\');
         addc(c);
       end;
-      'i','I','c','C': begin
+      'i','I','c','C': begin //i: xml's namestartchar, c: namechar
         if not inclass then addc('[');
         range := '';
         case c of
+          {$IFDEF REGEX_SUPPORTS_UNICODE}
           'i': range := ':A-Z_a-z\UC0-\UD6\UD8-\UF6\UF8-\U2FF\U370-\U37D\U37F-\U1FFF\U200C-\U200D\U2070-\U218F\U2C00-\U2FEF\U3001-\UD7FF\UF900-\UFDCF\UFDF0-\UFFFD\U10000-\UEFFFF';
           'I': range := '\U1-\U39\U3B-\U40\U5B-\U5E\U60-\U60\U7B-\UBF\UD7-\UD7\UF7-\UF7\U300-\U36F\U37E-\U37E\U2000-\U200B\U200E-\U206F\U2190-\U2BFF\U2FF0-\U3000\UD800-\UF8FF\UFDD0-\UFDEF\UFFFE-\UFFFF\UF0000-\UFFFFF';
           'c': range := '\U2D.0-9\UB7\U0300-\U036F\U203F-\U2040' +
@@ -246,6 +248,13 @@ var pos: integer;
                                           a:=strSplit(s,'\U');
                                           write('\U',IntToHex( StrToInt('$0'+ a[1])+1,0),'-\U',IntToHex( StrToInt('$0'+a[2])-1,0))
                                         end;   }
+          {$ELSE}
+          //ascii approximation of those above
+          'i': range := ':A-Z_a-z'#$7F'-'#$FF;
+          'I': range := #1'-'#64'\x5B-\x5E`\x7B-\x7E';
+          'c': range := '-.0-9:A-Z_a-z'#$7F'-'#$FF;
+          'C': range := #1'-'#44'/'#58'-'#64'\x5B-\x5E`\x7B-\x7E';
+          {$ENDIF}
         end;
         adds(range);
         if not inclass then addc(']');
