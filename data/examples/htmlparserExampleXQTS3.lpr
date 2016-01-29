@@ -220,7 +220,7 @@ var
   f: TTreeNode;
   v: IXQValue;
 begin
-  for v in xq.parseXPath2('./*').evaluate(e) do begin
+  for v in xq.parseXPath2('./*:*').evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'all-of', 'any-of', 'not': begin
@@ -902,7 +902,7 @@ begin
 
   name := e['name'];
   coversName := e['covers'];
-  for v in xq.parseXPath2('./*').evaluate(e) do begin
+  for v in xq.parseXPath2('./*:*').evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'description', 'created', 'modified': ;
@@ -1121,7 +1121,7 @@ begin
 
   name := e['name'];
   coversName := e['covers'];
-  for v in xq.parseXPath2('./*').evaluate(e) do begin
+  for v in xq.parseXPath2('./*:*').evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'description': ;
@@ -1187,7 +1187,7 @@ class function TSource.createMultiple(const n: TTreeNode): TList;
 var
   v, x: IXQValue;
 begin
-  x := xq.evaluateXPath2('source', n);
+  x := xq.evaluateXPath2('*:source', n);
   result := TList.Create;
   for v in x do result.add(TSource.Create(v.toNode));
 end;
@@ -1239,11 +1239,11 @@ var
 begin
   e := definition;
   definition := nil;
-  staticBaseUri := xq.parseXPath2('static-base-uri/@uri').evaluate(e).toString;
+  staticBaseUri := xq.parseXPath2('*:static-base-uri/@*:uri').evaluate(e).toString;
   if staticBaseUri = '' then staticBaseUri := e.getDocument().baseURI;
 
   collations := TStringList.Create;
-  for v in xq.parseXPath2('collation').evaluate(e) do begin
+  for v in xq.parseXPath2('*:collation').evaluate(e) do begin
     i := xqtsCollations.IndexOf(v.toNode['uri']);
     if (i < 0) and strBeginsWith(v.toNode['uri'], 'http://www.w3.org/2013/collation/UCA') then //todo: use a real collation
       xqtsCollations.AddObject(v.toNode['uri'], TXQCollation.create(v.toNode['uri'], @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
@@ -1255,7 +1255,7 @@ begin
   if (collations.Count > 0) and (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
     collations.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
 
-  u := xq.parseXPath2('param').evaluate(e);
+  u := xq.parseXPath2('*:param').evaluate(e);
   SetLength(params, u.getSequenceCount);
   for i := 0 to u.getSequenceCount -1  do begin
     n := u.get(i+1).toNode;
@@ -1267,17 +1267,17 @@ begin
     if n.hasAttribute('declared') then params[i].declared := n['declared']= 'true';
   end;
 
-  for v in xq.evaluateXPath2('context-item', e) do
+  for v in xq.evaluateXPath2('*:context-item', e) do
     contextItem := xq.evaluateXPath2(v.toString);
 
-  u := xq.evaluateXPath2('collection', e);
+  u := xq.evaluateXPath2('*:collection', e);
   if not u.isUndefined then begin
     collections := TStringList.Create;
     for v in u do
       collections.AddObject(v.toNode['uri'], TSource.createMultiple(v.toNode));
   end;
 
-  u := xq.evaluateXPath2('namespace', e);
+  u := xq.evaluateXPath2('*:namespace', e);
   if not u.isUndefined then begin
     if namespaces = nil then namespaces := TNamespaceList.Create;
     for v in u do namespaces.add(TNamespace.Create(v.toNode['uri'], v.toNode['prefix']));
@@ -1383,9 +1383,12 @@ begin
     xq.OnCollection:=@env.getCollection;
     xq.OnDeclareExternalVariable:=@env.getExternalVariable;
 
-    if env.namespaces = nil then FreeAndNil(sc.namespaces)
-    else begin
+    if env.namespaces = nil then begin
+      FreeAndNil(sc.namespaces);
+      //sc.defaultElementTypeNamespace := nil;
+    end else begin
       sc.namespaces := env.namespaces.clone;
+      //sc.defaultElementTypeNamespace := env.namespaces.namespaces['']; seems to work without??
     end;
     for i := 0 to high(env.params) do
       if not env.params[i].declared then
@@ -1404,7 +1407,7 @@ var e: TTreeNode;
     v: IXQValue;
     ts: TTestSet;
 begin
-  for v in xq.parseXPath2('/catalog/*').evaluate(tree.parseTreeFromFile(fn)) do begin
+  for v in xq.parseXPath2('/*:catalog/*:*').evaluate(tree.parseTreeFromFile(fn)) do begin
     e :=  v.toNode;
     case e.value of
       'environment': //environments.AddObject(e['name'], TEnvironment.load(e));
@@ -1510,6 +1513,7 @@ begin
   xq.StaticContext.strictTypeChecking:=true;
   xq.StaticContext.defaultFunctionNamespace := TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
   xq.StaticContext.defaultTypeNamespace := nil;
+  xq.StaticContext.useLocalNamespaces:=false;
   xq.AutomaticallyRegisterParsedModules := true;
   baseSchema.version := xsd11;
   defaultInternetAccessClass := TFailInternetAccess;
