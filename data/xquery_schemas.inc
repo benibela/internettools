@@ -734,7 +734,7 @@ begin
   if (lexicalSpaceRegex <> nil) then begin
     EnterCriticalsection(lexicalSpaceRegexCS);
     try
-      if not (lexicalSpaceRegex.Exec(v)) then exit(xsceFORG0001);
+      if not (wregexprMatches(TWrappedRegExpr(lexicalSpaceRegex), v)) then exit(xsceFORG0001);
     finally
       LeaveCriticalsection(lexicalSpaceRegexCS);
     end;
@@ -752,8 +752,7 @@ begin
   inherited Create(aname, aparent, TXQValueString);
   subType:=asubtype;
   if pattern <> '' then begin
-    lexicalSpaceRegex := TRegExpr.Create();
-    lexicalSpaceRegex.Expression := pattern;
+    lexicalSpaceRegex := wregexprParse(pattern, []);
     InitCriticalSection(lexicalSpaceRegexCS);
   end;
 end;
@@ -761,7 +760,7 @@ end;
 destructor TXSStringType.Destroy;
 begin
   if lexicalSpaceRegex <> nil then begin
-    lexicalSpaceRegex.free;
+    wregexprFree(TWrappedRegExpr(lexicalSpaceRegex));
     DoneCriticalsection(lexicalSpaceRegexCS);
   end;
   inherited Destroy;
@@ -1149,7 +1148,7 @@ begin
 
   AnyURI := primitiveBaseType(TXSStringType.create('anyURI', AnyAtomicType, xsstUrl));
   anyURI.whiteSpaceFacet:=xsfwCollapse; anyURI.whiteSpaceFixed := true;
-  Base64Binary := primitiveBaseType(TXSStringType.create('base64Binary', AnyAtomicType, xsstBase64Binary, '^(([A-Za-z0-9+/] *){4})*(|([A-Za-z0-9+/] *){2}[AEIMQUYcgkosw048] *=|[A-Za-z0-9+/] *[AQgw] *= *=)$'));
+  Base64Binary := primitiveBaseType(TXSStringType.create('base64Binary', AnyAtomicType, xsstBase64Binary, '^(([A-Za-z0-9+/] *){4})*(([A-Za-z0-9+/] *){2}[AEIMQUYcgkosw048] *=|[A-Za-z0-9+/] *[AQgw] *= *=)?$'));
   base64Binary.whiteSpaceFacet:=xsfwCollapse; base64Binary.whiteSpaceFixed := true;
   hexBinary := primitiveBaseType(TXSStringType.create('hexBinary', AnyAtomicType, xsstHexBinary, '^([0-9A-Fa-f][0-9A-Fa-f])*$'));
   hexBinary.whiteSpaceFacet:=xsfwCollapse; hexBinary.whiteSpaceFixed := true;

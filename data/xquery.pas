@@ -52,7 +52,6 @@ interface
 
 uses
    Classes, SysUtils,
-   regexpr, //this should contain Sorokin's TRegExpr library. It is contained in new fpc version, for older ones, there this package contains a copy in dregexpr.pas
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif};
 
@@ -1122,7 +1121,7 @@ type
   //** XML Schema string type, derived from xs:string, xs:anyURI, xs:hexBinary, xs:base64Binary or xs:untypedAtomic
   TXSStringSubType = (xsstString, xsstHexBinary, xsstBase64Binary, xsstUrl);
   TXSStringType = class(TXSSimpleType)
-    lexicalSpaceRegex: TRegExpr;
+    lexicalSpaceRegex: TObject {TWrappedRegExpr};
     lexicalSpaceRegexCS: TRTLCriticalSection;
     subType: TXSStringSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
