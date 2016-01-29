@@ -994,7 +994,7 @@ type
   { TXSType }
 
   TXSNumericType = class;
-  TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001, xsceFOCA0002, xsceFODT0001, xsceFODT0002);
+  TXSCastingError = (xsceNoError, xsceXPTY0004, xsceFORG0001, xsceFOCA0002, xsceFODT0001, xsceFODT0002, xsceFOAR0002);
   //** General XML schema type
   TXSType = class
     name: string;
