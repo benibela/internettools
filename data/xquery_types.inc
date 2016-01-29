@@ -634,7 +634,14 @@ end;
 
 function TXQValueFloat.toDecimal: BigDecimal;
 begin
-  Result:=value;
+  try
+    case (typeAnnotation as TXSNumericType).subType of
+      xsstDouble: result := FloatToBigDecimal(double(value), bdffShortest);
+      xsstFloat: result := FloatToBigDecimal(single(value), bdffShortest);
+    end;
+  except
+    on EConvertError do raise EXQEvaluationException.Create('FOAR0002', 'Float ' + debugAsStringWithTypeAnnotation()+  ' cannot be cast to decimal');
+  end;
 end;
 
 function TXQValueFloat.toString: string;
@@ -660,10 +667,14 @@ begin
   if value = 0 then
     if isSignedXQFloat(value) then exit('-0')
     else exit('0');
-
-  case (typeAnnotation as TXSNumericType).subType of
-    xsstDouble: result := doubleToString(double(value));
-    xsstFloat: result := singleToString(single(value));
+  try
+    case (typeAnnotation as TXSNumericType).subType of
+      xsstDouble: result := doubleToString(double(value));
+      xsstFloat: result := singleToString(single(value)); //this can overflow
+    end;
+  except
+    on EConvertError do exit('internal float: '+FloatToStr(value));
+    on EMathError do exit('internal float: '+FloatToStr(value));
   end;
 end;
 

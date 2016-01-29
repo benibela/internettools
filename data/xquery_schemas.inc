@@ -536,10 +536,16 @@ begin
         if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
         else outv^ := TXQValueDecimal.create(self, temp);
       xsstFloat, xsstDouble: begin
-        if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
-        else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
-        else tempd := single(BigDecimalToExtended(temp));
-        outv^ := TXQValueFloat.create(self, tempd);
+        try
+          if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
+          else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
+          else tempd := single(BigDecimalToExtended(temp));
+          ClearExceptions();
+          outv^ := TXQValueFloat.create(self, tempd);
+        except
+          on EOverflow do outv^ := TXQValueFloat.create(self, getPosInf);
+          on EUnderflow do outv^ := TXQValueFloat.create(self, getNegInf);
+        end;
       end;
     end
     {result := TryStrDecodeDecimal(v, tempintstart, tempintend, tempdot, tempexp);

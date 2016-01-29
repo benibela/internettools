@@ -385,11 +385,11 @@ begin
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
   if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
-
-  if (a is TXQValueFloat) and (isNan(a.toFloat) or IsInfinite(a.toFloat)) then raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.debugAsStringWithTypeAnnotation()+' for integer division');
-  if (b is TXQValueFloat) then begin
+  if bk = pvkFloat then begin
     if (IsNan(b.toFloat)) then raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+b.debugAsStringWithTypeAnnotation()+' for integer division');
-    if IsInfinite(b.toFloat) then exit(baseSchema.integer.createValue(0));
+    if IsInfinite(b.toFloat) then
+      if TXQValueFloat.isPure(a) then exit(baseSchema.integer.createValue(0))
+      else raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.debugAsStringWithTypeAnnotation()+' for integer division');
   end;
 
   tempd := b.toDecimal;

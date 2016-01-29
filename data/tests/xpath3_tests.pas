@@ -312,7 +312,7 @@ begin
   t('fn:round(xs:float(12345.6), 2)', '12345.6');
 
 
-  try raise EInvalidArgument.create('The math tests raises EInvalidArgument exceptions. These exceptions should be disabled in the debugger.'); except on EInvalidArgument do ; end;
+  try raise EMathError.create('The math tests raise EMathError exceptions. These exceptions should be disabled in the debugger.'); except on EMathError do ; end;
 
   registerModuleMath();
 
@@ -326,6 +326,7 @@ begin
   t('math:pow(xs:double("NaN"), 5)', 'NaN');
   t('let $big := 88888888888 return (math:pow(3, $big), math:pow(3, -$big), math:pow(0.3, $big), math:pow(0.3, -$big))', 'INF 0 0 INF');
   t('math:atan2(xs:double("INF"), xs:double("-INF"))', '2.356194490192345');
+  //t('xs:float("1.00000003009493E+060")', 'INF');
 
 
   //interface tests
