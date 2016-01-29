@@ -3387,6 +3387,7 @@ begin
   end;
 
 
+  result := dtprSuccess;
   mp:=1;
   ip:=1;
   while mp<=length(mask) do begin
@@ -3399,12 +3400,13 @@ begin
           truecount:=count;
           if (mp <= length(mask)) and (mask[mp] = '+') then begin
             while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do inc(count);
-            if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then dec(count);
             inc(mp);
             if count > 9 then begin
-              result := dtprFailureValueTooHigh;
-              exit;
-            end;
+              result := dtprFailureValueTooHigh; //input is invalid, but continue parsing, so we do not report value-too-high on input with completely invalid format, just because there is a large number at the beginning
+              inc(ip, count-4); //jump ahead, so there are no problems with invalid integers
+              count := 4;
+            end else if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then dec(count);
+
           end;
         end else begin //am/pm special case
           if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then inc(mp, 5)
@@ -3423,7 +3425,7 @@ begin
           else assert(false);
         end;
 
-        if (ip+count-1 > length(input)) or (count >= 10) then begin result := dtprFailure; exit; end;
+        if (ip+count-1 > length(input)) then begin result := dtprFailure; exit; end;
 
         case base of
           'y': if (input[ip] = '-') then begin //special case: allow negative years
@@ -3542,8 +3544,7 @@ begin
         while (ip <= length(input)) and (input[ip] in [' ',#9]) do inc(ip);
       end
       else if (mask[mp] = '$') and (mp  = length(mask)) then begin
-        if ip = length(input) + 1 then result := dtprSuccess
-        else result := dtprFailure;
+        if ip <> length(input) + 1 then result := dtprFailure;
         exit;
       end else if (ip > length(input)) or (mask[mp]<>input[ip]) then begin result := dtprFailure; exit; end
       else begin
@@ -3552,8 +3553,8 @@ begin
       end;
     end;
   end;
-  result := dtprSuccess;
 end;
+
 
 
 function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): TDateTimeParsingResult;
