@@ -1973,6 +1973,7 @@ var
   axis: String;
   namespaceMode: TXQNamespaceMode;
   marker: PChar;
+  ok: boolean;
 
 
 
@@ -2117,11 +2118,20 @@ begin
                   end;
                   'element', 'schema-element', 'attribute', 'schema-attribute', 'document-node': begin
                     push(parseValue());
-                    if (not (children[0] is TXQTermNodeMatcher))
-                       or ((length(TXQTermNodeMatcher(children[0]).children) > 0) and (word <> 'document-node') )
-                       or ( ((TXQTermNodeMatcher(children[0]).select = '*') or (TXQTermNodeMatcher(children[0]).namespaceCheck = xqnmNone)) and (word <> 'element') and (word <> 'attribute') )
-                       then
-                         raiseSyntaxError('Invalid test');
+                    ok := children[0] is TXQTermNodeMatcher;
+                    if ok then begin
+                      if (TXQTermNodeMatcher(children[0]).func or (length(TXQTermNodeMatcher(children[0]).children) > 0)) then
+                        if word <> 'document-node' then ok := false
+                        else case TXQTermNodeMatcher(children[0]).select of
+                          'element', 'schema-element': ; //ok
+                          else ok := false;
+                        end;
+                      if ( ((TXQTermNodeMatcher(children[0]).select = '*')
+                              or ((TXQTermNodeMatcher(children[0]).namespaceCheck = xqnmNone) and (word <> 'document-node' { nested function has no namespace }) ))
+                            and (word <> 'element') and (word <> 'attribute') ) then ok := false;
+                    end;
+                    if not ok then
+                      raiseSyntaxError('Invalid test');
                   end;
                   else raiseSyntaxError('No option allowed for matching test: '+word);
                 end;
@@ -3316,9 +3326,13 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     if not staticContext.useLocalNamespaces and (n.namespaceCheck = xqnmPrefix) then begin
       n.namespaceCheck := xqnmURL;
       if n.axis = 'attribute' then
-        n.namespaceURLOrPrefix := staticContext.findNamespaceURL(n.namespaceURLOrPrefix, xqdnkUnknown)
+        n.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.namespaceURLOrPrefix, xqdnkUnknown)
        else
-        n.namespaceURLOrPrefix := staticContext.findNamespaceURL(n.namespaceURLOrPrefix, xqdnkElementType);
+        n.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.namespaceURLOrPrefix, xqdnkElementType);
+    end;
+    if n.func and strBeginsWith(n.select, 'schema-') then begin
+      visitNodeMatcher(n.children[0] as TXQTermNodeMatcher);
+      raise EXQParsingException.create('XPST0008', 'Schema tests are not supported');
     end;
   end;
 
