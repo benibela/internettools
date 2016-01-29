@@ -1268,7 +1268,7 @@ begin
   end;
 
   for v in xq.evaluateXPath2('*:context-item', e) do
-    contextItem := xq.evaluateXPath2(v.toString);
+    contextItem := xq.evaluateXPath2(v.toNode['select']);
 
   u := xq.evaluateXPath2('*:collection', e);
   if not u.isUndefined then begin
