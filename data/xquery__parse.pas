@@ -2117,8 +2117,10 @@ begin
                   end;
                   'element', 'schema-element', 'attribute', 'schema-attribute', 'document-node': begin
                     push(parseValue());
-                    if (not (children[0] is TXQTermNodeMatcher)) or
-                       ((word <> 'document-node') and (length(TXQTermNodeMatcher(children[0]).children) > 0)) then
+                    if (not (children[0] is TXQTermNodeMatcher))
+                       or ((length(TXQTermNodeMatcher(children[0]).children) > 0) and (word <> 'document-node') )
+                       or ( ((TXQTermNodeMatcher(children[0]).select = '*') or (TXQTermNodeMatcher(children[0]).namespaceCheck = xqnmNone)) and (word <> 'element') and (word <> 'attribute') )
+                       then
                          raiseSyntaxError('Invalid test');
                   end;
                   else raiseSyntaxError('No option allowed for matching test: '+word);
@@ -2131,6 +2133,8 @@ begin
                 expect(',');
                 TXQTermNodeMatcher(result).push(parseSequenceType([xqstAllowValidationTypes]));
               end;
+            end else case word of
+              'schema-element', 'schema-attribute': raiseSyntaxError('schema-* test need name arg');
             end;
             expect(')');
             if (word <> 'node') and (axis <> 'self') and ( (axis = 'attribute') <> (strContains(word, 'attribute')) ) then begin
@@ -3311,7 +3315,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     if not staticContext.useLocalNamespaces and (n.namespaceCheck = xqnmPrefix) then begin
       n.namespaceCheck := xqnmURL;
-      n.namespaceURLOrPrefix := staticContext.findNamespaceURL(n.namespaceURLOrPrefix, xqdnkElementType);
+      if n.axis = 'attribute' then
+        n.namespaceURLOrPrefix := staticContext.findNamespaceURL(n.namespaceURLOrPrefix, xqdnkUnknown)
+       else
+        n.namespaceURLOrPrefix := staticContext.findNamespaceURL(n.namespaceURLOrPrefix, xqdnkElementType);
     end;
   end;
 
