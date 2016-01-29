@@ -855,6 +855,20 @@ begin
   end;
 end;
 
+function TXSDateTimeType.constraintsSatisfied(const v: TXQValueDateTimeData): boolean;
+var
+  i: Integer;
+begin
+  result := true;
+  for i := 0 to high(constrainingFacets) do
+    case constrainingFacets[i].kind of
+      xsfExplicitTimezone:
+        if (v.timezone <> high(Integer)) <> (constrainingFacets[i].fixed) then
+          exit(false);
+    end;
+
+end;
+
 function TXSDateTimeType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
   st: TXSType;
@@ -869,6 +883,10 @@ begin
        or (st.derivedFrom(schema.dateTime))
        or (st.derivedFrom(schema.date)) and not (self.derivedFrom(schema.time)) ) then
          exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv))
+  end;
+  if length(constrainingFacets) > 0 then begin
+    assert(v is TXQValueDateTime);
+    if not constraintsSatisfied((v as TXQValueDateTime).value) then exit(xsceFORG0001);
   end;
   result := xsceNoError;
   if (outv <> nil) then
@@ -895,6 +913,7 @@ begin
     dtprFailureValueTooHigh: exit(xsceFODT0001);
     dtprFailureValueTooHigh2: exit(xsceFODT0002);
   end;
+  if not constraintsSatisfied(tvd) then exit(xsceFORG0001);
   result := xsceNoError;
   if (outv <> nil) then
     outv^ := TXQValueDateTime.create(self, truncated(tvd))

@@ -1153,6 +1153,7 @@ type
     isDuration: boolean;
     truncation: TXQDateTimeTruncation;
     function truncated(const value: TXQValueDateTimeData): TXQValueDateTimeData;
+    function constraintsSatisfied(const v: TXQValueDateTimeData): boolean;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: string; outv: PXQValue = nil): TXSCastingError; override;
     constructor Create(aname: string; aparent: TXSType; apattern: string; atruncation: TXQDateTimeTruncation = xqdttNone );
