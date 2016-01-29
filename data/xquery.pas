@@ -6873,7 +6873,6 @@ begin
   if GlobalStaticNamespaces.hasNamespacePrefix(nsprefix, result) then exit;
   case nsprefix of
     'xml': result := XMLNamespace_XML;
-    'xmlns': result := XMLNamespace_XMLNS;
     'xs': result := XMLNamespace_XMLSchema;
     'xsi': result := XMLNamespace_XMLSchemaInstance;
     'fn': result := XMLNamespace_XPathFunctions;
