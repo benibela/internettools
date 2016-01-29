@@ -2580,7 +2580,10 @@ begin
   pendings := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
   hadPending := pendings.Count > 0;
   result := parseModuleInternal();
-  if result = nil then exit;
+  if result = nil then begin
+    raiseSyntaxError('No input');
+    exit;
+  end;
   if nextToken() <> '' then begin
     result.free;
     raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');

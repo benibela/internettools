@@ -44,6 +44,7 @@ var
       xml.parseTree(s3);
       if rooted then context.RootElement := xml.getLastTree
       else context.RootElement:=nil;
+      if s1 = '' then exit;
     end;
     ps.parseXPath2(s1);
     if ps.LastQuery.getTerm <> nil then ps.LastQuery.getTerm.getContextDependencies;
@@ -121,7 +122,7 @@ begin
   xml.TargetEncoding:=eUnknown;
   xml.trimText:=true;
 
-  t('',                          '',                                 '');
+  f('',                          'XPST0003');
   t('''''',                      '',                                 '');
   t('''Test''',                  'Test',                             '');
   t(#9'   ''xyz''     '#13#10,   'xyz',                              '');
@@ -2780,7 +2781,7 @@ begin
   t('true() instance of anyAtomicType', 'true', '');
 //  t('QName("abc")', 'abc', ''); todo?
                //,('QName("abc", "def")', 'abc', '')
-  t('','','');
+
   t('xs:gMonth("--12") castable as decimal', 'false', '');
   t('xs:dateTime("2030-12-05T01:01:01") castable as decimal', 'false', '');
   t('(0.0 div 0e1)', 'NaN', '');

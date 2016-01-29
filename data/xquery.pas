@@ -6033,13 +6033,9 @@ var cxt: TXQParsingContext;
   oldFunctionCount: Integer;
   i: Integer;
 begin
+  if str = '' then raise EXQParsingException.create('XPST0003', 'No input');
   staticContextShared := context <> nil;
   if context = nil then context := StaticContext.clone();
-  if str = '' then begin
-    result := TXQuery.Create(context, TXQTermSequence.Create);
-    result.staticContextShared := staticContextShared;
-    exit;
-  end;
   cxt := TXQParsingContext.Create;
   cxt.encoding:=eUTF8;
   cxt.options := ParsingOptions;
