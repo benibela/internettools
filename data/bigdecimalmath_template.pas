@@ -101,9 +101,12 @@ type
   end;
   PBigDecimal = ^BigDecimal;
 
+type TBigDecimalErrorCode = (bdceNoError, bdceParsingInvalidFormat, bdceParsingTooBig );
+     PBigDecimalErrorCode = ^TBigDecimalErrorCode;
+
 //** Converts a decimal string to a bigdecimal. @br
 //** Supports standard decimal notation, like -123.456 or 1E-2    (@code(-?[0-9]+(.[0-9]+)?([eE][-+]?[0-9]+)))
-function TryStrToBigDecimal(const s: string; res: PBigDecimal): boolean;
+function TryStrToBigDecimal(const s: string; res: PBigDecimal; errCode: PBigDecimalErrorCode = nil): boolean;
 //** Converts a decimal string to a bigdecimal. @br
 //** Supports standard decimal notation, like -123.456 or 1E-2    (@code(-?[0-9]+(.[0-9]+)?([eE][-+]?[0-9]+)))
 //** Raises an exception on invalid input.
@@ -281,7 +284,7 @@ begin
   result := true;
 end;
 
-function TryStrToBigDecimal(const s: string; res: PBigDecimal): boolean;
+function TryStrToBigDecimal(const s: string; res: PBigDecimal; errCode: PBigDecimalErrorCode = nil): boolean;
 var dot, exp, i: integer;
   intstart: Integer;
   intend: Integer;
@@ -291,19 +294,24 @@ var dot, exp, i: integer;
   totalintlength: Integer;
 begin
   result := TryStrDecodeDecimal(s, intstart, intend, dot, exp);
-  if not result then exit;
+  if not result then begin
+    if Assigned(errCode) then errCode^ := bdceParsingInvalidFormat;
+    exit;
+  end else if Assigned(errCode) then errCode^ := bdceNoError;
   if exp = 0 then trueexponent := 0
   else begin
-    if (length(s) - exp <= 10) and (res = nil) then exit;
-    if not TryStrToInt64(copy(s, exp + 1, length(s)), trueexponent) then begin
+    if (length(s) - exp <= 10) and (res = nil) then exit; //if the exponent is small, we know it is okay. If we do not need res, we can exit, otherwise we need to actually get the exponent
+    if not TryStrToInt64(copy(s, exp + 1, length(s)), trueexponent) then trueexponent := high(int64);
+    if (trueexponent < DIGITS_PER_ELEMENT * int64(low(integer))) or (trueexponent > DIGITS_PER_ELEMENT * int64(high(integer))) then begin
       //exponent too big
       for i := 1 to exp - 1 do
-        if not (s[i] in ['0', '.', '-']) then exit(false);
-      if res <> nil then setZero(res^); //but if all digigts are 0, the exponent can be ignored
+        if not (s[i] in ['0', '.', '-']) then begin
+          if assigned(errCode) then errCode^ := bdceParsingTooBig;
+          exit(false);
+        end;
+      if res <> nil then setZero(res^); //but if all digits are 0, the exponent can be ignored
       exit;
     end;
-    if (trueexponent < DIGITS_PER_ELEMENT * int64(low(integer))) or (trueexponent > DIGITS_PER_ELEMENT * int64(high(integer))) then
-      exit(false);
   end;
   if res = nil then exit;
   with res^ do begin
