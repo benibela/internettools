@@ -1038,6 +1038,8 @@ type
     function tryCreateValue(const v: Int64; outv: PXQValue = nil): TXSCastingError; virtual;
     function tryCreateValue(const v: xqfloat; outv: PXQValue = nil): TXSCastingError; virtual;
     function tryCreateValue(const v: BigDecimal; outv: PXQValue = nil): TXSCastingError; virtual;
+
+    function xsceXPTY0004ButTryCreatingFromAFakeSingleton(const v: IXQValue; outv: PXQValue): TXSCastingError;
   end;
 
   //TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt, pvkDecimal, pvkString, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
@@ -2494,7 +2496,6 @@ public
   //function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
 
   function xqvalueArray(a: array of IXQValue): TXQVArray;
-
 type
   (***
   @abstract(A XQuery variable)
@@ -4511,6 +4512,12 @@ var
 begin
   setlength(result, length(a));
   for i := 0 to high(a) do Result[i] := a[i];
+end;
+
+// If the value is a sequence of exactly one element. That should not happen and this function should not be used.
+function xqvalueIsFakeSingleton(const v: IXQValue): boolean;
+begin
+  result := (v.kind = pvkSequence) and (v.getSequenceCount = 1) and (v.get(1) <> v)
 end;
 
 const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];

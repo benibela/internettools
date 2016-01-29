@@ -376,6 +376,13 @@ begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
 
+function TXSType.xsceXPTY0004ButTryCreatingFromAFakeSingleton(const v: IXQValue; outv: PXQValue): TXSCastingError;
+begin
+  result := xsceXPTY0004;
+  if not xqvalueIsFakeSingleton(v) then exit;
+  result := tryCreateValue(v.get(1), outv);
+end;
+
 
 
 { TXSUnionType }
@@ -500,7 +507,7 @@ begin
   end else if st.derivedFrom([schema.float, schema.double]) then
     exit(tryCreateValue(v.toFloat, outv))
   else
-   exit(xsceXPTY0004);
+   exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
 end;
 
 function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
@@ -663,7 +670,8 @@ var
 begin
   st := v.typeAnnotation;
   if st.derivedFrom([schema.untypedAtomic, schema.string_]) then exit(tryCreateValue(v.toString, outv));
-  if not st.derivedFrom([schema.boolean, schema.float, schema.double, schema.decimal]) then exit(xsceXPTY0004);
+  if not st.derivedFrom([schema.boolean, schema.float, schema.double, schema.decimal]) then
+    exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v,outv));
   result := xsceNoError;
   if outv <> nil then outv^ := TXQValueBoolean.create(self, v.toBoolean);
 end;
@@ -695,7 +703,8 @@ begin
   case subType of
     xsstString: result := tryCreateValueInternal(v.toString, outv);
     xsstHexBinary, xsstBase64Binary: begin
-      if not st.derivedFrom([schema.hexBinary, schema.base64Binary]) then exit;
+      if not st.derivedFrom([schema.hexBinary, schema.base64Binary]) then
+        exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
       result := xsceNoError;
       if outv <> nil then
         if st.derivedFrom(schema.hexBinary) = (subType = xsstHexBinary) then
@@ -706,7 +715,8 @@ begin
           outv^ := TXQValueString.create(self, base64.EncodeStringBase64(strDecodeHex(v.toString)))
     end;
     xsstUrl: begin
-      if not st.derivedFrom(schema.anyURI) then exit;
+      if not st.derivedFrom(schema.anyURI) then
+        exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
       result := xsceNoError;
       if (outv <> nil) then
         outv^ := TXQValueString.create(self, v.toString);
@@ -778,7 +788,7 @@ begin
     result := xsceNoError;
     if outv <> nil then
       outv^ := TXQValueQName.create(self, (v as TXQValueQName).url, (v as TXQValueQName).prefix, (v as TXQValueQName).local);
-  end;
+  end else result := xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv);
 end;
 
 function TXSQNameType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
@@ -857,12 +867,14 @@ var
 begin
   st := v.typeAnnotation;
   if isDuration then begin
-    if not ( (st is TXSDateTimeType) and (st as TXSDateTimeType).isDuration ) then exit(xsceXPTY0004)
+    if not ( (st is TXSDateTimeType) and (st as TXSDateTimeType).isDuration ) then
+      exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv))
   end else begin
     if not (
        st.derivedFrom(self)
        or (st.derivedFrom(schema.dateTime))
-       or (st.derivedFrom(schema.date)) and not (self.derivedFrom(schema.time)) ) then exit(xsceXPTY0004)
+       or (st.derivedFrom(schema.date)) and not (self.derivedFrom(schema.time)) ) then
+         exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv))
   end;
   result := xsceNoError;
   if (outv <> nil) then
