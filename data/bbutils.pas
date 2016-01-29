@@ -917,8 +917,6 @@ function dateEncode(year, month, day: integer): TDateTime;
 //**Encodes a date as datetime (supports negative years)
 procedure dateDecode(date: TDateTime; year, month, day: PInteger);
 
-
-
 const WHITE_SPACE=[#9,#10,#13,' '];
 
 (*
@@ -4545,9 +4543,10 @@ begin
   if s = '' then exit;
   if not (s[1] in ['A'..'Z','a'..'z']) then exit;
   p := pos(':', s);
-  if p = 0 then exit;
+  if (p = 0) or (p + 2 > length(s)) then exit;
   for i:=2 to p-1 do
     if not (s[i] in ['A'..'Z','a'..'z','0'..'9','+','-','.']) then exit;
+  if (s[p+1] <> '/') or (s[p+2] <> '/') then exit;
   result := true;
 end;
 
@@ -4609,6 +4608,18 @@ end;
 
 
 function strResolveURI(rel, base: RawByteString): RawByteString;
+  function strIsRelative(const r: RawByteString): boolean; //this is weird, but the XQTS3 has "non-hierarchical uris" as test case for fn:resolve-uri
+  var
+    i: Integer;
+  begin
+    result := true;
+    for i := 1 to length(r) do
+      case r[i] of
+        ':': begin result := false; exit; end;
+        '?': exit;
+      end;
+  end;
+
 var
   schemaLength: SizeInt;
   baseIsAbsolute: Boolean;
@@ -4616,7 +4627,7 @@ var
   returnBackslashes: Boolean;
   i: Integer;
 begin
-  if strIsAbsoluteURI(rel) or (base = '') then begin result := rel; exit; end;
+  if not strIsRelative(rel) or (base = '') then begin result := rel; exit; end;
 
   fileSchemaPrefixLength := 0;
   if stribeginswith(base, 'file:///') then fileSchemaPrefixLength := 8
@@ -5168,6 +5179,7 @@ end;
 
 //const DATETIME_PARSING_FORMAT_CHARS = ['h','n','s','d','y','Z','z'];
 
+
 type T9Ints = array[1..9] of integer;
 
 function dateTimeParsePartsTryInternal(input,mask:RawByteString; var parts: T9Ints; options: TDateTimeParsingFlags): TDateTimeParsingResult;
@@ -5425,6 +5437,7 @@ begin
     end;
   end;
 end;
+
 
 
 function dateTimeParsePartsTry(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): TDateTimeParsingResult;

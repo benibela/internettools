@@ -2529,10 +2529,12 @@ begin
     base := context.staticContext.baseURI;
     if not strIsAbsoluteURI(base) then base := 'file://' + GetCurrentDir + DirectorySeparator + base;
   end;
+  if pos('#', base) > 0 then raise EXQEvaluationException.Create('FORG0002', 'Fragment identifier are not allowed');
   if args[0].isUndefined then exit(xqvalue);
   rel := args[0].toString;
+  if rel = ':' then raise EXQEvaluationException.Create('FORG0002', 'Invalid relative uri');
   if strIsAbsoluteURI(rel) then exit(TXQValueString.create(baseSchema.anyURI, rel));
-  if not strIsAbsoluteURI(base) then raise EXQEvaluationException.Create('FORG0009', 'Need absolute url to resolve relative url');
+  if not strIsAbsoluteURI(base) then raise EXQEvaluationException.Create('FORG0002', 'Need absolute url to resolve relative url');
   result := TXQValueString.create(baseSchema.anyURI, strResolveURI(rel, base));
 end;
 
