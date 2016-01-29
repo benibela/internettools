@@ -262,6 +262,7 @@ begin
     xsceFOCA0002: temp := 'FOCA0002';
     xsceFODT0001: temp := 'FODT0001';
     xsceFODT0002: temp := 'FODT0002';
+    xsceFOAR0002: temp := 'FOAR0002';
   end;
   raise EXQEvaluationException.create('err:'+temp, 'Cannot cast '+from+' to '+to_);
 end;
@@ -515,6 +516,7 @@ var
   pure: Boolean;
   temp: BigDecimal;
   tempd: xqfloat;
+  errCode: TBigDecimalErrorCode;
 {  tempintstart, tempintend, tempdot, tempexp: integer;
   tempe: Extended;}
 begin
@@ -534,7 +536,10 @@ begin
   if pure and striContains(v, 'e') then exit();
   if (subType = xsstInteger) and (strContains(v, '.')) then exit();
 
-  if not TryStrToBigDecimal(v, @temp) then exit;
+  if not TryStrToBigDecimal(v, @temp, @errCode) then begin
+    if errCode = bdceParsingTooBig then result := xsceFOAR0002;
+    exit;
+  end;
   if not constraintsSatisfied(temp) then exit;
   result := xsceNoError;
   if (outv <> nil) then
