@@ -1630,23 +1630,12 @@ begin
     result.annotations := annotations;
     if not anonymous then begin
       result.name := parseEQNameWithPrefix;
-      //since functions can only be defined in the module declarations, all static namespaces are known here
-      if result.name is TXQEQNameUnresolved then
-        result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
-      if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
-      if (result.name.namespacePrefix = '') and isModel3 then refuseReservedFunctionName(result.name.localname);
-      case result.name.namespaceURL of
-        XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
-          raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
-        XMLNamespaceURL_XPathFunctionsMath, XMLNamespaceURL_XQuery:
-          if parsingModel = xqpmXQuery3 then
-            raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
-      end;
       expect('(');
     end else require3('Anonymous functions need XPath/XQuery 3');
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
       tempVar := parseDefineVariable;
+      //since functions can only be defined in the module declarations, all static namespaces are known here
       if not (tempVar.variable is TXQTermVariable) then
         tempVar.variable := (tempVar.variable as TXQTermPendingEQNameToken).resolveAndFree(staticContext) as TXQTermVariable;
       result.push(tempVar);
@@ -1670,6 +1659,21 @@ begin
       end;
       'external': if anonymous then raiseSyntaxError('Anonymous function cannot be external');
       else raiseSyntaxError('Function body { } or external expected');
+    end;
+    //resolve name. Do it at the end, so we know there was no XPST0003 error in the function
+    if not anonymous then begin
+      if result.name is TXQEQNameUnresolved then
+        result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
+      if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
+      if (result.name.namespacePrefix = '') and isModel3 then refuseReservedFunctionName(result.name.localname);
+      case result.name.namespaceURL of
+        XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
+          raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
+        XMLNamespaceURL_XPathFunctionsMath, XMLNamespaceURL_XQuery:
+          if parsingModel = xqpmXQuery3 then
+            raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
+      end;
+
     end;
   except
     result.free;
