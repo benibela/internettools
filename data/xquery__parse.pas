@@ -1634,7 +1634,7 @@ begin
       if result.name is TXQEQNameUnresolved then
         result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
       if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
-      if result.name.namespacePrefix = '' then refuseReservedFunctionName(result.name.localname);
+      if (result.name.namespacePrefix = '') and isModel3 then refuseReservedFunctionName(result.name.localname);
       case result.name.namespaceURL of
         XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
           raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
