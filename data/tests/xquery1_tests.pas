@@ -11,6 +11,7 @@ uses
 procedure unittests(testerrors: boolean);
 
 implementation
+uses bbutils;
 
 type
 
@@ -29,6 +30,12 @@ end;
 procedure equal(const s1, s2, testname: string);
 begin
   if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
+end;
+
+function collection(fakeself, sender: TObject; const variable: string; var value: IXQValue): boolean;
+begin
+  if variable = '' then
+    value := xqvalue('foobar');
 end;
 
 
@@ -191,8 +198,7 @@ begin
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.ImplicitTimezoneInMinutes:=-5 * 60;
-  //ps.OnEvaluateVariable:=@vars.evaluateVariable;
-  //ps.OnDefineVariable:=@vars.defineVariable;
+  ps.OnCollection := TXQEvaluateVariableEvent(procedureToMethod(TProcedure(@collection)));
   ps.ParsingOptions.AllowJSONLiterals:=false;
   ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
   xml := TTreeParser.Create;
@@ -1670,7 +1676,7 @@ begin
   m('number(comment {"17"} )', '17');
   m('string-to-codepoints("ABC")', '65');
   m('string-to-codepoints(processing-instruction XYZ {"A"})', '65');
-  t('collection()', '');
+  t('collection()', 'foobar');
   m('123 castable as xs:integer', 'true');
   f('456 castable as xs:integer+', 'err:XPST0003');
   m('<e/>[1]/text{string-join(., " ")}', '');

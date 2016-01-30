@@ -23,6 +23,13 @@ end;
 type TXQueryEngineBreaker = class(TXQueryEngine)
 end;
 
+
+function collection(fakeself, sender: TObject; const variable: string; var value: IXQValue): boolean;
+begin
+  if variable = '' then
+    value := xqvalue('foobar');
+end;
+
 const strictTypeChecking = true;
 
 procedure unittests(TestErrors:boolean);
@@ -112,6 +119,8 @@ begin
   ps.VariableChangelog.add('abc', 'alphabet');
   ps.VariableChangelog.add('test', 'tset');
   ps.VariableChangelog.add('eval', '''abc'' = ''abc''');
+
+  ps.OnCollection := TXQEvaluateVariableEvent(procedureToMethod(TProcedure(@collection)));
 
   //ps.OnEvaluateVariable:=@vars.evaluateVariable;
   //ps.OnDefineVariable:=@vars.defineVariable;
@@ -3859,7 +3868,7 @@ begin
 
   t('day-from-dateTime(())', '');
   t('doc(())', '');
-  t('collection(())', '');
+  t('collection(())', 'foobar');
 
   t('x / text() / . / . / .', 'y', '<x>y</x>');
   t('x / comment() / . / . / .', 'comment', '<x><!--comment--></x>');
