@@ -2538,6 +2538,7 @@ var
   overriden: Integer;
   truechildrenhigh: integer;
   j: Integer;
+  oldFunctionCount: Integer;
 begin
   children := module.children;
 
@@ -2545,12 +2546,11 @@ begin
   functionCount := 0;
   for i:=truechildrenhigh downto 0 do
     if children[i] is TXQTermDefineFunction then begin
-      if cloneTerms then
-        sc.functions[high(sc.functions) - functionCount].assignCopiedTerms(sc.functions[high(sc.functions) - functionCount]);
       functionCount += 1;
     end;
 
-  for i := high(sc.functions) downto high(sc.functions) - functionCount + 1 do begin
+  oldFunctionCount := length(sc.functions) - functionCount;
+  for i := high(sc.functions) downto oldFunctionCount do begin
     overriden := -1;
     for j := i - 1 downto 0 do
       if equalNamespaces(sc.functions[i].namespaceURL, sc.functions[j].namespaceURL)
@@ -2560,6 +2560,8 @@ begin
         overriden := j;
         break;
       end;
+    if overriden >= oldFunctionCount then
+      raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].debugAsStringWithTypeAnnotation() + ' and '+sc.functions[overriden].debugAsStringWithTypeAnnotation());
     if overriden >= 0 then begin
       sc.functions[overriden].free;
       sc.functions[overriden] := sc.functions[i];
@@ -2567,6 +2569,9 @@ begin
       SetLength(sc.functions, high(sc.functions));
     end;
   end;
+  if cloneTerms then
+    for i := oldFunctionCount to high(sc.functions) do
+      sc.functions[i].assignCopiedTerms(sc.functions[i]);
 end;
 
 function TXQParsingContext.parseModule: TXQTerm;
