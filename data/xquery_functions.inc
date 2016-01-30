@@ -2572,8 +2572,8 @@ var
   contenttype: string;
 begin
   requiredArgCount(args, 1);
+  if args[0].isUndefined  then exit(xqvalue);
   url := args[0].toString;
-  if url = '' then exit(xqvalue);
   {$ifndef ALLOW_EXTERNAL_DOC_DOWNLOAD}
   raise EXQEvaluationException.Create('pxp:CONFIG', 'Using fn:doc is not allowed');
   {$endif}
@@ -2621,8 +2621,9 @@ begin
   requiredArgCount(args, 0, 1);
   if (length(args) = 0) or (args[0].isUndefined) then url := ''
   else url := strResolveURI(args[0].toString, context.staticContext.baseURI);
-  result := xqvalue();
+  result := nil;
   if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnCollection) then context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
+  if result = nil then raise EXQEvaluationException.create('FODC0002', 'No collection entry for ' + url);
 end;
 
 function xqFunctionConcatenate(const args: TXQVArray): IXQValue;
