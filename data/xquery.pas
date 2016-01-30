@@ -1303,7 +1303,9 @@ type
   TXQAbstractFunctionInfo = class
     minArgCount, maxArgCount: word;
     versions: array of TXQFunctionParameterTypes;
+    //used for user defined functions where the parameters must be promoted to the right type
     class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm): IXQValue; static;
+    //used for native functions (which should be robust enough to handle different types on the Pascal side)
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
     function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext; term: TXQTerm): integer;
     destructor Destroy; override;
@@ -4653,14 +4655,16 @@ begin
     else if (not typ.allowMultiple) then
       term.raiseTypeError0004('Expected singleton', result);
   end;
-  if typ.kind in [tikAtomic, tikFunctionTest] then begin
-    if not (result is TXQValueSequence) then
-      exit(conversionSingle(result));
-    seq := (result as TXQValueSequence).seq;
-    for i := 0 to seq.Count - 1 do
-      seq[i] := conversionSingle(seq[i]);
-  end else if typ.kind = tikElementTest then
-    term.raiseTypeError0004('Expected '+typ.serialize, result);
+  case typ.kind of
+    tikAtomic, tikFunctionTest: begin
+      if not (result is TXQValueSequence) then
+        exit(conversionSingle(result));
+      seq := (result as TXQValueSequence).seq;
+      for i := 0 to seq.Count - 1 do
+        seq[i] := conversionSingle(seq[i]);
+    end;
+    tikNone, tikElementTest: term.raiseTypeError0004('Expected '+typ.serialize, result);
+  end;
 end;
 
 class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean;
