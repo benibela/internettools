@@ -73,6 +73,12 @@ begin
   result := xqvalue(v);
 end;
 
+function isSignedXQFloat(const v: xqfloat): boolean;
+begin
+  result := PQWord(@v)^ shr 63 = 1;
+end;
+
+
 function mathPi(const args: TXQVArray): IXQValue;
 begin
   result := xqv(pi);
@@ -272,7 +278,7 @@ begin
     end;
     on EDivByZero do begin
       if IsInfinite(a) then exit(xqv(NaN));
-      if a < 0 then
+      if isSignedXQFloat(a) then
         if (args[1].instanceOf(baseSchema.decimal) and odd(args[1].toDecimal))
            or ((frac(args[1].toFloat) = 0) and odd(args[1].toFloat)) then exit(xqv(-Infinity));
       result := xqv(Infinity);
@@ -281,7 +287,7 @@ begin
       if a = -1 then result := xqv(1)
       else if (a < 0) and (frac(b) <> 0) then result := xqv(NaN) //gets imaginary
       else if IsInfinite(a) or ((b > 0) = (abs(a) > 1))  then begin
-        if (a < 0) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then exit(xqv(-Infinity))
+        if isSignedXQFloat(a) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then exit(xqv(-Infinity))
         else exit(xqv(Infinity));
       end else result := xqv(0);
     end;
