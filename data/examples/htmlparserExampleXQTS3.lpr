@@ -1202,6 +1202,8 @@ begin
     idx := xq.ExternalDocumentsCacheInternal.IndexOf('file://'+filename);
     if idx >= 0 then begin
       ftree := TTreeNode(xq.ExternalDocumentsCacheInternal.Objects[idx]);
+      if (url <> '') and (xq.ExternalDocumentsCacheInternal.IndexOf(url) < 0) then
+        xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
       exit(ftree);
     end;
     if url <> '' then begin
