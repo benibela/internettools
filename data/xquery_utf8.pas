@@ -4,7 +4,7 @@
   If this unit is included in any uses clause it overrides the default string-length, substring, translate, string-to-codepoints XQuery functions
   with utf8-aware functions.
 
-  It depends on the utf8tools (http://wiki.lazarus.freepascal.org/Theodp)
+  It depends on the utf8tools (http://wiki.lazarus.freepascal.org/Theodp). (You need to remove the uc >= $FDD0 checks from its unicodeinfo, if you want it to pass all XQuery test suite tests.)
 
   @author Benito van der Zander (http://www.benibela.de)
 *}
