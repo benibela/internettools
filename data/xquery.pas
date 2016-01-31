@@ -1958,8 +1958,6 @@ type
     destructor Destroy; override;
   private
     fterm: txqterm;
-    staticContextInitialized: boolean;
-    procedure initializeStaticContext(const context: TXQEvaluationContext);
   protected
     staticContext: TXQStaticContext;
     staticContextShared: boolean;
@@ -4276,10 +4274,6 @@ begin
 
   tempcontext:=context;
   tempcontext.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
-  initializeStaticContext(tempcontext);
-  //reevaluate module variables ()
-//  if (staticContext.moduleVariables <> nil) and (staticContext.moduleVariables.count > 0) then
-//    staticContext.moduleVariables.clear;
   if staticContext.importedModules <> nil then
     for i := 0 to staticContext.importedModules.Count - 1 do
       ((staticContext.importedModules.Objects[i] as TXQuery).fterm as TXQTermModule).initializeVariables(tempcontext, (staticContext.importedModules.Objects[i] as TXQuery).staticContext);
@@ -4303,7 +4297,6 @@ var
   q: TXQuery;
 begin
   q := TXQuery.Create(staticContext, fterm.clone);
-  q.staticContextInitialized := staticContextInitialized;
   q.staticContextShared := staticContextShared;
   if not q.staticContextShared then q.staticContext := staticContext.clone();
   result := q;
@@ -4339,12 +4332,6 @@ end;
 procedure TXQuery.setTerm(aterm: TXQTerm);
 begin
   fterm := aterm;
-end;
-
-procedure TXQuery.initializeStaticContext(const context: TXQEvaluationContext);
-begin
-  if staticContextInitialized then exit;
-  staticContextInitialized:=true;
 end;
 
 
@@ -6000,13 +5987,7 @@ end;
 
 
 procedure TXQueryEngine.registerModule(module: IXQuery);
-var
-  modobj: TXQuery;
-  context: TXQEvaluationContext;
 begin
-  modobj := module as TXQuery;
-  context := getEvaluationContext(modobj.staticContext);
-  modobj.initializeStaticContext(context);
   FModules.Add(module);
 end;
 
