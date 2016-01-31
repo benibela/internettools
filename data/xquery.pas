@@ -2886,11 +2886,15 @@ end;
 
 function TXQValueDateTimeData.toMicroSecondStamp(subtractTimeZone: Boolean = true): int64;
 var
-  tempmin: Integer;
+  tempmin: int64;
+  dayStamp: Int64;
+  timeStamp: Int64;
 begin
   tempmin := min;
   if subtractTimeZone and (timezone <> high(Integer)) then tempmin -= timezone;
-  result := int64(trunc(dateEncode(year, month, day)) * SecsPerDay + (hour * 3600 + tempmin *60 + seconds)) * MicroSecsPerSec + microsecs;
+  dayStamp := trunc(dateEncode(year, month, day));
+  timeStamp := hour * 3600  + tempmin *60 + seconds;
+  result := (dayStamp * int64(SecsPerDay) + timeStamp) * MicroSecsPerSec + microsecs;
 end;
 
 

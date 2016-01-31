@@ -1290,7 +1290,6 @@ const componentFiller: array[1..6] of integer = (1972, 1, 1, 0, 0, 0);
 var
   adf, bdf: String;
   av, bv: TXQValueDateTimeData;
-  amics, bmics: int64;
   i: Integer;
 
   overlap: Integer;
@@ -1314,22 +1313,10 @@ begin
   end;
   if overlap = 0 then exit(-2); //not comparable
 
-  result := compareValue( TXQValueDateTime.getMonths(av) , TXQValueDateTime.getMonths(bv) );
-  if result = 0 then begin
-    amics := TXQValueDateTime.getDayTime(av);
-    bmics := TXQValueDateTime.getDayTime(bv);
-
-    if av.timezone <> high(integer) then amics -= av.timezone * 60 * MicroSecsPerSec
-    else if implicitTimezone <> high(integer) then amics -= implicitTimezone * 60 * MicroSecsPerSec;
-    if bv.timezone <> high(integer) then bmics -= bv.timezone * 60 * MicroSecsPerSec
-    else if implicitTimezone <> high(integer) then bmics -= implicitTimezone * 60 * MicroSecsPerSec;
-
-    {if (pos('z', (a.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) and (pos('z', (b.typeAnnotation as TXSDateTimeType).fixedDateTimePattern) > 0) then begin
-      if av.nanosecs <> high(integer) then ans += av.nanosecs;
-      if bv.nanosecs <> high(integer) then bns += bv.nanosecs;
-    end;}
-    result := CompareValue(amics,bmics);
-  end;
+  //carefully here, the timezone difference might change every date component, even the year
+  if av.timezone = high(Integer) then av.timezone := implicitTimezone;
+  if bv.timezone = high(Integer) then bv.timezone := implicitTimezone;
+  result := compareValue(av.toMicroSecondStamp(), bv.toMicroSecondStamp());
 end;
 
 
