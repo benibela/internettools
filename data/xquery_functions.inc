@@ -2385,18 +2385,25 @@ end;
 function xqFunctionResolve_QName(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 
 var
-  name, ns: String;
+  name, nsprefix: String;
   p: SizeInt;
+  nsurl: String;
 begin
+  ignore(context);
   requiredArgCount(args, 2);
   if args[0].isUndefined then exit(xqvalue);
   name := args[0].toString;
-  ns := '';
-  p := pos(':', name);
-  if p > 0 then ns := copy(name, 1, p - 1);
   if args[1].toNode = nil then exit(xqvalue);
-  result := TXQValueQName.create(args[1].toNode.getNamespaceURL(ns, @context.staticContext.nodeCollation.equal), ns, strCopyFrom(name, p+1));
-  ignore(context);
+  if not baseSchema.isValidQName(name) then raise EXQEvaluationException.create('FOCA0002', 'Invalid QName: '+name);
+  nsprefix := '';
+  p := pos(':', name);
+  if p > 0 then begin
+    nsprefix := copy(name, 1, p - 1);
+    name := strCopyFrom(name, p+1);
+  end;
+  nsurl := args[1].toNode.getNamespaceURL(nsprefix, @context.staticContext.nodeCollation.equal);
+  if (nsurl = '') and (nsprefix <> '') then raise EXQEvaluationException.create('FONS0004', 'Cannot find namespace for prefix: '+nsprefix);
+  result := TXQValueQName.create(nsurl, nsprefix, name);
 end;
 
 function xqFunctionQName(const args: TXQVArray): IXQValue;

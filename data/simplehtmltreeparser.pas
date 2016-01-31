@@ -1074,6 +1074,9 @@ begin
       exit;
     n := n.getParent();
   end;
+  case prefixOverride of
+    ':xml': exit(XMLNamespaceUrl_XML);
+  end;
   exit('');
 end;
 
