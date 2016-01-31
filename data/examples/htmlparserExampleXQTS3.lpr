@@ -1467,8 +1467,9 @@ begin
   if config.version in [xqpmXPath3, xqpmXQuery3] then begin
     if GetEnvironmentVariable('QTTEST') <> '42' then begin
       {$ifndef windows}
-      writeln(stderr, 'You need to set enviroment variables QTTEST="42" QTTEST2="other" QTTESTEMPTY=""');
-      halt;
+      writeln(stderr, 'You must set enviroment variables QTTEST="42" QTTEST2="other" QTTESTEMPTY=""');
+      writeln('');
+      writeln('Otherwise certain tests will fail');
       {$else}
       SetEnvironmentVariable('QTTEST', '42');
       SetEnvironmentVariable('QTTEST2', 'other');
