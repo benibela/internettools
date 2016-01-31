@@ -95,6 +95,7 @@ protected
   function replaceEntitiesIfNeeded(const s: string): string; inline;
   function parseString: string;
   function parseString(const w: string): string;
+  function parseModuleNamespaceURI: string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
   function parseJSONLikeObjectConstructor(): TXQTermWithChildren; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(): TXQTermJSONArray;
@@ -1773,6 +1774,12 @@ begin
   result := replaceEntitiesIfNeeded(normalizeLineEnding(StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll])));
 end;
 
+function TXQParsingContext.parseModuleNamespaceURI: string;
+begin
+  result := xmlStrWhitespaceCollapse(parseString);
+  if result = '' then raiseParsingError('XQST0088', 'Empty namespace URI');
+end;
+
 function TXQParsingContext.parseString: string;
 begin
   skipWhitespaceAndComment();
@@ -2728,13 +2735,17 @@ function TXQParsingContext.parseModuleInternal(): TXQTerm;
     moduleName := '';
     if pos^ = 'n' then begin
       expect('namespace'); moduleName:=nextTokenNCName(); expect('=');
+      case moduleName of
+        'xml', 'xmlns': raiseParsingError('XQST0070', 'Invalid module prefix');
+      end;
     end;
-    moduleURL := parseString;
+    moduleURL := parseModuleNamespaceURI;
     at := nil;
     if nextToken(true) = 'at' then begin
       expect('at');
       arrayAdd(at, parseString);
       while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseString); end;
+      //todo resolve at with static context
     end;
 
     module := engine.findModule(moduleURL);
@@ -2838,7 +2849,7 @@ begin
           requireModule;
           staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
           expect('=');
-          (staticContext.moduleNamespace as TNamespace).url := parseString;
+          (staticContext.moduleNamespace as TNamespace).url := parseModuleNamespaceURI;
           expect(';');
           token := nextToken(true);
           if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
