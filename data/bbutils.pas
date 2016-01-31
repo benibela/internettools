@@ -5625,7 +5625,7 @@ var y,m,d: integer;
     nanoseconds: integer;
     timeZone: integer;
 begin
-  dateTimeParsePartsNew(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @nanoseconds, @outtimezone);
+  dateTimeParsePartsNew(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @nanoseconds, outtimezone);
 
   if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
   if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
