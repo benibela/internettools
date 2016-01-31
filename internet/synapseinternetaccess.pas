@@ -139,6 +139,8 @@ function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; d
   procedure initConnection;
   var
     i: Integer;
+    refer: String;
+    accept: String;
   begin
    connection.Clear;
    //Some servers fail without port in host, some with. This behaviour mirrors Firefox:
@@ -150,19 +152,26 @@ function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; d
      WriteStrToStream(connection.Document, data);
      connection.MimeType := ContentTypeForData;
    end;
-   if lastUrl <> '' then
-     connection.Headers.Add('Referer: '+lastUrl);
-   connection.Headers.add('Accept: text/html,application/xhtml+xml,application/xml,text/*,*/*');;
    connection.Protocol:='1.1';
-   for i := 0 to additionalHeaders.Count - 1 do
-     if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
-       connection.Headers.add(additionalHeaders[i])
-     else
-       connection.MimeType := trim(strCopyFrom(additionalHeaders[i], pos(':', additionalHeaders[i])+1));
    //fallback to TLS 1 for servers where auto detection fails
    if striequal(url.protocol, 'https') then
      if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := LT_TLSv1
      else connection.Sock.SSL.SSLType := LT_all;
+
+
+   refer := lastUrl;
+   accept := 'text/html,application/xhtml+xml,application/xml,text/*,*/*';
+
+   for i := 0 to additionalHeaders.Count - 1 do
+     case parseHeaderLineKind(additionalHeaders[i]) of
+       iaContentType: connection.MimeType := parseHeaderLineValue(additionalHeaders[i]);
+       iaAccept: accept := parseHeaderLineValue(additionalHeaders[i]);
+       iaReferer: refer := parseHeaderLineValue(additionalHeaders[i]);
+       else connection.Headers.add(additionalHeaders[i])
+     end;
+
+   if refer <> '' then connection.Headers.Add(makeHeaderLine(iaReferer, refer));
+   if accept <> '' then connection.Headers.Add(makeHeaderLine(iaAccept, accept));
   end;
 
 var newurl: string;

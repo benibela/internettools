@@ -125,7 +125,14 @@ type
     procedure setCookie(name,value:string);
     procedure parseHeaderForCookies(header: string);
     function makeCookieHeader:string;
-    procedure init; //constructor, since .create is "abstract" and can not be called
+    //utility functions to minimize platform dependent code
+    type THeaderKind = (iahUnknown, iaContentType, iaAccept, iaReferer, iaLocation);
+    class function parseHeaderLineKind(const line: string): THeaderKind; static;
+    class function parseHeaderLineValue(const line: string): string; static;
+    class function makeHeaderLine(const name, value: string): string; static;
+    class function makeHeaderLine(const kind: THeaderKind; const value: string): string; static;
+    //constructor, since .create is "abstract" and can not be called
+    procedure init;
   public
     class function parseHeaderForLocation(header: string): string; static;
   public
@@ -717,6 +724,54 @@ begin
   for i:=1 to high(cookies) do
     result+='; '+cookies[i].name+'='+cookies[i].value;
   result+=#13#10;
+end;
+
+class function TInternetAccess.parseHeaderLineKind(const line: string): THeaderKind;
+  function check(const s: string): boolean;
+  var
+    i: Integer;
+  begin
+    result := false;
+    if striBeginsWith(line, s) then begin
+      for i := length(s) + 1 to length(line) do
+        case line[i] of
+          ' ',#9,#10,#13: ;
+          ':': exit(true);
+          else exit(false);
+        end;
+    end;
+  end;
+
+begin
+  result := iahUnknown;
+  if line = '' then exit();
+  case line[1] of
+    'c', 'C': if check('content-type') then exit(iaContentType);
+    'a', 'A': if check('accept') then exit(iaAccept);
+    'l', 'L': if check('location') then exit(iaLocation);
+    'r', 'R': if check('referer') then exit(iaReferer);
+  end;
+end;
+
+class function TInternetAccess.parseHeaderLineValue(const line: string): string;
+begin
+  result := trim(strCopyFrom(line, pos(':', line)+1))
+end;
+
+class function TInternetAccess.makeHeaderLine(const name, value: string): string;
+begin
+  result := name + ': ' + value;
+end;
+
+class function TInternetAccess.makeHeaderLine(const kind: THeaderKind; const value: string): string;
+begin
+  case kind of
+    iaContentType: result := 'Content-Type: ' + value;
+    iaAccept: result := 'Accept: ' + value;
+    iaReferer: result := 'Referer: ' + value;
+    iaLocation: result := 'Location: ' + value;
+    else raise EInternetException.create('Internal error: Unknown header line kind');
+  end;
 end;
 
 procedure TInternetAccess.init;
