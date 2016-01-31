@@ -119,6 +119,7 @@
       <Unit8>
         <Filename Value="bigdecimal_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="bigdecimal_tests"/>
       </Unit8>
       <Unit9>
         <Filename Value="parsertests.pas"/>
