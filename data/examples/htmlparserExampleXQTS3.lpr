@@ -490,9 +490,12 @@ begin
 end;
 
 procedure TLogger.endXQTS(const result: TResultSet);
+var
+  totalTests: Integer;
 begin
   writeln(stderr);
-  writeln(stderr, 'Total results: ');
+  totalTests := result[tcrPass] +result[tcrFail] +result[tcrWrongError] + result[tcrDisputed] + result[tcrTooBig];// tcrNotRun;
+  writeln(stderr, 'Total results: ', result[tcrPass] * 100 / totalTests :4:2, '%'  );
   printResults(stderr, result);
 end;
 
