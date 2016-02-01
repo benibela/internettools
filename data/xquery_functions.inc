@@ -2589,6 +2589,7 @@ begin
   //if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('FODC0005', 'Invalid url: '+url);
 
   url := context.staticContext.resolveDocURI(url);
+  if strBeginsWith(url, ':') then raise EXQEvaluationException.create('FODC0005', 'Invalid url: '+ url);
 
   if context.staticContext.sender.FExternalDocuments = nil then context.staticContext.sender.FExternalDocuments := TStringList.Create;
 
@@ -2597,7 +2598,11 @@ begin
 
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
 
-  node := context.parseDoc(data, url, contenttype);
+  try
+    node := context.parseDoc(data, url, contenttype);
+  except
+    on e: ETreeParseException do raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url + LineEnding+e.Message);
+  end;
   if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url);
 
   context.staticContext.sender.FExternalDocuments.AddObject(url, node);
