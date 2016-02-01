@@ -7562,8 +7562,8 @@ fn.registerFunction('position', @xqFunctionPosition, ['() as xs:integer'], [xqcd
 fn.registerFunction('last', @xqFunctionLast, ['() as xs:integer'], [xqcdFocusOther]);
 
 fn.registerFunction('id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()']);
-fn.registerFunction('idref', @xqFunctionId, ['($arg as xs:string*) as node()*', '($arg as xs:string*, $node as node()) as node()*']);
-fn.registerFunction('element-with-id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
+fn.registerFunction('idref', @xqFunctionIdRef, ['($arg as xs:string*) as node()*', '($arg as xs:string*, $node as node()) as node()*']);
+fn.registerFunction('element-with-id', @xqFunctionElement_With_Id, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
 
 fn3.registerFunction('head', @xqFunctionHead, ['($arg as item()*) as item()?']);
 fn3.registerFunction('tail', @xqFunctionTail, ['($arg as item()*) as item()*']);
