@@ -6,7 +6,9 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, strutils, xquery, xquery_utf8, xquery_module_math, simplehtmltreeparser, bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
+  Classes, sysutils, strutils, xquery, xquery_utf8, xquery_module_math,
+  simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead,
+  bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
   {$ifdef windows}windows{$endif}
   ;
   { you can add units after this }
@@ -286,6 +288,27 @@ end;
 
 { THTMLLogger }
 
+function asciiDecode(Context: Pointer; InBuf: PChar; var InCnt: Cardinal; OutBuf: PWideChar; var OutCnt: Cardinal): Integer; stdcall;
+begin
+  result := min(InCnt,OutCnt);
+  while (InCnt > 0) and (OutCnt > 0) do begin
+    OutBuf^ := inbuf^;
+    inc(OutBuf);
+    inc(InBuf);
+    dec(InCnt);
+    dec(OutCnt);
+  end;
+end;
+
+function ASCIIDecoder(const AEncoding: string; out Decoder: TDecoder): Boolean; stdcall;
+begin
+  result := AEncoding = 'us-ascii';
+  if result then begin
+    decoder.Decode := @asciiDecode;
+    Decoder.Cleanup:=nil;
+  end;
+end;
+
 constructor THTMLLogger.create(clr: TCommandLineReader);
 var
   i: Integer;
@@ -495,6 +518,7 @@ var
 begin
   writeln(stderr);
   totalTests := result[tcrPass] +result[tcrFail] +result[tcrWrongError] + result[tcrDisputed] + result[tcrTooBig];// tcrNotRun;
+  if totalTests = 0 then totalTests := 1;
   writeln(stderr, 'Total results: ', result[tcrPass] * 100 / totalTests :4:2, '%'  );
   printResults(stderr, result);
 end;
@@ -1200,6 +1224,7 @@ var
   idx: Integer;
   doc: TTreeDocument;
 begin
+  result := ftree;
   if ftree = nil then begin
     if xq.ExternalDocumentsCacheInternal = nil then xq.ExternalDocumentsCacheInternal := TStringList.Create;
     idx := xq.ExternalDocumentsCacheInternal.IndexOf('file://'+filename);
@@ -1227,9 +1252,8 @@ begin
     if not strContains(doc.documentURI, '://') then doc.documentURI := 'file://' + doc.documentURI;
     if not strContains(doc.baseURI, '://') then doc.baseURI := 'file://' + doc.baseURI;
     if doc.documentURI <> '' then xq.ExternalDocumentsCacheInternal.AddObject(doc.documentURI, ftree);
-
+    result := ftree
   end;
-  result := ftree
 end;
 
 { TEnvironment }
@@ -1459,6 +1483,7 @@ begin
   clr.declareString('print-test-cases', 'Which test case results to print (n: not run, f: failed, p: passed, e: wrong error, d: disputed, s: skipped, b: too big, o: dbs)', 'penfdsb');
   clr.declareFlag('print-failed-inputs', 'Print failed inputs');
   clr.declareString('format', 'html or text output','text');
+  clr.declareString('parser', 'Parser used for xml files. Either simple or fcl-xml', 'simple');
   //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
   case clr.readString('mode') of
@@ -1497,8 +1522,16 @@ begin
 
   TXQueryEngine.registerCollation(TXQCollation(xqtsCollations.Objects[0]));
 
+  case clr.readString('parser') of
+    'simple': tree := TTreeParser.Create;
+    'fcl-xml': begin
+      RegisterDecoder(@ASCIIDecoder);
+      XQGlobalUseIDfromDTD := true;
+      tree := TTreeParserDOM.Create;
+    end;
+  end;
 
-  tree := TTreeParser.Create;
+
   tree.readComments:=true;
   tree.readProcessingInstructions:=true;
   tree.trimText:=false;
@@ -1506,6 +1539,7 @@ begin
   tree.repairMissingStartTags:=false;
   tree.parsingModel := pmStrict;
   xq :=  TXQueryEngine.create;
+  xq.DefaultParser := tree;
   xq.ImplicitTimezoneInMinutes:=-5 * 60;
   //xq.CurrentDateTime := dateTimeParse('2005-12-05T17:10:00.203-05:00', 'yyyy-mm-dd"T"hh:nn:ss.zzz');
   xq.ParsingOptions.AllowExtendedStrings  := false;
@@ -1543,6 +1577,6 @@ begin
   for cat in  cmd.readNamelessFiles() do begin
 
   end;}
-  logger.endXQTS(totalResults)
+  logger.endXQTS(totalResults);
 end.
 

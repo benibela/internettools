@@ -2402,8 +2402,6 @@ public
     FModules, FPendingModules: TInterfaceList; //internal used
 
   protected
-    DefaultParser: TTreeParser; //used by fn:doc if no context node is there
-
     function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext = nil): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
     function parseXStringNullTerminated(str: string): TXQuery;
@@ -2427,6 +2425,8 @@ public
     class function evaluateAccessList(term: TXQTerm; const context: TXQEvaluationContext): IXQValue;
 
   public
+    DefaultParser: TTreeParser; //used by fn:doc if no context node is there (internally used)
+
     class procedure registerNativeModule(const module: TXQNativeModule);
     class function collationsInternal: TStringList;
     property ExternalDocumentsCacheInternal: TStringList read FExternalDocuments write FExternalDocuments;
