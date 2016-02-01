@@ -2630,6 +2630,11 @@ end;
 var XQGlobalTrimNodes: boolean = true;
 
 
+//**If XQGlobalUseIDfromDTD is false, the fn:*id* functions will thus assume every attribute with name id is an ID attribute@br
+//**If XQGlobalUseIDfromDTD is true, only real ID attributes are used.  However, simplehtmltreeparser cannot handle DTDs, so it cannot detect ID attributes. So if this is true, only the wrapped fcl-xml parser from simplehtmltreeparserfpdom can be used
+var XQGlobalUseIDfromDTD: boolean = false;
+
+
 type
 
 { TXQValue_DatePart }
