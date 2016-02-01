@@ -114,6 +114,11 @@ var doc: TTreeDocument;
           new.addAttribute(name(node.Attributes[i]), UTF8Encode(node.Attributes[i].NodeValue));
           if (node.Attributes[i].NamespaceURI <> '') and (node.Attributes[i].NodeName <> 'xmlns') then
             new.attributes.Items[new.attributes.count - 1].namespace := getNamespace(UTF8Encode(node.Attributes[i].NamespaceURI), UTF8Encode(node.Attributes[i].Prefix));
+          case TDOMAttr(node.Attributes[i]).DataType of
+          dtId:  new.attributes.Items[new.attributes.count - 1].setDataTypeHack(1);
+          dtIdRef, dtIdRefs: new.attributes.Items[new.attributes.count - 1].setDataTypeHack(2);
+          end;
+
         end;
       for i := 0 to node.ChildNodes.Count - 1 do
         importNode(new, node.ChildNodes[i]);

@@ -3291,12 +3291,13 @@ begin
   else raiseXPDY0002ContextItemAbsent;
 end;
 
-function xqFunctionId(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionId_Common(const context: TXQEvaluationContext; const args: TXQVArray; parentElement: boolean): IXQValue;
 var sl: TStringList;
 procedure addSplitted(s: string);
 var
   t: String;
 begin
+  s := xmlStrWhitespaceCollapse(s);
   while s <> '' do begin
     t := strSplitGet(' ', s);
     if t = '' then continue;
@@ -3314,36 +3315,38 @@ begin
 end;
 
 var
-  seq: TXQVList;
-  i: Integer;
+  v: IXQValue;
   node: TTreeNode;
   attrib: TTreeAttribute;
+  useTrueId: Boolean;
 begin
+  ignore(parentElement); //we should give the parent element of an id-element, but atm we ignore all id-elements
   requiredArgCount(args,1, 2);
   result := nil;
 
   sl := TStringList.Create;
   sl.Sorted:=true;;
-  if args[0].kind <> pvkSequence then addSplitted(args[0].toString)
-  else begin
-    seq := args[0].toXQVList;
-    for i:=0 to seq.Count-1 do
-      addSplitted(seq[i].toString);
-    seq.free;
-  end;
+  for v in args[0] do
+    addSplitted(v.toString);
 
   try
     if length(args) = 2 then node := xqvalueToSingleNode(args[1])
     else node := context.contextNode();
 
     if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
+    if not node.hasDocument then raise EXQEvaluationException.create('FODC0001', 'Need node in document');
 
     node := node.getRootElement();
+    if node = nil then exit();
+
+    useTrueId := XQGlobalUseIDfromDTD;
+
 
     while node <> nil do begin
       if node.attributes <> nil then
         for attrib in node.attributes do
-          if context.staticContext.nodeCollation.equal(attrib.value, 'id') then
+          if (not useTrueId and context.staticContext.nodeCollation.equal(attrib.value, 'id')) or
+             (useTrueId  and ((attrib.getDataTypeHack() = 1) or ((attrib.value = 'id') and equalNamespaces(attrib.namespace, XMLNamespace_XML) ) )) then
             if isSearchedId(attrib.realvalue) then begin
               xqvalueSeqAddMove(result, xqvalue(node));
               break;
@@ -3352,8 +3355,78 @@ begin
     end;
   finally
     sl.free;
+    if result= nil then result := xqvalue();
   end;
-  if result= nil then result := xqvalue();
 end;
 
 
+function xqFunctionId(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionId_Common(context, args, false);
+end;
+
+function xqFunctionElement_With_Id(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionId_Common(context, args, true);
+end;
+
+
+function xqFunctionIdRef(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+
+var sl: TStringList;
+  function matchesSearchedId(const s: string): boolean;
+  var
+    t: string;
+  begin
+    for t in strSplit(xmlStrWhitespaceCollapse(s), ' ') do
+      if sl.IndexOf(t) >= 0 then
+        exit(true);
+    result := false;
+  end;
+
+var
+  v: ixqvalue;
+  node: TTreeNode;
+  attrib: TTreeAttribute;
+  useTrueId: Boolean;
+  temp: String;
+begin
+  requiredArgCount(args,1, 2);
+  result := nil;
+
+  sl := TStringList.Create;
+  sl.Sorted:=true;;
+  for v in args[0] do begin
+    temp := args[0].toString;
+    if not baseSchema.isValidNCName(temp) then continue;
+    sl.Add(temp);
+  end;
+
+  try
+    if length(args) = 2 then node := xqvalueToSingleNode(args[1])
+    else node := context.contextNode();
+
+    if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
+    if not node.hasDocument then raise EXQEvaluationException.create('FODC0001', 'Need node in document');
+
+    node := node.getRootElement();
+    if node = nil then exit;
+
+    useTrueId := XQGlobalUseIDfromDTD;
+    if not useTrueId then exit;
+
+    while node <> nil do begin
+      if node.attributes <> nil then
+        for attrib in node.attributes do
+          if  attrib.getDataTypeHack() = 2 then
+            if matchesSearchedId(attrib.realvalue) then begin
+              xqvalueSeqAddMove(result, xqvalue(node));
+              break;
+            end;
+      node := node.next;
+    end;
+  finally
+    sl.free;
+    if result= nil then result := xqvalue();
+  end;
+end;

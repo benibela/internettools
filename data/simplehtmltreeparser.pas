@@ -263,6 +263,9 @@ TTreeAttribute = class(TTreeNode)
   function isNamespaceNode: boolean;
   function toNamespace: INamespace;
   constructor create(const aname, avalue: string; const anamespace: INamespace = nil);
+
+  procedure setDataTypeHack(i: integer);
+  function getDataTypeHack(): integer;
 end;
 
 { TTreeDocument }
@@ -526,6 +529,24 @@ begin
   inherited create(tetAttribute, aname);
   realvalue := avalue;
   namespace := anamespace;
+end;
+
+var attributeDataTypeHackList1, attributeDataTypeHackList2: TAttributeList;
+
+procedure TTreeAttribute.setDataTypeHack(i: integer);
+begin
+  case i of
+    1: attributes := attributeDataTypeHackList1;
+    2: attributes := attributeDataTypeHackList2;
+    else attributes := nil;
+  end;
+end;
+
+function TTreeAttribute.getDataTypeHack: integer;
+begin
+  if attributes = attributeDataTypeHackList1 then exit(1);
+  if attributes = attributeDataTypeHackList2 then exit(2);
+  result := 0;
 end;
 
 { TAttributeList }
@@ -1626,7 +1647,7 @@ end;
 
 destructor TTreeNode.destroy();
 begin
-  attributes.Free;
+  if typ <> tetAttribute then attributes.Free;
   inherited destroy();
 end;
 
@@ -2638,7 +2659,12 @@ initialization
   omittedStartTags.add(THTMLOmittedEndTagInfo.Create(['tr'], ['table'], ['tbody', 'tfoot', 'thead']));
   omittedStartTags.add(THTMLOmittedEndTagInfo.Create(['col'], ['table'], ['colgroup']));
 
+
+  attributeDataTypeHackList1 := TAttributeList.Create;
+  attributeDataTypeHackList2 := TAttributeList.Create;
 finalization
+  attributeDataTypeHackList1.Free;
+  attributeDataTypeHackList2.free;
   XMLNamespace_XML := nil;  //prevent heaptrc warning
   XMLNamespace_XMLNS := nil;
   omittedEndTags.free;
