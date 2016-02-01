@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 
 uses
-  Classes, SysUtils, simplehtmltreeparser, DOM, XMLRead;
+  Classes, SysUtils, simplehtmltreeparser, DOM, XMLRead,xmlutils;
 
 type
 
@@ -38,12 +38,18 @@ type
 
 {** Base class for TTreeParserDOM *}
 TTreeParserDOMBase = class(TTreeParser)
+private
+  fparser: TDOMParser;
+public
+  constructor Create;
+  destructor destroy; override;
+
   //** Create a tree document from a standard fpc dom document
   function import(dom: TDOMDocument): TTreeDocument;
   //** Reads a tree document from a string, using the standard fpc dom functions to parse it
   function parseDOM(const document: String; const uri: string = ''): TTreeDocument;
-  //** Loads a tree document from a file, using the standard fpc dom functions to parse it
-  function parseDOMFromFile(const filename: string): TTreeDocument;
+
+  property Parser: TDOMParser read fparser;
 end;
 
 {** This class provides wrapper methods around the standard fpc DOM functions,
@@ -52,29 +58,48 @@ end;
 TTreeParserDOM = class(TTreeParserDOMBase)
   //** Reads a tree document from a string, using the standard fpc dom functions to parse it
   function parseTree(html: string; uri: string = ''; contentType: string = ''): TTreeDocument; override;
-  //** Loads a tree document from a file, using the standard fpc dom functions to parse it
-  function parseTreeFromFile(filename: string): TTreeDocument; override;
 end;
-
-EXMLReadError = XMLRead.EXMLReadError;
 
 implementation
 
 
 { TTreeParserDOM }
 
+constructor TTreeParserDOMBase.Create;
+begin
+  inherited;
+  fparser := TDOMParser.Create;
+  fparser.Options.ExpandEntities := True;
+  fparser.Options.CDSectionsAsText := True;
+  fparser.Options.Namespaces := True;
+  fparser.Options.PreserveWhitespace := True;
+  fparser.Options.Validate := true;
+end;
+
+destructor TTreeParserDOMBase.destroy;
+begin
+  fparser.free;
+  inherited destroy;
+end;
+
 function TTreeParserDOMBase.import(dom: TDOMDocument): TTreeDocument;
 var doc: TTreeDocument;
   namespaces: TNamespaceList;
   function getNamespace(const url, prefix: string): INamespace;
   begin
-    if namespaces.hasNamespacePrefix(prefix, result) then  //not tested, but should work like this
+    if namespaces.hasNamespacePrefix(prefix, result) then
       if result.getURL = url then exit;
     result := TNamespace.create(url, prefix);
     namespaces.add(result);
   end;
 
   procedure importNode(parent: TTreeNode; node: TDOMNode);
+    function name(n: TDOMNode): string;
+    begin
+      if n.LocalName <>'' then result := UTF8Encode(n.LocalName)
+      else result := UTF8Encode(n.NodeName);
+    end;
+
   var
     i: Integer;
     new: TTreeNode;
@@ -82,11 +107,12 @@ var doc: TTreeDocument;
   begin
     nscount := namespaces.Count;
     if node is TDOMElement then begin
-      new := TTreeNode.createElementPair(UTF8Encode(node.NodeName));
+      new := TTreeNode.createElementPair(name(node));
+      new.document := parent.document; //if we do not set it now, further children do not know their document
       if node.HasAttributes then
         for i := 0 to node.Attributes.Length - 1 do begin
-          new.addAttribute(UTF8Encode(node.Attributes[i].NodeName), UTF8Encode(node.Attributes[i].NodeValue));
-          if node.Attributes[i].NamespaceURI <> '' then
+          new.addAttribute(name(node.Attributes[i]), UTF8Encode(node.Attributes[i].NodeValue));
+          if (node.Attributes[i].NamespaceURI <> '') and (node.Attributes[i].NodeName <> 'xmlns') then
             new.attributes.Items[new.attributes.count - 1].namespace := getNamespace(UTF8Encode(node.Attributes[i].NamespaceURI), UTF8Encode(node.Attributes[i].Prefix));
         end;
       for i := 0 to node.ChildNodes.Count - 1 do
@@ -151,35 +177,31 @@ end;
 function TTreeParserDOMBase.parseDOM(const document: String; const uri: string): TTreeDocument;
 var
   temp: TXMLDocument;
-  stringStream: TStringStream;
+  source: TXMLInputSource;
 begin
-  stringStream := TStringStream.Create(document);
-  ReadXMLFile(temp, stringStream);
-  result := import(temp);
-  result.baseURI:=uri;
-  result.documentURI:=uri;
-  stringStream.Free;
-  temp.Free;
-end;
+  Parser.Options.ExpandEntities := true;
+  Parser.Options.PreserveWhitespace := not trimText;
+  Parser.Options.IgnoreComments := not readComments;
 
-function TTreeParserDOMBase.parseDOMFromFile(const filename: string): TTreeDocument;
-var
-  temp: TXMLDocument;
-begin
-  ReadXMLFile(temp, filename);
-  result := import(temp);
-  temp.Free;
+  source:=TXMLInputSource.Create(document);
+  try
+    try
+      Parser.Parse(source,temp);// TStringStream.Create(document)), temp);
+      result := import(temp);
+      result.baseURI:=uri;
+      result.documentURI:=uri;
+      temp.Free;
+    finally
+      source.free;
+    end;
+  except
+    on e: EXMLReadError do raise ETreeParseException.Create(e.Message);
+  end;
 end;
 
 function TTreeParserDOM.parseTree(html: string; uri: string; contentType: string): TTreeDocument;
 begin
   Result:=parseDOM(html, uri);
 end;
-
-function TTreeParserDOM.parseTreeFromFile(filename: string): TTreeDocument;
-begin
-  Result:=parseDOMFromFile(filename);
-end;
-
 end.
 
