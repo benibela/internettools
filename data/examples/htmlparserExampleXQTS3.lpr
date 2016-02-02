@@ -954,6 +954,7 @@ var
   i: Integer;
   contexttree: TTreeNode;
 begin
+  result.error := '';
   result.value := nil;
   if (config.forceTestCase <> '') and (config.forceTestCase <> name) then begin
     result.result:= tcrNA;
