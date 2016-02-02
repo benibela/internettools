@@ -53,7 +53,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--test-set  fn-adjust-dateTime-to-timezone --test-case cbcl-adjust-dateTime-to-timezone-004"/>
+        <CommandLineParams Value="--mode xpath2"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
     </RunParams>
@@ -90,7 +90,7 @@
     </Parsing>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="6">
+    <Exceptions Count="11">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -109,6 +109,21 @@
       <Item6>
         <Name Value="EXQParsingException"/>
       </Item6>
+      <Item7>
+        <Name Value="ETreeParseException"/>
+      </Item7>
+      <Item8>
+        <Name Value="EXMLReadError"/>
+      </Item8>
+      <Item9>
+        <Name Value="EInternetException"/>
+      </Item9>
+      <Item10>
+        <Name Value="EFLRE"/>
+      </Item10>
+      <Item11>
+        <Name Value="EConvertError"/>
+      </Item11>
     </Exceptions>
   </Debugging>
 </CONFIG>

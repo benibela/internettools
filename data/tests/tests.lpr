@@ -24,9 +24,7 @@ begin
   end;
 
   start := now;
- // bigdecimal_tests.unittests;
-
-
+  //bigdecimal_tests.unittests;
   bbutils_tests.unitTests;
   internetaccess_tests.unittests;
   parsertests.unittests(testerrors);
