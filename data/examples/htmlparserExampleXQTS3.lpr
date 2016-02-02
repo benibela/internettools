@@ -47,6 +47,7 @@ type
   collections: TStringList;
   refed: TEnvironment;
   sources: TList;
+  hasSchema: boolean;
   procedure init;
   class function load(e: TTreeNode): TEnvironment;
   function getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
@@ -970,8 +971,13 @@ begin
   FreeAndNil(xq.StaticContext.namespaces);
   contexttree := nil;
   if environments.Count = 0 then loadEnvironment(nil)
-  else for i := 0 to environments.count - 1 do
+  else for i := 0 to environments.count - 1 do begin
     contexttree :=  loadEnvironment(TEnvironment(environments[i]));
+    if TEnvironment(environments[i]).hasSchema then begin
+      result.result := tcrNA;
+      exit;
+    end;
+  end;
   xq.OnImportModule:=@importModule;
   {for i := 0 to modules.Count - 1 do
     if xq.findModule(TModule(modules[i]).uri) = nil then
@@ -1314,8 +1320,9 @@ begin
 
   sources := TSource.createMultiple(e);
 
+  hasSchema :=  not xq.evaluateXPath2('*:schema', e).isUndefined;
   {resource
-  unsupported: <xs:element ref="schema"/>   <xs:element ref="decimal-format"/>  <xs:element ref="function-library"/>                     <xs:element ref="resource"/>}
+   <xs:element ref="decimal-format"/>  <xs:element ref="function-library"/>                     <xs:element ref="resource"/>}
 end;
 
 class function TEnvironment.load(e: TTreeNode): TEnvironment;
@@ -1375,8 +1382,11 @@ begin
   result := nil;
 //  idx := environments.IndexOf(id);
 //  env := TEnvironment(environments.Objects[idx]);
-  if (env <> nil) and (env.refed <> nil) then
-    exit(loadEnvironment(env.refed));
+  if (env <> nil) and (env.refed <> nil) then begin
+    result := loadEnvironment(env.refed);
+    env.hasSchema := env.hasSchema or env.refed.hasSchema;
+    exit;
+  end;
   sc := xq.StaticContext;
   if env <> nil then begin
     if env.staticBaseUri = '#UNDEFINED' then sc.baseURI:=''
