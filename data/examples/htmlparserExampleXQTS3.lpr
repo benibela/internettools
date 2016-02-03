@@ -210,7 +210,7 @@ var xq: TXQueryEngine;
     version: TXQParsingModel;
     featureNamespaceAxis, featureHigherOrderFunctions: boolean;
     skipNegative: boolean;
-    forceTestSet, forceTestCase: string;
+    forceTestSet, forceTestCase: TStringArray;
   end;
   totalResults: TResultSet = (0, 0, 0, 0, 0, 0, 0);
   logger: TLogger;
@@ -949,6 +949,18 @@ begin
 end;
 
 function loadEnvironment(env: TEnvironment): TTreeNode; forward;
+
+
+function arrayStrContains(const sl: TStringArray; searched: string): boolean;
+var
+  s: String;
+begin
+  if length(sl) = 0 then exit(true);
+  for s in sl do
+    if striContains(searched, s) then exit(true);
+  result := false;
+end;
+
 function TTestCase.run: TTestCaseResultValue;
 var
   i: Integer;
@@ -956,7 +968,7 @@ var
 begin
   result.error := '';
   result.value := nil;
-  if (config.forceTestCase <> '') and (config.forceTestCase <> name) then begin
+  if not arrayStrContains(config.forceTestCase, name) then begin
     result.result:= tcrNA;
     exit();
   end;
@@ -1171,7 +1183,7 @@ end;
 class function TTestSet.load(e: TTreeNode): TTestSet;
 begin
   result := nil;
-  if (config.forceTestSet = '') or (striEqual(e['name'], config.forceTestSet) or striContains(e['file'], config.forceTestSet)) then
+  if arrayStrContains(config.forceTestSet, e['name'])  or arrayStrContains(config.forceTestSet, e['file']) then
     result := TTestSet.create(tree.parseTreeFromFile(e['file']).findChild(tetOpen, 'test-set'), e['file']);
 end;
 
@@ -1480,6 +1492,36 @@ begin
   raise EInternetException.create('Internet unavailable');
 end;
 
+function strReadFromStdin: string;
+var s:string;
+begin
+  result:='';
+  while not EOF(Input) do begin
+    ReadLn(s);
+    result+=s+LineEnding;
+  end;
+end;
+
+function parseForced(s: string): TStringArray;
+var i: integer;
+  j: LongInt;
+begin
+  if s = '-' then s := strReadFromStdin;
+  SetLength(result, 0);
+  if s = '' then exit;
+
+  j := 0;
+  repeat
+    i := j;
+    j := strIndexOf(s, [#1..#32, ','], i+1);
+    if j > i + 1 then begin
+      arrayAdd(result, copy(s, i + 1, j - i - 1));
+    end;
+  until j = 0;
+  if (i < length(s))  then arrayAdd(result, strCopyFrom(s, i+1));
+  writeln(strJoin(result,'|'));
+end;
+
 begin
   registerModuleMath;
 
@@ -1517,8 +1559,9 @@ begin
     end;
   end;
   config.skipNegative := clr.readFlag('skip-negative');
-  config.forceTestSet := clr.readString('test-set');
-  config.forceTestCase := clr.readString('test-case');
+  config.forceTestSet := parseForced(clr.readString('test-set'));
+  config.forceTestCase := parseForced(clr.readString('test-case'));
+
   //config.excludeTestCases := strSplit( clr.readString('test-case'), ',');
 
   TDependency.init;
