@@ -2886,8 +2886,8 @@ begin
         exit(false);
     end else begin
       if enum1.Current.kind = pvkFunction then raiseFOTY0015(enum1.Current);
-      if context.staticContext.nodeCollation <> nil then
-        collation := context.staticContext.nodeCollation; //?? do not want to use string collation for nodes?
+      if collation = nil then
+        collation := context.staticContext.nodeCollation;
       if (enum2.Current.instanceOf(baseSchema.anyAtomicType)) or
          (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
             and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then

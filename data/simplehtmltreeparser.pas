@@ -1155,27 +1155,44 @@ begin
 end;
 
 function TTreeNode.isDeepEqual(cmpTo: TTreeNode; ignoredTypes: TTreeNodeTypes; cmpFunction: TStringComparisonFunc): boolean;
+    function getAttributeCountExcludingNamespaceNodes(n: TTreeNode): integer;
+    var a: TTreeAttribute;
+    begin
+      result := 0;
+      if n.attributes = nil then exit();
+      for a in n.attributes do
+        if not a.isNamespaceNode then inc(result);
+    end;
+
 var
   attrib, tempattrib: TTreeAttribute;
   temp1, temp2: TTreeNode;
+  ok: Boolean;
 begin
   //this follows the XPath deep-equal function
   result := false;
   if typ <> cmpTo.typ then exit();
-  if not cmpFunction(value, cmpTo.value) then exit;
   if getNamespaceURL() <> cmpto.getNamespaceURL() then exit;
   case typ of
     tetAttribute:
-      if    not cmpFunction(value, TTreeAttribute(cmpTo).value)
+      if    (value <> TTreeAttribute(cmpTo).value)
          or not cmpFunction(TTreeAttribute(self).realvalue, TTreeAttribute(cmpTo).realvalue) then exit;
-    tetProcessingInstruction: if getAttribute('') <> cmpTo.getAttribute('') then exit;
+    tetProcessingInstruction: if (value <> cmpto.value) or ( getAttribute('') <> cmpTo.getAttribute('')) then exit;
     tetOpen, tetDocument: begin
-      if getAttributeCount <> cmpTo.getAttributeCount then exit;
-      if attributes <> nil then
+      if (value <> cmpTo.value) then exit;
+      if getAttributeCountExcludingNamespaceNodes(self) <> getAttributeCountExcludingNamespaceNodes(cmpTo) then exit;
+      if (attributes <> nil) and (cmpto.attributes <> nil) then
         for attrib in attributes do begin
-          if not cmpTo.getAttributeTry(attrib.value, tempattrib, cmpFunction) then exit;
-          if not cmpFunction(attrib.realvalue, tempattrib.realvalue) then exit;
+          if attrib.isNamespaceNode then continue;
+          ok := false;
+          for tempattrib in cmpto.attributes do   //todo: optimize
+            if attrib.isDeepEqual(tempattrib, ignoredTypes, cmpFunction) then begin
+              ok :=  true;
+              break;
+            end;
+          if not ok then exit;
         end;
+
 
       temp1 := next; temp2 := cmpTo.next;
       while (temp1 <> nil) and (temp1.typ in ignoredTypes) do temp1 := temp1.getNextSibling();
@@ -1191,7 +1208,8 @@ begin
       if temp2 = cmpTo.reverse then temp2 := nil;
       if (temp1 <> nil) <> (temp2 <> nil) then exit;
     end;
-    tetComment, tetText, tetClose: ;
+    tetComment, tetText, tetClose:
+      if not cmpFunction(value, cmpTo.value) then exit;
     else raise ETreeParseException.Create('Invalid node type');
   end;
   result := true;
