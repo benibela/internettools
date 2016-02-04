@@ -3558,7 +3558,7 @@ begin
   t('deep-equal(/r/a[1],  /r/a[1])', 'true', '!<r foo="z"><a>1<b>2</b>3</a> <a>1<b>2</b>3</a> <a>1<b>X</b>3</a> <a>1<B>2</B>3</a> <a>1<b x="z">2</b>3</a>  </r>');
   t('deep-equal(/r/a[1],  /r/a[2])', 'true');
   t('deep-equal(/r/a[1],  /r/a[3])', 'false');
-  t('deep-equal(/r/a[1],  /r/a[4])', 'true');
+  t('deep-equal(/r/a[1],  /r/a[4])', 'false');
   t('deep-equal(/r/a[1],  /r/a[5])', 'false');
   t('deep-equal(/r/a[5],  /r/a[1])', 'false');
   //casting tests
