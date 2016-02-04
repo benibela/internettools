@@ -105,6 +105,7 @@ begin
 
   t('let $a := (1,2) return $a ! $a', '1 2 1 2');
   t('let $a := (1,2) return for $b in $a return $a', '1 2 1 2');
+  t('17!(.[.>16])', '17');
 
   //Xquery 3 only
   f('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'err:XPST0003');

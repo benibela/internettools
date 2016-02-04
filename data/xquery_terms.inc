@@ -316,7 +316,7 @@ end;
 function TXQTermFilterSequence.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if length(children) <> 2 then raiseEvaluationError('XPST0003', 'Invalid [] sequence filter');
-  if children[0] is TXQTermNodeMatcher then begin
+  if (children[0] is TXQTermNodeMatcher) and (TXQTermNodeMatcher(children[0]).select <> '.') then begin
     result := TXQueryEngine.evaluateAccessList(self, context);
   end else begin
     result := children[0].evaluate(context);
