@@ -2291,6 +2291,7 @@ begin
   evaluateChildren(context, evilkids);
   assert((kind = xqfkUnknown) or (func <> nil));
 
+  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
   if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
     {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(evilkids, context, self)
    {$ifdef checkreturntypes}
@@ -2336,6 +2337,7 @@ begin
       raiseEvaluationError('XPTY0004', 'Invalid return value, '+result.debugAsStringWithTypeAnnotation()+' does not have type '+func.versions[version].returnType.serialize);
   end;
   {$endif}
+  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
 end;
 
 function TXQTermNamedFunction.getContextDependencies: TXQContextDependencies;
@@ -2531,7 +2533,10 @@ begin
     setlength(evilkids, length(children)-1);
     for i:=1 to high(children) do
       evilkids[i-1] := children[i].evaluate(context);
-    exit((func as TXQValueFunction).evaluate(evilkids, self));
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
+    result := (func as TXQValueFunction).evaluate(evilkids, self);
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
+    exit;
   end;
 
   if length(children) = 1 then begin
@@ -2641,6 +2646,7 @@ begin
     result := op.func(context, children[0].evaluate(context), children[1].evaluate(context))
   else begin
     evaluateChildren(context, evilkids);
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
     if xqofCastUntypedToString in op.flags then begin
       for i := 0 to high(evilkids) do
         case evilkids[i].kind of
@@ -2654,6 +2660,7 @@ begin
         end;
     op.checkOrConvertTypes(evilkids, context, self);
     result := op.func(context, evilkids[0], evilkids[1]);
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
   end;
 end;
 
@@ -4076,9 +4083,12 @@ var
   nsprefix: String;
 begin
   try
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, nil);
     result := body.evaluate(context);
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
   except
     on e: EXQEvaluationException do begin
+      if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
       if e.namespace <> nil then begin
         ns := e.namespace.getURL;
         nsprefix := e.namespace.getPrefix;

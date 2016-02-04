@@ -2574,6 +2574,7 @@ type
     function debugTextRepresentation: string; //**< Dump of the log as list of name=value pairs
 
     function clone: TXQVariableChangeLog;
+    procedure assign(from: TXQVariableChangeLog);
     function finalValues: TXQVariableChangeLog; //**< Remove all duplicates, so that only the last version of each variable remains
     procedure takeFrom(other: TXQVariableChangeLog); //**< Adds all variables from other to self, and clears other
     function condensed: TXQVariableChangeLog; //**< Removes all assignments to object properties and only keeps a final assignment to the object variable that contains all properties (i.e. @code(obj.a := 123, obj.b := 456) is condensed to a single assignment like in the pseudocode @code(obj := {a: 123, b:456})))
@@ -2634,6 +2635,11 @@ var XQGlobalTrimNodes: boolean = true;
 //**If XQGlobalUseIDfromDTD is true, only real ID attributes are used.  However, simplehtmltreeparser cannot handle DTDs, so it cannot detect ID attributes. So if this is true, only the wrapped fcl-xml parser from simplehtmltreeparserfpdom can be used
 var XQGlobalUseIDfromDTD: boolean = false;
 
+
+type TXQDebugTracingEvent = procedure (term: TXQTerm; const context: TXQEvaluationContext; entering: boolean; const args: TXQVArray) of object;
+
+//**Experimental event to trace the evaluation of a query
+var XQOnGlobalDebugTracing: TXQDebugTracingEvent;
 
 type
 
@@ -5461,6 +5467,12 @@ begin
   result := TXQVariableChangeLog.create();
   result.vars := vars;
   setlength(result.vars, length(result.vars)); //detach
+end;
+
+procedure TXQVariableChangeLog.assign(from: TXQVariableChangeLog);
+begin
+  vars := from.vars;
+  setlength(vars, length(vars)); //detach
 end;
 
 function TXQVariableChangeLog.finalValues: TXQVariableChangeLog;
