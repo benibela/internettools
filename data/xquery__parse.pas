@@ -1726,7 +1726,7 @@ var
   temp: string;
   code: Integer;
   i: Integer;
-  firstNonZero: Integer;
+  base: Integer;
 begin
   result := '';
   p := 1;
@@ -1744,25 +1744,23 @@ begin
       'apos': result += '''';
       else begin
         if (length(temp) <= 2) or (temp[1] <> '#')  then raiseSyntaxError('Invalid entity');
-        code := -1;
         case temp[2] of
           'x': begin
-            firstNonZero := 3;
-            while (firstNonZero <= length(temp)) and (temp[firstNonZero] = '0') do inc(firstNonZero);
-            for i := 3 to length(temp) do
-              if not (temp[i] in ['0'..'9', 'A'..'F','a'..'f']) then raiseSyntaxError('Invalid entity');
-            if length(temp) - firstNonZero + 1 > 7 then code := $0FFFFFFF
-            else code := StrToIntDef('$'+strcopyfrom(temp,firstNonZero), -1);
+            base := 16;
+            code := 0;
           end;
           '0'..'9': begin
-            firstNonZero := 2;
-            while (firstNonZero <= length(temp)) and (temp[firstNonZero] = '0') do inc(firstNonZero);
-            for i := 2 to length(temp) do
-              if not (temp[i] in ['0'..'9']) then raiseSyntaxError('Invalid entity');
-            if length(temp) - firstNonZero + 1 > 7 then code := $0FFFFFFF
-            else code := StrToIntDef(strCopyFrom(temp, firstNonZero), -1);
-          end;
+            base := 10;
+            code := charDecodeDigit(temp[2]);
+          end
           else raiseSyntaxError('Invalid entity');
+        end;
+        for i := 3 to length(temp) do begin
+          if (temp[i] in ['0'..'9'])
+             or ((base = 16) and (temp[i] in ['a'..'f','A'..'F'])) then
+               code := code * base + charDecodeHexDigit(temp[i])
+          else raiseSyntaxError('Invalid entity');
+          if code > $10FFFF then code :=  $10FFFF + 1; //overflow, but keep checking if the chars are valid
         end;
         if (code <= 0) or (code > $10FFFF) then raiseParsingError('XQST0090', 'Invalid entity value');
         result += strGetUnicodeCharacter(code, staticContext.stringEncoding)
