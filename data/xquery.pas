@@ -4964,15 +4964,24 @@ begin
         while a < b do begin
           m := (a+b) div 2;
           cmp:=TTreeNode.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
-          if cmp = 0 then begin exit; end
-          else if cmp < 0 then b := m-1
-          else a := m + 1;
+          if cmp <> 0 then begin
+            if cmp < 0 then b := m-1
+            else a := m + 1;
+          end else begin
+            a := m;
+            b := m;
+            break;
+          end;
         end;
         for m := b to a do begin
           cmp:=TTreeNode.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
-          if cmp = 0 then begin exit; end
-          else if cmp < 0 then begin insertSingle(m, node); exit; end
-          else begin insertSingle(m + 1, node); exit; end;
+          if cmp <> 0 then begin
+            if cmp < 0 then begin insertSingle(m, node); exit; end
+            else begin insertSingle(m + 1, node); exit; end;
+          end else begin
+            if childnode <> (Items[m] as TXQValueNode).node then insertSingle(m, node); //safety check. cmp only returns 0 for identical nodes
+            exit;
+          end;
         end;
         raise EXQEvaluationException.Create('pxp:INTERNAL', 'binary insert failed');
       end;

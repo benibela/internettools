@@ -5,11 +5,25 @@ unit parsertests;
 interface
 
 uses
-  Classes, SysUtils, simplehtmltreeparser;
+  Classes, SysUtils, simplehtmltreeparser,bbutils;
 
 procedure unittests(TestErrors:boolean);
 
 implementation
+
+function debugDump(t: TTreeNode): string;
+begin
+  result := '';
+  while t <> nil do begin
+    result += t.toString() + ' @' + inttostr(t.offset);
+    if t.next <> nil then result += ' :next: ' + t.next.toString() ;
+    if t.previous <> nil then result += ' :prev: ' + t.previous.toString() ;
+    if t.reverse <> nil then result += ' :rev: ' + t.reverse.toString() ;
+    if t.parent <> nil then result += ' :pa: ' + t.parent.toString() ;
+    result += LineEnding;
+    t := t.next;
+  end;
+end;
 
 procedure unittests(TestErrors:boolean);
 var
@@ -34,6 +48,9 @@ var
       if tn.typ = tetClose then parents.Count := parents.Count - 1;
       if (parents.Count > 1) and (tn.parent <> TTreeNode(parents[parents.Count-1])) then raise Exception.Create('parent invalid: '+tn.toString());
       if tn.typ in [tetOpen, tetDocument] then parents.Add(tn);
+      if tn.next <> nil then
+        if tn.offset >= tn.next.offset then
+          raise Exception.Create('Offset invalid ' + inttostr(tn.offset) + ' >= ' + IntToStr(tn.next.offset));        ;
       tn := tn.next;
     end;
     parents.free;
@@ -81,6 +98,10 @@ begin
   t('<html><body></body>u</html> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '<html><head/><body>u aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</body></html>');
   t('<html><body></body>  </html> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '<html><head/><body>   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</body></html>');
 
+
+  t('<table>', '<html><head/><body><table/></body></html>');
+  t('<table><tr><td>1</td></tr></table>', '<html><head/><body><table><tbody><tr><td>1</td></tr></tbody></table></body></html>');
+  t('<table><tr><td>1</td><td>1b</td></tr><tr><td>2</td><td>2b</td></tr></table>', '<html><head/><body><table><tbody><tr><td>1</td><td>1b</td></tr><tr><td>2</td><td>2b</td></tr></tbody></table></body></html>');
 
   tp.parsingModel := pmStrict;
   t('<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>', '<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>');

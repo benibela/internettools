@@ -124,6 +124,7 @@
       <Unit9>
         <Filename Value="parsertests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="parsertests"/>
       </Unit9>
       <Unit10>
         <Filename Value="extendedhtmlparser_tests.pas"/>
