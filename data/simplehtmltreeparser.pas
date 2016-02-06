@@ -1706,6 +1706,9 @@ begin
   result.document := FCurrentTree;
   FTemplateCount+=1;
 
+  if offset > FCurrentElement.offset then result.offset :=  offset
+  else result.offset := FCurrentElement.offset + 1;
+
   FCurrentElement.next := result;
   result.previous := FCurrentElement;
   FCurrentElement := result;
@@ -1717,7 +1720,6 @@ begin
     if (typ = tetClose) then
       FHasOpenedPTag := FHasOpenedPTag and not ((s = 'p') or (s = 'P'));
 
-  result.offset:=offset;
   //FCurrentElement.id:=FTemplateCount;
 end;
 
