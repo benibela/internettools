@@ -1676,8 +1676,14 @@ end;
 
 class function TTreeNode.compareInDocumentOrder(const a,b: TTreeNode): integer;
 begin
-  if a.document = b.document then
-    exit(a.offset - b.offset);
+  if a.document = b.document then begin
+    result := a.offset - b.offset;
+    if (result <> 0) or (a = b) then exit
+    else begin
+      if pointer(a) < pointer(b) then exit(-1)
+      else exit(1);
+    end;
+  end;
   if pointer(a.document) < pointer(b.document) then exit(-1)
   else exit(1);
 end;
