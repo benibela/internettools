@@ -59,6 +59,8 @@ end;
 TDependency = class
   isSatisfied: boolean;
   constructor create(e: TTreeNode);
+  class procedure put(atype, avalue: string; satisfied: boolean);
+  class procedure putMany(sl: TStringArray; satisfied: boolean);
   class procedure init;
 end;
 
@@ -1046,13 +1048,25 @@ begin
   else raise exception.Create('invalid dependency: '+typ+' = '+value);
 end;
 
+class procedure TDependency.put(atype, avalue: string; satisfied: boolean);
+begin
+  if satisfied then dependencyCacheTrue.Add(atype+#0+avalue)
+  else dependencyCacheFalse.add(atype+#0+avalue);
+end;
+
+class procedure TDependency.putMany(sl: TStringArray; satisfied: boolean);
+var
+  i: Integer;
+  temp: bbutils.TStringArray;
+begin
+  for i := 0 to high(sl) do begin
+    temp := strSplit(sl[i], '=');
+    TDependency.put(trim(temp[0]), trim(temp[1]), true);
+  end;
+end;
+
 
 class procedure TDependency.init;
-  procedure put(atype, avalue: string; satisfied: boolean);
-  begin
-    if satisfied then dependencyCacheTrue.Add(atype+#0+avalue)
-    else dependencyCacheFalse.add(atype+#0+avalue);
-  end;
 
 begin
   dependencyCacheTrue := TStringList.Create;
@@ -1502,7 +1516,7 @@ begin
   end;
 end;
 
-function parseForced(s: string): TStringArray;
+function parseForced(s: string; sep: TCharSet = [#1..#32, ',', ';']): TStringArray;
 var i: integer;
   j: LongInt;
 begin
@@ -1513,7 +1527,7 @@ begin
   j := 0;
   repeat
     i := j;
-    j := strIndexOf(s, [#1..#32, ','], i+1);
+    j := strIndexOf(s, sep, i+1);
     if j > i + 1 then begin
       arrayAdd(result, copy(s, i + 1, j - i - 1));
     end;
@@ -1537,6 +1551,8 @@ begin
   clr.declareFlag('print-failed-inputs', 'Print failed inputs');
   clr.declareString('format', 'html or text output','text');
   clr.declareString('parser', 'Parser used for xml files. Either simple or fcl-xml', 'simple');
+  clr.declareString('dependencies', 'Additional dependencies to assume as true');
+  //clr.declareString('dependencies-false', 'Additional dependencies to assume as false');
   //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
   case clr.readString('mode') of
@@ -1565,6 +1581,9 @@ begin
   //config.excludeTestCases := strSplit( clr.readString('test-case'), ',');
 
   TDependency.init;
+  TDependency.putMany(parseForced(clr.readString('dependencies'), [#13,#10,';']), true);
+  //TDependency.putMany(parseForced(clr.readString('dependencies-false'), [#13,#10,';']), false);
+
 
   TXQueryEngine.collationsInternal.Clear;
   TXQueryEngine.collationsInternal.OwnsObjects:=false;
