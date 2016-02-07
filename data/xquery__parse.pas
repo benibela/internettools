@@ -3045,6 +3045,7 @@ begin
         if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
           raiseParsingError('XPST0003', 'A main module must have a query body, it cannot only declare functions/variables (add ; ())');
     end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
+    declarationDuplicateChecker.free;
   except
     declarationDuplicateChecker.Free;
     result.free;
