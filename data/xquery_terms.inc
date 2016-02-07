@@ -3408,51 +3408,72 @@ var
     end;
   end;
 
-  procedure setTreeNodeNameFromValue(v: IXQValue; defkind: TXQDefaultNamespaceKind);
+
+  procedure setTreeNodeNameFromTerm(t: TXQTerm; defkind: TXQDefaultNamespaceKind);
     function chooseRandomPrefix(): string;
     begin
       result := 'XXX'; //just like Zorba
       while subcontext^.findNamespace(result, xqdnkAny) <> nil do result += 'X';
     end;
 
-  var
-    vname: TXQValueQName;
-    prefix: String;
-  begin
-    if (v is TXQValueSequence) and (v.getSequenceCount = 1) then v := v.get(1);
-    if (v.instanceOf(baseSchema.QName))  then begin
-     vname := (v as TXQValueQName);
-      tree.namespace := subcontext^.findNamespace(vname.prefix, defkind);
-      if ((tree.namespace = nil) or (tree.namespace.getURL <> vname.url))
-          and ((defkind = xqdnkElementType) or (vname.url <> '')) then begin
-        prefix := vname.prefix;
-        if (prefix = '') and (vname.url = XMLNamespaceUrl_XML) then prefix := 'xml';
-        if (prefix = '') and (defkind <> xqdnkElementType) then prefix := chooseRandomPrefix;
-        tree.namespace := declareNewNamespace(vname.url, prefix);
-      end;
-      tree.value := vname.local;
-    end else if v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.node) then begin
-      tree.value := v.toString;
-      if pos(':', tree.value) = 0 then tree.namespace := subcontext^.findNamespace('', defkind)
+    procedure setTreeNodeNameFromQName(const url, aprefix, local: string; defkind: TXQDefaultNamespaceKind);
+    var
+      prefix: String;
+    begin
+      prefix := aprefix;
+      if (url = '') and (prefix = '') then
+        tree.namespace := nil //something weird happens, if there is a non-nil Q{} Qname. Children of this node that have an empty-prefix namespace inherit this non-nil non existing namespace, so copying and serializing them, duplicates there namespace declaration attribute
       else begin
-        subcontext^.splitRawQName(tree.namespace, tree.value, defkind);
-        if tree.namespace = nil then raiseEvaluationError('XQDY0074', 'Failed to find namespace for '+v.toString);
+        tree.namespace := subcontext^.findNamespace(prefix, defkind);
+        if ((tree.namespace = nil) or (tree.namespace.getURL <> url))
+            and ((defkind = xqdnkElementType) or (url <> '')) then begin
+          if (prefix = '') and (url = XMLNamespaceUrl_XML) then prefix := 'xml';
+          if (prefix = '') and (defkind <> xqdnkElementType) then prefix := chooseRandomPrefix;
+          tree.namespace := declareNewNamespace(url, prefix);
+        end;
       end;
-    end else raiseEvaluationError('XPTY0004', 'Expected string value');
-    if tree.namespace <> nil then
-      with tree.namespace as TNamespace do
-        if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
-          raiseEvaluationError(IfThen(tree.typ <> tetAttribute, 'XQDY0096', 'XQDY0044'), 'Invalid namespace: '+tree.namespace.serialize);
+      tree.value := local;
+    end;
+
+    procedure setTreeNodeNameFromValue(v: IXQValue; defkind: TXQDefaultNamespaceKind);
+    var
+      vname: TXQValueQName;
+      prefix: String;
+    begin
+      if (v is TXQValueSequence) and (v.getSequenceCount = 1) then v := v.get(1);
+      if (v.instanceOf(baseSchema.QName))  then begin
+        vname := (v as TXQValueQName);
+        setTreeNodeNameFromQName(vname.url, vname.prefix, vname.local, defkind);
+      end else if v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.node) then begin
+        tree.value := v.toString;
+        if pos(':', tree.value) = 0 then tree.namespace := subcontext^.findNamespace('', defkind)
+        else begin
+          subcontext^.splitRawQName(tree.namespace, tree.value, defkind);
+          if tree.namespace = nil then raiseEvaluationError('XQDY0074', 'Failed to find namespace for '+v.toString);
+        end;
+      end else raiseEvaluationError('XPTY0004', 'Expected string value');
+      if tree.namespace <> nil then
+        with tree.namespace as TNamespace do
+          if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
+            raiseEvaluationError(IfThen(tree.typ <> tetAttribute, 'XQDY0096', 'XQDY0044'), 'Invalid namespace: '+tree.namespace.serialize);
+      if not baseSchema.isValidNCName(tree.value) then
+        raiseEvaluationError('XQDY0074', 'Invalid name: '+tree.value);
+    end;
+  var
+    tqname: TXQTermEQNameToken;
+  begin
+    if t.ClassType = TXQTermEQNameToken then begin
+      tqname := TXQTermEQNameToken(t);
+      setTreeNodeNameFromQName(tqname.namespaceurl, tqname.namespaceprefix, tqname.localpart, defkind);
+    end else setTreeNodeNameFromValue(t.evaluate(subcontext^), defkind);
     if (tree.typ = tetAttribute) and (tree.value = 'xmlns') and (tree.namespace = nil) then
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
-    if not baseSchema.isValidNCName(tree.value) then
-      raiseEvaluationError('XQDY0074', 'Invalid name: '+tree.value);
   end;
 
 var i, oldnamespacecount: integer;
   nameValueEvaluated: IXQValue;
 begin
-  if not (typ in [tetOpen,tetDocument]) then nameValueEvaluated := nameValue.evaluate(context);
+  if not (typ in [tetOpen,tetAttribute, tetDocument]) then nameValueEvaluated := nameValue.evaluate(context);
   if (typ = tetText) and (nameValueEvaluated.isUndefined) then exit(xqvalue);
 
   subcontext:=@context;
@@ -3476,7 +3497,7 @@ begin
     baseOffset+=1;
     case typ of
       tetAttribute: begin
-        setTreeNodeNameFromValue(nameValueEvaluated, xqdnkUnknown);
+        setTreeNodeNameFromTerm(nameValue, xqdnkUnknown);
         for i:= 0 to high(children) do
           TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
         if (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) then
@@ -3500,7 +3521,7 @@ begin
           end;
 
         if nameValue <> nil then begin
-          setTreeNodeNameFromValue(nameValue.evaluate(subcontext^), xqdnkElementType);
+          setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
           if tree.namespace <> nil then
             needNamespaceList.addIfNewPrefixUrl(tree.namespace);
         end;

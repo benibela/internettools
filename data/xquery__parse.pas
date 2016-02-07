@@ -30,7 +30,7 @@ uses
 type
  TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast, xqstResolveNow);
  TXQSequenceTypeFlags = set of TXQSequenceTypeFlag;
- TXQTermPendingEQNameTokenPending = (xqptUnknown, xqptVariable);
+ TXQTermPendingEQNameTokenPending = (xqptUnknown, xqptVariable, xqptAttribute, xqptElement);
  TXQTermPendingEQNameToken = class(TXQTermEQNameToken )
    mode: TXQNamespaceMode;
    data: integer;
@@ -185,6 +185,7 @@ begin
   end;
 end;
 
+
 const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
       PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
@@ -211,9 +212,7 @@ end;
 
 constructor TXQTermPendingEQNameToken.create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode; somedata: integer);
 begin
-  namespaceurl := anamespaceurl;
-  namespaceprefix := aprefix;
-  localpart := alocalpart;
+  inherited Create(anamespaceurl, aprefix, alocalpart);
   mode := amode;
   data := somedata;
 end;
@@ -221,9 +220,7 @@ end;
 constructor TXQTermPendingEQNameToken.create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode;
   realterm: TXQTermPendingEQNameTokenPending);
 begin
-  namespaceurl := anamespaceurl;
-  namespaceprefix := aprefix;
-  localpart := alocalpart;
+  inherited Create(anamespaceurl, aprefix, alocalpart);
   pending := realterm;
   mode := amode;
 end;
@@ -240,11 +237,17 @@ function TXQTermPendingEQNameToken.resolveAndFree(const staticContext: TXQStatic
 begin
   case pending of
     xqptVariable: begin
-      result := TXQTermVariable.create(localpart, resolveURI(staticContext, xqdnkUnknown));;
-      free;
+      result := TXQTermVariable.create(localpart, resolveURI(staticContext, xqdnkUnknown));
+    end;
+    xqptAttribute: begin
+      result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkUnknown), namespaceprefix, localpart);
+    end;
+    xqptElement: begin
+      result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkElementType), namespaceprefix, localpart);
     end;
     xqptUnknown: raise EXQParsingException.create('XPST0003', 'Internal error 20160101181238');
   end;
+  free;
 end;
 
 function TXQTermPendingEQNameToken.clone: TXQTerm;
@@ -300,7 +303,7 @@ begin
   if mode = xqnmPrefix then begin
     result := TXQEQNameUnresolved.Create;
     result.localname := local;
-    TXQEQNameUnresolved(result).namespacePrefix := prefix;
+    result.namespacePrefix := prefix;
   end else begin
     result := TXQEQNameWithPrefix.Create;
     result.namespaceURL := url;
@@ -1305,93 +1308,69 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     expect('-->');
   end;
 
-  function nextTokenQName: string;
-  var  namespaceUrl: string;
-       namespacePrefix: string;
-       name: string;
+  function nextTokenQName(kind: TXQTermPendingEQNameTokenPending): TXQTermPendingEQNameToken;
+  var
+    namespaceUrl: string;
+    namespacePrefix: string;
+    local: string;
+    mode: TXQNamespaceMode;
   begin
-    if nextTokenEQName(namespaceUrl, namespacePrefix, name) = xqnmURL then
+    mode := nextTokenEQName(namespaceUrl, namespacePrefix, local);
+    if mode = xqnmURL then
       raiseSyntaxError('Cannot use Q{} notation for direct constructors');
-    if namespacePrefix = '' then result := name
-    else result := namespacePrefix + ':' + name;
-  end;
-
-  procedure qnameToEQname(var vqname: IXQValue);
-  var
-    qname: String;
-    prefix: String;
-    namespace: INamespace;
-  begin
-    qname := vqname.toString;
-    prefix := '';
-    if system.pos(':', qname) > 0 then prefix := strSplitGet(':', qname);
-    if (result.implicitNamespaces <> nil) and (Result.implicitNamespaces.hasNamespacePrefix(prefix)) then begin
-      namespace := Result.implicitNamespaces.namespaces[prefix];
-      if namespace.getURL = '' then namespace := nil;
-    end else
-      namespace := staticContext.findNamespace(prefix, xqdnkUnknown); //todo?
-    if namespace <> nil then vqname := TXQValueQName.create(namespace.getURL, prefix, qname)
-    else if prefix <> '' then raiseParsingError('XPST0081', 'Unknown namespace: '+vqname.toString)
-    else vqname := TXQValueQName.create('', prefix, qname)
-  end;
-
-  procedure checkForDuplicatedAttributes;
-  var
-    i, j: Integer;
-  begin
-    for i := 0 to high(Result.children) do qnameToEQname(TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value);
-    for i := 0 to high(Result.children) do
-      for j := 0 to high(Result.children) do
-        if (i <> j)
-           and (staticContext.compareAtomic(TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value, TXQTermConstant(TXQTermConstructor(result.children[j]).nameValue).value, nil) = 0) then
-           raiseParsingError('XQST0040', 'Duplicated attribute: '+TXQTermConstant(TXQTermConstructor(result.children[i]).nameValue).value.toString);
+    result := TXQTermPendingEQNameToken.create(namespaceUrl, namespacePrefix, local, mode, kind);
   end;
 
 var
-  token: String;
+  token: TXQTermPendingEQNameToken;
+
+  procedure convertAttributeToNamespace(attribute: TXQTermConstructor);
+  var prefix: String;
+    url: String;
+  begin
+    if token.namespacePrefix = 'xmlns' then prefix := token.localpart
+    else prefix := '';
+    if result.implicitNamespaces = nil then result.implicitNamespaces := TNamespaceList.Create
+    else if result.implicitNamespaces.hasNamespacePrefix(prefix) then raiseParsingError('XQST0071', 'Duplicate namespace declaration');
+    url := '';
+    if length(attribute.children) > 0 then url := (attribute.children[0] as TXQTermConstant).value.toString;
+    url := xmlStrWhitespaceCollapse(url); //do this now or later?
+    if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
+      raiseParsingError('XQST0070', 'Invalid namespace declaration');
+    result.implicitNamespaces.add(TNamespace.create(url, prefix));
+    attribute.Free;
+  end;
+
+var
   marker: PChar;
   attribute: TXQTermConstructor;
   lastWasCData: Boolean;
-  oldDefaultElementTypeNamespace: INamespace;
-  prefix: String;
   isNamespaceNode: Boolean;
-  oldNamespaceCount: Integer;
 begin
   case pos^ of
     '!': exit(parseCommentConstructor);
     '?': exit(parsePIConstructor);
     #9,#10,#13,' ': raiseSyntaxError('Invalid whitespace in constructor');
   end;
-  result := TXQTermConstructor.create(tetOpen, TXQTermConstant.create(nextTokenQName));
+  result := TXQTermConstructor.create(tetOpen, nextTokenQName(xqptElement));
   try
     skipWhitespace();
     while not (pos^ in ['>', '/', #0]) do begin
-      token := nextTokenQName;
-      attribute := TXQTermConstructor.create(tetAttribute, TXQTermConstant.create(token));
+      token := nextTokenQName(xqptAttribute);
+      attribute := TXQTermConstructor.create(tetAttribute, token);
       expect('=');
       skipWhitespace();
       if not (pos^ in ['''', '"']) then raiseSyntaxError('Expected attribute value');
       marker := pos;
       pos+=1;
-      isNamespaceNode := strBeginsWith(token, 'xmlns:') or (token = 'xmlns');
+      isNamespaceNode := (token.namespacePrefix = 'xmlns') or (token.localpart = 'xmlns');
       parseCommonContent(attribute, marker^, false, isNamespaceNode);
       expect(marker^);
 
-      if isNamespaceNode then begin
-        if token = 'xmlns' then prefix := ''
-        else prefix := strCopyFrom(token, length('xmlns:')+1);
-        if result.implicitNamespaces = nil then result.implicitNamespaces := TNamespaceList.Create
-        else if result.implicitNamespaces.hasNamespacePrefix(prefix) then raiseParsingError('XQST0071', 'Duplicate namespace declaration');
-        token := '';
-        if length(attribute.children) > 0 then token := (attribute.children[0] as TXQTermConstant).value.toString;
-        if ((prefix = 'xml') <> (token = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (token = XMLNamespaceUrl_XMLNS) then
-          raiseParsingError('XQST0070', 'Invalid namespace declaration');
-        result.implicitNamespaces.add(TNamespace.create(xmlStrWhitespaceCollapse(token), prefix));
-        attribute.Free;
-      end else result.push(attribute);
+      if isNamespaceNode then convertAttributeToNamespace(attribute)
+      else result.push(attribute);
       skipWhitespace();
     end;
-    checkForDuplicatedAttributes;
     if pos^ = #0 then raiseSyntaxError('Attribute expected');
     if pos^ = '/' then begin
       expect('/');
@@ -1400,10 +1379,6 @@ begin
       exit;
     end;
     expect('>');
-
-    oldDefaultElementTypeNamespace := staticContext.defaultElementTypeNamespace;
-    if Result.implicitNamespaces <> nil then
-      oldNamespaceCount := addNamespacesToStaticContext(result.implicitNamespaces, staticContext);
 
     lastWasCData := false;
     while pos^ <> #0 do begin
@@ -1416,13 +1391,13 @@ begin
         case pos^ of
           '/': begin
             pos += 1;
-            if nextTokenQName() <> (result.nameValue as TXQTermConstant).value.toString then
-              raiseParsingError('XQST0118', 'Expected matching closing tag');
+            token := nextTokenQName(xqptElement);
+            if ((result.nameValue as TXQTermPendingEQNameToken).namespaceprefix <> token.namespaceprefix) or
+               ((result.nameValue as TXQTermPendingEQNameToken).localpart <> token.localpart) then begin
+               token.free;
+               raiseParsingError('XQST0118', 'Expected matching closing tag');
+             end else token.free;
             expect('>');
-            staticContext.defaultElementTypeNamespace := oldDefaultElementTypeNamespace;
-            if result.implicitNamespaces <> nil then
-              staticContext.namespaces.deleteFrom(oldNamespaceCount);
-
             exit;
           end;
           '!': if strBeginsWith(pos, '![CDATA[') then begin
@@ -1440,7 +1415,7 @@ begin
         end;
       end;
     end;
-    raiseParsingError('XPST0003', 'Unexpected end (probably missing closing tag for <'+(result.nameValue as TXQTermConstant).value.toString +'>');
+    raiseParsingError('XPST0003', 'Unexpected end (probably missing closing tag for <'+result.nameValue.debugTermToString +'>');
 
   except
     result.free;
@@ -1458,14 +1433,15 @@ var
   namespaceUrl: string;
   namespacePrefix: string;
   namespaceMode: TXQNamespaceMode;
+  temp: TXQTermPendingEQNameTokenPending;
 begin
   token := name;
-  if (token = 'element') then result := TXQTermConstructor.create(tetOpen)
-  else if (token = 'document') then result := TXQTermConstructor.create(tetDocument)
-  else if (token = 'attribute') then result := TXQTermConstructor.create(tetAttribute)
-  else if (token = 'text') then result := TXQTermConstructor.create(tetText)
-  else if (token = 'processing-instruction') then result := TXQTermConstructor.create(tetProcessingInstruction)
-  else if (token = 'comment') then result := TXQTermConstructor.create(tetComment)
+  if (token = 'element') then result := TXQTermConstructorComputed.create(tetOpen)
+  else if (token = 'document') then result := TXQTermConstructorComputed.create(tetDocument)
+  else if (token = 'attribute') then result := TXQTermConstructorComputed.create(tetAttribute)
+  else if (token = 'text') then result := TXQTermConstructorComputed.create(tetText)
+  else if (token = 'processing-instruction') then result := TXQTermConstructorComputed.create(tetProcessingInstruction)
+  else if (token = 'comment') then result := TXQTermConstructorComputed.create(tetComment)
   else raiseParsingError('XPST0003', 'Unknown constructor name');
   try
     expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute]) ;
@@ -1481,14 +1457,11 @@ begin
           if (namespaceMode <> xqnmPrefix) or (namespacePrefix <> '') then
             raiseSyntaxError('Cannot use namespace for processing instructions');
           result.nameValue := TXQTermConstant.create(token);
-        end else
-          case namespaceMode of
-            xqnmPrefix:
-              if namespacePrefix = '' then result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token))
-              else result.nameValue := TXQTermConstant.create(TXQValueQName.create(#0'pending', namespacePrefix, token));
-            xqnmURL:
-              result.nameValue := TXQTermConstant.create(TXQValueQName.create(namespaceUrl, namespacePrefix, token)); //is this even valid?
-          end;
+        end else begin
+          if result.typ = tetopen then temp := xqptElement
+          else temp := xqptAttribute;
+          result.nameValue := TXQTermPendingEQNameToken.create(namespaceUrl, namespacePrefix, token, namespaceMode, temp);
+        end;
       end;
     end;
     expect('{');
@@ -3371,20 +3344,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
   procedure visitConstructor(c: TXQTermConstructor);
-  var
-    qname: TXQValueQName;
   begin
-    if c.implicitNamespaces <> nil then begin
+    if (c.implicitNamespaces <> nil) then begin
       changedDefaultsTypeNamespaces.Add(staticContext.defaultElementTypeNamespace);
       arrayAddFast(implicitNamespaceCounts, implicitNamespaceCountsLength, addNamespacesToStaticContext(c.implicitNamespaces, staticContext));
-    end;
-
-    if (c.nameValue <> nil) and (c.nameValue is TXQTermConstant) and (TXQTermConstant(c.nameValue).value.kind = pvkQName) then begin
-      qname := TXQTermConstant(c.nameValue).value as TXQValueQName;
-      if qname.url = #0'pending' then begin
-        if c.typ = tetAttribute then qname.url := staticContext.findNamespaceURLMandatory(qname.prefix, xqdnkUnknown)
-        else qname.url := staticContext.findNamespaceURLMandatory(qname.prefix, xqdnkElementType);
-      end;
     end;
   end;
 
@@ -3417,12 +3380,35 @@ end;
 
 function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitConstructor(c: TXQTermConstructor);
+    procedure checkForDuplicatedAttributes;
+    var
+      i, j: Integer;
+      a1: TXQTermConstructor;
+      a2: TXQTermConstructor;
+    begin
+      for i := 0 to high(c.children) do begin
+        if c.children[i].ClassType <> TXQTermConstructor then continue;
+        a1 := TXQTermConstructor(c.children[i]);
+        if a1.typ <> tetAttribute then continue;
+        for j := 0 to high(c.children) do
+          if (i <> j) and (c.children[j].ClassType = TXQTermConstructor) then begin
+            a2 := TXQTermConstructor(c.children[j]);
+            if a2.typ <> tetAttribute then continue;
+            if ((a1.nameValue as TXQTermEQNameToken).namespaceurl = (a2.nameValue as TXQTermEQNameToken).namespaceurl) and
+               ((a1.nameValue as TXQTermEQNameToken).localpart = (a2.nameValue as TXQTermEQNameToken).localpart) then
+                 raiseParsingError('XQST0040', 'Duplicated attribute: '+a1.nameValue.debugTermToString);
+          end;
+      end;
+    end;
   begin
+    if (c.typ = tetOpen) and (c.ClassType = TXQTermConstructor) then
+      checkForDuplicatedAttributes;
     if c.implicitNamespaces <> nil then begin
       staticContext.defaultElementTypeNamespace := INamespace(changedDefaultsTypeNamespaces.Last);
       changedDefaultsTypeNamespaces.Delete(changedDefaultsTypeNamespaces.Count - 1);
 
       implicitNamespaceCountsLength -= 1;
+
       staticContext.namespaces.deleteFrom(implicitNamespaceCounts[implicitNamespaceCountsLength]);
     end;
   end;

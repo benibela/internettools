@@ -1533,9 +1533,12 @@ type
 
   TXQTermEQNameToken = class(TXQTerm)
     namespaceurl, namespaceprefix, localpart: string;
+    constructor Create;
+    constructor Create(const anamespaceurl, anamespaceprefix, alocalpart: string);
     function clone: TXQTerm; override;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function debugTermToString: string; override;
   end;
 
   TXQTermVariable = class(TXQTerm)
@@ -1875,7 +1878,7 @@ type
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
   end;
 
-  { TXQTermConstructor }
+  TXQTermConstructorComputed = class(TXQTermConstructor)  end; //exactly the same but used during parser for different error codes
 
   { TXQTermJSONObjectConstructor }
 
@@ -2809,6 +2812,18 @@ var
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
+constructor TXQTermEQNameToken.Create;
+begin
+
+end;
+
+constructor TXQTermEQNameToken.Create(const anamespaceurl, anamespaceprefix, alocalpart: string);
+begin
+  namespaceurl := anamespaceurl;
+  namespaceprefix := anamespaceprefix;
+  localpart := alocalpart;
+end;
+
 function TXQTermEQNameToken.clone: TXQTerm;
 begin
   Result:=inherited clone;
@@ -2825,6 +2840,14 @@ end;
 function TXQTermEQNameToken.getContextDependencies: TXQContextDependencies;
 begin
   raiseEvaluationError('pxp:internal','Internal error 160117');
+end;
+
+function TXQTermEQNameToken.debugTermToString: string;
+begin
+  result := '';
+  if namespaceurl <> '' then result += 'Q{'+namespaceurl+'}';
+  if namespaceprefix <> '' then result += namespaceprefix + ':';
+  result += localpart;
 end;
 
 constructor TXQEQNameWithPrefix.create;
