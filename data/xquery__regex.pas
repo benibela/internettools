@@ -769,7 +769,6 @@ var
   {$IFDEF USE_FLRE}
   i: Integer;
   captures: TFLREMultiCaptures;
-  list: TXQVList;
   {$ENDIF}
 
   curPos: integer; //handled, excluding curPos
@@ -808,6 +807,7 @@ var
 begin
   requiredArgCount(args, 2, 3);
   input := args[0].toString;
+  pendingMatchesLen := 0;
   curPos := 1;
   if input <> '' then begin
     regex := wregexprParse(args, 2, false);
