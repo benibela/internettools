@@ -1315,6 +1315,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     local: string;
     mode: TXQNamespaceMode;
   begin
+    if pos^ < 'A' then raiseSyntaxError('NCName expected');
     mode := nextTokenEQName(namespaceUrl, namespacePrefix, local);
     if mode = xqnmURL then
       raiseSyntaxError('Cannot use Q{} notation for direct constructors');
@@ -1341,11 +1342,20 @@ var
     attribute.Free;
   end;
 
+  procedure expectWithoutComment(c: char);
+  begin
+    skipWhitespace();
+    if pos^ <> c then raiseSyntaxError('Expected ' + c);
+    inc(pos);
+  end;
+
+
 var
   marker: PChar;
   attribute: TXQTermConstructor;
   lastWasCData: Boolean;
   isNamespaceNode: Boolean;
+  hadWhitespace: Boolean;
 begin
   case pos^ of
     '!': exit(parseCommentConstructor);
@@ -1354,11 +1364,13 @@ begin
   end;
   result := TXQTermConstructor.create(tetOpen, nextTokenQName(xqptElement));
   try
+    hadWhitespace := true; //if there is no whitespace the qname would have eaten pos^
     skipWhitespace();
     while not (pos^ in ['>', '/', #0]) do begin
+      if not hadWhitespace then raiseSyntaxError('Expected whitespace');
       token := nextTokenQName(xqptAttribute);
       attribute := TXQTermConstructor.create(tetAttribute, token);
-      expect('=');
+      expectWithoutComment('=');
       skipWhitespace();
       if not (pos^ in ['''', '"']) then raiseSyntaxError('Expected attribute value');
       marker := pos;
@@ -1369,6 +1381,7 @@ begin
 
       if isNamespaceNode then convertAttributeToNamespace(attribute)
       else result.push(attribute);
+      hadWhitespace := pos^ in [#$20,#9,#$D,#$A];
       skipWhitespace();
     end;
     if pos^ = #0 then raiseSyntaxError('Attribute expected');
@@ -1378,7 +1391,7 @@ begin
       inc(pos);
       exit;
     end;
-    expect('>');
+    expectWithoutComment('>');
 
     lastWasCData := false;
     while pos^ <> #0 do begin
@@ -1397,7 +1410,7 @@ begin
                token.free;
                raiseParsingError('XQST0118', 'Expected matching closing tag');
              end else token.free;
-            expect('>');
+            expectWithoutComment('>');
             exit;
           end;
           '!': if strBeginsWith(pos, '![CDATA[') then begin
