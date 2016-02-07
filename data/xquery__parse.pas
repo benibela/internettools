@@ -3461,6 +3461,9 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
     checker.knownVars.clear;
     for i := 0 to high(f.children) - 1 do begin
       case TXQTermFlowerSubClause(f.children[i]).kind of
+        xqtfcFor:
+          if (TXQTermFlowerFor(f.children[i]).positionVar <> nil) and TXQTermFlowerFor(f.children[i]).positionVar.equalsVariable(TXQTermFlowerFor(f.children[i]).loopvar) then
+            raiseParsingError('XQST0089', 'Duplicate variable: ' + TXQTermFlowerFor(f.children[i]).positionVar.ToString);
         xqtfcGroup:
           with TXQTermFlowerGroup(f.children[i]) do
             for j := 0 to high(vars) do
