@@ -1,5 +1,5 @@
 (***
- This unit implements the math module of http://www.w3.org/2005/xpath-functions/math .
+ @abstract(This unit implements the math module of http://www.w3.org/2005/xpath-functions/math )
 
  Call registerModuleMath to register it.
  Afterwards you can use e.g. @code(query('Q{http://www.w3.org/2005/xpath-functions/math("/tmp/")')) to test for the existence of a file.
@@ -38,6 +38,7 @@ uses
   Classes, SysUtils, simplehtmltreeparser, bigdecimalmath;
 
 
+//**Registers the module to the XQuery engine
 procedure registerModuleMath;
 
 const XMLNamespaceURL_Math = 'http://www.w3.org/2005/xpath-functions/math';

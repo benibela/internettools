@@ -139,7 +139,7 @@ The entire template can be loaded with the TMultipageTemplate class and evaluate
 
 The class TXQueryEngine in the unit xquery implements an XQuery/XPath 3 interpreter, interpreting Turing complete programming languages. The function query can be used to evaluate an expression, which returns the results of the evaluation as @link(xquery.IXQValue IXQValue) which can be chained through a LINQ-like pipeline.
 
-All the other functions and methods can be accessed from within the interpreted language. Not all features are enabled at default. Add the units xquery_json and xquery_utf8 to a uses clause of any unit to activate JSONiq and UTF-8 support. Their presence in the unit clause is enough to activate them. Another unit xquery_module_file implements the EXPath file module. It will be activated by calling the register function of that unit. 
+All the other functions and methods can be accessed from within the interpreted language. Not all features are enabled at default. Add the units xquery_json and xquery_utf8 to a uses clause of any unit to activate JSONiq and UTF-8 support. Their presence in the unit clause is enough to activate them. Further modules are available in the units xquery_module_math (XPath/XQuery 3.0 math functions) and xquery_module_file (EXPath file module). They are activated by calling the register function of the corresponding unit. 
 
 
 

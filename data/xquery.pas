@@ -19,7 +19,7 @@
 
 
   @author Benito van der Zander (http://www.benibela.de)
-*}
+}
 unit xquery;
 
 {

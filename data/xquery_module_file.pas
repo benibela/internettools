@@ -1,5 +1,5 @@
 (***
- This unit implements the file module of http://expath.org/spec/file .
+ @abstract(This unit implements the file module of http://expath.org/spec/file )
 
  Call registerModuleFile to register it.
  Afterwards you can use e.g. @code(query('Q{http://expath.org/ns/file}exists("/tmp/")')) to test for the existence of a file.
