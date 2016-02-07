@@ -4976,17 +4976,17 @@ var
 begin
   case node.kind of
     pvkNode: begin
-      childnode:=(node as TXQValueNode).node;
-      if (Count = 0) or (TTreeNode.compareInDocumentOrder(childnode, (Items[count-1] as TXQValueNode).node) > 0) then
+      childnode:=node.toNode;
+      if (Count = 0) or (TTreeNode.compareInDocumentOrder(childnode, Items[count-1].toNode) > 0) then
         add(node)
-      else if (TTreeNode.compareInDocumentOrder(childnode, (Items[0] as TXQValueNode).node) < 0) then
+      else if (TTreeNode.compareInDocumentOrder(childnode, Items[0].toNode) < 0) then
         insertSingle(0, node)
       else begin
         a := 0;
         b := count-1;
         while a < b do begin
           m := (a+b) div 2;
-          cmp:=TTreeNode.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
+          cmp:=TTreeNode.compareInDocumentOrder(childnode, Items[m].toNode);
           if cmp <> 0 then begin
             if cmp < 0 then b := m-1
             else a := m + 1;
@@ -4997,12 +4997,12 @@ begin
           end;
         end;
         for m := b to a do begin
-          cmp:=TTreeNode.compareInDocumentOrder(childnode, (Items[m] as TXQValueNode).node);
+          cmp:=TTreeNode.compareInDocumentOrder(childnode, Items[m].toNode);
           if cmp <> 0 then begin
             if cmp < 0 then begin insertSingle(m, node); exit; end
             else begin insertSingle(m + 1, node); exit; end;
           end else begin
-            if childnode <> (Items[m] as TXQValueNode).node then insertSingle(m, node); //safety check. cmp only returns 0 for identical nodes
+            if childnode <> Items[m].toNode then insertSingle(m, node); //safety check. cmp only returns 0 for identical nodes
             exit;
           end;
         end;
