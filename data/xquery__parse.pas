@@ -2795,6 +2795,15 @@ function TXQParsingContext.parseModuleInternal(): TXQTerm;
     end;
   end;
 
+var declarationDuplicateChecker: TStringList;
+
+  procedure checkForDuplicate(declaration, err: string);
+  begin
+    if declarationDuplicateChecker = nil then declarationDuplicateChecker := TStringList.Create;
+    if declarationDuplicateChecker.IndexOf(declaration) >= 0 then raiseParsingError(err, 'Only one '+declaration+'declaration can be given.');
+    declarationDuplicateChecker.Add(declaration);
+  end;
+
 var
   token: String;
   nameSpaceName: String;
@@ -2808,6 +2817,7 @@ var
   oldNamespaceCount: Integer;
 begin
   result := nil;
+  declarationDuplicateChecker := nil;
   oldNamespaceCount := 0;
   if staticContext.namespaces <> nil then oldNamespaceCount := staticContext.namespaces.Count;
   try
@@ -2871,17 +2881,23 @@ begin
           end;
         end;
       end else case nextToken() of //declare ...
-        'boundary-space':
+        'boundary-space': begin
+          checkForDuplicate('boundary-space', 'XQST0068');
           case nextToken() of
             'preserve': staticContext.StripBoundarySpace:=false;
             'strip': staticContext.StripBoundarySpace:=true;
             else raiseParsingError('XPST0003', 'unknown boundary-space declaration');
           end;
+        end;
         'default': begin
           token := nextToken();
           case token of
-            'collation': staticContext.collation := staticContext.sender.getCollation(parseString, staticContext.baseURI);
+            'collation': begin
+              checkForDuplicate(token, 'XQST0038');
+              staticContext.collation := staticContext.sender.getCollation(parseString, staticContext.baseURI);
+            end;
             'order': begin
+              checkForDuplicate(token, 'XQST0069');
               expect('empty');
               case nextToken() of
                 'greatest': staticContext.emptyOrderSpec:=xqeoEmptyGreatest;
@@ -2896,21 +2912,29 @@ begin
             else raiseParsingError('XPST0003', 'Unknown default value');
           end;
         end;
-        'base-uri': staticContext.baseUri := parseString;
-        'construction':
+        'base-uri': begin
+          checkForDuplicate('base-uri', 'XQST0032');
+          staticContext.baseUri := parseString;
+        end;
+        'construction': begin
+          checkForDuplicate('construction', 'XQST0067');
           case nextToken() of
             'strip': staticContext.constructionPreserve := false;
             'preserve': staticContext.constructionPreserve := true
             else raiseParsingError('XPST0003', 'invalid construction declaration');
           end;
-        'ordering':
+        end;
+        'ordering': begin
+          checkForDuplicate('ordering', 'XQST0065');
           case nextToken() of
             'unordered': staticContext.ordering:=false;
             'ordered': staticContext.ordering:=true;
             else raiseParsingError('XPST0003', 'invalid ordering mode');
           end;
+        end;
         'copy-namespaces': begin
-           case nextToken() of
+          checkForDuplicate('copy-namespaces', 'XQST0055');
+          case nextToken() of
              'preserve': staticContext.copyNamespacePreserve:=true;
              'no-preserve': staticContext.copyNamespacePreserve:=false;
              else raiseParsingError('XPST0003', 'Invalid copy-namespace');
@@ -3022,6 +3046,7 @@ begin
           raiseParsingError('XPST0003', 'A main module must have a query body, it cannot only declare functions/variables (add ; ())');
     end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
   except
+    declarationDuplicateChecker.Free;
     result.free;
     if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then begin
       TXQueryBreaker(resultquery)._AddRef; //increase ref, so we can remove it from FModules without freeing. Cannot free it here, since the caller still has a reference to the object (but not the interface)
