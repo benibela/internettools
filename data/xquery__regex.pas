@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 //Here you can choose which regex library to use
-{$if not defined(USE_SOROKINS_REGEX) and not defined(USE_FLRE)}
+{$if not defined(USE_SOROKINS_REGEX) and not defined(USE_SOROKINS_DREGEX) and not defined(USE_FLRE) and not defined(USE_FLRE_WITH_CACHE)}
 //{$DEFINE USE_SOROKINS_REGEX}
 //{$DEFINE USE_SOROKINS_DREGEX}
 //{$DEFINE USE_FLRE}
