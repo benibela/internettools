@@ -100,7 +100,6 @@
       <Unit4>
         <Filename Value="xquery1_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="xquery1_tests"/>
       </Unit4>
       <Unit5>
         <Filename Value="internetaccess_tests.pas"/>
@@ -109,22 +108,18 @@
       <Unit6>
         <Filename Value="xpath3_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="xpath3_tests"/>
       </Unit6>
       <Unit7>
         <Filename Value="xquery3_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="xquery3_tests"/>
       </Unit7>
       <Unit8>
         <Filename Value="bigdecimal_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="bigdecimal_tests"/>
       </Unit8>
       <Unit9>
         <Filename Value="parsertests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="parsertests"/>
       </Unit9>
       <Unit10>
         <Filename Value="extendedhtmlparser_tests.pas"/>
@@ -137,7 +132,6 @@
       <Unit12>
         <Filename Value="simpleinternet_tests.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="simpleinternet_tests"/>
       </Unit12>
       <Unit13>
         <Filename Value="commontestutils.pas"/>

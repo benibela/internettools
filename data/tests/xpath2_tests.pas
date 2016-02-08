@@ -307,6 +307,7 @@ begin
     t('fn:matches("helloworld", "hello[ ]world", "x") ' , 'false');
     t('fn:matches("hello world", "hello\ sworld", "x") ' , 'true');
     t('fn:matches("hello world", "hello world", "x") ' , 'false');
+    t('fn:matches("foo", "\P{Sk }", "x")' , 'true');
 
     f('matches("", "[^]")', 'FORX0002');
     f('matches("", "[--x]")', 'FORX0002');

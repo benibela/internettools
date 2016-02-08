@@ -21,7 +21,7 @@ You can do one of the following to set the paths:
   @item(Install the package internettools.lpk in Lazarus.)
 )
 
-On Linux you also need to install Synapse and OpenSSL devel. For Android you need the standard Android SDK/NDK and initialize the JVM reference in bbjniutils.
+On Linux you also need to install Synapse and OpenSSL devel. For Android you need the standard Android SDK/NDK and initialize the JVM reference in bbjniutils. In the default settings it uses FLRE as regular expression library, you can set a define USE_SOROKINS_REGEX to use Sorokin/FPC's regexpr unit.
 
 The Internet Tools is modularly structured and you can activate different features, depending on which units are included in the unit clause of your project. You need one of synapseinternetaccess, w32internetaccess or androidinternetaccess, so it knows, which underlying library to use for internet access. You do not need to use anything of these units, just including them in the unit clause already activates them. 
 

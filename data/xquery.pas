@@ -23,7 +23,7 @@
 unit xquery;
 
 {
-Copyright (C) 2008 - 2015 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2016 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -2239,7 +2239,7 @@ type
                   @br Only available if the xquery_json unit is included in an uses clause.
                   )
       @item(@code(serialize-json($object as item()* ))
-                  @br Converts an xq value to a json string.
+                  @br Serializes an xq value as JSON string.
                   @br Only available if the xquery_json unit is included in an uses clause.)
       @item(@code(binary-to-string($data as xs:base64Binary|xs:hexBinary[, $encoding as xs:string]) as xs:string)
                   @br Converts $data to a string using the given $encoding)

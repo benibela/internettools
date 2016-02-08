@@ -1,7 +1,7 @@
 unit xquery__parse;
 
 {
-Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2016 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 

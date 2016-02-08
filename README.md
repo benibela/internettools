@@ -1,7 +1,8 @@
 Internet Tools
 ==================
  
-This package provides a standard compatible XPath 2 / XQuery 1.0 interpreter, with extensions for - among others - JSONiq, pattern matching, CSS and html; as well as functions to perform http/s requests on windows/linux/mac/android, an xslt-like webscraping language, and an auto update class.
+This package provides a XPath 2.0, XQuery 1.0 and XPath/XQuery 3.0 interpreter with extensions for - among others - JSONiq, pattern matching, CSS and HTML; as well as functions to perform HTTP/S requests on Windows/Linux/MacOSX/Android, an xslt-inspired webscraping language, and an auto update class.
+The XPath 2.0 and XQuery 1.0 modes are fully standard compatible, the XPath/XQuery 3.0 modes still lack the format-* functions for and non-implicit namespace nodes (i.e. namespace nodes not bound to any element).
 
 
 

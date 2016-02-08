@@ -35,7 +35,7 @@ type TMockTransfer = procedure (const method: string; const url: TDecodedUrl; co
 
 { TMockInternetAccess }
 (***
-    @æbstract(This class simulates an internet access, e.g. for unit tests)
+    @abstract(This class simulates an internet access, e.g. for unit tests)
 
 There are three ways to use it:
 @unorderedList(
