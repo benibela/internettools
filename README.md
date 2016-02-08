@@ -7,4 +7,4 @@ The XPath 2.0 and XQuery 1.0 modes are fully standard compatible, the XPath/XQue
 
 
 
-See my webpage for the detailed [internettools documentation](http://www.benibela.de/sources_en.html#internettools). You can also test the XQuery engine with its [online cgi service](http://videlibri.sourceforge.net/cgi-bin/xidelcgi).
+See my webpage for the detailed [internettools documentation](http://www.benibela.de/documentation/internettools/) or a [short overview](http://www.benibela.de/sources_en.html#internettools). You can also test the XQuery engine with its [online cgi service](http://www.videlibri.de/cgi-bin/xidelcgi).
