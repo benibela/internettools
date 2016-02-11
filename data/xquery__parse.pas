@@ -95,7 +95,7 @@ protected
   function replaceEntitiesIfNeeded(const s: string): string; inline;
   function parseString: string;
   function parseString(const w: string): string;
-  function parseModuleNamespaceURI: string;
+  function parseNamespaceURI(const errXmlAlias, errEmpty: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
   function parseJSONLikeObjectConstructor(): TXQTermWithChildren; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(): TXQTermJSONArray;
@@ -1771,10 +1771,11 @@ begin
   result := replaceEntitiesIfNeeded(normalizeLineEnding(StringReplace(copy(w,2,length(w)-2), w[1]+w[1], w[1], [rfReplaceAll])));
 end;
 
-function TXQParsingContext.parseModuleNamespaceURI: string;
+function TXQParsingContext.parseNamespaceURI(const errXmlAlias, errEmpty: string): string;
 begin
   result := xmlStrWhitespaceCollapse(parseString);
-  if result = '' then raiseParsingError('XQST0088', 'Empty namespace URI');
+  if (result = '') and (errEmpty <> '') then raiseParsingError(errEmpty, 'Empty namespace URI');
+  if (errXmlAlias <> '') and ((Result = XMLNamespaceUrl_XML) or (Result = XMLNamespaceUrl_XMLNS)) then raiseParsingError(errXmlAlias, 'Invalid namespace')
 end;
 
 function TXQParsingContext.parseString: string;
@@ -2668,6 +2669,16 @@ end;
 
 
 function TXQParsingContext.parseModuleInternal(): TXQTerm;
+
+var declarationDuplicateChecker: TStringList;
+
+  procedure checkForDuplicate(declaration, err: string);
+  begin
+    if declarationDuplicateChecker = nil then declarationDuplicateChecker := TStringList.Create;
+    if declarationDuplicateChecker.IndexOf(declaration) >= 0 then raiseParsingError(err, 'Only one '+declaration+'declaration can be given.');
+    declarationDuplicateChecker.Add(declaration);
+  end;
+
   procedure parseEncoding;
   var
     encname: String;
@@ -2736,7 +2747,7 @@ function TXQParsingContext.parseModuleInternal(): TXQTerm;
         'xml', 'xmlns': raiseParsingError('XQST0070', 'Invalid module prefix');
       end;
     end;
-    moduleURL := parseModuleNamespaceURI;
+    moduleURL := parseNamespaceURI('','XQST0088');
     at := nil;
     if nextToken(true) = 'at' then begin
       expect('at');
@@ -2795,14 +2806,6 @@ function TXQParsingContext.parseModuleInternal(): TXQTerm;
     end;
   end;
 
-var declarationDuplicateChecker: TStringList;
-
-  procedure checkForDuplicate(declaration, err: string);
-  begin
-    if declarationDuplicateChecker = nil then declarationDuplicateChecker := TStringList.Create;
-    if declarationDuplicateChecker.IndexOf(declaration) >= 0 then raiseParsingError(err, 'Only one '+declaration+'declaration can be given.');
-    declarationDuplicateChecker.Add(declaration);
-  end;
 
 var
   token: String;
@@ -2856,7 +2859,7 @@ begin
           requireModule;
           staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
           expect('=');
-          (staticContext.moduleNamespace as TNamespace).url := parseModuleNamespaceURI;
+          (staticContext.moduleNamespace as TNamespace).url := parseNamespaceURI('', 'XQST0088');
           expect(';');
           token := nextToken(true);
           if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
@@ -2906,8 +2909,9 @@ begin
             end;
             'element', 'function': begin
               expect('namespace');
-              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(xmlStrWhitespaceCollapse(parseString), '')
-              else staticContext.defaultFunctionNamespace := TNamespace.Create(xmlStrWhitespaceCollapse(parseString), '')
+              checkForDuplicate('default '+token+' namespace', 'XQST0066');
+              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseNamespaceURI('XQST0070',''), '')
+              else staticContext.defaultFunctionNamespace := TNamespace.Create(parseNamespaceURI('XQST0070',''), '')
             end;
             else raiseParsingError('XPST0003', 'Unknown default value');
           end;
