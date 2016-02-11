@@ -80,8 +80,8 @@ protected
   // $Q{ns}foo  -> ('ns', 'Q', 'foo', xqnmURL)
   function nextTokenEQName(out url, prefix, localpart: string; allowWildcards: boolean=false): TXQNamespaceMode; //returns a splitted EQName
   function parsePendingEQName(pending: TXQTermPendingEQNameTokenPending = xqptUnknown): TXQTermPendingEQNameToken;
-  function parseEQName: TXQEQName;
-  function parseEQNameWithPrefix: TXQEQNameWithPrefix;
+  function parseEQName: TXQEQName; //parse with pending resolving
+  function parseEQNameWithPrefix: TXQEQNameWithPrefix; //parse with pending resolving
 
 
   function normalizeLineEnding(const s: string): string;
@@ -1514,7 +1514,9 @@ begin
   requireXQuery('for extensions');
   expect('#');
   if nextTokenEQName(url, prefix, pragma) = xqnmPrefix then
-    if prefix = '' then raiseParsingError('XPST0003', 'Extension name requires namespace');
+    if prefix = '' then raiseParsingError('XPST0081', 'Extension name requires namespace')
+    else url := staticContext.findNamespaceURLMandatory(prefix, xqdnkUnknown);
+  if (pos^ <> '#') and not (pos^ in WHITE_SPACE) then raiseSyntaxError('Expected whitespace or #');
   //just ignore it
   while (pos^ <> #0) and ((pos^ <> '#') or ((pos+1)^ <> ')')) do
     pos += 1;
@@ -1525,7 +1527,11 @@ begin
     expect('(');
     exit(parseExtension());
   end;
-  expect('{'); result := parsePrimaryLevel; expect('}');
+  expect('{');
+  skipWhitespaceAndComment();
+  if pos^ = '}' then raiseParsingError('XQST0079', 'Extension expr needs expr');
+  result := parsePrimaryLevel;
+  expect('}');
 end;
 
 function TXQParsingContext.parseVariable: TXQTermPendingEQNameToken;
