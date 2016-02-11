@@ -2824,6 +2824,7 @@ var
 
 
   oldNamespaceCount: Integer;
+  namespaceMode: TXQNamespaceMode;
 begin
   result := nil;
   declarationDuplicateChecker := nil;
@@ -2999,10 +3000,13 @@ begin
           end;
         end;
         'option': begin
-          if nextTokenEQName(nameSpaceURL, nameSpaceName, token) = xqnmPrefix then
-            if nameSpaceName = '' then nameSpaceURL := XMLNamespaceUrl_XQuery
-            else nameSpaceURL := staticContext.findNamespaceURL(nameSpaceName, xqdnkUnknown);
+          namespaceMode := nextTokenEQName(nameSpaceURL, nameSpaceName, token);
           temp := parseString;
+          if staticContext.moduleNamespace <> nil then raiseParsingError('XQST0108', 'option not allowed in modules');
+          if namespaceMode = xqnmPrefix then
+            if nameSpaceName <> '' then nameSpaceURL := staticContext.findNamespaceURLMandatory(nameSpaceName, xqdnkUnknown)
+            else if isModel3 then nameSpaceURL := 'http://www.w3.org/2012/xquery'
+            else raiseParsingError('XPST0081', 'No namespace');
           if nameSpaceURL = XMLNamespaceURL_MyExtensions then begin
             case token of
               'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
