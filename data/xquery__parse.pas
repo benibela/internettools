@@ -999,7 +999,7 @@ var token: String;
     end;
     token := nextToken();
     if token = 'collation' then begin
-      group.collation := parseString;
+      group.collation := TXQueryEngine.getCollation(parseString(), staticContext.baseURI, 'XQST0076');
       token := nextToken();
     end;
   end;
@@ -1038,9 +1038,7 @@ var
         end;
 
         if token = 'collation' then begin
-          collation := nextToken;
-          if (collation = '') or not (collation[1] in ['''', '"']) or (collation[1] <> collation[length(collation)]) then raiseParsingError('XPST0003', 'Invalid collation');
-          collation := copy(collation, 2, length(collation) - 2);
+          collation := staticContext.sender.getCollation(parseString, staticContext.baseURI, 'XQST0076');
           token := nextToken;
         end
       end;
@@ -2904,7 +2902,7 @@ begin
           case token of
             'collation': begin
               checkForDuplicate(token, 'XQST0038');
-              staticContext.collation := staticContext.sender.getCollation(parseString, staticContext.baseURI);
+              staticContext.collation := staticContext.sender.getCollation(parseString, staticContext.baseURI, 'XQST0038');
             end;
             'order': begin
               checkForDuplicate(token, 'XQST0069');
@@ -3009,7 +3007,7 @@ begin
             else raiseParsingError('XPST0081', 'No namespace');
           if nameSpaceURL = XMLNamespaceURL_MyExtensions then begin
             case token of
-              'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI);
+              'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI, 'XQST0038');
               'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
               'json': readBoolean(options.AllowJSON, temp);
               'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);

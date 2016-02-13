@@ -1946,8 +1946,7 @@ var
     if sortingCache.Count = 0 then exit;
     group := TXQTermFlowerGroup(children[pos]);
     data.context := @context;
-    if group.collation = '' then data.collation := nil
-    else data.collation := TXQueryEngine.getCollation(group.collation, context.staticContext.baseURI);
+    data.collation := group.collation;
     varindex := clauseIndex[pos];
     with group do begin
       SetLength(data.groupingIndices, length(vars));
@@ -2098,9 +2097,7 @@ begin
     sortingData.minOrderIndex:=0;
     sortingData.maxOrderIndex:=-1;
     setlength(sortingData.collations, length(orders));
-    for i := 0 to high(orders) do
-      if orders[i].collation = '' then sortingData.collations[i] := nil
-      else sortingData.collations[i] := TXQueryEngine.getCollation(orders[i].collation, context.staticContext.baseURI);
+    for i := 0 to high(orders) do sortingData.collations[i] := orders[i].collation;
 
     sortingCache := tfplist.Create;
     currentTuple := TOrderedTuple.Create;

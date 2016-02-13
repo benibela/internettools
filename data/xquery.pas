@@ -1780,7 +1780,7 @@ type
     expr: TXQTerm;
     descending: boolean; //ascending is default
     emptyOrder: TXQTermFlowerOrderEmpty;
-    collation: string;
+    collation: TXQCollation;
     class function kind: TXQTermFlowerSubClauseKind; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function getContextDependencies: TXQContextDependencies; override;
@@ -1800,7 +1800,7 @@ type
   TXQTermFlowerGroup = class(TXQTermFlowerSubClause)
     vars: array of TXQTermVariable;
     seqtypes: array of TXQTermSequenceType;
-    collation: string;
+    collation: TXQCollation;
     class function kind: TXQTermFlowerSubClauseKind; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
     procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
@@ -2395,7 +2395,7 @@ public
     class procedure registerCollation(const collation: TXQCollation);
 
     //** Returns the collation for an url id
-    class function getCollation(id:string; base: string): TXQCollation;
+    class function getCollation(id:string; base: string; errCode: string = 'FOCH0002'): TXQCollation;
 
   private
     FLastQuery: IXQuery;
@@ -6883,7 +6883,7 @@ begin
 end;
 
 
-class function TXQueryEngine.getCollation(id: string; base: string): TXQCollation;
+class function TXQueryEngine.getCollation(id: string; base: string; errCode: string): TXQCollation;
 var
   i: Integer;
   oldid: string;
@@ -6897,7 +6897,7 @@ begin
   if i < 0 then begin
     i := collations.IndexOf(oldid);
     if i < 0 then
-      raise EXQEvaluationException.Create('FOCH0002', 'Collation ' + id + ' is not defined');
+      raise EXQEvaluationException.Create(errCode, 'Collation ' + id + ' is not defined');
   end;
   result:=TXQCollation(collations.Objects[i]);
 end;
