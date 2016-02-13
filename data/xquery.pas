@@ -6548,6 +6548,7 @@ var
  i: Integer;
  value: IXQValue;
  list: TXQVList;
+ i64: Int64;
 begin
   if (result = nil) or (result.getSequenceCount = 0) then exit;
 
@@ -6561,11 +6562,11 @@ begin
         result := xqvalue();
         exit();
       end;
-      i := value.toInt64;
+      i64 := value.toInt64;
       if result is TXQValueSequence then begin
-        if (i < 1) or (i > result.getSequenceCount) then result := xqvalue()
-        else result := (result as TXQValueSequence).seq[i - 1];
-      end else if i <> 1 then result := xqvalue();
+        if (i64 < 1) or (i64 > result.getSequenceCount) then result := xqvalue()
+        else result := (result as TXQValueSequence).seq[i64 - 1];
+      end else if i64 <> 1 then result := xqvalue();
     end else if not value.toBooleanEffective then
       result := xqvalue();
     exit;
