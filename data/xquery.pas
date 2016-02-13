@@ -3479,10 +3479,10 @@ var
   temp: INamespace;
 begin
   temp := findNamespace(nsprefix, defaultNamespaceKind);
-  if temp <> nil then exit(temp.getURL);
-  if nsprefix <> '' then
+  if temp <> nil then result := temp.getURL
+  else result := '';
+  if (nsprefix <> '') and (result = '') then
     raise EXQParsingException.create('XPST0081', 'Unknown namespace prefix: ' + nsprefix);
-  result := '';
 end;
 
 procedure TXQStaticContext.splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
