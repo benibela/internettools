@@ -587,8 +587,8 @@ begin
   //t('validate strict { <element>abc</element> }', 'abc');
 
 
-  t('(# foobar:def abc #) {7}', '7');
-  t('(#foobar:def#) {7, 8}', '7 8');
+  m('declare namespace foobar = "foobar"; (# foobar:def abc #) {7}', '7');
+  m('declare namespace foobar = "foobar"; join ( (#foobar:def#) {7, 8} ) ', '7 8');
 
   m('xquery version "1.0"; 7', '7');
   m('xquery version "1.0" encoding "utf-8"; 7', '7');
@@ -869,8 +869,8 @@ begin
   t('(# abc:def "afas" #) {123}', '123');
   t('(# abc:def "afas#" #) {123}', '123');
   t('(# abc:def # # ) # ) #) {123}', '123');
-  t('(# abc:def # # ) # ) #) (# h:k #) {123}', '123');
-  t('(# abc:def # # ) # ) #) (: ..(#. :) (# h:k #) {123}', '123');
+  m('declare namespace abc = "abc"; declare namespace h = "h"; (# abc:def # # ) # ) #) (# h:k #) {123}', '123');
+  m('declare namespace abc = "abc"; declare namespace h = "h"; (# abc:def # # ) # ) #) (: ..(#. :) (# h:k #) {123}', '123');
   t('let $i := <e xml:lang="en"> <b xml:lang="de"/> </e> return lang("de", $i)', 'false');
   t('fn:local-name(processing-instruction PITarget {"PIcontent"})', 'PITarget');
   t('fn:name(processing-instruction PITarget {"PIcontent"})', 'PITarget');
@@ -1096,11 +1096,11 @@ begin
   t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>/b)', '<b/>');
   t('outer-xml(<a xmlns="foobar"><b xmlns=""/></a>)', '<a xmlns="foobar"><b xmlns=""/></a>');
   t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b><pref:c>..</pref:c></b>');
+  f('outer-xml(<a xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', 'XPST0081');
   t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz" xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>'); //should raise error
+  f('outer-xml(<a xmlns:pref="foobar" xmlns:a1="a1" xmlns:a2="a2"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', 'XPST0081');
   t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref="xyz"><pref:c>..</pref:c></b></a>/*:b)', '<b xmlns:pref="xyz" xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>');
-  t('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', '<b xmlns:a1="a1" xmlns:a2="a2"><pref:c>..</pref:c></b>'); //should raise error
+  f('outer-xml(<a xmlns:a1="a1" xmlns:a2="a2" xmlns:pref="foobar"><b xmlns:pref=""><pref:c>..</pref:c></b></a>/b)', 'XPST0081');
 
 
   m('declare function local:f($local:v){ $local:v + 1}; local:f(2)', '3');
