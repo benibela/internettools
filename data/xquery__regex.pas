@@ -896,10 +896,12 @@ var
   end;
   procedure openGroup(id, from: integer);
   begin
+    if from < curPos then exit;
     tempStr += nextBlock(from) + '<group nr="'+IntToStr(id)+'">';
   end;
   procedure closeGroup(till: integer);
   begin
+    if till < curPos then exit;
     tempStr += nextBlock(till) + '</group>';
   end;
   procedure closeMatch(till: integer);
