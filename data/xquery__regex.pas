@@ -388,6 +388,112 @@ begin
 end;
 
 
+//This is a simplified version of regexprreencode that does not raise exceptions and just returns a nesting representation.
+//It returns an array of opening and closig(-) indices, e.g. ()(()) becomes 1,-1,2,3,-3,-2
+function regexprGetGroupNesting(regexpr: string): TLongintArray;
+var pos: integer;
+
+  procedure abort;
+  begin
+  end;
+
+  function gotonextchar: char; inline;
+  begin
+    inc(pos);
+    if pos > length(regexpr) then exit(#0);
+    result := regexpr[pos];
+  end;
+
+  function curchar: char; inline;
+  begin
+    result := regexpr[pos];
+  end;
+
+  procedure charClassEsc();
+  begin
+    case gotonextchar of
+      'p', 'P': begin
+        //gotonextchar; //expect('{');
+        //copyCurvy();
+        while curchar <> '}' do gotonextchar;
+      end;
+    end;
+  end;
+
+  procedure charClassExpr;
+  begin
+    gotonextchar;
+    if curchar = '^' then gotonextchar;
+    while true do begin
+      case curchar of
+        ']': exit;
+        '\': charClassEsc();
+        '-': begin
+          case gotonextchar  of
+            '[': begin //subtraction
+              charClassExpr;
+              exit;
+            end;
+            '-': gotonextchar; //expect('[');  //2nd -
+            ']': dec(pos);//- is char in class, next iteration
+            else dec(pos); //single char, next iteration
+          end;
+        end;
+      end;
+      gotonextchar;
+    end;
+  end;
+
+
+var
+  c: Char;
+  groups: array of integer; // > 0 capturing; < 0 not-capturing
+  groupcount: integer;
+  reslen: integer;
+  capturingGroupsCount: integer;
+  procedure resultAdd(r: Integer);
+  begin
+    result[reslen] := r;
+    inc(reslen);
+  end;
+
+begin
+  SetLength(result, length(regexpr));
+  groups := nil;
+  reslen := 0;
+  groupcount := 0;
+  capturingGroupsCount := 0;
+  pos := 1;
+  while pos <= length(regexpr) do begin
+    c := regexpr[pos];
+    case c of
+      '(': begin
+        if pos >= length(regexpr) then break;
+        if groupcount >= length(groups) then SetLength(groups, groupcount + 8);
+        if regexpr[pos+1] = '?' then begin
+          inc(pos, 2); //expect ?:
+          groups[groupcount] := -1;
+        end else  begin
+          inc(capturingGroupsCount); //this differs from regexprreencode
+          groups[groupcount] := capturingGroupsCount;
+          resultAdd(capturingGroupsCount);
+        end;
+        inc(groupcount);
+      end;
+      ')': begin
+        if groupcount <= 0 then break;
+        dec(groupcount);
+        if groups[groupcount] >= 0 then resultAdd(-groups[groupcount]);
+      end;
+      '[': charClassExpr;
+      '\': charClassEsc();
+    end;
+    inc(pos);
+  end;
+  if length(result) <> reslen then SetLength(result, reslen);
+end;
+
+
 
 {$IFDEF USE_SOROKINS_REGEX}
 
