@@ -884,6 +884,7 @@ var
 
   function nextBlock(till: Integer): string;
   begin
+    if till < curPos then till := curPos;
     result := xmlStrEscape(copy(input, curPos, till - curPos));
     curPos := till;
   end;
@@ -912,7 +913,8 @@ begin
   curPos := 1;
   if input <> '' then begin
     regex := wregexprParse(args, 2, false);
-    nesting := regexprGetGroupNesting(args[1].toString);
+    if (high(args) >= 2) and strContains(args[2].toString, 'q') then nesting := nil
+    else nesting := regexprGetGroupNesting(args[1].toString);
     try
       try
         {$IFDEF USE_SOROKINS_REGEX}
