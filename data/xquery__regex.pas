@@ -865,13 +865,12 @@ begin
   end;
 end;
 
+
+
 function xqFunctionAnalyze_String(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   regEx: TWrappedRegExpr;
   input: String;
-  {$IFDEF USE_SOROKINS_REGEX}
-
-  {$ENDIF}
   {$IFDEF USE_FLRE}
   i: Integer;
   captures: TFLREMultiCaptures;
@@ -879,58 +878,69 @@ var
 
   curPos: integer; //handled, excluding curPos
   tempStr: string;
-  pendingMatches: array of integer;
-  pendingMatchesLen: integer;
   node: TTreeNode;
   j: Integer;
+  nesting: TLongintArray;
 
-  procedure closeMatches(till: integer; minLength: integer); //till including
-  var
-    p: LongInt;
+  function nextBlock(till: Integer): string;
   begin
-    while (pendingMatchesLen > minLength) and (pendingMatches[pendingMatchesLen - 1] <= till) do begin
-      p := pendingMatches[pendingMatchesLen - 1];
-      tempStr += xmlStrEscape(copy(input, curPos, p - curPos)) + ifthen(pendingMatchesLen > 1, '</group>', '</match>');
-      curPos := p;
-      pendingMatchesLen -= 1;
-    end;
+    result := xmlStrEscape(copy(input, curPos, till - curPos));
+    curPos := till;
   end;
 
-  procedure addMatch(id, from, len: integer);
+  procedure openMatch(from: integer);
   begin
-    if id = 0 then begin
-      closeMatches(from, 0);
-      if curPos < from then tempStr += '<non-match>' + xmlStrEscape(copy(input, curPos, from - curPos)) + '</non-match>';
-      tempStr += '<match>';
-    end else begin
-      closeMatches(from, 1);
-      tempStr += xmlStrEscape(copy(input, curPos, from - curPos)) + '<group nr="'+IntToStr(id)+'">';
-    end;
-    curPos := from;
-    arrayAddFast(pendingMatches, pendingMatchesLen, from + len);
+    if from > curPos then tempStr += '<non-match>' + nextBlock(from) + '</non-match>';;
+    tempStr += '<match>';
+  end;
+  procedure openGroup(id, from: integer);
+  begin
+    tempStr += nextBlock(from) + '<group nr="'+IntToStr(id)+'">';
+  end;
+  procedure closeGroup(till: integer);
+  begin
+    tempStr += nextBlock(till) + '</group>';
+  end;
+  procedure closeMatch(till: integer);
+  begin
+    tempStr += nextBlock(till) + '</match>';
   end;
 
 begin
   requiredArgCount(args, 2, 3);
   input := args[0].toString;
-  pendingMatchesLen := 0;
   curPos := 1;
   if input <> '' then begin
     regex := wregexprParse(args, 2, false);
+    nesting := regexprGetGroupNesting(args[1].toString);
     try
       try
         {$IFDEF USE_SOROKINS_REGEX}
-        raise EXQEvaluationException.Create('FORX0002', 'analyze-string requires FLRE ');
+        if regEx.Exec(input) then
+          repeat
+            openMatch(regex.MatchPos[0]);
+            for j := 0 to high(nesting) do
+              if nesting[j] > 0 then openGroup(nesting[j], regex.MatchPos[nesting[j]])
+              else closeGroup(regex.MatchPos[-nesting[j]] + regex.MatchLen[-nesting[j]]);
+            closeMatch(regex.MatchPos[0] + regex.MatchLen[0]);
+          until not regEx.ExecNext;
         {$ENDIF}
         {$IFDEF USE_FLRE}
         captures := nil;
         regEx.UTF8MatchAll(input, captures);
-        for i := 0 to high(captures) do
-          for j := 0 to high(captures[i]) do
-            addMatch(j, captures[i][j].Start, captures[i][j].Length);
-        closeMatches(length(input) + 1, 0);
-        if curPos <= length(input) then tempStr += '<non-match>' + xmlStrEscape(strCopyFrom(input, curPos)) + '</non-match>';
+        for i := 0 to high(captures) do begin
+          openMatch(captures[i][0].Start);
+          for j := 0 to high(nesting) do
+            if nesting[j] > 0 then begin
+              if nesting[j] <= high(captures[i]) then openGroup(nesting[j], captures[i][nesting[j]].Start)
+              else openGroup(nesting[j], curPos);
+            end else
+              if -nesting[j] <= high(captures[i]) then closeGroup(captures[i][-nesting[j]].Start + captures[i][-nesting[j]].Length)
+              else closeGroup(curPos);
+          closeMatch(captures[i][0].Start + captures[i][0].Length);
+        end;
         {$ENDIF}
+        if curPos <= length(input) then tempStr += '<non-match>' + xmlStrEscape(strCopyFrom(input, curPos)) + '</non-match>';
       except
         on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
       end;
