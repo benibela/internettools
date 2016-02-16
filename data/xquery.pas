@@ -2325,7 +2325,7 @@ type
     OnImportModule: TXQImportModuleEvent;  //**< Event called to import a XQuery module that has not previously be defined
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
-    OnCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
+    OnCollection, OnUriCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
     OnParseDoc: TXQParseDocEvent; //**< Event called by fn:doc (if nil, a default xml parser is used)
 
     ParsingOptions: TXQParsingOptions;
@@ -7557,6 +7557,7 @@ fn.registerFunction('document-uri',@xqFunctionDocument_Uri, ['($arg as node()?) 
 fn.registerFunction('doc', @xqFunctionDoc, ['($uri as xs:string?) as document-node()?']);
 fn.registerFunction('doc-available', @xqFunctionDoc_Available, ['($uri as xs:string?) as xs:boolean']);
 fn.registerFunction('collection', @xqFunctionCollection, ['() as node()*', '($arg as xs:string?) as node()*']);
+fn3.registerFunction('uri-collection', @xqFunctionUri_Collection, ['() as xs:anyURI*', '($arg as xs:string?) as xs:anyURI*']);
 
 
 fn.registerFunction('root', @xqFunctionRoot, ['() as node()', '($arg as node()?) as node()?'], [xqcdFocusDocument]);

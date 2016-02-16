@@ -2638,6 +2638,17 @@ begin
   if result = nil then raise EXQEvaluationException.create('FODC0002', 'No collection entry for ' + url);
 end;
 
+function xqFunctionUri_Collection(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var url: string;
+begin
+  requiredArgCount(args, 0, 1);
+  if (length(args) = 0) or (args[0].isUndefined) then url := ''
+  else url := strResolveURI(args[0].toString, context.staticContext.baseURI);
+  result := nil;
+  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnUriCollection) then context.staticContext.sender.OnUriCollection(context.staticContext.sender, url, result);
+  if result = nil then raise EXQEvaluationException.create('FODC0002', 'No uri collection entry for ' + url);
+end;
+
 function xqFunctionConcatenate(const args: TXQVArray): IXQValue;
 var
  i: Integer;
