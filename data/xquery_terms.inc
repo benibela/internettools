@@ -755,7 +755,8 @@ end;
 function TXQTermSequenceType.subtypeOf(tb: TXQTermSequenceType): boolean;
 begin
   if kind = tikNone then exit((tb.kind = tikNone) or tb.allowNone);
-  if tb.kind = tikNone then exit(false);
+  if tb.kind = tikNone then
+    exit(allowNone and (kind = tikAtomic) and (atomicTypeInfo = baseSchema.error)); //special case: xs:error? is empty-sequence()
   if (allowNone and not tb.allowNone) or (allowMultiple and not tb.allowMultiple) then exit(false);
   result := subtypeItemTypeOf(tb);
 end;
