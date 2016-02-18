@@ -580,10 +580,11 @@ constructor TXQTermSequenceType.create();
 begin
 end;
 
-constructor TXQTermSequenceType.create(atomic: TXSType);
+constructor TXQTermSequenceType.create(atomic: TXSType; aallowNone: boolean);
 begin
   kind := tikAtomic;
   atomicTypeInfo := atomic;
+  allowNone := aallowNone;
 end;
 
 destructor TXQTermSequenceType.destroy;
@@ -3989,6 +3990,12 @@ begin
         (children[i] as TXQTermDefineVariable).push(temp);
       end;
       resulttype := TXQTermSequenceType.create(baseSchema.string_);
+    end else if f.kind = xqfkTypeConstructor then begin
+      for i := 0 to parameterCount - 1 do begin
+        temp := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
+        (children[i] as TXQTermDefineVariable).push(temp);
+      end;
+      resulttype := TXQTermSequenceType.create(TXSType(TObject(f.func)), true);
     end;
 
     if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
@@ -4038,6 +4045,8 @@ begin
        end else if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
         if f.interpretedFunction.parameters[i].seqtype <> nil then
           result.parameters[j].seqtype := TXQTermSequenceType(f.interpretedFunction.parameters[i].seqtype.clone);
+       end else if f.kind = xqfkTypeConstructor then begin
+         result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
        end;
       inc(j);
      end else
@@ -4049,7 +4058,9 @@ begin
   else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then
     result.resulttype := TXQTermSequenceType.create(baseSchema.string_)
   else if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (f.interpretedFunction.resulttype <> nil)  then
-    result.resulttype := TXQTermSequenceType(f.interpretedFunction.resulttype.clone);
+    result.resulttype := TXQTermSequenceType(f.interpretedFunction.resulttype.clone)
+  else if f.kind = xqfkTypeConstructor then
+    result.resulttype := TXQTermSequenceType.create(TXSType(TObject(f.func)), true);;
   result.context := context;
 end;
 
