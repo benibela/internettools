@@ -3967,7 +3967,6 @@ var
   resulttype: TXQTermSequenceType;
   f: TXQTermNamedFunction;
   i: Integer;
-  temp: TXQTermSequenceType;
 begin
   if (kind <> xqtdfNamedReference) or initialized then exit;
 
@@ -3984,18 +3983,12 @@ begin
           (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(version^.types[i]));
       resulttype := nativeMetaTypeToActualType(version^.returnType);
     end else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
-      for i := 0 to parameterCount-1 do begin
-        temp := TXQTermSequenceType.create;
-        temp.kind := tikAny;
-        temp.allowNone := true;
-        (children[i] as TXQTermDefineVariable).push(temp);
-      end;
+      for i := 0 to parameterCount-1 do
+        (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.anyAtomicType, true));
       resulttype := TXQTermSequenceType.create(baseSchema.string_);
     end else if f.kind = xqfkTypeConstructor then begin
-      for i := 0 to parameterCount - 1 do begin
-        temp := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
-        (children[i] as TXQTermDefineVariable).push(temp);
-      end;
+      for i := 0 to parameterCount - 1 do
+        (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.anyAtomicType, true));
       resulttype := TXQTermSequenceType.create(TXSType(TObject(f.func)), true);
     end;
 
@@ -4038,11 +4031,7 @@ begin
       if version <> nil then
         result.parameters[j].seqtype := nativeMetaTypeToActualType(version^.types[i])
        else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
-        result.parameters[j].seqtype := TXQTermSequenceType.create();
-        with result.parameters[j].seqtype do begin
-          kind := tikAny;
-          allowNone := true;
-        end;
+        result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
        end else if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
         if f.interpretedFunction.parameters[i].seqtype <> nil then
           result.parameters[j].seqtype := TXQTermSequenceType(f.interpretedFunction.parameters[i].seqtype.clone);

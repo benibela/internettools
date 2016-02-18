@@ -1507,7 +1507,7 @@ type
     arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 
     constructor create();
-    constructor create(atomic: TXSType; aallowNone: boolean = true);
+    constructor create(atomic: TXSType; aallowNone: boolean = false);
     destructor destroy; override;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
