@@ -2353,10 +2353,20 @@ function xqFunctionDocument_Uri(const args: TXQVArray): IXQValue;
 var
   node: TTreeNode;
 begin
-  requiredArgCount(args,1);
+  requiredArgCount(args, 0, 1);
   if args[0].isUndefined then exit(xqvalue);
   node := xqvalueToSingleNode(args[0]);
   if (node = nil) or not (node is TTreeDocument) then exit(xqvalue);
+  if TTreeDocument(node).documentURI = '' then exit(xqvalue);
+  result := baseSchema.anyURI.createValue(TTreeDocument(node).documentURI);
+end;
+
+function xqFunctionDocument_Uri0(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  node: TTreeNode;
+begin
+  node := context.contextNode();
+  if not (node is TTreeDocument) then exit(xqvalue);
   if TTreeDocument(node).documentURI = '' then exit(xqvalue);
   result := baseSchema.anyURI.createValue(TTreeDocument(node).documentURI);
 end;
@@ -2729,21 +2739,6 @@ begin
   end;
 end;
 
-function xqFunctionNilled(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-var
-  temp: IXQValue;
-begin
-  requiredArgCount(args, 1);
-  if args[0].getSequenceCount <> 1 then exit(xqvalue);
-  temp := args[0];
-  if temp is TXQValueSequence then temp := (temp as TXQValueSequence).seq[0];
-  if (temp.toNode <> nil) and (temp.toNode.typ = tetOpen) then
-    result := xqvalue((temp.toNode.getAttribute('xml:nil', @context.staticContext.nodeCollation.equal) = 'true')
-                       and (temp.toNode.deepNodeText() = ''))
-   else
-    result := xqvalue();
-  ignore(context);
-end;
 
 function xqFunctionDistinct_values(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
@@ -3247,17 +3242,6 @@ begin
 end;
 
 
-function xqFunctionNode_name(const args: TXQVArray): IXQValue;
-var
-  node: TTreeNode;
-begin
-  requiredArgCount(args,1);
-  node := args[0].toNode;
-  if (node <> nil) and (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) then
-    result := TXQValueQName.create(node.namespace, node.value)
-   else
-    result := xqvalue();
-end;
 
 function simpleNode(const context: TXQEvaluationContext; args: TXQVArray): TTreeNode;
 begin
@@ -3266,6 +3250,32 @@ begin
   else if args[0].isUndefined then exit(nil)
   else exit(xqvalueToSingleNode(args[0]));
 end;
+
+
+function xqFunctionNilled(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  node: TTreeNode;
+begin
+  node := simplenode(context, args);
+  if (node <> nil) and (node.typ = tetOpen) then
+    result := xqvalue((node.getAttribute('xml:nil', @context.staticContext.nodeCollation.equal) = 'true')
+                       and (node.deepNodeText() = ''))
+   else
+    result := xqvalue();
+  ignore(context);
+end;
+
+function xqFunctionNode_name(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  node: TTreeNode;
+begin
+  node := simpleNode(context, args);
+  if (node <> nil) and (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) then
+    result := TXQValueQName.create(node.namespace, node.value)
+   else
+    result := xqvalue();
+end;
+
 
 function simpleNodeName(const context: TXQEvaluationContext; args: TXQVArray): string;
 var

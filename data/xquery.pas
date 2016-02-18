@@ -7480,6 +7480,7 @@ pxp.registerInterpretedFunction('transform', '($f as function(*)) as item()*', '
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
 fn.registerFunction('empty', @xqFunctionempty,['($arg as item()*) as xs:boolean']);
 fn.registerFunction('nilled', @xqFunctionNilled,['($arg as node()?) as xs:boolean?']);
+fn3.registerFunction('nilled', @xqFunctionNilled,['() as xs:boolean']);
 fn.registerFunction('error',@xqFunctionError,['() as none', '($error as xs:QName) as none', '($error as xs:QName?, $description as xs:string) as none', '($error as xs:QName?, $description as xs:string, $error-object as item()*) as none']);
 
 fn.registerFunction('abs',@xqFunctionAbs,['($arg as numeric?) as numeric?']);
@@ -7556,6 +7557,7 @@ fn.registerFunction('default-collation', @xqFunctionDefault_Collation, ['() as x
 fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri, ['() as xs:anyURI?']);
 fn.registerFunction('base-uri',@xqFunctionBase_Uri, ['() as xs:anyURI?', '($arg as node()?) as xs:anyURI?']);
 fn.registerFunction('document-uri',@xqFunctionDocument_Uri, ['($arg as node()?) as xs:anyURI?']);
+fn3.registerFunction('document-uri',@xqFunctionDocument_Uri0, ['() as xs:anyURI?']);
 
 fn.registerFunction('doc', @xqFunctionDoc, ['($uri as xs:string?) as document-node()?']);
 fn.registerFunction('doc-available', @xqFunctionDoc_Available, ['($uri as xs:string?) as xs:boolean']);
@@ -7572,6 +7574,7 @@ fn.registerFunction('name',@xqFunctionName, ['() as xs:string', '($arg as node()
 fn.registerFunction('local-name',@xqFunctionLocal_Name, ['() as xs:string', '($arg as node()?) as xs:string'], [xqcdFocusDocument]);
 fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, ['() as xs:anyURI', '($arg as node()?) as xs:anyURI'], [xqcdFocusDocument]);
 fn.registerFunction('node-name', @xqFunctionNode_Name, ['($arg as node()?) as xs:QName?']);
+fn3.registerFunction('node-name', @xqFunctionNode_Name, ['() as xs:QName?']);
 fn.registerFunction('resolve-QName',@xqFunctionResolve_QName, ['($qname as xs:string?, $element as element()) as xs:QName?'], [xqcdContextCollation]);
 fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
 fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
