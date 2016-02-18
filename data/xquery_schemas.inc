@@ -405,7 +405,8 @@ var
   i: Integer;
   temp: TXSCastingError;
 begin
-  result := xsceXPTY0004;
+  if length(members) > 0 then result := xsceXPTY0004
+  else result := xsceFORG0001; //<- xs:error special case
   for i := 0 to high(members) do begin
     temp := members[i].tryCreateValue(v, outv);
     if temp = xsceNoError then exit(xsceNoError);
@@ -418,7 +419,8 @@ var
   i: Integer;
   temp: TXSCastingError;
 begin
-  result := xsceXPTY0004;
+  if length(members) > 0 then result := xsceXPTY0004
+  else result := xsceFORG0001; //<- xs:error special case
   for i := 0 to high(members) do begin
     temp := members[i].tryCreateValue(v, outv);
     if temp = xsceNoError then exit(xsceNoError);
@@ -1233,6 +1235,11 @@ begin
   node := TXSType.Create('node()', nil, TXQValueNode, self);
   sequence := TXSType.Create('sequence*', nil, TXQValueSequence, self);
   function_ := TXSType.Create('function(*)', nil, TXQValueFunction, self);
+
+  error := TXSUnionType.Create('error',nil,nil,[]);
+  error.variety := xsvAbsent;
+  error.schema := self;
+  typeList.AddObject('error', error);
 
   typeList.Sorted := true;
   numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);

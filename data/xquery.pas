@@ -1186,6 +1186,9 @@ type
     sequence, function_: TXSType;
     numericPseudoType: TXSUnionType;
 
+    //1.1 only
+    error: TXSSimpleType;
+
     constructor Create;
     destructor Destroy; override;
     function findType(const typeName: string): TXSType;
@@ -1504,7 +1507,7 @@ type
     arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 
     constructor create();
-    constructor create(atomic: TXSType);
+    constructor create(atomic: TXSType; aallowNone: boolean = true);
     destructor destroy; override;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
