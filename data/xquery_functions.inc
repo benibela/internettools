@@ -2059,9 +2059,26 @@ begin
 end;
 
 function xqFunctionType_of(const args: TXQVArray): IXQValue;
+var
+  t: TXSType;
+  f: TXQValueFunction;
+  r: String;
+  i: Integer;
 begin
   requiredArgCount(args, 1);
-  result := xqvalue(args[0].typeName);
+  t := args[0].typeAnnotation;
+  if (t = baseSchema.function_) and (args[0] is TXQValueFunction) then begin
+    f := args[0] as TXQValueFunction;
+    r := 'function(';
+    for i := 0 to high(f.parameters) do begin
+      if i <> 0 then r += ', ';
+      if f.parameters[i].seqtype = nil then r += '*'
+      else r += f.parameters[i].seqtype.serialize;
+    end;
+    r += ') as ';
+    if f.resulttype = nil then r += '*' else r += f.resulttype.serialize;
+    result :=xqvalue(r);
+  end else result := xqvalue(args[0].typeName);
 end;
 
 function xqFunctionGet_Property(const args: TXQVArray): IXQValue;

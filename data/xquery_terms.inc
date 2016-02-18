@@ -609,8 +609,8 @@ begin
   if (kind = tikAtomic) and (atomicTypeInfo = nil) then result += '(TYPE NOT FOUND)';
   if Result = '' then
     case kind of
-      tikNone: result := 'empty-sequence()';
-      tikAny: result := 'item()*';
+      tikNone: exit( 'empty-sequence()' );
+      tikAny: exit ( 'item()*' );
       tikAtomic: result := 'xs:'+atomicTypeInfo.name;
       tikFunctionTest: result := 'function';
       tikElementTest: result := 'node()';
@@ -621,7 +621,10 @@ begin
         delete(result, 1, 2);
       end;
     end;
-  //incomplete
+  if allowNone and allowMultiple then result += '*'
+  else if allowMultiple then result += '+'
+  else if allowNone then result += '?';
+  //incomplete??
 end;
 
 function TXQTermSequenceType.getContextDependencies: TXQContextDependencies;
