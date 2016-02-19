@@ -500,38 +500,8 @@ begin
   result := xqvalue('autoid'+strFromPtr(node));
 end;
 
-
-function englishfy(const n: string): string;
-  function englishfybelow1000(const n: string; lowest: integer): string;
-  const digits: array['1'..'9'] of string = ('one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine');
-        prefix: array['1'..'9'] of string = ('ten', 'twen', 'thir', 'for', 'fif', 'six', 'seven', 'eigh', 'nine');
-  begin
-    result := '';
-    if (lowest >= 3) and (n[lowest-2] > '0') then result := digits[n[lowest-2]] + ' hundred ';
-    if (lowest >= 2) then begin
-      case n[lowest - 1] of
-        '0': ;
-        '1': begin
-          case n[lowest] of
-            '0': result += 'ten';
-            '1': result += 'eleven';
-            '2': result += 'twelve';
-            '4': result += 'fourteen'
-            else result += prefix[n[lowest]] + 'teen';
-          end;
-          exit;
-        end;
-
-        else begin
-          result += prefix[n[lowest-1]] + 'ty';
-          if n[lowest] > '0' then result += '-';
-        end;
-      end;
-    end;
-    if n[lowest] <> '0' then result += digits[n[lowest]];
-  end;
-
-function blockgen(i: integer): string;
+//returns 1000^(i+1) as English numeral using the Conway-Wechsler system
+function strConwayWechsler(i: integer): string;
 const cache: array[0..18] of string = ('n', 'm', 'b', 'tr', 'quadr', 'quint', 'sext', 'sept', 'oct', 'non', 'dec', 'undec', 'duodec', 'tredec', 'quattuordec', 'quindec', 'sedec', 'septendec', 'octodec');      //illion
 var units: array[0..9] of string = ('', 'un', 'duo', 'tre', 'quattor', 'quinqua', 'se', 'septe', 'octo', 'nove');
     tens: array[0..9] of string = ('', 'deci', 'viginti', 'triginta', 'quadraginta', 'quinquaginta', 'sexaginta', 'septuaginta', 'octoginta', 'nonaginta');
@@ -539,12 +509,11 @@ var units: array[0..9] of string = ('', 'un', 'duo', 'tre', 'quattor', 'quinqua'
     ones: Integer;
 begin
   if i <= high(cache) then begin
-    result := cache[i] + 'illion'; //this returns nillion 10^0
+    result := cache[i] + 'illion'; //this returns nillion 1000^0
   end else if i >= 1000 then begin
-    //use the Conway-Wechsler system for larger illions
-    result := blockgen(i div 1000);
+    result := strConwayWechsler(i div 1000);
     delete(result, length(result) - 1, 2); //illion => illi
-    result += blockgen(i mod 1000);
+    result += strConwayWechsler(i mod 1000);
   end else begin
     //tens and hundreds
     result := tens[(i div 10) mod 10] + hundreds[i div 100];
@@ -581,25 +550,106 @@ begin
   end;
 end;
 
+
+function englishfy(const n: string; modifiers: TXQFormatIntegerModifiers): string;
+  const digits: array['1'..'9'] of string = ('one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine');
+       prefix: array['1'..'9'] of string = ('ten', 'twen', 'thir', 'for', 'fif', 'six', 'seven', 'eigh', 'nine');
+  function englishfybelow100(const n: string; lowest: integer): string;
+  begin
+    result := '';
+    if (lowest >= 2) then begin
+      case n[lowest - 1] of
+        '0': ;
+        '1': begin
+          case n[lowest] of
+            '0': result += 'ten';
+            '1': result += 'eleven';
+            '2': result += 'twelve';
+            '4': result += 'fourteen'
+            else result += prefix[n[lowest]] + 'teen';
+          end;
+          exit;
+        end;
+
+        else begin
+          result += prefix[n[lowest-1]] + 'ty';
+          if n[lowest] > '0' then result += '-';
+        end;
+      end;
+    end;
+    if (lowest >= 1) and (n[lowest] <> '0') then result += digits[n[lowest]];
+  end;
+
+  function englishfybelow1000(const n: string; lowest: integer): string;
+  var
+    hundreds: String;
+  begin
+    result := englishfybelow100(n, lowest);
+    if (lowest >= 3) and (n[lowest-2] > '0') then begin
+      hundreds := digits[n[lowest-2]] + ' hundred';
+      if result = '' then exit(hundreds);
+      if xqfimTraditional in modifiers then result := hundreds + ' and ' + result
+      else result := hundreds + ' ' + result;
+    end;
+  end;
+
+
+  procedure addWithScale(number, scale: string);
+  begin
+    if number = '' then exit;
+    if scale <> '' then scale := ' ' + scale;
+    if result <> '' then result := result + ' ' + number + scale
+    else result := number + scale;
+  end;
+
 var
   temp: String;
   blockStart: Integer;
   i: Integer;
+  temp2: String;
 begin
+  result := '';
+  if xqfimTraditional in modifiers then begin
+    //let's go crazy
+    if length(n) <= 4 then begin
+      i := StrToInt(n);
+      case i of
+        0: result := 'goose egg';
+        12: result := 'dozen';
+        100: result := 'teenty';
+        144: result := 'gross';
+        1000: result := 'grand';
+        1728: result := 'great gross';
+      end;
+    end;
+    if strBeginsWith(n, '10') and (strIndexOf(n, ['1'..'9'], 2) = 0) then begin
+      case length(n) of
+        1+4: result := 'myriad';
+        1+100: result := 'googol';
+      end;
+    end;
+    if result <> '' then exit;
+  end;
   if (n = '0') or (n = '') then exit('zero');
   blockStart := (length(n)-1) div 3;
-  result := '';
-  for i := blockStart downto 0 do begin
+  for i := blockStart downto 2 do begin
     temp := englishfybelow1000(n, length(n)-3*i);
-    if temp <> '' then begin
-      if (temp <> '') and (temp[length(temp)] = ' ') then result += temp //hundred ends with space, so do not add another one
-      else result += temp + ' ';
-      if i > 1 then result += blockgen(i-1)
-      else if i = 1 then result += 'thousand';
-      result += ' ';
-    end;
+    if temp <> '' then addWithScale(temp, strConwayWechsler(i-1));
   end;
-  while (result <> '') and (result[length(Result)] = ' ') do delete(result, length(result), 1);
+  if not (xqfimTraditional in modifiers)
+     or ((length(n) >= 5) and (n[length(n)-4] <> '0'))
+     or ((length(n) >= 6) and (n[length(n)-5] <> '0')) then begin
+       addWithScale(englishfybelow1000(n, length(n)-3), 'thousand');
+       addWithScale(englishfybelow1000(n, length(n)), '');
+  end else begin
+    if length(n) > 2 then  temp := englishfybelow100(n, length(n)-2) else temp := '';
+    temp2 := englishfybelow100(n, length(n));
+    if (temp <> '') and (temp2 <> '') then begin
+      addWithScale(temp, 'hundred');
+      result += ' and';
+    end else addWithScale(temp, 'hundred');
+    addWithScale(temp2, '');
+  end;
 end;
 
 function alphabetify(number: BigDecimal; one: char): string;
@@ -698,7 +748,7 @@ begin
       end;
       'w','W','Ww': begin
         case shortLang of
-          'en','': formatted := englishfy(BigDecimalToStr(number));
+          'en','': formatted := englishfy(BigDecimalToStr(number), modifiers);
         end;
         if formatted <> '' then
           case primaryFormat of
