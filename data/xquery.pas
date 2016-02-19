@@ -2028,10 +2028,16 @@ type
   TXQImportModuleEvent = procedure (sender: TObject; const namespace: string; const at: array of string) of object;
 
   //** Event called by the fn:trace(value,info) function.
-  type TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;
+  TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;
   //** Event called by the fn:doc to parse a downloaded document.
-  type TXQParseDocEvent = procedure (sender: TXQueryEngine; data, url, contenttype: string; var node: TTreeNode) of object;
+  TXQParseDocEvent = procedure (sender: TXQueryEngine; data, url, contenttype: string; var node: TTreeNode) of object;
 
+  //** Modifier for integer formatting, as described in fn:format-integer.
+  //** The absence of xqfimOrdinal means cardinal    , the absence of traditional means alphabetic. (traditional is a traditional way of writing integers with letters, e.g. roman numbers)
+  TXQFormatIntegerModifier = (xqfimOrdinal, xqfimTraditional);
+  TXQFormatIntegerModifiers = set of TXQFormatIntegerModifier;
+
+  TXQFormatIntegerEvent = procedure (sender: TObject; integerNumber: BigDecimal; primaryFormat, modifierVariant, language: string; modifiers: TXQFormatIntegerModifiers; var formatted: string) of object;
 
   //** Record grouping different parsing options
   TXQParsingOptions = record
@@ -7630,6 +7636,7 @@ fn3.registerInterpretedFunction('innermost', '($nodes as node()*) as node()*', '
 fn3.registerInterpretedFunction('outermost', '($nodes as node()*) as node()*', '$nodes[not(ancestor::node() intersect $nodes)]/.', []);
 fn3.registerFunction('path', @xqFunctionPath, ['() as xs:string?', '($arg as node()?) as xs:string?']);
 
+fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, ['($value as xs:integer?, $picture as xs:string) as xs:string', '(	$value	 as xs:integer?, $picture	 as xs:string,$lang	 as xs:string?) as xs:string']);
 
 fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, ['($name as xs:QName, $arity as xs:integer) as function(*)?']);
 fn3.registerFunction('function-name', @xqFunctionFunction_Name, ['($func as function(*)) as xs:QName?']);

@@ -501,4 +501,211 @@ begin
 end;
 
 
+function englishfy(const n: string): string;
+  function englishfybelow1000(const n: string; lowest: integer): string;
+  const digits: array['1'..'9'] of string = ('one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine');
+        prefix: array['1'..'9'] of string = ('ten', 'twen', 'thir', 'for', 'fif', 'six', 'seven', 'eigh', 'nine');
+  begin
+    result := '';
+    if (lowest >= 3) and (n[lowest-2] > '0') then result := digits[n[lowest-2]] + ' hundred ';
+    if (lowest >= 2) then begin
+      case n[lowest - 1] of
+        '0': ;
+        '1': begin
+          case n[lowest] of
+            '0': result += 'ten';
+            '1': result += 'eleven';
+            '2': result += 'twelve';
+            '4': result += 'fourteen'
+            else result += prefix[n[lowest]] + 'teen';
+          end;
+          exit;
+        end;
+
+        else begin
+          result += prefix[n[lowest-1]] + 'ty';
+          if n[lowest] > '0' then result += '-';
+        end;
+      end;
+    end;
+    if n[lowest] <> '0' then result += digits[n[lowest]];
+  end;
+
+function blockgen(i: integer): string;
+var units: array[0..9] of string = ('', 'un', 'duo', 'tre', 'quattor', 'quinqua', 'se', 'septe', 'octo', 'nove');
+    tens: array[0..9] of string = ('', 'deci', 'viginti', 'triginta', 'quadraginta', 'quinquaginta', 'sexaginta', 'septuaginta', 'octoginta', 'nonaginta');
+    hundreds: array[0..9] of string = ('', 'centi', 'ducenti', 'trecenti', 'quadringenti', 'quingenti', 'sescenti', 'septigenti', 'octingenti', 'nongenti');
+    ones: Integer;
+begin
+  //tens and hundreds
+  result := tens[(i div 10) mod 10] + hundreds[i div 100];
+  //ones, with special cases for intermediate letter insertion
+  if result = '' then result := units[i] // should not happen
+  else begin
+    ones := i mod 10;
+    case ones of
+      3, 6:
+        case result[1] of
+          'v','t','q': result := units[ones] + 's' + result;
+          'o', 'x':
+            if ones = 3 then result := units[ones] + 's' + result
+            else result := units[ones] + 'x' + result;
+          else result := units[ones] + result;
+        end;
+      7, 9: case result[1] of
+        'o', 'v': result := units[ones] + 'm' + result;
+        'n': result := units[ones] + result;
+        else result := units[ones] + 'n' + result;
+      end;
+      else result := units[ones] + result;
+    end;
+  end;
+  //remove vocal, add illion
+  case result[length(result)] of
+    'i': result += 'llion';
+    'a','o','e','u': begin
+      delete(result,length(result),1);
+      result += 'illion';
+    end;
+    else result += 'illion';
+  end;
+end;
+
+const blocks: array[0..19] of string = ('', 'thousand', 'm', 'b', 'tr', 'quadr', 'quint', 'sext', 'sept', 'oct', 'non', 'dec', 'undec', 'duodec', 'tredec', 'quattuordec', 'quindec', 'sexdec', 'septendec', 'octodec');      //illion
+var
+  temp: String;
+  blockStart: Integer;
+  i: Integer;
+begin
+  if (n = '0') or (n = '') then exit('zero');
+  blockStart := (length(n)-1) div 3;
+  if blockStart > 1000 then exit;
+  result := '';
+  for i := blockStart downto 0 do begin
+    temp := englishfybelow1000(n, length(n)-3*i);
+    if temp <> '' then begin
+      if (temp <> '') and (temp[length(temp)] = ' ') then result += temp //hundred ends with space, so do not add another one
+      else result += temp + ' ';
+      if i > high(blocks) then result += blockgen(i-1)
+      else if i > 1 then result += blocks[i] + 'illion'
+      else if i = 1 then result += 'thousand';
+      result += ' ';
+    end;
+  end;
+  while (result <> '') and (result[length(Result)] = ' ') do delete(result, length(result), 1);
+end;
+
+function alphabetify(number: BigDecimal; one: char): string;
+var base, aaa, aaaa: BigDecimal;
+    len: Integer;
+    remainder: BigDecimal;
+    quotient: BigDecimal;
+    i: Integer;
+begin
+  base := 26;
+  aaa := 1; aaaa := base;
+  len := 1;
+  number := number - 1;
+  while number >= aaaa do begin
+    aaa := aaaa;
+    aaaa := aaa * 26;
+    number -= aaa;
+    inc(len);
+  end;
+  SetLength(result, len);
+  for i := 1 to len do begin
+    divideModNoAlias(quotient, remainder, number, base, 0, [bddfFillIntegerPart, bddfNoFractionalPart]);
+    result[len-i+1] := chr(ord(one) + BigDecimalToLongint(remainder));
+    number := quotient;
+  end;
+end;
+
+function xqFunctionFormat_Integer(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+
+
+var
+  primaryFormat, modifierVariant: String;
+  separator: LongInt;
+  modifiers: TXQFormatIntegerModifiers;
+  i: Integer;
+  number: BigDecimal;
+  formatted: String;
+  j: LongInt;
+  signed: Boolean;
+  lang: String;
+  shortLang: String;
+  procedure raiseInvalidPicture();
+  begin
+    raise EXQEvaluationException.create('FODF1310', 'Invalid picture string: ', nil, args[1]);
+  end;
+
+begin
+  requiredArgCount(args, 2, 3);
+  //preprocessing picture string
+  primaryFormat := args[1].toString;
+  separator := strLastIndexOf(primaryFormat, ';');
+  modifiers := [];
+  modifierVariant := '';
+  if separator > 0 then begin
+    i := separator + 1;
+    if (i <= length(primaryFormat)) and (primaryFormat[i] in ['c', 'o']) then begin
+      if primaryFormat[i] = 'o' then include(modifiers, xqfimOrdinal);
+      inc(i);
+      if (i <= length(primaryFormat)) and (primaryFormat[i] = '(') then begin
+        j := strLastIndexOf(primaryFormat, ')');
+        if j <= 0 then raiseInvalidPicture;
+        modifierVariant := copy(primaryFormat, i + 1, j - i - 1);
+        i := j + 1;
+      end;
+    end;
+    if (i <= length(primaryFormat)) then
+      case primaryFormat[i] of
+        'a': inc(i);
+        't': begin
+          include(modifiers, xqfimTraditional);
+          inc(i);
+        end;
+      end;
+    if (i <= length(primaryFormat)) then raiseInvalidPicture();
+    delete(primaryFormat, separator, length(primaryFormat) - separator + 1);
+  end;
+
+  if high(args) < 2 then lang := ''
+  else lang := args[2].toString;
+  shortLang := lang;
+  if strContains(shortLang, '-') then shortLang := LowerCase(strBefore(shortLang, '-'));
+
+
+  //default conversions
+
+  number := args[0].toDecimal;
+  signed := number.signed;
+  number.signed := false;
+  formatted := '';
+  if primaryFormat <> '' then
+    case primaryFormat of
+      'A', 'a': if not isZero(number) then formatted := alphabetify(number, primaryFormat[1]);
+      'i', 'I': begin
+        if isLongint(number) then formatted := IntToRoman(BigDecimalToLongint(number));
+        if primaryFormat = 'i' then formatted := LowerCase(formatted);
+      end;
+      'w','W','Ww': begin
+        case shortLang of
+          'en','': formatted := englishfy(BigDecimalToStr(number));
+        end;
+        if formatted <> '' then
+          case primaryFormat of
+            'W': formatted := UpperCase(formatted);
+            'Ww': begin
+              formatted[1] := upCase(formatted[1]);
+              for i := 1 to length(formatted) - 1 do
+                if formatted[i] in [' ', '-'] then formatted[i+1]:=upCase(formatted[i+1]);
+            end;
+          end;
+      end;
+    end;
+  if formatted = '' then formatted := BigDecimalToStr(number);
+  if Signed and not isZero(number) then formatted := '-' + formatted ;
+  result := xqvalue(formatted);
+end;
 

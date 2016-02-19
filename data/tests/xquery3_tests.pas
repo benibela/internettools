@@ -278,7 +278,9 @@ begin
   '*FGIJ -FG--'{actually the spec says -F--- but see w3 bug 27175}+' ----- ----- ----- ----- ----- --G-- --G-- --GI- --GIJ');
 
   t('typeswitch (boolean#1) case function (item()*) as xs:boolean return "T" default return "F"', 'T');
-  t('concat#4 ! (typeswitch (.) case function (string,string,string,string) as xs:string return "T" default return "F", typeswitch (.) case function (item(),item(),item(),item()) as xs:string return "T" default return "F")', 'T T');
+  t('concat#4 ! (typeswitch (.) case function (string,string,string,string) as xs:string return "T" default return "F", typeswitch (.) case function (item(),item(),item(),item()) as xs:string return "T" default return "F")', 'T F');
+  t('concat(?,?,?,?) ! (typeswitch (.) case function (string,string,string,string) as xs:string return "T" default return "F", typeswitch (.) case function (item(),item(),item(),item()) as xs:string return "T" default return "F")', 'T F');
+  t('xs:int#1 ! (typeswitch (.) case function (string) as xs:int? return "T" default return "F", typeswitch (.) case function (item()) as xs:int? return "T" default return "F")', 'T F');
   t('abs#1 ! (typeswitch (.) case function (anyAtomicType?) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (item()) as anyAtomicType? return "T" default return "F")', 'T F');
   m('declare function wntc($a as xs:int, $b as xs:string) as xs:float { concat(">",$a,$b,"<") }; typeswitch (wntc#2) case function (int, string) as xs:float return "T" default return "F"', 'T');
   m('typeswitch ( function () { function () { function ($a as xs:integer, $b as xs:integer ) as xs:integer { a + b } (?, 10) } } () () ) case function (xs:decimal) as xs:integer return 1 case function (xs:integer) as xs:int return 2 case function (xs:integer) as xs:integer return 3 default return 4 ', '3');

@@ -314,6 +314,12 @@ begin
   t('fn:round(-12550, -2)', '-12500');
   t('fn:round(xs:float(12345.6), 2)', '12345.6');
 
+  //Formatting
+  t('(1 to 3, 26, 27, 28, 702, 703, 18278) ! format-integer(., "a")', 'a b c z aa ab zz aaa zzz');
+  t('(1 to 10,4000) ! format-integer(., "i")', 'i ii iii iv v vi vii viii ix x mmmm');
+  t('(1 to 13,15, 18, 40, 50, 80, 100, 100000) ! format-integer(., "Ww")', 'One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Thirteen Fifteen Eighteen Forty Fifty Eighty One Hundred One Hundred Thousand');
+  t('(1000, 1000000, 1000000000, 1000000000000, 1000000000000000) ! format-integer(., "w")', 'one thousand one million one billion one trillion one quadrillion');
+
 
   try raise EMathError.create('The math tests raise EMathError exceptions. These exceptions should be disabled in the debugger.'); except on EMathError do ; end;
 
