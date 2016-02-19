@@ -553,38 +553,48 @@ end;
 
 function englishfy(const n: string; modifiers: TXQFormatIntegerModifiers): string;
   const digits: array['1'..'9'] of string = ('one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine');
-       prefix: array['1'..'9'] of string = ('ten', 'twen', 'thir', 'for', 'fif', 'six', 'seven', 'eigh', 'nine');
-  function englishfybelow100(const n: string; lowest: integer): string;
+        prefix: array['1'..'9'] of string = ('ten', 'twen', 'thir', 'for', 'fif', 'six', 'seven', 'eigh', 'nine');
+        digitsOrdinals: array['1'..'9'] of string = ('first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth');
+  function englishfybelow100(lowest: integer): string;
+    function ordinalCase: boolean; inline;
+    begin
+      result := (length(n) = lowest) and (xqfimOrdinal in modifiers);
+    end;
+
   begin
     result := '';
-    if (lowest >= 2) then begin
+    if lowest <= 0 then exit;
+    if (lowest >= 2) then
       case n[lowest - 1] of
         '0': ;
         '1': begin
           case n[lowest] of
-            '0': result += 'ten';
-            '1': result += 'eleven';
-            '2': result += 'twelve';
+            '0': result := 'ten';
+            '1': result := 'eleven';
+            '2': if not ordinalCase then result := 'twelve' else exit('twelfth');
             '4': result += 'fourteen'
             else result += prefix[n[lowest]] + 'teen';
           end;
+          if ordinalCase then result += 'th';
           exit;
         end;
-
         else begin
-          result += prefix[n[lowest-1]] + 'ty';
-          if n[lowest] > '0' then result += '-';
+          result := prefix[n[lowest-1]];
+          if n[lowest] > '0' then result += 'ty-'
+          else if not ordinalCase then result += 'ty'
+          else result += 'tieth'
         end;
       end;
-    end;
-    if (lowest >= 1) and (n[lowest] <> '0') then result += digits[n[lowest]];
+    if (n[lowest] <> '0') then
+      if not ordinalCase then result += digits[n[lowest]]
+      else result += digitsOrdinals[n[lowest]];
   end;
 
-  function englishfybelow1000(const n: string; lowest: integer): string;
+  function englishfybelow1000(lowest: integer): string;
   var
     hundreds: String;
   begin
-    result := englishfybelow100(n, lowest);
+    result := englishfybelow100(lowest);
     if (lowest >= 3) and (n[lowest-2] > '0') then begin
       hundreds := digits[n[lowest-2]] + ' hundred';
       if result = '' then exit(hundreds);
@@ -602,6 +612,21 @@ function englishfy(const n: string; modifiers: TXQFormatIntegerModifiers): strin
     else result := number + scale;
   end;
 
+  procedure ordinalize;
+  var
+    suffix: String;
+  begin
+    if not (xqfimOrdinal in modifiers) then exit;
+    suffix := 'th';
+    if (length(n) < 2) or (n[length(n)-1] <> '1') then
+      case n[length(n)] of
+        '1': suffix := 'st';
+        '2': suffix := 'nd';
+        '3': suffix := 'rd';
+      end;
+    result += suffix;
+  end;
+
 var
   temp: String;
   blockStart: Integer;
@@ -616,7 +641,7 @@ begin
       case i of
         0: result := 'goose egg';
         12: result := 'dozen';
-        100: result := 'teenty';
+        100: if not (xqfimOrdinal in modifiers) then result := 'teenty';
         144: result := 'gross';
         1000: result := 'grand';
         1728: result := 'great gross';
@@ -628,28 +653,37 @@ begin
         1+100: result := 'googol';
       end;
     end;
-    if result <> '' then exit;
+    if result <> '' then begin
+      if xqfimOrdinal in modifiers then result += 'th';
+      exit;
+    end;
   end;
-  if (n = '0') or (n = '') then exit('zero');
+  if (n = '0') or (n = '') then
+    if xqfimOrdinal in modifiers then exit('zeroth')
+    else exit('zero');
   blockStart := (length(n)-1) div 3;
   for i := blockStart downto 2 do begin
-    temp := englishfybelow1000(n, length(n)-3*i);
+    temp := englishfybelow1000(length(n)-3*i);
     if temp <> '' then addWithScale(temp, strConwayWechsler(i-1));
   end;
   if not (xqfimTraditional in modifiers)
      or ((length(n) >= 5) and (n[length(n)-4] <> '0'))
      or ((length(n) >= 6) and (n[length(n)-5] <> '0')) then begin
-       addWithScale(englishfybelow1000(n, length(n)-3), 'thousand');
-       addWithScale(englishfybelow1000(n, length(n)), '');
+       addWithScale(englishfybelow1000(length(n)-3), 'thousand');
+       addWithScale(englishfybelow1000(length(n)), '');
   end else begin
-    if length(n) > 2 then  temp := englishfybelow100(n, length(n)-2) else temp := '';
-    temp2 := englishfybelow100(n, length(n));
+    if length(n) > 2 then  temp := englishfybelow100(length(n)-2) else temp := '';
+    temp2 := englishfybelow100(length(n));
     if (temp <> '') and (temp2 <> '') then begin
       addWithScale(temp, 'hundred');
       result += ' and';
     end else addWithScale(temp, 'hundred');
     addWithScale(temp2, '');
   end;
+  if (xqfimOrdinal in modifiers) then
+    case copy(n, length(n)-1,2) of
+      '00', '0': result += 'th';
+    end;
 end;
 
 function alphabetify(number: BigDecimal; one: char): string;
