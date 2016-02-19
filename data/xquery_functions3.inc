@@ -532,46 +532,55 @@ function englishfy(const n: string): string;
   end;
 
 function blockgen(i: integer): string;
+const cache: array[0..18] of string = ('n', 'm', 'b', 'tr', 'quadr', 'quint', 'sext', 'sept', 'oct', 'non', 'dec', 'undec', 'duodec', 'tredec', 'quattuordec', 'quindec', 'sexdec', 'septendec', 'octodec');      //illion
 var units: array[0..9] of string = ('', 'un', 'duo', 'tre', 'quattor', 'quinqua', 'se', 'septe', 'octo', 'nove');
     tens: array[0..9] of string = ('', 'deci', 'viginti', 'triginta', 'quadraginta', 'quinquaginta', 'sexaginta', 'septuaginta', 'octoginta', 'nonaginta');
     hundreds: array[0..9] of string = ('', 'centi', 'ducenti', 'trecenti', 'quadringenti', 'quingenti', 'sescenti', 'septigenti', 'octingenti', 'nongenti');
     ones: Integer;
 begin
-  //tens and hundreds
-  result := tens[(i div 10) mod 10] + hundreds[i div 100];
-  //ones, with special cases for intermediate letter insertion
-  if result = '' then result := units[i] // should not happen
-  else begin
-    ones := i mod 10;
-    case ones of
-      3, 6:
-        case result[1] of
-          'v','t','q': result := units[ones] + 's' + result;
-          'o', 'x':
-            if ones = 3 then result := units[ones] + 's' + result
-            else result := units[ones] + 'x' + result;
-          else result := units[ones] + result;
+  if i <= high(cache) then begin
+    result := cache[i] + 'illion'; //this returns nillion 10^0
+  end else if i >= 1000 then begin
+    //use the Conway-Wechsler system for larger illions
+    result := blockgen(i div 1000);
+    delete(result, length(result) - 1, 2); //illion => illi
+    result += blockgen(i mod 1000);
+  end else begin
+    //tens and hundreds
+    result := tens[(i div 10) mod 10] + hundreds[i div 100];
+    //ones, with special cases for intermediate letter insertion
+    if result = '' then result := units[i] // should not happen
+    else begin
+      ones := i mod 10;
+      case ones of
+        3, 6:
+          case result[1] of
+            'v','t','q': result := units[ones] + 's' + result;
+            'o', 'x':
+              if ones = 3 then result := units[ones] + 's' + result
+              else result := units[ones] + 'x' + result;
+            else result := units[ones] + result;
+          end;
+        7, 9: case result[1] of
+          'o', 'v': result := units[ones] + 'm' + result;
+          'n': result := units[ones] + result;
+          else result := units[ones] + 'n' + result;
         end;
-      7, 9: case result[1] of
-        'o', 'v': result := units[ones] + 'm' + result;
-        'n': result := units[ones] + result;
-        else result := units[ones] + 'n' + result;
+        else result := units[ones] + result;
       end;
-      else result := units[ones] + result;
     end;
-  end;
-  //remove vocal, add illion
-  case result[length(result)] of
-    'i': result += 'llion';
-    'a','o','e','u': begin
-      delete(result,length(result),1);
-      result += 'illion';
+    //remove vocal, add illion
+    case result[length(result)] of
+      'i': result += 'llion';
+      'a','o','e','u': begin
+        delete(result,length(result),1);
+        result += 'illion';
+      end;
+      else result += 'illion';
     end;
-    else result += 'illion';
   end;
 end;
 
-const blocks: array[0..19] of string = ('', 'thousand', 'm', 'b', 'tr', 'quadr', 'quint', 'sext', 'sept', 'oct', 'non', 'dec', 'undec', 'duodec', 'tredec', 'quattuordec', 'quindec', 'sexdec', 'septendec', 'octodec');      //illion
 var
   temp: String;
   blockStart: Integer;
@@ -579,15 +588,13 @@ var
 begin
   if (n = '0') or (n = '') then exit('zero');
   blockStart := (length(n)-1) div 3;
-  if blockStart > 1000 then exit;
   result := '';
   for i := blockStart downto 0 do begin
     temp := englishfybelow1000(n, length(n)-3*i);
     if temp <> '' then begin
       if (temp <> '') and (temp[length(temp)] = ' ') then result += temp //hundred ends with space, so do not add another one
       else result += temp + ' ';
-      if i > high(blocks) then result += blockgen(i-1)
-      else if i > 1 then result += blocks[i] + 'illion'
+      if i > 1 then result += blockgen(i-1)
       else if i = 1 then result += 'thousand';
       result += ' ';
     end;
