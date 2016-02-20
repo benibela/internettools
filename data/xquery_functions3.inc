@@ -915,21 +915,24 @@ var shortLang: String;
     sepcount := 0;
     optional := 0;
     mandatory := 0;
-    validGroupingSeparator := wregexprParse('^[^\p{Nd}\p{Nl}\p{No}\p{Lu}\p{Ll}\p{Lt}\p{Lm}\p{Lo}]$',[]);
+    validGroupingSeparator := nil;
     for cp in strIterator(primaryFormat) do begin
       if cp = ord('#') then begin
         if mandatory > 0 then raise EXQEvaluationException.create('FODF1310', 'Invalid optional in ' + primaryFormat);
         inc(optional)
       end else if (cp >= family) and (cp < family + 10) then inc(mandatory)
-      else if (optional + mandatory > 0) and wregexprMatches(validGroupingSeparator, strGetUnicodeCharacter(cp)) then begin
-        if sepcount >= length(separators) then SetLength(separators, sepcount * 2);
-        separators[sepcount].sep := strGetUnicodeCharacter(cp);
-        separators[sepcount].pos := optional + mandatory;
-        inc(sepcount)
-      end else begin
-        wregexprFree(validGroupingSeparator);
-        raise EXQEvaluationException.create('FODF1310', 'Invalid grouping separator in ' + primaryFormat);
-      end
+      else begin
+        if validGroupingSeparator = nil then validGroupingSeparator := wregexprParse('^[^\p{Nd}\p{Nl}\p{No}\p{Lu}\p{Ll}\p{Lt}\p{Lm}\p{Lo}]$',[]);
+        if (optional + mandatory > 0) and wregexprMatches(validGroupingSeparator, strGetUnicodeCharacter(cp)) then begin
+          if sepcount >= length(separators) then SetLength(separators, sepcount * 2);
+          separators[sepcount].sep := strGetUnicodeCharacter(cp);
+          separators[sepcount].pos := optional + mandatory;
+          inc(sepcount)
+        end else begin
+          wregexprFree(validGroupingSeparator);
+          raise EXQEvaluationException.create('FODF1310', 'Invalid grouping separator in ' + primaryFormat);
+        end
+      end;
     end;
     wregexprFree(validGroupingSeparator);
     if mandatory = 0 then raise EXQEvaluationException.create('FODF1310', 'No digit in ' + primaryFormat);
