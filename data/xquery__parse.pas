@@ -607,7 +607,7 @@ var partialApplications: integer;
       if pos^ = '?' then begin
         inc(pos);
         inc(partialApplications);
-        result.push(TXQTermVariable.create(inttostr(partialApplications)+'.', XMLNamespace_MyExtensions));
+        result.push(TXQTermVariable.create(inttostr(partialApplications)+'.', XMLNamespace_MyExtensionsNew));
         exit;
       end;
     end;
@@ -1798,7 +1798,7 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
   procedure pushTerm(t: TXQTerm);
   begin
     if not (t is TXQTermConstant) then
-      t := TXQTermNamedFunction.create(XMLNamespaceUrl_MyExtensions, 'join', [t]);
+      t := TXQTermNamedFunction.create(XMLNamespaceURL_MyExtensionsNew, 'join', [t]);
     if (result = nil) and (t is TXQTermConstant) then
       result := t
     else if result = nil then
@@ -2794,7 +2794,7 @@ var declarationDuplicateChecker: TStringList;
         expect(':=');
         vari.push(parse());
         SetLength(vari.annotations, length(vari.annotations)+1);
-        vari.annotations[high(vari.annotations)].name := TXQEQName.create(XMLNamespaceURL_MyExtensions, 'external');
+        vari.annotations[high(vari.annotations)].name := TXQEQName.create(XMLNamespaceURL_MyExtensionsNew, 'external');
       end;
       else raiseParsingError('XPST0003', 'Invalid variable declaration');
     end;
@@ -3005,7 +3005,7 @@ begin
             if nameSpaceName <> '' then nameSpaceURL := staticContext.findNamespaceURLMandatory(nameSpaceName, xqdnkUnknown)
             else if isModel3 then nameSpaceURL := 'http://www.w3.org/2012/xquery'
             else raiseParsingError('XPST0081', 'No namespace');
-          if nameSpaceURL = XMLNamespaceURL_MyExtensions then begin
+          if (nameSpaceURL = XMLNamespaceURL_MyExtensionsNew) or (nameSpaceURL = XMLNamespaceURL_MyExtensionsMerged) then begin
             case token of
               'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI, 'XQST0038');
               'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
@@ -3267,7 +3267,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           if not (xqpmXPath2 in module.acceptedModels) then result += ' (XPath/XQuery 3.0)';
         result += ':'+LineEnding+moduleResult+LineEnding;
       end;
-      if module.parent <> nil then searchModule(TXQNativeModuleBreaker(module.parent));
+      for i := 0 to high(module.parents) do
+        searchModule(TXQNativeModuleBreaker(module.parents[i]));
     end;
 
     var

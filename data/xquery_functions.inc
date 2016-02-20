@@ -2960,6 +2960,18 @@ begin
       resseq.add(x);
 end;
 
+function xqFunctionProduct(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  v: IXQValue;
+begin
+  requiredArgCount(args,1);
+  if args[0].isUndefined then exit(args[0]);
+  result := nil;
+  for v in args[0] do
+    if result = nil then result := v
+    else result := xqvalueMultiply(context, result, v);
+end;
+
 function xqFunctionSum(const args: TXQVArray): IXQValue;
 var
  tempf: xqfloat;

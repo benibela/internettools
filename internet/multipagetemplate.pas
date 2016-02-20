@@ -461,11 +461,11 @@ begin
       if e.errorCode >= 0 then tempcode := IntToStr(e.errorCode)
       else tempcode := '000';
       while length(tempcode) < 3 do tempcode := '0' + tempcode;
-      if checkError(XMLNamespaceURL_MyExtensions, 'pxp', 'http' + tempcode)  then exit;
+      if checkError(XMLNamespaceURL_MyExtensionsNew, 'x', 'http' + tempcode)  then exit;
       raise;
     end;
     on e: EHTMLParseMatchingException do begin
-      if checkError(XMLNamespaceURL_MyExtensions, 'pxp', 'pattern') then exit;
+      if checkError(XMLNamespaceURL_MyExtensionsNew, 'x', 'pattern') then exit;
       raise;
     end;
   end;
@@ -501,10 +501,10 @@ begin
         errCodes[i] := temp[1];
         case errNamespaces[i] of
           'err': errNamespaces[i] := XMLNamespaceURL_XQTErrors;
-          'pxp': errNamespaces[i] := XMLNamespaceURL_MyExtensions;
+          'pxp', 'x': errNamespaces[i] := XMLNamespaceURL_MyExtensionsNew;
           'local': errNamespaces[i] := XMLNamespaceURL_XQueryLocalFunctions;
           'http': begin
-            errNamespaces[i] := XMLNamespaceURL_MyExtensions;
+            errNamespaces[i] := XMLNamespaceURL_MyExtensionsNew;
             errCodes[i] := 'http' + errCodes[i];
             case length(errCodes[i]) of
               length('http12*'): errCodes[i] := StringReplace(errCodes[i], '*', 'x', []);
@@ -518,7 +518,7 @@ begin
           end
         end;
       end else begin
-        errNamespaces[i] := XMLNamespaceURL_MyExtensions;
+        errNamespaces[i] := XMLNamespaceURL_MyExtensionsNew;
         errCodes[i] := errors[i];
         if errCodes[i] = '*' then errNamespaces[i] := '*';
       end;
@@ -554,7 +554,7 @@ function TTemplateActionCatch.checkError(reader: TMultipageTemplateReader; const
     for i := 0 to high(errCodes) do begin
       if (errNamespaces[i] <> namespace) and (errNamespaces[i] <> '*') then continue;
       if (errCodes[i] = code) or (errCodes[i] = '*') then exit(true);
-      if (errNamespaces[i] = XMLNamespaceURL_MyExtensions) and (strBeginsWith(errCodes[i], 'http')) and (strBeginsWith(code, 'http')) then begin
+      if (errNamespaces[i] = XMLNamespaceURL_MyExtensionsNew) and (strBeginsWith(errCodes[i], 'http')) and (strBeginsWith(code, 'http')) then begin
         if length(errCodes[i]) = 4 { = 'http' } then exit(true);
         if length(errCodes[i]) <> length(code) then continue;
         ok := true;

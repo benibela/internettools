@@ -3729,8 +3729,8 @@ var
 begin
   parameterCount := arity;
   for i := 1 to arity do begin
-    push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
-    fun.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensions));
+    push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew));
+    fun.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew));
   end;
   push(fun);
   kind := xqtdfNamedReference;

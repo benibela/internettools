@@ -2670,8 +2670,9 @@ type
  TXQNativeModule = class
   acceptedModels: set of TXQParsingModel;
   namespace: INamespace;
-  parent: TXQNativeModule;
-  constructor create(const anamespace: INamespace; const aparentModule: TXQNativeModule=nil);
+  parents: array of TXQNativeModule;
+  constructor create(const anamespace: INamespace; const aparentModule: array of TXQNativeModule);
+  constructor create(const anamespace: INamespace);
   destructor Destroy; override;
   //** Registers a function that does not depend on the context.
   //** TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
@@ -2718,7 +2719,8 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
         XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
         XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
         XMLNamespaceURL_XQTErrors = 'http://www.w3.org/2005/xqt-errors';
-        XMLNamespaceURL_MyExtensions = MY_NAMESPACE_PREFIX_URL + 'extensions';
+        XMLNamespaceURL_MyExtensionsMerged = MY_NAMESPACE_PREFIX_URL + 'extensions';
+        XMLNamespaceURL_MyExtensionsNew = 'http://pxp.benibela.de';
         XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
         XMLNamespaceURL_XQuery = 'http://www.w3.org/2012/xquery';
 
@@ -2774,7 +2776,7 @@ protected
 
 end;
 
-var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensions: INamespace;
+var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged: INamespace;
 function convertElementTestToPathMatchingStep(const select: string; const children: TXQTermArray): TXQPathMatchingStep;
 
 function xqFunctionConcat(const args: TXQVArray): IXQValue;
@@ -3031,7 +3033,10 @@ begin
   rawMessageLength := length(amessage);
   if strBeginsWith(aerrcode, 'pxp:') then begin
     delete(aerrcode, 1, 4);
-    namespace := TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
+    namespace := TNamespace.create(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
+  end else if strBeginsWith(aerrcode, 'x:') then begin
+    delete(aerrcode, 1, 4);
+    namespace := TNamespace.create(XMLNamespaceURL_MyExtensionsNew, 'x');
   end else if strBeginsWith(aerrcode, 'err:') then begin
     delete(aerrcode, 1, 4);
     namespace := TNamespace.create(XMLNamespaceURL_XQTErrors, 'err');
@@ -3103,7 +3108,7 @@ var   XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQuer
 function namespaceReverseLookup(const url: string): INamespace;
 begin
   if url = XMLNamespaceURL_XPathFunctions then result := XMLNamespace_XPathFunctions
-  else if url = XMLNamespaceURL_MyExtensions then result := XMLNamespace_MyExtensions
+  else if url = XMLNamespaceURL_MyExtensionsNew then result := XMLNamespace_MyExtensionsNew
   else result := TNamespace.create(url, 'prefix');
 end;
 
@@ -4057,7 +4062,7 @@ begin
   hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
   extern := not hasExpression;
   if not extern and (length(declaration.annotations) > 0) then
-    extern := declaration.annotations[high(declaration.annotations)].name.isEqual(XMLNamespaceURL_MyExtensions, 'external');
+    extern := declaration.annotations[high(declaration.annotations)].name.isEqual(XMLNamespaceURL_MyExtensionsNew, 'external');
 
   result := nil;
   if hasExpression then begin
@@ -5846,7 +5851,7 @@ begin
   //OnDefineVariable:= @VariableChangelog.defineVariable;
   GlobalNamespaces := TNamespaceList.Create;
   StaticContext := TXQStaticContext.Create;
-  StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensions;
+  StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged;
   StaticContext.sender := self;
   StaticContext.collation := TXQCollation(collations.Objects[0]);
   StaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
@@ -6175,7 +6180,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
 
   function newFunction(f: string; args: array of TXQTerm): TXQTerm;
   begin
-    result := TXQTermNamedFunction.Create(XMLNamespaceURL_MyExtensions, f, args);
+    result := TXQTermNamedFunction.Create(XMLNamespaceURL_MyExtensionsMerged, f, args);
   end;
 
   function newOne: TXQTerm;
@@ -6927,7 +6932,8 @@ begin
     'xsi': result := XMLNamespace_XMLSchemaInstance;
     'fn': result := XMLNamespace_XPathFunctions;
     'local': result := XMLNamespace_XQueryLocalFunctions;
-    'pxp': result := XMLNamespace_MyExtensions;
+    'pxp': result := XMLNamespace_MyExtensionsMerged;
+    'x': result := XMLNamespace_MyExtensionsNew;
     'op': result := XMLNamespace_MyExtensionOperators;
     else result := nil;
   end;
@@ -7137,7 +7143,9 @@ end;
 
 { TXQNativeModule }
 
-constructor TXQNativeModule.create(const anamespace: INamespace; const aparentModule: TXQNativeModule=nil);
+constructor TXQNativeModule.create(const anamespace: INamespace; const aparentModule: array of TXQNativeModule);
+var
+  i: Integer;
 begin
   namespace := anamespace;
   basicFunctions:=TStringList.Create;
@@ -7163,9 +7171,17 @@ begin
   binaryOpFunctions:=TStringList.Create;
   binaryOpFunctions.Sorted := true;
   binaryOpFunctions.CaseSensitive := true;
-  parent := aparentModule;
+  if length(aparentModule) > 0 then begin
+    SetLength(parents, length(aparentModule));
+    for i := 0 to high(aparentModule) do parents[i] := aparentModule[i];
+  end;
 
   acceptedModels := [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3];
+end;
+
+constructor TXQNativeModule.create(const anamespace: INamespace);
+begin
+  create(anamespace,[]);
 end;
 
 destructor TXQNativeModule.Destroy;
@@ -7282,42 +7298,62 @@ begin
 end;
 
 function TXQNativeModule.findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQBasicFunctionInfo;
+var
+  i: Integer;
 begin
   if model in acceptedModels then begin
     result := TXQBasicFunctionInfo(findFunction(basicFunctions, name, argCount));
     if result <> nil then exit;
   end;
-  if parent <> nil then exit(parent.findBasicFunction(name, argCount, model));
+  for i := 0 to high(parents) do begin
+    result := parents[i].findBasicFunction(name, argCount, model);
+    if result <> nil then exit;
+  end;
   result := nil;
 end;
 
 function TXQNativeModule.findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQComplexFunctionInfo;
+var
+  i: Integer;
 begin
   if model in acceptedModels then begin
    result := TXQComplexFunctionInfo(findFunction(complexFunctions, name, argCount));
    if result <> nil then exit;
   end;
-  if parent <> nil then exit(parent.findComplexFunction(name, argCount, model));
+  for i := 0 to high(parents) do begin
+    result := parents[i].findComplexFunction(name, argCount, model);
+    if result <> nil then exit;
+  end;
   result := nil;
 end;
 
 function TXQNativeModule.findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQInterpretedFunctionInfo;
+var
+  i: Integer;
 begin
   if model in acceptedModels then begin
    result := TXQInterpretedFunctionInfo(findFunction(interpretedFunctions, name, argCount));
    if result <> nil then exit;
   end;
-  if parent <> nil then exit(parent.findInterpretedFunction(name, argCount, model));
+  for i := 0 to high(parents) do begin
+    result := parents[i].findInterpretedFunction(name, argCount, model);
+    if result <> nil then exit;
+  end;
   result := nil;
 end;
 
 function TXQNativeModule.findBinaryOp(const name: string; model: TXQParsingModel): TXQOperatorInfo;
+var
+  i: Integer;
 begin
   if model in acceptedModels then begin
    result := TXQOperatorInfo(findFunction(binaryOpFunctions, name, 2));
    if result <> nil then exit;
   end;
-  if parent <> nil then exit(parent.findBinaryOp(name, model));
+  for i := 0 to high(parents) do begin
+    result := parents[i].findBinaryOp(name, model);
+    if result <> nil then exit;
+  end;
   result := nil;
 end;
 
@@ -7387,7 +7423,7 @@ begin
   FreeAndNil(theDefaultQueryEngine);
 end;
 
-var fn3, fn, pxp, op, xs: TXQNativeModule;
+var fn3, fn, pxp, pxpold, op, x, xs: TXQNativeModule;
 initialization
 collations:=TStringList.Create;
 collations.OwnsObjects:=true;
@@ -7402,7 +7438,8 @@ XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, '
 XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
 XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
 XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocalFunctions, 'local');
-XMLNamespace_MyExtensions:=TNamespace.create(XMLNamespaceURL_MyExtensions, 'pxp');
+XMLNamespace_MyExtensionsMerged:=TNamespace.create(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
+XMLNamespace_MyExtensionsNew:=TNamespace.create(XMLNamespaceURL_MyExtensionsNew, 'x');
 XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
 XMLNamespace_XQuery := TNamespace.create(XMLNamespaceURL_XQuery, '');
 
@@ -7417,7 +7454,7 @@ TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpat
 
 
 GlobalInterpretedNativeFunctionStaticContext:=TXQStaticContext.Create;
-GlobalInterpretedNativeFunctionStaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensions;
+GlobalInterpretedNativeFunctionStaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged;
 GlobalInterpretedNativeFunctionStaticContext.collation := TXQCollation(collations.Objects[0]);
 GlobalInterpretedNativeFunctionStaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
 GlobalInterpretedNativeFunctionStaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
@@ -7426,14 +7463,35 @@ GlobalInterpretedNativeFunctionStaticContext.copyNamespacePreserve:=true;
 GlobalInterpretedNativeFunctionStaticContext.stringEncoding:=eUTF8;
 GlobalInterpretedNativeFunctionStaticContext.jsonPXPExtensions:=true;
 
-fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions);
+
+{ Modules can be submodules of other. We have the following relations
+
+         fn3: standard xpath/xquery 3.0 functions
+        -/|
+        /
+   fn: standard xpath 2.0 / xquery1.0 functions
+  -/|
+  /
+ pxp: legacy module combinging fn: and my old extensions
+  \
+  _\|
+      pxpold: my old extensions
+  -/|
+  /
+ x: my (new and old) extensions
+
+}
+fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
 fn3.acceptedModels := [xqpmXPath3, xqpmXQuery3];
-fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions, fn3);
+fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn3]);
 TXQueryEngine.registerNativeModule(fn);
-xs := TXQNativeModule.Create(XMLNamespace_XMLSchema);
+xs := TXQNativeModule.Create(XMLNamespace_XMLSchema,[]);
 TXQueryEngine.registerNativeModule(xs);
 globalTypeParsingContext.staticContext.defaultElementTypeNamespace := xs.namespace;
-pxp := TXQNativeModule.Create(XMLNamespace_MyExtensions, fn);
+pxpold := TXQNativeModule.Create(TNamespace.create(#0'.benibela.de','hidden'));
+x := TXQNativeModule.Create(XMLNamespace_MyExtensionsNew, [pxpold]);
+TXQueryEngine.registerNativeModule(x);
+pxp := TXQNativeModule.Create(XMLNamespace_MyExtensionsMerged, [fn,pxpold]);
 TXQueryEngine.registerNativeModule(pxp);
 op := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators);
 TXQueryEngine.registerNativeModule(op);
@@ -7445,48 +7503,48 @@ baseJSONiqSchema := TJSONiqAdditionSchema.create();
 
 
 //my functions
-pxp.registerFunction('extract',2,4,@xqFunctionExtract, []);
-pxp.registerFunction('split-equal',2,3,@xqFunctionSplitEqual,[]); //to be removed ?
-pxp.registerFunction('parse-date',2,2,@xqFunctionParse_Date, []);
-pxp.registerFunction('parse-dateTime',2,2,@xqFunctionParse_Datetime, []);
-pxp.registerFunction('parse-time',2,2,@xqFunctionParse_Time, []);
-pxp.registerFunction('deep-text',0,1,@xqFunctionDeep_Node_Text, []);
-pxp.registerFunction('outer-xml',0,1,@xqFunctionOuter_XML, []);
-pxp.registerFunction('inner-xml',0,1,@xqFunctionInner_XML, []);
-pxp.registerFunction('outer-html',0,1,@xqFunctionOuter_HTML, []);
-pxp.registerFunction('inner-html',0,1,@xqFunctionInner_HTML, []);
-pxp.registerFunction('form',1,2,@xqFunctionForm, []);
-pxp.registerFunction('resolve-html',1,2,@xqFunctionResolve_Html, []);
-pxp.registerFunction('random',0,1,@xqFunctionRandom, []);
-pxp.registerFunction('random-seed',0,1,@xqFunctionRandom_Seed, []);
-pxp.registerFunction('sleep',1,1,@xqFunctionSleep, []);
-pxp.registerFunction('eval',1,2,@xqFunctionEval, []);
-pxp.registerFunction('css',1,1,@xqFunctionCSS, []);
-pxp.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string) as item()*','($name as xs:string, $def as item()*) as item()*'], [xqcdContextVariables]);
-pxp.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);
-pxp.registerFunction('type-of',1,1,@xqFunctionType_of, []);
-pxp.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
-pxp.registerFunction('object',0,1,@xqFunctionObject,[]); //deprecated
-pxp.registerFunction('join',1,2,@xqFunctionJoin,[]);
-pxp.registerFunction('binary-to-string',1,2,@xqFunctionBinary_To_String,['($data as xs:hexBinary) as xs:string', '($data as xs:base64Binary) as xs:string','($data as xs:hexBinary, $encoding as xs:string) as xs:string', '($data as xs:base64Binary, $encoding as xs:string) as xs:string']);
-pxp.registerFunction('string-to-hexBinary',1,2,@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
-pxp.registerFunction('string-to-base64Binary',1,2,@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
+pxpold.registerFunction('extract',2,4,@xqFunctionExtract, []);
+pxpold.registerFunction('split-equal',2,3,@xqFunctionSplitEqual,[]); //to be removed ?
+pxpold.registerFunction('parse-date',2,2,@xqFunctionParse_Date, []);
+pxpold.registerFunction('parse-dateTime',2,2,@xqFunctionParse_Datetime, []);
+pxpold.registerFunction('parse-time',2,2,@xqFunctionParse_Time, []);
+pxpold.registerFunction('deep-text',0,1,@xqFunctionDeep_Node_Text, []);
+pxpold.registerFunction('outer-xml',0,1,@xqFunctionOuter_XML, []);
+pxpold.registerFunction('inner-xml',0,1,@xqFunctionInner_XML, []);
+pxpold.registerFunction('outer-html',0,1,@xqFunctionOuter_HTML, []);
+pxpold.registerFunction('inner-html',0,1,@xqFunctionInner_HTML, []);
+pxpold.registerFunction('form',1,2,@xqFunctionForm, []);
+pxpold.registerFunction('resolve-html',1,2,@xqFunctionResolve_Html, []);
+pxpold.registerFunction('random',0,1,@xqFunctionRandom, []);
+pxpold.registerFunction('random-seed',0,1,@xqFunctionRandom_Seed, []);
+pxpold.registerFunction('sleep',1,1,@xqFunctionSleep, []);
+pxpold.registerFunction('eval',1,2,@xqFunctionEval, []);
+pxpold.registerFunction('css',1,1,@xqFunctionCSS, []);
+pxpold.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string) as item()*','($name as xs:string, $def as item()*) as item()*'], [xqcdContextVariables]);
+pxpold.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);
+pxpold.registerFunction('type-of',1,1,@xqFunctionType_of, []);
+pxpold.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
+pxpold.registerFunction('object',0,1,@xqFunctionObject,[]); //deprecated
+pxpold.registerFunction('join',1,2,@xqFunctionJoin,[]);
+pxpold.registerFunction('binary-to-string',1,2,@xqFunctionBinary_To_String,['($data as xs:hexBinary) as xs:string', '($data as xs:base64Binary) as xs:string','($data as xs:hexBinary, $encoding as xs:string) as xs:string', '($data as xs:base64Binary, $encoding as xs:string) as xs:string']);
+pxpold.registerFunction('string-to-hexBinary',1,2,@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
+pxpold.registerFunction('string-to-base64Binary',1,2,@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
 
-pxp.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
-pxp.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
-pxp.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']); //will probably be removed in future version
-pxp.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
-pxp.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
+pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
+pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
+pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']); //will probably be removed in future version
+pxpold.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
+pxpold.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
 
-pxp.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
+pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
 'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+
 '                typeswitch (.)'+
 '                  case element() return element {node-name(.)} { @* ! $f(.), node()!pxp:transform(., $f, $options) }'+
 '                  case document-node() return document {  node() ! pxp:transform(., $f, $options) }'+
 '                  default return .'+
 '             ) else . )');
-pxp.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
-pxp.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
+pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
+pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
 //standard functions
 fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
@@ -7626,6 +7684,7 @@ fn.registerFunction('avg', @xqFunctionavg, ['($arg as xs:anyAtomicType*) as xs:a
 fn.registerFunction('max', @xqFunctionmax, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
 fn.registerFunction('min', @xqFunctionmin, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
 fn.registerFunction('sum', @xqFunctionsum, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType', '($arg as xs:anyAtomicType*, $zero as xs:anyAtomicType?) as xs:anyAtomicType?']);
+x.registerFunction('product', @xqFunctionProduct, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType']);
 
 fn.registerFunction('position', @xqFunctionPosition, ['() as xs:integer'], [xqcdFocusOther]);
 fn.registerFunction('last', @xqFunctionLast, ['() as xs:integer'], [xqcdFocusOther]);
@@ -7659,7 +7718,7 @@ fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Env
 
 fn3.registerFunction('parse-xml', @xqFunctionParse_XML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
 fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
-{pxp3}pxp.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
+{pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusDocument]);
 fn3.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '( 	$arg 	 as item()*,  $params 	 as element(Q{http://www.w3.org/2010/xslt-xquery-serialization}serialization-parameters)?) as xs:string']);
 
 fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, ['($href as xs:string?) as xs:string?', '($href as xs:string?, $encoding as xs:string) as xs:string?'], []);
@@ -7751,7 +7810,9 @@ finalization
 freeThreadVars;
 DoneCriticalsection(interpretedFunctionSynchronization);
 xs.free;
+x.free;
 pxp.free;
+pxpold.free;
 fn.free;
 fn3.free;
 op.free;

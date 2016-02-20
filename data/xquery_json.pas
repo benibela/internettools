@@ -376,7 +376,7 @@ initialization
   jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as json-item()*', '($arg as xs:string?, $options as object()) as json-item()*']);
   jn.registerFunction('size', @xqFunctionSize, ['($arg as array()?) as xs:integer?']);
 
-  pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
+  pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsMerged);
   pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*'], [xqcdContextOther]);
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 

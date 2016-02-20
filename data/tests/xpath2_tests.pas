@@ -1040,6 +1040,7 @@ begin
   t('sum((3,xs:untypedAtomic("NaN"),5))', 'NaN', '');
   f('sum((3,xs:untypedAtomic("foobar"),5))', 'err:FORG0001');
   t('sum((xs:unsignedByte(200), xs:unsignedByte(200)))', '400', '');
+  t('(x:product(()), x:product(1 to 3))', '6');
 
   t('(1,2,3)[true()]', '1', '');
   t('(1,2,3)[false()]', '', '');

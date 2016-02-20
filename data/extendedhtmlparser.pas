@@ -2263,7 +2263,7 @@ var module: TXQNativeModule;
 
 initialization
 
-module := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensions);
+module := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsMerged);
 module.registerFunction('match', 2, 2, @xqFunctionMatches, []);
 xquery.patternMatcherParse:=@patternMatcherParse;
 xquery.patternMatcherMatch:=@patternMatcherMatch;
