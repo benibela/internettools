@@ -411,22 +411,24 @@ begin
     result := doTransferRec('GET', decoded.resolved(trim(newurl)), '', redirectionCount - 1);
     exit;
   end else if (lastHTTPResultCode =200) or (lastHTTPResultCode = 302) then begin
-    if assigned(OnProgress) then begin
-      dwCodeLen := 15;
-      HttpQueryInfoA(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, @dwcodelen, @dwIndex);
-      res := pchar(@dwcode);
-      dwContentLength:=StrToIntDef(res,1*1024*1024);
-      OnProgress(self,0,dwContentLength);
-    end;
-    dwRead:=0;
-    dwNumber := sizeof(databuffer)-1;
-    SetLastError(0);
-    while (InternetReadfile(hfile,@databuffer,dwNumber,@DwRead)) and (dwread>0) do begin
-      temp:=length(result);
-      setLength(result,temp+dwRead);
-      move(dataBuffer[0],result[temp+1],dwRead);
-      if assigned(OnProgress) then
-        OnProgress(self,length(result),dwContentLength);
+    if method <> 'HEAD' then begin
+      if assigned(OnProgress) then begin
+        dwCodeLen := 15;
+        HttpQueryInfoA(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, @dwcodelen, @dwIndex);
+        res := pchar(@dwcode);
+        dwContentLength:=StrToIntDef(res,1*1024*1024);
+        OnProgress(self,0,dwContentLength);
+      end;
+      dwRead:=0;
+      dwNumber := sizeof(databuffer)-1;
+      SetLastError(0);
+      while (InternetReadfile(hfile,@databuffer,dwNumber,@DwRead)) and (dwread>0) do begin
+        temp:=length(result);
+        setLength(result,temp+dwRead);
+        move(dataBuffer[0],result[temp+1],dwRead);
+        if assigned(OnProgress) then
+          OnProgress(self,length(result),dwContentLength);
+      end;
     end;
   end else if res='0' then
     raise EW32InternetException.create(rsInternetRequestFaile)
