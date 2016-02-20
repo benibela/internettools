@@ -607,21 +607,24 @@ var
   i: Integer;
 begin
   result := name;
-  if (kind = tikAtomic) and (atomicTypeInfo = nil) then result += '(TYPE NOT FOUND)';
-  if Result = '' then
-    case kind of
-      tikNone: exit( 'empty-sequence()' );
-      tikAny: exit ( 'item()*' );
-      tikAtomic: result := 'xs:'+atomicTypeInfo.name;
-      tikFunctionTest: result := 'function';
-      tikElementTest: result := 'node()';
-      tikUnion: begin
-        result := '';
-        for i := 0 to high(children) do
-          result += '| ' + (children[i] as TXQTermSequenceType).serialize;
-        delete(result, 1, 2);
-      end;
+  case kind of
+    tikNone: exit( 'empty-sequence()' );
+    tikAny: result := 'item()';
+    tikAtomic: begin
+      if atomicTypeInfo = nil then exit(name + '(TYPE NOT FOUND)');
+      if atomicTypeInfo.schema <> baseSchema then result := 'Q{' + atomicTypeInfo.schema.url + '}'
+      else result :=  '';
+      result += atomicTypeInfo.name;
     end;
+    tikFunctionTest: result := 'function';
+    tikElementTest: result := 'node()';
+    tikUnion: begin
+      result := '';
+      for i := 0 to high(children) do
+        result += '| ' + (children[i] as TXQTermSequenceType).serialize;
+      delete(result, 1, 2);
+    end;
+  end;
   if allowNone and allowMultiple then result += '*'
   else if allowMultiple then result += '+'
   else if allowNone then result += '?';
@@ -2443,29 +2446,6 @@ begin
 end;
 
 procedure TXQTermNamedFunction.init(const context: TXQStaticContext);
-  function suggestions: string;
-  function strSimilar(const s, ref: string): boolean;
-  begin
-    result := strContains(s, ref) or strContains(ref, s)
-              or (strSimilarity(name.localname, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
-  end;
-  var
-    module: TXQNativeModule;
-    i: Integer;
-  begin
-    result := '';
-    module := TXQueryEngine.findNativeModule(name.namespaceURL);
-    while module <> nil do begin
-      for  i := 0 to module.basicFunctions.Count - 1 do
-        if strSimilar(name.localname, module.basicFunctions[i]) then
-          result += module.basicFunctions[i]+' ';
-      for i := 0 to module.complexFunctions.Count - 1 do
-        if strSimilar(name.localname, module.complexFunctions[i]) then
-          result += module.complexFunctions[i]+' ';
-      module := module.parent;
-    end;
-    if result <> '' then result := LineEnding +'Did you mean: '+ result;
-  end;
 var
   i: Integer;
   f: TXQValueFunction;
@@ -2492,7 +2472,7 @@ begin
       end else begin
         findKindIndex(name.namespaceURL, name.localname, length(children), context, kind, func);
         if kind <> xqfkUnknown then exit();
-        raiseEvaluationError('XPST0017', 'Function '+name.ToString+'#'+IntToStr(length(children))+ ' not found. '+suggestions);
+        raiseEvaluationError('XPST0017', 'Function '+name.ToString+'#'+IntToStr(length(children))+ ' not found. ');
       end;
     end;
     xqfkNativeInterpreted: begin

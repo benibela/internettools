@@ -3158,6 +3158,8 @@ begin
   end;
 end;
 
+type TXQNativeModuleBreaker = class(TXQNativeModule);
+
 function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
   procedure visitAnnotations(var ans: TXQAnnotations; isFunction: boolean; isAnonymousFunction: boolean = false);
@@ -3215,9 +3217,73 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       end;
   end;
 
-
   procedure lookupNamedFunction(f: TXQTermNamedFunction);
-    function findFunction(const anamespace, alocalname: string; const argcount: integer): boolean;
+    function suggestions(localname: string): string;
+    function strSimilar(const s, ref: string): boolean;
+    begin
+      result := strContains(s, ref) or strContains(ref, s)
+                or (strSimilarity(s, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
+    end;
+    function functionName(const name: string; const f: TXQAbstractFunctionInfo): string;
+    var
+      i, j: Integer;
+    begin
+      result := name + ' ' + '#' + IntToStr(f.minArgCount);
+      if f.minArgCount <> f.maxArgCount then result += '-' + IntToStr(f.maxArgCount);;
+      if length(f.versions) > 0 then begin
+        result += ':';
+        for i := 0 to high(f.versions) do begin
+          if i <> 0 then result += ';'#9;
+          result += '  (';
+          for j := 0 to high(f.versions[i].types) do begin
+            if j <> 0 then result += ', ';
+            if f.versions[i].types[j] <> nil then result += f.versions[i].types[j].serialize;
+          end;
+          result += ')';
+          if f.versions[i].returnType <> nil then result += ' as ' + f.versions[i].returnType.serialize;
+        end;
+      end;
+      result += LineEnding;
+    end;
+
+    var searched: TList;
+    procedure searchModule(module: TXQNativeModuleBreaker );
+    var moduleResult: String;
+      i: Integer;
+    begin
+      if searched.IndexOf(module) >= 0 then exit;
+      searched.Add(module);
+      moduleResult := '';
+      for  i := 0 to module.basicFunctions.Count - 1 do
+        if strSimilar(localname, module.basicFunctions[i]) then begin
+          moduleResult += '    ' + functionName(module.basicFunctions[i], TXQBasicFunctionInfo(module.basicFunctions.Objects[i]));
+        end;
+      for i := 0 to module.complexFunctions.Count - 1 do
+        if strSimilar(localname, module.complexFunctions[i]) then
+          moduleResult += '    ' + functionName(module.complexFunctions[i], TXQComplexFunctionInfo(module.complexFunctions.Objects[i]));
+      if moduleResult <> '' then begin
+        result += '  In module ' + namespaceGetURL(module.namespace);
+        if equalNamespaces(module.namespace, XMLNamespace_XPathFunctions) then
+          if not (xqpmXPath2 in module.acceptedModels) then result += ' (XPath/XQuery 3.0)';
+        result += ':'+LineEnding+moduleResult+LineEnding;
+      end;
+      if module.parent <> nil then searchModule(TXQNativeModuleBreaker(module.parent));
+    end;
+
+    var
+      modules: TStringList;
+      m: Integer;
+    begin
+      result := '';
+      modules := TXQueryEngineBreaker(staticContext.sender).GetNativeModules;
+      searched := TList.Create;
+      for m := 0 to modules.count - 1 do
+        searchModule(TXQNativeModuleBreaker(modules.Objects[m]));
+      searched.free;
+      if result <> '' then result := LineEnding + LineEnding + 'Did you mean: '+LineEnding+ result;
+    end;
+
+  function findFunction(const anamespace, alocalname: string; const argcount: integer): boolean;
     var
       module: TXQNativeModule;
       t: TXSType;
@@ -3314,11 +3380,13 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           if findFunction(namespaceURL, localname, length(f.children)) then
             exit();
         end;
+
+    //generate error message
     if not unresolved then name := 'Q{'+f.name.namespaceURL+'}'
     else if TXQEQNameUnresolved(f.name).namespacePrefix = '' then name := ''
     else name := TXQEQNameUnresolved(f.name).namespacePrefix + ':' ;
     name += f.name.localname;
-    raiseParsingError('XPST0017', 'unknown function: ' + name);
+    raiseParsingError('XPST0017', 'unknown function: ' + name + ' #' + IntToStr(length(f.children)) + suggestions(f.name.localname));
   end;
 
   function visitNamedFunction(f: TXQTermNamedFunction): TXQTerm;

@@ -2412,6 +2412,7 @@ public
     FInternalDocuments: TFPList;
   protected
     FModules, FPendingModules: TInterfaceList; //internal used
+    function GetNativeModules: TStringList;
 
   protected
     function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext = nil): TXQuery;
@@ -2773,7 +2774,7 @@ protected
 
 end;
 
-var XMLNamespace_MyExtensions: INamespace;
+var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensions: INamespace;
 function convertElementTestToPathMatchingStep(const select: string; const children: TXQTermArray): TXQPathMatchingStep;
 
 function xqFunctionConcat(const args: TXQVArray): IXQValue;
@@ -3096,7 +3097,7 @@ end;
 
 
 
-var   XMLNamespace_XPathFunctions, XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_MyExtensionOperators, XMLNamespace_XQuery: INamespace;
+var   XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_MyExtensionOperators, XMLNamespace_XQuery: INamespace;
 
 
 function namespaceReverseLookup(const url: string): INamespace;
@@ -6909,6 +6910,11 @@ begin
       raise EXQEvaluationException.Create(errCode, 'Collation ' + id + ' is not defined');
   end;
   result:=TXQCollation(collations.Objects[i]);
+end;
+
+function TXQueryEngine.GetNativeModules: TStringList;
+begin
+  result := nativeModules;
 end;
 
 function TXQueryEngine.findNamespace(const nsprefix: string): INamespace;
