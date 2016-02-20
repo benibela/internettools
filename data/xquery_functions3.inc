@@ -612,21 +612,6 @@ function englishfy(const n: string; modifiers: TXQFormatIntegerModifiers): strin
     else result := number + scale;
   end;
 
-  procedure ordinalize;
-  var
-    suffix: String;
-  begin
-    if not (xqfimOrdinal in modifiers) then exit;
-    suffix := 'th';
-    if (length(n) < 2) or (n[length(n)-1] <> '1') then
-      case n[length(n)] of
-        '1': suffix := 'st';
-        '2': suffix := 'nd';
-        '3': suffix := 'rd';
-      end;
-    result += suffix;
-  end;
-
 var
   temp: String;
   blockStart: Integer;
@@ -686,6 +671,9 @@ begin
     end;
 end;
 
+
+
+
 function alphabetify(number: BigDecimal; one: char): string;
 var base, aaa, aaaa: BigDecimal;
     len: Integer;
@@ -711,20 +699,156 @@ begin
   end;
 end;
 
+function charUnicodeZero(const cp: integer): integer;
+const UNICODE_ZEROS: array[1..55] of integer = ($0030,$0660,$06F0,$07C0,$0966,$09E6,$0A66,$0AE6,$0B66,$0BE6,$0C66,$0CE6,$0D66,$0DE6,$0E50,$0ED0,$0F20,$1040,$1090,$17E0,$1810,$1946,$19D0,$1A80,$1A90,$1B50,$1BB0,$1C40,$1C50,$A620,$A8D0,$A900,$A9D0,$A9F0,$AA50,$ABF0,$FF10,$104A0,$11066,$110F0,$11136,$111D0,$112F0,$114D0,$11650,$116C0,$11730,$118E0,$16A60,$16B50,$1D7CE,$1D7D8,$1D7E2,$1D7EC,$1D7F6);
+var
+  i: Integer;
+begin
+  for i := low(UNICODE_ZEROS) to high(UNICODE_ZEROS) do
+    if (cp >= UNICODE_ZEROS[i]) and (cp < UNICODE_ZEROS[i] + 10) then
+      exit(UNICODE_ZEROS[i]);
+  result := -11;
+end;
+function strBeginsWithUnicodeNumber(const picture: string): boolean;
+var
+  temp: Integer;
+begin
+  temp := 1;
+  result := charUnicodeZero(strDecodeUTF8Character(picture, temp)) > 0;
+end;
+
+type TStrIterator = record
+  FCurrent: integer;
+
+  s: RawByteString;
+  pos: integer;
+  property Current: integer read FCurrent;
+  function MoveNext: Boolean;
+  function GetEnumerator: TStrIterator;
+end;
+function TStrIterator.MoveNext: Boolean;
+begin
+  result := pos <= length(s);
+  fcurrent := strDecodeUTF8Character(s, pos);
+end;
+
+function TStrIterator.GetEnumerator: TStrIterator;
+begin
+  result := self;
+end;
+
+function strIterator(const s: RawByteString): TStrIterator;
+begin
+  result.s := s;
+  result.pos := 1;
+end;
+
+
 function xqFunctionFormat_Integer(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 
 
-var
-  primaryFormat, modifierVariant: String;
-  separator: LongInt;
-  modifiers: TXQFormatIntegerModifiers;
-  i: Integer;
+var shortLang: String;
   number: BigDecimal;
+  modifiers: TXQFormatIntegerModifiers;
+  primaryFormat, modifierVariant: String;
+  needOrdinalization: Boolean;
+
+  function ordinalize(n: string): string;
+  var
+    suffix: String;
+  begin
+    result := n;
+    if not needOrdinalization then exit;
+    case shortLang of
+      'en': begin
+        suffix := 'th';
+        if getDigit(number, 1) <> 1 then
+          case getDigit(number, 0) of
+            1: suffix := 'st';
+            2: suffix := 'nd';
+            3: suffix := 'rd';
+          end;
+        result += suffix;
+      end;
+    end;
+  end;
+
+  function formatUnicodeInteger(family: integer): string;
+  var
+    cp: Integer;
+    optional: Integer;
+    mandatory: Integer;
+    validGroupingSeparator: TWrappedRegExpr;
+    separators: array of record
+      pos: integer;
+      sep: string;
+    end;
+    sepcount: Integer;
+    arabic: String;
+    totalDigits: Integer;
+    delta: Integer;
+    i: Integer;
+
+  begin
+    SetLength(separators, 10);
+    sepcount := 0;
+    optional := 0;
+    mandatory := 0;
+    validGroupingSeparator := wregexprParse('^[^\p{Nd}\p{Nl}\p{No}\p{Lu}\p{Ll}\p{Lt}\p{Lm}\p{Lo}]$',[]);
+    for cp in strIterator(primaryFormat) do begin
+      if cp = ord('#') then begin
+        if mandatory > 0 then raise EXQEvaluationException.create('FODF1310', 'Invalid optional in ' + primaryFormat);
+        inc(optional)
+      end else if (cp >= family) and (cp < family + 10) then inc(mandatory)
+      else if (optional + mandatory > 0) and wregexprMatches(validGroupingSeparator, strGetUnicodeCharacter(cp)) then begin
+        if sepcount >= length(separators) then SetLength(separators, sepcount * 2);
+        separators[sepcount].sep := strGetUnicodeCharacter(cp);
+        separators[sepcount].pos := optional + mandatory;
+        inc(sepcount)
+      end else begin
+        wregexprFree(validGroupingSeparator);
+        raise EXQEvaluationException.create('FODF1310', 'Invalid grouping separator in ' + primaryFormat);
+      end
+    end;
+    wregexprFree(validGroupingSeparator);
+    if mandatory = 0 then raise EXQEvaluationException.create('FODF1310', 'No digit in ' + primaryFormat);
+
+    delta := -1;
+    if sepcount > 0 then begin
+      for i := 0 to sepcount - 1 do separators[i].pos := optional + mandatory - separators[i].pos;
+        if separators[sepcount - 1].pos = 0 then
+          raise EXQEvaluationException.create('FODF1310', 'Trailing grouping separator in ' + primaryFormat);
+      delta := separators[sepcount-1].pos;
+      for i := sepcount - 2 downto 0 do begin
+        if (separators[i].pos - separators[i+1].pos <> delta) or (separators[i+1].sep <> separators[i].sep) then delta := -1;
+        if separators[i+1].pos - separators[i].pos = 0 then raise EXQEvaluationException.create('FODF1310', 'Adjacent grouping separator in ' + primaryFormat);
+      end;
+    end;
+
+    arabic := BigDecimalToStr(number);
+    if length(arabic) < mandatory then arabic := strDup('0', mandatory - length(arabic) ) + arabic;
+    if (family = ord('0')) and (sepcount = 0) then exit(arabic);
+
+    result := '';
+    totalDigits := 0;
+    for i := length(arabic) downto 1 do begin
+      result := strGetUnicodeCharacter(family + ord(arabic[i]) - ord('0')) + result;
+      inc(totalDigits);
+      if (sepcount > 0) and (separators[sepcount-1].pos <= totalDigits) then begin
+        result := separators[sepcount-1].sep + result;
+        if Delta > 0 then separators[sepcount-1].pos += delta
+        else dec(sepcount);
+      end;
+    end;
+  end;
+
+var
+  separator: LongInt;
+  i: Integer;
   formatted: String;
   j: LongInt;
   signed: Boolean;
   lang: String;
-  shortLang: String;
   procedure raiseInvalidPicture();
   begin
     raise EXQEvaluationException.create('FODF1310', 'Invalid picture string: ', nil, args[1]);
@@ -732,15 +856,20 @@ var
 
 begin
   requiredArgCount(args, 2, 3);
+  if args[0].isUndefined then exit(xqvalue(''));
   //preprocessing picture string
   primaryFormat := args[1].toString;
   separator := strLastIndexOf(primaryFormat, ';');
   modifiers := [];
   modifierVariant := '';
+  needOrdinalization := false;
   if separator > 0 then begin
     i := separator + 1;
     if (i <= length(primaryFormat)) and (primaryFormat[i] in ['c', 'o']) then begin
-      if primaryFormat[i] = 'o' then include(modifiers, xqfimOrdinal);
+      if primaryFormat[i] = 'o' then begin
+        include(modifiers, xqfimOrdinal);
+        needOrdinalization := true;
+      end;
       inc(i);
       if (i <= length(primaryFormat)) and (primaryFormat[i] = '(') then begin
         j := strLastIndexOf(primaryFormat, ')');
@@ -765,6 +894,7 @@ begin
   else lang := args[2].toString;
   shortLang := lang;
   if strContains(shortLang, '-') then shortLang := LowerCase(strBefore(shortLang, '-'));
+  shortLang := 'en';
 
 
   //default conversions
@@ -773,29 +903,43 @@ begin
   signed := number.signed;
   number.signed := false;
   formatted := '';
-  if primaryFormat <> '' then
-    case primaryFormat of
-      'A', 'a': if not isZero(number) then formatted := alphabetify(number, primaryFormat[1]);
-      'i', 'I': begin
-        if isLongint(number) then formatted := IntToRoman(BigDecimalToLongint(number));
-        if primaryFormat = 'i' then formatted := LowerCase(formatted);
+  case primaryFormat of
+    '': raise EXQEvaluationException.create('FODF1310', 'Invalid picture string');
+    'A', 'a': if not isZero(number) then begin
+      formatted := alphabetify(number, primaryFormat[1]);
+      if xqfimOrdinal in modifiers then formatted += '-';
+    end;
+    'i', 'I': begin
+      if isLongint(number) then formatted := IntToRoman(BigDecimalToLongint(number));
+      if primaryFormat = 'i' then formatted := LowerCase(formatted);
+    end;
+    'w','W','Ww': begin
+      case shortLang of
+        'en': formatted := englishfy(BigDecimalToStr(number), modifiers);
       end;
-      'w','W','Ww': begin
-        case shortLang of
-          'en','': formatted := englishfy(BigDecimalToStr(number), modifiers);
-        end;
-        if formatted <> '' then
-          case primaryFormat of
-            'W': formatted := UpperCase(formatted);
-            'Ww': begin
-              formatted[1] := upCase(formatted[1]);
-              for i := 1 to length(formatted) - 1 do
-                if formatted[i] in [' ', '-'] then formatted[i+1]:=upCase(formatted[i+1]);
-            end;
+      if formatted <> '' then
+        case primaryFormat of
+          'W': formatted := UpperCase(formatted);
+          'Ww': begin
+            formatted[1] := upCase(formatted[1]);
+            for i := 1 to length(formatted) - 1 do
+              if formatted[i] in [' ', '-'] then formatted[i+1]:=upCase(formatted[i+1]);
           end;
+        end;
+      needOrdinalization := false;
+    end;
+  end;
+  if (formatted = '') then begin
+    for i in strIterator(primaryFormat) do begin
+      j := charUnicodeZero(i);
+      if j > 0 then begin
+        formatted := formatUnicodeInteger(j);
+        break;
       end;
     end;
-  if formatted = '' then formatted := BigDecimalToStr(number);
+  end;
+  if formatted <> '' then formatted := ordinalize(formatted);
+  if formatted = '' then formatted := ordinalize(BigDecimalToStr(number));
   if Signed and not isZero(number) then formatted := '-' + formatted ;
   result := xqvalue(formatted);
 end;
