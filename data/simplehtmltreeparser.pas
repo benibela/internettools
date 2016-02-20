@@ -1766,6 +1766,8 @@ end;
 function TTreeParser.prependTag(const tag: string): TTreeNode;
 begin
   result := newTreeNode(tetOpen, tag, FCurrentElement.offset+1);
+  if result.parent <> nil then
+    result.namespace := result.parent.namespace;
   FElementStack.Add(result);
   result.initialized;
 end;
