@@ -500,7 +500,7 @@ begin
   result := xqvalue('autoid'+strFromPtr(node));
 end;
 
-//returns 1000^(i+1) as English numeral using the Conway-Wechsler system
+//returns 1000^(i+1) as English numeral using the Conway-Wechsler system. The result always ends with 'illion'
 function strConwayWechsler(i: integer): string;
 const cache: array[0..18] of string = ('n', 'm', 'b', 'tr', 'quadr', 'quint', 'sext', 'sept', 'oct', 'non', 'dec', 'undec', 'duodec', 'tredec', 'quattuordec', 'quindec', 'sedec', 'septendec', 'octodec');      //illion
 var units: array[0..9] of string = ('', 'un', 'duo', 'tre', 'quattor', 'quinqua', 'se', 'septe', 'octo', 'nove');
@@ -672,6 +672,126 @@ begin
 end;
 
 
+function germanfy(const n: string; modifiers: TXQFormatIntegerModifiers): string;
+  const digits: array['1'..'9'] of string = ('ein', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun');
+        prefix: array['1'..'9'] of string = ('zehn', 'zwanz', 'dreiß', 'vierz', 'fünfz', 'sechz', 'siebz', 'achtz', 'neunz');
+        digitsOrdinals: array['1'..'9'] of string = ('erste', 'zweite', 'dritte', 'vierte', 'fünfte', 'sechste', 'siebte', 'achte', 'neunte');
+  function germanfybelow100(lowest: integer): string;
+    function ordinalCase: boolean; inline;
+    begin
+      result := (length(n) = lowest) and (xqfimOrdinal in modifiers);
+    end;
+
+  begin
+    result := '';
+    if lowest <= 0 then exit;
+    if (lowest >= 2) then
+      case n[lowest - 1] of
+        '0': ;
+        '1': begin
+          case n[lowest] of
+            '0': result := 'zehn';
+            '1': result := 'elf';
+            '2': result := 'zwölf';
+            '6': result := 'sechzehn';
+            '7': result := 'siebzehn';
+            else result += digits[n[lowest]] + 'zehn';
+          end;
+          if ordinalCase then result += 'te';
+          exit;
+        end;
+        else begin
+          result := prefix[n[lowest-1]] + 'ig';
+          if ordinalCase then result += 'ste';
+        end;
+      end;
+    if (n[lowest] <> '0') then begin
+      if result = '' then begin
+        if not ordinalCase then result += digits[n[lowest]]
+        else result += digitsOrdinals[n[lowest]]
+      end else result := digits[n[lowest]] + 'und' + result;
+    end;
+  end;
+
+  function germanfybelow1000(lowest: integer): string;
+  var
+    hundreds: String;
+  begin
+    result := germanfybelow100(lowest);
+    if (lowest >= 3) and (n[lowest-2] > '0') then
+      result := digits[n[lowest-2]] + 'hundert' + result;
+  end;
+
+  function finalEins(s: string): string;
+  begin
+    result := s;
+    if strEndsWith(s, 'ein') then result += 's';
+  end;
+
+  procedure addArdeIllion(numberilliarde, numberillion, scale: string);
+  var
+    i: Integer;
+    illiarde: String;
+  begin
+    if (numberilliarde = '') and (numberillion = '') then exit;
+    //germanfy english scale
+    for i := 1 to length(scale) do
+      if scale[i] = 'c' then
+        if (i = 1) or (scale[i-1] <> 'o') then scale[i] := 'z'
+        else scale[i] := 'k';
+
+    scale[1] := upcase(scale[1]);
+    if numberilliarde <> '' then begin
+      if result <> '' then result += ' ';
+      illiarde := copy(scale, 1, length(scale) - 6 {length(illion)} ) + 'illiarde';
+      if numberilliarde = 'ein' then result += 'eine ' + illiarde
+      else result += finalEins(numberilliarde) + ' ' +illiarde + 'n';
+    end;
+
+    if numberillion <> '' then begin
+      if result <> '' then result += ' ';
+      if numberillion = 'ein' then result += 'eine ' + scale
+      else result += finalEins(numberillion) + ' '+ scale + 'en';
+    end;
+  end;
+
+var
+  temp: String;
+  blockStart: Integer;
+  i: Integer;
+  temp2: String;
+  illion: String;
+  illiarde: String;
+begin
+  result := '';
+  //if xqfimTraditional in modifiers then begin    end;
+  if (n = '0') or (n = '') then
+    if xqfimOrdinal in modifiers then exit('nullte')
+    else exit('null');
+  blockStart := (length(n)-1) div 6;
+  for i := blockStart downto 1 do begin
+    illiarde := germanfybelow1000(length(n)-6*i - 3);
+    illion   := germanfybelow1000(length(n)-6*i);
+    if (illiarde <> '') or (illion <> '') then addArdeIllion(illiarde, illion, strConwayWechsler(i));
+  end;
+  //0te illion
+  illiarde := germanfybelow1000(length(n) - 3);
+  illion := germanfybelow1000(length(n));
+  if (illiarde <> '') or (illion <> '') then begin
+    if result <> '' then result += ' ';
+    if illiarde <> '' then result += illiarde + 'tausend';
+    result += finalEins(illion);
+  end;
+  if (xqfimOrdinal in modifiers) then
+    case copy(n, length(n)-1,2) of
+      '00', '0': begin
+        if result[length(result)] = 'e' then delete(result, length(result), 1)
+        else if strEndsWith(result, 'illionen') or strEndsWith(result, 'illiarden') then delete(result, length(result) - 1, 2);
+        result += 'ste';
+      end;
+    end;
+end;
+
 
 
 function alphabetify(number: BigDecimal; one: char): string;
@@ -770,6 +890,7 @@ var shortLang: String;
           end;
         result += suffix;
       end;
+      'de': result += '.';
     end;
   end;
 
@@ -894,7 +1015,10 @@ begin
   else lang := args[2].toString;
   shortLang := lang;
   if strContains(shortLang, '-') then shortLang := LowerCase(strBefore(shortLang, '-'));
-  shortLang := 'en';
+  case shortLang of
+    'de': ;
+    else shortLang := 'en';
+  end;
 
 
   //default conversions
@@ -914,12 +1038,22 @@ begin
       if primaryFormat = 'i' then formatted := LowerCase(formatted);
     end;
     'w','W','Ww': begin
+      formatted := BigDecimalToStr(number);
       case shortLang of
-        'en': formatted := englishfy(BigDecimalToStr(number), modifiers);
+        'en': formatted := englishfy(formatted, modifiers);
+        'de': begin
+          formatted := germanfy(formatted, modifiers);
+          if needOrdinalization and (modifierVariant <> '') and (strBeginsWith(modifierVariant, '-e')) then formatted += strCopyFrom(modifierVariant, 3);
+        end;
       end;
       if formatted <> '' then
         case primaryFormat of
-          'W': formatted := UpperCase(formatted);
+          'W': begin
+            formatted := UpperCase(formatted);
+            case shortLang of
+              'de': formatted := StringReplace(StringReplace(formatted, 'ö', 'Ö', [rfReplaceAll]), 'ü', 'Ü', [rfReplaceAll]);
+            end;
+          end;
           'Ww': begin
             formatted[1] := upCase(formatted[1]);
             for i := 1 to length(formatted) - 1 do
