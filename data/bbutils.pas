@@ -1,9 +1,9 @@
 {
 A collection of often needed functions missing in FPC
 
-Copyright (C) 2008 Benito van der Zander (BeniBela)
-                   benito@benibela.de
-                   www.benibela.de
+Copyright (C) 2008 - 2016  Benito van der Zander (BeniBela)
+                           benito@benibela.de
+                           www.benibela.de
 
 This file is distributed under under the same license as Lazarus and the LCL itself:
 
@@ -846,6 +846,7 @@ const DateMonthDaysCumSum: array[false..true,0..12] of Cardinal =
 
 //**Week of year
 function dateWeekOfYear(const date:TDateTime):word;
+function dateWeekOfYear(year, month, day: integer):word;
 //**@returns if year is a leap year (supports negative years, i think)
 function dateIsLeapYear(const year: integer): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 type EDateTimeParsingException = class(Exception);
@@ -5145,14 +5146,17 @@ begin
 end;
 
 function dateWeekOfYear(const date:TDateTime):word;
-//After Claus T�ndering
+var month, day, year: word;
+begin
+  DecodeDate(date,year,month,day);
+  result := dateWeekOfYear(year,month,day);
+end;
 
+function dateWeekOfYear(year, month, day: integer): word;
+//ISO Week after Claus T�ndering  http://www.tondering.dk/claus/cal/week.php#weekno
 var a,b,c,s,e,f,g,d,n: longint;
-    month, day, year: word;
     startOfYear: boolean;
 begin
-
-  DecodeDate(date,year,month,day);
   dec(month);
   dec(day);
   startOfYear:=month in [0,1];
@@ -5166,7 +5170,7 @@ begin
     f:=day + 31*month;
   end else begin
     e:=s+1;
-    f:=day+153*(month-2)div 5 + 57 + s;
+    f:=day+(153*(month-2)+2)div 5 + 59 + s;
   end;
 
   g:=(a+b) mod 7;
