@@ -2920,11 +2920,14 @@ end;
 
 function TXQValueDateTimeData.initFromMicroSecondStampTimeOnly(mics: int64; const tz: integer): int64;
 begin
+  result := mics div (MicroSecsPerSec * 60 * 60 * 24);
+  mics := mics - result * (MicroSecsPerSec * 60 * 60 * 24);
+  if mics < 0 then mics += (MicroSecsPerSec * 60 * 60 * 24);
+
   microsecs := mics mod MicroSecsPerSec; mics := mics div MicroSecsPerSec;
   seconds   := mics mod 60; mics := mics div 60;
   min       := mics mod 60; mics := mics div 60;
   hour      := mics mod 24; mics := mics div 24;
-  result := mics;
   timezone := tz;
 end;
 
