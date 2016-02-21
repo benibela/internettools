@@ -2031,7 +2031,7 @@ function xqFunctionCSS(const context: TXQEvaluationContext; const args: TXQVArra
 begin
   requiredArgCount(args, 1);
   if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:css without a xquery engine (e.g. from an interpreted function in a native module)');
-  result := context.staticContext.sender.evaluateCSS3(args[0].toString, context.ParentElement);
+  result := context.staticContext.sender.evaluateCSS3(args[0].toString, context.contextNode(false));
 end;
 
 function xqFunctionGet(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
