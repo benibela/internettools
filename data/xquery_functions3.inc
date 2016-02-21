@@ -1175,10 +1175,12 @@ var
   zerocp: Integer;
   allDigits: Boolean;
   tz: Integer;
+  fallbackOccured: String;
 
 
 begin
   calendarNamespace := '';
+  fallbackOccured := '';
   if length(args) = 5 then begin
     lang := args[2].toString;
     calendar := args[3].toString;
@@ -1194,7 +1196,7 @@ begin
         '':;
         'AD', 'ISO': ;
         'AH', 'AME', 'AM', 'AP', 'AS', 'BE', 'CB', 'CE', 'CL', 'CS', 'EE', 'FE', 'JE', 'KE', 'KY', 'ME', 'MS', 'NS', 'OS', 'RS', 'SE', 'SH', 'SS', 'TE', 'VE', 'VS': begin
-          //???
+          fallbackOccured += '[Calendar: AD]';
         end
         else raise EXQEvaluationException.create('FOFD1340', 'Invalid calendar: '+calendar);
       end;
@@ -1210,7 +1212,11 @@ begin
   if strContains(lang, '-') then sublang := strBefore(sublang, '-');
   case sublang of
     'de', 'en':;
-    else sublang := 'en';
+    '': sublang := 'en';
+    else begin
+      sublang := 'en';
+      fallbackOccured += '[Language: en]';
+    end;
   end;
 
   if args[0].isUndefined then exit(xqvalue);
@@ -1237,6 +1243,7 @@ begin
           last := i;
         end else begin
           inc(i);
+          while (i <= length(picture)) and (picture[i] in WHITE_SPACE) do inc(i);
           pictured[picturedlength].component:=picture[i];
           case pictured[picturedlength].component of
             'Y','M','D','d','F','W','w', 'E': if not allowDate then
@@ -1249,6 +1256,7 @@ begin
           last := i + 1;
           i := strIndexOf(picture, ']', i);
           pictured[picturedlength].format := copy(picture, last, i - last);
+          pictured[picturedlength].format := StringsReplace(pictured[picturedlength].format, [#9,#$A,#$D,' '], ['','','',''],[rfReplaceAll]);
           pictured[picturedlength].minwidth := 0;
           pictured[picturedlength].maxwidth := 999;
           commapos := strLastIndexOf(pictured[picturedlength].format, ',');
@@ -1264,10 +1272,10 @@ begin
           end else if pictured[picturedlength].format <> '' then begin
             with pictured[picturedlength] do begin
               minwidth := countDigits(format);
-              maxwidth:=minwidth;
+              if minwidth > 0 then maxwidth:=minwidth;
             end;
           end;
-          if pictured[picturedlength].format <> '' then begin
+          if length(pictured[picturedlength].format) > 1 then begin
             if pictured[picturedlength].format[length(pictured[picturedlength].format)] in ['c','o','a','t'] then begin
               pictured[picturedlength].modifier := pictured[picturedlength].format[length(pictured[picturedlength].format)];
               delete(pictured[picturedlength].format, length(pictured[picturedlength].format), 1);
@@ -1293,147 +1301,171 @@ begin
 
   dateTime := @((args[0] as TXQValueDateTime).value);
 
-  formatted := '';
-  for i := 0 to picturedlength - 1 do begin
-    component := '';
-    format := pictured[i].format;
-    case pictured[i].component of
-      '"': begin
-        formatted += pictured[i].format;
-        continue;
-      end;
-      'Y': begin
-        number := dateTime^.year;
-        if pictured[i].maxwidth = 2 then number := number mod 100;
-      end;
-      'M': number := dateTime^.month;
-      'D': number := dateTime^.day;
-      'd': number := DateMonthDaysCumSum[IsLeapYear(dateTime^.year), dateTime^.month - 1] + dateTime^.day;
-      'F': begin
-        number := DayOfWeek( dateEncode(dateTime^.year, dateTime^.month, dateTime^.day ) - 1 ); //-1 there seems to be an offset between pascal and iso
-        if format = '' then format := 'n';
-      end;
-      'W': number := dateWeekOfYear( dateTime^.year, dateTime^.month, dateTime^.day ) ;
-      'w': number := dateWeekOfMonth( dateTime^.year, dateTime^.month, dateTime^.day ) ;
-      'H': number := dateTime^.hour;
-      'h': begin
-        number := dateTime^.hour;
-        if number > 12 then number -= 12
-        else if number = 0 then number := 12;
-      end;
-      'P': begin
-        if dateTime^.hour >= 12 then component := 'pm'
-        else component := 'am';
-        format := #0;
-      end;
-      'm': begin
-        number := dateTime^.min;
-        if format = '' then format := '01';
-      end;
-      's': begin
-        number := dateTime^.seconds;
-        if format = '' then format := '01';
-      end;
-      'f': begin
-        if pictured[i].maxwidth < 6 then
-           number := (dateTime^.microsecs + powersOf10[6 - pictured[i].maxwidth] div 2) div powersOf10[6 - pictured[i].maxwidth]
-         else number := dateTime^.microsecs ;
-        if pictured[i].minwidth < 7 then
-          while ((number mod 10) = 0 ) and (number > powersOf10[pictured[i].minwidth]) do number := number div 10;
-       end;
-      'Z', 'z': begin
-        if format = 'N' then format := '01:01';
-        if format = '' then format := '01:01';
-        //writeln(picture, '  z: ', format);
-        tz := dateTime^.timezone;
-        if dateTime^.timezone = high(Integer) then begin
-          if (format = 'Z') then component := 'J'
-          else component := '';
+  try
+    formatted := '';
+    for i := 0 to picturedlength - 1 do begin
+      component := '';
+      format := pictured[i].format;
+      case pictured[i].component of
+        '"': begin
+          formatted += pictured[i].format;
+          continue;
+        end;
+        'Y': begin
+          number := dateTime^.year;
+          if pictured[i].maxwidth = 2 then number := number mod 100;
+          if number < 0 then for j := 0 to picturedlength - 1 do
+            if pictured[j].component = 'E' then number := abs(number);
+        end;
+        'M': number := dateTime^.month;
+        'D': number := dateTime^.day;
+        'd': number := DateMonthDaysCumSum[IsLeapYear(dateTime^.year), dateTime^.month - 1] + dateTime^.day;
+        'F': begin
+          number := DayOfWeek( dateEncode(dateTime^.year, dateTime^.month, dateTime^.day ) - 1 ); //-1 there seems to be an offset between pascal and iso
+          if format = '' then format := 'n';
+        end;
+        'W': number := dateWeekOfYear( dateTime^.year, dateTime^.month, dateTime^.day ) ;
+        'w': number := dateWeekOfMonth( dateTime^.year, dateTime^.month, dateTime^.day ) ;
+        'H': number := dateTime^.hour;
+        'h': begin
+          number := dateTime^.hour;
+          if number > 12 then number -= 12
+          else if number = 0 then number := 12;
+        end;
+        'P': begin
+          if dateTime^.hour >= 12 then component := 'pm'
+          else component := 'am';
           format := #0;
-        end else if (format = 'Z') and (tz mod 60 = 0) and (tz >= -12*60) and (tz <= 12*60) then begin
-          if tz = 0 then component := 'Z'
-          else begin
-            tz := tz div 60;
-            if tz < 0 then component := chr(ord('M') - tz)
-            else if tz < 10 then component := chr(ord('A') + tz - 1)
-            else component := chr(ord('A') + tz); //military time goes H I K L M  i.e. J is skipped
-          end;
-          format := #0;
-        end else begin
-          if format = 'Z' then format := '00:00';
-          tz := abs( (tz div 60) * 100 + (tz mod 60) );
-          j := countDigits(format, @zerocp, @allDigits);
-          if j > 0 then
-            if (tz = 0) and (pictured[i].modifier = 't') then begin
-              component := 'Z';
-              format := #0;
-            end else if allDigits and (j <= 2) then begin
-              if tz mod 100 = 0 then component := formatUnicodeInteger(inttostr(tz div 100), format, zerocp)
-              else component := formatUnicodeInteger(inttostr(tz), format + ':'+strdup(strGetUnicodeCharacter(zerocp),2), zerocp);
-            end else if not allDigits then  component := formatUnicodeInteger(inttostr(tz), format, zerocp)
-            else if j <= 4 then component := formatUnicodeInteger(inttostr(tz), format, zerocp);
-          if (component <> '') and (component <> 'Z') then begin
-            if dateTime^.timezone < 0 then component := '-' + component
-            else component := '+' + component;
-            if pictured[i].component = 'z' then component := 'GMT'+component;
+        end;
+        'm': begin
+          number := dateTime^.min;
+          if format = '' then format := '01';
+        end;
+        's': begin
+          number := dateTime^.seconds;
+          if format = '' then format := '01';
+        end;
+        'f': begin
+          if pictured[i].maxwidth < 6 then
+             number := (dateTime^.microsecs + powersOf10[6 - pictured[i].maxwidth] div 2) div powersOf10[6 - pictured[i].maxwidth]
+           else number := dateTime^.microsecs ;
+          if pictured[i].minwidth < 7 then
+            while ((number mod 10) = 0 ) and (number > powersOf10[pictured[i].minwidth]) do number := number div 10;
+         end;
+        'Z', 'z': begin
+          if format = 'N' then format := '01:01';
+          if format = '' then format := '01:01';
+          //writeln(picture, '  z: ', format);
+          tz := dateTime^.timezone;
+          if dateTime^.timezone = high(Integer) then begin
+            if (format = 'Z') then component := 'J'
+            else component := '';
             format := #0;
-          end else number := tz;
-        end;
-      end;
-      //if format = '' then format := '01';;
-      'C': if format = '' then format := 'n';
-      'E': if format = '' then format := 'n';
-    end;
-    case format of
-      #0: ; //special case handled above
-      '', '1': component := IntToStr(number);
-      '01': begin
-        component := IntToStr(number);
-        if (length(component) = 1) and (pictured[i].maxwidth > 1) then component := '0' + component;
-      end;
-      'N','n','Nn': begin
-        case pictured[i].component of
-          'M': case sublang of
-            'en': component := monthNamesEnglish[number];
-            'de': component := monthNamesGerman[number];
-          end;
-          'F': case sublang of
-            'en': component := weekDayNamesEnglish[number];
-            'de': component := weekDayNamesGerman[number];
-          end;
-          'C': component := calendar;
-          'E': ;
-          else component := xqFunctionFormat_Integer(context, xqvalueArray([xqvalue(number), xqvalue(format), xqvalue(lang)])).toString;
-        end;
-        case format of
-          'N': component := UpperCase(StringReplace(component, 'ä', 'Ä',[]));
-          'n': component[1] := lowerCase(component[1]);
-        end;
-        if (length(component) > pictured[i].maxwidth) and (pictured[i].component in ['M','F']) then begin
-          j := strLengthUtf8(component) - pictured[i].maxwidth;
-          if j > 0 then begin
-            case sublang of
-              'en', 'de': if (pictured[i].maxwidth > 3) and (pictured[i].minwidth = 3) then
-                j := strLengthUtf8(component) - pictured[i].minwidth;
+          end else if (format = 'Z') and (tz mod 60 = 0) and (tz >= -12*60) and (tz <= 12*60) then begin
+            if tz = 0 then component := 'Z'
+            else begin
+              tz := tz div 60;
+              if tz < 0 then component := chr(ord('M') - tz)
+              else if tz < 10 then component := chr(ord('A') + tz - 1)
+              else component := chr(ord('A') + tz); //military time goes H I K L M  i.e. J is skipped
             end;
-            delete(component, length(component) - j + 1, j);
+            format := #0;
+          end else begin
+            if format = 'Z' then format := '00:00';
+            tz := abs( (tz div 60) * 100 + (tz mod 60) );
+            j := countDigits(format, @zerocp, @allDigits);
+            if j > 0 then
+              if (tz = 0) and (pictured[i].modifier = 't') then begin
+                component := 'Z';
+                format := #0;
+              end else if allDigits and (j <= 2) then begin
+                if tz mod 100 = 0 then component := formatUnicodeInteger(inttostr(tz div 100), format, zerocp)
+                else component := formatUnicodeInteger(inttostr(tz), format + ':'+strdup(strGetUnicodeCharacter(zerocp),2), zerocp);
+              end else if not allDigits then  component := formatUnicodeInteger(inttostr(tz), format, zerocp)
+              else if j <= 4 then component := formatUnicodeInteger(inttostr(tz), format, zerocp);
+            if (component <> '') and (component <> 'Z') then begin
+              if dateTime^.timezone < 0 then component := '-' + component
+              else component := '+' + component;
+              if pictured[i].component = 'z' then component := 'GMT'+component;
+              format := #0;
+            end else number := tz;
           end;
         end;
+        //if format = '' then format := '01';;
+        'C': if format = '' then format := 'n';
+        'E': if format = '' then format := 'n';
       end;
-      else component := xqFunctionFormat_Integer(context, xqvalueArray([xqvalue(number), xqvalue(format), xqvalue(lang)])).toString;
-    end;
-    missingCharacterCount := pictured[i].minwidth - strLengthUtf8(component);
-    if missingCharacterCount > 0 then begin
-      j := 1;
-      zerocp := charUnicodeZero(strDecodeUTF8Character(component, j));
-      if (zerocp > 0) and (pictured[i].component <> 'f') then
-        component := strDup(strGetUnicodeCharacter(zerocp), missingCharacterCount) + component
-      else begin
-        if zerocp <= 0 then zerocp := ord(' ');
-        component := component + strDup(strGetUnicodeCharacter(zerocp), missingCharacterCount);
+      if format <> #0 then begin //not handled above
+        component := '';
+        case format of
+          '', '1': if pictured[i].modifier = #0 then
+            component := IntToStr(number);
+          '01': if pictured[i].modifier = #0 then begin
+            component := IntToStr(number);
+            if (length(component) = 1) and (pictured[i].maxwidth > 1) then component := '0' + component;
+          end;
+          'N','n','Nn': begin
+            case pictured[i].component of
+              'M': case sublang of
+                'en': component := monthNamesEnglish[number];
+                'de': component := monthNamesGerman[number];
+              end;
+              'F': case sublang of
+                'en': component := weekDayNamesEnglish[number];
+                'de': component := weekDayNamesGerman[number];
+              end;
+              'C': component := calendar;
+              'E': if dateTime^.year >= 0 then begin
+                case sublang of
+                  'en': component := 'CE';
+                  'de': component := 'n. d. Z.';
+                end;
+              end else
+                case sublang of
+                  'en': component := 'BCE';
+                  'de': component := 'v. d. Z.';
+                end;
+            end;
+            case format of
+              'N': component := UpperCase(StringReplace(component, 'ä', 'Ä',[]));
+              'n': component[1] := lowerCase(component[1]);
+            end;
+            if (length(component) > pictured[i].maxwidth) and (pictured[i].component in ['M','F']) then begin
+              j := strLengthUtf8(component) - pictured[i].maxwidth;
+              if j > 0 then begin
+                case sublang of
+                  'en', 'de': if (pictured[i].maxwidth > 3) and (pictured[i].minwidth = 3) then
+                    j := strLengthUtf8(component) - pictured[i].minwidth;
+                end;
+                delete(component, length(component) - j + 1, j);
+              end;
+            end;
+          end;
+        end;
+        if component = '' then begin
+          if format = '' then format := '0';
+          if pictured[i].modifier <> #0 then format += ';' + pictured[i].modifier else format += ';';
+          component := xqFunctionFormat_Integer(context, xqvalueArray([xqvalue(number), xqvalue(format), xqvalue(lang)])).toString;
+        end;
       end;
+      missingCharacterCount := pictured[i].minwidth - strLengthUtf8(component);
+      if missingCharacterCount > 0 then begin
+        j := 1;
+        zerocp := charUnicodeZero(strDecodeUTF8Character(component, j));
+        if (zerocp > 0) and (pictured[i].component <> 'f') then
+          component := strDup(strGetUnicodeCharacter(zerocp), missingCharacterCount) + component
+        else begin
+          if zerocp <= 0 then zerocp := ord(' ');
+          component := component + strDup(strGetUnicodeCharacter(zerocp), missingCharacterCount);
+        end;
+      end;
+      formatted += component;
     end;
-    formatted += component;
+    formatted := fallbackOccured + formatted;
+  except
+    on e:EXQEvaluationException do
+      if e.errorCode = 'FODF1310' then raiseInvalidPictureFOFD1340
+      else raise;
   end;
   result := xqvalue(formatted);
 end;
