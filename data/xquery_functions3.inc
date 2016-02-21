@@ -863,6 +863,75 @@ begin
   result.pos := 1;
 end;
 
+function formatUnicodeInteger(arabic, primaryFormat: string; family: integer): string;
+  var
+    cp: Integer;
+    optional: Integer;
+    mandatory: Integer;
+    validGroupingSeparator: TWrappedRegExpr;
+    separators: array of record
+      pos: integer;
+      sep: string;
+    end;
+    sepcount: Integer;
+    totalDigits: Integer;
+    delta: Integer;
+    i: Integer;
+
+  begin
+    SetLength(separators, 10);
+    sepcount := 0;
+    optional := 0;
+    mandatory := 0;
+    validGroupingSeparator := nil;
+    for cp in strIterator(primaryFormat) do begin
+      if cp = ord('#') then begin
+        if mandatory > 0 then raise EXQEvaluationException.create('FODF1310', 'Invalid optional in ' + primaryFormat);
+        inc(optional)
+      end else if (cp >= family) and (cp < family + 10) then inc(mandatory)
+      else begin
+        if validGroupingSeparator = nil then validGroupingSeparator := wregexprParse('^[^\p{Nd}\p{Nl}\p{No}\p{Lu}\p{Ll}\p{Lt}\p{Lm}\p{Lo}]$',[]);
+        if (optional + mandatory > 0) and wregexprMatches(validGroupingSeparator, strGetUnicodeCharacter(cp)) then begin
+          if sepcount >= length(separators) then SetLength(separators, sepcount * 2);
+          separators[sepcount].sep := strGetUnicodeCharacter(cp);
+          separators[sepcount].pos := optional + mandatory;
+          inc(sepcount)
+        end else begin
+          wregexprFree(validGroupingSeparator);
+          raise EXQEvaluationException.create('FODF1310', 'Invalid grouping separator in "' + primaryFormat + '": x' + IntToStr(cp) );
+        end
+      end;
+    end;
+    wregexprFree(validGroupingSeparator);
+    if mandatory = 0 then raise EXQEvaluationException.create('FODF1310', 'No digit in ' + primaryFormat);
+
+    delta := -1;
+    if sepcount > 0 then begin
+      for i := 0 to sepcount - 1 do separators[i].pos := optional + mandatory - separators[i].pos;
+        if separators[sepcount - 1].pos = 0 then
+          raise EXQEvaluationException.create('FODF1310', 'Trailing grouping separator in ' + primaryFormat);
+      delta := separators[sepcount-1].pos;
+      for i := sepcount - 2 downto 0 do begin
+        if (separators[i].pos - separators[i+1].pos <> delta) or (separators[i+1].sep <> separators[i].sep) then delta := -1;
+        if separators[i+1].pos - separators[i].pos = 0 then raise EXQEvaluationException.create('FODF1310', 'Adjacent grouping separator in ' + primaryFormat);
+      end;
+    end;
+
+    if length(arabic) < mandatory then arabic := strDup('0', mandatory - length(arabic) ) + arabic;
+    if (family = ord('0')) and (sepcount = 0) then exit(arabic);
+
+    result := '';
+    totalDigits := 0;
+    for i := length(arabic) downto 1 do begin
+      if (sepcount > 0) and (separators[sepcount-1].pos <= totalDigits) then begin
+        result := separators[sepcount-1].sep + result;
+        if Delta > 0 then separators[sepcount-1].pos += delta
+        else dec(sepcount);
+      end;
+      result := strGetUnicodeCharacter(family + ord(arabic[i]) - ord('0')) + result;
+      inc(totalDigits);
+    end;
+  end;
 
 function xqFunctionFormat_Integer(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 
@@ -894,77 +963,7 @@ var shortLang: String;
     end;
   end;
 
-  function formatUnicodeInteger(family: integer): string;
-  var
-    cp: Integer;
-    optional: Integer;
-    mandatory: Integer;
-    validGroupingSeparator: TWrappedRegExpr;
-    separators: array of record
-      pos: integer;
-      sep: string;
-    end;
-    sepcount: Integer;
-    arabic: String;
-    totalDigits: Integer;
-    delta: Integer;
-    i: Integer;
 
-  begin
-    SetLength(separators, 10);
-    sepcount := 0;
-    optional := 0;
-    mandatory := 0;
-    validGroupingSeparator := nil;
-    for cp in strIterator(primaryFormat) do begin
-      if cp = ord('#') then begin
-        if mandatory > 0 then raise EXQEvaluationException.create('FODF1310', 'Invalid optional in ' + primaryFormat);
-        inc(optional)
-      end else if (cp >= family) and (cp < family + 10) then inc(mandatory)
-      else begin
-        if validGroupingSeparator = nil then validGroupingSeparator := wregexprParse('^[^\p{Nd}\p{Nl}\p{No}\p{Lu}\p{Ll}\p{Lt}\p{Lm}\p{Lo}]$',[]);
-        if (optional + mandatory > 0) and wregexprMatches(validGroupingSeparator, strGetUnicodeCharacter(cp)) then begin
-          if sepcount >= length(separators) then SetLength(separators, sepcount * 2);
-          separators[sepcount].sep := strGetUnicodeCharacter(cp);
-          separators[sepcount].pos := optional + mandatory;
-          inc(sepcount)
-        end else begin
-          wregexprFree(validGroupingSeparator);
-          raise EXQEvaluationException.create('FODF1310', 'Invalid grouping separator in ' + primaryFormat);
-        end
-      end;
-    end;
-    wregexprFree(validGroupingSeparator);
-    if mandatory = 0 then raise EXQEvaluationException.create('FODF1310', 'No digit in ' + primaryFormat);
-
-    delta := -1;
-    if sepcount > 0 then begin
-      for i := 0 to sepcount - 1 do separators[i].pos := optional + mandatory - separators[i].pos;
-        if separators[sepcount - 1].pos = 0 then
-          raise EXQEvaluationException.create('FODF1310', 'Trailing grouping separator in ' + primaryFormat);
-      delta := separators[sepcount-1].pos;
-      for i := sepcount - 2 downto 0 do begin
-        if (separators[i].pos - separators[i+1].pos <> delta) or (separators[i+1].sep <> separators[i].sep) then delta := -1;
-        if separators[i+1].pos - separators[i].pos = 0 then raise EXQEvaluationException.create('FODF1310', 'Adjacent grouping separator in ' + primaryFormat);
-      end;
-    end;
-
-    arabic := BigDecimalToStr(number);
-    if length(arabic) < mandatory then arabic := strDup('0', mandatory - length(arabic) ) + arabic;
-    if (family = ord('0')) and (sepcount = 0) then exit(arabic);
-
-    result := '';
-    totalDigits := 0;
-    for i := length(arabic) downto 1 do begin
-      result := strGetUnicodeCharacter(family + ord(arabic[i]) - ord('0')) + result;
-      inc(totalDigits);
-      if (sepcount > 0) and (separators[sepcount-1].pos <= totalDigits) then begin
-        result := separators[sepcount-1].sep + result;
-        if Delta > 0 then separators[sepcount-1].pos += delta
-        else dec(sepcount);
-      end;
-    end;
-  end;
 
 var
   separator: LongInt;
@@ -1070,7 +1069,7 @@ begin
     for i in strIterator(primaryFormat) do begin
       j := charUnicodeZero(i);
       if j > 0 then begin
-        formatted := formatUnicodeInteger(j);
+        formatted := formatUnicodeInteger(BigDecimalToStr(number), primaryFormat, j);
         break;
       end;
     end;
@@ -1081,3 +1080,373 @@ begin
   result := xqvalue(formatted);
 end;
 
+
+function dateWeekOfMonth(y,m,d: integer): integer;
+var
+  week: Word;
+  firstweek: Word;
+begin
+  week := dateWeekOfYear( y, m, d );
+  firstweek :=dateWeekOfYear( y, m, 4 );
+  if (week >= firstweek) and (week < firstweek + 10) then exit(week - firstweek + 1);
+  dec(m);
+  if m <=0 then begin exit(dateWeekOfMonth(y-1,12,31)); end;
+  firstweek :=dateWeekOfYear( y, m, 4 );
+  result := week - firstweek + 1;
+end;
+
+function xqFunctionFormat_DateTimeC(const context: TXQEvaluationContext; const args: TXQVArray; allowDate, allowTime: boolean): IXQValue;
+
+const monthNamesEnglish: array[1..12] of string = ('January', 'February', 'March','April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December');
+      monthNamesGerman: array[1..12] of string = ('Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember');
+      weekDayNamesEnglish: array[1..7] of string = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+      weekDayNamesGerman: array[1..7] of string = ('Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag');
+
+
+var picture: string;
+  procedure raiseInvalidPictureFOFD1340;
+  begin
+    raise EXQEvaluationException.create('FOFD1340', 'Invalid picture string: ' + picture);
+  end;
+
+  function parseWidth(const width: string; const def: integer): integer;
+  begin
+    if width = '*' then exit(def);
+    result := StrToIntDef(width, -1);
+    if result <= 0 then raiseInvalidPictureFOFD1340;
+  end;
+
+  function countDigits(const s: string; zerodp: PInteger = nil; allDigits: PBoolean = nil): integer;
+  var
+    j: Integer;
+    zerocp: Integer;
+  begin
+    j := 1;
+    result := 0;
+    if assigned(allDigits) then allDigits^ := true;
+    while j <= length(s) do begin
+      case s[j] of
+        '0'..'9': begin
+          inc(result);
+          inc(j);
+          if assigned(zerodp) then zerodp^ := ord('0');
+        end;
+        '!'..'/', ':'..'z': begin
+          inc(j); //non-digit ascii
+          if assigned(allDigits) then allDigits^ := false;
+        end
+        else begin
+          zerocp := charUnicodeZero(strDecodeUTF8Character(s, j));
+          if zerocp > 0 then begin
+            inc(result);
+            if assigned(zerodp) then zerodp^ := zerocp;
+          end else if assigned(allDigits) then allDigits^ := false;
+        end;
+      end;
+    end;
+  end;
+
+var
+  lang: String;
+  calendar: String;
+  place: String;
+
+  pictured: array of record
+    component: char;
+    modifier: char;
+    format: string;
+    minwidth, maxwidth: integer;
+  end;
+  picturedlength: Integer;
+  commapos: SizeInt;
+  tempstrmin: RawByteString;
+  tempstr: RawByteString;
+  tempstrmax: RawByteString;
+  last: Integer;
+  i: Integer;
+  calendarNamespace: string;
+  dateTime: PXQValueDateTimeData;
+  number: Integer;
+  component, format: String;
+  sublang: String;
+  formatted: String;
+  missingCharacterCount: Integer;
+  j: Integer;
+  zerocp: Integer;
+  allDigits: Boolean;
+  tz: Integer;
+
+
+begin
+  calendarNamespace := '';
+  if length(args) = 5 then begin
+    lang := args[2].toString;
+    calendar := args[3].toString;
+    if strBeginsWith(calendar, 'Q{') then begin //EQName!
+      calendarNamespace := strSplitGet('}', calendar);
+      delete(calendarNamespace, 1, 2); //Q{ no more
+    end else if pos(':', calendar) > 0 then begin
+      context.staticContext.splitRawQName(calendarNamespace, calendar, xqdnkUnknown);
+      if calendarNamespace = '' then raiseInvalidPictureFOFD1340;
+    end;
+    if calendarNamespace = '' then
+      case calendar of
+        '':;
+        'AD', 'ISO': ;
+        'AH', 'AME', 'AM', 'AP', 'AS', 'BE', 'CB', 'CE', 'CL', 'CS', 'EE', 'FE', 'JE', 'KE', 'KY', 'ME', 'MS', 'NS', 'OS', 'RS', 'SE', 'SH', 'SS', 'TE', 'VE', 'VS': begin
+          //???
+        end
+        else raise EXQEvaluationException.create('FOFD1340', 'Invalid calendar: '+calendar);
+      end;
+
+    place := args[4].toString;
+  end else if length(args) = 2 then begin
+    lang := '';
+    calendar := '';
+    place := '';
+  end else raise EXQEvaluationException.Create('XPST0017','Need 2 or 5 arguments passed');
+
+  sublang := lang;
+  if strContains(lang, '-') then sublang := strBefore(sublang, '-');
+  case sublang of
+    'de', 'en':;
+    else sublang := 'en';
+  end;
+
+  if args[0].isUndefined then exit(xqvalue);
+
+  picture := args[1].toString;
+  //writeln('>>',picture);
+  SetLength(pictured, 32);
+  picturedlength := 0;
+  last := 1;
+  i := 1;
+  while i <= length(picture) do begin
+    case picture[i] of
+      '[', ']': begin
+        if picturedlength = length(pictured) then SetLength(pictured, 2 * length(pictured));
+        pictured[picturedlength].component:='"';
+        pictured[picturedlength].format := copy(picture, last, i - last);
+        inc(picturedlength);
+        last := i;
+
+        if i + 1 > length(picture) then raise EXQEvaluationException.create('FOFD1340', 'Invalid datetime picture: '+picture);
+        if picture[i+1] = picture[i] then begin
+          pictured[picturedlength-1].format += picture[i];
+          inc(i, 2);
+          last := i;
+        end else begin
+          inc(i);
+          pictured[picturedlength].component:=picture[i];
+          case pictured[picturedlength].component of
+            'Y','M','D','d','F','W','w', 'E': if not allowDate then
+              raise EXQEvaluationException.create('FOFD1350', 'Invalid component in '+picture);
+            'H','h','P','m','s','f': if not allowTime then
+              raise EXQEvaluationException.create('FOFD1350', 'Invalid component in '+picture);
+            'Z', 'z': ;
+            else raiseInvalidPictureFOFD1340;
+          end;
+          last := i + 1;
+          i := strIndexOf(picture, ']', i);
+          pictured[picturedlength].format := copy(picture, last, i - last);
+          pictured[picturedlength].minwidth := 0;
+          pictured[picturedlength].maxwidth := 999;
+          commapos := strLastIndexOf(pictured[picturedlength].format, ',');
+          if commapos > 0 then begin
+            tempstrmax := strCopyFrom(pictured[picturedlength].format, commapos + 1);
+            delete(pictured[picturedlength].format, commapos, length(pictured[picturedlength].format));
+            if not strContains(tempstrmax, '-') then begin
+              tempstrmin := tempstrmax;
+              tempstrmax := '*'
+            end else tempstrmin := strSplitGet('-', tempstrmax );
+            pictured[picturedlength].minwidth := parseWidth(tempstrmin,0);
+            pictured[picturedlength].maxwidth := parseWidth(tempstrmax,pictured[picturedlength].minwidth + 99);
+          end else if pictured[picturedlength].format <> '' then begin
+            with pictured[picturedlength] do begin
+              minwidth := countDigits(format);
+              maxwidth:=minwidth;
+            end;
+          end;
+          if pictured[picturedlength].format <> '' then begin
+            if pictured[picturedlength].format[length(pictured[picturedlength].format)] in ['c','o','a','t'] then begin
+              pictured[picturedlength].modifier := pictured[picturedlength].format[length(pictured[picturedlength].format)];
+              delete(pictured[picturedlength].format, length(pictured[picturedlength].format), 1);
+            end;
+          end;
+          last := i + 1;
+          i := last;
+          inc(picturedlength);
+        end;
+      end;
+      else inc(i);
+    end;
+  end;
+  if last <> i then begin
+    pictured[picturedlength].component:='"';
+    pictured[picturedlength].format := copy(picture, last, i - last);
+    inc(picturedlength);
+  end;
+
+  {for i := 0 to picturedlength - 1 do
+    with pictured[i] do
+      writeln(component,': ',format, ' ',minwidth,'-',maxwidth);}
+
+  dateTime := @((args[0] as TXQValueDateTime).value);
+
+  formatted := '';
+  for i := 0 to picturedlength - 1 do begin
+    component := '';
+    format := pictured[i].format;
+    case pictured[i].component of
+      '"': begin
+        formatted += pictured[i].format;
+        continue;
+      end;
+      'Y': begin
+        number := dateTime^.year;
+        if pictured[i].maxwidth = 2 then number := number mod 100;
+      end;
+      'M': number := dateTime^.month;
+      'D': number := dateTime^.day;
+      'd': number := DateMonthDaysCumSum[IsLeapYear(dateTime^.year), dateTime^.month - 1] + dateTime^.day;
+      'F': begin
+        number := DayOfWeek( dateEncode(dateTime^.year, dateTime^.month, dateTime^.day ) - 1 ); //-1 there seems to be an offset between pascal and iso
+        if format = '' then format := 'n';
+      end;
+      'W': number := dateWeekOfYear( dateTime^.year, dateTime^.month, dateTime^.day ) ;
+      'w': number := dateWeekOfMonth( dateTime^.year, dateTime^.month, dateTime^.day ) ;
+      'H': number := dateTime^.hour;
+      'h': begin
+        number := dateTime^.hour;
+        if number > 12 then number -= 12
+        else if number = 0 then number := 12;
+      end;
+      'P': begin
+        if dateTime^.hour >= 12 then component := 'pm'
+        else component := 'am';
+        format := #0;
+      end;
+      'm': begin
+        number := dateTime^.min;
+        if format = '' then format := '01';
+      end;
+      's': begin
+        number := dateTime^.seconds;
+        if format = '' then format := '01';
+      end;
+      'f': begin
+        if pictured[i].maxwidth < 6 then
+           number := (dateTime^.microsecs + powersOf10[6 - pictured[i].maxwidth] div 2) div powersOf10[6 - pictured[i].maxwidth]
+         else number := dateTime^.microsecs ;
+        if pictured[i].minwidth < 7 then
+          while ((number mod 10) = 0 ) and (number > powersOf10[pictured[i].minwidth]) do number := number div 10;
+       end;
+      'Z', 'z': begin
+        if format = 'N' then format := '01:01';
+        if format = '' then format := '01:01';
+        //writeln(picture, '  z: ', format);
+        tz := dateTime^.timezone;
+        if dateTime^.timezone = high(Integer) then begin
+          if (format = 'Z') then component := 'J'
+          else component := '';
+          format := #0;
+        end else if (format = 'Z') and (tz mod 60 = 0) and (tz >= -12*60) and (tz <= 12*60) then begin
+          if tz = 0 then component := 'Z'
+          else begin
+            tz := tz div 60;
+            if tz < 0 then component := chr(ord('M') - tz)
+            else if tz < 10 then component := chr(ord('A') + tz - 1)
+            else component := chr(ord('A') + tz); //military time goes H I K L M  i.e. J is skipped
+          end;
+          format := #0;
+        end else begin
+          if format = 'Z' then format := '00:00';
+          tz := abs( (tz div 60) * 100 + (tz mod 60) );
+          j := countDigits(format, @zerocp, @allDigits);
+          if j > 0 then
+            if (tz = 0) and (pictured[i].modifier = 't') then begin
+              component := 'Z';
+              format := #0;
+            end else if allDigits and (j <= 2) then begin
+              if tz mod 100 = 0 then component := formatUnicodeInteger(inttostr(tz div 100), format, zerocp)
+              else component := formatUnicodeInteger(inttostr(tz), format + ':'+strdup(strGetUnicodeCharacter(zerocp),2), zerocp);
+            end else if not allDigits then  component := formatUnicodeInteger(inttostr(tz), format, zerocp)
+            else if j <= 4 then component := formatUnicodeInteger(inttostr(tz), format, zerocp);
+          if (component <> '') and (component <> 'Z') then begin
+            if dateTime^.timezone < 0 then component := '-' + component
+            else component := '+' + component;
+            if pictured[i].component = 'z' then component := 'GMT'+component;
+            format := #0;
+          end else number := tz;
+        end;
+      end;
+      //if format = '' then format := '01';;
+      'C': if format = '' then format := 'n';
+      'E': if format = '' then format := 'n';
+    end;
+    case format of
+      #0: ; //special case handled above
+      '', '1': component := IntToStr(number);
+      '01': begin
+        component := IntToStr(number);
+        if (length(component) = 1) and (pictured[i].maxwidth > 1) then component := '0' + component;
+      end;
+      'N','n','Nn': begin
+        case pictured[i].component of
+          'M': case sublang of
+            'en': component := monthNamesEnglish[number];
+            'de': component := monthNamesGerman[number];
+          end;
+          'F': case sublang of
+            'en': component := weekDayNamesEnglish[number];
+            'de': component := weekDayNamesGerman[number];
+          end;
+          'C': component := calendar;
+          'E': ;
+          else component := xqFunctionFormat_Integer(context, xqvalueArray([xqvalue(number), xqvalue(format), xqvalue(lang)])).toString;
+        end;
+        case format of
+          'N': component := UpperCase(StringReplace(component, 'ä', 'Ä',[]));
+          'n': component[1] := lowerCase(component[1]);
+        end;
+        if (length(component) > pictured[i].maxwidth) and (pictured[i].component in ['M','F']) then begin
+          j := strLengthUtf8(component) - pictured[i].maxwidth;
+          if j > 0 then begin
+            case sublang of
+              'en', 'de': if (pictured[i].maxwidth > 3) and (pictured[i].minwidth = 3) then
+                j := strLengthUtf8(component) - pictured[i].minwidth;
+            end;
+            delete(component, length(component) - j + 1, j);
+          end;
+        end;
+      end;
+      else component := xqFunctionFormat_Integer(context, xqvalueArray([xqvalue(number), xqvalue(format), xqvalue(lang)])).toString;
+    end;
+    missingCharacterCount := pictured[i].minwidth - strLengthUtf8(component);
+    if missingCharacterCount > 0 then begin
+      j := 1;
+      zerocp := charUnicodeZero(strDecodeUTF8Character(component, j));
+      if (zerocp > 0) and (pictured[i].component <> 'f') then
+        component := strDup(strGetUnicodeCharacter(zerocp), missingCharacterCount) + component
+      else begin
+        if zerocp <= 0 then zerocp := ord(' ');
+        component := component + strDup(strGetUnicodeCharacter(zerocp), missingCharacterCount);
+      end;
+    end;
+    formatted += component;
+  end;
+  result := xqvalue(formatted);
+end;
+
+function xqFunctionFormat_DateTime(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionFormat_DateTimeC(context, args, true, true);
+end;
+function xqFunctionFormat_Date(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionFormat_DateTimeC(context, args, true, false);
+end;
+function xqFunctionFormat_Time(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+begin
+  result := xqFunctionFormat_DateTimeC(context, args, false, true);
+end;
