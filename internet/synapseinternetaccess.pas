@@ -57,8 +57,7 @@ protected
   lastHTTPSFallbackHost: string;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  function doTransferRec(method:string; url: TDecodedUrl; data:string; redirectionCount:longint): string;
-  function doTransfer(method:string; const url: TDecodedUrl; data:string): string;override;
+  function doTransferUnchecked(method:string; const url: TDecodedUrl; data: string): string; override;
   function GetLastHTTPHeaders: TStringList; override;
 public
   constructor create();override;
@@ -135,7 +134,7 @@ begin
 end;
 
 
-function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; data: string; redirectionCount:longint): string;
+function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TDecodedUrl; data: string): string;
   procedure initConnection;
   var
     i: Integer;
@@ -157,7 +156,6 @@ function TSynapseInternetAccess.doTransferRec(method:string; url: TDecodedUrl; d
    if striequal(url.protocol, 'https') then
      if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := LT_TLSv1
      else connection.Sock.SSL.SSLType := LT_all;
-
 
    refer := lastUrl;
    accept := 'text/html,application/xhtml+xml,application/xml,text/*,*/*';
@@ -183,8 +181,15 @@ begin
   lastProgressLength:=-1;
 
   if striequal(url.protocol, 'https') then
-    if (not IsSSLloaded) then //check if ssl is actually loaded
-       raise EInternetException.Create('Couldn''t load ssl libraries: libopenssl and libcrypto'#13#10'(Hint: Also install the dev packages of openssl. Called libssl-dev on Debian/Ubunutu, openssl-devel on Fedora/CentOS, ...)');
+    if (not IsSSLloaded) then begin//check if ssl is actually loaded
+      lastHTTPResultCode := -2;
+      lastErrorDetails := 'Couldn''t load ssl libraries: libopenssl and libcrypto' + LineEnding +
+                          'They must be installed separately.' + LineEnding +
+                          '  On Debian/Ubuntu install libssl-dev.' + LineEnding +
+                          '  On Fedora/CentOS install openssl-devel.' + LineEnding +
+                          '  On Windows install OpenSSL from https://slproweb.com/products/Win32OpenSSL.html';
+      exit;
+    end;
 
   url.prepareSelfForRequest(lastConnectedUrl);
 
@@ -208,22 +213,8 @@ begin
 
   if ok then begin
     lastConnectedUrl := url;
-
-    //for i:=0 to connection.Headers.Count-1 do
-    //  writeln(connection.Headers[i]);
-     if (connection.ResultCode = 200) {or ((connection.ResultCode = 302) and (connection.document.Size > 512))} then
-       result:=ReadStrFromStream(connection.Document, connection.Document.Size)
-      else begin
-       if ((connection.ResultCode = 301) or (connection.ResultCode = 302) or (connection.ResultCode = 303) or (connection.ResultCode = 307)) and (redirectionCount > 0) then
-         for i:=0 to connection.Headers.Count-1 do
-           if stribeginswith(connection.Headers[i], 'Location:') then begin
-             newurl := connection.Headers[i]; strSplitGet(':',newurl);
-             exit(doTransferRec('GET', url.resolved(trim(newurl)), '', redirectionCount - 1));
-           end;
-       raise EInternetException.Create('Transfer failed: '+inttostr(connection.ResultCode)+': '+connection.ResultString+#13#10'when talking to: '+url.combined, connection.ResultCode);
-      end;
-  end else
-    raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
+    result:=ReadStrFromStream(connection.Document, connection.Document.Size)
+  end else exit;
 
   //url.username:=''; url.password:=''; url.linktarget:=''; //keep it secret in referer
   lastUrl:=url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]);
@@ -232,11 +223,6 @@ begin
   if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then
     if contentLength=-1 then FOnProgress(self,connection.DownloadSize,connection.DownloadSize)
     else FOnProgress(self,connection.DownloadSize,contentLength);
-end;
-
-function TSynapseInternetAccess.doTransfer(method:string;const url: TDecodedUrl; data: string): string;
-begin
-  result:=doTransferRec(method, url, data, 10);
 end;
 
 function TSynapseInternetAccess.GetLastHTTPHeaders: TStringList;

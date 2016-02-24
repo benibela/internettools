@@ -3540,7 +3540,7 @@ begin
     on e: EInternetException do
       raise EXQEvaluationException.create(failErrCode, e.Message);
   end;
-  contenttype := defaultInternet.getLastHTTPHeader('Content-Type');
+  contenttype := defaultInternet.getLastContentType;
 end;
 
 function TXQStaticContext.retrieveFromFile(url: string; out contenttype: string; failErrCode: string): string;

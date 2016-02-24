@@ -46,7 +46,7 @@ There are three ways to use it:
 *)
 TMockInternetAccess = class(TInternetAccess)
   constructor create; override;
-  function doTransfer(method: string; const url: TDecodedUrl; data: string): string; override;
+  function doTransferunChecked(method: string; const url: TDecodedUrl; data: string): string; override;
   function GetLastHTTPHeaders: TStringList; override;
 
   destructor Destroy; override;
@@ -67,7 +67,7 @@ begin
   additionalHeaders := TStringList.Create;
 end;
 
-function TMockInternetAccess.doTransfer(method: string; const url: TDecodedUrl; data: string): string;
+function TMockInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; data: string): string;
 begin
   if SimulatedServerPath = '' then result := DefaultMockPage
   else result := strLoadFromFile(SimulatedServerPath + url.path + url.params);

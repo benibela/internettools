@@ -50,9 +50,9 @@ protected
   lastConnectedUrl: TDecodedUrl;
   jhttpclient: jobject;
   FLastHTTPHeaders: TStringList;
-  function doTransfer2(method:string; url: TDecodedUrl; data:string): string;
-  function doTransfer(method:string; const url: TDecodedUrl; data:string): string;override;
+  function doTransferUnchecked(method:string; const aurl: TDecodedUrl; data:string): string;override;
   function GetLastHTTPHeaders: TStringList; override;
+  function ExceptionCheckAndClear: boolean;
 public
   constructor create;override;
   destructor destroy;override;
@@ -62,7 +62,7 @@ public
   function internalHandle: TObject; override;
 
   //**sets username and password for an host
-  procedure setCredentials(const username, password: string; const host: string);
+  function setCredentials(const username, password: string; const host: string): boolean;
 end;
 TAndroidInternetAccessClass = class of TAndroidInternetAccess;
 
@@ -259,7 +259,7 @@ begin
 end;
 
 
-function TAndroidInternetAccess.doTransfer2(method: string; url: TDecodedUrl; data: string): string;
+function TAndroidInternetAccess.doTransferUnchecked(method: string; const aurl: TDecodedUrl; data: string): string;
 var jRequest: jobject;
     classInfos: TClassInformation;
 
@@ -276,7 +276,7 @@ var jRequest: jobject;
     end;
   end;
 
-  procedure setRequestData;
+  function setRequestData: boolean;
   var jentity: jvalue;
       wrappedData: jbyteArray;
       temp: jvalue;
@@ -284,7 +284,10 @@ var jRequest: jobject;
     with classInfos do begin
       if data = '' then exit;
       wrappedData := j.env^^.NewByteArray(j.env, length(data));
-      if wrappedData = nil then raise EInternetException.create('Failed to allocate JNI array');
+      if wrappedData = nil then begin
+        lastErrorDetails := 'Failed to allocate JNI array';
+        exit(false);
+      end;
       j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, length(data), @data[1]); //todo: faster way than copying?
 
       //entity = new ByteArrayEntity(data)
@@ -299,6 +302,7 @@ var jRequest: jobject;
       j.CallVoidMethod(jRequest,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
 
       j.DeleteLocalRef(wrappedData);
+      result := true;
     end;
   end;
 
@@ -307,21 +311,20 @@ var
 
   m: THttpMethod;
   jUrl, jResponse, jResult, jStatusLine, jHeaderIterator, jHeader, jContext, jHost, jRedirectRequest: jobject;
-  resultCode: integer;
-  resultString: string;
   args: array[0..1] of jvalue;
+  url: TDecodedUrl;
 
   const allowedUnreserved =  ['0'..'9', 'A'..'Z', 'a'..'z',    '-', '_', '.', '!', '~', '*', '''', '(', ')', '%'];
         allowedPath = allowedUnreserved  + [':','@','&','=','+','$',',', ';','/'];
         allowedURI = allowedUnreserved + [';','/','?',':','@','&','=','+','$',',','[',']','"'];
         low = [#0..#128];
 begin
+  url := aurl;
 
   result:='';
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
-    j.env^^.ExceptionDescribe(j.env);
-    j.env^^.ExceptionClear(j.env);
+    ExceptionCheckAndClear
     //log('Warning: Ignoring exception');
   end;
 
@@ -339,7 +342,7 @@ begin
       //HttpGet httpget = new HttpGet(url);
       jUrl := j.stringToJString(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
       jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
-      j.RethrowJavaExceptionIfThereIsOne(EInternetException);
+      if ExceptionCheckAndClear then exit;
       j.DeleteLocalRef(jUrl);
 
       if lastUrl <> '' then
@@ -347,13 +350,20 @@ begin
       for i := 0 to additionalHeaders.Count - 1 do
         addHeader(additionalHeaders.Names[i], additionalHeaders.ValueFromIndex[i]);
       if (data <> '') and (m in [hmPut, hmPost]) then
-        setRequestData();
+        if not setRequestData() then begin
+          lastErrorDetails:= 'Failed to set request data';
+          exit;
+        end;
 
       jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
-      j.RethrowJavaExceptionIfThereIsOne(EInternetException);
+      if ExceptionCheckAndClear then exit;
 
       if url.username <> '' then
-        setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ); //problem: this is host specific, so it does not work for redirections
+        //problem: this is host specific, so it does not work for redirections
+        if not setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ) then begin
+          lastErrorDetails:= 'Failed to set credentials';
+          exit;
+        end;
 
 
       //send
@@ -361,64 +371,58 @@ begin
       args[1].l := jContext;
       jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @args);;
 
-      j.RethrowJavaExceptionIfThereIsOne(EInternetException); //if there is an exception during execute, do NOT delete the jRespone (having it in a finally block caused sigsegv, because it is an invalid not-nil value)
+      if ExceptionCheckAndClear then exit;
 
       try
         //process
         jResult := j.CallObjectMethod(jResponse,  jmHttpResponseGetEntity);
 
         jStatusLine := j.CallObjectMethod(jResponse, jmHttpResponseGetStatusLine);
-        resultCode := j.CallIntMethod(jStatusLine, jmStatusLineGetStatusCode);
-        resultString := j.jStringToStringAndDelete(j.CallObjectMethod(jStatusLine, jmStatusLineGetReasonPhrase));
+        lastHTTPResultCode := j.CallIntMethod(jStatusLine, jmStatusLineGetStatusCode);
+        lastErrorDetails := j.jStringToStringAndDelete(j.CallObjectMethod(jStatusLine, jmStatusLineGetReasonPhrase));
         j.DeleteLocalRef(jStatusLine);
 
         try
-          if (resultCode >= 200) and (resultCode <= 250) then begin
-            result := j.inputStreamToStringAndDelete(j.CallObjectMethod(jResult,  jmHttpEntityGetContent));
+          result := j.inputStreamToStringAndDelete(j.CallObjectMethod(jResult,  jmHttpEntityGetContent));
 
-            lastHTTPHeaders.Clear;
-            jHeaderIterator := j.CallObjectMethod(jResponse,  jmHttpMessageHeaderIterator);
-            while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
-              jHeader := j.CallObjectMethod(jHeaderIterator,  jmHeaderIteratorNextHeader);
-              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + ':'+
-                                  j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetValue)));
-              j.DeleteLocalRef(jHeader);
-            end;
-            j.DeleteLocalRef(jHeaderIterator);
-
+          lastHTTPHeaders.Clear;
+          jHeaderIterator := j.CallObjectMethod(jResponse,  jmHttpMessageHeaderIterator);
+          while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
+            jHeader := j.CallObjectMethod(jHeaderIterator,  jmHeaderIteratorNextHeader);
+            lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + ':'+
+                                j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetValue)));
+            j.DeleteLocalRef(jHeader);
+          end;
+          j.DeleteLocalRef(jHeaderIterator);
 
 
-            args[0].l := j.stringToJString('http.request');  //Better: ExecutionContext.HTTP_REQUEST
-            jRedirectRequest := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
+
+          args[0].l := j.stringToJString('http.request');  //Better: ExecutionContext.HTTP_REQUEST
+          jRedirectRequest := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
+          j.deleteLocalRef(args[0].l);
+
+          jUrl := j.callObjectMethod(jRedirectRequest, jmHttpUriRequestGetURI);
+          lastUrl := j.callStringMethod(jUrl, jmObjectToString);
+          if not j.callBooleanMethod(jUrl, jmURIIsAbsolute) then begin
+            args[0].l := j.stringToJString('http.target_host'); //Better: ExecutionContext.HTTP_TARGET_HOST
+            jHost := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
             j.deleteLocalRef(args[0].l);
 
-            jUrl := j.callObjectMethod(jRedirectRequest, jmHttpUriRequestGetURI);
-            lastUrl := j.callStringMethod(jUrl, jmObjectToString);
-            if not j.callBooleanMethod(jUrl, jmURIIsAbsolute) then begin
-              args[0].l := j.stringToJString('http.target_host'); //Better: ExecutionContext.HTTP_TARGET_HOST
-              jHost := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
-              j.deleteLocalRef(args[0].l);
-
-              lastUrl := j.callStringMethod(jHost, jmHttpHostToUri) + lastUrl;
-              j.deleteLocalRef(jHost);
-            end;
-            j.deleteLocalRef(jUrl);
-            j.deleteLocalRef(jRedirectRequest);
-          end else
-            raise EInternetException.Create('Transfer failed: '+inttostr(ResultCode)+': '+resultString+#13#10'when talking to: '+url.combined, resultCode);
-            //raise EInternetException.Create('Connecting failed'#13#10'when talking to: '+url.combined);
+            lastUrl := j.callStringMethod(jHost, jmHttpHostToUri) + lastUrl;
+            j.deleteLocalRef(jHost);
+          end;
+          j.deleteLocalRef(jUrl);
+          j.deleteLocalRef(jRedirectRequest);
         finally
           j.DeleteLocalRef(jResult);
         end;
 
         if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
-          j.env^^.ExceptionDescribe(j.env);
-          j.env^^.ExceptionClear(j.env);
+          ExceptionCheckAndClear
           //log('Warning: Ignoring exception');
         end;
 
         lastConnectedUrl := url;
-        lastHTTPResultCode := ResultCode;
       finally
         if  jResponse <> nil then
           j.DeleteLocalRef(jResponse);
@@ -432,17 +436,16 @@ begin
   end;
 end;
 
-function TAndroidInternetAccess.doTransfer(method: string; const url: TDecodedUrl; data: string): string;
-begin
-  result := doTransfer2(method, url, data);
-end;
-
-
 function TAndroidInternetAccess.GetLastHTTPHeaders: TStringList;
 begin
   result := FLastHTTPHeaders;
 end;
 
+function TAndroidInternetAccess.ExceptionCheckAndClear: boolean;
+begin
+  result := j.ExceptionCheck;
+  if result then lastErrorDetails := j.ExceptionDescribeAndClear
+end;
 
 
 constructor TAndroidInternetAccess.create();
@@ -526,13 +529,16 @@ begin
  result:=tobject(jhttpclient);
 end;
 
-procedure TAndroidInternetAccess.setCredentials(const username, password: string; const host: string);
+function TAndroidInternetAccess.setCredentials(const username, password: string; const host: string): boolean;
 var jcCredentialsProvider, jcAbstractHttpClient, jcAuthScope, jcUsernamePasswordCredentials: jclass;
     jmAbstractHttpClientGetCredentialsProvider, jmCredentialsProviderSetCredentials, jmAuthScopeConstructor, jmUsernamePasswordCredentialsConstructor: jmethodID;
     jhost, jusername, jpassword, authScope, creds, credProvider: jclass;
     tempargs: array[0..1] of jvalue;
 begin
-  if jhttpclient = nil then raise EAndroidInterfaceException.Create('HttpClient not created');
+  if jhttpclient = nil then begin
+    lastErrorDetails := 'HttpClient not created';
+    exit(false);
+  end;
   //jhttpclient.getCredentialsProvider().setCredentials(new AuthScope(host, AuthScope.ANY_PORT), new UsernamePasswordCredentials(username, password));
   with needJ do begin
     jcAbstractHttpClient := getclass('org/apache/http/impl/client/AbstractHttpClient');
@@ -577,6 +583,7 @@ begin
       deleteLocalRef(jcAuthScope);
       deleteLocalRef(jcUsernamePasswordCredentials);
     end;
+    result := true;
   end;
 end;
 

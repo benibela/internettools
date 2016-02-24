@@ -90,6 +90,9 @@ type
 
   procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
   procedure RethrowJavaExceptionIfThereIsOne();
+  function ExceptionDescribe: string;
+  function ExceptionDescribeAndClear: string;
+  function ExceptionCheck: boolean;
 
   procedure ThrowNew(c: jclass; error: string);
   procedure ThrowNew(c: pchar; error: string);
@@ -714,27 +717,41 @@ end;
 
 
 procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
-var je: jthrowable;
-    temp: jobject;
-    message: String;
 begin
-  if env^^.ExceptionCheck(env) <> JNI_FALSE then begin
-    je := env^^.ExceptionOccurred(env);
-    env^^.ExceptionDescribe(env);
-    env^^.ExceptionClear(env);
-    temp:= env^^.CallObjectMethod(env, je, getmethod('java/lang/Object', 'getClass', '()Ljava/lang/Class;'));
-    message := 'Java Internet Exception '
-                   + jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, getmethod('java/lang/Class', 'getName', '()Ljava/lang/String;'))) + ': '
-                   + jStringToStringAndDelete(env^^.CallObjectMethod(env, je, getmethod('java/lang/Throwable', 'getMessage', '()Ljava/lang/String;')));
-    env^^.DeleteLocalRef(env, temp);
-    env^^.DeleteLocalRef(env, je);
-    raise aexceptionClass.create(message);
-  end;
+  if ExceptionCheck then
+    raise aexceptionClass.create(ExceptionDescribeAndClear);
+
 end;
 
 procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne;
 begin
   RethrowJavaExceptionIfThereIsOne(EAndroidInterfaceException);
+end;
+
+function TJavaEnv.ExceptionDescribe: string;
+var je: jthrowable;
+    temp: jobject;
+    message: String;
+begin
+  je := env^^.ExceptionOccurred(env);
+  if je = nil then exit('');
+  env^^.ExceptionDescribe(env);
+  temp:= env^^.CallObjectMethod(env, je, getmethod('java/lang/Object', 'getClass', '()Ljava/lang/Class;'));
+  result := jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, getmethod('java/lang/Class', 'getName', '()Ljava/lang/String;'))) + ': '
+          + jStringToStringAndDelete(env^^.CallObjectMethod(env, je, getmethod('java/lang/Throwable', 'getMessage', '()Ljava/lang/String;')));
+  env^^.DeleteLocalRef(env, temp);
+  env^^.DeleteLocalRef(env, je);
+end;
+
+function TJavaEnv.ExceptionDescribeAndClear: string;
+begin
+  result := ExceptionDescribe;
+  env^^.ExceptionClear(env);
+end;
+
+function TJavaEnv.ExceptionCheck: boolean;
+begin
+  result := env^^.ExceptionCheck(env) <> JNI_FALSE
 end;
 
 procedure TJavaEnv.ThrowNew(c: jclass; error: string);

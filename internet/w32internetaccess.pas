@@ -40,19 +40,6 @@ uses
 
 
 type
-
-  { EW32InternetException }
-
-  EW32InternetException=class(EInternetException)
-    constructor create();
-    constructor create(s:string;showError:boolean=false);
-    constructor create(s:string;httpStatusCode: integer);
-  end;
-
-  { TInternetAccess }
-
-  { TW32InternetAccess }
-
   //**@abstract(Internet access class using the wininet library)
   //**Set defaultInternetAccessClass to TW32InternetAccess if
   //**you want to use wininet to connect to internet@br
@@ -65,8 +52,8 @@ type
     newConnectionOpened:boolean;
     FLastHTTPHeaders: TStringList;
     function GetLastHTTPHeaders: TStringList; override;
-    function doTransferRec(method:string; decoded: TDecodedUrl; data:string;redirectionCount: integer): string;
-    function doTransfer(method:string; const url: TDecodedUrl; data:string): string;override;
+    function doTransferUnchecked(method:string; const decoded: TDecodedUrl; data: string): string; override;
+    function getLastErrorDetails: string; override;
   public
     constructor create();override;
     destructor destroy;override;
@@ -130,170 +117,19 @@ resourcestring
   rsInvalidSSLCertificat = 'Invalid SSL certificate (invalid site name)';
   rsInvalidSSLCertificat2 = 'Invalid SSL certificate (too old)';
   rsFailedToValidateSSLC = 'Failed to validate SSL certificate';
-  rsUnknownInternetError = 'Unknown internet error: ';
+  rsWindowsCode = 'Windows error code: ';
   rsWindowsErrorMessage = 'Windows error message: ';
 
 //uses bbdebugtools;
 
 {$IFDEF COMPILE_W32_INTERNETACCESS}
 
-constructor EW32InternetException.create();
-var s: string;
-    temp1,temp2: dword;
-begin
-{ERROR_INTERNET_CLIENT_AUTH_NOT_SETUP
-Client authorization is not set up on this computer.
-}
-{ERROR_INTERNET_INCORRECT_USER_NAME
-The request to connect and log on to an FTP server could not be completed because the supplied user name is incorrect.
-ERROR_INTERNET_INCORRECT_PASSWORD
-The request to connect and log on to an FTP server could not be completed because the supplied password is incorrect.
-ERROR_INTERNET_LOGIN_FAILURE
-The request to connect to and log on to an FTP server failed.}
-{    ERROR_INTERNET_NO_CONTEXT
-An asynchronous request could not be made because a zero context value was supplied.
-ERROR_INTERNET_NO_CALLBACK
-An asynchronous request could not be made because a callback function has not been set.
-ERROR_INTERNET_REQUEST_PENDING
-The required operation could not be completed because one or more requests are pending.}
-{ERROR_INTERNET_ZONE_CROSSING
-Not used in this release.}
-{ERROR_FTP_TRANSFER_IN_PROGRESS
-The requested operation cannot be made on the FTP session handle because an operation is already in progress.
-ERROR_FTP_DROPPED
-The FTP operation was not completed because the session was aborted.
-ERROR_GOPHER_PROTOCOL_ERROR
-An error was detected while parsing data returned from the gopher server.
-ERROR_GOPHER_NOT_FILE
-The request must be made for a file locator.
-ERROR_GOPHER_DATA_ERROR
-An error was detected while receiving data from the gopher server.
-ERROR_GOPHER_END_OF_DATA
-The end of the data has been reached.
-ERROR_GOPHER_INVALID_LOCATOR
-The supplied locator is not valid.
-ERROR_GOPHER_INCORRECT_LOCATOR_TYPE
-The type of the locator is not correct for this operation.
-ERROR_GOPHER_NOT_GOPHER_PLUS
-The requested operation can only be made against a Gopher+ server, or with a locator that specifies a Gopher+ operation.
-ERROR_GOPHER_ATTRIBUTE_NOT_FOUND
-The requested attribute could not be located.
-ERROR_GOPHER_UNKNOWN_LOCATOR
-The locator type is unknown.}
-  s:='';
-  case GetLastError of
-    ERROR_INTERNET_OUT_OF_HANDLES:
-      s:=rsNoInternetHandlesAva;
-    ERROR_INTERNET_TIMEOUT:
-      s:=rsConnectionTimedOut;
-    ERROR_INTERNET_EXTENDED_ERROR: begin
-      setlength(s,4096);
-      temp2:=length(s);
-      InternetGetLastResponseInfoA({$ifndef DELPHI_WININET}@{$endif}temp1,@s[1],@temp2);
-      setlength(s,temp2);
-      s:=rsExtendedInternetConn+#13#10+s;
-    end;
-    ERROR_INTERNET_INTERNAL_ERROR:
-      s:=rsInternalErrorInWinin;
-    ERROR_INTERNET_INVALID_URL:
-      s:=rsInvalidUrl;
-    ERROR_INTERNET_UNRECOGNIZED_SCHEME:
-      s:=rsUnrecognizedUrlSchem;
-    ERROR_INTERNET_NAME_NOT_RESOLVED:
-      s:=rsDNSRequestFailedProb;
-    ERROR_INTERNET_PROTOCOL_NOT_FOUND:
-      s:=rsProtocolNotFound;
-    ERROR_INTERNET_INVALID_OPTION:
-      s:=rsInvalidParameter;
-    ERROR_INTERNET_BAD_OPTION_LENGTH:
-      s:=rsInvalidParameterLeng;
-    ERROR_INTERNET_OPTION_NOT_SETTABLE:
-      s:=rsTheRequestOptionCanN;
-    ERROR_INTERNET_SHUTDOWN:
-      s:=rsInternetHasBeenShutd;
-    ERROR_INTERNET_INVALID_OPERATION:
-      s:=rsInvalidInternetOpera;
-    ERROR_INTERNET_OPERATION_CANCELLED:
-      s:=rsOperationCancelled;
-    ERROR_INTERNET_INCORRECT_HANDLE_TYPE:
-      s:=rsInvalidHandle;
-    ERROR_INTERNET_INCORRECT_HANDLE_STATE:
-      s:=rsIncorrectHandle;
-    ERROR_INTERNET_NOT_PROXY_REQUEST        :
-      s:=rsInvalidProxyUsage;
-    ERROR_INTERNET_REGISTRY_VALUE_NOT_FOUND:
-      s:=rsRegistryCorrupted;
-    ERROR_INTERNET_BAD_REGISTRY_PARAMETER:
-      s:=rsCorruptedRegistry;
-    ERROR_INTERNET_NO_DIRECT_ACCESS:
-      s:=rsDirectInternetAccess;
-    ERROR_INTERNET_INCORRECT_FORMAT:
-      s:=rsIncorrectFormatForHt;
-    ERROR_INTERNET_ITEM_NOT_FOUND:
-      s:=rsInternetItemNotFound;
-    ERROR_INTERNET_CANNOT_CONNECT:
-      s:=rsFailedToCreateConnec;
-    ERROR_INTERNET_CONNECTION_ABORTED:
-      s:=rsInternetConnectionAb;
-    ERROR_INTERNET_CONNECTION_RESET:
-      s:=rsInternetConnectionRe;
-    ERROR_INTERNET_FORCE_RETRY:
-      s:=rsNeedRetriedRequest;
-    ERROR_INTERNET_MIXED_SECURITY:
-      s:=rsUnsecurePage;
-    {ERROR_INTERNET_SSL_CERT_CN_INVALID:
-      s:='Sicherheitszertifikat des Servers ungültig';}
-    ERROR_INTERNET_HANDLE_EXISTS :
-      s:=rsInternetHandleAlread;
-    ERROR_HTTP_HEADER_NOT_FOUND :
-      s:=rsHTTPHeaderNotFound;
-    ERROR_HTTP_DOWNLEVEL_SERVER:
-      s:=rsServerAnsweredWithou;
-    ERROR_HTTP_INVALID_SERVER_RESPONSE:
-      s:=rsServerResponseIsInva;
-    ERROR_HTTP_INVALID_HEADER:
-      s:=rsInvalidHttpHeader;
-    ERROR_HTTP_INVALID_QUERY_REQUEST:
-      s:=rsInvalidHttpQueryRequ;
-    ERROR_HTTP_HEADER_ALREADY_EXISTS:
-      s:=rsHttpHeaderAlreadyExi;
-    ERROR_INVALID_HANDLE:
-      s:=rsInvalidInternetHandl;
-    ERROR_INVALID_PARAMETER:
-      s:=rsInvalidParameter;
-    ERROR_INTERNET_SEC_CERT_NO_REV:
-      s :=rsTheSSLCertificateWas;
-    ERROR_INTERNET_SEC_CERT_CN_INVALID:
-      s :=rsInvalidSSLCertificat;
-    ERROR_INTERNET_SEC_CERT_DATE_INVALID :
-      s := rsInvalidSSLCertificat2;
-    ERROR_INTERNET_SEC_CERT_REV_FAILED:
-      s := rsFailedToValidateSSLC;
-    else
-      s:=rsUnknownInternetError + IntToStr(GetLastError);
-  end;
-  inherited create(s);
-end;
-
-constructor EW32InternetException.create(s:string;showError:boolean=false);
-begin
-  create();
-  details:=rsWindowsErrorMessage+Message;
-  Message:=s;
-end;
-
-constructor EW32InternetException.create(s: string; httpStatusCode: integer);
-begin
-  create(s);
-  errorCode:=httpStatusCode;
-end;
-
 function TW32InternetAccess.GetLastHTTPHeaders: TStringList;
 begin
   result := FLastHTTPHeaders;
 end;
 
-function TW32InternetAccess.doTransferRec(method:string; decoded: TDecodedUrl; data:string;redirectionCount: integer): string;
+function TW32InternetAccess.doTransferUnchecked(method:string; const decoded: TDecodedUrl; data:string): string;
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', '');
 var
   databuffer : array[0..4095] of char;
@@ -309,8 +145,10 @@ var
   headerOut: string;
   overridenPostHeader: string;
 begin
-  if not assigned(hSession) Then
-    raise EW32InternetException.create(rsNoInternetSessionCre);
+  lastHTTPResultCode := -1;
+  lastErrorDetails := '';
+  result := '';
+  if not assigned(hSession) Then exit;
 
   if (lastConnectedUrl.Protocol<>decoded.protocol) or (lastConnectedUrl.Host<>decoded.host) or (lastConnectedUrl.Port <> decoded.port)
      or (lastConnectedUrl.username <> decoded.username) or (lastConnectedUrl.password <> decoded.password) then begin
@@ -329,8 +167,11 @@ begin
     if (decoded.username = '') and (decoded.password = '') then hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,nil,            nil,temp,0,0)
     else if decoded.password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),nil,temp,0,0)
     else                                        hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),pchar(strUnescapeHex(decoded.password, '%')),temp,0,0);
-    if hLastConnection=nil then
-      raise EW32InternetException.create(format(rsConnectingTo0SFailed, [decoded.host]));
+    if hLastConnection=nil then begin
+      lastHTTPResultCode := -2;
+      lastErrorDetails:=rsConnectingTo0SFailed;
+      exit;
+    end;
     lastConnectedUrl := decoded;
   end;
 
@@ -342,9 +183,10 @@ begin
   end else
     hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
-  if not assigned(hfile) then
-    raise EW32InternetException.create(format(rsReceivingFrom0SFaile, [decoded.combined])); //'Can''t connect');
-
+  if not assigned(hfile) then begin
+    lastErrorDetails := rsReceivingFrom0SFaile;
+    exit;
+  end;
 
   cookiestr:=makeCookieHeader;
   if cookiestr<>'' then
@@ -378,7 +220,8 @@ begin
       end;
     end;
 
-    raise EW32InternetException.create();
+    lastHTTPResultCode := -3;
+    exit;
   end;
       
   lastRefererUrl := decoded;
@@ -388,52 +231,18 @@ begin
   dwIndex  := 0;
   dwCodeLen := 10;
   if not HttpQueryInfoA(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, @dwcodeLen, @dwIndex) then
-    raise EW32InternetException.create();
+    exit;
   res := pchar(@dwcode);
 
-  lastHTTPResultCode := StrToIntDef(res, -1);
+  lastHTTPResultCode := StrToIntDef(res, -4);
 
-  if (lastHTTPResultCode = 200) or (lastHTTPResultCode = 301) or (lastHTTPResultCode = 302) or (lastHTTPResultCode = 303) or (lastHTTPResultCode = 307) then begin
+  if (lastHTTPResultCode >= 200) and (lastHTTPResultCode <= 399) then begin
     dwNumber := sizeof(databuffer)-1;
     if HttpQueryInfoA(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,@dwNumber,@dwindex) then
-      parseHeaderForCookies(databuffer) //handle cookies ourself, our we could not have separate cookies for different connections
+      parseHeaderForCookies(databuffer) //handle cookies ourself, or we could not have separate cookies for different connections
      else
       dwNumber := 0;
   end else dwNumber := 0;
-
-  Result:='';
-  if ((lastHTTPResultCode = 301) or (lastHTTPResultCode = 302) or (lastHTTPResultCode = 303) or (lastHTTPResultCode = 307)) and (redirectionCount > 0) then begin
-    InternetCloseHandle(hfile);
-    //handle redirection ourself, or we could not read cookies transmitted during redirections (for videlibri ubfu)
-    if dwNumber = 0 then exit;
-    newurl := parseHeaderForLocation(databuffer);
-    if newurl = '' then exit('');
-    result := doTransferRec('GET', decoded.resolved(trim(newurl)), '', redirectionCount - 1);
-    exit;
-  end else if (lastHTTPResultCode =200) or (lastHTTPResultCode = 302) then begin
-    if method <> 'HEAD' then begin
-      if assigned(OnProgress) then begin
-        dwCodeLen := 15;
-        HttpQueryInfoA(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, @dwcodelen, @dwIndex);
-        res := pchar(@dwcode);
-        dwContentLength:=StrToIntDef(res,1*1024*1024);
-        OnProgress(self,0,dwContentLength);
-      end;
-      dwRead:=0;
-      dwNumber := sizeof(databuffer)-1;
-      SetLastError(0);
-      while (InternetReadfile(hfile,@databuffer,dwNumber,@DwRead)) and (dwread>0) do begin
-        temp:=length(result);
-        setLength(result,temp+dwRead);
-        move(dataBuffer[0],result[temp+1],dwRead);
-        if assigned(OnProgress) then
-          OnProgress(self,length(result),dwContentLength);
-      end;
-    end;
-  end else if res='0' then
-    raise EW32InternetException.create(rsInternetRequestFaile)
-   else
-    raise EW32InternetException.create(format(rsHTTPErrorCode0SNWhen, [res, decoded.combined]), StrToIntDef(res, 999));
 
   lastHTTPHeaders.Clear;
   if not HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
@@ -443,22 +252,133 @@ begin
       lastHTTPHeaders.Text:=headerOut;
     end;
 
+  if method <> 'HEAD' then begin
+    if assigned(OnProgress) then begin
+      dwCodeLen := 15;
+      HttpQueryInfoA(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, @dwcodelen, @dwIndex);
+      res := pchar(@dwcode);
+      dwContentLength:=StrToIntDef(res,1*1024*1024);
+      OnProgress(self,0,dwContentLength);
+    end;
+    dwRead:=0;
+    dwNumber := sizeof(databuffer)-1;
+    SetLastError(0);
+    while (InternetReadfile(hfile,@databuffer,dwNumber,@DwRead)) and (dwread>0) do begin
+      temp:=length(result);
+      setLength(result,temp+dwRead);
+      move(dataBuffer[0],result[temp+1],dwRead);
+      if assigned(OnProgress) then
+        OnProgress(self,length(result),dwContentLength);
+    end;
+  end;
 
   InternetCloseHandle(hfile);
 end;
 
-function TW32InternetAccess.doTransfer(method:string; const url: TDecodedUrl;data:string): string;
+function TW32InternetAccess.getLastErrorDetails: string;
+var
+  temp1,templen: dword;
 begin
-  result := doTransferRec(UpperCase(method), url, data, 10);
+  result:=lastErrorDetails;
+  case GetLastError of
+    ERROR_INTERNET_OUT_OF_HANDLES:
+      result:=rsNoInternetHandlesAva;
+    ERROR_INTERNET_TIMEOUT:
+      result:=rsConnectionTimedOut;
+    ERROR_INTERNET_EXTENDED_ERROR: begin
+      setlength(result,4096);
+      templen:=length(result);
+      InternetGetLastResponseInfoA({$ifndef DELPHI_WININET}@{$endif}temp1,@result[1],@templen);
+      setlength(result,templen);
+      result:=rsExtendedInternetConn+#13#10+result;
+    end;
+    ERROR_INTERNET_INTERNAL_ERROR:
+      result:=rsInternalErrorInWinin;
+    ERROR_INTERNET_INVALID_URL:
+      result:=rsInvalidUrl;
+    ERROR_INTERNET_UNRECOGNIZED_SCHEME:
+      result:=rsUnrecognizedUrlSchem;
+    ERROR_INTERNET_NAME_NOT_RESOLVED:
+      result:=rsDNSRequestFailedProb;
+    ERROR_INTERNET_PROTOCOL_NOT_FOUND:
+      result:=rsProtocolNotFound;
+    ERROR_INTERNET_INVALID_OPTION:
+      result:=rsInvalidParameter;
+    ERROR_INTERNET_BAD_OPTION_LENGTH:
+      result:=rsInvalidParameterLeng;
+    ERROR_INTERNET_OPTION_NOT_SETTABLE:
+      result:=rsTheRequestOptionCanN;
+    ERROR_INTERNET_SHUTDOWN:
+      result:=rsInternetHasBeenShutd;
+    ERROR_INTERNET_INVALID_OPERATION:
+      result:=rsInvalidInternetOpera;
+    ERROR_INTERNET_OPERATION_CANCELLED:
+      result:=rsOperationCancelled;
+    ERROR_INTERNET_INCORRECT_HANDLE_TYPE:
+      result:=rsInvalidHandle;
+    ERROR_INTERNET_INCORRECT_HANDLE_STATE:
+      result:=rsIncorrectHandle;
+    ERROR_INTERNET_NOT_PROXY_REQUEST        :
+      result:=rsInvalidProxyUsage;
+    ERROR_INTERNET_REGISTRY_VALUE_NOT_FOUND:
+      result:=rsRegistryCorrupted;
+    ERROR_INTERNET_BAD_REGISTRY_PARAMETER:
+      result:=rsCorruptedRegistry;
+    ERROR_INTERNET_NO_DIRECT_ACCESS:
+      result:=rsDirectInternetAccess;
+    ERROR_INTERNET_INCORRECT_FORMAT:
+      result:=rsIncorrectFormatForHt;
+    ERROR_INTERNET_ITEM_NOT_FOUND:
+      result:=rsInternetItemNotFound;
+    ERROR_INTERNET_CANNOT_CONNECT:
+      result:=rsFailedToCreateConnec;
+    ERROR_INTERNET_CONNECTION_ABORTED:
+      result:=rsInternetConnectionAb;
+    ERROR_INTERNET_CONNECTION_RESET:
+      result:=rsInternetConnectionRe;
+    ERROR_INTERNET_FORCE_RETRY:
+      result:=rsNeedRetriedRequest;
+    ERROR_INTERNET_MIXED_SECURITY:
+      result:=rsUnsecurePage;
+    {ERROR_INTERNET_SSL_CERT_CN_INVALID:
+      result:='Sicherheitszertifikat des Servers ungültig';}
+    ERROR_INTERNET_HANDLE_EXISTS :
+      result:=rsInternetHandleAlread;
+    ERROR_HTTP_HEADER_NOT_FOUND :
+      result:=rsHTTPHeaderNotFound;
+    ERROR_HTTP_DOWNLEVEL_SERVER:
+      result:=rsServerAnsweredWithou;
+    ERROR_HTTP_INVALID_SERVER_RESPONSE:
+      result:=rsServerResponseIsInva;
+    ERROR_HTTP_INVALID_HEADER:
+      result:=rsInvalidHttpHeader;
+    ERROR_HTTP_INVALID_QUERY_REQUEST:
+      result:=rsInvalidHttpQueryRequ;
+    ERROR_HTTP_HEADER_ALREADY_EXISTS:
+      result:=rsHttpHeaderAlreadyExi;
+    ERROR_INVALID_HANDLE:
+      result:=rsInvalidInternetHandl;
+    ERROR_INVALID_PARAMETER:
+      result:=rsInvalidParameter;
+    ERROR_INTERNET_SEC_CERT_NO_REV:
+      result:=rsTheSSLCertificateWas;
+    ERROR_INTERNET_SEC_CERT_CN_INVALID:
+      result:=rsInvalidSSLCertificat;
+    ERROR_INTERNET_SEC_CERT_DATE_INVALID :
+      result:= rsInvalidSSLCertificat2;
+    ERROR_INTERNET_SEC_CERT_REV_FAILED:
+      result:= rsFailedToValidateSSLC;
+    else if GetLastError <> 0 then
+      result:='('+ rsWindowsCode + IntToStr(GetLastError)+')';
+  end;
 end;
-
 
 constructor TW32InternetAccess.create();
 var proxyStr:string;
     timeout: longint;
 begin
   init;
-  FLastHTTPHeaders := TStringList.Create;
+  FLastHTTPHeaders:= TStringList.Create;
   if defaultInternetConfiguration.tryDefaultConfig then
     hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
                             INTERNET_OPEN_TYPE_PRECONFIG,
@@ -501,7 +421,7 @@ begin
                             nil,nil,0)
   end;
   if hSession=nil then
-    raise EW32InternetException.create(rsFailedToConnectToThe, true);
+    raise EInternetException.create(rsFailedToConnectToThe + getLastErrorDetails);
   hLastConnection:=nil;
   newConnectionOpened:=false;
   timeout:=2*60*1000;

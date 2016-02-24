@@ -91,13 +91,13 @@ type
     class function HeaderForBoundary(const boundary: string): string; static;
   end;
 
-  { TCustomInternetAccess }
+  TInternetAccessReaction = (iarAccept, iarFollowRedirectGET, iarFollowRedirectKeepMethod, iarReject);
 
-  { TInternetAccess }
   //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
+  TTransferReactEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var reaction: TInternetAccessReaction; var data:string) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
   //**@abstract(Abstract base class for connections)
   //**This class defines the interface methods for http requests, like get, post or request.@br
@@ -114,9 +114,12 @@ type
     FOnTransferStart: TTransferStartEvent;
   protected
     FOnProgress:TProgressEvent;
+    lastErrorDetails: string;
     //**Override this if you want to sub class it
-    function doTransfer(method: string; const url: TDecodedUrl;  data:string):string;virtual;abstract;
     function GetLastHTTPHeaders: TStringList; virtual; abstract;
+    function doTransferUnchecked(method: string; const url: TDecodedUrl;  data:string):string;virtual;abstract;
+    function doTransferChecked(method: string; url: TDecodedUrl;  data:string; remainingRedirects: integer):string;
+    function getLastErrorDetails(): string; virtual;
   protected
     //** Cookies receive from/to-send the server (only for backends that does not support cookies natively (i.e.. win32). Synapse has its own cookies)
     cookies: array of record
@@ -131,10 +134,10 @@ type
     class function parseHeaderLineValue(const line: string): string; static;
     class function makeHeaderLine(const name, value: string): string; static;
     class function makeHeaderLine(const kind: THeaderKind; const value: string): string; static;
+    function getLastHTTPHeaderValue(kind: THeaderKind): string;
+    function getLastHTTPHeaderValue(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
     //constructor, since .create is "abstract" and can not be called
     procedure init;
-  public
-    class function parseHeaderForLocation(header: string): string; static;
   public
     //in
     internetConfig: PInternetConfig; //**< Configuration to use. Defaults to defaultInternetConfig
@@ -147,7 +150,6 @@ type
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last @noAutoLink(request)
     lastUrl: String; //**< Last retrieved URL
     property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last @noAutoLink(request)
-    function getLastHTTPHeader(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
     function getLastContentType: string; //**< Same as getLastHTTPHeader('Content-Type') but easier to remember and without magic string
   public
     constructor create();virtual;
@@ -660,13 +662,55 @@ begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
   if assigned(FOnTransferStart) then
     FOnTransferStart(self, method, url, data);
-  result:=doTransfer(method,url,data);
+
+  result:=doTransferChecked(method,url,data,10);
+
   if internetConfig^.logToPath<>'' then
     writeString(internetConfig^.logToPath, url.combined+'<-DATA:'+data,result);
   if assigned(FOnTransferEnd) then
     FOnTransferEnd(self, method, url, data, Result);
 end;
 
+function TInternetAccess.doTransferChecked(method: string; url: TDecodedUrl; data: string; remainingRedirects: integer): string;
+var
+  reaction: TInternetAccessReaction;
+  message: String;
+begin
+  while true do begin
+    result := doTransferUnchecked(method, url, data);
+
+    reaction := iarReject;
+    case lastHTTPResultCode of
+      200..299: reaction := iarAccept;
+      301,302,303: if remainingRedirects > 0 then reaction := iarFollowRedirectGET;
+      304..308: if remainingRedirects > 0 then reaction := iarFollowRedirectKeepMethod;
+      else reaction := iarReject;
+    end;
+
+    case reaction of
+      iarAccept: exit;
+      iarFollowRedirectGET, iarFollowRedirectKeepMethod: begin
+        if reaction = iarFollowRedirectGET then begin
+          method := 'GET';
+          data := '';
+        end;
+        url := decodeURL(getLastHTTPHeaderValue(iaLocation));
+        dec(remainingRedirects);
+      end;
+      else begin
+        message := getLastErrorDetails();
+        if lastHTTPResultCode <= 0 then message := 'Internet Error: ' + IntToStr(lastHTTPResultCode) + ' ' + message
+        else message := 'Internet/HTTP Error: ' + IntToStr(lastHTTPResultCode) + ' ' + message;
+        raise EInternetException.Create(message + LineEnding + 'when talking to: '+url.combined, lastHTTPResultCode);
+      end;
+    end;
+  end;
+end;
+
+function TInternetAccess.getLastErrorDetails: string;
+begin
+  result := lastErrorDetails;
+end;
 
 procedure TInternetAccess.setCookie(name, value: string);
 var i:longint;
@@ -786,30 +830,6 @@ begin
   ContentTypeForData := ContentTypeUrlEncoded;
 end;
 
-class function TInternetAccess.parseHeaderForLocation(header: string): string;
-var i,mark:longint;
-begin
-  //log('PHFL Header: ');  log(header);
-  i:=1;
-  while i<length(header) do begin
-    if strlibeginswith(@header[i],length(header)-i,'Location:') then begin
-      i+=length('Location:');
-      //Name getrimmt finden
-      while header[i] = ' ' do i+=1;
-
-      mark:=i;
-      while not (header[i] in [#13,#10]) do i+=1;
-      result:=copy(header,mark,i-mark);
-
-      //log('====> Redirection to:'+result);
-      exit;
-    end;
-    while (i<=length(header)) and not (header[i] in [#13,#10]) do i+=1;
-    if (i <= length(header)) and (header[i] = #13) then i+=1;
-    if (i <= length(header)) and (header[i] = #10) then i+=1;
-  end;
-end;
-
 function TInternetAccess.getFinalMultipartFormData: string;
 var
   boundary: String;
@@ -820,7 +840,19 @@ begin
   multipartFormData.clear;
 end;
 
-function TInternetAccess.getLastHTTPHeader(header: string): string;
+function TInternetAccess.getLastHTTPHeaderValue(kind: THeaderKind): string;
+var
+  headers: TStringList;
+  i: Integer;
+begin
+  headers := GetLastHTTPHeaders;
+  for i:= 0 to headers.count - 1 do
+    if parseHeaderLineKind(headers[i]) = kind then
+      exit(parseHeaderLineValue(headers[i]));
+  exit('');
+end;
+
+function TInternetAccess.getLastHTTPHeaderValue(header: string): string;
 var
   headers: TStringList;
   i: Integer;
@@ -835,7 +867,7 @@ end;
 
 function TInternetAccess.getLastContentType: string;
 begin
-  result := getLastHTTPHeader('Content-Type');
+  result := getLastHTTPHeaderValue(iaContentType);
 end;
 
 constructor TInternetAccess.create();
