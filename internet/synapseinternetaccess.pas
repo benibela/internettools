@@ -179,6 +179,7 @@ begin
   result:='';
   contentLength:=-1;
   lastProgressLength:=-1;
+  lastHTTPResultCode := -1;
 
   if striequal(url.protocol, 'https') then
     if (not IsSSLloaded) then begin//check if ssl is actually loaded

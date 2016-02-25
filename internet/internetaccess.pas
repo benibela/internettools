@@ -694,7 +694,7 @@ begin
           method := 'GET';
           data := '';
         end;
-        url := decodeURL(getLastHTTPHeaderValue(iaLocation));
+        url := url.resolved(getLastHTTPHeaderValue(iaLocation));
         dec(remainingRedirects);
       end;
       else begin
