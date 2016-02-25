@@ -50,7 +50,6 @@ TSynapseInternetAccess=class(TInternetAccess)
     const Value: String);
 protected
   //synapse will automatically handle keep alive
-  lastConnectedUrl: TDecodedUrl;
   connection: THTTPSend;
   lastProgressLength,contentLength:longint;
   forwardProgressEvent: TProgressEvent;
@@ -58,7 +57,6 @@ protected
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
   function doTransferUnchecked(method:string; const url: TDecodedUrl; data: string): string; override;
-  function GetLastHTTPHeaders: TStringList; override;
 public
   constructor create();override;
   destructor destroy;override;
@@ -172,9 +170,7 @@ function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TD
    if accept <> '' then connection.Headers.Add(makeHeaderLine(iaAccept, accept));
   end;
 
-var newurl: string;
-  i: Integer;
-  ok: Boolean;
+var ok: Boolean;
 begin
   result:='';
   contentLength:=-1;
@@ -192,13 +188,13 @@ begin
       exit;
     end;
 
-  url.prepareSelfForRequest(lastConnectedUrl);
 
   initConnection;
   if (url.username <> '') then begin
     connection.UserName := strUnescapeHex(url.username, '%');
     connection.Password := strUnescapeHex(url.password, '%');
   end;
+
   ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
 
   if (not ok) and (checkEtcResolv) then begin
@@ -213,22 +209,18 @@ begin
   end;
 
   if ok then begin
-    lastConnectedUrl := url;
-    result:=ReadStrFromStream(connection.Document, connection.Document.Size)
-  end else exit;
+    result:=ReadStrFromStream(connection.Document, connection.Document.Size);
+    LastHTTPHeaders.assign(connection.Headers);
+    lastHTTPResultCode := connection.ResultCode;
+  end else begin
+    lastHTTPResultCode := -4;
+    exit;
+  end;
 
-  //url.username:=''; url.password:=''; url.linktarget:=''; //keep it secret in referer
-  lastUrl:=url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]);
-  lastHTTPResultCode := connection.ResultCode;
 
   if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then
     if contentLength=-1 then FOnProgress(self,connection.DownloadSize,connection.DownloadSize)
     else FOnProgress(self,connection.DownloadSize,contentLength);
-end;
-
-function TSynapseInternetAccess.GetLastHTTPHeaders: TStringList;
-begin
-  result := connection.Headers;
 end;
 
 constructor TSynapseInternetAccess.create();
@@ -266,7 +258,6 @@ end;
 destructor TSynapseInternetAccess.destroy;
 begin
   FreeAndNil(connection);
-  additionalHeaders.free;
   inherited destroy;
 end;
 

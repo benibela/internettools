@@ -47,7 +47,6 @@ There are three ways to use it:
 TMockInternetAccess = class(TInternetAccess)
   constructor create; override;
   function doTransferunChecked(method: string; const url: TDecodedUrl; data: string): string; override;
-  function GetLastHTTPHeaders: TStringList; override;
 
   destructor Destroy; override;
 public
@@ -63,8 +62,7 @@ uses bbutils;
 
 constructor TMockInternetAccess.create;
 begin
-  internetConfig := @defaultInternetConfiguration;
-  additionalHeaders := TStringList.Create;
+  init
 end;
 
 function TMockInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; data: string): string;
@@ -74,14 +72,8 @@ begin
   if Assigned(OnTransfer) then OnTransfer(method, url, data, result);
 end;
 
-function TMockInternetAccess.GetLastHTTPHeaders: TStringList;
-begin
-  result := additionalHeaders;
-end;
-
 destructor TMockInternetAccess.Destroy;
 begin
-  additionalHeaders.Free;
   inherited Destroy;
 end;
 

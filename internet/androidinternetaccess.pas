@@ -47,11 +47,8 @@ type
 //**Additionally bbjniutils.jvmref must be set to the Java VM reference.@br
 TAndroidInternetAccess=class(TInternetAccess)
 protected
-  lastConnectedUrl: TDecodedUrl;
   jhttpclient: jobject;
-  FLastHTTPHeaders: TStringList;
-  function doTransferUnchecked(method:string; const aurl: TDecodedUrl; data:string): string;override;
-  function GetLastHTTPHeaders: TStringList; override;
+  function doTransferUnchecked(method:string; const url: TDecodedUrl; data:string): string;override;
   function ExceptionCheckAndClear: boolean;
 public
   constructor create;override;
@@ -107,7 +104,7 @@ type TClassInformation = record
     jiStatusLine: jclass;
     jmStatusLineGetStatusCode: jmethodID;
     jmDefaultHttpClientGetParams: jmethodID;
-    jmHttpParamsSetParameter: jmethodID;
+    jmHttpParamsSetParameter, jmHttpParamsSetBooleanParameter: jmethodID;
     jcHttpHost: jclass;
     jmHttpHostConstructor, jmHttpHostToUri: jmethodID;
 
@@ -157,6 +154,7 @@ begin
 
      jiHttpParams := getc('org/apache/http/params/HttpParams');
      jmHttpParamsSetParameter := getm(jiHttpParams, 'setParameter', '(Ljava/lang/String;Ljava/lang/Object;)Lorg/apache/http/params/HttpParams;');
+     jmHttpParamsSetBooleanParameter := getm(jiHttpParams, 'setBooleanParameter', '(Ljava/lang/String;Z)Lorg/apache/http/params/HttpParams;');
 
      jcHttpHost := getc('org/apache/http/HttpHost');
      jmHttpHostConstructor := getm(jcHttpHost, '<init>', '(Ljava/lang/String;I)V');
@@ -259,7 +257,7 @@ begin
 end;
 
 
-function TAndroidInternetAccess.doTransferUnchecked(method: string; const aurl: TDecodedUrl; data: string): string;
+function TAndroidInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; data: string): string;
 var jRequest: jobject;
     classInfos: TClassInformation;
 
@@ -310,29 +308,15 @@ var
   i: Integer;
 
   m: THttpMethod;
-  jUrl, jResponse, jResult, jStatusLine, jHeaderIterator, jHeader, jContext, jHost, jRedirectRequest: jobject;
+  jUrl, jResponse, jResult, jStatusLine, jHeaderIterator, jHeader, jContext: jobject;
   args: array[0..1] of jvalue;
-  url: TDecodedUrl;
-
-  const allowedUnreserved =  ['0'..'9', 'A'..'Z', 'a'..'z',    '-', '_', '.', '!', '~', '*', '''', '(', ')', '%'];
-        allowedPath = allowedUnreserved  + [':','@','&','=','+','$',',', ';','/'];
-        allowedURI = allowedUnreserved + [';','/','?',':','@','&','=','+','$',',','[',']','"'];
-        low = [#0..#128];
 begin
-  url := aurl;
-
   result:='';
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
     ExceptionCheckAndClear
     //log('Warning: Ignoring exception');
   end;
-
-  url.path := strEscapeToHex(url.path, low - allowedPath, '%');
-  url.params := strEscapeToHex(url.params, low - allowedURI, '%');
-  url.linktarget := strEscapeToHex(url.linktarget, low - allowedURI, '%'); //? or set to ''
-
-  url.prepareSelfForRequest(lastConnectedUrl);
 
   m := methodStringToMethod(method);
 
@@ -394,25 +378,6 @@ begin
             j.DeleteLocalRef(jHeader);
           end;
           j.DeleteLocalRef(jHeaderIterator);
-
-
-
-          args[0].l := j.stringToJString('http.request');  //Better: ExecutionContext.HTTP_REQUEST
-          jRedirectRequest := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
-          j.deleteLocalRef(args[0].l);
-
-          jUrl := j.callObjectMethod(jRedirectRequest, jmHttpUriRequestGetURI);
-          lastUrl := j.callStringMethod(jUrl, jmObjectToString);
-          if not j.callBooleanMethod(jUrl, jmURIIsAbsolute) then begin
-            args[0].l := j.stringToJString('http.target_host'); //Better: ExecutionContext.HTTP_TARGET_HOST
-            jHost := j.callObjectMethod(jContext, jmBasicHttpContextGetAttribute, @args[0]);
-            j.deleteLocalRef(args[0].l);
-
-            lastUrl := j.callStringMethod(jHost, jmHttpHostToUri) + lastUrl;
-            j.deleteLocalRef(jHost);
-          end;
-          j.deleteLocalRef(jUrl);
-          j.deleteLocalRef(jRedirectRequest);
         finally
           j.DeleteLocalRef(jResult);
         end;
@@ -422,7 +387,6 @@ begin
           //log('Warning: Ignoring exception');
         end;
 
-        lastConnectedUrl := url;
       finally
         if  jResponse <> nil then
           j.DeleteLocalRef(jResponse);
@@ -434,11 +398,6 @@ begin
   finally
     freeClasses(classInfos);
   end;
-end;
-
-function TAndroidInternetAccess.GetLastHTTPHeaders: TStringList;
-begin
-  result := FLastHTTPHeaders;
 end;
 
 function TAndroidInternetAccess.ExceptionCheckAndClear: boolean;
@@ -457,7 +416,6 @@ var args:array[0..1] of jvalue;
     javaEnvRef: PJNIEnv;
 begin
   init;
-  FLastHTTPHeaders := TStringList.Create;
 
   javaEnvRef:=needJ.env; //todo, use j. directl
 
@@ -478,6 +436,12 @@ begin
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, javaEnvRef^^.CallObjectMethodA(javaEnvRef, jparams, jmHttpParamsSetParameter, @args));
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
       javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[1].l);
+
+      //disable 3xx handling, so we can handle it ourselves like on all other platforms
+      args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, 'http.protocol.handle-redirects');
+      args[1].z  := JNI_FALSE;
+      javaEnvRef^^.DeleteLocalRef(javaEnvRef, javaEnvRef^^.CallObjectMethodA(javaEnvRef, jparams, jmHttpParamsSetBooleanParameter, @args));
+      javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
 
       if internetConfig^.useProxy then begin
         args[0].l := j.stringToJString(internetConfig^.proxyHTTPName);
@@ -507,8 +471,6 @@ end;
 
 destructor TAndroidInternetAccess.destroy;
 begin
-  additionalHeaders.free;
-  FLastHTTPHeaders.Free;
   if jhttpclient <> nil then needj.DeleteGlobalRef(jhttpclient);
   //else log('Invalid jhttpclient reference (nil)');
   inherited destroy;

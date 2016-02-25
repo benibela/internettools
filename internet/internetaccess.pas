@@ -115,8 +115,9 @@ type
   protected
     FOnProgress:TProgressEvent;
     lastErrorDetails: string;
+    lastURLDecoded: TDecodedUrl;
+    FLastHTTPHeaders: TStringList;
     //**Override this if you want to sub class it
-    function GetLastHTTPHeaders: TStringList; virtual; abstract;
     function doTransferUnchecked(method: string; const url: TDecodedUrl;  data:string):string;virtual;abstract;
     function doTransferChecked(method: string; url: TDecodedUrl;  data:string; remainingRedirects: integer):string;
     function getLastErrorDetails(): string; virtual;
@@ -149,10 +150,11 @@ type
     //out
     lastHTTPResultCode: longint;    //**< HTTP Status code of the last @noAutoLink(request)
     lastUrl: String; //**< Last retrieved URL
-    property lastHTTPHeaders: TStringList read GetLastHTTPHeaders; //**< HTTP headers received by the last @noAutoLink(request)
+    property lastHTTPHeaders: TStringList read FLastHTTPHeaders; //**< HTTP headers received by the last @noAutoLink(request)
     function getLastContentType: string; //**< Same as getLastHTTPHeader('Content-Type') but easier to remember and without magic string
   public
     constructor create();virtual;
+    destructor Destroy; override;
     //**post the (raw) data to the given url and returns the resulting document
     //**as string
     function post(totalUrl: string; data:string):string;
@@ -672,10 +674,20 @@ begin
 end;
 
 function TInternetAccess.doTransferChecked(method: string; url: TDecodedUrl; data: string; remainingRedirects: integer): string;
+
+  const allowedUnreserved =  ['0'..'9', 'A'..'Z', 'a'..'z',    '-', '_', '.', '!', '~', '*', '''', '(', ')', '%'];
+        allowedPath = allowedUnreserved  + [':','@','&','=','+','$',',', ';','/'];
+        allowedURI = allowedUnreserved + [';','/','?',':','@','&','=','+','$',',','[',']','"'];
+        low = [#0..#128];
 var
   reaction: TInternetAccessReaction;
   message: String;
 begin
+  url.path := strEscapeToHex(url.path, low - allowedPath, '%'); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
+  url.params := strEscapeToHex(url.params, low - allowedURI, '%');
+
+  url.prepareSelfForRequest(lastURLDecoded);
+
   while true do begin
     result := doTransferUnchecked(method, url, data);
 
@@ -688,7 +700,7 @@ begin
     end;
 
     case reaction of
-      iarAccept: exit;
+      iarAccept: break;
       iarFollowRedirectGET, iarFollowRedirectKeepMethod: begin
         if reaction = iarFollowRedirectGET then begin
           method := 'GET';
@@ -705,6 +717,10 @@ begin
       end;
     end;
   end;
+
+  lastURLDecoded := url;
+  lastURLDecoded.username:=''; lastURLDecoded.password:=''; lastURLDecoded.linktarget:=''; //keep this secret
+  lastUrl := lastURLDecoded.combined;
 end;
 
 function TInternetAccess.getLastErrorDetails: string;
@@ -826,6 +842,8 @@ begin
 
   additionalHeaders := TStringList.Create;
   additionalHeaders.nameValueSeparator := ':';
+  FLastHTTPHeaders := TStringList.Create;
+  FLastHTTPHeaders.nameValueSeparator := ':';
 
   ContentTypeForData := ContentTypeUrlEncoded;
 end;
@@ -845,7 +863,7 @@ var
   headers: TStringList;
   i: Integer;
 begin
-  headers := GetLastHTTPHeaders;
+  headers := LastHTTPHeaders;
   for i:= 0 to headers.count - 1 do
     if parseHeaderLineKind(headers[i]) = kind then
       exit(parseHeaderLineValue(headers[i]));
@@ -858,7 +876,7 @@ var
   i: Integer;
 begin
   header := header + ':';
-  headers := GetLastHTTPHeaders;
+  headers := LastHTTPHeaders;
   for i:= 0 to headers.count - 1 do
     if striBeginsWith(headers[i], header) then
       exit(trim(strCopyFrom(headers[i], length(header) + 1)));
@@ -873,6 +891,13 @@ end;
 constructor TInternetAccess.create();
 begin
   raise eabstracterror.create('Abstract internet class created (TInternetAccess)');
+end;
+
+destructor TInternetAccess.Destroy;
+begin
+  FLastHTTPHeaders.Free; //created by init
+  additionalHeaders.Free;
+  inherited Destroy;
 end;
 
 function TInternetAccess.post(totalUrl: string;data:string):string;

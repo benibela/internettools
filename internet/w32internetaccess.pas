@@ -48,10 +48,7 @@ type
   TW32InternetAccess=class(TInternetAccess)
   protected
     hSession,hLastConnection: hInternet;
-    lastConnectedUrl, lastRefererUrl: TDecodedUrl;
     newConnectionOpened:boolean;
-    FLastHTTPHeaders: TStringList;
-    function GetLastHTTPHeaders: TStringList; override;
     function doTransferUnchecked(method:string; const decoded: TDecodedUrl; data: string): string; override;
     function getLastErrorDetails: string; override;
   public
@@ -124,11 +121,6 @@ resourcestring
 
 {$IFDEF COMPILE_W32_INTERNETACCESS}
 
-function TW32InternetAccess.GetLastHTTPHeaders: TStringList;
-begin
-  result := FLastHTTPHeaders;
-end;
-
 function TW32InternetAccess.doTransferUnchecked(method:string; const decoded: TDecodedUrl; data:string): string;
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', '');
 var
@@ -150,8 +142,8 @@ begin
   result := '';
   if not assigned(hSession) Then exit;
 
-  if (lastConnectedUrl.Protocol<>decoded.protocol) or (lastConnectedUrl.Host<>decoded.host) or (lastConnectedUrl.Port <> decoded.port)
-     or (lastConnectedUrl.username <> decoded.username) or (lastConnectedUrl.password <> decoded.password) then begin
+  if (lastURLDecoded.Protocol<>decoded.protocol) or (lastUrlDecoded.Host<>decoded.host) or (lastUrlDecoded.Port <> decoded.port)
+     or (lastUrlDecoded.username <> decoded.username) or (lastUrlDecoded.password <> decoded.password) then begin
     if hLastConnection<>nil then
       InternetCloseHandle(hLastConnection);
     if striequal(decoded.protocol, 'http') then begin
@@ -172,16 +164,15 @@ begin
       lastErrorDetails:=rsConnectingTo0SFailed;
       exit;
     end;
-    lastConnectedUrl := decoded;
   end;
 
   if striequal(decoded.protocol, 'https') then begin
     if internetConfig^.checkSSLCertificates then
-      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
+      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
      else
-      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
+      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
   end else
-    hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastRefererUrl.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
+    hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
 
   if not assigned(hfile) then begin
     lastErrorDetails := rsReceivingFrom0SFaile;
@@ -223,10 +214,6 @@ begin
     lastHTTPResultCode := -3;
     exit;
   end;
-      
-  lastRefererUrl := decoded;
-  lastRefererUrl.username:=''; lastRefererUrl.password:=''; lastRefererUrl.linktarget:=''; //keep this secret
-  lastUrl := lastRefererUrl.combined;
 
   dwIndex  := 0;
   dwCodeLen := 10;
@@ -434,8 +421,6 @@ begin
   if hLastConnection<>nil then
     InternetCloseHandle(hLastConnection);
   InternetCloseHandle(hsession);
-  FLastHTTPHeaders.Free;
-  additionalHeaders.Free;
   inherited;
 end;
 
