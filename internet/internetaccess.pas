@@ -91,13 +91,15 @@ type
     class function HeaderForBoundary(const boundary: string): string; static;
   end;
 
-  TInternetAccessReaction = (iarAccept, iarFollowRedirectGET, iarFollowRedirectKeepMethod, iarReject);
+  TInternetAccess = class;
+
+  TInternetAccessReaction = (iarAccept, iarFollowRedirectGET, iarFollowRedirectKeepMethod, iarRetry, iarReject);
 
   //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
-  TTransferReactEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var reaction: TInternetAccessReaction; var data:string) of object;
+  TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data:string; var reaction: TInternetAccessReaction) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
   //**@abstract(Abstract base class for connections)
   //**This class defines the interface methods for http requests, like get, post or request.@br
@@ -111,6 +113,7 @@ type
   TInternetAccess=class
   private
     FOnTransferEnd: TTransferEndEvent;
+    FOnTransferReact: TTransferReactEvent;
     FOnTransferStart: TTransferStartEvent;
   protected
     FOnProgress:TProgressEvent;
@@ -193,6 +196,7 @@ type
     function internalHandle: TObject; virtual; abstract;
   published
     property OnTransferStart: TTransferStartEvent read FOnTransferStart write FOnTransferStart;
+    property OnTransferReact: TTransferReactEvent read FOnTransferReact write FOnTransferReact;
     property OnTransferEnd: TTransferEndEvent read FOnTransferEnd write FOnTransferEnd;
     property OnProgress: TProgressEvent read FOnProgress write FOnProgress;
   end;
@@ -699,6 +703,8 @@ begin
       else reaction := iarReject;
     end;
 
+    if Assigned(OnTransferReact) then OnTransferReact(self, method, url, data, reaction);
+
     case reaction of
       iarAccept: break;
       iarFollowRedirectGET, iarFollowRedirectKeepMethod: begin
@@ -709,6 +715,7 @@ begin
         url := url.resolved(getLastHTTPHeaderValue(iaLocation));
         dec(remainingRedirects);
       end;
+      iarRetry: ; //do nothing
       else begin
         message := getLastErrorDetails();
         if lastHTTPResultCode <= 0 then message := 'Internet Error: ' + IntToStr(lastHTTPResultCode) + ' ' + message
