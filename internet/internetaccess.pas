@@ -698,7 +698,9 @@ begin
     reaction := iarReject;
     case lastHTTPResultCode of
       200..299: reaction := iarAccept;
-      301,302,303: if remainingRedirects > 0 then reaction := iarFollowRedirectGET;
+      301,302,303: if remainingRedirects > 0 then
+        if striEqual(method, 'POST') then reaction := iarFollowRedirectGET
+        else reaction := iarFollowRedirectKeepMethod;
       304..308: if remainingRedirects > 0 then reaction := iarFollowRedirectKeepMethod;
       else reaction := iarReject;
     end;
