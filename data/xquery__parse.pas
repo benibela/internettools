@@ -2246,12 +2246,29 @@ function TXQParsingContext.parse: TXQTerm;
   function checkForPatternMatching: boolean; //i really abused the grammar there
   var
     submarker: PChar;
+    temp: String;
   begin
     submarker := pos;
     result := false;
     if nextToken() = '<' then begin
-      nextToken();
-      result := nextToken() = '>';
+      if baseSchema.isValidNCName(nextToken()) then begin
+        if nextToken(true) = ':' then begin
+          nextToken(); //:
+          nextToken(); //ns:name
+        end;
+        temp := nextToken();
+        case temp of
+          '>': result := true;
+          '/': result := nextToken() = '>';
+          else if baseSchema.isValidNCName(temp) then
+              case nextToken() of
+                '=': result := true;
+                ':': if baseSchema.isValidNCName(nextToken()) then
+                  result := nextToken() = '=';
+              end;
+
+        end;
+      end;
     end;
     pos := submarker;
   end;

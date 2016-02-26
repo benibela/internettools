@@ -1076,6 +1076,8 @@ begin
   q( ' let  <html><h2>section 1</h2> <p>{$var}</p>+ <h2>section 2</h2></html> := <html><h2>section 1</h2> <p>a</p>  <p>b</p>         <h2>section 2</h2>           <p>c</p></html>  return join($var / string())', 'a b');
   q('let <r>{$a}<b>{$b}</b>?</r> := <r>x<b>y</b></r>  return concat(count($a),count($b))', '11');
   q('let <r>{$a}<b>{$b}</b>?</r> := <r>x</r>  return concat(count($a),count($b))', '10');
+  q( 'let <a xmlns:pointless="t" x="{$abc}"/> := <a x="y">456</a> return $abc', 'y');
+  q( 'let <u:v xmlns:u="t" x="{$abc}"/> := <u:v xmlns:u="t" x="y">456</u:v> return $abc', 'y');
 
   q( 'for <a>{$abc}</a> in <a>123</a> return $abc', '123');
   qf( 'for <a>{$abc}</a> in <abc>123</abc> return $abc', 'pxp:PATTERN');
@@ -1085,6 +1087,7 @@ begin
   q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  </ul> return concat("li: ", .), "; ")', 'li: 1; li: 2');
   q('join(for <a>{$abc}</a>+ in <x><a>1</a><a>2</a></x> order by $abc return join($abc), ",")', '1,2');
   q('join(for <a>{$abc}</a>+ in <x><a>1</a><a>2</a></x> order by $abc descending return join($abc), ",")', '2,1');
+  q( 'for <a x="{$abc}"/> in <a x="y">456</a> return $abc', 'y');
 
   q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> where . mod 2 = 0 return ., "; ")', '2; 6');
   q('let <a>{$a}</a> := <a>1</a>, <b>{$b}</b> := <b>3</b> let <c>{$c}</c> := <c>5</c> return join(($a,$b,$c))', '1 3 5');
