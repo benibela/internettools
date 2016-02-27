@@ -1067,6 +1067,7 @@ begin
   qf('typeswitch (<x><a>1</a><a>2</a></x>) case <a>{.}</a>+ return join(.) default return "oh?"', 'pxp:PATTERN1');
   q( 'typeswitch (<abc>foobar</abc>) case <def>..</def> return 123 case <abc>{.}</abc> return . default return "oh??"', 'foobar');
   q( 'typeswitch (<html><b>foobar</b></html>)   case <a>{.}</a> return concat("a link to ", @href )  case <b>{$v}</b> return concat("bold text: ", $v)  default return "unknown element" ', 'bold text: foobar');
+  q( 'declare function local:f(){"t"}; typeswitch (<html><b>foobar</b></html>)   case <a>{.}</a> return concat("a link to ", @href )  case <b>{$x := concat(., local:f())}</b> return $x default return "unknown element" ', 'foobart');
 
   q( 'let <a>{$abc}</a> := <a>123</a> return $abc', '123');
   qf( 'let <a>{$abc}</a> := <abc>123</abc> return $abc', 'pxp:PATTERN');
@@ -1078,6 +1079,7 @@ begin
   q('let <r>{$a}<b>{$b}</b>?</r> := <r>x</r>  return concat(count($a),count($b))', '10');
   q( 'let <a xmlns:pointless="t" x="{$abc}"/> := <a x="y">456</a> return $abc', 'y');
   q( 'let <u:v xmlns:u="t" x="{$abc}"/> := <u:v xmlns:u="t" x="y">456</u:v> return $abc', 'y');
+  q( 'declare function local:test(){"ok"}; let <x>{$res := local:test()}</x> := <x/> return $res', 'ok');
 
   q( 'for <a>{$abc}</a> in <a>123</a> return $abc', '123');
   qf( 'for <a>{$abc}</a> in <abc>123</abc> return $abc', 'pxp:PATTERN');
