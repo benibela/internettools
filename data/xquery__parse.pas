@@ -53,6 +53,9 @@ type
    class function makeEQNameWithPrefix(const url, prefix, local: string; mode: TXQNamespaceMode): TXQEQNameWithPrefix;
  end;
 
+ TXQTermPendingPatternMatcher = class(TXQTermPatternMatcher)
+   pattern: string;
+ end;
 
 TXQParsingContext = class(TXQAbstractParsingContext)
 protected
@@ -811,9 +814,8 @@ begin
       expect('}');
     end;
   end;
-  //result := TXQTermTemporaryNode.create();
-  //result.node := (patternMatcherParse(strFromPchar(curpos, pos-curpos)));
-  Result := patternMatcherParse(staticContext, strFromPchar(curpos, pos-curpos));
+  result := TXQTermPendingPatternMatcher.Create;
+  TXQTermPendingPatternMatcher(result).pattern := strFromPchar(curpos, pos-curpos);
 end;
 
 function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
@@ -3499,6 +3501,15 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           t.catches[i].tests[j].name := TXQEQNameUnresolved(t.catches[i].tests[j].name).resolveAndFreeToEQName(staticContext);
   end;
 
+  procedure visitPendingPatternMatcher(pt: PXQTerm);
+  var
+    pattern: String;
+  begin
+    pattern := TXQTermPendingPatternMatcher(pt^).pattern;
+    FreeAndNil(pt^);
+    pt^ := patternMatcherParse(staticContext, pattern);
+  end;
+
 begin
   if t^ is TXQTermPendingEQNameToken then begin
     t^ := TXQTermPendingEQNameToken(t^).resolveAndFree(staticContext)
@@ -3511,6 +3522,7 @@ begin
   else if t^ is TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
   else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
   else if t^ is TXQTermTryCatch then visitTryCatch(TXQTermTryCatch(t^))
+  else if t^ is TXQTermPendingPatternMatcher then visitPendingPatternMatcher(t);
 
   ;result := xqtvaContinue;
 end;
