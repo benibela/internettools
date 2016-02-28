@@ -449,6 +449,12 @@ begin
       else if not FileExistsUTF8(fn) then errcode := Error_Not_Found;
       raiseFileError(errcode, 'Failed to open file for reading', xqvalue(fn));
     end;
+    on e: EOutOfMemory do begin //raised for a directory,wtf??
+      errcode := Error_Io_Error;
+      if DirectoryExistsUTF8(fn) then errcode := Error_IsDir
+      else if not FileExistsUTF8(fn) then errcode := Error_Not_Found;
+      raiseFileError(errcode, 'Failed to open file for reading', xqvalue(fn));
+    end;
   end;
 end;
 
