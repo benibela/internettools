@@ -193,6 +193,9 @@ type
     //**Encodes all var=... pairs of data in the url encoded format
     class function urlEncodeData(data: TStringList): string;
 
+    //**parses a string like 200=accept,400=abort,300=redirect
+    class function reactFromCodeString(const codes: string; actualCode: integer; var reaction: TInternetAccessReaction): string; static;
+
     function internalHandle: TObject; virtual; abstract;
   published
     property OnTransferStart: TTransferStartEvent read FOnTransferStart write FOnTransferStart;
@@ -1003,6 +1006,41 @@ begin
   for i:=0 to data.Count-1 do begin
     if result <> '' then result+='&';
     result+=urlEncodeData(data.Names[i])+'='+urlEncodeData(data.ValueFromIndex[i]);
+  end;
+end;
+
+class function TInternetAccess.reactFromCodeString(const codes: string; actualCode: integer;var reaction: TInternetAccessReaction): string;
+  function matches(filter: string; value: string): boolean;
+  var
+    i: Integer;
+  begin
+    if length(filter) <> length(value) then exit(false);
+    for i := 1 to length(filter) do
+      if (filter[i] <> 'x') and (filter[i] <> value[i]) then
+        exit(false);
+    result := true;
+  end;
+
+var
+  errors: TStringArray;
+  cur: TStringArray;
+  i: Integer;
+begin
+  result := '';
+  errors := strSplit(codes, ',');
+  for i:=0 to high(errors) do begin
+    cur := strSplit(errors[i], '=');
+    if matches(trim(cur[0]), inttostr(actualCode)) then begin
+      result := trim(cur[1]);
+      case result of
+        'accept', 'ignore', 'skip': reaction := iarAccept;
+        'retry': reaction := iarRetry;
+        'redirect': reaction := iarFollowRedirectGET;
+        'redirect-data': reaction := iarFollowRedirectKeepMethod;
+        'abort': reaction := iarReject
+      end;
+      exit;
+    end;
   end;
 end;
 

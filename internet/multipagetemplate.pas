@@ -329,9 +329,13 @@ type
     url:string;
     headers, postparams:array of TProperty;
     condition, method: string;
+
+    errorHandling: string;
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
+  private
+    procedure onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: string; var reaction: TInternetAccessReaction);
   end;
 
   { TTemplateActionLoadPage }
@@ -864,10 +868,16 @@ begin
           if t.hasAttribute('value') then method:=t['value']
           else method:=t.deepNodeText();
         end;
+        'error-handling': errorHandling := t['value'];
       end;
     end;
     t := t.getNextSibling();
   end;
+end;
+
+procedure TTemplateActionPage.onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: string; var reaction: TInternetAccessReaction);
+begin
+  TInternetAccess.reactFromCodeString(errorHandling, sender.lastHTTPResultCode, reaction);
 end;
 
 procedure TTemplateActionPage.perform(reader: TMultipageTemplateReader);
@@ -882,6 +892,7 @@ var
   curmethod: String;
   tempvi: IXQValue;
   oldHeaders: String;
+  oldReact: TTransferReactEvent;
 begin
   if (condition <> '') and not evaluateQuery(reader, condition).toBoolean then
     exit;
@@ -939,6 +950,10 @@ begin
       for j := 0 to high(headers) do
         reader.internet.additionalHeaders.Values[trim(headers[j].name)] := trim (reader.parser.replaceEnclosedExpressions(headers[j].value));
       try
+        if errorHandling <> '' then begin
+          oldReact := reader.internet.OnTransferReact;
+          reader.internet.OnTransferReact:=@onTransferReact;
+        end;
         page := reader.internet.request(curmethod, cururl, post);
       except
         on e: EInternetException do
@@ -948,6 +963,7 @@ begin
             page := reader.internet.request(curmethod, cururl, post);
           end else raise;
       end;
+      if errorHandling <> '' then reader.internet.OnTransferReact := oldReact;
 
       reader.lastContentType := reader.internet.getLastContentType;
 
