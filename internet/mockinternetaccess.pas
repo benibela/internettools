@@ -46,7 +46,7 @@ There are three ways to use it:
 *)
 TMockInternetAccess = class(TInternetAccess)
   constructor create; override;
-  function doTransferunChecked(method: string; const url: TDecodedUrl; data: string): string; override;
+  function doTransferUnChecked(method: string; const url: TDecodedUrl; data: string): string; override;
 
   destructor Destroy; override;
 public

@@ -7,9 +7,9 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Classes, sysutils, strutils, xquery, xquery_utf8, xquery_module_math,
-  simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead,
-  bbutils, math, rcmdline, internetaccess, mockinternetaccess, dregexpr
-  {$ifdef windows}windows{$endif}
+  simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex,
+  bbutils, math, rcmdline, internetaccess, mockinternetaccess
+  {$ifdef windows},windows{$endif}
   ;
   { you can add units after this }
 type
@@ -826,7 +826,7 @@ function TAssertionAssert.check(errorCode: string): TTestCaseResult;
 const OK: array[boolean] of TTestCaseResult = (tcrFail, tcrPass);
 var
   str: String;
-  regex: TRegExpr;
+  regex: TWrappedRegExpr;
   node: TTreeNode;
 
 begin
@@ -852,11 +852,11 @@ begin
       result := tcrFail;
       node := res.toNode;
       if node = nil then exit();
-      regex := TRegExpr.Create(value);
+      regex := wregexprParse(value,[]);
       try
-        result := OK[regex.Exec(node.outerXML())]
+        result := OK[wregexprMatches(regex, node.outerXML())]
       finally
-        regex.free;
+        wregexprFree(regex);
       end;
     end;
 
@@ -1493,7 +1493,7 @@ type
 { TFailInternetAccess }
 
  TFailInternetAccess = class(TMockInternetAccess)
-  function doTransfer(method: string; const url: TDecodedUrl; data: string): string; override;
+  function doTransferunChecked(method: string; const url: TDecodedUrl; data: string): string; override;
 end;
 
 var i: integer;
@@ -1501,7 +1501,7 @@ var i: integer;
 
 { TFailInternetAccess }
 
-function TFailInternetAccess.doTransfer(method: string; const url: TDecodedUrl; data: string): string;
+function TFailInternetAccess.doTransferunChecked(method: string; const url: TDecodedUrl; data: string): string;
 begin
   raise EInternetException.create('Internet unavailable');
 end;
