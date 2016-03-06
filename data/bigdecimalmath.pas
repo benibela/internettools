@@ -1821,6 +1821,7 @@ begin
       for i := 0 to high(result.digits) do
         if Result.digits[i] >= ELEMENT_OVERFLOW then begin
           result.digits[i] -= ELEMENT_OVERFLOW;
+          if i + 1 > high(result.digits) then SetLength(result.digits, length(result.digits) + 1);
           result.digits[i+1] += 1;
         end else break;
     end;
