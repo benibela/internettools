@@ -1500,23 +1500,21 @@ var
     integerOptional: Integer;
     fractionMandatory: Integer;
     fractionOptional: Integer;
+    integerGroups: TLongintArray; //integer and fraction groups are stored reversed compared to each other
+    fractionGroups: TLongintArray;
     exponentMandatory: Integer;
     exponentOptional: Integer;
     activeChar: Boolean;
     prefix, suffix: string;
   end;
-  isNegative: Boolean;
-  separators: array of record
-    pos: integer;
-    sep: string;
-  end;
-  firstChar: Boolean;
   arabic: String;
   dot: LongInt;
   integerActual: Integer;
   fractionActual: Integer;
   resstr: String;
   i: Integer;
+  integerGroupDelta, groupPos: Integer;
+  j: integer;
   procedure raiseInvalidPicture;
   begin
     raise EXQEvaluationException.create('FODF1310', 'Invalid picture string for format-number: ' + picture);
@@ -1551,15 +1549,25 @@ begin
       checkDuplicate(xqdfpDecimalSeparator);
       case subPosition of
         spExponentItself: raiseInvalidPicture;
-        spInInteger: subPosition := spInFraction;
+        spInPrefix, spInInteger: subPosition := spInFraction;
       end;
-
     end else if c = data^.chars[xqdfpGroupingSeparator] then begin
-      if subPosition = spExponentItself then raiseInvalidPicture
+      if subPosition = spExponentItself then raiseInvalidPicture;
+      case subPosition of
+        spInPrefix, spInInteger: begin
+          subPosition := spInInteger;
+          arrayAdd(integerGroups, integerMandatory + integerOptional);
+        end;
+        spInFraction: begin
+          arrayAdd(fractionGroups, fractionMandatory + fractionOptional);
+        end;
+        //exponent?
+      end;
     end else if c = data^.chars[xqdfpMinusSign] then begin
     end else if (c = data^.chars[xqdfpPercent]) or (c = data^.chars[xqdfpPerMille]) then begin
       checkDuplicate(xqdfpPercent);
       if c = data^.chars[xqdfpPerMille] then foundChar[xqdfpPerMille] := true;
+      activeChar := false;
     end else if (c >= data^.chars[xqdfpZeroDigit]) and (c < data^.chars[xqdfpZeroDigit] + 10)  then begin //mandatory digit
       foundChar[xqdfpZeroDigit]:=true;
       case subPosition of
@@ -1573,7 +1581,7 @@ begin
           subPosition := spInExponent
         end;
       end;
-    end else if (c >= data^.chars[xqdfpDigit]) and (c < data^.chars[xqdfpDigit] + 10) then begin//optional digit
+    end else if (c = data^.chars[xqdfpDigit]) then begin//optional digit
       foundChar[xqdfpDigit]:=true;
       case subPosition of
         spInPrefix, spInInteger: begin
@@ -1599,8 +1607,8 @@ begin
         end;
         spInSuffix: suffix += strGetUnicodeCharacter(c);
       end;
-    end else begin
-      activeChar := false;
+    end else activeChar := false;
+    if not activeChar then begin
       if subPosition = spInPrefix then prefix += strGetUnicodeCharacter(c)
       else begin
         if subPosition = spExponentItself then suffix += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
@@ -1628,7 +1636,10 @@ begin
       if args[0].instanceOf(baseSchema.float) then number := FloatToBigDecimal(single(numberf))
       else number := FloatToBigDecimal(numberf);
     end
-    else number := args[0].toDecimal;
+    else begin
+      number := args[0].toDecimal;
+      if number.signed and (currentPictureParser = 0) then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix;
+    end;
   end;
 
   with pictureParser[currentPictureParser] do begin
@@ -1642,9 +1653,11 @@ begin
     number := round(number, -(fractionMandatory + fractionOptional) );
 
     arabic := BigDecimalToStr(number);
+    if (integerMandatory = 0) and (fractionOptional + fractionMandatory > 0) and strBeginsWith(arabic, '0') then begin
+      delete(arabic, 1, 1);
+      if arabic = '' then arabic := '.0';
+    end;
     dot := strIndexOf(arabic, '.');
-
-    resstr := '';
 
     if dot = 0 then begin
       dot := length(arabic) + 1;
@@ -1654,14 +1667,44 @@ begin
     end;
     integerActual := dot - 1;
 
-    for i := 1 to integerMandatory - integerActual do
-      resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit]);
-    for i := 1 to dot - 1 do
-      resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + ord(arabic[i]) - ord('0') );
-    if dot < length(arabic) then begin
+    if length(integerGroups) > 0 then begin
+      for i := High(integerGroups) downto 0 do
+        integerGroups[i] := integerOptional + integerMandatory - integerGroups[i];
+      integerGroupDelta := integerGroups[high(integerGroups)];
+      for i := high(integerGroups) - 1 downto 0 do
+        if integerGroupDelta <> integerGroups[i] - integerGroups[i+1] then begin
+          integerGroupDelta := -1;
+          break;
+        end;
+    end;
+
+    resstr := '';
+    groupPos := high(integerGroups);
+    j := 1 - max(0, integerMandatory - integerActual);
+    for i := dot - 1 downto j do begin
+      if i >= 1 then c := ord(arabic[i]) - ord('0')
+      else c := 0;
+      resstr := strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + c  ) + resstr;
+      if groupPos >= 0 then begin
+        if (dot - i >= integerGroups[groupPos]) and (i <> j) then begin
+          resstr := strGetUnicodeCharacter(data^.chars[xqdfpGroupingSeparator]) + resstr;
+          if integerGroupDelta < 0 then dec(groupPos)
+          else integerGroups[groupPos] += integerGroupDelta;
+        end;
+      end;
+    end;
+    if (dot < length(arabic)) or (fractionMandatory > 0) then begin
       resstr += strGetUnicodeCharacter(data^.chars[xqdfpDecimalSeparator]);
-      for i := dot + 1 to length(arabic) do
-        resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + ord(arabic[i]) - ord('0') );
+      groupPos := 0;
+      for i := 1 to max(fractionMandatory, fractionActual) do begin
+        if (groupPos <= High(fractionGroups)) and (i > fractionGroups[groupPos]) then begin
+          resstr += strGetUnicodeCharacter(data^.chars[xqdfpGroupingSeparator]);
+          inc(groupPos);
+        end;
+        if i <= fractionActual then c := ord(arabic[i + dot])  - ord('0')
+        else c := 0;
+        resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + c );
+      end;
     end;
 
     result := xqvalue(prefix + resstr + suffix);

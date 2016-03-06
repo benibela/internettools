@@ -324,6 +324,11 @@ begin
   t('(1 to 3, 15, 18, 100, 1000) ! format-integer(., "w;o")', 'first second third fifteenth eighteenth one hundredth one thousandth');
   t('(1 to 3, 15, 18, 100, 1000) ! format-integer(., "w;o", "de")', 'erste zweite dritte fünfzehnte achtzehnte einhundertste eintausendste');
   t('join(for $format in ("0","123", "99,99.99", "##.#0,00") return join((0, 1, -123456) ! format-integer(., $format), " "), ";")', '0 1 -123456;000 001 -123456;00,00.00 00,00.01 -12,34.56;0,00 0,01 -12.34,56');
+
+  t('("ac00%abc", "00.###", "00.0000") ! format-number(123, .)', 'ac12300%abc 123 123.0000');
+  t('(format-number(123.456789,"ac####.#%"), format-number(xs:double("-INF"),"+0;_0"), format-number(12345678912345, "###,##,##"))', 'ac12345.7% _Infinity 12,34,56,78,91,23,45');
+
+
   //"#,0", 0 1 -1,2,3,4,5,6;
 
   try raise EMathError.create('The math tests raise EMathError exceptions. These exceptions should be disabled in the debugger.'); except on EMathError do ; end;
