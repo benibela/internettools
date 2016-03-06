@@ -1095,6 +1095,21 @@ begin
   result := week - firstweek + 1;
 end;
 
+function splitEQName(staticContext: TXQStaticContext; const eqname: string; out namespaceURL, localpart: string): boolean;
+begin
+  namespaceURL := '';
+  localpart := xmlStrWhitespaceCollapse(eqname);
+  result := true;
+  if strBeginsWith(localpart, 'Q{') then begin //EQName!
+    namespaceURL := strSplitGet('}', localpart);
+    delete(namespaceURL, 1, 2); //Q{ no more
+  end else if pos(':', localpart) > 0 then begin
+    staticContext.splitRawQName(namespaceURL, localpart, xqdnkUnknown);
+    result := namespaceURL <> '';
+  end;
+end;
+
+
 function xqFunctionFormat_DateTimeC(const context: TXQEvaluationContext; const args: TXQVArray; allowDate, allowTime: boolean): IXQValue;
 
 const monthNamesEnglish: array[1..12] of string = ('January', 'February', 'March','April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December');
@@ -1184,13 +1199,7 @@ begin
   if length(args) = 5 then begin
     lang := args[2].toString;
     calendar := args[3].toString;
-    if strBeginsWith(calendar, 'Q{') then begin //EQName!
-      calendarNamespace := strSplitGet('}', calendar);
-      delete(calendarNamespace, 1, 2); //Q{ no more
-    end else if pos(':', calendar) > 0 then begin
-      context.staticContext.splitRawQName(calendarNamespace, calendar, xqdnkUnknown);
-      if calendarNamespace = '' then raiseInvalidPictureFOFD1340;
-    end;
+    if not splitEQName(context.staticContext, args[3].toString, calendarNamespace, calendar) then raiseInvalidPictureFOFD1340;
     if calendarNamespace = '' then
       case calendar of
         '':;
@@ -1515,6 +1524,8 @@ var
   i: Integer;
   integerGroupDelta, groupPos: Integer;
   j: integer;
+  formatNamespaceURI: String;
+  formatName: String;
   procedure raiseInvalidPicture;
   begin
     raise EXQEvaluationException.create('FODF1310', 'Invalid picture string for format-number: ' + picture);
@@ -1535,7 +1546,20 @@ var
 
 begin
   requiredArgCount(args, 2, 3);
-  data := @XQDefaultDecimalFormat; //todo matching eqname in args[2] :FODF1280, if it is no syntactical eqname
+  data := @XQDefaultDecimalFormat;
+  if context.staticContext.decimalNumberFormats<> nil then begin
+    formatNamespaceURI := '';
+    formatName := '';
+    if length(args) = 3 then if not splitEQName(context.staticContext, args[2].toString, formatNamespaceURI, formatName) then
+      raise EXQEvaluationException.create('FODF1280', 'Invalid date format name', nil, args[2]);
+    for i := 0 to context.staticContext.decimalNumberFormats.count - 1 do
+      with TXQDecimalFormat(context.staticContext.decimalNumberFormats[i]) do
+        if (formatNamespaceURI = namespaceURL) and (formatName = localname) then begin
+          data := @formats;
+          break;
+        end;
+  end;
+  //todo matching eqname in args[2] :FODF1280, if it is no syntactical eqname
 
   //analyze picture
   picture := args[1].toString;
@@ -1563,8 +1587,8 @@ begin
         end;
         //exponent?
       end;
-    end else if c = data^.chars[xqdfpMinusSign] then begin
-    end else if (c = data^.chars[xqdfpPercent]) or (c = data^.chars[xqdfpPerMille]) then begin
+    end {else if c = data^.chars[xqdfpMinusSign] then begin it is just a passive character
+    end }else if (c = data^.chars[xqdfpPercent]) or (c = data^.chars[xqdfpPerMille]) then begin
       checkDuplicate(xqdfpPercent);
       if c = data^.chars[xqdfpPerMille] then foundChar[xqdfpPerMille] := true;
       activeChar := false;
@@ -1598,6 +1622,7 @@ begin
       checkPictureFinal;
       if (currentPictureParser = 1) or (subPosition = spExponentItself) then raiseInvalidPicture;
       currentPictureParser := 1;
+      continue;
     end else if c = data^.chars[xqdfpExponentSeparator] then begin
       case subPosition of
         spInPrefix: prefix += strGetUnicodeCharacter(c);
@@ -1625,6 +1650,7 @@ begin
   checkPictureFinal;
 
   case args[0].kind of
+    pvkUndefined: exit(xqvalue(data^.nan));
     pvkFloat: begin
       numberf := args[0].toFloat;
       if IsNan(numberf) then exit(xqvalue(data^.nan));
@@ -1638,7 +1664,8 @@ begin
     end
     else begin
       number := args[0].toDecimal;
-      if number.signed and (currentPictureParser = 0) then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix;
+      if not number.signed then currentPictureParser := 0
+      else if currentPictureParser = 0 then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix
     end;
   end;
 
