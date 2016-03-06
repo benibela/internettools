@@ -136,6 +136,7 @@ type
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
     defaultFunctionNamespace: INamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
     defaultElementTypeNamespace: INamespace; //**< Default element type namespace (default is empty)
+    decimalNumberFormats: TFPList;
 
     baseURI: string;              //**< Static base uri
     collation: TXQCollation;      //**< Default collation for string comparisons
@@ -2641,8 +2642,11 @@ TXQDecimalFormatPropertyData = record
    infinity, nan: string;
 end;
 TXQDecimalFormat = class
-  namespaceURI, localname: string;
+  namespaceURL, localname: string;
   formats: TXQDecimalFormatPropertyData;
+  constructor Create;
+  constructor CreateEmpty;
+  function clone: TXQDecimalFormat;
 end;
 
 //var curUnitTest: integer;
@@ -2837,6 +2841,24 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+constructor TXQDecimalFormat.Create;
+begin
+  formats := XQDefaultDecimalFormat;
+end;
+
+constructor TXQDecimalFormat.CreateEmpty;
+begin
+
+end;
+
+function TXQDecimalFormat.clone: TXQDecimalFormat;
+begin
+  result := TXQDecimalFormat.CreateEmpty;
+  result.namespaceURL := namespaceURL;
+  result.localname := localname;
+  result.formats := formats;
+end;
 
 constructor TXQTermEQNameToken.Create;
 begin
@@ -3428,6 +3450,11 @@ begin
     Result.useLocalNamespaces:=useLocalNamespaces;
     result.objectsRestrictedToJSONTypes:=objectsRestrictedToJSONTypes;
     result.jsonPXPExtensions := jsonPXPExtensions;
+    if decimalNumberFormats <> nil then begin
+      result.decimalNumberFormats:= TFPList.Create;
+      for i := 0 to decimalNumberFormats.Count - 1 do
+        result.decimalNumberFormats.Add(TXQDecimalFormat(decimalNumberFormats[i]).clone);
+    end;
   end;
 end;
 
@@ -3448,6 +3475,10 @@ begin
     functions[i].free;
   namespaces.free;
   importedSchemas.Free;
+  if decimalNumberFormats<> nil then
+    for i := 0 to decimalNumberFormats.Count - 1 do
+      tobject(decimalNumberFormats[i]).free;
+  decimalNumberFormats.free;
   inherited Destroy;
 end;
 

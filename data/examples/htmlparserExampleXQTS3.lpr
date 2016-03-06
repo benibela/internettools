@@ -48,6 +48,7 @@ type
   refed: TEnvironment;
   sources: TList;
   hasSchema: boolean;
+  decimalFormats: TFPList;
   procedure init;
   class function load(e: TTreeNode): TEnvironment;
   function getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
@@ -1298,6 +1299,9 @@ var
   n: TTreeNode;
   u: IXQValue;
   i: Integer;
+  decimalformat: TXQDecimalFormat;
+  temp: Integer;
+  att: TTreeAttribute;
 begin
   e := definition;
   definition := nil;
@@ -1349,7 +1353,41 @@ begin
 
   hasSchema :=  not xq.evaluateXPath2('*:schema', e).isUndefined;
   {resource
-   <xs:element ref="decimal-format"/>  <xs:element ref="function-library"/>                     <xs:element ref="resource"/>}
+     <xs:element ref="function-library"/>                     <xs:element ref="resource"/>}
+  for v in xq.parseXPath2('*:decimal-format').evaluate(e) do begin
+    n := v.toNode;
+    if n.attributes = nil then continue;
+    if decimalFormats = nil then decimalFormats := TFPList.Create;
+    decimalformat := TXQDecimalFormat.Create;
+    decimalFormats.add(decimalformat);
+    for i := 0 to n.attributes.Count - 1 do begin
+      temp := 1;
+      att := n.attributes.getAttribute(i);
+      if not att.isNamespaceNode then begin
+        case att.value of
+          'decimal-separator': decimalformat.formats.chars[xqdfpDecimalSeparator] := strDecodeUTF8Character(att.realvalue, temp);
+          'digit':  decimalformat.formats.chars[xqdfpDigit] := strDecodeUTF8Character(att.realvalue, temp);
+          'grouping-separator':  decimalformat.formats.chars[xqdfpGroupingSeparator] := strDecodeUTF8Character(att.realvalue, temp);
+          'infinity':  decimalformat.formats.infinity := att.realvalue;
+          'minus-sign':  decimalformat.formats.chars[xqdfpMinusSign] := strDecodeUTF8Character(att.realvalue, temp);
+          'NaN':  decimalformat.formats.nan := att.realvalue;
+          'pattern-separator':  decimalformat.formats.chars[xqdfpPatternSeparator] := strDecodeUTF8Character(att.realvalue, temp);
+          'percent':  decimalformat.formats.chars[xqdfpPercent] := strDecodeUTF8Character(att.realvalue, temp);
+          'per-mille':  decimalformat.formats.chars[xqdfpPerMille] := strDecodeUTF8Character(att.realvalue, temp);
+          'zero-digit':  decimalformat.formats.chars[xqdfpZeroDigit] := strDecodeUTF8Character(att.realvalue, temp);
+          'name':  begin
+            decimalformat.localname := att.realvalue;
+            if pos(':', decimalformat.localname) > 0 then begin
+              decimalformat.namespaceURL := strSplitGet(':', decimalformat.localname);
+              decimalformat.namespaceURL := att.getNamespaceURL(decimalformat.namespaceURL);
+            end;
+          end;
+          else raise Exception.Create('Unknown decimal format: '+att.value);
+        end;
+      end;
+    end;
+
+  end;
 end;
 
 class function TEnvironment.load(e: TTreeNode): TEnvironment;
@@ -1439,6 +1477,10 @@ begin
 
 
   xq.VariableChangelog.clear;
+  if sc.decimalNumberFormats <> nil then begin
+    for i := 0 to sc.decimalNumberFormats.count - 1 do tobject(sc.decimalNumberFormats[i]).free;
+    FreeAndNil(sc.decimalNumberFormats);
+  end;
 
   if env <> nil then begin
     for i := 0 to env.sources.Count-1 do
@@ -1459,11 +1501,20 @@ begin
     for i := 0 to high(env.params) do
       if not env.params[i].declared then
         xq.VariableChangelog.add(env.params[i].name, env.params[i].value);
+    if env.decimalFormats <> nil then begin
+      sc.decimalNumberFormats := TFPList.Create;
+      for i := 0 to env.decimalFormats.count - 1 do
+        sc.decimalNumberFormats.Add(TXQDecimalFormat(env.decimalFormats[i]).clone);
+    end;
   end else begin
     xq.OnCollection:=nil;
     xq.OnDeclareExternalVariable:=nil;
     FreeAndNil(sc.namespaces)
   end;
+
+  {if sc.decimalNumberFormats <> nil then begin
+    sc.decimalNumberFormats := nil;
+  end;}
 
 end;
 
