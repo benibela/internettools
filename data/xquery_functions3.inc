@@ -1482,3 +1482,188 @@ function xqFunctionFormat_Time(const context: TXQEvaluationContext; const args: 
 begin
   result := xqFunctionFormat_DateTimeC(context, args, false, true);
 end;
+
+type TXQSubPosition = (spInPrefix, spInInteger, spInFraction, spExponentItself, spInExponent, spInSuffix);
+
+function xqFunctionFormat_Number(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+var
+  data: ^TXQDecimalFormatPropertyData;
+  picture: String;
+  c: integer;
+  numberf: xqfloat;
+  number: BigDecimal;
+  currentPictureParser: integer;
+  pictureParser: array[0..1] of record
+    foundChar: array[TXQDecimalFormatProperty] of boolean;
+    subPosition: TXQSubPosition;
+    integerMandatory: Integer;
+    integerOptional: Integer;
+    fractionMandatory: Integer;
+    fractionOptional: Integer;
+    exponentMandatory: Integer;
+    exponentOptional: Integer;
+    activeChar: Boolean;
+    prefix, suffix: string;
+  end;
+  isNegative: Boolean;
+  separators: array of record
+    pos: integer;
+    sep: string;
+  end;
+  firstChar: Boolean;
+  arabic: String;
+  dot: LongInt;
+  integerActual: Integer;
+  fractionActual: Integer;
+  resstr: String;
+  i: Integer;
+  procedure raiseInvalidPicture;
+  begin
+    raise EXQEvaluationException.create('FODF1310', 'Invalid picture string for format-number: ' + picture);
+  end;
+  procedure checkDuplicate(prop: TXQDecimalFormatProperty);
+  begin
+    if pictureParser[currentPictureParser].foundChar[prop] then raiseInvalidPicture;
+    pictureParser[currentPictureParser].foundChar[prop] := true;
+  end;
+  procedure checkPictureFinal;
+  begin
+    with pictureParser[currentPictureParser] do begin
+      if (not  foundChar[xqdfpDigit]) and (not foundChar[xqdfpZeroDigit]) then raiseInvalidPicture;
+      if (foundChar[xqdfpExponentSeparator] and (exponentMandatory + exponentOptional > 0))
+         and (foundChar[xqdfpPercent] or foundChar[xqdfpPerMille]) then raiseInvalidPicture;
+    end;
+  end;
+
+begin
+  requiredArgCount(args, 2, 3);
+  data := @XQDefaultDecimalFormat; //todo matching eqname in args[2] :FODF1280, if it is no syntactical eqname
+
+  //analyze picture
+  picture := args[1].toString;
+  FillChar(pictureParser, sizeof(pictureParser), 0);
+  currentPictureParser := 0;
+  pictureParser[0].subPosition := spInPrefix;
+  pictureParser[1].subPosition := spInPrefix;
+  for c in strIterator(picture) do with pictureParser[currentPictureParser] do begin
+    activeChar := true;
+    if c = data^.chars[xqdfpDecimalSeparator] then begin
+      checkDuplicate(xqdfpDecimalSeparator);
+      case subPosition of
+        spExponentItself: raiseInvalidPicture;
+        spInInteger: subPosition := spInFraction;
+      end;
+
+    end else if c = data^.chars[xqdfpGroupingSeparator] then begin
+      if subPosition = spExponentItself then raiseInvalidPicture
+    end else if c = data^.chars[xqdfpMinusSign] then begin
+    end else if (c = data^.chars[xqdfpPercent]) or (c = data^.chars[xqdfpPerMille]) then begin
+      checkDuplicate(xqdfpPercent);
+      if c = data^.chars[xqdfpPerMille] then foundChar[xqdfpPerMille] := true;
+    end else if (c >= data^.chars[xqdfpZeroDigit]) and (c < data^.chars[xqdfpZeroDigit] + 10)  then begin //mandatory digit
+      foundChar[xqdfpZeroDigit]:=true;
+      case subPosition of
+        spInPrefix, spInInteger: inc(integerMandatory);
+        spInFraction: begin
+          if fractionOptional > 0 then raiseInvalidPicture;
+          inc(fractionMandatory);
+        end;
+        spInExponent,spExponentItself: begin
+          inc(exponentMandatory);
+          subPosition := spInExponent
+        end;
+      end;
+    end else if (c >= data^.chars[xqdfpDigit]) and (c < data^.chars[xqdfpDigit] + 10) then begin//optional digit
+      foundChar[xqdfpDigit]:=true;
+      case subPosition of
+        spInPrefix, spInInteger: begin
+          if integerMandatory > 0 then raiseInvalidPicture;
+          inc(integerOptional);
+        end;
+        spInFraction: inc(fractionOptional);
+        spInExponent,spExponentItself: begin
+          inc(exponentOptional);
+          subPosition := spInExponent
+        end;
+      end;
+    end else if c = data^.chars[xqdfpPatternSeparator] then begin
+      checkPictureFinal;
+      if (currentPictureParser = 1) or (subPosition = spExponentItself) then raiseInvalidPicture;
+      currentPictureParser := 1;
+    end else if c = data^.chars[xqdfpExponentSeparator] then begin
+      case subPosition of
+        spInPrefix: prefix += strGetUnicodeCharacter(c);
+        spInInteger, spInFraction, spInExponent, spExponentItself: begin
+          subPosition := spInFraction;
+          checkDuplicate(xqdfpExponentSeparator);
+        end;
+        spInSuffix: suffix += strGetUnicodeCharacter(c);
+      end;
+    end else begin
+      activeChar := false;
+      if subPosition = spInPrefix then prefix += strGetUnicodeCharacter(c)
+      else begin
+        if subPosition = spExponentItself then suffix += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
+        suffix += strGetUnicodeCharacter(c);
+        subPosition := spInSuffix;
+      end;
+    end;
+    case subPosition of
+      spInPrefix: if activeChar then subPosition := spInInteger;
+      spInInteger, spInFraction, spInExponent, spExponentItself: if not activeChar then subPosition := spInSuffix;
+      spInSuffix: if activeChar then raiseInvalidPicture;
+    end;
+  end;
+  checkPictureFinal;
+
+  case args[0].kind of
+    pvkFloat: begin
+      numberf := args[0].toFloat;
+      if IsNan(numberf) then exit(xqvalue(data^.nan));
+      if not isSignedXQFloat(numberf) then currentPictureParser := 0
+      else if currentPictureParser = 0 then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix;
+      if IsInfinite(numberf) then
+        with pictureParser[currentPictureParser] do
+          exit(xqvalue(prefix + data^.infinity + suffix));
+      if args[0].instanceOf(baseSchema.float) then number := FloatToBigDecimal(single(numberf))
+      else number := FloatToBigDecimal(numberf);
+    end
+    else number := args[0].toDecimal;
+  end;
+
+  with pictureParser[currentPictureParser] do begin
+    number.signed := false;
+    if foundChar[xqdfpPercent] then begin
+      if foundChar[xqdfpPerMille] then shift10(number, 3)
+      else shift10(number, 2)
+    end;
+
+    //todo: exponent (5,6)
+    number := round(number, -(fractionMandatory + fractionOptional) );
+
+    arabic := BigDecimalToStr(number);
+    dot := strIndexOf(arabic, '.');
+
+    resstr := '';
+
+    if dot = 0 then begin
+      dot := length(arabic) + 1;
+      fractionActual := 0;
+    end else begin
+      fractionActual := length(arabic) - dot;
+    end;
+    integerActual := dot - 1;
+
+    for i := 1 to integerMandatory - integerActual do
+      resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit]);
+    for i := 1 to dot - 1 do
+      resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + ord(arabic[i]) - ord('0') );
+    if dot < length(arabic) then begin
+      resstr += strGetUnicodeCharacter(data^.chars[xqdfpDecimalSeparator]);
+      for i := dot + 1 to length(arabic) do
+        resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + ord(arabic[i]) - ord('0') );
+    end;
+
+    result := xqvalue(prefix + resstr + suffix);
+  end;
+end;
