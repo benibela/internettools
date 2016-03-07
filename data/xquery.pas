@@ -2799,6 +2799,8 @@ function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQVal
 
 procedure freeAnnotations(annotations: TXQAnnotations);
 
+function charUnicodeZero(const cp: integer): integer;
+
 implementation
 uses base64, strutils, xquery__regex, xquery__parse;
 

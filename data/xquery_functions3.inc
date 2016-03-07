@@ -1095,7 +1095,9 @@ begin
   result := week - firstweek + 1;
 end;
 
-function splitEQName(staticContext: TXQStaticContext; const eqname: string; out namespaceURL, localpart: string): boolean;
+function splitEQName(context: TXQEvaluationContext; const eqname: string; out namespaceURL, localpart: string): boolean;
+var
+  namespace: INamespace;
 begin
   namespaceURL := '';
   localpart := xmlStrWhitespaceCollapse(eqname);
@@ -1104,7 +1106,8 @@ begin
     namespaceURL := strSplitGet('}', localpart);
     delete(namespaceURL, 1, 2); //Q{ no more
   end else if pos(':', localpart) > 0 then begin
-    staticContext.splitRawQName(namespaceURL, localpart, xqdnkUnknown);
+    context.splitRawQName(namespace, localpart, xqdnkUnknown);
+    namespaceURL := namespaceGetURL(namespace);
     result := namespaceURL <> '';
   end;
 end;
@@ -1199,7 +1202,7 @@ begin
   if length(args) = 5 then begin
     lang := args[2].toString;
     calendar := args[3].toString;
-    if not splitEQName(context.staticContext, args[3].toString, calendarNamespace, calendar) then raiseInvalidPictureFOFD1340;
+    if not splitEQName(context, args[3].toString, calendarNamespace, calendar) then raiseInvalidPictureFOFD1340;
     if calendarNamespace = '' then
       case calendar of
         '':;
@@ -1550,7 +1553,7 @@ begin
   data := nil;
   formatNamespaceURI := '';
   formatName := '';
-  if length(args) = 3 then if not splitEQName(context.staticContext, args[2].toString, formatNamespaceURI, formatName) then
+  if length(args) = 3 then if not splitEQName(context, args[2].toString, formatNamespaceURI, formatName) then
     raise EXQEvaluationException.create('FODF1280', 'Invalid date format', nil, args[2]);
   if context.staticContext.decimalNumberFormats<> nil then begin
     for i := 0 to context.staticContext.decimalNumberFormats.count - 1 do

@@ -2829,6 +2829,100 @@ var declarationDuplicateChecker: TStringList;
     end;
   end;
 
+  procedure declareDecimalFormat(name: TXQEQName = nil);
+  var
+    namespaceURL: String;
+    localname: String;
+    tempPropertyDuplicateChecker: TStringList;
+    decimalFormat: TXQDecimalFormat;
+    pname, value: string;
+
+    procedure setChar(c: TXQDecimalFormatProperty);
+    var
+      p: Integer;
+    begin
+      p := 1;
+      decimalFormat.formats.chars[c] := strDecodeUTF8Character(value, p);
+      if p <= length(value) then raiseParsingError('XQST0097', 'Need character');
+    end;
+
+    var uniqueSigns: array[1..6] of TXQDecimalFormatProperty = (xqdfpDecimalSeparator, xqdfpGroupingSeparator, xqdfpPercent, xqdfpPerMille, xqdfpDigit, xqdfpPatternSeparator);
+      i: Integer;
+      j: Integer;
+  begin
+    if name <> nil then begin
+      if name is TXQEQNameUnresolved then name := TXQEQNameUnresolved(name).resolveAndFreeToEQName(staticContext);
+      namespaceURL := name.namespaceURL;
+      localname := name.localname;
+    end else begin
+      namespaceURL := '';
+      localname := '';
+    end;
+
+    if staticContext.decimalNumberFormats = nil then staticContext.decimalNumberFormats := TFPList.Create;
+    tempPropertyDuplicateChecker := TStringList.Create;
+    decimalFormat := TXQDecimalFormat.Create;
+    decimalFormat.namespaceURL := namespaceURL;
+    decimalFormat.localname := localname;
+    try
+      for i := 0 to staticContext.decimalNumberFormats.count - 1 do
+        if (TXQDecimalFormat(staticContext.decimalNumberFormats[i]).namespaceURL = namespaceURL) and
+           (TXQDecimalFormat(staticContext.decimalNumberFormats[i]).localname = localname) then
+           raiseParsingError('XQST0111', 'Multiple declarations');
+
+      try
+        while true do
+          case nextToken(true) of
+            ';', '': break;
+            else begin
+              pname := nextToken();
+              expect('=');
+              value := parseString;
+              if tempPropertyDuplicateChecker.IndexOf(pname) >= 0 then raiseParsingError('XQST0114', 'Duplicate property')
+              else tempPropertyDuplicateChecker.Add(pname);
+
+              case pname of
+                'decimal-separator': setChar(xqdfpDecimalSeparator);
+                'digit':  setChar(xqdfpDigit);
+                'grouping-separator':  setChar(xqdfpGroupingSeparator);
+                'infinity':  decimalformat.formats.infinity := value;
+                'minus-sign':  setChar(xqdfpMinusSign);
+                'NaN':  decimalformat.formats.nan := value;
+                'pattern-separator':  setChar(xqdfpPatternSeparator);
+                'percent':  setChar(xqdfpPercent);
+                'per-mille':  setChar(xqdfpPerMille);
+                'zero-digit':  begin
+                  setChar(xqdfpZeroDigit);
+                  if decimalFormat.formats.chars[xqdfpZeroDigit] <> charUnicodeZero(decimalFormat.formats.chars[xqdfpZeroDigit]) then
+                    raiseParsingError('XQST0097', 'Need zero digit');
+                end
+                else raiseSyntaxError('Unknown property');
+              end;
+            end;
+          end;
+
+        with decimalFormat.formats do
+          for i := low(uniqueSigns) to high(uniqueSigns) do begin
+            for j := i + 1to high(uniqueSigns) do
+              if chars[uniqueSigns[i]] = chars[uniqueSigns[j]] then
+                raiseParsingError('XQST0098', 'Duplicate character: ' + strGetUnicodeCharacter(chars[uniqueSigns[i]]));
+            if (chars[uniqueSigns[i]] >= chars[xqdfpZeroDigit]) and (chars[uniqueSigns[i]] < chars[xqdfpZeroDigit] + 10) then
+               raiseParsingError('XQST0098', 'Duplicate character: ' + strGetUnicodeCharacter(chars[uniqueSigns[i]]));
+          end;
+
+      except
+        on e: EXQParsingException do begin
+          decimalFormat.Free;
+          raise;
+        end;
+      end;
+      staticContext.decimalNumberFormats.Add(decimalFormat);
+    finally
+      name.free;
+      tempPropertyDuplicateChecker.Free;
+    end;
+
+  end;
 
 var
   token: String;
@@ -2842,11 +2936,15 @@ var
 
   oldNamespaceCount: Integer;
   namespaceMode: TXQNamespaceMode;
+
+  oldDecimalFormatCount: integer;
 begin
   result := nil;
   declarationDuplicateChecker := nil;
   oldNamespaceCount := 0;
   if staticContext.namespaces <> nil then oldNamespaceCount := staticContext.namespaces.Count;
+  oldDecimalFormatCount := 0;
+  if staticContext.decimalNumberFormats <> nil then oldDecimalFormatCount := staticContext.decimalNumberFormats.Count;
   try
     token := nextToken(true);
     marker := pos;
@@ -2937,6 +3035,7 @@ begin
               if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseNamespaceURI('XQST0070',''), '')
               else staticContext.defaultFunctionNamespace := TNamespace.Create(parseNamespaceURI('XQST0070',''), '')
             end;
+            'decimal-format': declareDecimalFormat();
             else raiseParsingError('XPST0003', 'Unknown default value');
           end;
         end;
@@ -2974,6 +3073,7 @@ begin
              else raiseParsingError('XPST0003', 'Invalid copy-namespace');
            end;
          end;
+        'decimal-format': declareDecimalFormat(parseEQName);
         'namespace': begin
            nameSpaceName := nextTokenNCName();
            expect('=');
@@ -3078,6 +3178,12 @@ begin
     end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
     declarationDuplicateChecker.free;
   except
+    if staticContext.decimalNumberFormats <> nil then
+      for oldDecimalFormatCount := staticContext.decimalNumberFormats.Count - 1 downto oldDecimalFormatCount do begin
+        tobject(staticContext.decimalNumberFormats[oldDecimalFormatCount]).Free;
+        staticContext.decimalNumberFormats.Delete(oldDecimalFormatCount);
+      end;
+
     declarationDuplicateChecker.Free;
     result.free;
     if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then begin
