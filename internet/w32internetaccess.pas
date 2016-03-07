@@ -49,6 +49,7 @@ type
   protected
     hSession,hLastConnection: hInternet;
     newConnectionOpened:boolean;
+    lastServer: TDecodedUrl;
     function doTransferUnchecked(method:string; const decoded: TDecodedUrl; data: string): string; override;
     function getLastErrorDetails: string; override;
   public
@@ -142,8 +143,8 @@ begin
   result := '';
   if not assigned(hSession) Then exit;
 
-  if (lastURLDecoded.Protocol<>decoded.protocol) or (lastUrlDecoded.Host<>decoded.host) or (lastUrlDecoded.Port <> decoded.port)
-     or (lastUrlDecoded.username <> decoded.username) or (lastUrlDecoded.password <> decoded.password) then begin
+  if (lastServer.Protocol<>decoded.protocol) or (lastServer.Host<>decoded.host) or (lastServer.Port <> decoded.port)
+     or (lastServer.username <> decoded.username) or (lastServer.password <> decoded.password) then begin
     if hLastConnection<>nil then
       InternetCloseHandle(hLastConnection);
     if striequal(decoded.protocol, 'http') then begin
@@ -164,6 +165,7 @@ begin
       lastErrorDetails:=rsConnectingTo0SFailed;
       exit;
     end;
+    lastServer := decoded; //remember to which server the connection points. We cannot use lastURLDecoded, since the connection has already changed, but lastURLDecoded is only set after redirects
   end;
 
   if striequal(decoded.protocol, 'https') then begin
