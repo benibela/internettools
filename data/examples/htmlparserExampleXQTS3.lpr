@@ -1088,6 +1088,7 @@ begin
 
   put('spec', 'XP20 XQ10', config.version in [xqpmXPath2, xqpmXQuery1]);
   put('spec', 'XP20+ XQ10+', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
+  put('spec', 'XP20+ XQ30+', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery3]);
 
   put('spec', 'XP30 XQ30', config.version in [xqpmXPath3, xqpmXQuery3]);
   put('spec', 'XP30+ XQ10+', config.version in [xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
@@ -1135,9 +1136,10 @@ begin
   put('unicode-normalization-form', 'NFKD', true);
   put('unicode-normalization-form', 'NFKC', true);
   put('unicode-normalization-form', 'FULLY-NORMALIZED', false);
+  put('unicode-version', '3.1.1', true);
   put('unicode-version', '5.2', false);
-  put('unicode-version', '6.0', false);
-  put('unicode-version', '6.2', false);
+  put('unicode-version', '6.0', false); //should work, but is very slow
+  put('unicode-version', '6.2', false); //should work, but is very slow
 
   put('xml-version', '1.0', false);
   put('xml-version', '1.0:4-', false);
