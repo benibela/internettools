@@ -127,7 +127,7 @@ const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtm
 var
   databuffer : array[0..4095] of char;
   hfile: hInternet;
-  dwindex,dwcodelen,dwread,dwNumber,temp,dwContentLength: cardinal;
+  dwindex,dwcodelen,dwRead,dwNumber,temp,dwContentLength: cardinal;
   tempPort: integer;
   dwcode : array[1..20] of char;
   res    : pchar;
@@ -250,14 +250,20 @@ begin
       OnProgress(self,0,dwContentLength);
     end;
     dwRead:=0;
-    dwNumber := sizeof(databuffer)-1;
     SetLastError(0);
-    while (InternetReadfile(hfile,@databuffer,dwNumber,@DwRead)) and (dwread>0) do begin
-      temp:=length(result);
-      setLength(result,temp+dwRead);
-      move(dataBuffer[0],result[temp+1],dwRead);
-      if assigned(OnProgress) then
-        OnProgress(self,length(result),dwContentLength);
+    while true do begin
+      if InternetReadfile(hfile,@databuffer,sizeof(databuffer)-1,@DwRead) then begin
+        if dwRead = 0 then
+          break; //this is end-of-file condition according to MSDN (InternetReadFile must return true)
+        temp:=length(result);
+        setLength(result,temp+dwRead);
+        move(dataBuffer[0],result[temp+1],dwRead);
+        if assigned(OnProgress) then
+          OnProgress(self,length(result),dwContentLength);
+      end else if InternetQueryDataAvailable(hfile, @dwRead, 0, 0) then begin
+        if dwRead = 0 then //the above condition never occurs (at least on WINE). So explicitly check for more data. (this is supposed to prevent problems with chunked transfers)
+          break;
+      end else break;
     end;
   end;
 
