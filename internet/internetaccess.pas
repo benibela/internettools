@@ -690,12 +690,12 @@ var
   reaction: TInternetAccessReaction;
   message: String;
 begin
-  url.path := strEscapeToHex(url.path, low - allowedPath, '%'); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
-  url.params := strEscapeToHex(url.params, low - allowedURI, '%');
-
   url.prepareSelfForRequest(lastURLDecoded);
 
   while true do begin
+    url.path := strEscapeToHex(url.path, low - allowedPath, '%'); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
+    url.params := strEscapeToHex(url.params, low - allowedURI, '%');
+
     result := doTransferUnchecked(method, url, data);
 
     reaction := iarReject;
