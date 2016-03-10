@@ -601,15 +601,6 @@ begin
   end;
 end;}
 
-class function TXQValueFloat.isPure(const v: IXQValue): boolean;
-var
-  f: xqfloat;
-begin
-  if v.kind <> pvkFloat then exit(true);
-  f := v.toFloat;
-  result := not IsNan(f) and not IsInfinite(f);
-end;
-
 function TXQValueFloat.toBoolean: boolean;
 begin
   Result:=not IsNan(value) and (value <> 0);

@@ -508,7 +508,6 @@ type
     class function classKind: TXQValueKind; override;
 
     //class function truncateRange(const v: BigDecimal): BigDecimal; virtual;
-    class function isPure(const v: IXQValue): boolean; static;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer

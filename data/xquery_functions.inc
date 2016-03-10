@@ -120,12 +120,12 @@ begin
   end;
 
   af := a.toFloat; bf := b.toFloat;
-  if IsInfinite(af) or IsInfinite(bf) then begin
+  {if IsInfinite(af) or IsInfinite(bf) then begin
     if not (IsInfinite(af) and IsInfinite(bf))  then result := xqvalueF(af + bf, a, b)
     else if isNegInf(af) and isNegInf(bf)  then result := xqvalueF(-Infinity, a, b)
     else if isPosInf(af) and isPosInf(bf)  then result := xqvalueF(Infinity, a, b)
     else result := xqvalueF(getNan, a, b);
-  end else result := xqvalueF(af + bf, a, b)
+  end else} result := xqvalueF(af + bf, a, b)
 end;
 
 function xqvalueSubtract(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -184,12 +184,12 @@ begin
   end;
 
   ad := a.toFloat; bd := b.toFloat;
-  if IsNan(ad) or IsNan(bd) then result := xqvalueF(getNaN, a, b)
+  {if IsNan(ad) or IsNan(bd) then result := xqvalueF(getNaN, a, b)
   else if IsInfinite(ad) or IsInfinite(bd) then begin
     if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueF(ad - bd, a, b)
     else if ad = bd then result := xqvalueF(getNaN, a, b)
     else result := a.clone;
-  end else result := xqvalueF(ad - bd, a, b);
+  end else }result := xqvalueF(ad - bd, a, b);
 end;
 
 function xqvalueTo(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -275,13 +275,15 @@ begin
   end;
 
   ad := a.toFloat; bd := b.toFloat;
+  {this explicitly checks for the IEEE special case handling, but is not needed with the rigth exception mask
   if IsNan(ad) then result := a
   else if IsNan(bd) then result := b
   else if IsInfinite(ad) or IsInfinite(bd) then begin
     if (ad = 0) or (bd = 0) then result := XQValueF(getNaN, a, b)
     else if (ad < 0) = (bd < 0) then result := XQValueF(Infinity, a, b)
     else result := XQValueF(-Infinity, a, b);
-  end else result := XQValueF(ad * bd, a, b);
+  end else }
+  result := XQValueF(ad * bd, a, b);
 end;
 
 procedure raiseDivisionBy0NotAllowed;
@@ -295,7 +297,6 @@ var e, f: xqfloat;
   ai, bi, ri: Int64;
   t: TXSNumericType;
   bd: BigDecimal;
-  ex: Extended;
   i: Integer;
 begin
   ignore(cxt);
@@ -359,8 +360,15 @@ begin
     exit();
   end;
   e := a.toFloat;
-  if IsInfinite(e) or IsInfinite(f) then result := t.createValue(getNaN)
-  else result := t.createValue(e / f);
+  result := t.createValue(e / f);
+end;
+
+function xqvalueFloatLikeToDecimal(const v: IXQValue): BigDecimal;
+begin
+  result := v.toDecimal;
+  if isZero(result) then
+    if not (v.kind in [pvkInt64, pvkBigDecimal, pvkFloat]) then
+      baseSchema.double.createValue(v).toDecimal;  //check special values
 end;
 
 function xqvalueDivideInt(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -368,6 +376,8 @@ var
  i: int64;
  ak, bk: TXQValueKind;
  tempd: BigDecimal;
+ bf: xqfloat;
+ af: xqfloat;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
@@ -385,16 +395,21 @@ begin
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
   if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
-  if bk = pvkFloat then begin
-    if (IsNan(b.toFloat)) then raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+b.debugAsStringWithTypeAnnotation()+' for integer division');
-    if IsInfinite(b.toFloat) then
-      if TXQValueFloat.isPure(a) then exit(baseSchema.integer.createValue(0))
-      else raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.debugAsStringWithTypeAnnotation()+' for integer division');
+  if not (bk in [pvkInt64, pvkBigDecimal]) then begin
+    bf := b.toFloat;
+    if IsInfinite(bf) then begin
+      if not (ak in [pvkInt64, pvkBigDecimal]) then begin
+        af := a.toFloat;;
+        if IsNan(af) or IsInfinite(af) then
+          raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.debugAsStringWithTypeAnnotation()+' for integer division');
+      end;
+      exit(baseSchema.integer.createValue(0))
+    end;
   end;
 
-  tempd := b.toDecimal;
+  tempd :=  xqvalueFloatLikeToDecimal(b);
   if isZero(tempd) then raiseDivisionBy0NotAllowed;
-  result := baseSchema.integer.createValue(a.toDecimal div tempd);
+  result := baseSchema.integer.createValue(xqvalueFloatLikeToDecimal(a) div tempd);
 end;
 
 function xqvalueMod(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -404,6 +419,8 @@ var
  t: TXSType;
  ad: BigDecimal;
  bd: BigDecimal;
+ tempf: xqfloat;
+ rd: bigdecimal;
 begin
   ignore(cxt);
   ak := a.kind; bk := b.kind;
@@ -420,22 +437,33 @@ begin
   if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
 
 
-  if (a is TXQValueFloat) then begin
-    if isNan(a.toFloat) then exit(a);
-    if IsInfinite(a.toFloat) then exit(XQValueF(getNaN, a, b));
-  end;
-  if (b is TXQValueFloat) then begin
-    if (IsNan(b.toFloat)) then exit(b);
-    if IsInfinite(b.toFloat) then exit(a);
+  if ak in [pvkInt64, pvkBigDecimal] then
+    ad := a.toDecimal
+  else begin
+    tempf := a.toFloat;
+    if isNan(tempf) then exit(a);
+    if IsInfinite(tempf) then exit(XQValueF(getNaN, a, b));
+    ad := a.toDecimal;
   end;
 
-  ad := a.toDecimal;
-  bd := b.toDecimal;
+  if bk in [pvkInt64, pvkBigDecimal] then
+    bd := b.toDecimal
+  else begin
+    tempf := b.toFloat;
+    if (IsNan(tempf)) then exit(b);
+    if IsInfinite(tempf) then exit(a);
+    bd := b.toDecimal;
+  end;
+
+
   if isZero(bd) then  exit(XQValueF(getNaN, a, b));
   if isZero(ad) then exit(a);
 
   t := TXSType.commonDecimalType(a, b);
-  result := t.createValue(ad mod bd);
+  rd := ad mod bd;
+  if (ak = pvkFloat) and isZero(rd) and ((t = baseSchema.double) or (t = baseSchema.float)) then
+    if isSignedXQFloat(a.toFloat) then exit(t.createValue(-0.0));
+  result := t.createValue(rd);
 end;
 
 
