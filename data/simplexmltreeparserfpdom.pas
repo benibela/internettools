@@ -45,9 +45,9 @@ public
   destructor destroy; override;
 
   //** Create a tree document from a standard fpc dom document
-  function import(dom: TDOMDocument): TTreeDocument;
+  function import(dom: TDOMDocument; fragment: boolean): TTreeDocument;
   //** Reads a tree document from a string, using the standard fpc dom functions to parse it
-  function parseDOM(const document: String; const uri: string = ''): TTreeDocument;
+  function parseDOM(document: String; const uri: string = ''; const contenttype: string = ''): TTreeDocument;
 
   property Parser: TDOMParser read fparser;
 end;
@@ -61,7 +61,7 @@ TTreeParserDOM = class(TTreeParserDOMBase)
 end;
 
 implementation
-
+uses bbutils;
 
 { TTreeParserDOM }
 
@@ -82,7 +82,7 @@ begin
   inherited destroy;
 end;
 
-function TTreeParserDOMBase.import(dom: TDOMDocument): TTreeDocument;
+function TTreeParserDOMBase.import(dom: TDOMDocument; fragment: boolean): TTreeDocument;
 var doc: TTreeDocument;
   namespaces: TNamespaceList;
   function getNamespace(const url, prefix: string): INamespace;
@@ -142,6 +142,7 @@ var i: Integer;
   temp: TTreeNode;
   offset: Integer;
   a: TTreeAttribute;
+  root: TDOMNode_WithChildren;
 begin
   namespaces:= TNamespaceList.Create;
   doc := TTreeDocument.create(self);
@@ -155,8 +156,10 @@ begin
   doc.next.previous := doc;
   doc.reverse.document := doc;
 
-  for i := 0 to dom.ChildNodes.Count - 1 do
-    importNode(doc, dom.ChildNodes[i]);
+  if fragment then root := dom.FirstChild as TDOMNode_WithChildren
+  else root := dom;
+  for i := 0 to root.ChildNodes.Count - 1 do
+    importNode(doc, root.ChildNodes[i]);
 
   temp := doc;
   offset := 1;
@@ -179,20 +182,23 @@ begin
   result := doc;
 end;
 
-function TTreeParserDOMBase.parseDOM(const document: String; const uri: string): TTreeDocument;
+function TTreeParserDOMBase.parseDOM(document: String; const uri: string; const contenttype: string): TTreeDocument;
 var
   temp: TXMLDocument;
   source: TXMLInputSource;
+  fragment: Boolean;
 begin
   Parser.Options.ExpandEntities := true;
   Parser.Options.PreserveWhitespace := not trimText;
   Parser.Options.IgnoreComments := not readComments;
 
+  fragment := strBeginsWith(contenttype, 'text/xml-external-parsed-entity');
+  if fragment then document := '<wrapper>' + document + '</wrapper>';
   source:=TXMLInputSource.Create(document);
   try
     try
-      Parser.Parse(source,temp);// TStringStream.Create(document)), temp);
-      result := import(temp);
+      Parser.Parse(source,temp);// TStringStream.Create(document)), temp)
+      result := import(temp, fragment);
       result.baseURI:=uri;
       result.documentURI:=uri;
       temp.Free;
@@ -206,7 +212,7 @@ end;
 
 function TTreeParserDOM.parseTree(html: string; uri: string; contentType: string): TTreeDocument;
 begin
-  Result:=parseDOM(html, uri);
+  Result:=parseDOM(html, uri, contentType);
 end;
 end.
 

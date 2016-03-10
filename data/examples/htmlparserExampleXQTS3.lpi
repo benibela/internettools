@@ -53,7 +53,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--mode xquery3 --test-set fn-format-number --test-case numberformat12"/>
+        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set fn-parse-xml-fragment"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
     </RunParams>
