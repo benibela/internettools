@@ -2805,10 +2805,6 @@ begin
   t('(1.0 div 0e1)', 'INF', '');
   t('(-1.0 div 0e1)', '-INF', '');
   f('2 mod 0', 'err:FOAR0001');
-  t('(xs:double("INF") div xs:double("INF"))', 'NaN', '');
-  t('(xs:double("INF") div xs:untypedAtomic("INF"))', 'NaN', '');
-  t('(xs:untypedAtomic("INF") div xs:float("-INF"))', 'NaN', '');
-  t('(xs:untypedAtomic("   INF     ") div xs:float("   -INF  "))', 'NaN', '');
   t('(3 idiv xs:untypedAtomic("2"))', '1', '');
   //t('(3 idiv xs:untypedAtomic(" 2 "))', '1', '');
   t('xs:float(0.0 div 0e0) castable as xs:integer', 'false', '');
@@ -2903,14 +2899,6 @@ begin
   t('avg((dayTimeDuration("PT1S"), dayTimeDuration("PT2S")))', 'PT1.5S', '');
   t('avg(a/b)', '2', '');
   t('type-of(avg(a/b))', 'double', '');
-  t('xs:float("INF") + xs:float("-INF")', 'NaN', '');
-  t('5 + xs:float("-INF")', '-INF', '');
-  t('5 - xs:float("-INF")', 'INF', '');
-  t('xs:float("-INF") * 0', 'NaN', '');
-  t('xs:float("INF") - xs:float("INF")', 'NaN', '');
-  t('xs:float("INF") div xs:float("INF")', 'NaN', '');
-  t('xs:float("NaN") mod 5', 'NaN', '');
-  t('xs:float("5") mod xs:float("-INF")', '5', '');
   t('xs:gYearMonth("2005-02Z")', '2005-02Z', '');
   t('xs:gYearMonth("2005-02Z") = xs:gYearMonth("2005-02Z")', 'true', '');
   t('seconds-from-dateTime(xs:dateTime("2000-01-01T18:23:45.123"))', '45.123', '');

@@ -347,6 +347,19 @@ begin
   t('math:atan2(xs:double("INF"), xs:double("-INF"))', '2.356194490192345');
   //t('xs:float("1.00000003009493E+060")', 'INF');
 
+  SetExceptionMask([exInvalidOp, exDenormalized, exOverflow, exUnderflow, exPrecision]);
+  t('(xs:double("INF") div xs:double("INF"))', 'NaN', '');
+  t('(xs:double("INF") div xs:untypedAtomic("INF"))', 'NaN', '');
+  t('(xs:untypedAtomic("INF") div xs:float("-INF"))', 'NaN', '');
+  t('(xs:untypedAtomic("   INF     ") div xs:float("   -INF  "))', 'NaN', '');
+  t('xs:float("INF") + xs:float("-INF")', 'NaN', '');
+  t('5 + xs:float("-INF")', '-INF', '');
+  t('5 - xs:float("-INF")', 'INF', '');
+  t('xs:float("-INF") * 0', 'NaN', '');
+  t('xs:float("INF") - xs:float("INF")', 'NaN', '');
+  t('xs:float("INF") div xs:float("INF")', 'NaN', '');
+  t('xs:float("NaN") mod 5', 'NaN', '');
+  t('xs:float("5") mod xs:float("-INF")', '5', '');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
