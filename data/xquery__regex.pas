@@ -599,7 +599,7 @@ begin
       end;
   end;
 
-  if toescape <> nil then toescape^ := wrfIgnoreCase in flags;
+  if toescape <> nil then toescape^ := wrfQuote in flags;
 
   result := wregexprParse(args[1].toString, flags);
   if not allowEmptyMatch then begin
@@ -696,6 +696,7 @@ begin
     SetLength(repwith, 1);
     repwith[0].literal := rep;
     repwith[0].capture := -1;
+    parsed := true;
   end else repin := rep;
 end;
 
