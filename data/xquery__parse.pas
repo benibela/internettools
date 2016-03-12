@@ -3313,7 +3313,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       end;
     end;
 
-  procedure visitSequenceType(st: TXQTermSequenceType);
+  procedure visitSequenceType(st: TXQTermSequenceType; errCode: string = '');
   var
     schema: TXSSchema;
     pending: TXQTermPendingEQNameToken;
@@ -3327,8 +3327,12 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       else if pending.namespaceprefix <> '' then raiseParsingError('XPST0081', 'Unknown schema: '+pending.namespaceUrl)
       else st.atomicTypeInfo := nil;
       if (st.atomicTypeInfo = nil)
-         or (not (xqstAllowValidationTypes in flags) and baseSchema.isValidationOnlyType(st.atomicTypeInfo)) then
-        raiseParsingError(ifthen((xqstIsCast in flags) and (staticContext.model in PARSING_MODEL3), 'XQST0052', 'XPST0051'), 'Unknown type: Q{'+pending.namespaceurl+'}'+pending.localpart);
+         or (not (xqstAllowValidationTypes in flags) and baseSchema.isValidationOnlyType(st.atomicTypeInfo)) then begin
+           if errCode = '' then
+             if (xqstIsCast in flags) and (staticContext.model in PARSING_MODEL3) then errCode := 'XPST0052'
+             else errCode := 'XPST0051';
+           raiseParsingError(errCode, 'Unknown type: Q{'+pending.namespaceurl+'}'+pending.localpart);
+         end;
       pending.free;
       SetLength(st.children, 0);
     end;
@@ -3586,6 +3590,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       visitNodeMatcher(n.children[0] as TXQTermNodeMatcher);
       raise EXQParsingException.create('XPST0008', 'Schema tests are not supported');
     end;
+    if (length(n.children) > 0) and (n.children[high(n.children)] is TXQTermSequenceType) then
+      visitSequenceType(TXQTermSequenceType(n.children[high(n.children)]), 'XPST0008');
   end;
 
   procedure visitConstructor(c: TXQTermConstructor);
