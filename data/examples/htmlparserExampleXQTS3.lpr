@@ -8,7 +8,7 @@ uses
   {$ENDIF}{$ENDIF}
   Classes, sysutils, strutils, xquery, xquery_utf8, xquery_module_math,
   simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex,
-  bbutils, math, rcmdline, internetaccess, mockinternetaccess
+  bbutils, math, rcmdline, internetaccess, mockinternetaccess, utf8tools
   {$ifdef windows},windows{$endif}
   ;
   { you can add units after this }
@@ -159,7 +159,7 @@ protected
   testCasesToLog: array[TTestCaseResult] of boolean;
   logAllTestCases: boolean;
   printInputs: Boolean;
-  procedure printResults(var f: textfile; const r: TResultSet);
+  procedure printResults(var f: textfile; const r: TResultSet; addition: string = '');
 public
   constructor create(clr: TCommandLineReader);
   procedure loadCatalogue; virtual;
@@ -448,10 +448,10 @@ end;
 
 { TLogger }
 
-procedure TLogger.printResults(var f: textfile; const r: TResultSet);
+procedure TLogger.printResults(var f: textfile; const r: TResultSet; addition: string = '');
 const cols = 4;
 begin
-  writeln(f, 'Passed: ', r[tcrPass]:cols, '  Failed: ', r[tcrFail]:cols, '  Wrong error: ', r[tcrWrongError]:cols, '  N/A: ', r[tcrNA]:cols, '  Skipped: ', (r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]):cols );
+  writeln(f, 'Passed: ', r[tcrPass]:cols, '  Failed: ', r[tcrFail]:cols, '  Wrong error: ', r[tcrWrongError]:cols, '  N/A: ', r[tcrNA]:cols, '  Skipped: ', (r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]):cols, addition );
 end;
 
 constructor TLogger.create(clr: TCommandLineReader);
@@ -505,15 +505,21 @@ begin
   writeln(stderr, ts.name, ': ', 'n/a');
 end;
 
+var timing: TDateTime;
+
 procedure TLogger.beginTestSet(ts: TTestSet);
 begin
   write(StdErr, ts.name + strDup(' ', longestTestSetName - length(ts.name)), ': ');
+  timing := now;
 end;
 
 procedure TLogger.endTestSet(ts: TTestSet; const result: TResultSet);
+var
+  delta: Extended;
 begin
 //  write(stderr, 'Results of ', ts.name);
-  printResults(stderr, result);
+  delta := (now - timing);
+  printResults(stderr, result, #9'Time: '+FloatToStr(round(delta * MSecsPerDay)) + 'ms');
 end;
 
 procedure TLogger.endXQTS(const result: TResultSet);

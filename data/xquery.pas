@@ -1367,6 +1367,7 @@ type
     value: string; //**< If @code(value <> ''), only nodes with the corresponding value are found (value = node-name for element node, value = text for text/comment nodes)
     filters: array of TXQTerm; //**< expressions a matched node must satisfy
     requiredType: TXQTermSequenceType;
+    function serialize: string;
     case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
     qcSameNode: (matching: TXQPathMatchingKinds;); //**< Which nodes match the query command. If this is [], _nothing_ is found! The elements of the set [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute] match nodes of a certain type, qmValue activates the value field.
     qcFunctionSpecialCase: (specialCase: TXQTerm; );   //**< Term used for qcFunctionSpecialCase
@@ -2842,6 +2843,47 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+function TXQPathMatchingStep.serialize: string;
+var
+  i: Integer;
+begin
+  if typ <> qcFunctionSpecialCase then begin
+   if not (qmAttribute in matching) then
+     case typ of
+       qcSameNode: result := 'self::';
+       qcDirectParent: result := 'parent::';
+       qcDirectChild: result := 'child::';
+       qcSameOrDescendant: result := 'same-or-descendant::';
+       qcDescendant: result := 'descendant::';
+       qcFollowing: result := 'following::';
+       qcFollowingSibling: result := 'following-sibling::';
+       qcAncestor: result := 'ancestor::';
+       qcPrecedingSibling: result := 'preceding-sibling::';
+       qcPreceding: result := 'preceding::';
+       qcSameOrAncestor: result := 'same-or-ancestor::';
+       qcDocumentRoot: result := 'root::';
+       qcFunctionSpecialCase: result := '(:special-case::)';
+       else result := '???';
+     end;
+   if qmElement in matching then result += 'element';
+   if qmText in matching then result += 'text';
+   if qmComment in matching then result += 'comment';
+   if qmProcessingInstruction in matching then result += 'document';
+   if qmAttribute in matching then result += 'attribute';
+   if qmDocument in matching then result += 'document';
+   result += '(';
+   if qmCheckNamespacePrefix in matching then result += 'Q{'+namespaceURLOrPrefix+'}';
+   if qmCheckNamespaceURL in matching then result += namespaceURLOrPrefix + ':';
+   if qmValue in matching then result += value;
+   if qmCheckOnSingleChild in matching then result += '(:single child:)';
+
+   if requiredType <> nil then result += ', '+requiredType.serialize;
+   result += ')';
+  end;
+  for i := 0 to high(filters) do
+    result += '[' + filters[i].ToString + ']';
+end;
 
 constructor TXQDecimalFormat.Create;
 begin

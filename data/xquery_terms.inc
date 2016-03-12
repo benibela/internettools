@@ -617,7 +617,7 @@ begin
       result += atomicTypeInfo.name;
     end;
     tikFunctionTest: result := 'function';
-    tikElementTest: result := 'node()';
+    tikElementTest: result := nodeMatching.serialize();
     tikUnion: begin
       result := '';
       for i := 0 to high(children) do
