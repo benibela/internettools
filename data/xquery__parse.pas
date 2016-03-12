@@ -3162,7 +3162,7 @@ begin
                 end;
             end;
         end;
-        '': begin
+        else begin
           pos := marker;
           break;
         end;
