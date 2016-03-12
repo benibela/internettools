@@ -2130,8 +2130,11 @@ begin
                 case word of
                   'processing-instruction': begin
                     skipWhitespaceAndComment();
-                    if pos^ in ['"', ''''] then push(TXQTermConstant.create(parseString()))
-                    else push(TXQTermConstant.create(nextTokenNCName()))
+                    if pos^ in ['"', ''''] then begin
+                      wordlookahead := xmlStrWhitespaceCollapse(parseString());
+                      if not baseSchema.isValidNCName(wordlookahead) then raiseParsingError('XPTY0004', 'Need NCName');
+                      push(TXQTermConstant.create(wordlookahead));
+                    end else push(TXQTermConstant.create(nextTokenNCName()))
                   end;
                   'element', 'schema-element', 'attribute', 'schema-attribute', 'document-node': begin
                     push(parseValue());
