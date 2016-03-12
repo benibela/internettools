@@ -421,7 +421,7 @@ begin
   result := xqvalue();
   for i := 1 to getSequenceCount do begin
     v := get(i);
-    if v.kind = pvkNode then handle(xqFunctionResolve_Html(tempContext, xqvalueArray([v])))
+    if v.kind = pvkNode then handle(resolveHTMLCallback(tempContext, xqvalueArray([v])))
     else handle(v);
   end;
 end;
@@ -1613,7 +1613,8 @@ end;
 class function TXQValueNode.nodeTypeAnnotation(tn: TTreeNode): TXSType;
 begin
   case tn.typ of
-    tetOpen, tetDocument, tetText, tetAttribute: result := baseSchema.untypedAtomic; //todo: handle i:type="xs:integer" attribute
+    tetOpen, tetDocument: result := baseSchema.untyped; //todo: handle i:type="xs:integer" attribute
+    tetText, tetAttribute: result := baseSchema.untypedAtomic;
     tetComment, tetProcessingInstruction: result := baseSchema.string_;
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
   end;

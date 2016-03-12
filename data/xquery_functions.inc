@@ -111,10 +111,10 @@ begin
        (not (a.typeAnnotation as TXSDateTimeType).isDuration and not (b.typeAnnotation as TXSDateTimeType).isDuration) then exit(xqvalue());
     if (b.typeAnnotation as TXSDateTimeType).isDuration then begin
       result := a.clone;
-      (result as TXQValueDateTime).addDuration((b as TXQValueDateTime).value);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration((b as TXQValueDateTime).value);
     end else begin
       result := b.clone;
-      (result as TXQValueDateTime).addDuration((a as TXQValueDateTime).value);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration((a as TXQValueDateTime).value);
     end;
     exit;
   end;
@@ -172,13 +172,13 @@ begin
       xqtempdt.value.year:=0;
       xqtempdt.value.month:=0;
       xqtempdt.value.day := xqtempdt.value.initFromMicroSecondStampTimeOnly(abs(ai));
-      if ai < 0 then xqtempdt.multiplyComponents(-1);
+      if ai < 0 then TXQValueDateTimeBreaker(xqtempdt).multiplyComponents(-1);
       exit(xqtempdt);
     end else begin
       btemp := b.clone; //need to keep reference to the clone
-      (btemp as TXQValueDateTime).multiplyComponents(-1);
+      TXQValueDateTimeBreaker(btemp as TXQValueDateTime).multiplyComponents(-1);
       result := a.clone;
-      (result as TXQValueDateTime).addDuration((btemp as TXQValueDateTime).value);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration((btemp as TXQValueDateTime).value);
     end;
     exit;
   end;
@@ -197,7 +197,7 @@ var i, f,t: BigDecimal;
     len: BigDecimal;
     resseq: TXQValueSequence;
     idx: Integer;
-    resseqseq: TXQVList;
+    resseqseq: TXQVListBreaker;
     fsmall: integer;
     i64: int64;
     typ: TXSNumericType;
@@ -211,7 +211,7 @@ begin
   len := t - f + 1;
   if len > MaxInt then raise EXQEvaluationException.Create('XPDY0130', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
-  resseqseq := resseq.seq;
+  resseqseq := TXQVListBreaker(resseq.seq);
   resseqseq.setCount(BigDecimalToLongint(len));
   if isLongint(f) and isLongint(t) then begin
     fsmall := BigDecimalToLongint(f);
@@ -263,13 +263,13 @@ begin
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
     if bk <> pvkDateTime then begin
-      if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(b) <> xsceNoError) then exit(xqvalue);
+      if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (TXSTypeBreaker(baseSchema.double).tryCreateValue(b) <> xsceNoError) then exit(xqvalue);
       result := a.clone;
-      (result as TXQValueDateTime).multiplyComponents(b.toFloat);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).multiplyComponents(b.toFloat);
     end else begin
-      if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(a) <> xsceNoError) then exit(xqvalue);
+      if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (TXSTypeBreaker(baseSchema.double).tryCreateValue(a) <> xsceNoError) then exit(xqvalue);
       result := b.clone;
-      (result as TXQValueDateTime).multiplyComponents(a.toFloat);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).multiplyComponents(a.toFloat);
     end;
     exit;
   end;
@@ -323,21 +323,21 @@ begin
     if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
     if (b is TXQValueDateTime) and (a.typeAnnotation as TXSDateTimeType).isDuration then begin
       if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then begin
-        bd := (b as TXQValueDateTime ).toDayTime();
+        bd := TXQValueDateTimeBreaker(b as TXQValueDateTime ).toDayTime();
         if isZero(bd) then raiseDivisionBy0NotAllowed;
-        exit(baseSchema.decimal.createValue((a as TXQValueDateTime).toDayTime() / bd));
+        exit(baseSchema.decimal.createValue(TXQValueDateTimeBreaker(a as TXQValueDateTime).toDayTime() / bd));
       end;
       if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then begin
-        i := (b as TXQValueDateTime).toMonths();
+        i := TXQValueDateTimeBreaker(b as TXQValueDateTime).toMonths();
         if i = 0 then raiseDivisionBy0NotAllowed;
-        exit(baseSchema.decimal.createValue(((a as TXQValueDateTime).toMonths() / i)));
+        exit(baseSchema.decimal.createValue((TXQValueDateTimeBreaker(a as TXQValueDateTime).toMonths() / i)));
       end;
       exit(xqvalue);
     end;
     f:= b.toFloat;
     result := a.clone;
-    if IsInfinite(f) then (result as TXQValueDateTime).multiplyComponents(0)
-    else (result as TXQValueDateTime).divideComponents(f);
+    if IsInfinite(f) then TXQValueDateTimeBreaker(result as TXQValueDateTime).multiplyComponents(0)
+    else TXQValueDateTimeBreaker(result as TXQValueDateTime).divideComponents(f);
     exit;
   end;
 
@@ -609,7 +609,7 @@ begin
           raise EXQEvaluationException.Create('XPTY0004', 'invalid node');
         result.add(x);
       end;
-      result.seq.sortInDocumentOrderUnchecked;
+      TXQVListBreaker(result.seq).sortInDocumentOrderUnchecked;
       for i:=result.seq.Count-1 downto 1 do
         if result.seq[i].toNode = result.seq[i-1].toNode then
           result.seq.Delete(i);
@@ -660,36 +660,19 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-function getTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
-begin
-  if not (wrapper is TXQValueFunction) or not ((wrapper as TXQValueFunction).body is TXQTermSequenceType) then
-    raise EXQEvaluationException.Create('XPTY0004', 'Expected type, got: '+wrapper.toString);
-  result := TXQTermSequenceType((wrapper as TXQValueFunction).body);
-end;
 
-function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
-begin
-  ignore(cxt);
-  result := getTypeInfo(tb).castAs(ta, cxt);
-end;
-
-function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
-begin
-  ignore(cxt);
-  result := xqvalue(getTypeInfo(tb).castableAs(ta, cxt.staticContext));
-end;
 
 
 
 function xqvalueInstanceOf(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
-  result := xqvalue(getTypeInfo(tb).instanceOf(ta, cxt));
+  result := xqvalue(xqgetTypeInfo(tb).instanceOf(ta, cxt));
 end;
 
 function xqvalueTreatAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   result := ta;
-  if not getTypeInfo(tb).instanceOf(result, cxt) then
+  if not xqgetTypeInfo(tb).instanceOf(result, cxt) then
     raise EXQEvaluationException.Create('XPDY0050', 'treat as type not matched');
 end;
 
@@ -755,37 +738,12 @@ begin
   result := xqvalue();
 end;
 
-function xqvalueAtomize(const v: IXQValue): IXQValue;
-var x: IXQValue;
-  isAlreadyAtomized: Boolean;
-  seqResult: TXQValueSequence;
-begin
-  if v.getSequenceCount = 0 then exit(v);
-  if v is TXQValueSequence then begin
-    isAlreadyAtomized := true;
-    for x in v do
-      if not x.instanceOf(baseSchema.AnyAtomicType) then begin
-        isAlreadyAtomized := false;
-        break;
-      end;
-    if isAlreadyAtomized then exit(v);
-    seqResult := TXQValueSequence.create(v.getSequenceCount);
-    for x in v do seqResult.seq.add(xqvalueAtomize(x));
-    result := seqResult;
-    exit
-  end;
-  if v.instanceOf(baseSchema.AnyAtomicType) then exit(v);
-  if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
-  if not (v is TXQValueNode) then
-    raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
-  result := TXQValueNode.nodeTypeAnnotation(v.toNode).createValue(v.toString);
-end;
 
 function xqFunctionData(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
-    if context.SeqValue = nil then raiseXPDY0002ContextItemAbsent;
+    if context.SeqValue = nil then context.raiseXPDY0002ContextItemAbsent;
     result := xqvalueAtomize(context.SeqValue)
   end else result := xqvalueAtomize(args[0]);
 end;
@@ -798,7 +756,7 @@ function xqFunctionNumber(const context: TXQEvaluationContext; const args: TXQVA
     temp: TXQValue;
   begin
     if v.instanceOf(baseSchema.Double) then exit(v);
-    if baseSchema.double.tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
+    if TXSTypeBreaker(baseSchema.double).tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
     else exit(baseSchema.double.createValue(getNaN));
   end;
 begin
@@ -806,7 +764,7 @@ begin
   if length(args) = 0 then begin
     if context.SeqValue <> nil then result := numberize(context.SeqValue)
     else if context.ParentElement <> nil then result := numberize(xqvalue(context.ParentElement))
-    else raiseXPDY0002ContextItemAbsent;
+    else context.raiseXPDY0002ContextItemAbsent;
     exit;
   end;
   result := numberize(args[0]);
@@ -877,25 +835,7 @@ begin
   end;
 end;
 
-function xqfloatRounded(f: xqfloat; prec: integer = 0): xqfloat;
-var
-  ff: xqfloat;
-  p: math.float;
-begin
-  if IsNan(f) or IsInfinite(f) then exit((f));
-  if prec = 0 then begin
-    ff := frac(f);
-    if ff = 0 then exit((f));
-    f := f + 0.5;
-    ff := frac(f);
-    if ff >= 0 then result := (f - ff)
-    else result := (f - ff - 1);
-  end else begin
-    p := power(10, prec);
-    result := xqfloatRounded(f / p) * p;
-  end;
 
-end;
 
 function getReasonablePrecision(const prec: IXQValue): integer;
 //prec must be xs:integer
@@ -1071,9 +1011,7 @@ function xqFunctionString(const context: TXQEvaluationContext; const args: TXQVA
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 0 then begin
-    if context.SeqValue <> nil then result := xqvalue(context.SeqValue.toString)
-    else if context.ParentElement <> nil then result := xqvalue(treeElementAsString(context.ParentElement))
-    else raiseXPDY0002ContextItemAbsent;
+    result := xqvalue(context.SeqValueAsString);
   end else if length(args) = 1 then
     if args[0].kind = pvkFunction then raise EXQEvaluationException.create('FOTY0014', 'Cannot pass function item to fn:string')
     else result := xqvalue(args[0].toString);
@@ -1729,67 +1667,7 @@ begin
   result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
 end;
 
-procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
-var unti: integer;  //excluding last
-  temp: BigDecimal;
-  temp64: Int64;
-begin
-  case args[1].kind of
-    pvkInt64: from := args[1].toInt64;
-    pvkFloat: begin
-      if IsNan(args[1].toFloat) or isPosInf(args[1].toFloat) then begin
-        len := 0;
-        exit;
-      end else if isNegInf(args[1].toFloat) then begin
-        from := 1;
-        if length(args) <= 2 then len := maxLen
-        else len := 0;
-        exit;
-      end;
-      from := round(xqfloatRounded(args[1].toFloat));
-    end;
-    {pvkBigDecimal:}else begin
-      temp := round(args[1].toDecimal);
-      if temp.signed then from := 1
-      else if temp > high(integer) then begin
-        from := 1;
-        len := 0;
-        exit;
-      end else from := BigDecimalToLongint(temp);
-    end;
-  end;
 
-  if from > maxLen then begin len := 0; exit; end;
-
-  if length(args) = 3 then begin
-    case args[2].kind of
-      pvkInt64: begin
-        temp64 := args[2].toInt64;
-        if temp64 < 0 then unti := from
-        else if (temp64 > high(integer))  or ( (from > 0) and (temp64 > high(integer) - from) ) then unti := maxlen + 1
-        else unti := from + temp64;
-      end;
-      pvkFloat: begin
-        if IsNan(args[2].toFloat) or isNegInf(args[2].toFloat) then begin //Since -INF + INF returns NaN, no characters are selected.
-           len := 0;
-           exit();
-        end else if isPosInf(args[2].toFloat) then unti := maxLen+1
-        else unti := from + round(xqfloatRounded(args[2].toFloat));
-      end;
-      else begin
-        temp := round(args[2].toDecimal);
-        if temp.signed then unti := from
-        else if (temp > high(integer)) or ( (from > 0) and (temp > high(Integer) - from ) ) then unti := maxLen + 1
-        else unti := from + BigDecimalToLongint(temp);
-      end;
-    end;
-  end else unti := maxLen + 1;
-
-  if from < 1 then from := 1;
-  if unti > maxLen + 1 then unti := maxLen + 1;
-  len := unti-from;
-  if len < 0 then len := 0;
-end;
 
 function xqFunctionString_join(const args: TXQVArray): IXQValue;
 begin
@@ -1826,9 +1704,7 @@ var
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then temp := args[0].toString
-  else if context.SeqValue <> nil then temp := context.SeqValue.toString
-  else if context.ParentElement <> nil then temp := treeElementAsString(context.ParentElement)
-  else raiseXPDY0002ContextItemAbsent;
+  else temp := context.SeqValueAsString;
 
   result := xqvalue(length(temp));
 end;
@@ -1838,9 +1714,7 @@ var temp: string;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) > 0 then temp := args[0].toString
-  else if context.SeqValue <> nil then temp := context.SeqValue.toString
-  else if context.ParentElement <> nil then temp := treeElementAsString(context.ParentElement)
-  else raiseXPDY0002ContextItemAbsent;
+  else temp := context.SeqValueAsString;
   result := xqvalue(strTrimAndNormalize(temp));
 end;
 
@@ -1940,20 +1814,6 @@ begin
 end;
 
 
-function xqFunctionConcat(const args: TXQVArray): IXQValue;
-var temp:string;
- i: Integer;
-begin
-  temp:='';
-  for i:=0 to high(args) do begin
-    case args[i].kind of
-      pvkSequence: if args[i].getSequenceCount > 1 then raiseXPTY0004TypeError(args[i], 'singleton');
-      pvkFunction: raiseFOTY0013TypeError(args[i]);
-    end;
-    temp+=args[i].toString;
-  end;
-  result := xqvalue(temp);
-end;
 
 
 function xqFunctionSplitEqual(const cxt: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2047,7 +1907,7 @@ begin
       else raise EXQEvaluationException.create('PXP:EVAL','Invalid language');
     end;
   end;
-  term := context.staticContext.sender.parseTerm(args[0].toString, model);
+  term := TXQueryEngineBreaker(context.staticContext.sender).parseTerm(args[0].toString, model);
   try
     result := term.evaluate(context);
   finally
@@ -2215,16 +2075,16 @@ function xqFunctionYear_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueDateTime then result := xqvalue((args[0] as TXQValueDateTime).toMonths() div 12)
-  else result := xqvalue((baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() div 12);
+  if args[0] is TXQValueDateTime then result := xqvalue(TXQValueDateTimeBreaker(args[0] as TXQValueDateTime).toMonths() div 12)
+  else result := xqvalue(TXQValueDateTimeBreaker(baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() div 12);
 end;
 
 function xqFunctionMonth_From_Duration(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueDateTime then result := xqvalue((args[0] as TXQValueDateTime).toMonths() mod 12)
-  else result := xqvalue((baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() mod 12);
+  if args[0] is TXQValueDateTime then result := xqvalue(TXQValueDateTimeBreaker(args[0] as TXQValueDateTime).toMonths() mod 12)
+  else result := xqvalue(TXQValueDateTimeBreaker(baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() mod 12);
 end;
 
 function getCanonicalValueFromDayTimeDuration(v: integer; args: TXQVArray): IXQValue;
@@ -2237,7 +2097,7 @@ begin
   if xqv.isUndefined then exit(xqvalue);
   if not (xqv.instanceOf(baseSchema.duration)) then xqv := baseSchema.duration.createValue(xqv);
   tempValue := (xqv as TXQValueDateTime).value;
-  TXQValueDateTime.setDayTime(tempValue, (xqv as TXQValueDateTime).toDayTime());
+  TXQValueDateTimeBreaker.setDayTime(tempValue, TXQValueDateTimeBreaker(xqv as TXQValueDateTime).toDayTime());
   if (v <> 6) or (tempValue.microsecs = 0) then result := xqvalue(tempValue.values[v])
   else  result := xqvalue( tempValue.seconds + shifted10(bigdecimal(tempValue.microsecs), -6) );
 end;
@@ -2273,8 +2133,8 @@ begin
   if length(args) = 2 then begin
     if args[1].isUndefined then tz := high(integer)
     else begin
-      if args[1] is TXQValueDateTime then stamp :=  (args[1] as TXQValueDateTime).toDayTime()
-      else stamp := TXQValueDateTime.getDayTime( (baseSchema.duration.createValue(args[1]) as TXQValueDateTime).value );
+      if args[1] is TXQValueDateTime then stamp :=  TXQValueDateTimeBreaker(args[1] as TXQValueDateTime).toDayTime()
+      else stamp := TXQValueDateTimeBreaker.getDayTime( TXQValueDateTimeBreaker(baseSchema.duration.createValue(args[1]) as TXQValueDateTime).value );
       if (stamp mod SCALE <> 0)
          or (stamp < -14*60*SCALE) or (stamp > 14*60*SCALE)
          then raise EXQEvaluationException.create('FODT0003', 'Invalid timezone: ' + args[1].debugAsStringWithTypeAnnotation());
@@ -2291,7 +2151,7 @@ begin
     resdt.value.timezone := tz
   else if resdt.value.timezone <> tz  then begin
     resdt.value.initFromMicroSecondStamp(resdt.value.toMicroSecondStamp() + tz * SCALE, tz);
-    resdt.truncateRange();
+    TXQValueDateTimeBreaker(resdt).truncateRange();
   end;
 end;
 
@@ -2419,7 +2279,7 @@ begin
   requiredArgCount(args,1, 2);
   if length(args) = 2 then node := args[1].toNode
   else node := context.contextNode();
-  if node = nil then raiseXPDY0002ContextItemAbsent;
+  if node = nil then context.raiseXPDY0002ContextItemAbsent;
 
 
   testlang := lowercase(args[0].toString);
@@ -2632,6 +2492,7 @@ var
   node: TTreeNode;
   data: String;
   contenttype: string;
+  ExternalDocuments: TStringList;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined  then exit(xqvalue);
@@ -2646,10 +2507,14 @@ begin
   url := context.staticContext.resolveDocURI(url);
   if strBeginsWith(url, ':') then raise EXQEvaluationException.create('FODC0005', 'Invalid url: '+ url);
 
-  if context.staticContext.sender.FExternalDocuments = nil then context.staticContext.sender.FExternalDocuments := TStringList.Create;
+  ExternalDocuments := TXQueryEngineBreaker(context.staticContext.sender).FExternalDocuments;
+  if ExternalDocuments = nil then begin
+    ExternalDocuments := TStringList.Create;
+    TXQueryEngineBreaker(context.staticContext.sender).FExternalDocuments := ExternalDocuments;
+  end;
 
-  if context.staticContext.sender.FExternalDocuments.IndexOf(url) >= 0 then
-    exit(xqvalue(TTreeNode(context.staticContext.sender.FExternalDocuments.Objects[context.staticContext.sender.FExternalDocuments.IndexOf(url)])));
+  if ExternalDocuments.IndexOf(url) >= 0 then
+    exit(xqvalue(TTreeNode(ExternalDocuments.Objects[ExternalDocuments.IndexOf(url)])));
 
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
 
@@ -2660,7 +2525,7 @@ begin
   end;
   if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url);
 
-  context.staticContext.sender.FExternalDocuments.AddObject(url, node);
+  ExternalDocuments.AddObject(url, node);
 
   result := xqvalue(node);
 end;
@@ -2878,9 +2743,9 @@ begin
   oldseqseq := (args[0] as TXQValueSequence).seq;
   resseq := TXQValueSequence.create(0);
   resseqseq := resseq.seq;
-  resseqseq.setCount(len);
+  TXQVListBreaker(resseqseq).setCount(len);
   for i := from to from + len - 1 do
-    resseqseq.list[i - from] := oldseqseq[i];
+    TXQVListBreaker(resseqseq).list[i - from] := oldseqseq[i];
   result := resseq;
 end;
 
@@ -2914,41 +2779,6 @@ begin
   result := args[0];
 end;
 
-function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;
-  procedure raiseFOTY0015(const v: IXQValue);
-  begin
-    raise EXQEvaluationException.create('FOTY0015', 'Function item ' + v.debugAsStringWithTypeAnnotation() + ' passed to deep-equal')
-  end;
-
-var i:integer;
-    enum1, enum2: TXQValueEnumerator;
-begin
-  if a.getSequenceCount <> b.getSequenceCount then
-    exit(false);
-
-  enum1 := a.GetEnumerator; enum1.MoveNext;
-  enum2 := b.GetEnumerator; enum2.MoveNext;
-  for i := 0 to a.getSequenceCount - 1 do begin
-    if enum2.Current.kind = pvkFunction then raiseFOTY0015(enum2.Current);
-
-    if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
-      if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
-         or not context.staticContext.equalDeepAtomic(enum1.Current, enum2.Current, collation) then
-        exit(false);
-    end else begin
-      if enum1.Current.kind = pvkFunction then raiseFOTY0015(enum1.Current);
-      if collation = nil then
-        collation := context.staticContext.nodeCollation;
-      if (enum2.Current.instanceOf(baseSchema.anyAtomicType)) or
-         (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
-            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
-        exit(false);
-    end;
-    enum1.MoveNext;
-    enum2.MoveNext;
-  end;
-  result := true;
-end;
 
 function xqFunctionDeep_equal(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
@@ -3044,7 +2874,7 @@ begin
       for i:=0 to seq.Count-1 do begin
         with (seq.items[i] as TXQValueDateTime) do begin
           if typeAnnotation = baseSchema.duration then raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
-          (result as TXQValueDateTime).addDuration(value);
+          TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(value);
         end;
       end;
     end;
@@ -3121,7 +2951,7 @@ begin
   case seq.getPromotedType of
     pvkDateTime: begin
       result := xqFunctionSum(args);
-      (result as TXQValueDateTime).divideComponents(i);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).divideComponents(i);
     end;
     pvkInt64, pvkBigDecimal: begin
       tempd:=0;
@@ -3357,7 +3187,7 @@ begin
   requiredArgCount(args,0,0);
   if context.SeqValue <> nil then result := xqvalue(context.SeqIndex)
   else if context.ParentElement <> nil then result := xqvalue(1)
-  else raiseXPDY0002ContextItemAbsent;
+  else context.raiseXPDY0002ContextItemAbsent;
 
 end;
 
@@ -3366,7 +3196,7 @@ begin
   requiredArgCount(args,0,0);
   if context.SeqValue <> nil then result := xqvalue(context.SeqLength)
   else if context.ParentElement <> nil then result := xqvalue(1)
-  else raiseXPDY0002ContextItemAbsent;
+  else context.raiseXPDY0002ContextItemAbsent;
 end;
 
 function xqFunctionId_Common(const context: TXQEvaluationContext; const args: TXQVArray; parentElement: boolean): IXQValue;
