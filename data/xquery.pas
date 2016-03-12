@@ -7081,8 +7081,8 @@ begin
   if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(xqvalue(node))) then begin
     if nodeCondition.requiredType.isSingleType() then
       case node.typ of
-        tetOpen: exit(nodeCondition.requiredType.atomicTypeInfo.derivedFrom(baseSchema.untyped));
-        else exit(nodeCondition.requiredType.atomicTypeInfo.derivedFrom(baseSchema.untypedAtomic));
+        tetOpen: exit(baseSchema.untyped.derivedFrom(nodeCondition.requiredType.atomicTypeInfo));
+        else exit(baseSchema.untypedAtomic.derivedFrom(nodeCondition.requiredType.atomicTypeInfo));
       end;
     exit(false);
   end;
