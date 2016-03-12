@@ -256,6 +256,19 @@ type
 
 
   TXQValueClass = class of TXQValue;
+  //**Record to store a datetime splitted in years/months/days/hours/minutes/secondes/secondfractions+timezone (because TDateTime is not sufficient to distinguish 1a vs. 12m for durations)
+  TXQValueDateTimeData = record
+    procedure initFromMicroSecondStamp(mics: int64; const tz: integer = high(integer));
+    function initFromMicroSecondStampTimeOnly(mics: int64; const tz: integer = high(integer)): int64;
+    function toMicroSecondStamp(subtractTimeZone: Boolean = true): int64; //does not include timezone
+    function toMonths: integer; inline;
+    function toDayTime: int64;
+    case boolean of
+      true: (values: array[1..7] of integer; );
+      false: (year, month, day, hour, min, seconds, microsecs, timezone: integer;);
+      //microsecs = fraction scaled by 1000000, timezone in minutes or high(integer) if absent
+  end;
+  PXQValueDateTimeData = ^TXQValueDateTimeData;
 
   (***
   @abstract(Variant used in XQuery-expressions)
@@ -328,6 +341,7 @@ type
     function get(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getInternalDateTimeData: PXQValueDateTimeData;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
@@ -395,6 +409,7 @@ type
     function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getInternalDateTimeData: PXQValueDateTimeData; virtual;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; virtual;
@@ -599,17 +614,6 @@ type
   { TXQValueDateTime }
 
 
-  //**Record to store a datetime splitted in years/months/days/hours/minutes/secondes/secondfractions+timezone (because TDateTime is not sufficient to distinguish 1a vs. 12m for durations)
-  TXQValueDateTimeData = record
-    procedure initFromMicroSecondStamp(mics: int64; const tz: integer = high(integer));
-    function initFromMicroSecondStampTimeOnly(mics: int64; const tz: integer = high(integer)): int64;
-    function toMicroSecondStamp(subtractTimeZone: Boolean = true): int64; //does not include timezone
-    case boolean of
-      true: (values: array[1..7] of integer; );
-      false: (year, month, day, hour, min, seconds, microsecs, timezone: integer;);
-      //microsecs = fraction scaled by 1000000, timezone in minutes or high(integer) if absent
-  end;
-  PXQValueDateTimeData=^TXQValueDateTimeData;
 
   //** Datetime value
   TXQValueDateTime = class (TXQValue)
@@ -629,6 +633,7 @@ type
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function getInternalDateTimeData: PXQValueDateTimeData; override;
 
     procedure setDateTime(const dateTime: TDateTime);
     class procedure setDateTime(const dateTime: TDateTime; out v: TXQValueDateTimeData); static;
@@ -645,11 +650,7 @@ type
     //**A duration can be represented as an integer ("months" = 12 * year + months and "dayTime" = "dayTime" = time since midnight in microseconds)
     //**These set these values
     class procedure setMonths(var duration: TXQValueDateTimeData; m: integer; isDuration: boolean); static;
-    class function getMonths(const duration: TXQValueDateTimeData): integer; static;
     class procedure setDayTime(var duration: TXQValueDateTimeData; dt: int64); static;
-    class function getDayTime(const duration: TXQValueDateTimeData): int64; static; //microseconds since midnight
-    function toDayTime(): int64; inline;
-    function toMonths(): integer; inline;
 
     procedure truncateRange();
 
@@ -3048,6 +3049,17 @@ begin
   result := (dayStamp * int64(SecsPerDay) + timeStamp) * MicroSecsPerSec + microsecs;
 end;
 
+function TXQValueDateTimeData.toMonths: integer;
+begin
+  result := 12 * year + month;
+end;
+
+function TXQValueDateTimeData.toDayTime: int64;
+begin
+  result := microsecs + MicroSecsPerSec * (seconds + 60 * (min + 60 * (hour + 24 * int64(day))));
+end;
+
+
 
 
 { TXQFunctionParameter }
@@ -3921,6 +3933,9 @@ var ak, bk: TXQValueKind;
   end;
 
   function compareCommonEqualKind(): integer;
+  var
+    adate: PXQValueDateTimeData;
+    bdate: PXQValueDateTimeData;
   begin
 
     case ak of
@@ -3934,10 +3949,12 @@ var ak, bk: TXQValueKind;
       pvkFloat: result := compareCommonFloat();
       pvkDateTime: begin
         if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
+        adate := @TXQValueDateTime(a).value;
+        bdate := @TXQValueDateTime(b).value;
         if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
-          result := compareValue(TXQValueDateTime(a).toMonths(), TXQValueDateTime(b).toMonths());
+          result := compareValue(adate^.toMonths(), bdate^.toMonths());
           if result <> 0 then exit;
-          result := compareValue(TXQValueDateTime(a).toDayTime(), TXQValueDateTime(b).toDayTime());
+          result := compareValue(adate^.toDayTime(), bdate^.toDayTime());
         end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
           result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),ImplicitTimezoneInMinutes);
       end;

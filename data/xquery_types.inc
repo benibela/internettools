@@ -221,6 +221,11 @@ begin
   raise EXQEvaluationException.create('pxp:JSON', 'Attempted to read property of non-object');
 end;
 
+function TXQValue.getInternalDateTimeData: PXQValueDateTimeData;
+begin
+  raiseXPTY0004TypeError(self, 'internal datetime');
+end;
+
 function TXQValue.GetEnumerator: TXQValueEnumerator;
 begin
   result.FCurrent := self;
@@ -983,8 +988,8 @@ begin
     if (typeAnnotation as TXSDateTimeType).isDuration then begin
       for i:=1 to 7 do  if (value.values[i] <> high(integer)) and (value.values[i] < 0) then begin fac:= -1; break; end;
       v := value;
-      setDayTime(v, getDayTime(v));
-      setMonths(v, getMonths(v), true);
+      setDayTime(v, v.toDayTime);
+      setMonths(v, v.toMonths, true);
     end else v := value;
     result := bbutils.dateTimeFormatNEW((typeAnnotation as TXSDateTimeType).fixedDateTimePattern, fac * v.year, fac * v.month, fac * v.day, fac * v.hour, fac * v.min, fac * v.seconds, fac * v.microsecs * 1000, v.timezone);
     if (fac < 0) and (result <> 'P') then result := '-' + result;
@@ -1007,6 +1012,11 @@ begin
  if value.microsecs <> high(integer) then tempsecs += value.microsecs / MicroSecsPerSec;
  if value.timezone <> high(integer) then tempsecs -= value.timezone * 60 ;
  result += tempsecs / SecsPerDay;
+end;
+
+function TXQValueDateTime.getInternalDateTimeData: PXQValueDateTimeData;
+begin
+  result := @value;
 end;
 
 procedure TXQValueDateTime.setDateTime(const dateTime: TDateTime);
@@ -1141,8 +1151,8 @@ procedure TXQValueDateTime.multiplyComponents(fac: xqfloat);
 begin
   if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + debugAsStringWithTypeAnnotation())
   else if IsInfinite(fac) then raise EXQEvaluationException.create('FODT0002', 'Cannot multiply INF * ' + debugAsStringWithTypeAnnotation());
-       setMonths(value, integer(xqround(getMonths(value) * fac)), true);
-  setDayTime(value, xqround(getDayTime(value) * fac));
+       setMonths(value, integer(xqround(value.toMonths * fac)), true);
+  setDayTime(value, xqround(value.toDayTime * fac));
   truncateRange();
 end;
 
@@ -1150,8 +1160,8 @@ procedure TXQValueDateTime.divideComponents(fac: xqfloat);
 begin
   if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + debugAsStringWithTypeAnnotation())
   else if fac = 0 then raise EXQEvaluationException.create('FODT0002', 'Cannot divide duration by zero: ' + debugAsStringWithTypeAnnotation());
-  setMonths(value, integer(xqround(getMonths(value) / fac)), true);
-  setDayTime(value, xqround(getDayTime(value) / fac));
+  setMonths(value, integer(xqround(value.toMonths / fac)), true);
+  setDayTime(value, xqround(value.toDayTime / fac));
   truncateRange();
 end;
 
@@ -1159,8 +1169,8 @@ procedure TXQValueDateTime.addDuration(const D: TXQValueDateTimeData);
 var temp: TXQValueDateTimeData;
 begin
   if (typeAnnotation as TXSDateTimeType).isDuration then begin
-    setMonths(value, getMonths(value) + getMonths(D), true);
-    setDayTime(value, getDayTime(value) + getDayTime(D));
+    setMonths(value, value.toMonths + D.toMonths, true);
+    setDayTime(value, value.toDayTime + d.toDayTime);
   end else begin
     addDurationDToDateS(value, D, temp);
     value := temp;
@@ -1172,7 +1182,7 @@ class procedure TXQValueDateTime.addDurationDToDateS(const S, D: TXQValueDateTim
 begin
   E.timezone:=S.timezone;
 
-  E.month:=getMonths(S) + getMonths(d);
+  E.month:=S.toMonths  + d.toMonths;
   if E.month > 12 then setMonths(E, E.month,false) //the last month A.D. is 13 ( = 01.01.0001)
   else begin
     setMonths(E, 25 - E.month, false);             //the first month B.C. is also "13" ( like 01.01|12.-0001)
@@ -1228,11 +1238,6 @@ begin
   end;
 end;
 
-class function TXQValueDateTime.getMonths(const duration: TXQValueDateTimeData): integer;
-begin
-  result := 12 * duration.year + duration.month;
-end;
-
 class procedure TXQValueDateTime.setDayTime(var duration: TXQValueDateTimeData; dt: int64);
 begin
   {duration.microsecs:=round(frac(dt) * MicroSecsPerSec);
@@ -1249,21 +1254,6 @@ begin
   duration.min       := dt  div (60*MicroSecsPerSec);       dt := dt mod (60*MicroSecsPerSec);
   duration.seconds   := dt  div (MicroSecsPerSec);          dt := dt mod (MicroSecsPerSec);
   duration.microsecs := dt;
-end;
-
-class function TXQValueDateTime.getDayTime(const duration: TXQValueDateTimeData): int64;
-begin
-  result := duration.microsecs + MicroSecsPerSec * (duration.seconds + 60 * (duration.min + 60 * (duration.hour + 24 * int64(duration.day))));
-end;
-
-function TXQValueDateTime.toDayTime: int64;
-begin
-  result := getDayTime(value);
-end;
-
-function TXQValueDateTime.toMonths: integer;
-begin
-  result := getMonths(value);
 end;
 
 procedure TXQValueDateTime.truncateRange;

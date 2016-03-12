@@ -565,9 +565,6 @@ begin
 end;
 
 destructor TXQTermDefineVariable.destroy;
-var
-  i: Integer;
-  j: Integer;
 begin
   freeAnnotations(annotations);
   variable.Free;

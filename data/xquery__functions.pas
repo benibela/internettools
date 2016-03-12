@@ -174,10 +174,10 @@ begin
        (not (a.typeAnnotation as TXSDateTimeType).isDuration and not (b.typeAnnotation as TXSDateTimeType).isDuration) then exit(xqvalue());
     if (b.typeAnnotation as TXSDateTimeType).isDuration then begin
       result := a.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration((b as TXQValueDateTime).value);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(b.getInternalDateTimeData^);
     end else begin
       result := b.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration((a as TXQValueDateTime).value);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(a.getInternalDateTimeData^);
     end;
     exit;
   end;
@@ -199,6 +199,8 @@ var
   btemp: IXQValue;
   ai: Int64;
   bi: Int64;
+  adatevalue: PXQValueDateTimeData;
+  bdatevalue: PXQValueDateTimeData;
 begin
   ignore(cxt);
 
@@ -224,12 +226,12 @@ begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
     if not (b.typeAnnotation as TXSDateTimeType).isDuration then begin
       if (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
-      xqtempdt := a as TXQValueDateTime;
-      ai := xqtempdt.value.toMicroSecondStamp();
-      if (xqtempdt.value.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai -= cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
-      xqtempdt := b as TXQValueDateTime;
-      ai -= xqtempdt.value.toMicroSecondStamp();
-      if (xqtempdt.value.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai += cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
+      adatevalue := a.getInternalDateTimeData;
+      ai := adatevalue^.toMicroSecondStamp();
+      if (adatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai -= cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
+      bdatevalue := b.getInternalDateTimeData;
+      ai -= bdatevalue^.toMicroSecondStamp();
+      if (bdatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai += cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
 
       xqtempdt := TXQValueDateTime.create(baseSchema.dayTimeDuration);//, abs(tempdt));
       xqtempdt.value.year:=0;
@@ -241,7 +243,7 @@ begin
       btemp := b.clone; //need to keep reference to the clone
       TXQValueDateTimeBreaker(btemp as TXQValueDateTime).multiplyComponents(-1);
       result := a.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration((btemp as TXQValueDateTime).value);
+      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(btemp.getInternalDateTimeData^);
     end;
     exit;
   end;
@@ -386,14 +388,14 @@ begin
     if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
     if (b is TXQValueDateTime) and (a.typeAnnotation as TXSDateTimeType).isDuration then begin
       if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then begin
-        bd := TXQValueDateTimeBreaker(b as TXQValueDateTime ).toDayTime();
+        bd := b.getInternalDateTimeData^.toDayTime();
         if isZero(bd) then raiseDivisionBy0NotAllowed;
-        exit(baseSchema.decimal.createValue(TXQValueDateTimeBreaker(a as TXQValueDateTime).toDayTime() / bd));
+        exit(baseSchema.decimal.createValue(a.getInternalDateTimeData^.toDayTime() / bd));
       end;
       if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then begin
-        i := TXQValueDateTimeBreaker(b as TXQValueDateTime).toMonths();
+        i := b.getInternalDateTimeData^.toMonths;
         if i = 0 then raiseDivisionBy0NotAllowed;
-        exit(baseSchema.decimal.createValue((TXQValueDateTimeBreaker(a as TXQValueDateTime).toMonths() / i)));
+        exit(baseSchema.decimal.createValue(a.getInternalDateTimeData^.toMonths() / i));
       end;
       exit(xqvalue);
     end;
@@ -2106,7 +2108,8 @@ end;
 
 function xqFunctionDateTime(const args: TXQVArray): IXQValue;
 var
-  dt0, dt1, resdt: TXQValueDateTime;
+  resdt: TXQValueDateTime;
+  dt0, dt1: PXQValueDateTimeData;
 begin
   requiredArgCount(args, 1, 2);
   if length(args) = 1 then
@@ -2116,16 +2119,16 @@ begin
   if not args[0].instanceOf(baseSchema.date) or not args[1].instanceOf(baseSchema.time) then
     raise EXQEvaluationException.Create('XPTY0004', 'Invalid parameters for date time constructor: '+args[0].toString+','+args[1].toString);
   //todo: error when timezones differ
-  dt0 := args[0] as TXQValueDateTime;
-  dt1 := args[1] as TXQValueDateTime;
-  resdt := TXQValueDateTime.create(baseSchema.dateTime, dt0.value);
-  resdt.value.hour := dt1.value.hour;
-  resdt.value.min := dt1.value.min;
-  resdt.value.seconds := dt1.value.seconds;
-  resdt.value.microsecs := dt1.value.microsecs;
-  if dt0.value.timezone = high(integer) then resdt.value.timezone := dt1.value.timezone
-  else if dt1.value.timezone = high(integer) then resdt.value.timezone := dt0.value.timezone
-  else if dt0.value.timezone <> dt1.value.timezone then raise EXQEvaluationException.Create('FORG0008','Different timezones in: ' + args[0].toString + ' <> ' + args[1].toString);
+  dt0 := args[0].getInternalDateTimeData;
+  dt1 := args[1].getInternalDateTimeData;
+  resdt := TXQValueDateTime.create(baseSchema.dateTime, dt0^);
+  resdt.value.hour := dt1^.hour;
+  resdt.value.min := dt1^.min;
+  resdt.value.seconds := dt1^.seconds;
+  resdt.value.microsecs := dt1^.microsecs;
+  if dt0^.timezone = high(integer) then resdt.value.timezone := dt1^.timezone
+  else if dt1^.timezone = high(integer) then resdt.value.timezone := dt0^.timezone
+  else if dt0^.timezone <> dt1^.timezone then raise EXQEvaluationException.Create('FORG0008','Different timezones in: ' + args[0].toString + ' <> ' + args[1].toString);
   result := resdt;
 end;
 
@@ -2135,19 +2138,25 @@ end;
 
 
 function xqFunctionYear_From_Duration(const args: TXQVArray): IXQValue;
+var
+  dt: IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueDateTime then result := xqvalue(TXQValueDateTimeBreaker(args[0] as TXQValueDateTime).toMonths() div 12)
-  else result := xqvalue(TXQValueDateTimeBreaker(baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() div 12);
+  dt := args[0];
+  if dt.kind <> pvkDateTime then dt := baseSchema.duration.createValue(args[0]);
+  result := xqvalue(dt.getInternalDateTimeData^.toMonths() div 12);
 end;
 
 function xqFunctionMonth_From_Duration(const args: TXQVArray): IXQValue;
+var
+  dt: IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
-  if args[0] is TXQValueDateTime then result := xqvalue(TXQValueDateTimeBreaker(args[0] as TXQValueDateTime).toMonths() mod 12)
-  else result := xqvalue(TXQValueDateTimeBreaker(baseSchema.duration.createValue(args[0]) as TXQValueDateTime).toMonths() mod 12);
+  dt := args[0];
+  if dt.kind <> pvkDateTime then dt := baseSchema.duration.createValue(args[0]);
+  result := xqvalue(dt.getInternalDateTimeData^.toMonths() mod 12);
 end;
 
 function getCanonicalValueFromDayTimeDuration(v: integer; args: TXQVArray): IXQValue;
@@ -2159,8 +2168,8 @@ begin
   xqv := args[0];
   if xqv.isUndefined then exit(xqvalue);
   if not (xqv.instanceOf(baseSchema.duration)) then xqv := baseSchema.duration.createValue(xqv);
-  tempValue := (xqv as TXQValueDateTime).value;
-  TXQValueDateTimeBreaker.setDayTime(tempValue, TXQValueDateTimeBreaker(xqv as TXQValueDateTime).toDayTime());
+  tempValue := xqv.getInternalDateTimeData^;
+  TXQValueDateTimeBreaker.setDayTime(tempValue, tempValue.toDayTime());
   if (v <> 6) or (tempValue.microsecs = 0) then result := xqvalue(tempValue.values[v])
   else  result := xqvalue( tempValue.seconds + shifted10(bigdecimal(tempValue.microsecs), -6) );
 end;
@@ -2196,8 +2205,8 @@ begin
   if length(args) = 2 then begin
     if args[1].isUndefined then tz := high(integer)
     else begin
-      if args[1] is TXQValueDateTime then stamp :=  TXQValueDateTimeBreaker(args[1] as TXQValueDateTime).toDayTime()
-      else stamp := TXQValueDateTimeBreaker.getDayTime( TXQValueDateTimeBreaker(baseSchema.duration.createValue(args[1]) as TXQValueDateTime).value );
+      if args[1] is TXQValueDateTime then stamp :=  args[1].getInternalDateTimeData^.toDayTime()
+      else stamp := baseSchema.duration.createValue(args[1]).getInternalDateTimeData^.toDayTime();
       if (stamp mod SCALE <> 0)
          or (stamp < -14*60*SCALE) or (stamp > 14*60*SCALE)
          then raise EXQEvaluationException.create('FODT0003', 'Invalid timezone: ' + args[1].debugAsStringWithTypeAnnotation());
@@ -2205,11 +2214,10 @@ begin
     end;
   end else tz := context.staticContext.ImplicitTimezoneInMinutes;
 
-  result := args[0].clone;
-  if result.isUndefined then exit();
-  if not (result is TXQValueDateTime) then result := baseSchema.dateTime.createValue(result); //can this even happen?
-  resdt := Result as TXQValueDateTime;
-  if tz = (resdt as TXQValueDateTime).value.timezone then exit();
+  if args[0].isUndefined then exit(args[0]);
+  resdt := TXQValueDateTime.create(args[0].typeAnnotation, args[0].getInternalDateTimeData^);
+  result := resdt;
+  if tz = resdt.value.timezone then exit();
   if (tz = high(integer)) or (resdt.value.timezone = high(integer))  then
     resdt.value.timezone := tz
   else if resdt.value.timezone <> tz  then begin
@@ -2223,7 +2231,7 @@ begin
   requiredArgCount(args, 0);
   if context.staticContext.ImplicitTimezoneInMinutes = high(Integer) then exit(xqvalue);
   result := TXQValueDateTime.create(baseSchema.dayTimeDuration);
-  with (result as TXQValueDateTime).value do begin
+  with result.getInternalDateTimeData^ do begin
     min  := context.staticContext.ImplicitTimezoneInMinutes;
     hour := min div 60;    min := min mod 60;
   end;
@@ -2233,7 +2241,7 @@ function xqFunctionCurrent_Datetime(const context: TXQEvaluationContext; const a
 begin
   requiredArgCount(args, 0);
   result := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //stable during evaluation
-  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezoneInMinutes;
+  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then result.getInternalDateTimeData^.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
 function xqFunctionCurrent_Date(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2243,7 +2251,7 @@ begin
   requiredArgCount(args, 0);
   temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //force auto free
   result := baseSchema.Date.createValue(temp);
-  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezoneInMinutes;
+  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then result.getInternalDateTimeData^.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
 function xqFunctionCurrent_Time(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2253,7 +2261,7 @@ begin
   requiredArgCount(args, 0);
   temp := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //force auto free
   result := baseSchema.Time.createValue(temp);
-  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then (result as TXQValueDateTime).value.timezone := context.staticContext.ImplicitTimezoneInMinutes;
+  if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then result.getInternalDateTimeData^.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
 function xqFunctionTrace(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -2905,6 +2913,7 @@ var
  baseKind: TXQValueKind;
  absMax: Int64;
  baseType: TXSNumericType;
+ resdt: TXQValueDateTime;
 begin
   requiredArgCount(args,1,2);
 
@@ -2933,12 +2942,11 @@ begin
   baseKind := seq.getPromotedType;
   case baseKind of
     pvkDateTime: begin
-      result := TXQValueDateTime.create(seq.getPromotedDateTimeType(true));
+      resdt := TXQValueDateTime.create(seq.getPromotedDateTimeType(true));
+      result := resdt;
       for i:=0 to seq.Count-1 do begin
-        with (seq.items[i] as TXQValueDateTime) do begin
-          if typeAnnotation = baseSchema.duration then raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
-          TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(value);
-        end;
+        if seq.items[i].typeAnnotation = baseSchema.duration then raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
+        TXQValueDateTimeBreaker(resdt).addDuration(seq.items[i].getInternalDateTimeData^);
       end;
     end;
     pvkInt64, pvkBigDecimal: begin
@@ -4735,7 +4743,7 @@ begin
     with pictured[i] do
       writeln(component,': ',format, ' ',minwidth,'-',maxwidth);}
 
-  dateTime := @((args[0] as TXQValueDateTime).value);
+  dateTime := args[0].getInternalDateTimeData;
 
   try
     formatted := '';

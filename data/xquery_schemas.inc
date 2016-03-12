@@ -307,24 +307,6 @@ begin
   if v.typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.node]) then
     exit(tryCreateValue(v.toString, outv));
   result := tryCreateValueInternal(v, outv);
-  {class function TXQValue_Binary.createFromValue(const v: IXQValue): IXQValue;
-begin
-  if (v.getClassType <> self.ClassType) and (v is TXQValue_Binary) then
-    result := TXQValueStringClass(self.ClassType).Create(fromRawBinary((v as TXQValue_Binary).toRawBinary))
-   else
-    result := TXQValueStringClass(self.ClassType).Create(v.toString);
-end;
-}
- {if v is TXQValueDateTime then begin
-   result := TXQValueDateTimeClass(self.ClassType).create((v as TXQValueDateTime).value);
- end else begin
-   result := TXQValueDateTimeClass(self.ClassType).create(v.toString);
- end;}
-
-{
-
-
- }
 end;
 
 
@@ -332,7 +314,7 @@ function TXSType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSC
 begin
   if base = nil then exit(xsceXPTY0004);
   result := base.tryCreateValueInternal(v, outv);
-  if (result = xsceNoError) and (outv <> nil) then (outv^ as TXQValue).ftypeAnnotation := self;
+  if (result = xsceNoError) and (outv <> nil) then (outv^).ftypeAnnotation := self;
 end;
 
 function TXSType.tryCreateValue(v: string; outv: PXQValue): TXSCastingError;
@@ -349,7 +331,7 @@ function TXSType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCas
 begin
   if base = nil then exit(xsceXPTY0004);
   result := base.tryCreateValueInternal(v, outv);
-  if (result = xsceNoError) and (outv <> nil) then (outv^ as TXQValue).ftypeAnnotation := self;
+  if (result = xsceNoError) and (outv <> nil) then (outv^).ftypeAnnotation := self;
 end;
 
 function TXSType.tryCreateValue(const v: Int64; outv: PXQValue): TXSCastingError;
@@ -890,22 +872,14 @@ begin
   end;
   if length(constrainingFacets) > 0 then begin
     assert(v is TXQValueDateTime);
-    if not constraintsSatisfied((v as TXQValueDateTime).value) then exit(xsceFORG0001);
+    if not constraintsSatisfied(v.getInternalDateTimeData^) then exit(xsceFORG0001);
   end;
   result := xsceNoError;
   if (outv <> nil) then
     if v is TXQValueDateTime then //should always be true
-      outv^ := TXQValueDateTime.create(self, truncated((v as TXQValueDateTime).value))
+      outv^ := TXQValueDateTime.create(self, truncated(v.getInternalDateTimeData^))
      else
       result := tryCreateValueInternal(v.toString, outv);
-{  else if v.InheritsFrom(TXQValue_duration) then
-    result := (self is TXQValue_duration) or
-               ((self is TXQValueString) and TXQValueDateTimeClass(v).canCreateFromDateTime(toString))
-  else if v.InheritsFrom(TXQValueDateTime) then
-    result := (self.ClassType = TXQValueDateTime)
-              or ((self.ClassType = TXQValue_date) and not (v.InheritsFrom(TXQValue_time)))
-              or ( (self is TXQValueString) and TXQValueDateTimeClass(v).canCreateFromDateTime(toString))
-}
 end;
 
 function TXSDateTimeType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;

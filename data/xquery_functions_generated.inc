@@ -16,7 +16,7 @@ function xqFunctionSomethingFrom_Datetime(v: IXQValue; field: integer): IXQValue
 begin
   if v.isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(v);
-  result := xqvalue((v as TXQValueDateTime).value.values[field]);
+  result := xqvalue(v.getInternalDateTimeData^.values[field]);
 end;
 
 
@@ -51,15 +51,16 @@ begin
 end;
 
 
+
 function xqFunctionSeconds_From_Datetime(const args: TXQVArray): IXQValue;
 var v: IXQValue;
 begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
-  with (v as TXQValueDateTime) do begin
-    if value.microsecs = 0 then exit(xqvalue(value.seconds));
-    result := xqvalue(value.seconds + shifted10(value.microsecs, -6) );// RoundTo(xqfloat(value.sec + (v as TXQValueDateTime).value.secfraction), -6));
+  with v.getInternalDateTimeData^ do begin
+    if microsecs = 0 then exit(xqvalue(seconds));
+    result := xqvalue(seconds + shifted10(microsecs, -6) );
   end;
 end;
 
@@ -70,12 +71,13 @@ begin
   requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
-  if (v as TXQValueDateTime).value.timezone = high(Integer) then exit(xqvalue);
+  if v.getInternalDateTimeData^.timezone = high(Integer) then exit(xqvalue);
   fillchar(tempCorrectlyInitialized, sizeof(tempCorrectlyInitialized), 0);
-  tempCorrectlyInitialized.min:=(v as TXQValueDateTime).value.timezone;
+  tempCorrectlyInitialized.min:=v.getInternalDateTimeData^.timezone;
   tempCorrectlyInitialized.hour:=tempCorrectlyInitialized.min div 60; tempCorrectlyInitialized.min:=tempCorrectlyInitialized.min mod 60;
   tempCorrectlyInitialized.timezone:=high(Integer);
   result := TXQValueDateTime.create(baseSchema.dayTimeDuration, tempCorrectlyInitialized);
 end;
+
 
 
