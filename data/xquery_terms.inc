@@ -3192,6 +3192,7 @@ var
   kid: TTreeNode;
   lastKid: TTreeNode;
   subcontext: ^TXQEvaluationContext;
+  oldnamespacecount: integer;
   procedure addKid;
   begin
     if (kid.typ = tetText) and (kid.value = '') then begin
@@ -3253,6 +3254,7 @@ var
     attrib: TTreeAttribute;
     i: Integer;
     temps: TTreeAttribute;
+    namespaceIndex: Integer;
   begin
     kid.parent := tree;
     case kid.typ of
@@ -3261,11 +3263,13 @@ var
           //ensure that there is no conflict between new namespace nodes and default namespace nodes by renaming latter
           //todo: what happens if a later namespace node needs to override the new replacement namespace?
           if not TTreeAttribute(kid).isNamespaceNode then begin
-            if namespaceGetURL(needNamespaceList.namespaces[kid.namespace.getPrefix]) <> kid.namespace.getURL then
-              if tree.getAttributeTry('xmlns:' + kid.namespace.getPrefix, temps) then
-                kid.namespace := TNamespace.create(kid.namespace.getURL, chooseRandomPrefix());
-              tree.addAttribute(kid.namespace.getPrefix, kid.namespace.getURL, XMLNamespace_XMLNS as TNamespace);
-              needNamespaceList.add(kid.namespace);
+            namespaceIndex := needNamespaceList.lastIndexOfNamespacePrefix(kid.namespace.getPrefix);
+            if (namespaceIndex < 0) or not equalNamespaces(subcontext^.namespaces.items[namespaceIndex], kid.namespace) then begin
+              //if the namespace prefix is not already correctly bound, we need to add it. But if we have already a namespace for that prefix, we need use another prefix
+              //Also this does not actually create namespace nodes. Real namespace nodes might be inherited by the children, but these implicit namespaces nodes must not.
+              if namespaceIndex >= oldnamespacecount then kid.namespace := TNamespace.create(kid.namespace.getURL, chooseRandomPrefix());
+              subcontext^.namespaces.add(kid.namespace)
+            end;
           end else begin
             if (tree.namespace <> nil) and (tree.namespace.getPrefix = kid.value) and (tree.namespace.getURL <> TTreeAttribute(kid).realvalue) then begin
              tree.namespace := TNamespace.create(tree.namespace.getURL, chooseRandomPrefix());
@@ -3480,7 +3484,7 @@ var
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
   end;
 
-var i, oldnamespacecount: integer;
+var i: integer;
   nameValueEvaluated: IXQValue;
 begin
   if not (typ in [tetOpen,tetAttribute, tetDocument]) then nameValueEvaluated := nameValue.evaluate(context);
@@ -3559,9 +3563,9 @@ begin
           if children[i] is TXQTermConstructor then begin
             //if TXQTermConstructor(children[i]).isNamespaceConstructor then continue;
             kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
-            if (kid.typ = tetAttribute) then begin
+            {if (kid.typ = tetAttribute) then begin
               if (kid.namespace <> nil) then needNamespaceList.addIfNewPrefixUrl(kid.namespace);
-            end;
+            end;}
             addNodeAsKid;
           end else
             addValue(children[i].evaluate(subcontext^));
