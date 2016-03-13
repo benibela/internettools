@@ -1449,15 +1449,19 @@ var
   temp: TXQTermPendingEQNameTokenPending;
 begin
   token := name;
-  if (token = 'element') then result := TXQTermConstructorComputed.create(tetOpen)
-  else if (token = 'document') then result := TXQTermConstructorComputed.create(tetDocument)
-  else if (token = 'attribute') then result := TXQTermConstructorComputed.create(tetAttribute)
-  else if (token = 'text') then result := TXQTermConstructorComputed.create(tetText)
-  else if (token = 'processing-instruction') then result := TXQTermConstructorComputed.create(tetProcessingInstruction)
-  else if (token = 'comment') then result := TXQTermConstructorComputed.create(tetComment)
-  else raiseParsingError('XPST0003', 'Unknown constructor name');
+  result := nil;
+  case token of
+    'element': result := TXQTermConstructorComputed.create(tetOpen);
+    'document': result := TXQTermConstructorComputed.create(tetDocument);
+    'attribute': result := TXQTermConstructorComputed.create(tetAttribute);
+    'text': result := TXQTermConstructorComputed.create(tetText);
+    'processing-instruction': result := TXQTermConstructorComputed.create(tetProcessingInstruction);
+    'comment': result := TXQTermConstructorComputed.create(tetComment);
+    'namespace': if isModel3 then result := TXQTermConstructorComputed.create(tetNamespace);
+  end;
+  if result = nil then raiseSyntaxError('Unknown constructor name');
   try
-    expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute]) ;
+    expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute, tetNamespace]) ;
     if expectName then begin
       skipWhitespaceAndComment();
       if pos^ = '{' then begin
@@ -1466,9 +1470,9 @@ begin
         expect('}');
       end else begin
         namespaceMode := nextTokenEQName(namespaceUrl, namespacePrefix, token);
-        if result.typ = tetProcessingInstruction then begin
+        if result.typ in [tetProcessingInstruction, tetNamespace] then begin
           if (namespaceMode <> xqnmPrefix) or (namespacePrefix <> '') then
-            raiseSyntaxError('Cannot use namespace for processing instructions');
+            raiseSyntaxError('Cannot use namespace for processing instructions/namespace');
           result.nameValue := TXQTermConstant.create(token);
         end else begin
           if result.typ = tetopen then temp := xqptElement
@@ -1480,7 +1484,7 @@ begin
     expect('{');
     skipWhitespaceAndComment();
     if pos^ <> '}' then begin
-      if result.typ in [tetDocument, tetOpen, tetProcessingInstruction, tetAttribute] then begin
+      if result.typ in [tetDocument, tetOpen, tetProcessingInstruction, tetAttribute, tetNamespace] then begin
         tempSeq := parsePrimaryLevel;
         if tempSeq is TXQTermSequence then begin
           onlyConstructors := true;
@@ -2204,7 +2208,7 @@ begin
 
     if (namespaceMode = xqnmPrefix) and (namespacePrefix = '') then
       case word of
-        'element', 'attribute', 'document', 'text', 'processing-instruction', 'comment': begin
+        'element', 'attribute', 'document', 'text', 'processing-instruction', 'comment', 'namespace': begin
           skipWhitespaceAndComment();
           constr := nextToken(true) = '{';
           if (not constr) and (pos^ <> #0) and not (pos^ in SYMBOLS) then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)

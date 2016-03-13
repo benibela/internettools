@@ -3240,16 +3240,40 @@ var
     subcontext^.namespaces.Add(result);
   end;
 
+  function chooseRandomPrefix(): string;
+  begin
+    result := 'XXX'; //just like Zorba
+    while subcontext^.findNamespace(result, xqdnkAny) <> nil do result += 'X';
+  end;
+
   procedure addNodeAsKid;
   var
     doc: TTreeNode;
     n: TTreeNode;
     attrib: TTreeAttribute;
     i: Integer;
+    temps: TTreeAttribute;
   begin
     kid.parent := tree;
     case kid.typ of
       tetAttribute: begin
+        if (kid.namespace <> nil) and (kid.namespace.getPrefix <> '') then begin
+          //ensure that there is no conflict between new namespace nodes and default namespace nodes by renaming latter
+          //todo: what happens if a later namespace node needs to override the new replacement namespace?
+          if not TTreeAttribute(kid).isNamespaceNode then begin
+            if namespaceGetURL(needNamespaceList.namespaces[kid.namespace.getPrefix]) <> kid.namespace.getURL then
+              if tree.getAttributeTry('xmlns:' + kid.namespace.getPrefix, temps) then
+                kid.namespace := TNamespace.create(kid.namespace.getURL, chooseRandomPrefix());
+              tree.addAttribute(kid.namespace.getPrefix, kid.namespace.getURL, XMLNamespace_XMLNS as TNamespace);
+              needNamespaceList.add(kid.namespace);
+          end else begin
+            if (tree.namespace <> nil) and (tree.namespace.getPrefix = kid.value) and (tree.namespace.getURL <> TTreeAttribute(kid).realvalue) then begin
+             tree.namespace := TNamespace.create(tree.namespace.getURL, chooseRandomPrefix());
+              tree.addAttribute(tree.namespace.getPrefix, tree.namespace.getURL, XMLNamespace_XMLNS as TNamespace);
+              needNamespaceList.add(tree.namespace);
+            end;
+          end;
+        end;
         if tree.attributes = nil then tree.attributes := TAttributeList.Create;
         tree.attributes.add(kid);
         //kid.offset:=baseOffset;
@@ -3257,12 +3281,22 @@ var
         kid.document:=tree.document;
         //baseOffset+=1;
 
+        //errors need to be thrown after attribute has been added or we get memory leaks
         if tree.typ = tetDocument then raiseTypeError0004('Document node must not contain attributes');
-        if tree.getFirstChild() <> nil then //errors need to be thrown after attribute has been or we get memory leaks
+        if tree.getFirstChild() <> nil then
           raiseEvaluationError('XQTY0024', 'Attribute node after element node');
         for i := 0 to tree.attributes.Count - 2 do
-          with tree.attributes.Items[i] do if (value = kid.value) and equalNamespaces(namespace, kid.namespace) then
-            raiseEvaluationError('XQDY0025', 'Duplicate attribute: '+kid.value);
+          with tree.attributes.Items[i] do if (value = kid.value) and equalNamespaces(namespace, kid.namespace) then begin
+            if not equalNamespaces(namespace, XMLNamespace_XMLNS) then
+             raiseEvaluationError('XQDY0025', 'Duplicate attribute: '+kid.value)
+            else if (kid as TTreeAttribute).realvalue <> tree.attributes.Items[i].realvalue then
+             raiseEvaluationError('XQDY0102', 'Mismatched namespace: '+kid.value);
+          end;
+        if (kid as TTreeAttribute).isNamespaceNode then begin
+          if (kid.value = '') and ((tree.namespace = nil) or (tree.namespace.getPrefix = '')) and (TTreeAttribute(kid).realvalue <> namespaceGetURL(tree.namespace)) then
+            raiseEvaluationError('XQDY0102', 'Namespace override');
+          needNamespaceList.addIfNewPrefixUrl(TNamespace.create(TTreeAttribute(kid).realvalue, kid.value));
+        end;
       end;
       tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
@@ -3309,40 +3343,42 @@ var
             end;
           end;
         end;
-        if kid.typ in [tetOpen, tetDocument] then begin
-          if not context.staticContext.copyNamespacePreserve then begin
-            //remove old namespaces that are not used
-            temp := kid;
-            while (temp <> nil) and (temp <> kid.reverse) do begin
-              if temp.attributes <> nil then
-                for i := temp.attributes.Count - 1 downto 0 do
-                  if (temp.attributes.Items[i].isNamespaceNode) and not (temp.isNamespaceUsed(temp.attributes.Items[i].toNamespace)) then
-                    temp.attributes.Delete(i);
-              temp := temp.next;
-            end;
-          end;
-          if v.toNode.parent <> nil then begin
-            //copy namespaces of old parent
-            tempNamespaces := TNamespaceList.Create;
-            v.toNode.parent.getAllNamespaces(tempNamespaces);
-            for i:=0 to tempNamespaces.Count - 1 do
-              if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then
-                kid.addNamespaceDeclaration(tempNamespaces.items[i], false);
-            {if not tempNamespaces.hasNamespacePrefix('') then begin
-              v.toNode.getOwnNamespaces(tempNamespaces);
-              if not tempNamespaces.hasNamespacePrefix('') then
-                kid.addNamespaceDeclaration(TNamespace.create('', ''), false);
-            end;}
-            tempNamespaces.free;
-          end;
-          if (not context.staticContext.copyNamespaceInherit) and (subcontext^.namespaces <> nil) then begin
-            //remove namespaces of new parent
-            for i := 0 to subcontext^.namespaces.Count - 1 do
-              if not kid.isNamespaceUsed(subcontext^.namespaces.items[i]) then begin
-                if kid.attributes = nil then kid.attributes := TAttributeList.Create;
-                if subcontext^.namespaces.items[i].getPrefix = '' then kid.attributes.add('xmlns', '')
-                else kid.attributes.add(subcontext^.namespaces.items[i].getPrefix, '', XMLNamespace_XMLNS);
+        case kid.typ of
+          tetOpen, tetDocument: begin
+            if not context.staticContext.copyNamespacePreserve then begin
+              //remove old namespaces that are not used
+              temp := kid;
+              while (temp <> nil) and (temp <> kid.reverse) do begin
+                if temp.attributes <> nil then
+                  for i := temp.attributes.Count - 1 downto 0 do
+                    if (temp.attributes.Items[i].isNamespaceNode) and not (temp.isNamespaceUsed(temp.attributes.Items[i].toNamespace)) then
+                      temp.attributes.Delete(i);
+                temp := temp.next;
               end;
+            end;
+            if v.toNode.parent <> nil then begin
+              //copy namespaces of old parent
+              tempNamespaces := TNamespaceList.Create;
+              v.toNode.parent.getAllNamespaces(tempNamespaces);
+              for i:=0 to tempNamespaces.Count - 1 do
+                if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then
+                  kid.addNamespaceDeclaration(tempNamespaces.items[i], false);
+              {if not tempNamespaces.hasNamespacePrefix('') then begin
+                v.toNode.getOwnNamespaces(tempNamespaces);
+                if not tempNamespaces.hasNamespacePrefix('') then
+                  kid.addNamespaceDeclaration(TNamespace.create('', ''), false);
+              end;}
+              tempNamespaces.free;
+            end;
+            if (not context.staticContext.copyNamespaceInherit) and (subcontext^.namespaces <> nil) then begin
+              //remove namespaces of new parent
+              for i := 0 to subcontext^.namespaces.Count - 1 do
+                if not kid.isNamespaceUsed(subcontext^.namespaces.items[i]) then begin
+                  if kid.attributes = nil then kid.attributes := TAttributeList.Create;
+                  if subcontext^.namespaces.items[i].getPrefix = '' then kid.attributes.add('xmlns', '')
+                  else kid.attributes.add(subcontext^.namespaces.items[i].getPrefix, '', XMLNamespace_XMLNS);
+                end;
+            end;
           end;
         end;
         addNodeAsKid;
@@ -3389,11 +3425,6 @@ var
 
 
   procedure setTreeNodeNameFromTerm(t: TXQTerm; defkind: TXQDefaultNamespaceKind);
-    function chooseRandomPrefix(): string;
-    begin
-      result := 'XXX'; //just like Zorba
-      while subcontext^.findNamespace(result, xqdnkAny) <> nil do result += 'X';
-    end;
 
     procedure setTreeNodeNameFromQName(const url, aprefix, local: string; defkind: TXQDefaultNamespaceKind);
     var
@@ -3462,7 +3493,7 @@ begin
   if (typ = tetDocument) then begin
     tree := TTreeDocument.create(nil);
     TTreeDocument(tree).baseURI := context.staticContext.baseURI;
-  end else if typ = tetAttribute then tree := TTreeAttribute.create('','')
+  end else if typ in  [tetAttribute, tetNamespace] then tree := TTreeAttribute.create('','')
   else tree := TTreeNode.create(typ);
   if root = nil then root := tree;
   tree.document := root;
@@ -3475,12 +3506,25 @@ begin
     tree.offset:=baseOffset;
     baseOffset+=1;
     case typ of
-      tetAttribute: begin
-        setTreeNodeNameFromTerm(nameValue, xqdnkUnknown);
+      tetAttribute, tetNamespace: begin
+        if typ = tetAttribute then setTreeNodeNameFromTerm(nameValue, xqdnkUnknown)
+        else if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node)
+                or nameValueEvaluated.isUndefined then begin
+           tree.value := nameValueEvaluated.toString;
+           if (tree.value <> '') and not baseSchema.isValidNCName(tree.value) then raise EXQEvaluationException.create('XQDY0074', 'Invalid namespace prefix');
+           tree.namespace := XMLNamespace_XMLNS;
+        end else raiseTypeError0004('Invalid namespace prefix', nameValueEvaluated);
         for i:= 0 to high(children) do
           TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(subcontext^));
-        if (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) then
+        if (typ = tetNamespace) or ( (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) ) then begin
           TTreeAttribute(tree).realvalue := strTrimAndNormalize(TTreeAttribute(tree).realvalue);
+          if typ = tetNamespace then
+            if ((tree.value = 'xml') <> (TTreeAttribute(tree).realvalue = XMLNamespaceUrl_XML)) or
+               (tree.value = 'xmlns') or
+               (TTreeAttribute(tree).realvalue = XMLNamespaceUrl_XMLNS) or
+               (TTreeAttribute(tree).realvalue = '') then
+                 raise EXQEvaluationException.create('XQDY0101', 'Invalid namespace binding');
+        end;
       end;
       tetOpen, tetDocument: begin
         if implicitNamespaces <> nil then begin
@@ -3492,12 +3536,12 @@ begin
         end;
 
         lastKid := nil;
-        for i:=0 to high(children) do
+        {for i:=0 to high(children) do           <-         that became deprecated, when namespace constructors where replaced by implicitNamespaces;
           if (children[i] is TXQTermConstructor) and (TXQTermConstructor(children[i]).isNamespaceConstructor) then begin
             if tree.typ = tetDocument then raiseTypeError0004('Document node must not contain namespaces');
             kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
             addNodeAsKid;
-          end;
+          end;}
 
         if nameValue <> nil then begin
           setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
@@ -3511,9 +3555,9 @@ begin
             tree.addNamespaceDeclaration(context.namespaces.items[i], false);
 
 
-        for i:=0 to high(children) do
+        for i:=0 to high(children) do begin
           if children[i] is TXQTermConstructor then begin
-            if TXQTermConstructor(children[i]).isNamespaceConstructor then continue;
+            //if TXQTermConstructor(children[i]).isNamespaceConstructor then continue;
             kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
             if (kid.typ = tetAttribute) then begin
               if (kid.namespace <> nil) then needNamespaceList.addIfNewPrefixUrl(kid.namespace);
@@ -3521,6 +3565,7 @@ begin
             addNodeAsKid;
           end else
             addValue(children[i].evaluate(subcontext^));
+        end;
 
         kid := TTreeNode.create(tetClose, tree.value);
         kid.namespace := tree.namespace;
@@ -3569,9 +3614,10 @@ end;
 
 function TXQTermConstructor.isNamespaceConstructor: boolean;
 begin
-  result := (typ = tetAttribute)
+  result := ((typ = tetAttribute)
             and (nameValue is TXQTermConstant)
-            and ((TXQTermConstant(nameValue).value.toString = 'xmlns') or strBeginsWith(TXQTermConstant(nameValue).value.toString, 'xmlns:'));
+            and ((TXQTermConstant(nameValue).value.toString = 'xmlns') or strBeginsWith(TXQTermConstant(nameValue).value.toString, 'xmlns:')))
+            or (typ = tetNamespace);
 end;
 
 function TXQTermConstructor.clone: TXQTerm;

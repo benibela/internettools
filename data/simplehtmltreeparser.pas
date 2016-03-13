@@ -19,7 +19,8 @@ type
 
 //**The type of a tree element. <Open>, text, or </close>
 TTreeNodeType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument,
-                 tetInternalDoNotUseCDATAText); //tetInternalDoNotUseCDATAText is only used temporarily during parsing to mark elements in which entities should not be replaced.
+                 tetInternalDoNotUseCDATAText, //tetInternalDoNotUseCDATAText is only used temporarily during parsing to mark elements in which entities should not be replaced.
+                 tetNamespace); //not used here, only for XQuery
 TTreeNodeTypes = set of TTreeNodeType;
 //**Controls the search for a tree element.@br
 //**ignore type: do not check for a matching type, ignore text: do not check for a matching text,
