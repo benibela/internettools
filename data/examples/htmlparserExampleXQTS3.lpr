@@ -91,6 +91,7 @@ TTestCase = class
   environments, modules, dependencies, tests, results: TList;
   name, coversName: string;
   expected: string;
+  function expectedPrettier: string;
   constructor create(e: TTreeNode);
   function run: TTestCaseResultValue;
   procedure importModule(sender: TObject; const namespace: string; const at: array of string);
@@ -379,11 +380,11 @@ begin
   case resultValue.result of
     tcrPass: bufferTestSet.add('<tr class="passed" >'+n+'<td colspan="4">passed</td>');
     tcrFail: begin
-      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expected)+'</td>');
+      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
       if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
     end;
     tcrWrongError: begin
-      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expected)+'</td>');
+      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
       if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
     end;
     tcrNA: bufferTestSet.add('<tr class="correctNA" >'+n+'<td colspan="4">n/a</td>');
@@ -571,12 +572,12 @@ begin
     tcrPass: writeln('passed'); //todo
     tcrFail: begin
       writeln('FAILED');
-      writeln('      got: '+got+ ' expected: '+tc.expected);
+      writeln('      got: '+got+ ' expected: '+tc.expectedPrettier);
       if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
     end;
     tcrWrongError: begin
       writeln('wrong error');
-      writeln('      got: '+got+ ' expected: '+tc.expected);
+      writeln('      got: '+got+ ' expected: '+tc.expectedPrettier);
       if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
     end;
     tcrNA: writeln('na');
@@ -926,6 +927,12 @@ begin
 end;
 
 { TTestCase }
+
+function TTestCase.expectedPrettier: string;
+begin
+  result := expected;
+  if strContains(result, '&lt;') then result := strDecodeHTMLEntities(result,eUTF8) + ' <!--unescaped--> ';
+end;
 
 constructor TTestCase.create(e: TTreeNode);
 var v: IXQValue;
