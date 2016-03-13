@@ -4907,6 +4907,7 @@ begin
   else if select = 'processing-instruction' then exit([qmProcessingInstruction])
   else if select = 'document-node' then exit([qmDocument])
   else if select = 'attribute' then exit([qmAttribute])
+  else if select = 'namespace-node' then exit([qmAttribute])
   else raise EXQParsingException.Create('XPST0003', 'Unknown element test: '+select);
 end;
 
@@ -4915,6 +4916,10 @@ function convertElementTestToPathMatchingStep(const select: string; const childr
 begin
   result.typ:=qcDirectChild;
   result.matching:=convertElementTestToMatchingOptions(select);
+  if (result.matching = [qmAttribute]) and (select = 'namespace-node') then begin
+    result.matching := [qmAttribute, qmCheckNamespaceURL];
+    result.namespaceURLOrPrefix := XMLNamespaceUrl_XMLNS;
+  end;
   Result.requiredType := nil;
   if (length(children) = 0) then exit;
 
