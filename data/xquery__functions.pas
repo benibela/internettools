@@ -3211,10 +3211,14 @@ var
   node: TTreeNode;
 begin
   node := simpleNode(context, args);
-  if (node <> nil) and (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) then
-    result := TXQValueQName.create(node.namespace, node.value)
-   else
-    result := xqvalue();
+  if (node <> nil) and (node.typ in [tetOpen,tetProcessingInstruction,tetAttribute]) then begin
+    if (node.typ = tetAttribute) and (node as TTreeAttribute).isNamespaceNode then begin
+      if node.value <> '' then
+        exit(TXQValueQName.create('', '', node.value));
+    end else
+      exit(TXQValueQName.create(node.namespace, node.value));
+  end;
+  result := xqvalue();
 end;
 
 
@@ -3224,6 +3228,7 @@ var
 begin
   node := simpleNode(context, args);
   if node = nil then exit('');
+  if (node.typ = tetAttribute) and (node as TTreeAttribute).isNamespaceNode then exit(node.value);
   result := node.getNodeName();
 end;
 
@@ -3249,8 +3254,13 @@ var
   node: TTreeNode;
 begin
   node := simpleNode(context, args);
-  if (node = nil) or not (node.typ in [tetOpen, tetAttribute]) then result := baseSchema.anyURI.createValue('')
-  else result := baseSchema.anyURI.createValue(node.getNamespaceURL());
+  if node <> nil then
+    case node.typ of
+      tetOpen: exit(baseSchema.anyURI.createValue(node.getNamespaceURL()));
+      tetAttribute: if not (node as TTreeAttribute).isNamespaceNode then
+        exit(baseSchema.anyURI.createValue(node.getNamespaceURL()));
+    end;
+  result := baseSchema.anyURI.createValue('')
 end;
 
 function xqFunctionPosition(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;

@@ -1604,7 +1604,8 @@ class function TXQValueNode.nodeTypeAnnotation(tn: TTreeNode): TXSType;
 begin
   case tn.typ of
     tetOpen, tetDocument: result := baseSchema.untyped; //todo: handle i:type="xs:integer" attribute
-    tetText, tetAttribute: result := baseSchema.untypedAtomic;
+    tetText: result := baseSchema.untypedAtomic;
+    tetAttribute: if (tn as TTreeAttribute).isNamespaceNode then result := baseSchema.anyURI else result := baseSchema.untypedAtomic;
     tetComment, tetProcessingInstruction: result := baseSchema.string_;
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
   end;
