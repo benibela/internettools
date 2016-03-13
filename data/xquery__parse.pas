@@ -91,6 +91,7 @@ protected
 
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
   function parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
+  function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
   function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
   function parseSequenceTypeUnion(): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
@@ -649,10 +650,13 @@ begin
   result := parseSequenceLike(target, ')', parsingModel in [xqpmXPath3, xqpmXQuery3]);
 end;
 
-function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
+function TXQParsingContext.isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
 begin
-  result := (word = 'text') or (word = 'node') or (word = 'comment') or (word = 'processing-instruction')
-            or (word = 'element') or (word = 'document-node') or (word = 'schema-element') or (word = 'attribute') or (word = 'schema-attribute');
+  case word of
+    'text', 'node', 'comment', 'processing-instruction', 'element', 'document-node', 'schema-element', 'attribute', 'schema-attribute': result := true;
+    'namespace-node': result := isModel3;
+    else result := false;
+  end;
 end;
 
 function TXQParsingContext.parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
@@ -2126,7 +2130,11 @@ begin
           if isKindTestFunction(word) then begin
             result := TXQTermNodeMatcher.Create(word, true);
             TXQTermNodeMatcher(result).namespaceCheck := xqnmNone;
-            if strContains(word, 'attribute') and (axis = '') then axis := 'attribute';
+            if axis = '' then
+              case word of
+                'attribute', 'schema-attribute': axis := 'attribute';
+                'namespace-node': raiseParsingError('XQST0134', 'No namespace axis');
+              end;
             TXQTermNodeMatcher(result).axis:=axis;
             skipWhitespaceAndComment();
             if pos^ <> ')' then begin
