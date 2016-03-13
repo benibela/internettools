@@ -246,6 +246,12 @@ var
   bd: BigDecimal;
   a: xqfloat;
   b: xqfloat;
+  procedure chooseInfinity;
+  begin
+    if isSignedXQFloat(a) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then result := xqv(getNegInf)
+    else result := xqv(getPosInf);
+  end;
+
 begin
   requiredArgCount(args, 2);
   if args[0].isUndefined then exit(xqvalue);
@@ -260,37 +266,23 @@ begin
     if args[1].instanceOf(baseSchema.integer) then begin
       bd := args[1].toDecimal;
       if isZero(bd) then exit(xqv(1));
-      if IsInfinite(a) or not isLongint(bd) then begin
-        if IsInfinite(a) or (bd.signed <> (abs(a) > 1)) then begin
-          if (a < 0) and (odd(bd)) then exit(xqv(-Infinity))
-          else exit(xqv(Infinity));
-        end else exit(xqv(0))
+      if isLongint(bd) then b := BigDecimalToLongint(bd)
+      else begin
+        if odd(bd) then b := 2147483647
+        else b := 2147483646;
+        if bd.signed then b := -b;
       end;
-      result := xqv(intpower(a, BigDecimalToLongint(bd)))
-    end else begin
-      b := args[1].toFloat;
-      result := xqv(double(power(a, b)));
-    end;
+    end else b := args[1].toFloat;
+    result := xqv(double(power(a, b)));
     ClearExceptions(); //otherwise pow(-2.5, 3333) does not raise the exception here, but somewhere later
   except
-    on EOverflow do begin
-      if a > 0 then result := xqv(Infinity)
-      else result := xqv(-Infinity);
-    end;
-    on EDivByZero do begin
-      if IsInfinite(a) then exit(xqv(NaN));
-      if isSignedXQFloat(a) then
-        if (args[1].instanceOf(baseSchema.decimal) and odd(args[1].toDecimal))
-           or ((frac(args[1].toFloat) = 0) and odd(args[1].toFloat)) then exit(xqv(-Infinity));
-      result := xqv(Infinity);
-    end;
+    on EOverflow do chooseInfinity;
+    on EDivByZero do chooseInfinity;
     on EMathError do begin
       if a = -1 then result := xqv(1)
       else if (a < 0) and (frac(b) <> 0) then result := xqv(NaN) //gets imaginary
-      else if IsInfinite(a) or ((b > 0) = (abs(a) > 1))  then begin
-        if isSignedXQFloat(a) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then exit(xqv(-Infinity))
-        else exit(xqv(Infinity));
-      end else result := xqv(0);
+      else if IsInfinite(a) or ((b > 0) = (abs(a) > 1))  then chooseInfinity
+      else result := xqv(0);
     end;
   end;
 end;
