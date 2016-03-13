@@ -3332,7 +3332,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       if (st.atomicTypeInfo = nil)
          or (not (xqstAllowValidationTypes in flags) and baseSchema.isValidationOnlyType(st.atomicTypeInfo)) then begin
            if errCode = '' then
-             if (xqstIsCast in flags) and (staticContext.model in PARSING_MODEL3) then errCode := 'XPST0052'
+             if (xqstIsCast in flags) and (staticContext.model in PARSING_MODEL3) then errCode := 'XQST0052'
              else errCode := 'XPST0051';
            raiseParsingError(errCode, 'Unknown type: Q{'+pending.namespaceurl+'}'+pending.localpart);
          end;
