@@ -4357,6 +4357,7 @@ function formatUnicodeInteger(arabic, primaryFormat: string; family: integer): s
         if (separators[i].pos - separators[i+1].pos <> delta) or (separators[i+1].sep <> separators[i].sep) then delta := -1;
         if separators[i+1].pos - separators[i].pos = 0 then raise EXQEvaluationException.create('FODF1310', 'Adjacent grouping separator in ' + primaryFormat);
       end;
+      if (delta > 0) and (separators[0].pos < optional + mandatory - delta) then delta := -1; //[Bug 29488] [QT3]
     end;
 
     if length(arabic) < mandatory then arabic := strDup('0', mandatory - length(arabic) ) + arabic;
@@ -5161,6 +5162,8 @@ begin
           integerGroupDelta := -1;
           break;
         end;
+      if (integerGroupDelta > 0) and (integerGroups[0] < integerOptional + integerMandatory - integerGroupDelta) then
+        integerGroupDelta := -1; //[Bug 29488] [QT3]
     end;
 
     resstr := '';
