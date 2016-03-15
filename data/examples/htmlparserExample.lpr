@@ -1,22 +1,26 @@
 program htmlparserExample;
 
-uses heaptrc,  simpleinternet;
+uses heaptrc, xquery,  simpleinternet;
 
 var v: IXQValue;
 begin
   writeln('Print the numbers of 1 to 5 and multiply by 10:');
-  for v in process('', '1 to 5') do
+  for v in query('1 to 5') do
     writeln('  ', v.toString, ' * 10 = ', v.toInt64 * 10);
   writeln;
   writeln('Print the numbers of 1 to 5 and multiply by 10 (in XPath):');
-  for v in process('', '(1 to 5) ! x"  {.} * 10 = {. * 10}"') do
+  for v in query('(1 to 5) ! x"  {.} * 10 = {. * 10}"') do
     writeln(v.toString);
 
   writeln;
 
 
-  writeln('Get fpc''s website title: ');
+  writeln('Get fpc''s website title(old interface):');
   writeln('  ', process('http://www.freepascal.org/', '//title').toString);
+  writeln('Get fpc''s website title (new interface 1): ');
+  writeln('  ', xqvalue('http://www.freepascal.org/').retrieve().map('//title').toString);
+  writeln('Get fpc''s website title (new interface 2): ');
+  writeln('  ', query('"http://www.freepascal.org/"').retrieve().map('//title').toString);
 
 
   writeln;
@@ -61,7 +65,7 @@ begin
   WriteLn();
 
   WriteLn('Use XQuery to find all primes below 30:');
-  for v in process('',
+  for v in query(
     'xquery version "1.0";'                                +
     'declare function local:isprime($p){'                  +
     '  every $i in 2 to $p - 1 satisfies ($p mod $i != 0)' +
