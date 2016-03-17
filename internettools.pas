@@ -7,9 +7,9 @@ unit internettools;
 interface
 
 uses
-  bbutils, extendedhtmlparser, simpleinternet, internetaccess, simplehtmlparser, simplehtmltreeparser, simplexmlparser, int65math, xquery, 
+  bbutils, extendedhtmlparser, simpleinternet, internetaccess, simplehtmlparser, simplehtmltreeparser, simplexmlparser, xquery, 
   synapseinternetaccess, w32internetaccess, simplexmltreeparserfpdom, xquery_json, mockinternetaccess, xquery__regex, xquery__parse, 
-  xquery_module_math, LazarusPackageIntf;
+  xquery_module_math, xquery__functions, LazarusPackageIntf;
 
 implementation
 

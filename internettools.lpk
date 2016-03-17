@@ -11,7 +11,7 @@
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="25">
+    <Files Count="24">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -49,69 +49,65 @@
         <Type Value="Include"/>
       </Item9>
       <Item10>
-        <Filename Value="data/int65math.pas"/>
-        <UnitName Value="int65math"/>
-      </Item10>
-      <Item11>
         <Filename Value="data/xquery.pas"/>
         <UnitName Value="xquery"/>
+      </Item10>
+      <Item11>
+        <Filename Value="data/xquery_functions_generated.inc"/>
+        <Type Value="Include"/>
       </Item11>
       <Item12>
-        <Filename Value="data/xquery_functions.inc"/>
+        <Filename Value="data/xquery_functions_generated_template.inc"/>
         <Type Value="Include"/>
       </Item12>
       <Item13>
-        <Filename Value="data/xquery_functions_generated.inc"/>
+        <Filename Value="data/xquery_terms.inc"/>
         <Type Value="Include"/>
       </Item13>
       <Item14>
-        <Filename Value="data/xquery_functions_generated_template.inc"/>
+        <Filename Value="data/xquery_types.inc"/>
         <Type Value="Include"/>
       </Item14>
       <Item15>
-        <Filename Value="data/xquery_terms.inc"/>
-        <Type Value="Include"/>
-      </Item15>
-      <Item16>
-        <Filename Value="data/xquery_types.inc"/>
-        <Type Value="Include"/>
-      </Item16>
-      <Item17>
         <Filename Value="internet/synapseinternetaccess.pas"/>
         <UnitName Value="synapseinternetaccess"/>
-      </Item17>
-      <Item18>
+      </Item15>
+      <Item16>
         <Filename Value="internet/w32internetaccess.pas"/>
         <UnitName Value="w32internetaccess"/>
-      </Item18>
-      <Item19>
+      </Item16>
+      <Item17>
         <Filename Value="data/simplexmltreeparserfpdom.pas"/>
         <UnitName Value="simplexmltreeparserfpdom"/>
-      </Item19>
-      <Item20>
+      </Item17>
+      <Item18>
         <Filename Value="data/xquery_json.pas"/>
         <UnitName Value="xquery_json"/>
-      </Item20>
-      <Item21>
+      </Item18>
+      <Item19>
         <Filename Value="internet/mockinternetaccess.pas"/>
         <UnitName Value="mockinternetaccess"/>
-      </Item21>
-      <Item22>
+      </Item19>
+      <Item20>
         <Filename Value="data/xquery_schemas.inc"/>
         <Type Value="Include"/>
-      </Item22>
-      <Item23>
+      </Item20>
+      <Item21>
         <Filename Value="data/xquery__regex.pas"/>
         <UnitName Value="xquery__regex"/>
-      </Item23>
-      <Item24>
+      </Item21>
+      <Item22>
         <Filename Value="data/xquery__parse.pas"/>
         <UnitName Value="xquery__parse"/>
-      </Item24>
-      <Item25>
+      </Item22>
+      <Item23>
         <Filename Value="data/xquery_module_math.pas"/>
         <UnitName Value="xquery_module_math"/>
-      </Item25>
+      </Item23>
+      <Item24>
+        <Filename Value="data/xquery__functions.pas"/>
+        <UnitName Value="xquery__functions"/>
+      </Item24>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>

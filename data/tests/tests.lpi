@@ -68,16 +68,13 @@
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
-    <RequiredPackages Count="3">
+    <RequiredPackages Count="2">
       <Item1>
         <PackageName Value="utf8tools"/>
       </Item1>
       <Item2>
         <PackageName Value="LCLBase"/>
       </Item2>
-      <Item3>
-        <PackageName Value="internettools"/>
-      </Item3>
     </RequiredPackages>
     <Units Count="12">
       <Unit0>
@@ -142,7 +139,6 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="/home/benito/hg/components/pascal/import/synapse/;/home/benito/hg/components/pascal/internet/;../../import;.;../../../../../components/pascal/import/flre/src"/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
