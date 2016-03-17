@@ -4527,15 +4527,19 @@ begin
       exit;
     end;
   end;
-  if name = '$' then begin result := true; value := xqvalue('$'); end //default $$; as $
-  else if name = 'line-ending' then begin result := true; value := xqvalue(LineEnding); end //default $line-ending; as #13#10
-  else result := false;
-
   if (staticContext.sender <> nil) and staticContext.sender.VariableChangelog.hasVariable(name, @temp, namespaceURL) then begin
     result := true;
     if temp <> nil then //safety check. todo: necessary?
       value := temp;
+    exit;
   end;
+  value := nil; //safety, necessary?
+  case name of
+    '$': value := xqvalue('$'); //default $$; as $
+    'line-ending': value := xqvalue(LineEnding); //default $line-ending; as #13#10
+    'amp': value := xqvalue('&');
+  end;
+  result := value <> nil;
 end;
 
 function TXQEvaluationContext.getVariable(const name: string; const namespaceURL: string): IXQValue;
