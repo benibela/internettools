@@ -4787,11 +4787,7 @@ begin
           if number > 12 then number -= 12
           else if number = 0 then number := 12;
         end;
-        'P': begin
-          if dateTime^.hour >= 12 then component := 'pm'
-          else component := 'am';
-          format := #0;
-        end;
+        'P': if format = '' then format := 'n';
         'm': begin
           number := dateTime^.min;
           if format = '' then format := '01';
@@ -4869,15 +4865,17 @@ begin
                 'en': component := weekDayNamesEnglish[number];
                 'de': component := weekDayNamesGerman[number];
               end;
+              'P': if dateTime^.hour >= 12 then component := 'Pm'
+                   else component := 'Am';
               'C': component := calendar;
               'E': if dateTime^.year >= 0 then begin
                 case sublang of
-                  'en': component := 'CE';
+                  'en': component := 'Ce';
                   'de': component := 'n. d. Z.';
                 end;
               end else
                 case sublang of
-                  'en': component := 'BCE';
+                  'en': component := 'Bce';
                   'de': component := 'v. d. Z.';
                 end;
             end;
