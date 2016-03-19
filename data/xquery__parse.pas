@@ -1412,7 +1412,7 @@ begin
             if ((result.nameValue as TXQTermPendingEQNameToken).namespaceprefix <> token.namespaceprefix) or
                ((result.nameValue as TXQTermPendingEQNameToken).localpart <> token.localpart) then begin
                token.free;
-               raiseParsingError('XQST0118', 'Expected matching closing tag');
+               raiseParsingError('XQST0118', 'Expected matching closing tag to <' + TXQTermPendingEQNameToken(result.nameValue).debugTermToString+'>');
              end else token.free;
             expectWithoutComment('>');
             exit;
