@@ -246,10 +246,12 @@ var
   bd: BigDecimal;
   a: xqfloat;
   b: xqfloat;
-  procedure chooseInfinity;
+  procedure chooseInfinityOr0;
   begin
-    if isSignedXQFloat(a) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then result := xqv(getNegInf)
-    else result := xqv(getPosInf);
+    if ((b > 0) = (IsInfinite(a) or (abs(a) > 1)))  then begin
+      if isSignedXQFloat(a) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then result := xqv(getNegInf)
+      else result := xqv(getPosInf);
+    end else result := xqv(0);
   end;
 
 begin
@@ -276,13 +278,12 @@ begin
     result := xqv(double(power(a, b)));
     ClearExceptions(); //otherwise pow(-2.5, 3333) does not raise the exception here, but somewhere later
   except
-    on EOverflow do chooseInfinity;
-    on EDivByZero do chooseInfinity;
+    on EOverflow do chooseInfinityOr0;
+    on EDivByZero do chooseInfinityOr0;
     on EMathError do begin
       if a = -1 then result := xqv(1)
       else if (a < 0) and (frac(b) <> 0) then result := xqv(NaN) //gets imaginary
-      else if IsInfinite(a) or ((b > 0) = (abs(a) > 1))  then chooseInfinity
-      else result := xqv(0);
+      else chooseInfinityOr0;
     end;
   end;
 end;
