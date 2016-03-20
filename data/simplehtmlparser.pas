@@ -33,7 +33,7 @@ uses
 
 
 type
-  TParsingOptions = set of (poRespectHTMLCDATAElements);
+  TParsingOptions = set of (poRespectHTMLCDATAElements, poRespectProcessingInstructions);
   THTMLProperty=record
     name, value: pchar;
     nameLen, valueLen: longint;
@@ -69,7 +69,10 @@ type
   //**@bold(Notice:) You can pass nil for every callback function and if one of them returns prStop, the parsing is aborted.
   procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
+                    textEvent: TTextEvent;
+                    commentEvent: TCommentEvent = nil;
+                    processingInstruction: TTextEvent = nil
+                    );
 
 
   function existPropertyWithValue(propertyName,propertyValue: string; properties:THTMLProperties):boolean;
@@ -101,12 +104,23 @@ end;
 
 procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
-                    textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
+                    textEvent: TTextEvent; commentEvent: TCommentEvent = nil;
+                    processingInstruction: TTextEvent = nil);
 var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
     valueStart:char;
     tempLen:longint;
     properties:THTMLProperties;
     cdataTag: boolean;
+  procedure handleProcessingInstruction;
+  begin
+    inc(pos);
+    marker := pos;
+    while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+    if Assigned(processingInstruction) then processingInstruction(marker, pos - marker, []);
+    inc(pos, 2);
+    marker := pos;
+  end;
+
 begin
   if html='' then exit;
   pos:=@html[1];
@@ -158,8 +172,10 @@ begin
             inc(pos);
             marker:=pos;
           end;
+          else if (pos^ = '?') and (poRespectProcessingInstructions in options) then handleProcessingInstruction
           else begin //tag start
             marker:=pos;
+
             inc(pos);
             setlength(properties,0);
             while (pos<=htmlEnd) and not (pos^ in (['/','>','?']+WHITE_SPACE)) do
@@ -376,4 +392,4 @@ begin
   result:=findTagPropertyValueWithProperty(html,'a','href',prop,value);
 end;
 end.
-
+

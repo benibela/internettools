@@ -301,7 +301,7 @@ TBasicParsingState = (bpmBeforeHtml, bpmBeforeHead, bpmInHead, bpmAfterHead, bpm
 //**Parsing model used to interpret the document
 //**pmStrict: every tag must be closed explicitely (otherwise an exception is raised)
 //**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised), detect encoding
-TParsingModel = (pmStrict, pmHTML);
+TParsingModel = (pmStrict, pmHTML, pmUnstrictXML);
 //**@abstract This parses a html/sgml/xml file to a tree like structure.
 //**To use it, you have to call @code(parseTree) with a string containing the document. Afterwards you can call @code(getLastTree) to get the document root node.@br
 //**
@@ -309,6 +309,7 @@ TParsingModel = (pmStrict, pmHTML);
 //**If TargetEncoding is not eUnknown, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
 //**You can change the class used for the elements in the tree with the field treeNodeClass.
 TTreeParser = class
+  function processingInstruction(text: pchar; textLen: longint; unusedParameter: TTextFlags): TParsingResult;
 protected
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
@@ -1694,6 +1695,75 @@ end;
 
 { THTMLTreeParser }
 
+function TTreeParser.processingInstruction(text: pchar; textLen: longint; unusedParameter: TTextFlags): TParsingResult;
+  function cutproperty(var remainingtext: string; out value: string): string;
+  var
+    eq: LongInt;
+    closing: LongInt;
+  begin
+    result := '';
+    eq := strIndexOf(remainingtext, '=');
+    if eq <= 0 then exit;
+    result := strTrim(copy(remainingtext, 1, eq - 1));
+    remainingtext := strTrim(strCopyFrom(remainingtext, eq + 1));
+    if (length(remainingtext) = 0) or not (remainingtext[1] in ['''', '"']) then exit('');
+    closing := strIndexOf(remainingtext, remainingtext[1], 2);
+    if closing <= 0 then exit('');
+    value := copy(remainingtext, 2, closing - 1 - 1);
+    remainingtext := strCopyFrom(remainingtext, closing+1);
+  end;
+
+var content: string;
+    target: string;
+    value: String;
+    tempcontent: string;
+    ws: Integer;
+    i: Integer;
+    new: TTreeNode;
+
+
+begin
+  ws := -1;
+  for i := 0 to textLen - 1do
+    if (text + i)^ in WHITE_SPACE then begin
+      ws := i;
+      break;
+    end;
+  if ws < 0 then begin
+    target := strFromPchar(text, textLen);
+    content := '';
+  end else begin
+    target := strFromPchar(text, ws);
+    inc(ws);
+    //while ((text + ws)^ in WHITE_SPACE) and (ws < textLen)  do inc(ws); to trim or to not trim?
+    content := strFromPchar(text + ws, textLen - ws);
+  end;
+
+  if target = 'xml' then begin
+    tempcontent := content;
+    while tempcontent <> '' do begin
+      case cutproperty(tempcontent, value) of
+        'encoding': begin
+          case lowercase(value) of
+            'utf-8': FXmlHeaderEncoding:=eUTF8;
+            'windows-1252', 'iso-8859-1', 'iso-8859-15', 'latin1': FXmlHeaderEncoding:=eWindows1252;
+          end;
+        end;
+        'standalone':
+          if allowTextAtRootLevel and (parsingModel = pmStrict) then
+            raise ETreeParseException.Create('External-preparsed-entity cannot be standalone');
+        '': break;
+      end;
+    end;
+    exit;
+  end;
+  if not FReadProcessingInstructions then exit;
+  new := newTreeNode(tetProcessingInstruction, text, length(target));
+  if content <> '' then new.addAttribute('', strNormalizeLineEndings(content));
+  new.initialized;
+  result := prContinue;
+end;
+
 function TTreeParser.newTreeNode(typ:TTreeNodeType; text: pchar; len: longint): TTreeNode;
 begin
   result := newTreeNode(typ, strFromPchar(text, len), longint(text - @FCurrentFile[1]));
@@ -1854,37 +1924,6 @@ function TTreeParser.enterTag(tagName: pchar; tagNameLen: longint;
 var
   tag: String;
 
-  procedure doReadProcessingInstruction;
-  var
-    enc: String;
-    new: TTreeNode;
-    first, last: PChar;
-  begin
-    if strlEqual(tagName, '?xml', tagNameLen) then begin
-      enc := lowercase(getProperty('encoding', properties));
-      if enc = 'utf-8' then FXmlHeaderEncoding:=eUTF8
-      else if (enc = 'windows-1252') or (enc = 'iso-8859-1') or (enc = 'iso-8859-15') or (enc = 'latin1') then
-        FXmlHeaderEncoding:=eWindows1252;
-      if allowTextAtRootLevel and (parsingModel = pmStrict) and (getProperty('standalone', properties) = 'yes') then
-        raise ETreeParseException.Create('External-preparsed-entity cannot be standalone');
-
-      exit;
-    end;
-    if not FReadProcessingInstructions then exit;
-    new := newTreeNode(tetProcessingInstruction, tagName + 1, tagNameLen - 1);
-    if length(properties)>0 then begin
-      first := properties[0].name;
-      first-=1;
-      while first^ in [' ',#9] do first-=1;
-      first+=2;
-      last := properties[high(properties)].value + properties[high(properties)].valueLen;
-      while ((last+1)^ <> #0) and ((last^ <> '?') or ((last+1)^ <> '>'))  do last+=1;
-
-      new.addAttribute('', strNormalizeLineEndings(strFromPchar(first, last-first)));
-      new.addAttributes(properties);
-    end;
-    new.initialized;
-  end;
 
 
   procedure doRepairMissingEndTags;
@@ -1922,7 +1961,7 @@ begin
   result:=prContinue;
 
   if tagName^ = '?' then begin //processing instruction
-    doReadProcessingInstruction;
+    processingInstruction(tagName+1, properties[high(properties)].value + properties[high(properties)].valueLen - tagName, []);
     exit;
   end;
 
@@ -2049,7 +2088,7 @@ begin
     new.initialized;
   end else if FParsingModel = pmStrict then
     raise ETreeParseException.Create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but the latest opened was <'+last.value+'>  (url: '+FCurrentTree.FBaseURI+')')
-  else if FParsingModel = pmHTML then begin
+  else if FParsingModel in [pmHTML, pmUnstrictXML] then begin
     //try to auto detect unclosed tags
     match:=-1;
     for i:=FElementStack.Count-1 downto 0 do
@@ -2059,10 +2098,12 @@ begin
       end;
     if match > -1 then begin
       //there are unclosed tags, but a tag opening the currently closed exist, close all in between
-      weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
-      for i:=match+1 to FElementStack.Count-1 do
-        if htmlTagWeight(TTreeNode(FElementStack[i]).value) > weight then
-            exit;
+      if FParsingModel = pmHTML then begin
+        weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
+        for i:=match+1 to FElementStack.Count-1 do
+          if htmlTagWeight(TTreeNode(FElementStack[i]).value) > weight then
+              exit;
+      end;
       for i:=match+1 to FElementStack.Count-1 do
         autoCloseLastTag();
       new := newTreeNode(tetClose, tagName, tagNameLen);
@@ -2073,7 +2114,7 @@ begin
     end;
 
     name := strFromPchar(tagName, tagNameLen);
-    if htmlElementChildless(name) then begin
+    if (FParsingModel = pmHTML) and htmlElementChildless(name) then begin
       parenDelta := 0;
       last := FCurrentElement;
       weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
@@ -2422,7 +2463,7 @@ begin
 
   //parse
   if FParsingModel = pmHTML then simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText, @readComment)
-  else simplehtmlparser.parseML(FCurrentFile,[],@enterTag, @leaveTag, @readText, @readComment);
+  else simplehtmlparser.parseML(FCurrentFile,[poRespectProcessingInstructions],@enterTag, @leaveTag, @readText, @readComment, @processingInstruction);
 
   //close root element
   leaveTag(nil,0);
