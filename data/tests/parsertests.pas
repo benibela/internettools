@@ -106,6 +106,8 @@ begin
   tp.parsingModel := pmStrict;
   t('<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>', '<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>');
   t('<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;&#x20;&apos;&#x20;&#x20;&#x20;&#x20;&#x20;&#x20;">93.7</ex:b>', '<ex:b xmlns:ex="http://www.example.com/ns?p=&apos; &apos;">93.7</ex:b>');
+  t('<r> <?foobar?> </r>', '<r> <?foobar?> </r>');
+  t('<r> <?php echo "<span class=''cap''>".$row[''ID''].". "; ?> </r>', '<r> <?php echo "<span class=''cap''>".$row[''ID''].". "; ?> </r>');
 
   finally
       tp.free;

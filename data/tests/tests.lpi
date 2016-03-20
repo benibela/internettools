@@ -116,6 +116,7 @@
       <Unit8>
         <Filename Value="parsertests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="parsertests"/>
       </Unit8>
       <Unit9>
         <Filename Value="extendedhtmlparser_tests.pas"/>
@@ -163,7 +164,7 @@
     </Linking>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="10">
+    <Exceptions Count="13">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -194,6 +195,15 @@
       <Item10>
         <Name Value="EMathError"/>
       </Item10>
+      <Item11>
+        <Name Value="RunError(205)"/>
+      </Item11>
+      <Item12>
+        <Name Value="EOverflow"/>
+      </Item12>
+      <Item13>
+        <Name Value="EDivByZero"/>
+      </Item13>
     </Exceptions>
   </Debugging>
 </CONFIG>
