@@ -2568,6 +2568,7 @@ type
     function getName(i: integer): string; //**< Name of the variable at index @code(i)
     function getAll(const name: string; const namespaceURL: string = ''): IXQValue; //**< Returns all values of the variable with name @name(name) as sequence
     function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
+    function isPropertyChange(i: integer): boolean;
 
     function hasVariable(const variable: string; value: PXQValue; const namespaceURL: string = ''): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
     function hasVariable(const variable: TXQTermVariable; value: PXQValue = nil): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
@@ -5680,6 +5681,11 @@ end;
 function TXQVariableChangeLog.getString(const name: string): string;
 begin
   result := get(name, '').toString;
+end;
+
+function TXQVariableChangeLog.isPropertyChange(i: integer): boolean;
+begin
+  result := vars[i].propertyChange;
 end;
 
 function TXQVariableChangeLog.indexOf(const name: string;  const namespaceURL: string): integer;
