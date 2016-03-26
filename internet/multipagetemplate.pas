@@ -547,6 +547,7 @@ begin
     SetLength(errNamespaces, length(errNamespaces));
     SetLength(errCodes, length(errCodes));
   end;
+  cloneChildren(result);
 end;
 
 function TTemplateActionCatch.checkError(reader: TMultipageTemplateReader; const namespace, prefix, code: string): boolean;
