@@ -126,6 +126,7 @@
       <Unit10>
         <Filename Value="simpleinternet_tests.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="simpleinternet_tests"/>
       </Unit10>
       <Unit11>
         <Filename Value="commontestutils.pas"/>
@@ -164,7 +165,7 @@
     </Linking>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="13">
+    <Exceptions Count="16">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -204,6 +205,15 @@
       <Item13>
         <Name Value="EDivByZero"/>
       </Item13>
+      <Item14>
+        <Name Value="RunError(207)"/>
+      </Item14>
+      <Item15>
+        <Name Value="EInvalidOp"/>
+      </Item15>
+      <Item16>
+        <Name Value="RunError(200)"/>
+      </Item16>
     </Exceptions>
   </Debugging>
 </CONFIG>
