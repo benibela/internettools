@@ -48,7 +48,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set prod-direlem --test-case Constr-inscope-2"/>
+        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set pow --test-case math-pow-028"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
     </RunParams>

@@ -1603,6 +1603,11 @@ begin
 end;
 
 begin
+  {$IFDEF FPC_HAS_CPSTRING}
+  //from lazarus
+  SetMultiByteConversionCodePage(CP_UTF8);
+  SetMultiByteRTLFileSystemCodePage(CP_UTF8);
+  {$ENDIF}
   registerModuleMath;
 
   testsets := TList.Create;
