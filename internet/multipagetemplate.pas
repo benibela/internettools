@@ -29,7 +29,7 @@ unit multipagetemplate;
 interface
 
 uses
-  Classes, SysUtils,bbutils,extendedhtmlparser, simplehtmltreeparser,simplexmlparser, xquery,dRegExpr,internetaccess;
+  Classes, SysUtils,bbutils,extendedhtmlparser, simplehtmltreeparser,simplexmlparser, xquery,internetaccess;
 
 type
 
