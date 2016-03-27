@@ -4430,7 +4430,7 @@ end;
 
 function utf8toSys(const filename: RawByteString): RawByteString;
 begin
-{$ifdef windows}
+{$if defined(windows) and not defined(FPC_HAS_CPSTRING)}
   result :=  Utf8ToAnsi(filename);
 {$else}
   result := filename;
