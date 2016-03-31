@@ -188,7 +188,7 @@ public
 end;
 implementation
 
-uses FileUtil,process{$IFDEF UNIX},BaseUnix{$ENDIF}{$IFDEF WINDOWS},windows,ShellApi{$endif};
+uses FileUtil,process{$IFDEF FPC_HAS_CPSTRING},LazFileUtils{$ENDIF}{$IFDEF UNIX},BaseUnix{$ENDIF}{$IFDEF WINDOWS},windows,ShellApi{$endif};
 function isOurPlatform(p: string):boolean;
 begin
   p:=UpperCase(p);
@@ -501,4 +501,4 @@ begin
 end;
 
 end.
-
+
