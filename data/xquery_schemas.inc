@@ -994,10 +994,8 @@ procedure TXSSchema.hide(const s: string);
 var
   objIdx: Integer;
 begin
-  if hiddenTypeList = nil then begin
-    hiddenTypeList := TStringList.Create;
-    hiddenTypeList.OwnsObjects := true;
-  end;
+  if hiddenTypeList = nil then
+    hiddenTypeList := TXQMapStringObject.Create;
   objIdx := typeList.IndexOf(s);
   hiddenTypeList.AddObject(typeList[objIdx], typeList.Objects[objIdx]);
   typeList.OwnsObjects := false;
@@ -1101,16 +1099,14 @@ constructor TXSSchema.Create;
 
 begin
   version := xsd10;
-  typeList := TStringList.Create;
-  typeList.CaseSensitive := true;
-  typeList.OwnsObjects := true;
+  typeList := TXQMapStringObject.Create;
   if baseSchema <> nil then begin
-    typeList.Sorted := true;
     anyType := baseSchema.anyType;
     anySimpleType := baseSchema.anySimpleType;
     anyAtomicType := baseSchema.anyAtomicType;
     exit;
   end;
+  typeList.sorted := false;
   AnyType := TXSSimpleType.Create('anyType', nil, nil, self);
     AnySimpleType := TXSSimpleType.Create('anySimpleType', AnyType);
       AnyAtomicType := TXSSimpleType.Create('anyAtomicType', AnySimpleType);
@@ -1215,8 +1211,8 @@ begin
   error.schema := self;
   typeList.AddObject('error', error);
 
-  typeList.Sorted := true;
   numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
+  typeList.sorted := true;
 end;
 
 destructor TXSSchema.Destroy;

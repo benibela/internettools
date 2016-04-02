@@ -2041,8 +2041,8 @@ begin
     '''', '"':  exit(TXQTermConstant.create(parseString()));
     '$': exit(parseVariableWithDotNotation());
     '-', '+': begin
-      word := nextToken() + 'u';
-      exit(TXQTermBinaryOp.create(word, TXQTermConstant.create(xqvalue()), parseValue()));
+      word := nextToken();
+      exit(TXQTermBinaryOp.createUnary(word, parseValue()));
     end;
     '(': begin
       inc(pos);

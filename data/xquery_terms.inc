@@ -2566,6 +2566,7 @@ end;
 constructor TXQTermBinaryOp.create(const aop: string; arg1: TXQTerm; arg2: TXQTerm);
 begin
   op := TXQueryEngine.findOperator(pchar(aop));
+  if op = nil then raiseParsingError('XPST0003', 'No operator: ' + aop);
   if arg1 <> nil then begin
     push(arg1);
     if arg2 <> nil then push(arg2);
@@ -2580,6 +2581,11 @@ end;
 constructor TXQTermBinaryOp.create(opinfo: TXQOperatorInfo);
 begin
   op := opinfo;
+end;
+
+constructor TXQTermBinaryOp.createUnary(const aop: string; arg: TXQTerm);
+begin
+  create('unary~hack' + aop, TXQTermConstant.create(xqvalue()), arg);
 end;
 
 function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;

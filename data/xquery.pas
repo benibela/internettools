@@ -1162,7 +1162,11 @@ type
     constructor Create(aname: string; aparent: TXSType; apattern: string; atruncation: TXQDateTimeTruncation = xqdttNone );
   end;
 
-  { TXSSchema }
+  TXQMapStringObject = class(TStringList)
+    constructor Create;
+    function DoCompareText(const s1, s2: string): PtrInt; override;
+  end;
+
 
   TXSSchemaVersion = (xsd10, xsd11);
   //** XML Schema
@@ -1206,7 +1210,7 @@ type
     procedure show(const s: string); //do not use
     procedure hide(const s: string); //do not use
   private
-    typeList, hiddenTypeList: TStringList;
+    typeList, hiddenTypeList: TXQMapStringObject;
   end;
 
   { TJSSchema }
@@ -1691,6 +1695,7 @@ type
     constructor create(const aop: string; arg1: TXQTerm = nil; arg2: TXQTerm = nil);
     constructor create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
     constructor create(opinfo: TXQOperatorInfo);
+    constructor createUnary(const aop: string; arg: TXQTerm);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function debugTermToString: string; override;
     function getContextDependencies: TXQContextDependencies; override;
@@ -2682,7 +2687,6 @@ end;
 
 type
 
-{ TXQNativeModule }
 
  {** A native XQuery module. Each native module has a certain namespace and declares functions, types and operators *}
  TXQNativeModule = class
@@ -2712,9 +2716,9 @@ type
   function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQInterpretedFunctionInfo;
   function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQOperatorInfo;
 protected
-  basicFunctions, complexFunctions, interpretedFunctions: TStringList;
-  binaryOpLists: TStringList;
-  binaryOpFunctions: TStringList;
+  basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringObject;
+  binaryOpLists: TXQMapStringObject;
+  binaryOpFunctions: TXQMapStringObject;
   class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
   procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
 end;
@@ -2870,6 +2874,19 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+constructor TXQMapStringObject.Create;
+begin
+  Sorted := true;
+  OwnsObjects:=true;
+  Duplicates := dupAccept;
+  CaseSensitive := true;
+end;
+
+function TXQMapStringObject.DoCompareText(const s1, s2: string): PtrInt;
+begin
+  Result:=CompareText(s1, s2);
+end;
 
 function TXQPathMatchingStep.serialize: string;
 var
@@ -7465,29 +7482,12 @@ var
   i: Integer;
 begin
   namespace := anamespace;
-  basicFunctions:=TStringList.Create;
-  basicFunctions.Sorted := true;
-  basicFunctions.OwnsObjects:=true;
-  basicFunctions.Duplicates := dupAccept;
-  basicFunctions.CaseSensitive := true;
-  complexFunctions:=TStringList.Create;
-  complexFunctions.Sorted := true;
-  complexFunctions.OwnsObjects:=true;
-  complexFunctions.Duplicates := dupAccept;
-  complexFunctions.CaseSensitive := true;
-  interpretedFunctions:=TStringList.Create;
-  interpretedFunctions.Sorted := true;
-  interpretedFunctions.OwnsObjects:=true;
-  interpretedFunctions.Duplicates := dupAccept;
-  interpretedFunctions.CaseSensitive := true;
-  binaryOpLists:=TStringList.Create;
-  binaryOpLists.Sorted := true;
-  binaryOpLists.OwnsObjects:=true;
-  binaryOpLists.CaseSensitive := true;
-
-  binaryOpFunctions:=TStringList.Create;
-  binaryOpFunctions.Sorted := true;
-  binaryOpFunctions.CaseSensitive := true;
+  basicFunctions:=TXQMapStringObject.Create;
+  complexFunctions:=TXQMapStringObject.Create;
+  interpretedFunctions:=TXQMapStringObject.Create;
+  binaryOpLists:=TXQMapStringObject.Create;
+  binaryOpFunctions:=TXQMapStringObject.Create;
+  binaryOpFunctions.OwnsObjects := false;
   if length(aparentModule) > 0 then begin
     SetLength(parents, length(aparentModule));
     for i := 0 to high(aparentModule) do parents[i] := aparentModule[i];
