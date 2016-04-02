@@ -2885,7 +2885,7 @@ end;
 
 function TXQMapStringObject.DoCompareText(const s1, s2: string): PtrInt;
 begin
-  Result:=CompareText(s1, s2);
+  Result:=CompareStr(s1, s2);
 end;
 
 function TXQPathMatchingStep.serialize: string;
