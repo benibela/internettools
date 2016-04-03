@@ -257,52 +257,59 @@ begin
   end;
 end;
 
-
-function TAndroidInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; data: string): string;
-var jRequest: jobject;
+type TLocalStackRecord = record
+    jRequest: jobject;
     classInfos: TClassInformation;
+end;
+     PLocalStackRecord = ^TLocalStackRecord;
 
-  procedure addHeader(const n,v: string);
-  var args: array[0..1] of jvalue;
-  begin
-    //jRequest.addHeader(n, v)
+procedure addHeader(data: pointer; headerKind: TAndroidInternetAccess.THeaderKind; const name, value: string);
+var args: array[0..1] of jvalue;
+begin
+  //jRequest.addHeader(n, v)
+  with PLocalStackRecord(data)^ do
     with classInfos do begin
-      args[0].l := j.stringToJString(n);
-      args[1].l := j.stringToJString(v);
+      args[0].l := j.stringToJString(name);
+      args[1].l := j.stringToJString(value);
       j.CallVoidMethod(jRequest,  jmHttpMessageAddHeader, @args[0]);;
       j.DeleteLocalRef(args[0].l);
       j.DeleteLocalRef(args[1].l);
     end;
-  end;
+end;
+
+function TAndroidInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; data: string): string;
+var stack: TLocalStackRecord;
+
 
   function setRequestData: boolean;
   var jentity: jvalue;
       wrappedData: jbyteArray;
       temp: jvalue;
   begin
-    with classInfos do begin
-      if data = '' then exit;
-      wrappedData := j.env^^.NewByteArray(j.env, length(data));
-      if wrappedData = nil then begin
-        lastErrorDetails := 'Failed to allocate JNI array';
-        exit(false);
-      end;
-      j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, length(data), @data[1]); //todo: faster way than copying?
+    with stack do
+      with classInfos do begin
+        if data = '' then exit;
+        wrappedData := j.env^^.NewByteArray(j.env, length(data));
+        if wrappedData = nil then begin
+          lastErrorDetails := 'Failed to allocate JNI array';
+          exit(false);
+        end;
+        j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, length(data), @data[1]); //todo: faster way than copying?
 
-      //entity = new ByteArrayEntity(data)
-      jentity.l := j.env^^.NewObjectA(j.env, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
-      //entity.setContentType(..)
-      if additionalHeaders.IndexOfName('Content-Type') < 0 then begin
-        temp.l := j.NewStringUTF(ContentTypeForData);
-        j.CallVoidMethod(jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
-        j.DeleteLocalRef(temp.l);
-      end;
-      //httprequest.setEntity(entity)
-      j.CallVoidMethod(jRequest,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
+        //entity = new ByteArrayEntity(data)
+        jentity.l := j.env^^.NewObjectA(j.env, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
+        //entity.setContentType(..)
+        if additionalHeaders.IndexOfName('Content-Type') < 0 then begin
+          temp.l := j.NewStringUTF(ContentTypeForData);
+          j.CallVoidMethod(jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
+          j.DeleteLocalRef(temp.l);
+        end;
+        //httprequest.setEntity(entity)
+        j.CallVoidMethod(jRequest,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
 
-      j.DeleteLocalRef(wrappedData);
-      result := true;
-    end;
+        j.DeleteLocalRef(wrappedData);
+        result := true;
+      end;
   end;
 
 var
@@ -320,84 +327,82 @@ begin
   end;
 
   m := methodStringToMethod(method);
+  with stack do begin
+    classInfos := initializeClasses(); //todo: cache?
+    try
+      with classInfos do begin;
+        //HttpGet httpget = new HttpGet(url);
+        jUrl := j.stringToJString(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
+        jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
+        if ExceptionCheckAndClear then exit;
+        j.DeleteLocalRef(jUrl);
 
-  classInfos := initializeClasses(); //todo: cache?
-  try
-    with classInfos do begin;
-      //HttpGet httpget = new HttpGet(url);
-      jUrl := j.stringToJString(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
-      jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
-      if ExceptionCheckAndClear then exit;
-      j.DeleteLocalRef(jUrl);
+        enumerateAdditionalHeaders(@addHeader, data <> '', @stack);
+        if (data <> '') and (m in [hmPut, hmPost]) then
+          if not setRequestData() then begin
+            lastErrorDetails:= 'Failed to set request data';
+            exit;
+          end;
 
-      if lastUrl <> '' then addHeader('Referer', lastUrl);
-      if length(cookies) > 0 then addHeader('Cookie', makeCookieHeaderValueOnly);
-      for i := 0 to additionalHeaders.Count - 1 do
-        addHeader(additionalHeaders.Names[i], additionalHeaders.ValueFromIndex[i]);
-      if (data <> '') and (m in [hmPut, hmPost]) then
-        if not setRequestData() then begin
-          lastErrorDetails:= 'Failed to set request data';
-          exit;
-        end;
+        jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
+        if ExceptionCheckAndClear then exit;
 
-      jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
-      if ExceptionCheckAndClear then exit;
-
-      if url.username <> '' then
-        //problem: this is host specific, so it does not work for redirections
-        if not setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ) then begin
-          lastErrorDetails:= 'Failed to set credentials';
-          exit;
-        end;
+        if url.username <> '' then
+          //problem: this is host specific, so it does not work for redirections
+          if not setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ) then begin
+            lastErrorDetails:= 'Failed to set credentials';
+            exit;
+          end;
 
 
-      //send
-      args[0].l := jRequest;
-      args[1].l := jContext;
-      jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @args);;
+        //send
+        args[0].l := jRequest;
+        args[1].l := jContext;
+        jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @args);;
 
-      if ExceptionCheckAndClear then exit;
-
-      try
-        //process
-        jResult := j.CallObjectMethod(jResponse,  jmHttpResponseGetEntity);
-
-        jStatusLine := j.CallObjectMethod(jResponse, jmHttpResponseGetStatusLine);
-        lastHTTPResultCode := j.CallIntMethod(jStatusLine, jmStatusLineGetStatusCode);
-        lastErrorDetails := j.jStringToStringAndDelete(j.CallObjectMethod(jStatusLine, jmStatusLineGetReasonPhrase));
-        j.DeleteLocalRef(jStatusLine);
+        if ExceptionCheckAndClear then exit;
 
         try
-          result := j.inputStreamToStringAndDelete(j.CallObjectMethod(jResult,  jmHttpEntityGetContent));
+          //process
+          jResult := j.CallObjectMethod(jResponse,  jmHttpResponseGetEntity);
 
-          lastHTTPHeaders.Clear;
-          jHeaderIterator := j.CallObjectMethod(jResponse,  jmHttpMessageHeaderIterator);
-          while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
-            jHeader := j.CallObjectMethod(jHeaderIterator,  jmHeaderIteratorNextHeader);
-            lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + ':'+
-                                j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetValue)));
-            j.DeleteLocalRef(jHeader);
+          jStatusLine := j.CallObjectMethod(jResponse, jmHttpResponseGetStatusLine);
+          lastHTTPResultCode := j.CallIntMethod(jStatusLine, jmStatusLineGetStatusCode);
+          lastErrorDetails := j.jStringToStringAndDelete(j.CallObjectMethod(jStatusLine, jmStatusLineGetReasonPhrase));
+          j.DeleteLocalRef(jStatusLine);
+
+          try
+            result := j.inputStreamToStringAndDelete(j.CallObjectMethod(jResult,  jmHttpEntityGetContent));
+
+            lastHTTPHeaders.Clear;
+            jHeaderIterator := j.CallObjectMethod(jResponse,  jmHttpMessageHeaderIterator);
+            while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
+              jHeader := j.CallObjectMethod(jHeaderIterator,  jmHeaderIteratorNextHeader);
+              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + ':'+
+                                  j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetValue)));
+              j.DeleteLocalRef(jHeader);
+            end;
+            j.DeleteLocalRef(jHeaderIterator);
+          finally
+            j.DeleteLocalRef(jResult);
           end;
-          j.DeleteLocalRef(jHeaderIterator);
+
+          if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
+            ExceptionCheckAndClear
+            //log('Warning: Ignoring exception');
+          end;
+
         finally
-          j.DeleteLocalRef(jResult);
+          if  jResponse <> nil then
+            j.DeleteLocalRef(jResponse);
         end;
 
-        if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
-          ExceptionCheckAndClear
-          //log('Warning: Ignoring exception');
-        end;
-
-      finally
-        if  jResponse <> nil then
-          j.DeleteLocalRef(jResponse);
+        j.deleteLocalRef(jRequest);
+        j.deleteLocalRef(jContext);
       end;
-
-      j.deleteLocalRef(jRequest);
-      j.deleteLocalRef(jContext);
+    finally
+      freeClasses(classInfos);
     end;
-  finally
-    freeClasses(classInfos);
   end;
 end;
 

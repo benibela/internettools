@@ -67,7 +67,8 @@ const TEMPORARY_DIRECTORY='T:\theInternet\';
 {$ENDIF}
 implementation
 
-uses bbutils;
+uses bbutils//, bbdebugtools
+  ;
 
 resourcestring
   rsNoInternetSessionCre = 'No internet session created';
@@ -118,12 +119,35 @@ resourcestring
   rsWindowsCode = 'Windows error code: ';
   rsWindowsErrorMessage = 'Windows error message: ';
 
-//uses bbdebugtools;
+
 
 {$IFDEF COMPILE_W32_INTERNETACCESS}
 
+type TAddHeaderData = record
+  overridenPostHeader: string;
+  hfile: hinternet;
+end;
+  PAddHeaderData = ^TAddHeaderData;
+
+procedure addHeader(data: pointer; headerKind: TW32InternetAccess.THeaderKind; const name, value: string);
+var
+  headerLine: string;
+begin
+  with PAddHeaderData(data)^ do begin
+    case headerKind of
+      iahContentType: begin
+        overridenPostHeader := TW32InternetAccess.makeHeaderLine(headerKind, value);
+        exit;
+      end;
+      else headerLine := TW32InternetAccess.makeHeaderLine(name, value) + #13#10;
+    end;
+    HttpAddRequestHeadersA(hfile, @headerLine[1],length(headerLine),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+  end;
+end;
+
+
 function TW32InternetAccess.doTransferUnchecked(method:string; const decoded: TDecodedUrl; data:string): string;
-const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', '');
+const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', ''); //just as default. it will be overriden
 var
   databuffer : array[0..4095] of char;
   hfile: hInternet;
@@ -131,11 +155,10 @@ var
   tempPort: integer;
   dwcode : array[1..20] of char;
   res    : pchar;
-  cookiestr:string;
   callResult: boolean;
   i: Integer;
   headerOut: string;
-  overridenPostHeader: string;
+  headerAdd: TAddHeaderData;
 begin
   lastHTTPResultCode := -1;
   lastErrorDetails := '';
@@ -180,25 +203,14 @@ begin
     exit;
   end;
 
-  cookiestr:=makeCookieHeader;
-  if cookiestr<>'' then begin
-    cookiestr += #13#10;
-    HttpAddRequestHeadersA(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
-  end;
-  overridenPostHeader := 'Content-Type: ' + ContentTypeForData;;
-  for i:=0 to additionalHeaders.Count - 1 do
-    if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
-      HttpAddRequestHeadersA(hfile, pchar(additionalHeaders[i]), length(additionalHeaders[i]), HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD)
-     else
-      overridenPostHeader := additionalHeaders[i];
-
-
+  headerAdd.hfile := hfile;
+  enumerateAdditionalHeaders(@addHeader, data <> '', @headerAdd);
 
   for i := 1 to 2 do begin //repeat if ssl certificate is wrong
     if data='' then
       callResult:= httpSendRequestA(hfile, nil,0,nil,0)
      else
-      callResult:= httpSendRequestA(hfile, pchar(overridenPostHeader), Length(overridenPostHeader), @data[1], Length(data));
+      callResult:= httpSendRequestA(hfile, pchar(headerAdd.overridenPostHeader), Length(headerAdd.overridenPostHeader), @data[1], Length(data));
 
     if callResult then break;
 

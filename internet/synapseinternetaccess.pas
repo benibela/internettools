@@ -131,13 +131,19 @@ begin
   FOnProgress(self, lastProgressLength, contentLength);
 end;
 
+procedure addHeader(data: pointer; headerKind: TSynapseInternetAccess.THeaderKind; const name, header: string);
+var
+  connection: THTTPSend;
+begin
+  connection := THTTPSend(data);
+  case headerKind of
+    iahContentType: connection.MimeType := header;
+    else connection.Headers.Add(TSynapseInternetAccess.makeHeaderLine(name, header));
+  end;
+end;
 
 function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TDecodedUrl; data: string): string;
   procedure initConnection;
-  var
-    i: Integer;
-    refer: String;
-    accept: String;
   begin
    connection.Clear;
    connection.Cookies.Clear;
@@ -156,21 +162,7 @@ function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TD
      if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := LT_TLSv1
      else connection.Sock.SSL.SSLType := LT_all;
 
-   refer := lastUrl;
-   accept := 'text/html,application/xhtml+xml,application/xml,text/*,*/*';
-
-   for i := 0 to additionalHeaders.Count - 1 do
-     case parseHeaderLineKind(additionalHeaders[i]) of
-       iahContentType: connection.MimeType := parseHeaderLineValue(additionalHeaders[i]);
-       iahAccept: accept := parseHeaderLineValue(additionalHeaders[i]);
-       iahReferer: refer := parseHeaderLineValue(additionalHeaders[i]);
-       else connection.Headers.add(additionalHeaders[i])
-     end;
-
-   if refer <> '' then connection.Headers.Add(makeHeaderLine(iahReferer, refer));
-   if accept <> '' then connection.Headers.Add(makeHeaderLine(iahAccept, accept));
-   if length(cookies) > 0 then
-     connection.Headers.Add(makeCookieHeader());
+   enumerateAdditionalHeaders(@addHeader, data <> '', connection);
   end;
 
 var ok: Boolean;

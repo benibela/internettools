@@ -101,6 +101,7 @@ type
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
   TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data:string; var reaction: TInternetAccessReaction) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
+
   //**@abstract(Abstract base class for connections)
   //**This class defines the interface methods for http requests, like get, post or request.@br
   //**If a method fails, it will raise a EInternetException@br@br
@@ -134,16 +135,24 @@ type
     function makeCookieHeader:string;
     function makeCookieHeaderValueOnly:string;
     //utility functions to minimize platform dependent code
+  public
     type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie);
-    class function parseHeaderLineKind(const line: string): THeaderKind; static;
+         //if headerKind is iahUnknown header contains the entire header line name: value, otherwise only the value
+       THeaderEnumCallback = procedure (data: pointer; headerKindHint: THeaderKind; const name, value: string);
+      class function parseHeaderLineKind(const line: string): THeaderKind; static;
+  protected
     class function parseHeaderLineValue(const line: string): string; static;
+    class function parseHeaderLineName(const line: string): string; static;
     class function makeHeaderLine(const name, value: string): string; static;
     class function makeHeaderLine(const kind: THeaderKind; const value: string): string; static;
+    class function makeHeaderName(const kind: THeaderKind): string; static;
+    procedure enumerateAdditionalHeaders(callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
     function getLastHTTPHeaderValue(kind: THeaderKind): string;
     function getLastHTTPHeaderValue(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
     //constructor, since .create is "abstract" and can not be called
     procedure init;
   public
+
     //in
     internetConfig: PInternetConfig; //**< Configuration to use. Defaults to defaultInternetConfig
     additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
@@ -844,6 +853,11 @@ begin
   result := trim(strCopyFrom(line, pos(':', line)+1))
 end;
 
+class function TInternetAccess.parseHeaderLineName(const line: string): string;
+begin
+  result := copy(line, 1, pos(':', line));
+end;
+
 class function TInternetAccess.makeHeaderLine(const name, value: string): string;
 begin
   result := name + ': ' + value;
@@ -851,15 +865,45 @@ end;
 
 class function TInternetAccess.makeHeaderLine(const kind: THeaderKind; const value: string): string;
 begin
+  result := makeHeaderName(kind) + ': '+value;
+end;
+
+class function TInternetAccess.makeHeaderName(const kind: THeaderKind): string;
+begin
   case kind of
-    iahContentType: result := 'Content-Type: ' + value;
-    iahAccept: result := 'Accept: ' + value;
-    iahReferer: result := 'Referer: ' + value;
-    iahLocation: result := 'Location: ' + value;
-    iahSetCookie: result := 'Set-Cookie: ' + value;
-    iahCookie: result := 'Cookie: ' + value;
+    iahContentType: result := 'Content-Type';
+    iahAccept: result := 'Accept';
+    iahReferer: result := 'Referer';
+    iahLocation: result := 'Location';
+    iahSetCookie: result := 'Set-Cookie';
+    iahCookie: result := 'Cookie';
     else raise EInternetException.create('Internal error: Unknown header line kind');
   end;
+end;
+
+procedure TInternetAccess.enumerateAdditionalHeaders(callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
+  procedure callKnownKind(kind: THeaderKind; value: string);
+  begin
+    callback(data, kind, makeHeaderName(kind), value);
+  end;
+
+var
+  hadHeader: array[THeaderKind] of Boolean;
+  i: Integer;
+  kind: THeaderKind;
+begin
+  FillChar(hadHeader, sizeof(hadHeader), 0);
+
+  for i := 0 to additionalHeaders.Count - 1 do begin
+     kind := parseHeaderLineKind(additionalHeaders[i]);
+     hadHeader[kind] := true;
+     callback(data, kind, parseHeaderLineName(additionalHeaders[i]), parseHeaderLineValue(additionalHeaders[i]));
+   end;
+
+   if (not hadHeader[iahReferer]) and (lastUrl <> '') then callKnownKind( iahReferer, lastUrl );
+   if (not hadHeader[iahAccept]) then callKnownKind( iahAccept, 'text/html,application/xhtml+xml,application/xml,text/*,*/*' );
+   if (not hadHeader[iahCookie]) and (length(cookies) > 0) then callKnownKind( iahCookie, makeCookieHeaderValueOnly());
+   if (not hadHeader[iahContentType]) and hasPostData then callKnownKind(iahContentType, ContentTypeForData);
 end;
 
 procedure TInternetAccess.init;
