@@ -132,7 +132,6 @@ var
   dwcode : array[1..20] of char;
   res    : pchar;
   cookiestr:string;
-  newurl: string;
   callResult: boolean;
   i: Integer;
   headerOut: string;
@@ -182,8 +181,10 @@ begin
   end;
 
   cookiestr:=makeCookieHeader;
-  if cookiestr<>'' then
+  if cookiestr<>'' then begin
+    cookiestr += #13#10;
     HttpAddRequestHeadersA(hfile,@cookiestr[1],length(cookiestr),HTTP_ADDREQ_FLAG_REPLACE or HTTP_ADDREQ_FLAG_ADD);
+  end;
   overridenPostHeader := 'Content-Type: ' + ContentTypeForData;;
   for i:=0 to additionalHeaders.Count - 1 do
     if not striBeginsWith(additionalHeaders[i], 'Content-Type') then
@@ -224,16 +225,8 @@ begin
   res := pchar(@dwcode);
 
   lastHTTPResultCode := StrToIntDef(res, -4);
-
-  if (lastHTTPResultCode >= 200) and (lastHTTPResultCode <= 399) then begin
-    dwNumber := sizeof(databuffer)-1;
-    if HttpQueryInfoA(hfile,HTTP_QUERY_RAW_HEADERS_CRLF,@databuffer,@dwNumber,@dwindex) then
-      parseHeaderForCookies(databuffer) //handle cookies ourself, or we could not have separate cookies for different connections
-     else
-      dwNumber := 0;
-  end else dwNumber := 0;
-
   lastHTTPHeaders.Clear;
+  dwNumber := 0;
   if not HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
     if (GetLastError = ERROR_INSUFFICIENT_BUFFER) and (i > 0) then begin
       setlength(headerOut, i+1);

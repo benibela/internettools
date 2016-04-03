@@ -125,15 +125,15 @@ type
     function doTransferChecked(method: string; url: TDecodedUrl;  data:string; remainingRedirects: integer):string;
     function getLastErrorDetails(): string; virtual;
   protected
-    //** Cookies receive from/to-send the server (only for backends that does not support cookies natively (i.e.. win32). Synapse has its own cookies)
+    //** Cookies receive from/to-send the server
     cookies: array of record
       name, value:string;
     end;
     procedure setCookie(name,value:string);
-    procedure parseHeaderForCookies(header: string);
+    procedure parseHeadersForCookies();
     function makeCookieHeader:string;
     //utility functions to minimize platform dependent code
-    type THeaderKind = (iahUnknown, iaContentType, iaAccept, iaReferer, iaLocation);
+    type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie);
     class function parseHeaderLineKind(const line: string): THeaderKind; static;
     class function parseHeaderLineValue(const line: string): string; static;
     class function makeHeaderLine(const name, value: string): string; static;
@@ -692,11 +692,14 @@ var
 begin
   url.prepareSelfForRequest(lastURLDecoded);
 
-  while true do begin
+  reaction := iarReject;
+  while reaction <> iarAccept do begin
     url.path := strEscapeToHex(url.path, low - allowedPath, '%'); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
     url.params := strEscapeToHex(url.params, low - allowedURI, '%');
 
     result := doTransferUnchecked(method, url, data);
+
+
 
     reaction := iarReject;
     case lastHTTPResultCode of
@@ -711,13 +714,13 @@ begin
     if Assigned(OnTransferReact) then OnTransferReact(self, method, url, data, reaction);
 
     case reaction of
-      iarAccept: break;
+      iarAccept: ; //see above
       iarFollowRedirectGET, iarFollowRedirectKeepMethod: begin
         if reaction = iarFollowRedirectGET then begin
           method := 'GET';
           data := '';
         end;
-        url := url.resolved(getLastHTTPHeaderValue(iaLocation));
+        url := url.resolved(getLastHTTPHeaderValue(iahLocation));
         dec(remainingRedirects);
       end;
       iarRetry: ; //do nothing
@@ -728,6 +731,8 @@ begin
         raise EInternetException.Create(message + LineEnding + 'when talking to: '+url.combined, lastHTTPResultCode);
       end;
     end;
+
+    parseHeadersForCookies();
   end;
 
   lastURLDecoded := url;
@@ -753,38 +758,37 @@ begin
   cookies[high(cookies)].value:=value;
 end;
 
-procedure TInternetAccess.parseHeaderForCookies(header: string);
+procedure TInternetAccess.parseHeadersForCookies();
 var i,mark:longint;
-    name,value:string;
+    cookie, header, name, value:string;
+    ci: Integer;
 begin
-  //log('Header: ');  log(header);
-  i:=1;
-  while i<length(header) do begin
-    if strlibeginswith(@header[i],length(header)-i,'Set-Cookie:') then begin
-      i+=length('Set-Cookie:');
-      //Name getrimmt finden
-      while header[i] = ' ' do i+=1;
-      mark:=i;
-      while not (header[i] in ['=',' ',#0]) do i+=1;
-      name:=copy(header,mark,i-mark);
+  for ci := 0 to lastHTTPHeaders.Count - 1 do
+    case parseHeaderLineKind(lastHTTPHeaders[ci]) of
+      iahSetCookie: begin
+        header := parseHeaderLineValue(lastHTTPHeaders[ci]);
+        //Name getrimmt finden
+        i := 1;
+        while header[i] = ' ' do i+=1;
+        mark:=i;
+        while not (header[i] in ['=',' ',#0]) do i+=1;
+        name:=copy(header,mark,i-mark);
 
-      //Wert finden
-      while not (header[i] in ['=',#0]) do i+=1;
-      i+=1;
-      mark:=i;
-      if header[i]='"' then begin//quoted-str allowed??
+        //Wert finden
+        while not (header[i] in ['=',#0]) do i+=1;
         i+=1;
-        while not (header[i] in ['"', #0]) do i+=1;
-        i+=1;
-      end else
-        while not (header[i] in [';', #13, #10,#0]) do i+=1;
-      value:=copy(header,mark,i-mark);
+        mark:=i;
+        if header[i]='"' then begin//quoted-str allowed??
+          i+=1;
+          while not (header[i] in ['"', #0]) do i+=1;
+          i+=1;
+        end else
+          while not (header[i] in [';', #13, #10,#0]) do i+=1;
+        value:=copy(header,mark,i-mark);
 
-      setCookie(name,value);
-
-      //log('=>Cookie'+name);      log('value:'+value);
-    end else i+=1;
-  end;
+        setCookie(name,value);
+      end;
+    end;
 end;
 
 function TInternetAccess.makeCookieHeader: string;
@@ -795,7 +799,6 @@ begin
   result:='Cookie: '+cookies[0].name+'='+cookies[0].value;
   for i:=1 to high(cookies) do
     result+='; '+cookies[i].name+'='+cookies[i].value;
-  result+=#13#10;
 end;
 
 class function TInternetAccess.parseHeaderLineKind(const line: string): THeaderKind;
@@ -818,10 +821,12 @@ begin
   result := iahUnknown;
   if line = '' then exit();
   case line[1] of
-    'c', 'C': if check('content-type') then exit(iaContentType);
-    'a', 'A': if check('accept') then exit(iaAccept);
-    'l', 'L': if check('location') then exit(iaLocation);
-    'r', 'R': if check('referer') then exit(iaReferer);
+    'c', 'C': if check('content-type') then exit(iahContentType)
+              else if check('cookie') then exit(iahCookie);
+    'a', 'A': if check('accept') then exit(iahAccept);
+    'l', 'L': if check('location') then exit(iahLocation);
+    'r', 'R': if check('referer') then exit(iahReferer);
+    's', 'S': if check('set-cookie') then exit(iahSetCookie);
   end;
 end;
 
@@ -838,10 +843,12 @@ end;
 class function TInternetAccess.makeHeaderLine(const kind: THeaderKind; const value: string): string;
 begin
   case kind of
-    iaContentType: result := 'Content-Type: ' + value;
-    iaAccept: result := 'Accept: ' + value;
-    iaReferer: result := 'Referer: ' + value;
-    iaLocation: result := 'Location: ' + value;
+    iahContentType: result := 'Content-Type: ' + value;
+    iahAccept: result := 'Accept: ' + value;
+    iahReferer: result := 'Referer: ' + value;
+    iahLocation: result := 'Location: ' + value;
+    iahSetCookie: result := 'Set-Cookie: ' + value;
+    iahCookie: result := 'Cookie: ' + value;
     else raise EInternetException.create('Internal error: Unknown header line kind');
   end;
 end;
@@ -897,7 +904,7 @@ end;
 
 function TInternetAccess.getLastContentType: string;
 begin
-  result := getLastHTTPHeaderValue(iaContentType);
+  result := getLastHTTPHeaderValue(iahContentType);
 end;
 
 constructor TInternetAccess.create();

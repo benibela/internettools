@@ -140,6 +140,7 @@ function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TD
     accept: String;
   begin
    connection.Clear;
+   connection.Cookies.Clear;
    //Some servers fail without port in host, some with. This behaviour mirrors Firefox:
    connection.AddPortNumberToHost:=(url.port <> '')
                                     and ( (striEqual(url.protocol, 'http') and (url.port <> '80'))
@@ -160,14 +161,16 @@ function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TD
 
    for i := 0 to additionalHeaders.Count - 1 do
      case parseHeaderLineKind(additionalHeaders[i]) of
-       iaContentType: connection.MimeType := parseHeaderLineValue(additionalHeaders[i]);
-       iaAccept: accept := parseHeaderLineValue(additionalHeaders[i]);
-       iaReferer: refer := parseHeaderLineValue(additionalHeaders[i]);
+       iahContentType: connection.MimeType := parseHeaderLineValue(additionalHeaders[i]);
+       iahAccept: accept := parseHeaderLineValue(additionalHeaders[i]);
+       iahReferer: refer := parseHeaderLineValue(additionalHeaders[i]);
        else connection.Headers.add(additionalHeaders[i])
      end;
 
-   if refer <> '' then connection.Headers.Add(makeHeaderLine(iaReferer, refer));
-   if accept <> '' then connection.Headers.Add(makeHeaderLine(iaAccept, accept));
+   if refer <> '' then connection.Headers.Add(makeHeaderLine(iahReferer, refer));
+   if accept <> '' then connection.Headers.Add(makeHeaderLine(iahAccept, accept));
+   if length(cookies) > 0 then
+     connection.Headers.Add(makeCookieHeader());
   end;
 
 var ok: Boolean;
