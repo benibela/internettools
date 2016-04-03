@@ -412,53 +412,49 @@ constructor TAndroidInternetAccess.create();
 var args:array[0..1] of jvalue;
     temp: jobject;
     jparams: jobject;
-    jlhttpclient: jobject;
     tempClasses: TClassInformation;
-    javaEnvRef: PJNIEnv;
+
 begin
   init;
 
-  javaEnvRef:=needJ.env; //todo, use j. directl
-
   tempClasses := initializeClasses();
   try
-    with tempClasses do begin
-      jlhttpclient := javaEnvRef^^.NewObject(javaEnvRef, jcDefaultHttpClient, jmDefaultHttpClientConstructor);
-      jhttpclient := javaEnvRef^^.NewGlobalRef(javaEnvRef, jlhttpclient);
-      if jhttpclient = nil then
-        raise EInternetException.create('Failed to create DefaultHttpClient');
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, jlhttpclient);
+    with needJ do
+      with tempClasses do begin
+        jhttpclient := newGlobalRefAndDelete(NewObject(jcDefaultHttpClient, jmDefaultHttpClientConstructor));
+        if jhttpclient = nil then
+          raise EInternetException.create('Failed to create DefaultHttpClient');
 
 
-      jparams := javaEnvRef^^.CallObjectMethod(javaEnvRef, jhttpclient, jmDefaultHttpClientGetParams);
+        jparams := CallObjectMethod(jhttpclient, jmDefaultHttpClientGetParams);
 
-      args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, 'http.useragent');
-      args[1].l  := j.stringToJString(internetConfig^.userAgent);
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, javaEnvRef^^.CallObjectMethodA(javaEnvRef, jparams, jmHttpParamsSetParameter, @args));
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[1].l);
+        args[0].l := NewStringUTF('http.useragent');
+        args[1].l  := j.stringToJString(internetConfig^.userAgent);
+        deleteLocalRef(callObjectMethod(jparams, jmHttpParamsSetParameter, @args));
+        deleteLocalRef(args[0].l);
+        deleteLocalRef(args[1].l);
 
-      //disable 3xx handling, so we can handle it ourselves like on all other platforms
-      args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, 'http.protocol.handle-redirects');
-      args[1].z  := JNI_FALSE;
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, javaEnvRef^^.CallObjectMethodA(javaEnvRef, jparams, jmHttpParamsSetBooleanParameter, @args));
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
+        //disable 3xx handling, so we can handle it ourselves like on all other platforms
+        args[0].l := NewStringUTF('http.protocol.handle-redirects');
+        args[1].z  := JNI_FALSE;
+        DeleteLocalRef(CallObjectMethod(jparams, jmHttpParamsSetBooleanParameter, @args));
+        DeleteLocalRef(args[0].l);
 
-      if internetConfig^.useProxy then begin
-        args[0].l := j.stringToJString(internetConfig^.proxyHTTPName);
-        args[1].i := StrToIntDef(internetConfig^.proxyHTTPPort, 8080);
-        temp := javaEnvRef^^.NewObjectA(javaEnvRef, jcHttpHost, jmHttpHostConstructor, @args);
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
+        if internetConfig^.useProxy then begin
+          args[0].l := stringToJString(internetConfig^.proxyHTTPName);
+          args[1].i := StrToIntDef(internetConfig^.proxyHTTPPort, 8080);
+          temp := NewObject(jcHttpHost, jmHttpHostConstructor, @args);
+          DeleteLocalRef(args[0].l);
 
-        args[0].l := javaEnvRef^^.NewStringUTF(javaEnvRef, 'http.route.default-proxy');
-        args[1].l := temp;
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, javaEnvRef^^.CallObjectMethodA(javaEnvRef, jparams, jmHttpParamsSetParameter, @args));
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[0].l);
-        javaEnvRef^^.DeleteLocalRef(javaEnvRef, args[1].l);
+          args[0].l := NewStringUTF('http.route.default-proxy');
+          args[1].l := temp;
+          DeleteLocalRef(CallObjectMethod(jparams, jmHttpParamsSetParameter, @args));
+          DeleteLocalRef(args[0].l);
+          DeleteLocalRef(args[1].l);
+        end;
+
+        DeleteLocalRef(jparams);
       end;
-
-      javaEnvRef^^.DeleteLocalRef(javaEnvRef, jparams);
-    end;
   finally
     freeClasses(tempClasses);
   end;
