@@ -45,6 +45,7 @@ type
 //**@abstract(Internet access class using the Apache HttpComponents on Android.)
 //**Set defaultInternetAccessClass to TAndroidInternetAccess if you want to use this class on Android.@br
 //**Additionally bbjniutils.jvmref must be set to the Java VM reference.@br
+//**This class handles cookies. Apaches's HttpClient also handles cookies. This might lead to duplicated cookie headers, if you do not disable Apache's handling with a custom http client class on the Java side.
 TAndroidInternetAccess=class(TInternetAccess)
 protected
   jhttpclient: jobject;
@@ -329,8 +330,8 @@ begin
       if ExceptionCheckAndClear then exit;
       j.DeleteLocalRef(jUrl);
 
-      if lastUrl <> '' then
-        addHeader('Referer', lastUrl);
+      if lastUrl <> '' then addHeader('Referer', lastUrl);
+      if length(cookies) > 0 then addHeader('Cookie', makeCookieHeaderValueOnly);
       for i := 0 to additionalHeaders.Count - 1 do
         addHeader(additionalHeaders.Names[i], additionalHeaders.ValueFromIndex[i]);
       if (data <> '') and (m in [hmPut, hmPost]) then

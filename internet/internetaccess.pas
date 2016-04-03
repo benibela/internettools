@@ -132,6 +132,7 @@ type
     procedure setCookie(name,value:string);
     procedure parseHeadersForCookies();
     function makeCookieHeader:string;
+    function makeCookieHeaderValueOnly:string;
     //utility functions to minimize platform dependent code
     type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie);
     class function parseHeaderLineKind(const line: string): THeaderKind; static;
@@ -760,7 +761,7 @@ end;
 
 procedure TInternetAccess.parseHeadersForCookies();
 var i,mark:longint;
-    cookie, header, name, value:string;
+    header, name, value:string;
     ci: Integer;
 begin
   for ci := 0 to lastHTTPHeaders.Count - 1 do
@@ -792,11 +793,19 @@ begin
 end;
 
 function TInternetAccess.makeCookieHeader: string;
-var i:longint;
 begin
   result:='';
   if length(cookies)=0 then exit;
-  result:='Cookie: '+cookies[0].name+'='+cookies[0].value;
+  result := makeHeaderLine(iahCookie, makeCookieHeaderValueOnly);
+end;
+
+function TInternetAccess.makeCookieHeaderValueOnly: string;
+var
+  i: Integer;
+begin
+  result:='';
+  if length(cookies)=0 then exit;
+  result:=cookies[0].name+'='+cookies[0].value;
   for i:=1 to high(cookies) do
     result+='; '+cookies[i].name+'='+cookies[i].value;
 end;
