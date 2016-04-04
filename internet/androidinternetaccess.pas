@@ -145,7 +145,7 @@ var
   jcObject: jclass;
 
 begin
-  //if initialized then exit(cache);
+  needJ;
   with result do begin    //TODO: merge with androidutils of VideLibri
      jcDefaultHttpClient := defaultHttpClientClass;
      if jcDefaultHttpClient = nil then jcDefaultHttpClient := getc('org/apache/http/impl/client/DefaultHttpClient');
@@ -221,6 +221,7 @@ procedure freeClasses(const info:TClassInformation);
 var
   m: THttpMethod;
 begin
+  needJ;
   with info do begin
     if jcDefaultHttpClient <> defaultHttpClientClass then j.deleteLocalRef(jcDefaultHttpClient);
 
