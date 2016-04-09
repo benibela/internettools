@@ -293,6 +293,24 @@ end;
 
 { TXQTermIf }
 
+constructor TXQTermIf.create;
+begin
+
+end;
+
+constructor TXQTermIf.createLogicOperation(const isOr: boolean; a, b: TXQTerm);
+begin
+  push(a);
+  b := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'boolean', [b]);
+  if isOr then begin
+    push(TXQTermConstant.create(xqvalueTrue));
+    push(b);
+  end else begin
+    push(b);
+    push(TXQTermConstant.create(xqvalueFalse));
+  end;
+end;
+
 function TXQTermIf.evaluate(const context: TXQEvaluationContext): IXQValue;
 begin
   if length(children)<>3 then raiseEvaluationError('XPST0003', 'if must have 3 arguments');

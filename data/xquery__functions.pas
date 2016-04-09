@@ -642,19 +642,6 @@ begin
 end;
 
 
-function xqvalueAnd(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
-begin
-  ignore(cxt);
-  if a.toBooleanEffective then result := xqvalue(b.toBooleanEffective)
-  else result := xqvalueFalse;
-end;
-
-function xqvalueOr(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
-begin
-  ignore(cxt);
-  if a.toBooleanEffective then result := xqvalueTrue
-  else result := xqvalue(b.toBooleanEffective);
-end;
 
 
 function xqvalueToNormalizedNodeSeq(v: IXQValue): TXQValueSequence;
@@ -5524,9 +5511,9 @@ begin
   op.registerBinaryOp('<<',@xqvalueNodeBefore,50,[],['node-before($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
   op.registerBinaryOp('>>',@xqvalueNodeAfter,50,[],['node-after($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
 
-  op.registerBinaryOp('and',@xqvalueAnd,40,[xqofAssociativeSyntax],[]);
+  op.registerBinaryOp('and',@xqvalueAndPlaceholder,40,[xqofAssociativeSyntax],[]);
 
-  op.registerBinaryOp('or',@xqvalueOr,30,[xqofAssociativeSyntax],[]);
+  op.registerBinaryOp('or',@xqvalueOrPlaceholder,30,[xqofAssociativeSyntax],[]);
 
   op.registerBinaryOp(':=',@xqvalueAssignment,20,[xqofAssociativeSyntax],[]);
 end;

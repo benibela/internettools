@@ -1844,6 +1844,8 @@ type
   { TXQTermIf }
 
   TXQTermIf = class(TXQTermWithChildren)
+    constructor create;
+    constructor createLogicOperation(const isOr: boolean; a, b: TXQTerm);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -2809,6 +2811,8 @@ function xqFunctionConcat(const args: TXQVArray): IXQValue;
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+function xqvalueOrPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
+function xqvalueAndPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 
 procedure freeAnnotations(annotations: TXQAnnotations);
 
@@ -3616,6 +3620,17 @@ function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQVal
 begin
   ignore(cxt);
   result := xqvalue(xqgetTypeInfo(tb).castableAs(ta, cxt.staticContext));
+end;
+
+function xqvalueOrPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
+begin
+  ignore(cxt); ignore(a); ignore(b);
+  raise EXQEvaluationException.create('PXP:ORPL','Placeholder called');
+end;
+
+function xqvalueAndPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
+begin
+  raise EXQEvaluationException.create('PXP:ANDPL', 'Placeholder called');
 end;
 
 
@@ -6829,10 +6844,10 @@ var pos: pchar;
       else if striEqual(t, 'last-child') then result := newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling::*')])
       else if striEqual(t, 'first-of-type') then result := newFunction('empty', [allOfSameType('preceding-sibling')])
       else if striEqual(t, 'last-of-type') then  result := newFunction('empty', [allOfSameType('following-sibling')])
-      else if striEqual(t, 'only-child') then    result := newBinOp(newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling::*')]), 'and', newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling::*')]))
+      else if striEqual(t, 'only-child') then    result := TXQTermIf.createLogicOperation(false, newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling::*')]), newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling::*')]))
       else if striEqual(t, 'only-of-type') then  result := newBinOp(newFunction('count', [allOfSameType('')]), '=', newOne)
       else if striEqual(t, 'empty') then         result := newFunction('not', [TXQTermNodeMatcher.Create('node', true)])
-      else if striEqual(t, 'link') then          result := newBinOp(TXQTermNodeMatcher.Create('self::a'), 'and', newFunction('exists', newReadAttrib('href')))
+      else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self::a'), newFunction('exists', newReadAttrib('href')))
       else if striEqual(t, 'checked') then       result := newFunction('exists', [newReadAttrib('checked')])
       else if striEqual(t, 'enabled') or striEqual(t, 'disabled') or striEqual(t, 'visited') or striEqual(t, 'active') or striEqual(t, 'hover') or striEqual(t, 'focus') or striEqual(t, 'target')  then raiseParsingError('Unsupported pseudo class: '+t)
       else raiseParsingError('Unknown pseudo class: '+t);
@@ -6882,7 +6897,7 @@ var pos: pchar;
            (TXQTermFilterSequence(result).children[1] is TXQTermConstant) then
           result := TXQTermFilterSequence.Create(result, filter)
          else
-          TXQTermFilterSequence(result).children[1] := newBinOp(TXQTermFilterSequence(result).children[1], 'and', filter);
+          TXQTermFilterSequence(result).children[1] := TXQTermIf.createLogicOperation(false, TXQTermFilterSequence(result).children[1], filter);
       end;
 
       skipSpace;
