@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils;
 
-procedure unittests(TestErrors:boolean);
+procedure unittests(TestErrors, testerrmath:boolean);
 
 
 implementation
@@ -19,7 +19,7 @@ begin
   if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
 end;
 
-procedure unittests(testerrors: boolean);
+procedure unittests(testerrors, testerrmath: boolean);
 var
   count: integer;
   ps: TXQueryEngine;
@@ -335,17 +335,20 @@ begin
 
   registerModuleMath();
 
+
   t('math:pi()', '3.141592653589793');
   t('math:pow(-2, 3)', '-8');
-  t('math:pow(-2, -3111111111111111111111111111111111111111111)', '0');
-  t('math:pow(-2, 3111111111111111111111111111111111111111111)', '-INF');
-  t('math:pow(-2, 3111111111111111111111111111111111111111112)', 'INF');
-  t('math:pow(-2, 3111111111111111111111111111111111111111111.5)', 'INF');
-  t('math:pow(-2, 3E100)', 'INF');
-  t('math:pow(xs:double("NaN"), 5)', 'NaN');
-  t('let $big := 88888888888 return (math:pow(3, $big), math:pow(3, -$big), math:pow(0.3, $big), math:pow(0.3, -$big))', 'INF 0 0 INF');
-  t('math:atan2(xs:double("INF"), xs:double("-INF"))', '2.356194490192345');
+  if testerrmath then begin
+    t('math:pow(-2, -3111111111111111111111111111111111111111111)', '0');
+    t('math:pow(-2, 3111111111111111111111111111111111111111111)', '-INF');
+    t('math:pow(-2, 3111111111111111111111111111111111111111112)', 'INF');
+    t('math:pow(-2, 3111111111111111111111111111111111111111111.5)', 'INF');
+    t('math:pow(-2, 3E100)', 'INF');
+    t('math:pow(xs:double("NaN"), 5)', 'NaN');
+    t('let $big := 88888888888 return (math:pow(3, $big), math:pow(3, -$big), math:pow(0.3, $big), math:pow(0.3, -$big))', 'INF 0 0 INF');
+    t('math:atan2(xs:double("INF"), xs:double("-INF"))', '2.356194490192345');
   //t('xs:float("1.00000003009493E+060")', 'INF');
+  end;
 
   SetExceptionMask([exInvalidOp, exDenormalized, exOverflow, exUnderflow, exPrecision]);
   t('(xs:double("INF") div xs:double("INF"))', 'NaN', '');
