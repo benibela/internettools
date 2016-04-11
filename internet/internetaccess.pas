@@ -855,7 +855,7 @@ end;
 
 class function TInternetAccess.parseHeaderLineName(const line: string): string;
 begin
-  result := copy(line, 1, pos(':', line));
+  result := copy(line, 1, pos(':', line) - 1);
 end;
 
 class function TInternetAccess.makeHeaderLine(const name, value: string): string;
