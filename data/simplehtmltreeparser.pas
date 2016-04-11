@@ -2256,7 +2256,7 @@ begin
     'xml': result := XMLNamespace_XML;
     'xmlns': result := XMLNamespace_XMLNS;
     '': result := FCurrentNamespace;
-    else if parsingModel = pmStrict then raise ETreeParseException.Create('Unknown namespace: '+prefix);
+    else if parsingModel = pmStrict then raise ETreeParseException.Create('Unknown namespace in XML file: '+prefix);
   end;
 end;
 
