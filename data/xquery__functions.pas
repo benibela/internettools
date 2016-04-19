@@ -4552,16 +4552,16 @@ const monthNamesEnglish: array[1..12] of string = ('January', 'February', 'March
 
 
 var picture: string;
-  procedure raiseInvalidPictureFOFD1340;
+  procedure raiseInvalidPictureFOFD1340(s: string = '');
   begin
-    raise EXQEvaluationException.create('FOFD1340', 'Invalid picture string: ' + picture);
+    raise EXQEvaluationException.create('FOFD1340', 'Invalid picture string: ' + picture + ' ' + s);
   end;
 
   function parseWidth(const width: string; const def: integer): integer;
   begin
     if width = '*' then exit(def);
     result := StrToIntDef(width, -1);
-    if result <= 0 then raiseInvalidPictureFOFD1340;
+    if result <= 0 then raiseInvalidPictureFOFD1340('width: ' + width+#13#10'Hint: Use - ([X,3-3]) to separate min/max width');
   end;
 
   function countDigits(const s: string; zerodp: PInteger = nil; allDigits: PBoolean = nil): integer;
@@ -4693,7 +4693,7 @@ begin
             'H','h','P','m','s','f': if not allowTime then
               raise EXQEvaluationException.create('FOFD1350', 'Invalid component in '+picture);
             'Z', 'z': ;
-            else raiseInvalidPictureFOFD1340;
+            else raiseInvalidPictureFOFD1340('unknown component');
           end;
           last := i + 1;
           i := strIndexOf(picture, ']', i);
@@ -4904,7 +4904,7 @@ begin
     formatted := fallbackOccured + formatted;
   except
     on e:EXQEvaluationException do
-      if e.errorCode = 'FODF1310' then raiseInvalidPictureFOFD1340
+      if e.errorCode = 'FODF1310' then raiseInvalidPictureFOFD1340(e.Message)
       else raise;
   end;
   result := xqvalue(formatted);
