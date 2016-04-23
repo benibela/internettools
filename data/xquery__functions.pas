@@ -3576,7 +3576,7 @@ end;
 
 
 
-function xqFunctionFold(left: boolean; const args: TXQVArray): IXQValue;
+function xqFunctionFold(const context: TXQEvaluationContext; left: boolean; const args: TXQVArray): IXQValue;
 var
   func: TXQValueFunction;
   newargs: TXQVArray;
@@ -3594,7 +3594,7 @@ begin
     newargs[0] := args[1];
     for v in args[0] do begin
       newargs[1] := v;
-      newargs[0] := func.evaluate(newargs, nil);
+      newargs[0] := func.evaluate(context, newargs, nil);
     end;
     result := newargs[0];
   end else begin
@@ -3602,25 +3602,25 @@ begin
     newargs[1] := args[1];
     for i := count downto 1 do begin
       newargs[0] := args[0].get(i);
-      newargs[1] := func.evaluate(newargs, nil);
+      newargs[1] := func.evaluate(context, newargs, nil);
     end;
     result := newargs[1];
   end;
 end;
 
 
-function xqFunctionFold_left(const args: TXQVArray): IXQValue;
+function xqFunctionFold_left(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
-  result := xqFunctionFold(true, args);
+  result := xqFunctionFold(context, true, args);
 end;
 
-function xqFunctionFold_right(const args: TXQVArray): IXQValue;
+function xqFunctionFold_right(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
-  result := xqFunctionFold(false, args);
+  result := xqFunctionFold(context, false, args);
 end;
 
 
-function xqFunctionFor_each_pair(const args: TXQVArray): IXQValue;
+function xqFunctionFor_each_pair(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   seq1: TXQValue;
   seq2: TXQValue;
@@ -3641,7 +3641,7 @@ begin
   for i := 1 to count do begin
     newargs[0] := seq1.get(i);
     newargs[1] := seq2.get(i);
-    resseq.add(func.evaluate(newargs, nil));
+    resseq.add(func.evaluate(context, newargs, nil));
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);

@@ -81,6 +81,7 @@ type
   IXQuery = interface;
   TXQNativeModule = class;
   TXQValuePropertyEnumerator = class;
+  TXQTermDefineVariable = class;
 
   float = record end;
   xqfloat = double;
@@ -117,7 +118,6 @@ type
 
   //============================XQUERY CONTEXTS==========================
 
-  { TXQStaticContext }
 
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   TXQStaticContext = class
@@ -125,12 +125,18 @@ type
     FNodeCollation: TXQCollation;  // default collation used for node name comparisons (extension, does not exist in XQuery)
     function getNodeCollation: TXQCollation;
   public
+    type TXQVariableContext = record
+      definition: TXQTermDefineVariable;
+      context: TXQStaticContext;
+    end;
+
+  public
     sender: TXQueryEngine; //**< Engine this context belongs to
 
     //The following values map directly to XQuery options declarable in a prolog
     moduleNamespace: INamespace; //**< The namespace of this module or nil
     namespaces: TNamespaceList;  //**< All declared namespaces.
-    moduleVariables: TXQVariableChangeLog;  //**< All declared and imported variables.
+    moduleVariables: array of TXQVariableContext;  //**< All declared and imported variables.
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
@@ -914,7 +920,7 @@ type
 
     function toBooleanEffective: boolean; override;
 
-    function evaluate(const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    function evaluate(const outerContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
     function evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
 
     function directClone: TXQValue;
@@ -922,7 +928,7 @@ type
     function debugAsStringWithTypeAnnotation(textOnly: boolean=true): string;
 
     procedure assignCopiedTerms(const func: TXQValueFunction); //for internal use
-  private
+
     procedure visit(visitor: TXQTerm_Visitor);
   end;
 
@@ -1574,6 +1580,7 @@ type
     constructor create(avarname: string; anamespace: INamespace);
     constructor create(vari: TXQTerm; value: TXQTerm = nil);
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function getClassicValue(const context: TXQEvaluationContext): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -1924,9 +1931,6 @@ type
   { TXQTermModule }
 
   TXQTermModule = class(TXQTermWithChildren)
-    procedure initializeVariables(var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext);
-    function getVariableValue(declaration: TXQTermDefineVariable; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
-    function getVariableValue(const name: string; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -2804,6 +2808,17 @@ protected
 
 end;
 
+type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
+  overridenVariables: {set of string} TXQVariableChangeLog;
+  tempValue: IXQValue;
+  constructor create;
+  destructor Destroy; override;
+
+  procedure declare(v: PXQTermVariable); override;
+  procedure undeclare(v: PXQTermVariable); override;
+end;
+
+
 var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators: INamespace;
 function convertElementTestToPathMatchingStep(const select: string; const children: TXQTermArray): TXQPathMatchingStep;
 
@@ -3659,17 +3674,6 @@ begin
 end;
 
 
-type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
-  overridenVariables: {set of string} TXQVariableChangeLog;
-  tempValue: IXQValue;
-  constructor create;
-  destructor Destroy; override;
-
-  procedure declare(v: PXQTermVariable); override;
-  procedure undeclare(v: PXQTermVariable); override;
-end;
-
-
 { TXQStaticContext }
 
 function TXQStaticContext.getNodeCollation: TXQCollation;
@@ -3724,7 +3728,10 @@ begin
   with sc do begin
     result.sender := sender;
     result.stripboundaryspace := stripboundaryspace;
-    if modulevariables <> nil then result.modulevariables := modulevariables.clone;
+    if modulevariables <> nil then begin
+      result.modulevariables := modulevariables;
+      SetLength(result.modulevariables, length(result.modulevariables));
+    end;
     if namespaces <> nil then result.namespaces := namespaces.clone;
     result.functions := functions;
     if length(result.functions) > 0 then begin
@@ -3775,7 +3782,6 @@ destructor TXQStaticContext.Destroy;
 var
   i: Integer;
 begin
-  FreeAndNil(moduleVariables);
   if importedModules <> nil then
   FreeAndNil(importedModules);
   for i := 0 to high(functions) do
@@ -4264,208 +4270,6 @@ begin
   Result:=children[high(children)].getContextDependencies;
 end;
 
-
-
-type
-
-{ TVariableCycleDetector }
-
-TVariableCycleDetector = class(TXQTerm_VisitorTrackKnownVariables)
-  stack, visited: TList;
-  declaredVarStack: TXQVariableChangeLog;
-  scontext: TXQStaticContext;
-  module: TXQTermModule;
-  constructor create;
-  destructor Destroy; override;
-  function visit(term: PXQTerm): TXQTerm_VisitAction; override;
-  function leave(term: PXQTerm): TXQTerm_VisitAction; override;
-end;
-
-{ TVariableCycleDetector }
-
-constructor TVariableCycleDetector.create;
-begin
-  inherited;
-  stack := TList.Create;
-  visited := tlist.Create;
-  declaredVarStack:=TXQVariableChangeLog.create();
-end;
-
-destructor TVariableCycleDetector.Destroy;
-begin
-  stack.free;
-  visited.Free;
-  declaredVarStack.free;
-  inherited Destroy;
-end;
-
-function TVariableCycleDetector.visit(term: PXQTerm): TXQTerm_VisitAction;
-var
-  modu: TXQTermModule;
-  q: TXQuery;
-  declaration: TXQTermDefineVariable;
-  hasExpression: Boolean;
-  v: TXQTermVariable;
-  i: Integer;
-  tnf: TXQTermNamedFunction;
-  oldContext: TXQStaticContext;
-begin
-  Result:=inherited visit(term);
-  stack.Add(term^);
-  if visited.IndexOf(term^) >= 0 then exit(xqtvaNoRecursion);
-  visited.Add(term^);
-  if term^ is TXQTermNamedFunction then begin
-    tnf := TXQTermNamedFunction (term^);
-    if tnf.kind = xqfkUnknown then tnf.init(scontext);
-    if tnf.kind = xqfkUnknown then begin
-      oldContext := scontext;
-      if tnf.functionStaticContext <> nil then //should always be true?
-        scontext := tnf.functionStaticContext;
-      TXQTermNamedFunction (term^).interpretedFunction.visit(self);
-      scontext := oldContext;
-    end;
-  end else if term^ is TXQTermVariable then begin
-    v := TXQTermVariable(term^);
-    if (overridenVariables.hasVariable(v)) or ((scontext.moduleVariables <> nil) and (scontext.moduleVariables.hasVariable(v))) then exit;
-    if declaredVarStack.hasVariable(v) then raise EXQEvaluationException.create( ifthen(scontext.model in [xqpmXPath3, xqpmXQuery3], 'XQDY0054', 'XQST0054' ), 'Dependancy cycle detected for '+term^.debugTermToString);
-    q := scontext.findModule(TXQTermVariable(term^).namespace);
-    if q <> nil then modu := q.fTerm as TXQTermModule
-    else modu := module;
-    for i:=0 to high(modu.children) - ifthen((modu = module) and (scontext.moduleNamespace = nil), 1,0) do
-      if (modu.children[i] is TXQTermDefineVariable) and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
-        declaration := TXQTermDefineVariable(modu.children[i]);
-        hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
-        if hasExpression then begin
-          declaredVarStack.pushAll;
-          declaredVarStack.add(v, xqvalue());
-          simpleTermVisit(@declaration.children[high(declaration.children)], nil);
-          declaredVarStack.popAll();
-        end;
-      end;
-  end;
-end;
-
-function TVariableCycleDetector.leave(term: PXQTerm): TXQTerm_VisitAction;
-begin
-  Result:=inherited leave(term);
-  assert(term^ = txqterm(stack[stack.Count-1]));
-  stack.Delete(stack.Count-1);
-end;
-
-
-procedure TXQTermModule.initializeVariables(var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext);
-var
-  targetStaticContext: TXQStaticContext;
-  vars: TXQVariableChangeLog;
-  i: Integer;
-  tempDefVar: TXQTermDefineVariable;
-  nsu: string;
-  name: String;
-  hasTypeDeclaration: Boolean;
-  tempValue: IXQValue;
-  priv: Boolean;
-  j: Integer;
-begin
-  targetStaticContext := context.staticContext;
-  context.staticContext := ownStaticContext;
-
-  if targetStaticContext.moduleVariables = nil then targetStaticContext.moduleVariables := TXQVariableChangeLog.create();
-  vars := targetStaticContext.moduleVariables;
-  for i:=0 to high(children) - ifthen(context.staticContext.moduleNamespace = nil, 1,0) do
-    if children[i] is TXQTermDefineVariable then begin
-      tempDefVar := TXQTermDefineVariable(children[i]);
-      priv := false;
-      for j := 0 to high(tempDefVar.annotations) do
-        if tempDefVar.annotations[j].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
-          priv := true;
-      if priv then continue;
-
-      nsu := (tempDefVar.variable as TXQTermVariable).namespace;
-      name := (tempDefVar.variable as TXQTermVariable).value;
-      //if (ns = nil) and (context.staticContext.moduleNamespace <> nil) then
-      //  raiseEvaluationError('XPST0008', 'Unknown namespace prefix for variable: '+name);
-      if (context.staticContext.moduleNamespace  <> nil) and (context.staticContext.moduleNamespace.getURL  <> nsu ) then
-         raiseEvaluationError('XQST0048', 'Invalid namespace for variable: Q{'+nsu+ '}'+name);
-
-      hasTypeDeclaration := (length(tempDefVar.children) > 0) and (tempDefVar.children[0] is TXQTermSequenceType);
-
-      tempValue := getVariableValue(tempDefVar, context, ownStaticContext);
-      vars.add(name, tempValue, nsu);
-
-      if hasTypeDeclaration then
-        if not (tempDefVar.children[0] as TXQTermSequenceType).instanceOf(tempValue, context) then
-          raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +tempValue.toString + ' has not the correct type '+TXQTermSequenceType(tempDefVar.children[0]).serialize);
-    end;
-
-
-  context.staticContext := targetStaticContext;
-end;
-
-function TXQTermModule.getVariableValue(declaration: TXQTermDefineVariable; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
-var
-  tempcontext: TXQEvaluationContext;
-  hasExpression: Boolean;
-  nsu, name: String;
-  i: Integer;
-  cycler: TVariableCycleDetector;
-  extern: Boolean;
-begin
-  if context.staticContext <> ownStaticContext then begin
-    for i := 0 to high(declaration.annotations) do
-      if declaration.annotations[i].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
-        raiseEvaluationError('XPST0008', 'Variable is private');
-
-    tempcontext := context;
-    tempcontext.staticContext := ownStaticContext;
-    exit(getVariableValue(declaration, tempcontext, ownStaticContext));
-  end;
-  hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
-  extern := not hasExpression;
-  if not extern and (length(declaration.annotations) > 0) then
-    extern := declaration.annotations[high(declaration.annotations)].name.isEqual(XMLNamespaceURL_MyExtensionsNew, 'external');
-
-  result := nil;
-  if hasExpression then begin
-    cycler := TVariableCycleDetector.create;
-    cycler.module := self;
-    cycler.scontext := ownStaticContext;
-    try
-      cycler.declaredVarStack.add(declaration.variable as TXQTermVariable, xqvalue());
-      cycler.simpleTermVisit(@declaration.children[high(declaration.children)], declaration);
-    finally
-      cycler.free;
-    end;
-    result := declaration.children[high(declaration.children)].evaluate(context)
-  end;
-  if extern then begin
-    if (context.staticContext.sender <> nil) and assigned(context.staticContext.sender.OnDeclareExternalVariable) then begin
-     //raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
-      name := (declaration.variable as TXQTermVariable).value;
-      nsu := (declaration.variable as TXQTermVariable).namespace;
-      context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, nsu, name, result);
-    end;
-    if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
-  end;
-end;
-
-function TXQTermModule.getVariableValue(const name: string; const context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
-var
-  tempDefVar: TXQTermDefineVariable;
-  tname, nsu: String;
-  i: Integer;
-begin
-  for i:=0 to high(children) - 1 do
-    if children[i] is TXQTermDefineVariable then begin
-      tempDefVar := TXQTermDefineVariable(children[i]);
-      tname := (tempDefVar.variable as TXQTermVariable).value;
-      if tname <> name then continue;
-      nsu := (tempDefVar.variable as TXQTermVariable).namespace;
-      if (ownStaticContext.moduleNamespace  <> nil) and not equalNamespaces(ownStaticContext.moduleNamespace.getURL, nsu) then
-        raiseEvaluationError('XQST0048', 'Invalid namespace for variable: Q{'+nsu+ '}'+name);
-      exit(getVariableValue(tempDefVar, context, ownStaticContext));
-    end;
-end;
-
 { TXQValueEnumerator }
 
 function TXQValueEnumerator.MoveNext: Boolean;
@@ -4533,7 +4337,6 @@ end;
 function TXQEvaluationContext.hasVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
 var
   temp: TXQValue;
-  module: TXQuery;
 begin
   temp := nil;
   value := nil;
@@ -4541,24 +4344,6 @@ begin
     result := temporaryVariables.hasVariable(name, @temp, namespaceURL);
     value := temp;
     if result then exit;
-  end;
-  if (staticContext.moduleVariables <> nil) then begin
-    result := staticContext.moduleVariables.hasVariable(name, @temp, namespaceURL);
-    value := temp;
-    if result then exit;
-  end;
-  module := staticContext.findModule(namespaceURL);
-  if (module <> nil) then begin
-    if (module.staticContext.moduleVariables <> nil) then begin //what is the point of this?? unit tests work without and it might expose private variables. todo: remove if it is not needed for XQTS
-      result := module.staticContext.moduleVariables.hasVariable(name, @temp, namespaceURL);
-      value := temp;
-      exit;
-    end;
-    if module.fterm is TXQTermModule then begin
-      value := TXQTermModule(module.fTerm).getVariableValue(name, self, module.staticContext);
-      result := value <> nil;
-      exit;
-    end;
   end;
   if (staticContext.sender <> nil) and staticContext.sender.VariableChangelog.hasVariable(name, @temp, namespaceURL) then begin
     result := true;
@@ -4687,18 +4472,40 @@ end;
 function TXQuery.evaluate(const context: TXQEvaluationContext): IXQValue;
 var tempcontext: TXQEvaluationContext;
   i: Integer;
+  tempcontext2: TXQEvaluationContext;
+  curcontext: ^TXQEvaluationContext;
 begin
   if fterm = nil then exit(xqvalue());
-  if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
+  if (context.staticContext <> nil) and (staticContext.importedModules = nil) and (length(staticContext.moduleVariables) = 0)  and not (fterm is TXQTermModule) then
     exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
 
   tempcontext:=context;
   tempcontext.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
-  if staticContext.importedModules <> nil then
-    for i := 0 to staticContext.importedModules.Count - 1 do
-      ((staticContext.importedModules.Objects[i] as TXQuery).fterm as TXQTermModule).initializeVariables(tempcontext, (staticContext.importedModules.Objects[i] as TXQuery).staticContext);
-  if fterm is TXQTermModule then TXQTermModule(fterm).initializeVariables(tempcontext, staticContext);
+
+  {if staticContext.importedModules <> nil then SetLength(tempcontexts, staticContext.importedModules.Count)
+  else SetLength(tempcontexts, 0);
+  for i := 0 to high(tempcontexts) do begin
+    tempcontexts := context;
+    tempcontexts[i].staticContext := staticContext.importedModules;
+  end;}
+  if length(staticContext.moduleVariables) > 0 then begin
+    tempcontext.beginSubContextWithVariables;
+    for i := 0 to high(staticContext.moduleVariables) do begin
+      if staticContext.moduleVariables[i].context = staticContext then curcontext := @tempcontext
+      else begin
+        curcontext := @tempcontext2;
+        if staticContext.moduleVariables[i].context <> tempcontext2.staticContext then begin
+          tempcontext2 := context;
+          tempcontext2.staticContext := staticContext.moduleVariables[i].context;
+        end;
+      end;
+
+      tempcontext.temporaryVariables.add(staticContext.moduleVariables[i].definition.variable as TXQTermVariable, staticContext.moduleVariables[i].definition.getClassicValue(curcontext^));
+    end;
+  end;
   result := fterm.evaluate(tempcontext);
+  if length(staticContext.moduleVariables) > 0 then
+    tempcontext.endSubContextWithVariables(context);
 end;
 
 function TXQuery.evaluate(const contextItem: IXQValue): IXQValue;

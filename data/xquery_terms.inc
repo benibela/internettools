@@ -531,6 +531,37 @@ begin
   else context.staticContext.sender.OnDefineVariable(self, variablename, result);*)
 end;
 
+//returns the value, if the definition is a standard xquery 'declare variable $ ...'
+function TXQTermDefineVariable.getClassicValue(const context: TXQEvaluationContext): IXQValue;
+var
+  hasExpression, extern, hasTypeDeclaration: Boolean;
+  name, nsu: string;
+begin
+  hasTypeDeclaration := (length(children) > 0) and (children[0] is TXQTermSequenceType);
+  hasExpression := (length(children) > 0) and not (children[high(children)] is TXQTermSequenceType);
+  extern := not hasExpression;
+  if not extern and (length(annotations) > 0) then
+    extern := annotations[high(annotations)].name.isEqual(XMLNamespaceURL_MyExtensionsNew, 'external');
+
+  result := nil;
+  if hasExpression then
+    result := children[high(children)].evaluate(context);
+
+  if extern then begin
+    if (context.staticContext.sender <> nil) and assigned(context.staticContext.sender.OnDeclareExternalVariable) then begin
+     //raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
+      name := (variable as TXQTermVariable).value;
+      nsu := (variable as TXQTermVariable).namespace;
+      context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, nsu, name, result);
+    end;
+  end;
+  if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
+
+  if hasTypeDeclaration then
+    if not (children[0] as TXQTermSequenceType).instanceOf(result, context) then
+      raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +result.debugAsStringWithTypeAnnotation() + ' has not the correct type '+TXQTermSequenceType(children[0]).serialize);
+end;
+
 function TXQTermDefineVariable.getContextDependencies: TXQContextDependencies;
 begin
   Result:=[];
@@ -2347,7 +2378,7 @@ begin
     end;
     xqfkUnknown: begin
       init(context.staticContext);
-      result := interpretedFunction.evaluate(evilkids, self);
+      result := interpretedFunction.evaluate(context, evilkids, self);
     end;
   end;
 
@@ -2531,7 +2562,7 @@ begin
     for i:=1 to high(children) do
       evilkids[i-1] := children[i].evaluate(context);
     if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
-    result := (func as TXQValueFunction).evaluate(evilkids, self);
+    result := (func as TXQValueFunction).evaluate(context, evilkids, self);
     if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
     exit;
   end;

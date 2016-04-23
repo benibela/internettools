@@ -2074,21 +2074,22 @@ begin
 end;
 
 
-function TXQValueFunction.evaluate(const args: TXQVArray; const term: TXQTerm): IXQValue;
+function TXQValueFunction.evaluate(const outerContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
   j: Integer;
 begin
   tempcontext := context;
   if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
-  tempcontext.temporaryVariables := TXQVariableChangeLog.create();
+  tempcontext.temporaryVariables := outerContext.temporaryVariables;
+  tempcontext.beginSubContextWithVariables;
   try
     for j := 0 to high(parameters) do
       tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context, term));
     result := body.evaluate(tempcontext);
     result := TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);
   finally
-    tempcontext.temporaryVariables.free;
+    tempcontext.endSubContextWithVariables(outerContext);
   end;
 end;
 
