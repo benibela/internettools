@@ -1584,6 +1584,10 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
+
+    function getExpression: TXQTerm;
+    function getSequenceType: TXQTermSequenceType;
+
     destructor destroy; override;
   end;
 
@@ -4479,6 +4483,7 @@ var tempcontext: TXQEvaluationContext;
   i: Integer;
   tempcontext2: TXQEvaluationContext;
   curcontext: ^TXQEvaluationContext;
+  vari: TXQTermVariable;
 begin
   if fterm = nil then exit(xqvalue());
   if (context.staticContext <> nil) and (staticContext.importedModules = nil) and (length(staticContext.moduleVariables) = 0)  and not (fterm is TXQTermModule) then
@@ -4500,14 +4505,23 @@ begin
       else begin
         curcontext := @tempcontext2;
         if staticContext.moduleVariables[i].context <> tempcontext2.staticContext then begin
-          tempcontext2 := context;
+          tempcontext2 := tempcontext;
           tempcontext2.staticContext := staticContext.moduleVariables[i].context;
         end;
       end;
 
-      tempcontext.temporaryVariables.add(staticContext.moduleVariables[i].definition.variable as TXQTermVariable, staticContext.moduleVariables[i].definition.getClassicValue(curcontext^));
+      vari := staticContext.moduleVariables[i].definition.variable as TXQTermVariable;
+      if vari.value = '$' then begin
+        tempcontext.SeqValue := staticContext.moduleVariables[i].definition.getClassicValue(curcontext^);
+        tempcontext.SeqLength := 1;
+        tempcontext.SeqIndex := 1;
+        tempcontext2.SeqValue := tempcontext.SeqValue;
+        tempcontext2.SeqLength := 1;
+        tempcontext2.SeqIndex := 1;
+      end else tempcontext.temporaryVariables.add(vari, staticContext.moduleVariables[i].definition.getClassicValue(curcontext^));
     end;
   end;
+
   result := fterm.evaluate(tempcontext);
   if length(staticContext.moduleVariables) > 0 then
     tempcontext.endSubContextWithVariables(context);

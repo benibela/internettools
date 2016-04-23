@@ -2703,20 +2703,31 @@ begin
 end;
 
 procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext; cloneTerms: boolean);
-  procedure checkVariableOverride(v: TXQTermVariable);
+  procedure checkVariableOverride(d: TXQTermDefineVariable);
   var
     i, j: Integer;
     modu: TXQTermModule;
+    v: TXQTermVariable;
+    otherdef: TXQTermDefineVariable;
   begin
-    if sc.importedModules <> nil then
+    if sc.importedModules <> nil then begin
+      v := TXQTermVariable(d.variable);
       for i := 0 to sc.importedModules.Count - 1 do begin
         modu := TXQueryBreaker(sc.importedModules.Objects[i]).getTerm as TXQTermModule;
         if modu = module then continue;
         for j :=  0 to high( modu.children ) do
           if (modu.children[j] is TXQTermDefineVariable)
-             and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then
-          raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
+             and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then begin
+               if v.value = '$' then begin //context item hack
+                 otherdef := TXQTermDefineVariable(modu.children[j]);
+                 if (d.getExpression <> nil) and (otherdef.getSequenceType <> nil) then  begin
+                   d.children[high(d.children)] := TXQTermBinaryOp.create('treat as', d.getExpression, otherdef.getSequenceType);
+                 end;
+               end else raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
+             end;
+
       end;
+    end;
 
   end;
 
@@ -2738,7 +2749,7 @@ begin
   for i:=truechildrenhigh downto 0 do
     if children[i] is TXQTermDefineFunction then begin
       functionCount += 1;
-    end else checkVariableOverride(TXQTermVariable((children[i] as TXQTermDefineVariable).variable));
+    end else checkVariableOverride(((children[i] as TXQTermDefineVariable)));
 
   oldFunctionCount := length(sc.functions) - functionCount;
   for i := high(sc.functions) downto oldFunctionCount do begin
@@ -2995,18 +3006,40 @@ var declarationDuplicateChecker: TStringList;
     staticContext.importedModules.AddObject(moduleName, module);
   end;
 
-  procedure declareVariable(annotations: TXQAnnotations);
+  procedure declareVariable(annotations: TXQAnnotations; contextItem: boolean = false);
   var vari: TXQTermDefineVariable;
+    typ: TXQTermSequenceType;
   begin
     requireModule;
-    vari := parseDefineVariable;
-    vari.annotations := annotations;
+    if not contextItem then begin
+      vari := parseDefineVariable;
+      vari.annotations := annotations;
+    end else begin
+      vari := TXQTermDefineVariable.create('$', nil);
+      if nextToken(true) = 'as' then begin
+        expect('as');
+        typ := parseSequenceType([]);
+        vari.push(typ);
+        if (typ.allowMultiple) or (typ.allowNone) then begin
+          vari.free;
+          raiseSyntaxError('Expected ItemType');
+        end;
+      end else begin
+        typ := TXQTermSequenceType.create();
+        typ.kind := tikAny;
+        vari.push(typ);
+      end;
+    end;
     TXQTermModule(result).push(vari);
     if vari.variable is TXQTermPendingEQNameToken then vari.variable := TXQTermPendingEQNameToken(vari.variable).resolveAndFree(staticContext); //global variable namespaces are known
-    if staticContext.isLibraryModule and (namespaceGetURL(staticContext.moduleNamespace) <> (vari.variable as TXQTermVariable).namespace) then
-      raiseParsingError('XQST0048', 'Wrong namespace: ' + vari.debugTermToString);
+    if not contextItem and staticContext.isLibraryModule and (namespaceGetURL(staticContext.moduleNamespace) <> (vari.variable as TXQTermVariable).namespace) then
+      raiseParsingError( 'XQST0048', 'Wrong namespace: ' + vari.debugTermToString);
     case nextToken() of
-      ':=': vari.push(parse());
+      ':=': begin
+        vari.push(parse());
+        if contextItem and staticContext.isLibraryModule then
+          raiseParsingError('XQST0113', 'Cannot set context item in library module');
+      end;
       'external': if nextToken(true) = ':=' then begin
         requireXQuery3('default value');
         expect(':=');
@@ -3300,6 +3333,11 @@ begin
       expect(token);
       case nextToken() of
         'variable': declareVariable(nil);
+        'context': begin
+          expect('item');
+          checkForDuplicate('context', 'XQST0099');
+          declareVariable(nil, true);
+        end;
         'function': begin
           requireModule;
           TXQTermModule(result).push(parseFunctionDeclaration(nil));

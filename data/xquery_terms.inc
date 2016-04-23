@@ -536,16 +536,20 @@ function TXQTermDefineVariable.getClassicValue(const context: TXQEvaluationConte
 var
   hasExpression, extern, hasTypeDeclaration: Boolean;
   name, nsu: string;
+  expression: TXQTerm;
+  sequenceType: TXQTermSequenceType;
 begin
-  hasTypeDeclaration := (length(children) > 0) and (children[0] is TXQTermSequenceType);
-  hasExpression := (length(children) > 0) and not (children[high(children)] is TXQTermSequenceType);
+  sequenceType := getSequenceType;
+  hasTypeDeclaration := sequenceType <> nil;
+  expression := getExpression;
+  hasExpression := expression <> nil;
   extern := not hasExpression;
   if not extern and (length(annotations) > 0) then
     extern := annotations[high(annotations)].name.isEqual(XMLNamespaceURL_MyExtensionsNew, 'external');
 
   result := nil;
   if hasExpression then
-    result := children[high(children)].evaluate(context);
+    result := expression.evaluate(context);
 
   if extern then begin
     if (context.staticContext.sender <> nil) and assigned(context.staticContext.sender.OnDeclareExternalVariable) then begin
@@ -558,7 +562,7 @@ begin
   if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
 
   if hasTypeDeclaration then
-    if not (children[0] as TXQTermSequenceType).instanceOf(result, context) then
+    if not sequenceType.instanceOf(result, context) then
       raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +result.debugAsStringWithTypeAnnotation() + ' has not the correct type '+TXQTermSequenceType(children[0]).serialize);
 end;
 
@@ -611,6 +615,18 @@ begin
   other := TXQTermDefineVariable(result);
   other.variable:=variable.clone;
   copyAnnotations(other.annotations, annotations);
+end;
+
+function TXQTermDefineVariable.getExpression: TXQTerm;
+begin
+  if (length(children) > 0) and not (children[high(children)] is TXQTermSequenceType) then exit(children[high(children)])
+  else exit(nil);
+end;
+
+function TXQTermDefineVariable.getSequenceType: TXQTermSequenceType;
+begin
+  if (length(children) > 0) and (children[0] is TXQTermSequenceType) then exit(TXQTermSequenceType(children[0]))
+  else exit(nil);
 end;
 
 destructor TXQTermDefineVariable.destroy;
