@@ -187,7 +187,7 @@ type
     function findModule(const namespaceURL: string): TXQuery;
     function findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
     function findFunction(const anamespace, alocalname: string; const argcount: integer): TXQValueFunction;
-
+    function isLibraryModule: boolean;
   protected
     function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
   public
@@ -3717,6 +3717,11 @@ begin
       exit(f);
   end;
   exit(nil);
+end;
+
+function TXQStaticContext.isLibraryModule: boolean;
+begin
+  result := moduleNamespace <> nil;
 end;
 
 procedure TXQStaticContext.assign(sc: TXQStaticContext);

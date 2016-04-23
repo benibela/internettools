@@ -2703,6 +2703,23 @@ begin
 end;
 
 procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext; cloneTerms: boolean);
+  procedure checkVariableOverride(v: TXQTermVariable);
+  var
+    i, j: Integer;
+    modu: TXQTermModule;
+  begin
+    if sc.importedModules <> nil then
+      for i := 0 to sc.importedModules.Count - 1 do begin
+        modu := TXQueryBreaker(sc.importedModules.Objects[i]).getTerm as TXQTermModule;
+        if modu = module then continue;
+        for j :=  0 to high( modu.children ) do
+          if (modu.children[j] is TXQTermDefineVariable)
+             and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then
+          raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
+      end;
+
+  end;
+
 var
   i: Integer;
   children: array of TXQTerm;
@@ -2710,7 +2727,9 @@ var
   overriden: Integer;
   truechildrenhigh: integer;
   j: Integer;
-  oldFunctionCount: Integer;
+  oldFunctionCount, k: Integer;
+  otherModule: TXQTermModule;
+  otherFunction: TXQTermDefineFunction;
 begin
   children := module.children;
 
@@ -2719,7 +2738,7 @@ begin
   for i:=truechildrenhigh downto 0 do
     if children[i] is TXQTermDefineFunction then begin
       functionCount += 1;
-    end;
+    end else checkVariableOverride(TXQTermVariable((children[i] as TXQTermDefineVariable).variable));
 
   oldFunctionCount := length(sc.functions) - functionCount;
   for i := high(sc.functions) downto oldFunctionCount do begin
@@ -2734,12 +2753,26 @@ begin
       end;
     if overriden >= oldFunctionCount then
       raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].debugAsStringWithTypeAnnotation() + ' and '+sc.functions[overriden].debugAsStringWithTypeAnnotation());
+    if sc.importedModules <> nil then
+      for j := 0 to sc.importedModules.Count - 1 do begin
+        otherModule := TXQueryBreaker(sc.importedModules.Objects[j]).getTerm as TXQTermModule;
+        if otherModule = module then continue;
+        for k := 0 to high(otherModule.children)  do
+          if otherModule.children[k] is TXQTermDefineFunction then begin
+            otherFunction := TXQTermDefineFunction(otherModule.children[k]);
+            if equalNamespaces(sc.functions[i].namespaceURL, otherFunction.name.namespaceURL)
+               and (sc.functions[i].name = otherFunction.name.localname)
+               and (length(sc.functions[i].parameters) = (otherFunction.parameterCount)) then
+                 raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].debugAsStringWithTypeAnnotation() + ' and imported '+otherFunction.debugTermToString());
+          end;
+      end;
     if overriden >= 0 then begin
       sc.functions[overriden].free;
       sc.functions[overriden] := sc.functions[i];
       sc.functions[i] := sc.functions[high(sc.functions)];
       SetLength(sc.functions, high(sc.functions));
     end;
+
   end;
   if cloneTerms then
     for i := oldFunctionCount to high(sc.functions) do
@@ -2918,6 +2951,7 @@ var declarationDuplicateChecker: TStringList;
     at: array of string;
     module: TXQuery;
     nativeModule: TXQNativeModule;
+    i: Integer;
   begin
     requireModule;
     skipWhitespaceAndComment();
@@ -2937,6 +2971,12 @@ var declarationDuplicateChecker: TStringList;
       //todo resolve at with static context
     end;
 
+    if staticContext.importedModules = nil then
+      staticContext.importedModules := TStringList.Create;
+    for i := 0 to staticContext.importedModules.Count -  1 do
+      if namespaceGetURL(TXQueryBreaker(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace) = moduleURL then
+        raiseParsingError('XQST0047', 'Duplicated module import of ' + moduleURL);
+
     module := engine.findModule(moduleURL);
     if module = nil then begin
       if assigned(engine.OnImportModule) then engine.onImportModule(engine, moduleURL, at);
@@ -2951,8 +2991,6 @@ var declarationDuplicateChecker: TStringList;
         exit;
       end;
     end;
-    if staticContext.importedModules = nil then
-      staticContext.importedModules := TStringList.Create;
     if moduleName = '' then moduleName := TXQueryBreaker(module).staticContext.moduleNamespace.getPrefix;
     staticContext.importedModules.AddObject(moduleName, module);
   end;
@@ -2964,6 +3002,9 @@ var declarationDuplicateChecker: TStringList;
     vari := parseDefineVariable;
     vari.annotations := annotations;
     TXQTermModule(result).push(vari);
+    if vari.variable is TXQTermPendingEQNameToken then vari.variable := TXQTermPendingEQNameToken(vari.variable).resolveAndFree(staticContext); //global variable namespaces are known
+    if staticContext.isLibraryModule and (namespaceGetURL(staticContext.moduleNamespace) <> (vari.variable as TXQTermVariable).namespace) then
+      raiseParsingError('XQST0048', 'Wrong namespace: ' + vari.debugTermToString);
     case nextToken() of
       ':=': vari.push(parse());
       'external': if nextToken(true) = ':=' then begin
@@ -3277,7 +3318,7 @@ begin
         'option': begin
           namespaceMode := nextTokenEQName(nameSpaceURL, nameSpaceName, token);
           temp := parseString;
-          if staticContext.moduleNamespace <> nil then raiseParsingError('XQST0108', 'option not allowed in modules');
+          if staticContext.isLibraryModule then raiseParsingError('XQST0108', 'option not allowed in modules');
           if namespaceMode = xqnmPrefix then
             if nameSpaceName <> '' then nameSpaceURL := staticContext.findNamespaceURLMandatory(nameSpaceName, xqdnkUnknown)
             else if isModel3 then nameSpaceURL := 'http://www.w3.org/2012/xquery'
