@@ -28,7 +28,7 @@ uses
   Classes, SysUtils, xquery;
 
 type
- TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast, xqstResolveNow);
+ TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast, xqstResolveNow, xqstNoMultiples);
  TXQSequenceTypeFlags = set of TXQSequenceTypeFlag;
  TXQTermPendingEQNameTokenPending = (xqptUnknown, xqptVariable, xqptAttribute, xqptElement);
  TXQTermPendingEQNameToken = class(TXQTermEQNameToken )
@@ -829,7 +829,7 @@ begin
       else begin
         result.push(parse());
         if nextToken() = ',' then begin
-          result.push(parseSequenceType([xqstAllowValidationTypes]));
+          result.push(parseSequenceType([xqstAllowValidationTypes,xqstNoMultiples]));
           expect(')');
         end;
       end;
@@ -901,6 +901,7 @@ begin
         '+': result.allowMultiple:=true;
         '*': begin result.allowNone:=true; result.allowMultiple:=true; end;
       end;
+      if result.allowMultiple and (xqstNoMultiples in flags) then raiseSyntaxError('No multiples');
       pos+=1;
     end;
   except
@@ -2303,7 +2304,7 @@ begin
                 if (word <> 'element') and (word <> 'attribute') then
                   raiseParsingError('XPST0003', 'Only one parameter is allowed for matching test '+word);
                 expect(',');
-                TXQTermNodeMatcher(result).push(parseSequenceType([xqstAllowValidationTypes]));
+                TXQTermNodeMatcher(result).push(parseSequenceType([xqstAllowValidationTypes, xqstNoMultiples]));
               end;
             end else case word of
               'schema-element', 'schema-attribute': raiseSyntaxError('schema-* test need name arg');
