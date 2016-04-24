@@ -3180,6 +3180,21 @@ begin
 end;
 
 function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+  function visitWithPossibleVariable(seq: TXQTermSequence): TXQTerm_VisitAction;
+  var
+    j: Integer;
+  begin
+     if seq.children[0] is TXQTermVariable then
+      visitor.declare(@seq.children[0], self);
+
+     for j := 0 to high(seq.children) do begin
+       result := visitor.simpleTermVisit(@seq.children[j], self);
+       case result of xqtvaAbort: exit; end;
+     end;
+
+     if seq.children[0] is TXQTermVariable then
+       visitor.undeclare(@seq.children[0], self);
+  end;
 var
   i: Integer;
   j: Integer;
