@@ -170,10 +170,11 @@ type
  end;
 
  TVariableGathererAndCycleDetector = class(TXQTerm_VisitorTrackKnownVariables)
-  stack, visited: TList;
+  stack, visited, moduleStack: TList;
   curcontext, outcontext: TXQStaticContext;
   mainmodule: TXQTermModule;
-  constructor create;
+  lastXQ1VariableIndex: integer;
+  constructor create(startcontext: TXQStaticContext);
   destructor Destroy; override;
   function visit(term: PXQTerm): TXQTerm_VisitAction; override;
   function leave(term: PXQTerm): TXQTerm_VisitAction; override;
@@ -203,15 +204,21 @@ end;
 const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
       PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
-constructor TVariableGathererAndCycleDetector.create;
+constructor TVariableGathererAndCycleDetector.create(startcontext: TXQStaticContext);
 begin
-  inherited;
+  inherited create;
   stack := TList.Create;
   visited := tlist.Create;
+  if startcontext.model in [xqpmXQuery1, xqpmXPath2]then
+    moduleStack := tlist.Create;
+  outcontext := startcontext;
+  curcontext := startcontext;
+  lastXQ1VariableIndex := MaxInt;
 end;
 
 destructor TVariableGathererAndCycleDetector.Destroy;
 begin
+  moduleStack.Free;
   stack.free;
   visited.Free;
   inherited Destroy;
@@ -249,6 +256,30 @@ function TVariableGathererAndCycleDetector.visit(term: PXQTerm): TXQTerm_VisitAc
     result := false;
   end;
 
+var oldContext: TXQStaticContext;
+    oldLastX1VarIndex: integer;
+  procedure goToNewContext(nc: TXQStaticContext);
+  begin
+    oldLastX1VarIndex := lastXQ1VariableIndex;
+    lastXQ1VariableIndex := MaxInt;
+    oldContext := curcontext;
+    if nc = curcontext then exit;
+    curcontext := nc;
+    if moduleStack <> nil then begin
+      if moduleStack.IndexOf(curContext) >= 0 then raise EXQParsingException.create('XQST0093', 'Module import cycle');
+      moduleStack.Add(oldContext);
+    end;
+  end;
+
+  procedure goToOldContext;
+  begin
+    lastXQ1VariableIndex := oldLastX1VarIndex;
+    if oldContext = curcontext then exit;
+    curcontext := oldContext;
+    if moduleStack <> nil then
+      moduleStack.Delete(moduleStack.Count - 1);
+  end;
+
 var
   modu: TXQTermModule;
   q: TXQuery;
@@ -256,7 +287,7 @@ var
   hasExpression: Boolean;
   i, stackIndex, visitedIndex, varCount, varFunctionCount: Integer;
   tnf: TXQTermNamedFunction;
-  oldContext: TXQStaticContext;
+
   errCode: String;
 begin
   Result:=inherited visit(term);
@@ -290,10 +321,10 @@ begin
     if tnf.kind = xqfkUnknown then tnf.init(curcontext); //todo: still needed ?
     if tnf.kind = xqfkUnknown then begin
       oldContext := curcontext;
-      if tnf.functionStaticContext <> nil then //todo: should always be true?
-        curcontext := tnf.functionStaticContext;
+      if tnf.functionStaticContext = nil then raise EXQEvaluationException.create('PXP:INTERNAL', '20160424172727');
+      goToNewContext(tnf.functionStaticContext);
       TXQTermNamedFunction (term^).interpretedFunction.visit(self);
-      curcontext := oldContext;
+      goToOldContext;
     end;
   end else if term^ is TXQTermVariable then begin
     v := TXQTermVariable(term^);
@@ -306,12 +337,16 @@ begin
     for i:=0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
       if (modu.children[i] is TXQTermDefineVariable)
          and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
+
+        if (moduleStack <> nil) and (i > lastXQ1VariableIndex) then
+          raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
         if q <> nil then begin
-          oldContext := curcontext;
-          curcontext := TXQueryBreaker(q).staticContext;
+          goToNewContext(TXQueryBreaker(q).staticContext);
           if (curcontext <> oldContext) and isPriv(TXQTermDefineVariable(modu.children[i]).annotations) then
             raise EXQParsingException.create('XPST0008', 'Variable is private: '+v.ToString);
-        end;
+        end else oldLastX1VarIndex := lastXQ1VariableIndex;
+
+        lastXQ1VariableIndex := i;
 
         declaration := TXQTermDefineVariable(modu.children[i]);
         hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
@@ -322,7 +357,8 @@ begin
         outcontext.moduleVariables[high(outcontext.moduleVariables)].context := curcontext;
         outcontext.moduleVariables[high(outcontext.moduleVariables)].definition := TXQTermDefineVariable(modu.children[i]);
 
-        if q <> nil then curcontext := oldContext;
+        if q <> nil then goToOldContext
+        else lastXQ1VariableIndex := oldLastX1VarIndex;
 
         break;
       end;
@@ -2899,10 +2935,8 @@ begin
     initializeFunctionsAfterResolving();
     if sc.moduleNamespace = nil then begin //main module
       //SetLength(sc.moduleVariables, 0); do not reset variables, so multiple queries in a shared context can access the earlier variables
-      cycler := TVariableGathererAndCycleDetector.create;
+      cycler := TVariableGathererAndCycleDetector.create(sc);
       cycler.mainmodule := TXQTermModule(result);
-      cycler.outcontext := sc;
-      cycler.curcontext := sc;
       try
         //add all declared variables (even unused still need to check for cycles, and the context might be shared)
         for i := 0 to high(cycler.mainmodule.children) - 1 do
