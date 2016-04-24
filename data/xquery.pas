@@ -1983,11 +1983,10 @@ type
     function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 
     destructor Destroy; override;
-  private
-    fterm: txqterm;
   protected
     staticContext: TXQStaticContext;
     staticContextShared: boolean;
+    fterm: txqterm;
     function getTerm: TXQTerm;
     procedure setTerm(aterm: TXQTerm);
   end;

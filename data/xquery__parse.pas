@@ -131,7 +131,7 @@ protected
 
 
   function parseModule: TXQTerm; override;
-  class function finalResolving(term: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions): TXQTerm;
+  class procedure finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
   function parseXStringOnly(nullTerminatedString: boolean = false): TXQTerm; override;
   procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); override;
 end;
@@ -334,34 +334,39 @@ begin
     if q <> nil then modu := TXQueryBreaker(q).getTerm as TXQTermModule
     else if curcontext = outcontext then modu := mainmodule
     else raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString);
-    for i:=0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
-      if (modu.children[i] is TXQTermDefineVariable)
-         and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
+    if modu <> nil then
+      for i:=0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
+        if (modu.children[i] is TXQTermDefineVariable)
+           and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
 
-        if (moduleStack <> nil) and (i > lastXQ1VariableIndex) then
-          raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
-        if q <> nil then begin
-          goToNewContext(TXQueryBreaker(q).staticContext);
-          if (curcontext <> oldContext) and isPriv(TXQTermDefineVariable(modu.children[i]).annotations) then
-            raise EXQParsingException.create('XPST0008', 'Variable is private: '+v.ToString);
-        end else oldLastX1VarIndex := lastXQ1VariableIndex;
+          if (moduleStack <> nil) and (i > lastXQ1VariableIndex) then
+            raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
+          if q <> nil then begin
+            goToNewContext(TXQueryBreaker(q).staticContext);
+            if (curcontext <> oldContext) and isPriv(TXQTermDefineVariable(modu.children[i]).annotations) then
+              raise EXQParsingException.create('XPST0008', 'Variable is private: '+v.ToString);
+          end else oldLastX1VarIndex := lastXQ1VariableIndex;
 
-        lastXQ1VariableIndex := i;
+          lastXQ1VariableIndex := i;
 
-        declaration := TXQTermDefineVariable(modu.children[i]);
-        hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
-        if hasExpression then
-          simpleTermVisit(@declaration.children[high(declaration.children)], nil);
+          declaration := TXQTermDefineVariable(modu.children[i]);
+          hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
+          if hasExpression then
+            simpleTermVisit(@declaration.children[high(declaration.children)], nil);
 
-        SetLength(outcontext.moduleVariables, length(outcontext.moduleVariables) + 1);
-        outcontext.moduleVariables[high(outcontext.moduleVariables)].context := curcontext;
-        outcontext.moduleVariables[high(outcontext.moduleVariables)].definition := TXQTermDefineVariable(modu.children[i]);
+          SetLength(outcontext.moduleVariables, length(outcontext.moduleVariables) + 1);
+          outcontext.moduleVariables[high(outcontext.moduleVariables)].context := curcontext;
+          outcontext.moduleVariables[high(outcontext.moduleVariables)].definition := TXQTermDefineVariable(modu.children[i]);
 
-        if q <> nil then goToOldContext
-        else lastXQ1VariableIndex := oldLastX1VarIndex;
+          if q <> nil then goToOldContext
+          else lastXQ1VariableIndex := oldLastX1VarIndex;
 
-        break;
-      end;
+          exit;
+        end;
+
+    if curcontext.sender.VariableChangelog.hasVariable(v) then exit; //my global variable hack
+
+    raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
   end;
 end;
 
@@ -2886,6 +2891,7 @@ var
   i: Integer;
   hadPending: Boolean;
   shared: Boolean;
+  tempTerm: TXQTerm;
 begin
   pendings := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
   hadPending := pendings.Count > 0;
@@ -2908,10 +2914,14 @@ begin
   for i := pendings.Count - 1 downto 0 do begin
     otherQuery := TXQueryBreaker( IXQuery(pendings[i]) as txquery);
     if otherQuery.getTerm = result then continue;
-    finalResolving(otherQuery.getTerm, otherQuery.staticContext, options);
+    tempTerm := TXQueryBreaker(otherQuery).getterm;
+    finalResolving(tempTerm, otherQuery.staticContext, options);
     finalizeFunctionsEvenMore(otherQuery.getTerm as TXQTermModule, otherQuery.staticContext, otherQuery.staticContextShared);
   end;
-  result := finalResolving(result, staticContext, options);
+  if resultquery <> nil then begin
+    finalResolving(TXQueryBreaker(resultquery).fterm, staticContext, options);
+    result := TXQueryBreaker(resultquery).fterm;
+  end else finalResolving(result, staticContext, options); //does this even ever happen?
   if result is TXQTermModule then begin
     shared := false; if resultquery <> nil then shared := TXQueryBreaker(resultquery).staticContextShared;
     finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, shared);
@@ -2922,7 +2932,7 @@ begin
   pendings.Clear;
 end;
 
-class function TXQParsingContext.finalResolving(term: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions): TXQTerm;
+class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
 var truechildrenhigh, i: integer;
   visitor: TFinalNamespaceResolving;
   cycler: TVariableGathererAndCycleDetector;
@@ -2948,7 +2958,6 @@ var truechildrenhigh, i: integer;
       end;
   end;
 begin
-  result := term;
   try
     visitor := TFinalNamespaceResolving.Create();
     visitor.staticContext := sc;
@@ -2960,13 +2969,14 @@ begin
   if opts.AllowJSONLiterals then
     TJSONLiteralReplaceVisitor.startVisiting(@result);
 
-  if (result is TXQTermModule) then begin
+  if (result is TXQTermModule) then
     initializeFunctionsAfterResolving();
-    if sc.moduleNamespace = nil then begin //main module
-      //SetLength(sc.moduleVariables, 0); do not reset variables, so multiple queries in a shared context can access the earlier variables
-      cycler := TVariableGathererAndCycleDetector.create(sc);
-      cycler.mainmodule := TXQTermModule(result);
-      try
+  if sc.moduleNamespace = nil then begin //main module
+    //SetLength(sc.moduleVariables, 0); do not reset variables, so multiple queries in a shared context can access the earlier variables
+    cycler := TVariableGathererAndCycleDetector.create(sc);
+    try
+      if result is TXQTermModule then begin
+        cycler.mainmodule := TXQTermModule(result);
         //add context item declaration first (it is not easy to find variables depending on the context item, but finding variables the context item depends on is nothing unusual )
         for i := 0 to high(cycler.mainmodule.children) - 1 do
           if (cycler.mainmodule.children[i] is TXQTermDefineVariable)
@@ -2979,9 +2989,10 @@ begin
             cycler.simpleTermVisit(@TXQTermDefineVariable(cycler.mainmodule.children[i]).variable, nil);
         //add all used variables (includes imported ones)
         cycler.simpleTermVisit(@TXQTermModule(result).children[high(TXQTermModule(result).children)], result);
-      finally
-        cycler.free;
-      end;
+      end else
+        cycler.simpleTermVisit(@result, nil);
+    finally
+      cycler.free;
     end;
   end;
 end;
@@ -3533,7 +3544,7 @@ begin
     raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   end;
   if Assigned(resultquery) then TXQueryBreaker(resultquery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
-  result := finalResolving(result, staticContext, options);
+  finalResolving(result, staticContext, options);
 end;
 
 procedure TXQParsingContext.parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string);
