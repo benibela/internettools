@@ -254,16 +254,29 @@ var
   q: TXQuery;
   declaration: TXQTermDefineVariable;
   hasExpression: Boolean;
-  i, stackIndex, visitedIndex: Integer;
+  i, stackIndex, visitedIndex, varCount, varFunctionCount: Integer;
   tnf: TXQTermNamedFunction;
   oldContext: TXQStaticContext;
+  errCode: String;
 begin
   Result:=inherited visit(term);
   stackIndex := stack.IndexOf(term^);
   if stackIndex >= 0 then begin
+    varCount := 0;
+    varFunctionCount := 0;
     for i := stackIndex to stack.count - 1 do begin
-      if tobject(stack[i]) is TXQTermVariable then
-        raise EXQEvaluationException.create( ifthen(outcontext.model in [xqpmXPath3, xqpmXQuery3], 'XQDY0054', 'XQST0054' ), 'Dependancy cycle detected for '+tobject(stack[i]).ToString);
+      if tobject(stack[i]) is TXQTermVariable then inc(varCount)
+      else if tobject(stack[i]) is TXQTermNamedFunction then inc(varFunctionCount);
+    end;
+    if varCount > 0 then begin
+      for i := stackIndex to stack.count - 1 do begin
+        if tobject(stack[i]) is TXQTermVariable then begin
+          errCode := 'XPST0008'; //a cycle only involving one variable is not a cycle, it is using an undefined variable
+          if (varCount > 1) or (varFunctionCount > 0) then errCode := ifthen(outcontext.model in [xqpmXPath3, xqpmXQuery3], 'XQDY0054', 'XQST0054' );
+          raise EXQEvaluationException.create(errCode , 'Dependancy cycle detected for '+tobject(stack[i]).ToString);
+        end;
+
+      end;
     end;
     stack.Add(term^);
     exit(xqtvaNoRecursion);
@@ -289,7 +302,7 @@ begin
     q := curcontext.findModule(TXQTermVariable(term^).namespace);
     if q <> nil then modu := TXQueryBreaker(q).getTerm as TXQTermModule
     else if curcontext = outcontext then modu := mainmodule
-    else raise EXQParsingException.create('PXP:INTERNAL', '201604222127b');
+    else raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString);
     for i:=0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
       if (modu.children[i] is TXQTermDefineVariable)
          and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
@@ -305,11 +318,11 @@ begin
         if hasExpression then
           simpleTermVisit(@declaration.children[high(declaration.children)], nil);
 
-        if q <> nil then curcontext := oldContext;
-
         SetLength(outcontext.moduleVariables, length(outcontext.moduleVariables) + 1);
         outcontext.moduleVariables[high(outcontext.moduleVariables)].context := curcontext;
         outcontext.moduleVariables[high(outcontext.moduleVariables)].definition := TXQTermDefineVariable(modu.children[i]);
+
+        if q <> nil then curcontext := oldContext;
 
         break;
       end;
