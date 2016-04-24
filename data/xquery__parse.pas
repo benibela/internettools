@@ -2975,7 +2975,7 @@ begin
         //add all declared variables (even unused still need to check for cycles, and the context might be shared)
         for i := 0 to high(cycler.mainmodule.children) - 1 do
           if (cycler.mainmodule.children[i] is TXQTermDefineVariable)
-             and (TXQTermVariable(TXQTermDefineVariable(cycler.mainmodule.children[i]).variable).value = '$') then
+             and (TXQTermVariable(TXQTermDefineVariable(cycler.mainmodule.children[i]).variable).value <> '$') then
             cycler.simpleTermVisit(@TXQTermDefineVariable(cycler.mainmodule.children[i]).variable, nil);
         //add all used variables (includes imported ones)
         cycler.simpleTermVisit(@TXQTermModule(result).children[high(TXQTermModule(result).children)], result);
