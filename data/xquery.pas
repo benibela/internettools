@@ -137,6 +137,7 @@ type
     moduleNamespace: INamespace; //**< The namespace of this module or nil
     namespaces: TNamespaceList;  //**< All declared namespaces.
     moduleVariables: array of TXQVariableContext;  //**< All declared and imported variables.
+    moduleContextItemDeclarationTypes: array of TXQTermSequenceType;
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
@@ -1587,6 +1588,7 @@ type
 
     function getExpression: TXQTerm;
     function getSequenceType: TXQTermSequenceType;
+    function isExternal: boolean;
 
     destructor destroy; override;
   end;
@@ -3741,6 +3743,7 @@ begin
       result.modulevariables := modulevariables;
       SetLength(result.modulevariables, length(result.modulevariables));
     end;
+    result.moduleContextItemDeclarationTypes := moduleContextItemDeclarationTypes;
     if namespaces <> nil then result.namespaces := namespaces.clone;
     result.functions := functions;
     if length(result.functions) > 0 then begin
@@ -4480,7 +4483,7 @@ end;
 
 function TXQuery.evaluate(const context: TXQEvaluationContext): IXQValue;
 var tempcontext: TXQEvaluationContext;
-  i: Integer;
+  i, j: Integer;
   tempcontext2: TXQEvaluationContext;
   curcontext: ^TXQEvaluationContext;
   vari: TXQTermVariable;
@@ -4512,7 +4515,9 @@ begin
 
       vari := staticContext.moduleVariables[i].definition.variable as TXQTermVariable;
       if vari.value = '$' then begin
-        tempcontext.SeqValue := staticContext.moduleVariables[i].definition.getClassicValue(curcontext^);
+        if (not staticContext.moduleVariables[i].definition.isExternal)
+           or ((tempcontext.SeqValue = nil) and (tempcontext.ParentElement = nil) and (tempcontext.RootElement = nil) ) then
+          tempcontext.SeqValue := staticContext.moduleVariables[i].definition.getClassicValue(curcontext^);
         tempcontext.SeqLength := 1;
         tempcontext.SeqIndex := 1;
         tempcontext2.SeqValue := tempcontext.SeqValue;
@@ -4520,6 +4525,22 @@ begin
         tempcontext2.SeqIndex := 1;
       end else tempcontext.temporaryVariables.add(vari, staticContext.moduleVariables[i].definition.getClassicValue(curcontext^));
     end;
+  end;
+  if (length(staticContext.moduleContextItemDeclarationTypes) > 0) then begin
+     if (tempcontext.SeqValue = nil) then
+       if (tempcontext.ParentElement <> nil) then tempcontext.SeqValue := xqvalue( tempcontext.ParentElement )
+       else if (tempcontext.RootElement <> nil) then tempcontext.SeqValue := xqvalue( tempcontext.RootElement )
+       else begin
+         if assigned(staticContext.sender.OnDeclareExternalVariable) then
+           staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', tempcontext.SeqValue);
+         if tempcontext.SeqValue = nil then
+           raise EXQEvaluationException.create('XPTY0004', 'context item missing');
+         tempcontext.SeqLength := 1;
+         tempcontext.SeqIndex := 1;
+       end;
+    for j := 0 to high(staticContext.moduleContextItemDeclarationTypes) do
+      if not staticContext.moduleContextItemDeclarationTypes[j].instanceOf(tempcontext.SeqValue) then
+        raiseXPTY0004TypeError(tempcontext.SeqValue, staticContext.moduleContextItemDeclarationTypes[j].debugTermToString);
   end;
 
   result := fterm.evaluate(tempcontext);

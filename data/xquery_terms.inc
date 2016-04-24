@@ -629,6 +629,13 @@ begin
   else exit(nil);
 end;
 
+function TXQTermDefineVariable.isExternal: boolean;
+begin
+  result := (getExpression = nil) or (
+    (length(annotations) > 0)
+    and (annotations[high(annotations)].name.isEqual(XMLNamespaceURL_MyExtensionsNew, 'external')) );
+end;
+
 destructor TXQTermDefineVariable.destroy;
 begin
   freeAnnotations(annotations);
@@ -801,7 +808,8 @@ begin
       if qmAttribute in nodeMatching.matching then nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkUnknown)
       else nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkElementType);
     end;
-    nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
+    if (context.staticContext <> nil) and (context.staticContext.nodeCollation <> nil) then
+      nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
   end;
   result := true;
   for v in ta do begin

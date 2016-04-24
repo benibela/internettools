@@ -2757,6 +2757,33 @@ begin
     end;
 end;
 
+procedure finalizeContextItemTypes(outsc: TXQStaticContext);
+var
+  visited: TList;
+  procedure rec(sc: TXQStaticContext);
+  var
+    i, oldlen: Integer;
+    sc2: TXQStaticContext;
+  begin
+    if (visited.IndexOf(sc) >= 0) or (sc.importedModules = nil) then exit;
+    visited.Add(sc);
+   for i := 0 to sc.importedModules.Count - 1 do begin
+     sc2 := TXQueryBreaker(sc.importedModules.Objects[i]).staticContext;
+     if length(sc2.moduleContextItemDeclarationTypes) > 0 then begin
+       oldlen := length(outsc.moduleContextItemDeclarationTypes);
+       SetLength(outsc.moduleContextItemDeclarationTypes, oldlen + length(sc2.moduleContextItemDeclarationTypes));
+       move(sc2.moduleContextItemDeclarationTypes[0], outsc.moduleContextItemDeclarationTypes[oldlen], length(sc2.moduleContextItemDeclarationTypes) * sizeof(sc2.moduleContextItemDeclarationTypes[0]));
+     end;
+     rec(sc2);
+   end;
+  end;
+begin
+  if outsc.importedModules = nil then exit;
+  visited := tlist.Create;
+  rec(outsc);
+  visited.free;
+end;
+
 procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext; cloneTerms: boolean);
   procedure checkVariableOverride(d: TXQTermDefineVariable);
   var
@@ -2773,12 +2800,8 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
         for j :=  0 to high( modu.children ) do
           if (modu.children[j] is TXQTermDefineVariable)
              and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then begin
-               if v.value = '$' then begin //context item hack
-                 otherdef := TXQTermDefineVariable(modu.children[j]);
-                 if (d.getExpression <> nil) and (otherdef.getSequenceType <> nil) then  begin
-                   d.children[high(d.children)] := TXQTermBinaryOp.create('treat as', d.getExpression, otherdef.getSequenceType);
-                 end;
-               end else raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
+               if v.value <> '$' then //context item hack
+                  raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
              end;
 
       end;
@@ -2789,7 +2812,10 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
          and (modu.children[j] <> d)
          and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then
       raise EXQParsingException.create('XQST0049', 'Duplicate variable declarations:  ' + v.ToString);
-
+    if (v.value = '$') and (d.getSequenceType <> nil) then begin
+      SetLength(sc.moduleContextItemDeclarationTypes, 1);
+      sc.moduleContextItemDeclarationTypes[0] := d.getSequenceType;
+    end;
   end;
 
 var
@@ -2849,6 +2875,8 @@ begin
   if cloneTerms then
     for i := oldFunctionCount to high(sc.functions) do
       sc.functions[i].assignCopiedTerms(sc.functions[i]);
+
+  finalizeContextItemTypes(sc);
 end;
 
 function TXQParsingContext.parseModule: TXQTerm;
@@ -2898,6 +2926,7 @@ class function TXQParsingContext.finalResolving(term: TXQTerm; sc: TXQStaticCont
 var truechildrenhigh, i: integer;
   visitor: TFinalNamespaceResolving;
   cycler: TVariableGathererAndCycleDetector;
+
   procedure initializeFunctionsAfterResolving();
   var
     i: Integer;
@@ -2938,9 +2967,15 @@ begin
       cycler := TVariableGathererAndCycleDetector.create(sc);
       cycler.mainmodule := TXQTermModule(result);
       try
+        //add context item declaration first (it is not easy to find variables depending on the context item, but finding variables the context item depends on is nothing unusual )
+        for i := 0 to high(cycler.mainmodule.children) - 1 do
+          if (cycler.mainmodule.children[i] is TXQTermDefineVariable)
+             and (TXQTermVariable(TXQTermDefineVariable(cycler.mainmodule.children[i]).variable).value = '$')  then
+            cycler.simpleTermVisit(@TXQTermDefineVariable(cycler.mainmodule.children[i]).variable, nil);
         //add all declared variables (even unused still need to check for cycles, and the context might be shared)
         for i := 0 to high(cycler.mainmodule.children) - 1 do
-          if cycler.mainmodule.children[i] is TXQTermDefineVariable then
+          if (cycler.mainmodule.children[i] is TXQTermDefineVariable)
+             and (TXQTermVariable(TXQTermDefineVariable(cycler.mainmodule.children[i]).variable).value = '$') then
             cycler.simpleTermVisit(@TXQTermDefineVariable(cycler.mainmodule.children[i]).variable, nil);
         //add all used variables (includes imported ones)
         cycler.simpleTermVisit(@TXQTermModule(result).children[high(TXQTermModule(result).children)], result);
@@ -3094,11 +3129,7 @@ var declarationDuplicateChecker: TStringList;
     if not contextItem and staticContext.isLibraryModule and (namespaceGetURL(staticContext.moduleNamespace) <> (vari.variable as TXQTermVariable).namespace) then
       raiseParsingError( 'XQST0048', 'Wrong namespace: ' + vari.debugTermToString);
     case nextToken() of
-      ':=': begin
-        vari.push(parse());
-        if contextItem and staticContext.isLibraryModule then
-          raiseParsingError('XQST0113', 'Cannot set context item in library module');
-      end;
+      ':=': vari.push(parse());
       'external': if nextToken(true) = ':=' then begin
         requireXQuery3('default value');
         expect(':=');
@@ -3108,6 +3139,8 @@ var declarationDuplicateChecker: TStringList;
       end;
       else raiseParsingError('XPST0003', 'Invalid variable declaration');
     end;
+    if contextItem and (vari.getExpression <> nil) and staticContext.isLibraryModule then
+      raiseParsingError('XQST0113', 'Cannot set context item in library module');
   end;
 
   procedure readBoolean(var b: boolean; const v: string);
