@@ -222,6 +222,9 @@ end;
 
 
 function TVariableGathererAndCycleDetector.visit(term: PXQTerm): TXQTerm_VisitAction;
+//example cycles:
+// v  --->  f <-> g ---> v
+// x ---> f --> b --> f  --> b
 
   function isPriv(an: TXQAnnotations): boolean;
   var
@@ -254,13 +257,23 @@ var
   q: TXQuery;
   declaration: TXQTermDefineVariable;
   hasExpression: Boolean;
-  i: Integer;
+  i, stackIndex, visitedIndex: Integer;
   tnf: TXQTermNamedFunction;
   oldContext: TXQStaticContext;
 begin
   Result:=inherited visit(term);
+  stackIndex := stack.IndexOf(term^);
+  if stackIndex >= 0 then begin
+    for i := stackIndex to stack.count - 1 do begin
+      if tobject(stack[i]) is TXQTermVariable then
+        raise EXQEvaluationException.create( ifthen(outcontext.model in [xqpmXPath3, xqpmXQuery3], 'XQDY0054', 'XQST0054' ), 'Dependancy cycle detected for '+tobject(stack[i]).ToString);
+    end;
+    stack.Add(term^);
+    exit(xqtvaNoRecursion);
+  end;
   stack.Add(term^);
-  if visited.IndexOf(term^) >= 0 then exit(xqtvaNoRecursion);
+  visitedIndex := visited.IndexOf(term^);
+  if visitedIndex >= 0 then exit(xqtvaNoRecursion);
   visited.Add(term^);
   if term^ is TXQTermNamedFunction then begin
     tnf := TXQTermNamedFunction (term^);
