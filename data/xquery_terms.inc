@@ -3210,26 +3210,23 @@ begin
         for j := 0 to high(vars) do
           visitor.declare(@vars[j]);
       visitor.simpleTermVisit(@seq.children[0], self);
-    end else if seq.children[0] is TXQTermVariable then
-      visitor.declare(@seq.children[0], self);
 
-    for j := 0 to high(seq.children) do begin
-      result := visitor.simpleTermVisit(@seq.children[j], self);
-      case result of xqtvaAbort: exit; end;
-    end;
+      for j := 0 to high(seq.children) do begin
+        result := visitor.simpleTermVisit(@seq.children[j], self);
+        case result of xqtvaAbort: exit; end;
+      end;
 
-
-    if (seq.children[0] is TXQTermPatternMatcher) then begin
       visitor.parent := self;
       with TXQTermPatternMatcher(seq.children[0]) do
         for j := 0 to high(vars) do
           visitor.undeclare(@vars[j]);
-    end else if seq.children[0] is TXQTermVariable then
-      visitor.undeclare(@seq.children[0], self);
+    end else begin
+      result := visitWithPossibleVariable(seq);
+      case result of xqtvaAbort: exit; end;
+    end;
   end;
 
-  result := visitor.simpleTermVisit(@children[high(children)], self);
-  case result of xqtvaAbort: exit; end;
+  result := visitWithPossibleVariable(children[high(children)] as TXQTermSequence);
 end;
 
 { TXQTermSwitch }
