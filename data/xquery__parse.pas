@@ -171,7 +171,6 @@ type
 
  TVariableGathererAndCycleDetector = class(TXQTerm_VisitorTrackKnownVariables)
   stack, visited: TList;
-  declaredVarStack: TXQVariableChangeLog;
   curcontext, outcontext: TXQStaticContext;
   mainmodule: TXQTermModule;
   constructor create;
@@ -209,14 +208,12 @@ begin
   inherited;
   stack := TList.Create;
   visited := tlist.Create;
-  declaredVarStack:=TXQVariableChangeLog.create();
 end;
 
 destructor TVariableGathererAndCycleDetector.Destroy;
 begin
   stack.free;
   visited.Free;
-  declaredVarStack.free;
   inherited Destroy;
 end;
 
@@ -288,7 +285,6 @@ begin
   end else if term^ is TXQTermVariable then begin
     v := TXQTermVariable(term^);
     if (overridenVariables.hasVariable(v)) or isKnownVariable() then exit;
-    if declaredVarStack.hasVariable(v) then raise EXQEvaluationException.create( ifthen(outcontext.model in [xqpmXPath3, xqpmXQuery3], 'XQDY0054', 'XQST0054' ), 'Dependancy cycle detected for '+term^.debugTermToString);
 
     q := curcontext.findModule(TXQTermVariable(term^).namespace);
     if q <> nil then modu := TXQueryBreaker(q).getTerm as TXQTermModule
@@ -306,12 +302,8 @@ begin
 
         declaration := TXQTermDefineVariable(modu.children[i]);
         hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
-        if hasExpression then begin
-          declaredVarStack.pushAll;
-          declaredVarStack.add(v, xqvalue());
+        if hasExpression then
           simpleTermVisit(@declaration.children[high(declaration.children)], nil);
-          declaredVarStack.popAll();
-        end;
 
         if q <> nil then curcontext := oldContext;
 
@@ -2723,8 +2715,8 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
     v: TXQTermVariable;
     otherdef: TXQTermDefineVariable;
   begin
+    v := TXQTermVariable(d.variable);
     if sc.importedModules <> nil then begin
-      v := TXQTermVariable(d.variable);
       for i := 0 to sc.importedModules.Count - 1 do begin
         modu := TXQueryBreaker(sc.importedModules.Objects[i]).getTerm as TXQTermModule;
         if modu = module then continue;
@@ -2741,6 +2733,12 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
 
       end;
     end;
+    modu := module;
+    for j := 0 to high(modu.children) - 1 do
+      if (modu.children[j] is TXQTermDefineVariable)
+         and (modu.children[j] <> d)
+         and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then
+      raise EXQParsingException.create('XQST0049', 'Duplicate variable declarations:  ' + v.ToString);
 
   end;
 
