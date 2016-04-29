@@ -617,6 +617,11 @@ begin
   copyAnnotations(other.annotations, annotations);
 end;
 
+function TXQTermDefineVariable.getVariable: TXQTermVariable;
+begin
+  result := variable as TXQTermVariable;
+end;
+
 function TXQTermDefineVariable.getExpression: TXQTerm;
 begin
   if (length(children) > 0) and not (children[high(children)] is TXQTermSequenceType) then exit(children[high(children)])

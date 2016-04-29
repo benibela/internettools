@@ -2774,10 +2774,10 @@ var
     visited.Add(sc);
    for i := 0 to sc.importedModules.Count - 1 do begin
      sc2 := TXQueryBreaker(sc.importedModules.Objects[i]).staticContext;
-     if length(sc2.moduleContextItemDeclarationTypes) > 0 then begin
-       oldlen := length(outsc.moduleContextItemDeclarationTypes);
-       SetLength(outsc.moduleContextItemDeclarationTypes, oldlen + length(sc2.moduleContextItemDeclarationTypes));
-       move(sc2.moduleContextItemDeclarationTypes[0], outsc.moduleContextItemDeclarationTypes[oldlen], length(sc2.moduleContextItemDeclarationTypes) * sizeof(sc2.moduleContextItemDeclarationTypes[0]));
+     if length(sc2.moduleContextItemDeclarations) > 0 then begin
+       oldlen := length(outsc.moduleContextItemDeclarations);
+       SetLength(outsc.moduleContextItemDeclarations, oldlen + length(sc2.moduleContextItemDeclarations));
+       move(sc2.moduleContextItemDeclarations[0], outsc.moduleContextItemDeclarations[oldlen], length(sc2.moduleContextItemDeclarations) * sizeof(sc2.moduleContextItemDeclarations[0]));
      end;
      rec(sc2);
    end;
@@ -2817,9 +2817,9 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
          and (modu.children[j] <> d)
          and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then
       raise EXQParsingException.create('XQST0049', 'Duplicate variable declarations:  ' + v.ToString);
-    if (v.value = '$') and (d.getSequenceType <> nil) then begin
-      SetLength(sc.moduleContextItemDeclarationTypes, 1);
-      sc.moduleContextItemDeclarationTypes[0] := d.getSequenceType;
+    if (v.value = '$') then begin
+      SetLength(sc.moduleContextItemDeclarations, 1);
+      sc.moduleContextItemDeclarations[0] := d;
     end;
   end;
 
@@ -2930,6 +2930,8 @@ begin
   for i := 0 to pendings.Count - 1 do
     TXQueryEngineBreaker(staticContext.sender).fmodules.Add(pendings[i]);
   pendings.Clear;
+
+  staticContext.primaryTerm := Result;
 end;
 
 class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
@@ -2971,7 +2973,7 @@ begin
 
   if (result is TXQTermModule) then
     initializeFunctionsAfterResolving();
-  if sc.moduleNamespace = nil then begin //main module
+  if (sc.model = xqpmXQuery1) and (sc.moduleNamespace = nil) then begin //main module
     //SetLength(sc.moduleVariables, 0); do not reset variables, so multiple queries in a shared context can access the earlier variables
     cycler := TVariableGathererAndCycleDetector.create(sc);
     try
