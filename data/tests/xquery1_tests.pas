@@ -1756,7 +1756,7 @@ begin
 
   ps.parseXQuery1('module namespace circle1 = "pseudo://circle1"; import module "pseudo://circle2"; declare function circle1:cf1 ($x) { if ($x <= 0) then 1 else $x * circle2:cf2($x - 1)};');
 
-  m('import module namespace circle1 = "pseudo://circle1"; import module namespace circle2 = "pseudo://circle2"; circle1:cf1(10)', '3628800');
+  f('import module namespace circle1 = "pseudo://circle1"; import module namespace circle2 = "pseudo://circle2"; circle1:cf1(10)', 'XQST0093');
 
 
 
