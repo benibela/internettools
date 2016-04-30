@@ -1653,7 +1653,7 @@ type
 
   { TXQTermPatternMatcher }
 
-  TXQTermPatternMatcher = class(TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
+  TXQTermPatternMatcher = class (TXQTerm) //a node temporarily used in a query (it cannot be kept the query, since it is destroyed with the query)
     node: TTreeNode;
     vars: array of TXQTermVariable;
     hasDefaultVariable: boolean;
@@ -1870,8 +1870,17 @@ type
   { TXQTermTypeSwitch }
 
   TXQTermTypeSwitch = class(TXQTermWithChildren)
+    type TXQTermTypeSwitchClause = class(TXQterm)
+      pattern: TXQTermPatternMatcher;
+      variable: TXQTermVariable;
+      typ: TXQTermSequenceType;
+      expr: TXQTerm;
+      function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+      function getContextDependencies: TXQContextDependencies; override;
+      function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+      function matched(const context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
+    end;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
   end;
 

@@ -3104,24 +3104,61 @@ end;
 
 { TXQTermTypeSwitch }
 
-function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
-  function evaluateWithChangedVariable(clause: TXQTermSequence; const value: IXQValue): IXQValue;
+
+function TXQTermTypeSwitch.TXQTermTypeSwitchClause.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  j: Integer;
+  seq: TXQTermSequence;
+begin
+  if pattern = nil then begin
+    if variable <> nil then visitor.declare(@variable, self);
+    if typ <> nil then begin
+      result := visitor.simpleTermVisit(@typ, self);
+      case result of xqtvaAbort: exit; end;
+    end;
+    result := visitor.simpleTermVisit(@expr, self);
+    case result of xqtvaAbort: exit; end;
+    if variable <> nil then visitor.undeclare(@variable, self);
+  end else begin
+    visitor.parent := self;
+    with pattern do
+      for j := 0 to high(vars) do
+        visitor.declare(@vars[j]);
+
+    result := visitor.simpleTermVisit(@expr, self);
+    case result of xqtvaAbort: exit; end;
+
+    visitor.parent := self;
+    with pattern do
+      for j := 0 to high(vars) do
+        visitor.undeclare(@vars[j]);
+  end;
+end;
+
+function TXQTermTypeSwitch.TXQTermTypeSwitchClause.getContextDependencies: TXQContextDependencies;
+begin
+
+end;
+
+function TXQTermTypeSwitch.TXQTermTypeSwitchClause.evaluate(const context: TXQEvaluationContext): IXQValue;
+begin
+  raiseInternalError(1604301730);
+end;
+
+function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(const context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
+  function evaluateWithChangedVariable(const value: IXQValue): IXQValue;
   var
     tempContext: TXQEvaluationContext;
-    hasVariableDeclaration: Boolean;
-    eval: TXQTerm;
   begin
-    eval := clause.children[high(clause.children)];
-    hasVariableDeclaration := (length(clause.children) > 1) and (clause.children[0] is TXQTermVariable);
     tempContext := context;
-    if hasVariableDeclaration then begin
+    if variable <> nil then begin
       tempContext.beginSubContextWithVariables;
-      tempContext.temporaryVariables.add(TXQTermVariable(clause.children[0]).value, value);
+      tempContext.temporaryVariables.add(variable, value);
     end;
-    result := eval.evaluate(tempContext);
-    if hasVariableDeclaration then tempContext.endSubContextWithVariables(context);
+    result := expr.evaluate(tempContext);
+    if variable <> nil then tempContext.endSubContextWithVariables(context);
   end;
-  function evaluateWithChangedVariableLog(eval: TXQTerm; log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
+  function evaluateWithChangedVariableLog(log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
   var
     tempContext: TXQEvaluationContext;
     value: TXQValue;
@@ -3144,7 +3181,7 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
           if not tempContext.temporaryVariables.hasVariable(vars[i], nil) then
             tempContext.temporaryVariables.add(vars[i], xqvalue());
       tempContext.temporaryVariables.parentLog := context.temporaryVariables;
-      result := eval.evaluate(tempContext);
+      result := expr.evaluate(tempContext);
     finally
       tempContext.temporaryVariables.Free;
       log.Free;
@@ -3152,89 +3189,47 @@ function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQVal
   end;
 
 var
-  v: IXQValue;
-  start: integer;
-  i, j: Integer;
   log: TXQVariableChangeLog;
-  seq: TXQTermSequence;
 begin
-  v := children[0].evaluate(context);
-  for i:=1 to high(children) - 1 do begin
-    if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
-    seq := TXQTermSequence(children[i]);
-    if (seq.children[0] is TXQTermPatternMatcher) and (v.toNode <> nil) then begin
-      log := patternMatcherMatch(TXQTermPatternMatcher(seq.children[0]).node, v.toNode, context);
-      if log <> nil then exit(evaluateWithChangedVariableLog(seq.children[high(seq.children)], log, TXQTermPatternMatcher(seq.children[0]).vars));
-      continue;
-    end
-    else if seq.children[0] is TXQTermVariable then start := 1
-    else start := 0;
-    for j := start to high(seq.children) - 1 do
-      if (seq.children[j] as TXQTermSequenceType).instanceOf(v, context) then
-        exit(evaluateWithChangedVariable(seq, v));
+  if pattern <> nil then begin
+    log := patternMatcherMatch(pattern.node, v.toNode, context);
+    result := log <> nil;
+    if result then res := evaluateWithChangedVariableLog(log, pattern.vars);
+    exit;
   end;
-  i := high(children);
-  if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
-  seq := TXQTermSequence(children[i]);
-  result := evaluateWithChangedVariable(seq, v);
+
+  if (typ <> nil) and not typ.instanceOf(v, context) then
+    exit(false);
+
+  result := true;
+  res := evaluateWithChangedVariable(v);
 end;
 
-function TXQTermTypeSwitch.getContextDependencies: TXQContextDependencies;
+
+
+
+function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  v: IXQValue;
+  i: Integer;
 begin
-  Result:=getChildrenContextDependencies;
+  v := children[0].evaluate(context);
+  for i:=1 to high(children) do
+    if TXQTermTypeSwitchClause(children[i]).matched(context, v, result) then
+      exit;
+  raiseInternalError(164301750);
 end;
 
 function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
-  function visitWithPossibleVariable(seq: TXQTermSequence): TXQTerm_VisitAction;
-  var
-    j: Integer;
-  begin
-     if seq.children[0] is TXQTermVariable then
-      visitor.declare(@seq.children[0], self);
-
-     for j := 0 to high(seq.children) do begin
-       result := visitor.simpleTermVisit(@seq.children[j], self);
-       case result of xqtvaAbort: exit; end;
-     end;
-
-     if seq.children[0] is TXQTermVariable then
-       visitor.undeclare(@seq.children[0], self);
-  end;
-var
-  i: Integer;
-  j: Integer;
-  seq: TXQTermSequence;
 begin
   result := visitor.simpleTermVisit(@children[0], self);
   case result of xqtvaAbort: exit; end;
-  for i:=1 to high(children) - 1 do begin
-    seq := TXQTermSequence(children[i]);
-    if (seq.children[0] is TXQTermPatternMatcher) then begin
-      visitor.parent := self;
-      with TXQTermPatternMatcher(seq.children[0]) do
-        for j := 0 to high(vars) do
-          visitor.declare(@vars[j]);
-      visitor.simpleTermVisit(@seq.children[0], self);
-
-      for j := 0 to high(seq.children) do begin
-        result := visitor.simpleTermVisit(@seq.children[j], self);
-        case result of xqtvaAbort: exit; end;
-      end;
-
-      visitor.parent := self;
-      with TXQTermPatternMatcher(seq.children[0]) do
-        for j := 0 to high(vars) do
-          visitor.undeclare(@vars[j]);
-    end else begin
-      result := visitWithPossibleVariable(seq);
-      case result of xqtvaAbort: exit; end;
-    end;
-  end;
-
-  result := visitWithPossibleVariable(children[high(children)] as TXQTermSequence);
+  Result:=inherited visitchildren(visitor);
 end;
 
-{ TXQTermSwitch }
+
+
+
 
 function TXQTermSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
 var

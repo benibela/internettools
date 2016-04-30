@@ -1320,7 +1320,7 @@ end;
 function TXQParsingContext.parseTypeSwitch: TXQTermTypeSwitch;
 var
   word: String;
-  tempSeq: TXQTermSequence;
+  clause: TXQTermTypeSwitch.TXQTermTypeSwitchClause;
 begin
   requireXQuery('for typeswitch statement');
   result := TXQTermTypeSwitch.Create;
@@ -1332,25 +1332,26 @@ begin
     word := nextToken();
     while word = 'case' do begin
       skipWhitespaceAndComment();
-      tempSeq := TXQTermSequence.Create;
-      result.push(tempSeq);
+      clause := TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
+      result.push(clause);
       if pos^ = '<' then begin
-        tempSeq.push(parsePatternMatcher());
+        clause.pattern := parsePatternMatcher();
       end else begin
-        if pos^ = '$' then begin tempSeq.push(parseVariable); expect('as'); end;
-        tempSeq.push(parseSequenceTypeUnion());
+        if pos^ = '$' then begin clause.variable := TXQTermVariable(parseVariable); expect('as'); end;
+        clause.typ := parseSequenceTypeUnion();
       end;
       expect('return');
-      tempSeq.push(parse());
+      clause.expr := parse;
       word := nextToken();
     end;
+
     if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
     skipWhitespaceAndComment();
-    tempSeq := TXQTermSequence.Create;
-    result.push(tempSeq);
-    if pos^ = '$' then tempSeq.push(parseVariable);
+    clause := TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
+    result.push(clause);
+    if pos^ = '$' then clause.variable := TXQTermVariable(parseVariable);
     expect('return');
-    tempSeq.push(parse());
+    clause.expr := parse();
   except
     result.free;
     raise;

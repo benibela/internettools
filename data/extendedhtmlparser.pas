@@ -2196,6 +2196,7 @@ var temp: THtmlTemplateParser;
   oldEngine: TXQueryEngine;
   queryVarLog: TXQVariableChangeLog;
 begin
+  if data = nil then exit(nil);
   temp := THtmlTemplateParser.create;
   oldEngine := temp.FQueryEngine;
   queryVarLog := context.staticContext.sender.VariableChangelog;
