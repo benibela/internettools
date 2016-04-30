@@ -1878,6 +1878,7 @@ type
       function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
       function getContextDependencies: TXQContextDependencies; override;
       function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+      function clone: TXQTerm; override;
       function matched(const context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
     end;
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;

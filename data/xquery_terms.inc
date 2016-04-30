@@ -3145,6 +3145,15 @@ begin
   raiseInternalError(1604301730);
 end;
 
+function TXQTermTypeSwitch.TXQTermTypeSwitchClause.clone: TXQTerm;
+begin
+  Result:=TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
+  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).pattern := pattern;
+  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).variable := variable;
+  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).typ := typ;
+  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).expr := expr;
+end;
+
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(const context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
   function evaluateWithChangedVariable(const value: IXQValue): IXQValue;
   var
