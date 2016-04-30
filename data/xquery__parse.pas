@@ -339,14 +339,15 @@ begin
         if (modu.children[i] is TXQTermDefineVariable)
            and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
 
-          if (moduleStack <> nil) and (i > lastXQ1VariableIndex) then
-            raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
           if q <> nil then begin
             goToNewContext(TXQueryBreaker(q).staticContext);
             if (curcontext <> oldContext) and isPriv(TXQTermDefineVariable(modu.children[i]).annotations) then
               raise EXQParsingException.create('XPST0008', 'Variable is private: '+v.ToString);
-          end else oldLastX1VarIndex := lastXQ1VariableIndex;
-
+          end else begin
+            if (moduleStack <> nil) and (i > lastXQ1VariableIndex) then
+              raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
+            oldLastX1VarIndex := lastXQ1VariableIndex;
+          end;
           lastXQ1VariableIndex := i;
 
           declaration := TXQTermDefineVariable(modu.children[i]);

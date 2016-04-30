@@ -4325,14 +4325,14 @@ var
  tname, nsu: String;
  i: Integer;
 begin
- for i:=0 to high(children) - 1 do
+ for i:=0 to high(children) - IfThen(ownStaticContext.isLibraryModule, 0, 1) do //todo check namespace
    if children[i] is TXQTermDefineVariable then begin
      tempDefVar := TXQTermDefineVariable(children[i]);
      tname := (tempDefVar.variable as TXQTermVariable).value;
      if tname <> name then continue;
      nsu := (tempDefVar.variable as TXQTermVariable).namespace;
      if (ownStaticContext.moduleNamespace <> nil) and not equalNamespaces(ownStaticContext.moduleNamespace.getURL, nsu) then
-     raiseEvaluationError('XQST0048', 'Invalid namespace for variable: Q{'+nsu+ '}'+name);
+       raiseEvaluationError('XQST0048', 'Invalid namespace for variable: Q{'+nsu+ '}'+name);
      exit(getVariableValue(tempDefVar, context, ownStaticContext));
    end;
 end;
@@ -4423,11 +4423,10 @@ begin
     term := staticContext.primaryTerm;
     sc := staticContext;
   end;
-  if (term is TXQTermModule) then begin
-      value := TXQTermModule(term).getVariableValue(name, self, sc);
-      result := value <> nil;
-      exit;
-
+  if term is TXQTermModule then begin
+    value := TXQTermModule(term).getVariableValue(name, self, sc);
+    result := value <> nil;
+    exit;
   end;
   if (staticContext.sender <> nil) and staticContext.sender.VariableChangelog.hasVariable(name, @temp, namespaceURL) then begin
     result := true;
