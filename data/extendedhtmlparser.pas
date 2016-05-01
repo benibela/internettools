@@ -1729,7 +1729,6 @@ begin
       FOldVariableLog.takeFrom(FVariableLog);;
   end;
   FreeAndNil(FVariableLogCondensed);
-  FOldVariableLog.caseSensitive:=FVariableLog.caseSensitive;
 
   oldFunctionCount := length(FQueryEngine.StaticContext.functions);
 

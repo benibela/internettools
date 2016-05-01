@@ -2584,7 +2584,6 @@ type
 
   *)
   TXQVariableChangeLog = class
-    caseSensitive: boolean; //**< If true, variables are case-sensitive, otherwise case-insensitive
     readonly: boolean; //**< If true, modifying the variable value raises an error
     parentLog: TXQVariableChangeLog;
 
@@ -5617,12 +5616,8 @@ end;
 function TXQVariableChangeLog.indexOf(const name: string;  const namespaceURL: string): integer;
 var i:longint;
 begin
-  if caseSensitive then begin
-    for i:=high(vars) downto 0 do
-      if (vars[i].name = name) and equalNamespaces(vars[i].namespaceURL, namespaceURL) then exit(i);
-  end else
   for i:=high(vars) downto 0 do
-    if striequal(vars[i].name, name) and equalNamespaces(vars[i].namespaceURL, namespaceURL) then exit(i);
+    if (vars[i].name = name) and equalNamespaces(vars[i].namespaceURL, namespaceURL) then exit(i);
   exit(-1);
 end;
 
@@ -5667,14 +5662,9 @@ var
 begin
   result := xqvalue();
   list := TXQVList.create();
-  if caseSensitive then begin
-    for i:=0 to high(vars) do
-      if (vars[i].name = name) and (equalNamespaces(vars[i].namespaceURL, namespaceURL)) then
-        list.add(vars[i].value);
-  end else
-    for i:=0 to high(vars) do
-      if striequal(vars[i].name, name) and (equalNamespaces(vars[i].namespaceURL, namespaceURL)) then
-        list.add(vars[i].value);
+  for i:=0 to high(vars) do
+    if (vars[i].name = name) and (equalNamespaces(vars[i].namespaceURL, namespaceURL)) then
+      list.add(vars[i].value);
   result := xqvalueSeqSqueezed(list);
 end;
 
@@ -5762,7 +5752,6 @@ end;}
 
 constructor TXQVariableChangeLog.create();
 begin
-  caseSensitive:=true;
   pushAll;
 end;
 
@@ -5810,7 +5799,6 @@ begin
     if not final then continue;
     result.add(getName(i), get(i));
   end;
-  result.caseSensitive:=caseSensitive;
 end;
 
 function TXQVariableChangeLog.collected: TXQVariableChangeLog;

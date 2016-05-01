@@ -4005,10 +4005,6 @@ begin
 
   performUnitTest('$abc','alphabet','');
   f('$ABC', 'err:XPST0008');
-  ps.VariableChangelog.caseSensitive:=false;
-  performUnitTest('$abc','alphabet','');
-  performUnitTest('$ABC','alphabet','');
-  ps.VariableChangelog.caseSensitive:=true;
   performUnitTest('$abc','alphabet','');
   f('$ABC', 'err:XPST0008');
 
