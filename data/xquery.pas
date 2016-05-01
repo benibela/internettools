@@ -6143,6 +6143,7 @@ var
   i: Integer;
 begin
   VariableChangelog.Free;
+  VariableChangelogUndefined.free;
   DefaultParser.Free;
   clear;
   if FInternalDocuments <> nil then begin;
