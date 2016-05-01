@@ -18,9 +18,7 @@ procedure unitTests(testerrors: boolean);
 var data: array[1..290] of array[1..3] of string = (
 //---classic tests--- (remark: the oldest, most verbose syntax is tested first; the new, simple syntax at the end)
  //simple reading
- ('<a><b><template:read source="text()" var="test"/></b></a>',
- '<a><b>Dies wird Variable test</b></a>',
- 'test=Dies wird Variable test'),
+ ('<a><b><template:read source="text()" var="test"/></b></a>', '<a><b>Dies wird Variable test</b></a>', 'test=Dies wird Variable test'),
  ('<a><b><template:read source="text()" var="test"/></b></a>',
  '<a><b>Dies wird erneut Variable test</b><b>Nicht Test</b><b>Test</b></a>',
  'test=Dies wird erneut Variable test'),
@@ -1142,7 +1140,7 @@ begin
   q3('(let $abc := "0", $f := function(){ let <a>{$abc := ($abc, .)}</a>+ := <x><a>1</a><a>2</a></x> return join($abc)} return $f) ()', '0 1 0 2');
   q3('join((let $abc := "0", $f := function(){ for <a>{$abc := ($abc, .)}</a>+ in <x><a>1</a><a>2</a></x> return join($abc)} return $f) (), ",")', '0 1,0 2');
 
-  t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123');
+  t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := $abc}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=123'); //maus used be stored in global $abc
   t('<r>{xquery version "1.0"; declare variable $abc := 123; ()}<b>{$def := concat(., $abc, .)}</b></r>', '<r><b>XXX</b></r>', '_result='#10'def=XXX123XXX');
   t('<r>{xquery version "1.0"; declare function doub($x) { 2 * $x }; ()}<b>{$def := doub(.)}</b></r>', '<r><b>100</b></r>', '_result='#10'def=200');
   t('<r>{xquery version "1.0"; declare function doub($x) { 2 * $x }; ()}<b>{$def := doub(.)}</b></r>', '<r><b>100</b></r>', '_result='#10'def=200');

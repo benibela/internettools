@@ -2455,6 +2455,7 @@ public
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
     FModules, FPendingModules: TInterfaceList; //internal used
+    FParserVariableVisitor: TObject;
     VariableChangelogUndefined: TXQVariableChangeLog;
     function GetNativeModules: TStringList;
     function isAWeirdGlobalVariable(const namespace, local: string): boolean;
@@ -6154,6 +6155,7 @@ begin
   GlobalNamespaces.free;
   FModules.Free;
   FPendingModules.Free;
+  FParserVariableVisitor.free;
   StaticContext.Free;
   inherited Destroy;
 end;

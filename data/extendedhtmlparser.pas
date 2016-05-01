@@ -1011,7 +1011,7 @@ begin
     cacheRegExpr('regex', '', '', false);
     if templateAttributes.IndexOfName('var') >= 0 then begin
       varname := parser.parseQuery('x"'+templateAttributes.Values['var']+'"');
-      temp := varname.evaluate().toString;
+      temp := varname.evaluate(xqvalue('')).toString;
       if strContains(temp, '.') then temp := strBefore(temp, '.');
       TXQueryEngineBreaker(parser.QueryEngine).addAWeirdGlobalVariable('', temp);
     end;
@@ -1059,7 +1059,13 @@ begin
   if expression = '' then raise ETemplateParseException.Create('no expression given');
   context := nil;
   if FSingleQueryModule then context := FQueryContext.StaticContext;
-  result := FQueryEngine.parseXQuery3(expression, context);
+  //carefully here. parseXQuery3 will keep lastquery in the engine with this query. But assigned to which context? no idea.
+  //likely the outer expression is the primary context (unshared one),
+  //  i.e. if the pattern is used as pattern matching its context is shared with the xquery expression around it,
+  //        and if xquery is included in a pattern, the xquery shares the context of the pattern
+  // but if we mix it, lastquery will still contain a reference to a static context that has expired. Which will crash when the query is freed (i.e. a new query is read)
+  //using parseTerm avoids all that, since it does not keep a lastquery
+  result := TXQueryEngineBreaker(FQueryEngine).parseTerm(expression, xqpmXQuery3, context);
 end;
 
 function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;
@@ -1820,14 +1826,14 @@ end;
 
 destructor THtmlTemplateParser.destroy;
 begin
+  FTemplate.Free;
+  FHTML.Free;
   FQueryEngine.Free;
   FAttributeMatching.Free;
   wregexprFree(FRepetitionRegEx);
   FreeAndNil(FVariables);
   FVariableLogCondensed.free;
   FOldVariableLog.Free;
-  FTemplate.Free;
-  FHTML.Free;
   inherited destroy;
 end;
 

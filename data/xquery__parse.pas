@@ -227,8 +227,8 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     replacement: TXQTermVariableGlobal;
     declaration: TXQTermDefineVariable;
   begin
-    if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) then exit;
     v := TXQTermVariable(pt^);
+    if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) and (TXQTermDefineVariable(parent).getVariable = v) then exit;
     if overridenVariables.hasVariable(v) then exit;
 
     q := staticContext.findModule(v.namespace);
@@ -260,8 +260,25 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       end;
     raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
   end;
+
+  procedure visitPendingPatternMatcher(pt: PXQTerm);
+  var
+    pattern: String;
+    patternMatcher: TXQTermPatternMatcher;
+    i: Integer;
+  begin
+    //this is extraordinary hacky
+    //here we know the variables, so the pattern can access the outer variables. but we do not know the namespaces anymore, so it does not inherit them
+    pattern := TXQTermPendingPatternMatcher(pt^).pattern;
+    patternMatcher := patternMatcherParse(staticContext, pattern);
+    if patternMatcher = nil then raise EXQParsingException.create('pxp:PATTERN', 'Invalid pattern: ' + pattern);
+    replace(pt, patternMatcher);
+    for i := 0 to high(patternMatcher.vars) do
+      declare(@patternMatcher.vars[i]);
+  end;
 begin
-  if t^ is TXQTermVariable then visitVariable(t);
+  if t^ is TXQTermVariable then visitVariable(t)
+  else if t^ is TXQTermPendingPatternMatcher then visitPendingPatternMatcher(t);
   Result:=xqtvaContinue;
 end;
 
@@ -3005,12 +3022,29 @@ var truechildrenhigh: integer;
 begin
   try
     try
-      varvisitor := TFinalVariableResolving.create;
-      varvisitor.staticContext := visitor.staticContext;
-      varvisitor.mainModule := visitor.mainModule;
-      varvisitor.simpleTermVisit(@result, nil);
-    finally
-      varvisitor.free;
+      visitor := TFinalNamespaceResolving.Create();
+      if result is TXQTermModule then begin
+        visitor.mainModule := TXQTermModule(result);
+        if sc.associatedModules = nil then sc.associatedModules := TFPList.Create;
+        sc.associatedModules.Add(result);
+      end;
+      visitor.staticContext := sc;
+      visitor.simpleTermVisit(@result, nil);
+
+      //keep the known variables in the engine, so nested expression (patterns) can access each other variables
+      if TXQueryEngineBreaker(sc.sender).FParserVariableVisitor = nil then
+        TXQueryEngineBreaker(sc.sender).FParserVariableVisitor := TFinalVariableResolving.create;
+      varvisitor := TXQueryEngineBreaker(sc.sender).FParserVariableVisitor as TFinalVariableResolving;
+      try
+        varvisitor.overridenVariables.pushAll();
+        varvisitor.staticContext := visitor.staticContext;
+        varvisitor.simpleTermVisit(@result, nil);
+      finally
+        varvisitor.overridenVariables.popAll();
+      end;
+    except
+      if result is TXQTermModule then sc.associatedModules.Remove(result);
+      raise;
     end;
   finally
     visitor.free;
@@ -3987,15 +4021,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           t.catches[i].tests[j].name := TXQEQNameUnresolved(t.catches[i].tests[j].name).resolveAndFreeToEQName(staticContext);
   end;
 
-  procedure visitPendingPatternMatcher(pt: PXQTerm);
-  var
-    pattern: String;
-  begin
-    pattern := TXQTermPendingPatternMatcher(pt^).pattern;
-    FreeAndNil(pt^);
-    pt^ := patternMatcherParse(staticContext, pattern);
-  end;
-
 begin
   if t^ is TXQTermPendingEQNameToken then begin
     t^ := TXQTermPendingEQNameToken(t^).resolveAndFree(staticContext);
@@ -4008,7 +4033,6 @@ begin
   else if t^ is TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
   else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
   else if t^ is TXQTermTryCatch then visitTryCatch(TXQTermTryCatch(t^))
-  else if t^ is TXQTermPendingPatternMatcher then visitPendingPatternMatcher(t)
 
   ;result := xqtvaContinue;
 end;

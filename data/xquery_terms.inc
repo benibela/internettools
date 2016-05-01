@@ -3116,8 +3116,12 @@ end;
 
 
 function TXQTermVariableGlobal.evaluate(const context: TXQEvaluationContext): IXQValue;
+var temp: TXQValue;
 begin
-  if context.hasVariable(definition.getVariable, result) then exit;
+  if (context.temporaryVariables <> nil) and context.temporaryVariables.hasVariable(definition.getVariable, @temp) then begin
+    result := temp;
+    exit();
+  end;
   Result:=evaluateInitial(PXQEvaluationContext(@context)^);
 end;
 
@@ -3161,8 +3165,12 @@ end;
 function TXQTermVariableGlobalImported.evaluate(const context: TXQEvaluationContext): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
+  temp: TXQValue;
 begin
-  if context.hasVariable(definition.getVariable, result) then exit;
+  if (context.temporaryVariables <> nil) and context.temporaryVariables.hasVariable(definition.getVariable, @temp) then begin
+    result := temp;
+    exit();
+  end;
   tempcontext := context;
   tempcontext.staticContext := staticContext;
   Result:=evaluateInitial(tempcontext);
