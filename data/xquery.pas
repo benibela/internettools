@@ -218,7 +218,6 @@ type
     NodeCollation: TXQCollation read getNodeCollation write FNodeCollation;
   end;
 
-  { TXQEvaluationContext }
 
   (***
   @abstract(evaluation context, internal used)
@@ -246,6 +245,7 @@ type
     function getRootHighest: TTreeNode;
 
     function hasVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
+    function hasVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
     function getVariable(const name: string; const namespaceURL: string): IXQValue;
     function getVariable(const v: TXQTermVariable): IXQValue; inline;
 
@@ -260,6 +260,7 @@ type
   private
     procedure setSingletonContextItem(const v: IXQValue);
   end;
+  PXQEvaluationContext = ^TXQEvaluationContext;
 
 
   //============================VALUE STORAGE==========================
@@ -1576,7 +1577,20 @@ type
     function ToString: ansistring; override;
   end;
 
-  { TXQTermDefineVariable }
+  TXQTermVariableGlobal = class(TXQTerm)
+    definition: TXQTermDefineVariable;
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
+    function ToString: ansistring; override;
+  private
+    function evaluateInitial(var context: TXQEvaluationContext): IXQValue;
+  end;
+  TXQTermVariableGlobalImported = class(TXQTermVariableGlobal)
+    staticContext: TXQStaticContext;
+    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function clone: TXQTerm; override;
+  end;
 
   TXQTermDefineVariable = class(TXQTermWithChildren)
     variable: TXQTerm;
@@ -1953,9 +1967,6 @@ type
   TXQTermModule = class(TXQTermWithChildren)
     function evaluate(const context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
-    function getVariableValue(declaration: TXQTermDefineVariable; var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
-    function getVariableValue(const name: string; var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext): IXQValue;
-
   end;
 
 
@@ -2916,6 +2927,8 @@ var
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
+
+
 constructor TXQMapStringObject.Create;
 begin
   Sorted := true;
@@ -3702,7 +3715,14 @@ procedure raiseFOTY0013TypeError(const v: IXQValue);
 begin
   raise EXQEvaluationException.create('FOTY0013', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to atomic value');
 end;
-
+procedure raiseInternalError(const s: string);
+begin
+  raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error: ' + s);
+end;
+procedure raiseInternalError(const code: integer);
+begin
+  raiseInternalError(IntToStr(code));
+end;
 
 { TXQStaticContext }
 
@@ -4306,47 +4326,6 @@ begin
   Result:=children[high(children)].getContextDependencies;
 end;
 
-function TXQTermModule.getVariableValue(declaration: TXQTermDefineVariable; var context: TXQEvaluationContext;
-  ownStaticContext: TXQStaticContext): IXQValue;
-var
- tempcontext: TXQEvaluationContext;
- ns, pendingname: String;
-begin
-  if context.temporaryVariables = nil then context.temporaryVariables := TXQVariableChangeLog.create();
-  if context.temporaryVariables.parentLog = nil then context.temporaryVariables.parentLog := TXQVariableChangeLog.create();
-
-  ns := namespaceGetURL(ownStaticContext.moduleNamespace);
-  pendingname := #0 + declaration.getVariable.value;
-
-  if context.temporaryVariables.parentLog.hasVariable(pendingname, nil, ns) then
-    raise EXQEvaluationException.create('XQDY0054', 'Dependancy cycle: ' + declaration.getVariable.ToString );
-  context.temporaryVariables.parentLog.add(pendingname, xqvalue(), ns);
-
-  tempcontext := context;
-  tempcontext.staticContext := ownStaticContext;
-  result := declaration.getClassicValue(tempcontext);
-  context.temporaryVariables.parentLog.add(declaration.getVariable.value, result, ns);
-end;
-
-function TXQTermModule.getVariableValue(const name: string; var context: TXQEvaluationContext; ownStaticContext: TXQStaticContext
-  ): IXQValue;
-var
- tempDefVar: TXQTermDefineVariable;
- tname, nsu: String;
- i: Integer;
-begin
- for i:=0 to high(children) - IfThen(ownStaticContext.isLibraryModule, 0, 1) do //todo check namespace
-   if children[i] is TXQTermDefineVariable then begin
-     tempDefVar := TXQTermDefineVariable(children[i]);
-     tname := (tempDefVar.variable as TXQTermVariable).value;
-     if tname <> name then continue;
-     nsu := (tempDefVar.variable as TXQTermVariable).namespace;
-     if (ownStaticContext.moduleNamespace <> nil) and not equalNamespaces(ownStaticContext.moduleNamespace.getURL, nsu) then
-       raiseEvaluationError('XQST0048', 'Invalid namespace for variable: Q{'+nsu+ '}'+name);
-     exit(getVariableValue(tempDefVar, context, ownStaticContext));
-   end;
-end;
-
 { TXQValueEnumerator }
 
 function TXQValueEnumerator.MoveNext: Boolean;
@@ -4414,9 +4393,6 @@ end;
 function TXQEvaluationContext.hasVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
 var
   temp: TXQValue;
-  module: TXQuery;
-  sc: TXQStaticContext;
-  term: TXQTerm;
 begin
   temp := nil;
   value := nil;
@@ -4425,32 +4401,18 @@ begin
     value := temp;
     if result then exit;
   end;
-  module := staticContext.findModule(namespaceURL);
-  if module <> nil then begin
-   term := module.fterm;
-   sc := module.staticContext;
-  end  else begin
-    term := staticContext.primaryTerm;
-    sc := staticContext;
-  end;
-  if term is TXQTermModule then begin
-    value := TXQTermModule(term).getVariableValue(name, self, sc);
-    result := value <> nil;
-    exit;
-  end;
   if (staticContext.sender <> nil) and staticContext.sender.VariableChangelog.hasVariable(name, @temp, namespaceURL) then begin
     result := true;
     if temp <> nil then //safety check. todo: necessary?
       value := temp;
     exit;
   end;
-  value := nil; //safety, necessary?
-  case name of
-    '$': value := xqvalue('$'); //default $$; as $
-    'line-ending': value := xqvalue(LineEnding); //default $line-ending; as #13#10
-    'amp': value := xqvalue('&');
-  end;
-  result := value <> nil;
+  result := false;
+end;
+
+function TXQEvaluationContext.hasVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
+begin
+  result := hasVariable(v.value, value, v.namespace);
 end;
 
 function TXQEvaluationContext.getVariable(const name: string; const namespaceURL: string): IXQValue;

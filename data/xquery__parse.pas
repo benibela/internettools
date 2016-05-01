@@ -153,12 +153,13 @@ type
    destructor Destroy; override;
  end;
 
- TFinalNamespaceResolving = class(TXQTerm_Visitor)
+ TFinalNamespaceResolving = class(TXQTerm_VisitorTrackKnownVariables)
    staticContext: TXQStaticContext;
    changedDefaultsTypeNamespaces: TInterfaceList;
    implicitNamespaceCounts: TLongintArray;
    implicitNamespaceCountsLength: integer;
    checker: TFlowerVariableChecker;
+   mainModule: TXQTermModule;
    procedure declare(v: PXQTermVariable); override;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
@@ -169,15 +170,17 @@ type
    destructor Destroy; override;
  end;
 
- TVariableGathererAndCycleDetector = class(TXQTerm_VisitorTrackKnownVariables)
+ TVariableCycleDetectorXQ1 = class(TXQTerm_VisitorTrackKnownVariables)
   stack, visited, moduleStack: TList;
+  acceptedVariables: TXQVariableChangeLog;
   curcontext, outcontext: TXQStaticContext;
   mainmodule: TXQTermModule;
-  lastXQ1VariableIndex: integer;
+  lastVariableIndex: integer;
   constructor create(startcontext: TXQStaticContext);
   destructor Destroy; override;
   function visit(term: PXQTerm): TXQTerm_VisitAction; override;
   function leave(term: PXQTerm): TXQTerm_VisitAction; override;
+  class procedure detectCycle(start: TXQTerm; sc: TXQStaticContext); static;
 end;
 
  TXQueryBreaker = class(TXQuery) end;
@@ -204,64 +207,42 @@ end;
 const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
       PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
-constructor TVariableGathererAndCycleDetector.create(startcontext: TXQStaticContext);
+constructor TVariableCycleDetectorXQ1.create(startcontext: TXQStaticContext);
 begin
   inherited create;
   stack := TList.Create;
   visited := tlist.Create;
-  if startcontext.model in [xqpmXQuery1, xqpmXPath2]then
-    moduleStack := tlist.Create;
+  moduleStack := tlist.Create;
   outcontext := startcontext;
   curcontext := startcontext;
-  lastXQ1VariableIndex := MaxInt;
+  lastVariableIndex := MaxInt;
+  acceptedVariables := TXQVariableChangeLog.create();
 end;
 
-destructor TVariableGathererAndCycleDetector.Destroy;
+destructor TVariableCycleDetectorXQ1.Destroy;
 begin
   moduleStack.Free;
   stack.free;
   visited.Free;
+  acceptedVariables.free;
   inherited Destroy;
 end;
 
 
-function TVariableGathererAndCycleDetector.visit(term: PXQTerm): TXQTerm_VisitAction;
+function TVariableCycleDetectorXQ1.visit(term: PXQTerm): TXQTerm_VisitAction;
 //example cycles:
 // v  --->  f <-> g ---> v
 // x ---> f --> b --> f  --> b
 
-  function isPriv(an: TXQAnnotations): boolean;
-  var
-    j: Integer;
-  begin
-    result := false;
-    for j := 0 to high(an) do
-      if an[j].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
-        exit(true);
-  end;
-
-  var
+var
     v: TXQTermVariable;
-  function isKnownVariable(): boolean;
-
-  var
-    i: Integer;
-  begin
-    for i := 0 to high(outcontext.moduleVariables) do
-      if v.equalsVariable(outcontext.moduleVariables[i].definition.variable as TXQTermVariable) then begin
-        if (outcontext.moduleVariables[i].context <> curcontext) and isPriv(outcontext.moduleVariables[i].definition.annotations) then
-          raise EXQParsingException.create('XPST0008', 'Variable is private: '+v.ToString);
-        exit(true);
-      end;
-    result := false;
-  end;
 
 var oldContext: TXQStaticContext;
-    oldLastX1VarIndex: integer;
+    oldLastVarIndex: integer;
   procedure goToNewContext(nc: TXQStaticContext);
   begin
-    oldLastX1VarIndex := lastXQ1VariableIndex;
-    lastXQ1VariableIndex := MaxInt;
+    oldLastVarIndex := lastVariableIndex;
+    lastVariableIndex := MaxInt;
     oldContext := curcontext;
     if nc = curcontext then exit;
     curcontext := nc;
@@ -273,7 +254,7 @@ var oldContext: TXQStaticContext;
 
   procedure goToOldContext;
   begin
-    lastXQ1VariableIndex := oldLastX1VarIndex;
+    lastVariableIndex := oldLastVarIndex;
     if oldContext = curcontext then exit;
     curcontext := oldContext;
     if moduleStack <> nil then
@@ -283,34 +264,17 @@ var oldContext: TXQStaticContext;
 var
   modu: TXQTermModule;
   q: TXQuery;
-  declaration: TXQTermDefineVariable;
-  hasExpression: Boolean;
-  i, stackIndex, visitedIndex, varCount, varFunctionCount: Integer;
+  i, stackIndex, visitedIndex: Integer;
   tnf: TXQTermNamedFunction;
 
-  errCode: String;
+  globalVar: TXQTermVariableGlobal;
 begin
   Result:=inherited visit(term);
-  stackIndex := stack.IndexOf(term^);
+  stackIndex := stack.IndexOf(term^); //todo, only need to put variables and functions there?
   if stackIndex >= 0 then begin
-    varCount := 0;
-    varFunctionCount := 0;
-    for i := stackIndex to stack.count - 1 do begin
-      if tobject(stack[i]) is TXQTermVariable then inc(varCount)
-      else if tobject(stack[i]) is TXQTermNamedFunction then inc(varFunctionCount);
-    end;
-    if varCount > 0 then begin
-      for i := stackIndex to stack.count - 1 do begin
-        if tobject(stack[i]) is TXQTermVariable then begin
-          errCode := 'XPST0008'; //a cycle only involving one variable is not a cycle, it is using an undefined variable
-          if (varCount > 1) or (varFunctionCount > 0) then errCode := ifthen(outcontext.model in [xqpmXPath3, xqpmXQuery3], 'XQDY0054', 'XQST0054' );
-          raise EXQEvaluationException.create(errCode , 'Dependancy cycle detected for '+tobject(stack[i]).ToString);
-        end;
-
-      end;
-    end;
-    stack.Add(term^);
-    exit(xqtvaNoRecursion);
+    for i := stackIndex to stack.count - 1 do
+      if tobject(stack[i]) is TXQTermVariableGlobal then
+        raise EXQEvaluationException.create('XQST0054', 'Dependancy cycle detected for '+tobject(stack[i]).ToString);
   end;
   stack.Add(term^);
   visitedIndex := visited.IndexOf(term^);
@@ -326,56 +290,68 @@ begin
       TXQTermNamedFunction (term^).interpretedFunction.visit(self);
       goToOldContext;
     end;
-  end else if term^ is TXQTermVariable then begin
-    v := TXQTermVariable(term^);
-    if (overridenVariables.hasVariable(v)) or isKnownVariable() then exit;
+  end else if term^ is TXQTermVariableGlobal then begin
+    globalVar := TXQTermVariableGlobal(term^);
+    v := globalVar. definition.getVariable;
+    if (overridenVariables.hasVariable(v)) or acceptedVariables.hasVariable(v) then exit;
 
-    q := curcontext.findModule(TXQTermVariable(term^).namespace);
-    if q <> nil then modu := TXQueryBreaker(q).getTerm as TXQTermModule
-    else if curcontext = outcontext then modu := mainmodule
-    else raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString);
-    if modu <> nil then
-      for i:=0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
-        if (modu.children[i] is TXQTermDefineVariable)
-           and ((TXQTermDefineVariable(modu.children[i]).variable as TXQTermVariable).equalsVariable(v)) then begin
+    q := curcontext.findModule(v.namespace);
+    if q <> nil then begin
+      modu := TXQueryBreaker(q).getTerm as TXQTermModule;
+      goToNewContext(TXQueryBreaker(q).staticContext);
+    end else if curcontext = outcontext then begin
+      modu := mainmodule;
+      oldLastVarIndex := lastVariableIndex;
+    end else raise EXQParsingException.create('pxp:INTERNAL', '1650100');
 
-          if q <> nil then begin
-            goToNewContext(TXQueryBreaker(q).staticContext);
-            if (curcontext <> oldContext) and isPriv(TXQTermDefineVariable(modu.children[i]).annotations) then
-              raise EXQParsingException.create('XPST0008', 'Variable is private: '+v.ToString);
-          end else begin
-            if (moduleStack <> nil) and (i > lastXQ1VariableIndex) then
-              raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
-            oldLastX1VarIndex := lastXQ1VariableIndex;
-          end;
-          lastXQ1VariableIndex := i;
 
-          declaration := TXQTermDefineVariable(modu.children[i]);
-          hasExpression := (length(declaration.children) > 0) and not (declaration.children[high(declaration.children)] is TXQTermSequenceType);
-          if hasExpression then
-            simpleTermVisit(@declaration.children[high(declaration.children)], nil);
+    for i := 0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
+      if modu.children[i] = globalVar.definition then begin
+        if (i > lastVariableIndex) then
+          raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
+        lastVariableIndex := i;
+        break;
+      end;
 
-          SetLength(outcontext.moduleVariables, length(outcontext.moduleVariables) + 1);
-          outcontext.moduleVariables[high(outcontext.moduleVariables)].context := curcontext;
-          outcontext.moduleVariables[high(outcontext.moduleVariables)].definition := TXQTermDefineVariable(modu.children[i]);
+    if globalVar.definition.getExpression <> nil  then
+      simpleTermVisit(@globalVar.definition.children[high(globalVar.definition.children)], nil);
 
-          if q <> nil then goToOldContext
-          else lastXQ1VariableIndex := oldLastX1VarIndex;
+    acceptedVariables.add(v, tempValue);
 
-          exit;
-        end;
 
-    if curcontext.sender.VariableChangelog.hasVariable(v) then exit; //my global variable hack
+    if q <> nil then goToOldContext
+    else lastVariableIndex := oldLastVarIndex;
 
-    raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
   end;
 end;
 
-function TVariableGathererAndCycleDetector.leave(term: PXQTerm): TXQTerm_VisitAction;
+function TVariableCycleDetectorXQ1.leave(term: PXQTerm): TXQTerm_VisitAction;
 begin
   Result:=inherited leave(term);
   assert(term^ = txqterm(stack[stack.Count-1]));
   stack.Delete(stack.Count-1);
+end;
+
+class procedure TVariableCycleDetectorXQ1.detectCycle(start: TXQTerm; sc: TXQStaticContext);
+var
+  cycler: TVariableCycleDetectorXQ1;
+  i: Integer;
+begin
+  cycler := TVariableCycleDetectorXQ1.create(sc);
+  try
+    if start is TXQTermModule then begin
+      cycler.mainmodule := TXQTermModule(start);
+      for i := 0 to high(cycler.mainmodule.children) - 1 do begin
+        if cycler.mainmodule.children[i] is TXQTermDefineVariable then cycler.lastVariableIndex := i
+        else cycler.lastVariableIndex := MaxInt;
+        //if cycler.mainmodule.children[i].);
+        cycler.simpleTermVisit(@cycler.mainmodule.children[i], cycler.mainmodule);
+      end;
+    end else
+      cycler.simpleTermVisit(@start, nil);
+  finally
+    cycler.free;
+  end;
 end;
 
 procedure TFlowerVariableChecker.undeclare(v: PXQTermVariable);
@@ -2939,7 +2915,7 @@ end;
 class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
 var truechildrenhigh, i: integer;
   visitor: TFinalNamespaceResolving;
-  cycler: TVariableGathererAndCycleDetector;
+  cycler: TVariableCycleDetectorXQ1;
 
   procedure initializeFunctionsAfterResolving();
   var
@@ -2965,7 +2941,13 @@ begin
   try
     visitor := TFinalNamespaceResolving.Create();
     visitor.staticContext := sc;
-    visitor.simpleTermVisit(@result, nil);
+    if result is TXQTermModule then begin
+      visitor.mainModule := TXQTermModule(result);
+      for i := 0 to high(TXQTermModule(result).children) do begin
+        visitor.simpleTermVisit(@TXQTermModule(result).children[i], result);
+        visitor.overridenVariables.clear;
+      end;
+    end else visitor.simpleTermVisit(@result, nil);
   finally
     visitor.free;
   end;
@@ -2975,30 +2957,8 @@ begin
 
   if (result is TXQTermModule) then
     initializeFunctionsAfterResolving();
-  if (sc.model = xqpmXQuery1) and (sc.moduleNamespace = nil) then begin //main module
-    //SetLength(sc.moduleVariables, 0); do not reset variables, so multiple queries in a shared context can access the earlier variables
-    cycler := TVariableGathererAndCycleDetector.create(sc);
-    try
-      if result is TXQTermModule then begin
-        cycler.mainmodule := TXQTermModule(result);
-        //add context item declaration first (it is not easy to find variables depending on the context item, but finding variables the context item depends on is nothing unusual )
-        for i := 0 to high(cycler.mainmodule.children) - 1 do
-          if (cycler.mainmodule.children[i] is TXQTermDefineVariable)
-             and (TXQTermVariable(TXQTermDefineVariable(cycler.mainmodule.children[i]).variable).value = '$')  then
-            cycler.simpleTermVisit(@TXQTermDefineVariable(cycler.mainmodule.children[i]).variable, nil);
-        //add all declared variables (even unused still need to check for cycles, and the context might be shared)
-        for i := 0 to high(cycler.mainmodule.children) - 1 do
-          if (cycler.mainmodule.children[i] is TXQTermDefineVariable)
-             and (TXQTermVariable(TXQTermDefineVariable(cycler.mainmodule.children[i]).variable).value <> '$') then
-            cycler.simpleTermVisit(@TXQTermDefineVariable(cycler.mainmodule.children[i]).variable, nil);
-        //add all used variables (includes imported ones)
-        cycler.simpleTermVisit(@TXQTermModule(result).children[high(TXQTermModule(result).children)], result);
-      end else
-        cycler.simpleTermVisit(@result, nil);
-    finally
-      cycler.free;
-    end;
-  end;
+  if sc.model = xqpmXQuery1 then
+    TVariableCycleDetectorXQ1.detectCycle(result, sc);
 end;
 
 
@@ -3625,6 +3585,7 @@ begin
     if pending.pending <> xqptVariable then raiseParsingError('XPST0003', 'Internal error 20160101181238b');
     v^ := TXQTermVariable(pending.resolveAndFree(staticContext));
   end;
+  inherited;
 end;
 
 type TXQNativeModuleBreaker = class(TXQNativeModule);
@@ -3972,9 +3933,58 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     pt^ := patternMatcherParse(staticContext, pattern);
   end;
 
+  procedure visitVariable(pt: PXQTerm);
+  var v: TXQTermVariable;
+    function findDeclaration( m: TXQTermModule; delta: integer): TXQTermDefineVariable;
+    var
+      i: Integer;
+    begin
+      for i := 0 to high(m.children) - delta do
+        if (m.children[i] is TXQTermDefineVariable) and (TXQTermDefineVariable(m.children[i]).getVariable.equalsVariable(v)) then
+          exit(TXQTermDefineVariable(m.children[i]));
+      exit(nil);
+    end;
+  var
+    q: TXQuery;
+    modu: TXQTermModule;
+    replacement: TXQTermVariableGlobal;
+    declaration: TXQTermDefineVariable;
+  begin
+    v := TXQTermVariable(pt^);
+    if overridenVariables.hasVariable(v) then exit;
+
+    q := staticContext.findModule(v.namespace);
+    if q <> nil then begin
+      declaration := findDeclaration(TXQueryBreaker(q).getTerm as TXQTermModule, 0);
+      if declaration <> nil then begin
+        replacement := TXQTermVariableGlobalImported.Create;
+        TXQTermVariableGlobalImported(replacement).staticContext := TXQueryBreaker(q).staticContext;
+      end;
+    end else if staticContext.isLibraryModule then EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString)
+    else if mainModule <> nil then begin
+      declaration := findDeclaration(mainModule, 1);
+      if declaration <> nil then
+        replacement := TXQTermVariableGlobal.Create;
+    end else declaration := nil;
+    if declaration <> nil then begin
+      replacement.definition := declaration;
+      replace(pt, replacement);
+      exit;
+    end;
+
+    if staticContext.sender.VariableChangelog.hasVariable(v) then exit; //my global variable hack
+    if (v.namespace = '') then
+      case v.value of //some global default variables
+        'line-ending': replace(pt, TXQTermConstant.create(xqvalue(LineEnding) ));
+        'amp': replace(pt, TXQTermConstant.create(xqvalue('&') ))
+      end;
+    raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
+  end;
+
 begin
   if t^ is TXQTermPendingEQNameToken then begin
-    t^ := TXQTermPendingEQNameToken(t^).resolveAndFree(staticContext)
+    t^ := TXQTermPendingEQNameToken(t^).resolveAndFree(staticContext);
+    if t^ is TXQTermVariable then visitVariable(t);
   end else if t^ is TXQTermSequenceType then visitSequenceType(TXQTermSequenceType(t^))
   else if t^ is TXQTermNamedFunction then t^ := visitNamedFunction(TXQTermNamedFunction(t^))
   else if t^ is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(t^))
@@ -3984,7 +3994,8 @@ begin
   else if t^ is TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
   else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
   else if t^ is TXQTermTryCatch then visitTryCatch(TXQTermTryCatch(t^))
-  else if t^ is TXQTermPendingPatternMatcher then visitPendingPatternMatcher(t);
+  else if t^ is TXQTermPendingPatternMatcher then visitPendingPatternMatcher(t)
+  else if t^ is TXQTermVariable then visitVariable(t);
 
   ;result := xqtvaContinue;
 end;
@@ -4068,6 +4079,7 @@ end;
 
 constructor TFinalNamespaceResolving.Create;
 begin
+  inherited;
   changedDefaultsTypeNamespaces := TNamespaceList.Create;
 end;
 

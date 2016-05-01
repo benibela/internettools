@@ -3101,6 +3101,66 @@ end;
 
 
 
+function TXQTermVariableGlobal.evaluate(const context: TXQEvaluationContext): IXQValue;
+begin
+  if context.hasVariable(definition.getVariable, result) then exit;
+  Result:=evaluateInitial(PXQEvaluationContext(@context)^);
+end;
+
+function TXQTermVariableGlobal.getContextDependencies: TXQContextDependencies;
+begin
+  result := [xqcdContextVariables];
+end;
+
+function TXQTermVariableGlobal.clone: TXQTerm;
+begin
+  Result:=TXQTermVariableGlobal.Create;
+  TXQTermVariableGlobal(result).definition := definition;
+end;
+
+function TXQTermVariableGlobal.ToString: ansistring;
+begin
+  Result := definition.getVariable.ToString;
+end;
+
+function TXQTermVariableGlobal.evaluateInitial(var context: TXQEvaluationContext): IXQValue;
+var
+  v: TXQTermVariable;
+  pendingname: String;
+begin
+  if context.temporaryVariables = nil then context.temporaryVariables := TXQVariableChangeLog.create();
+  if context.temporaryVariables.parentLog = nil then context.temporaryVariables.parentLog := TXQVariableChangeLog.create();
+
+  v := definition.getVariable;
+
+  if context.staticContext.model in PARSING_MODEL3 then begin
+    pendingname := #0 + v.value;
+    if context.temporaryVariables.parentLog.hasVariable(pendingname, nil, v.namespace) then
+      raise EXQEvaluationException.create('XQDY0054', 'Dependancy cycle: ' + v.ToString );
+    context.temporaryVariables.parentLog.add(pendingname, xqvalue(), v.namespace);
+  end;
+
+  result := definition.getClassicValue(context);
+  context.temporaryVariables.parentLog.add(v, result);
+end;
+
+function TXQTermVariableGlobalImported.evaluate(const context: TXQEvaluationContext): IXQValue;
+var
+  tempcontext: TXQEvaluationContext;
+begin
+  if context.hasVariable(definition.getVariable, result) then exit;
+  tempcontext := context;
+  tempcontext.staticContext := staticContext;
+  Result:=evaluateInitial(tempcontext);
+end;
+
+function TXQTermVariableGlobalImported.clone: TXQTerm;
+begin
+  Result:=TXQTermVariableGlobalImported.Create;
+  TXQTermVariableGlobalImported(result).definition := definition;
+  TXQTermVariableGlobalImported(result).staticContext := staticContext;
+end;
+
 
 { TXQTermTypeSwitch }
 
@@ -3791,10 +3851,6 @@ end;
 
 
 type
-  PXQEvaluationContext = ^TXQEvaluationContext;
-
-  { TXQTerm_VisitorReplaceKnownVariables }
-
   TXQTerm_VisitorReplaceKnownVariables = class(TXQTerm_VisitorTrackKnownVariables)
     context: PXQEvaluationContext;
     uncertainVariables: TXQVariableChangeLog; //pattern variables cannot be are not know statically
