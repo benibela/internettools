@@ -173,6 +173,9 @@ begin
   else result := '';
 end;
 
+type TXQueryEngineBreaker = class(TXQueryEngine)
+end;
+
 function process(data: string; query: string): xquery.IXQValue;
 var dataFileName: string;
   datain: String;
@@ -232,6 +235,7 @@ begin
         else raise Exception.Create('internal error 21412466');
       end;
       context := pxpParser.getEvaluationContext();
+      TXQueryEngineBreaker(pxpParser).addAWeirdGlobalVariable('', 'json');
 
       if format <> itfJSON then begin
         if tree = nil then begin
