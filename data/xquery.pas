@@ -132,6 +132,7 @@ type
     namespaces: TNamespaceList;  //**< All declared namespaces.
     moduleContextItemDeclarations: array of TXQTermDefineVariable;
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
+    associatedModules: TFPList;
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
     defaultFunctionNamespace: INamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
@@ -181,6 +182,8 @@ type
     function findModule(const namespaceURL: string): TXQuery;
     function findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
     function findFunction(const anamespace, alocalname: string; const argcount: integer): TXQValueFunction;
+    function findVariableDeclaration( v: TXQTermVariable): TXQTermDefineVariable;
+    function findVariableDeclaration(const namespace, varname: string): TXQTermDefineVariable;
     function isLibraryModule: boolean;
   protected
     function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
@@ -3763,6 +3766,32 @@ begin
   exit(nil);
 end;
 
+function TXQStaticContext.findVariableDeclaration(v: TXQTermVariable): TXQTermDefineVariable;
+begin
+  result := findVariableDeclaration(v.namespace, v.value);
+end;
+
+function TXQStaticContext.findVariableDeclaration(const namespace, varname: string): TXQTermDefineVariable;
+var
+  i, mi, delta: Integer;
+  m: TXQTermModule;
+  w: TXQTermVariable;
+begin
+  if associatedModules = nil then exit(nil);
+  if isLibraryModule then delta := 0
+  else delta := 1;
+  for mi := 0 to associatedModules.Count - 1 do begin
+    m := TXQTermModule(associatedModules[mi]);
+    for i := 0 to high(m.children) - delta do begin
+      if not (m.children[i] is TXQTermDefineVariable) then continue;
+      w := TXQTermDefineVariable(m.children[i]).getVariable;
+      if (w.namespace = namespace) and (w.value = varname) then
+        exit(TXQTermDefineVariable(m.children[i]));
+    end;
+  end;
+  exit(nil);
+end;
+
 function TXQStaticContext.isLibraryModule: boolean;
 begin
   result := moduleNamespace <> nil;
@@ -3786,6 +3815,11 @@ begin
         result.functions[i] := result.functions[i].directClone as TXQValueFunction;
         result.functions[i].context.staticContext := result;
       end;
+    end;
+    result.associatedModules := associatedModules;
+    if associatedModules <> nil then begin
+      result.associatedModules := TFPList.Create;
+      result.associatedModules.Assign(associatedModules);
     end;
     result.importedmodules := importedmodules;
     if result.importedModules <> nil then begin
@@ -3828,7 +3862,7 @@ destructor TXQStaticContext.Destroy;
 var
   i: Integer;
 begin
-  if importedModules <> nil then
+  FreeAndNil(associatedModules);
   FreeAndNil(importedModules);
   for i := 0 to high(functions) do
     functions[i].free;
@@ -4597,9 +4631,9 @@ end;
 
 destructor TXQuery.Destroy;
 begin
-  fterm.Free;
-  if not staticContextShared then
-    FreeAndNil(staticContext);
+  fterm.Free; //delete term first, since it might contain other queries that have a reference to staticContext (let's hope they all share it => requirement nested queries must share);
+  if not staticContextShared then FreeAndNil(staticContext)
+  else if staticContext.associatedModules <> nil then staticContext.associatedModules.Remove(fterm);
   inherited Destroy;
 end;
 

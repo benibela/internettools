@@ -172,9 +172,7 @@ type
  end;
 
  TFinalVariableResolving = class(TXQTerm_VisitorTrackKnownVariables)
-   mainModule: TXQTermModule;
    staticContext: TXQStaticContext;
-   //globalVariableHack: TXQVariableChangeLog;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
  end;
@@ -224,16 +222,6 @@ end;
 function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitVariable(pt: PXQTerm);
   var v: TXQTermVariable;
-    function findDeclaration( m: TXQTermModule; delta: integer): TXQTermDefineVariable;
-    var
-      i: Integer;
-    begin
-      for i := 0 to high(m.children) - delta do
-        if (m.children[i] is TXQTermDefineVariable) and (TXQTermDefineVariable(m.children[i]).getVariable.equalsVariable(v)) then
-          exit(TXQTermDefineVariable(m.children[i]));
-      exit(nil);
-    end;
-  var
     q: TXQuery;
     modu: TXQTermModule;
     replacement: TXQTermVariableGlobal;
@@ -245,7 +233,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
     q := staticContext.findModule(v.namespace);
     if q <> nil then begin
-      declaration := findDeclaration(TXQueryBreaker(q).getTerm as TXQTermModule, 0);
+      declaration := TXQueryBreaker(q).staticContext.findVariableDeclaration(v);
       if declaration <> nil then begin
         if (TXQueryBreaker(q).staticContext <> staticContext) and hasAnnotation(declaration.annotations, XMLNamespaceURL_XQuery, 'private') then
           raise EXQParsingException.create('XPST0008', 'Private variable '+v.ToString);
@@ -253,11 +241,11 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         TXQTermVariableGlobalImported(replacement).staticContext := TXQueryBreaker(q).staticContext;
       end;
     end else if staticContext.isLibraryModule then raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString)
-    else if mainModule <> nil then begin
-      declaration := findDeclaration(mainModule, 1);
+    else begin
+      declaration := staticContext.findVariableDeclaration(v);
       if declaration <> nil then
         replacement := TXQTermVariableGlobal.Create;
-    end else declaration := nil;
+    end;
     if declaration <> nil then begin
       replacement.definition := declaration;
       replace(pt, replacement);
@@ -3016,10 +3004,6 @@ var truechildrenhigh: integer;
   end;
 begin
   try
-    visitor := TFinalNamespaceResolving.Create();
-    if result is TXQTermModule then visitor.mainModule := TXQTermModule(result);
-    visitor.staticContext := sc;
-    visitor.simpleTermVisit(@result, nil);
     try
       varvisitor := TFinalVariableResolving.create;
       varvisitor.staticContext := visitor.staticContext;
