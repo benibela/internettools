@@ -813,6 +813,21 @@ begin
   value := COMMAND_STR[attyp];
 end;
 
+function isVariableName(s: string): boolean;
+begin
+  result := false;
+  s := trim(s);
+  if length(s) < 2 then exit();
+  if s[1] <> '$' then exit;
+  s[1] := ' ';
+  s := StringsReplace(s, [' ',#9,#13,#10], ['','','',''], [rfReplaceAll]); //for dot notation
+  if baseSchema.isValidQName(s) then exit(true);
+  if strBeginsWith(s, 'Q{') then begin
+    delete(s, 1, pos(s, '}'));
+    if baseSchema.isValidNCName(s) then exit(true);
+  end;
+end;
+
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
  curChild: TTreeNode;
@@ -844,7 +859,9 @@ begin
         temp.addChild(TTemplateElement.create());
         temp.templateNext.typ := tetText;
         temp.templateNext.templateType := tetIgnore;
-        temp.templateNext.value:='@'+attributes.Items[i].getNodeName() + ' / (' + copy(rv, 2, length(rv) - 2)+')';
+        rv := copy(rv, 2, length(rv) - 2);
+        if isVariableName(rv) then temp.templateNext.value:= rv + ':= @'+attributes.Items[i].getNodeName()
+        else temp.templateNext.value:='@'+attributes.Items[i].getNodeName() + ' / (' + rv +')';
         addChild(temp);
         if templateAttributes = nil then templateAttributes := TStringAttributeList.Create;
         //todo: optimize ?
@@ -908,6 +925,17 @@ begin
   end;
 end;
 
+type
+
+TXQueryEngineBreaker = class(TXQueryEngine)
+  function parserEnclosedExpressionsString(s: string): IXQuery;
+end;
+
+function TXQueryEngineBreaker.parserEnclosedExpressionsString(s: string): IXQuery;
+begin
+  result := parseXStringNullTerminated(s);
+end;
+
 procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   function cachePXP(name: string): IXQuery;
   var i: integer;
@@ -943,15 +971,9 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     end;
     textRegexs[high(textRegexs)] := wregexprParse(r, flags);
   end;
-
-  function isVariableName(t: TXQTerm): boolean;
-  begin
-    while ((t is TXQTermBinaryOp) and (TXQTermBinaryOp(t).op.name = '.')) or (t is TXQTermReadObjectProperty) do t := TXQTermWithChildren(t).children[0];
-    result := t is TXQTermVariable;
-  end;
-
 var
   term: TXQTerm;
+  temp: String;
 begin
   contentRepetitions := 0;
 
@@ -960,20 +982,10 @@ begin
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
   if templateType = tetCommandShortRead then begin
-    source := parser.parseQuery(deepNodeText()); //todo: use correct encoding
+    temp := deepNodeText();
+    if isVariableName(temp) then temp += ' := .'; //replace $xx with $xx := .
+    source := parser.parseQuery(temp); //todo: encoding?
     term := source.Term;
-    if isVariableName(term) then source.Term := TXQTermDefineVariable.create(Term, TXQTermNodeMatcher.Create('.')) //replace $xx with $xx := .
-    else if (term is TXQTermBinaryOp) and (TXQTermBinaryOp(term).op.name = '/')
-            and (TXQTermBinaryOp(source.term).children[0] is TXQTermNodeMatcher)and (TXQTermNodeMatcher(TXQTermBinaryOp(source.term).children[0]).axis = 'attribute') and (TXQTermBinaryOp(source.Term).children[1] is TXQTermSequence)
-            and (TXQTermBinaryOp(source.term).children[1] is TXQTermWithChildren) and (length(TXQTermWithChildren(TXQTermBinaryOp(source.term).children[1]).children) = 1) and isVariableName(TXQTermWithChildren(TXQTermBinaryOp(source.term).children[1]).children[0]) then begin
-      //replace    @foobar / ( $xyz ) by $xyz := @foobar
-      source.term := TXQTermDefineVariable.create(TXQTermWithChildren(TXQTermWithChildren(Term).children[1]).children[0],  TXQTermWithChildren(Term).children[0]);
-      //free terms
-      setlength(TXQTermWithChildren(TXQTermWithChildren(term).children[1]).children, 0);
-      TXQTermWithChildren(term).children[1].free;
-      setlength(TXQTermWithChildren(term).children, 0);
-      term.free;
-    end;
   end else
     source := cachePXP('source');
 
@@ -997,8 +1009,12 @@ begin
     cacheRegExpr('list-contains', '(^|,) *', ' *(,|$)', true);
   end else if (templateType = tetCommandRead) then begin
     cacheRegExpr('regex', '', '', false);
-    if templateAttributes.IndexOfName('var') >= 0 then
+    if templateAttributes.IndexOfName('var') >= 0 then begin
       varname := parser.parseQuery('x"'+templateAttributes.Values['var']+'"');
+      temp := varname.evaluate().toString;
+      if strContains(temp, '.') then temp := strBefore(temp, '.');
+      TXQueryEngineBreaker(parser.QueryEngine).addAWeirdGlobalVariable('', temp);
+    end;
   end;
 end;
 
@@ -1950,17 +1966,6 @@ begin
     end else Result+=s[i];
     i+=1;
   end;
-end;
-
-type
-
-TXQueryEngineBreaker = class(TXQueryEngine)
-  function parserEnclosedExpressionsString(s: string): IXQuery;
-end;
-
-function TXQueryEngineBreaker.parserEnclosedExpressionsString(s: string): IXQuery;
-begin
-  result := parseXStringNullTerminated(s);
 end;
 
 function THtmlTemplateParser.replaceEnclosedExpressions(str: string): string;
