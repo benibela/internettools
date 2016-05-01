@@ -1313,10 +1313,11 @@ end;
 
 procedure TXQTermFlowerWindow.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
 begin
+  visitor.undeclare(@loopvar);
+
   endCondition.visitchildrenToUndeclare(visitor, self);
   startCondition.visitchildrenToUndeclare(visitor, self);
 
-  visitor.undeclare(@loopvar);
 end;
 
 procedure TXQTermFlowerWindow.visitlocalvariables(callback: TXQTermFlowerWindowVariableCallback; data: pointer);
@@ -3198,6 +3199,8 @@ begin
       for j := 0 to high(vars) do
         visitor.declare(@vars[j]);
 
+    result := visitor.simpleTermVisit(@pattern, self);
+    case result of xqtvaAbort: exit; end;
     result := visitor.simpleTermVisit(@expr, self);
     case result of xqtvaAbort: exit; end;
 

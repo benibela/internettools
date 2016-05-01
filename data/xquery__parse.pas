@@ -160,7 +160,7 @@ type
    implicitNamespaceCounts: TLongintArray;
    implicitNamespaceCountsLength: integer;
    checker: TFlowerVariableChecker;
-   globalVariableHack: TXQVariableChangeLog;
+   //globalVariableHack: TXQVariableChangeLog;
    procedure declare(v: PXQTermVariable); override;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
@@ -174,7 +174,7 @@ type
  TFinalVariableResolving = class(TXQTerm_VisitorTrackKnownVariables)
    mainModule: TXQTermModule;
    staticContext: TXQStaticContext;
-   globalVariableHack: TXQVariableChangeLog;
+   //globalVariableHack: TXQVariableChangeLog;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
  end;
@@ -198,6 +198,15 @@ end;
  TXQAnnotationsInClass = class
    annotations: TXQAnnotations;
  end;
+
+function hasAnnotation(const ans: TXQAnnotations; const namespace, local: string): boolean;
+var
+  i: Integer;
+begin
+  for i := 0 to high(ans) do
+    if ans[i].name.isEqual(namespace, local) then exit(true);
+  exit(false);
+end;
 
 function addNamespacesToStaticContext(ns: TNamespaceList; sc: TXQStaticContext): integer;
 var
@@ -238,10 +247,12 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     if q <> nil then begin
       declaration := findDeclaration(TXQueryBreaker(q).getTerm as TXQTermModule, 0);
       if declaration <> nil then begin
+        if (TXQueryBreaker(q).staticContext <> staticContext) and hasAnnotation(declaration.annotations, XMLNamespaceURL_XQuery, 'private') then
+          raise EXQParsingException.create('XPST0008', 'Private variable '+v.ToString);
         replacement := TXQTermVariableGlobalImported.Create;
         TXQTermVariableGlobalImported(replacement).staticContext := TXQueryBreaker(q).staticContext;
       end;
-    end else if staticContext.isLibraryModule then EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString)
+    end else if staticContext.isLibraryModule then raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString)
     else if mainModule <> nil then begin
       declaration := findDeclaration(mainModule, 1);
       if declaration <> nil then
@@ -253,8 +264,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       exit;
     end;
 
-    if staticContext.sender.VariableChangelog.hasVariable(v)
-       or ((globalVariableHack <> nil) and (globalVariableHack.hasVariable(v))) then exit; //my global variable hack
+    if TXQueryEngineBreaker(staticContext.sender).isAWeirdGlobalVariable(v.namespace, v.value) then exit;
     if (v.namespace = '') then
       case v.value of //some global default variables
         'line-ending': replace(pt, TXQTermConstant.create(xqvalue(LineEnding) ));
@@ -2977,14 +2987,11 @@ begin
   for i := 0 to pendings.Count - 1 do
     TXQueryEngineBreaker(staticContext.sender).fmodules.Add(pendings[i]);
   pendings.Clear;
-
-  staticContext.primaryTerm := Result;
 end;
 
 class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
-var truechildrenhigh, i: integer;
+var truechildrenhigh: integer;
   visitor: TFinalNamespaceResolving;
-  cycler: TVariableCycleDetectorXQ1;
   varvisitor: TFinalVariableResolving;
 
   procedure initializeFunctionsAfterResolving();
@@ -3017,7 +3024,6 @@ begin
       varvisitor := TFinalVariableResolving.create;
       varvisitor.staticContext := visitor.staticContext;
       varvisitor.mainModule := visitor.mainModule;
-      varvisitor.globalVariableHack := visitor.globalVariableHack;
       varvisitor.simpleTermVisit(@result, nil);
     finally
       varvisitor.free;
@@ -4084,10 +4090,13 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
   procedure visitDefineVariable(f: TXQTermDefineVariable);
+  var
+    v: TXQTermVariable;
   begin
-    if (parent <> mainModule) and not (parent is TXQTermDefineFunction) then begin
-      if globalVariableHack = nil then globalVariableHack := TXQVariableChangeLog.create();
-      globalVariableHack.add(f.getVariable, xqvalue());
+    if ((parent <> mainModule) or (mainModule = nil) or (not staticContext.isLibraryModule and (mainModule.children[high(mainModule.children)] = f)))
+       and not (parent is TXQTermDefineFunction) and (staticContext.sender <> nil) then begin
+      v := f.getVariable;
+      TXQueryEngineBreaker(staticContext.sender).addAWeirdGlobalVariable(v.namespace, v.value);
     end;
   end;
 

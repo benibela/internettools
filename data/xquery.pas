@@ -125,19 +125,11 @@ type
     FNodeCollation: TXQCollation;  // default collation used for node name comparisons (extension, does not exist in XQuery)
     function getNodeCollation: TXQCollation;
   public
-    type TXQVariableContext = record
-      definition: TXQTermDefineVariable;
-      context: TXQStaticContext;
-    end;
-
-  public
     sender: TXQueryEngine; //**< Engine this context belongs to
-    primaryTerm: TXQTerm;
 
     //The following values map directly to XQuery options declarable in a prolog
     moduleNamespace: INamespace; //**< The namespace of this module or nil
     namespaces: TNamespaceList;  //**< All declared namespaces.
-    moduleVariables: array of TXQVariableContext;  //**< All declared and imported variables.
     moduleContextItemDeclarations: array of TXQTermDefineVariable;
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
@@ -2460,8 +2452,10 @@ public
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
     FModules, FPendingModules: TInterfaceList; //internal used
+    VariableChangelogUndefined: TXQVariableChangeLog;
     function GetNativeModules: TStringList;
-
+    function isAWeirdGlobalVariable(const namespace, local: string): boolean;
+    procedure addAWeirdGlobalVariable(const namespace, local: string);
   protected
     function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext = nil): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
@@ -3783,10 +3777,6 @@ begin
   with sc do begin
     result.sender := sender;
     result.stripboundaryspace := stripboundaryspace;
-    if modulevariables <> nil then begin
-      result.modulevariables := modulevariables;
-      SetLength(result.modulevariables, length(result.modulevariables));
-    end;
     result.moduleContextItemDeclarations := moduleContextItemDeclarations;
     if namespaces <> nil then result.namespaces := namespaces.clone;
     result.functions := functions;
@@ -4532,7 +4522,7 @@ var tempcontext: TXQEvaluationContext;
   vari: TXQTermVariable;
 begin
   if fterm = nil then exit(xqvalue());
-  if (context.staticContext <> nil) and (staticContext.importedModules = nil) and (length(staticContext.moduleVariables) = 0)  and not (fterm is TXQTermModule) then
+  if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
     exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
 
   tempcontext:=context;
@@ -7138,6 +7128,24 @@ end;
 function TXQueryEngine.GetNativeModules: TStringList;
 begin
   result := nativeModules;
+end;
+
+function TXQueryEngine.isAWeirdGlobalVariable(const namespace, local: string): boolean;
+begin
+  if VariableChangelog.hasVariable(local, nil, namespace) then exit(true);
+  if VariableChangelogUndefined = nil then exit(false);
+  if VariableChangelogUndefined.hasVariable(local, nil, namespace) then exit(true);
+  exit(false);
+end;
+
+procedure TXQueryEngine.addAWeirdGlobalVariable(const namespace, local: string);
+begin
+  if isAWeirdGlobalVariable(namespace, local) then exit;
+  if VariableChangelogUndefined = nil then begin
+    VariableChangelogUndefined := TXQVariableChangeLog.create();
+    VariableChangelogUndefined.add(local, xqvalue(), namespace);
+  end else
+    VariableChangelogUndefined.add(local, VariableChangelogUndefined.get(0), namespace  );
 end;
 
 function TXQueryEngine.findNamespace(const nsprefix: string): INamespace;
