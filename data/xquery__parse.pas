@@ -153,13 +153,14 @@ type
    destructor Destroy; override;
  end;
 
- TFinalNamespaceResolving = class(TXQTerm_VisitorTrackKnownVariables)
+ TFinalNamespaceResolving = class(TXQTerm_Visitor)
+   mainModule: TXQTermModule;
    staticContext: TXQStaticContext;
    changedDefaultsTypeNamespaces: TInterfaceList;
    implicitNamespaceCounts: TLongintArray;
    implicitNamespaceCountsLength: integer;
    checker: TFlowerVariableChecker;
-   mainModule: TXQTermModule;
+   globalVariableHack: TXQVariableChangeLog;
    procedure declare(v: PXQTermVariable); override;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
@@ -168,6 +169,14 @@ type
 
    constructor Create;
    destructor Destroy; override;
+ end;
+
+ TFinalVariableResolving = class(TXQTerm_VisitorTrackKnownVariables)
+   mainModule: TXQTermModule;
+   staticContext: TXQStaticContext;
+   globalVariableHack: TXQVariableChangeLog;
+   function visit(t: PXQTerm): TXQTerm_VisitAction; override;
+   function leave(t: PXQTerm): TXQTerm_VisitAction; override;
  end;
 
  TVariableCycleDetectorXQ1 = class(TXQTerm_VisitorTrackKnownVariables)
@@ -203,9 +212,69 @@ begin
   end;
 end;
 
+function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
+  procedure visitVariable(pt: PXQTerm);
+  var v: TXQTermVariable;
+    function findDeclaration( m: TXQTermModule; delta: integer): TXQTermDefineVariable;
+    var
+      i: Integer;
+    begin
+      for i := 0 to high(m.children) - delta do
+        if (m.children[i] is TXQTermDefineVariable) and (TXQTermDefineVariable(m.children[i]).getVariable.equalsVariable(v)) then
+          exit(TXQTermDefineVariable(m.children[i]));
+      exit(nil);
+    end;
+  var
+    q: TXQuery;
+    modu: TXQTermModule;
+    replacement: TXQTermVariableGlobal;
+    declaration: TXQTermDefineVariable;
+  begin
+    if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) then exit;
+    v := TXQTermVariable(pt^);
+    if overridenVariables.hasVariable(v) then exit;
+
+    q := staticContext.findModule(v.namespace);
+    if q <> nil then begin
+      declaration := findDeclaration(TXQueryBreaker(q).getTerm as TXQTermModule, 0);
+      if declaration <> nil then begin
+        replacement := TXQTermVariableGlobalImported.Create;
+        TXQTermVariableGlobalImported(replacement).staticContext := TXQueryBreaker(q).staticContext;
+      end;
+    end else if staticContext.isLibraryModule then EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString)
+    else if mainModule <> nil then begin
+      declaration := findDeclaration(mainModule, 1);
+      if declaration <> nil then
+        replacement := TXQTermVariableGlobal.Create;
+    end else declaration := nil;
+    if declaration <> nil then begin
+      replacement.definition := declaration;
+      replace(pt, replacement);
+      exit;
+    end;
+
+    if staticContext.sender.VariableChangelog.hasVariable(v)
+       or ((globalVariableHack <> nil) and (globalVariableHack.hasVariable(v))) then exit; //my global variable hack
+    if (v.namespace = '') then
+      case v.value of //some global default variables
+        'line-ending': replace(pt, TXQTermConstant.create(xqvalue(LineEnding) ));
+        'amp': replace(pt, TXQTermConstant.create(xqvalue('&') ))
+      end;
+    raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
+  end;
+begin
+  if t^ is TXQTermVariable then visitVariable(t);
+  Result:=xqtvaContinue;
+end;
+
+function TFinalVariableResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
+begin
+  Result:=inherited leave(t);
+end;
 
 const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
       PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
+
 
 constructor TVariableCycleDetectorXQ1.create(startcontext: TXQStaticContext);
 begin
@@ -2916,6 +2985,7 @@ class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQSta
 var truechildrenhigh, i: integer;
   visitor: TFinalNamespaceResolving;
   cycler: TVariableCycleDetectorXQ1;
+  varvisitor: TFinalVariableResolving;
 
   procedure initializeFunctionsAfterResolving();
   var
@@ -2940,14 +3010,18 @@ var truechildrenhigh, i: integer;
 begin
   try
     visitor := TFinalNamespaceResolving.Create();
+    if result is TXQTermModule then visitor.mainModule := TXQTermModule(result);
     visitor.staticContext := sc;
-    if result is TXQTermModule then begin
-      visitor.mainModule := TXQTermModule(result);
-      for i := 0 to high(TXQTermModule(result).children) do begin
-        visitor.simpleTermVisit(@TXQTermModule(result).children[i], result);
-        visitor.overridenVariables.clear;
-      end;
-    end else visitor.simpleTermVisit(@result, nil);
+    visitor.simpleTermVisit(@result, nil);
+    try
+      varvisitor := TFinalVariableResolving.create;
+      varvisitor.staticContext := visitor.staticContext;
+      varvisitor.mainModule := visitor.mainModule;
+      varvisitor.globalVariableHack := visitor.globalVariableHack;
+      varvisitor.simpleTermVisit(@result, nil);
+    finally
+      varvisitor.free;
+    end;
   finally
     visitor.free;
   end;
@@ -3843,7 +3917,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
   procedure visitDefineVariable(f: TXQTermDefineVariable);
-
   begin
     visitAnnotations(f.annotations, false);
   end;
@@ -3933,58 +4006,9 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     pt^ := patternMatcherParse(staticContext, pattern);
   end;
 
-  procedure visitVariable(pt: PXQTerm);
-  var v: TXQTermVariable;
-    function findDeclaration( m: TXQTermModule; delta: integer): TXQTermDefineVariable;
-    var
-      i: Integer;
-    begin
-      for i := 0 to high(m.children) - delta do
-        if (m.children[i] is TXQTermDefineVariable) and (TXQTermDefineVariable(m.children[i]).getVariable.equalsVariable(v)) then
-          exit(TXQTermDefineVariable(m.children[i]));
-      exit(nil);
-    end;
-  var
-    q: TXQuery;
-    modu: TXQTermModule;
-    replacement: TXQTermVariableGlobal;
-    declaration: TXQTermDefineVariable;
-  begin
-    v := TXQTermVariable(pt^);
-    if overridenVariables.hasVariable(v) then exit;
-
-    q := staticContext.findModule(v.namespace);
-    if q <> nil then begin
-      declaration := findDeclaration(TXQueryBreaker(q).getTerm as TXQTermModule, 0);
-      if declaration <> nil then begin
-        replacement := TXQTermVariableGlobalImported.Create;
-        TXQTermVariableGlobalImported(replacement).staticContext := TXQueryBreaker(q).staticContext;
-      end;
-    end else if staticContext.isLibraryModule then EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString)
-    else if mainModule <> nil then begin
-      declaration := findDeclaration(mainModule, 1);
-      if declaration <> nil then
-        replacement := TXQTermVariableGlobal.Create;
-    end else declaration := nil;
-    if declaration <> nil then begin
-      replacement.definition := declaration;
-      replace(pt, replacement);
-      exit;
-    end;
-
-    if staticContext.sender.VariableChangelog.hasVariable(v) then exit; //my global variable hack
-    if (v.namespace = '') then
-      case v.value of //some global default variables
-        'line-ending': replace(pt, TXQTermConstant.create(xqvalue(LineEnding) ));
-        'amp': replace(pt, TXQTermConstant.create(xqvalue('&') ))
-      end;
-    raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
-  end;
-
 begin
   if t^ is TXQTermPendingEQNameToken then begin
     t^ := TXQTermPendingEQNameToken(t^).resolveAndFree(staticContext);
-    if t^ is TXQTermVariable then visitVariable(t);
   end else if t^ is TXQTermSequenceType then visitSequenceType(TXQTermSequenceType(t^))
   else if t^ is TXQTermNamedFunction then t^ := visitNamedFunction(TXQTermNamedFunction(t^))
   else if t^ is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(t^))
@@ -3995,7 +4019,6 @@ begin
   else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
   else if t^ is TXQTermTryCatch then visitTryCatch(TXQTermTryCatch(t^))
   else if t^ is TXQTermPendingPatternMatcher then visitPendingPatternMatcher(t)
-  else if t^ is TXQTermVariable then visitVariable(t);
 
   ;result := xqtvaContinue;
 end;
@@ -4060,10 +4083,18 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
     end;
   end;
 
+  procedure visitDefineVariable(f: TXQTermDefineVariable);
+  begin
+    if (parent <> mainModule) and not (parent is TXQTermDefineFunction) then begin
+      if globalVariableHack = nil then globalVariableHack := TXQVariableChangeLog.create();
+      globalVariableHack.add(f.getVariable, xqvalue());
+    end;
+  end;
 
 begin
   if t^ is TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
   else if t^ is TXQTermFlower then visitFlower(TXQTermFlower(t^))
+  else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
   ;result := xqtvaContinue;
 end;
 

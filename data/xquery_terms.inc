@@ -618,8 +618,21 @@ begin
 end;
 
 function TXQTermDefineVariable.getVariable: TXQTermVariable;
+var
+  v: TXQTerm;
 begin
-  result := variable as TXQTermVariable;
+  if (variable.ClassType = TXQTermVariable) or (variable is TXQTermVariable) then
+    exit(TXQTermVariable(variable));
+  v := variable;
+  while true do begin
+    if v is TXQTermSequence then v := TXQTermSequence(v).children[0]
+    else if v is TXQTermVariable then exit(TXQTermVariable(v))
+    else if v is TXQTermReadObjectProperty then v := TXQTermReadObjectProperty(v).children[0]
+    else if v is TXQTermDynamicFunctionCall then  v := TXQTermDynamicFunctionCall(v).children[0]
+    else if v is TXQTermFilterSequence then v := TXQTermFilterSequence(v).children[0]
+    else raiseInternalError(1651217);
+  end;
+  raiseInternalError(1651218);
 end;
 
 function TXQTermDefineVariable.getExpression: TXQTerm;
