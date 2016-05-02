@@ -1362,7 +1362,6 @@ begin
   internet:=ainternet;
   parser:=THtmlTemplateParser.create;
   parser.KeepPreviousVariables:=kpvKeepValues;
-  parser.variableChangeLog.caseSensitive:=false;
   setTemplate(atemplate);
   retryOnConnectionFailures := true;
 end;
