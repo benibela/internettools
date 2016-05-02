@@ -246,13 +246,10 @@ begin
         tree.parseTree(data, dataFileName);
         context.ParentElement := tree.getLastTree;
         context.RootElement := tree.getLastTree;
-      end else begin
-        assert(context.temporaryVariables = nil);
-        context.temporaryVariables := TXQVariableChangeLog.create();
-        context.temporaryVariables.add('json', parseJSON(data));
-      end;
+      end else
+        pxpParser.VariableChangelog.add('json', parseJSON(data)); //TODO: this is bad, it leaks all JSON data, till the engine is reset
+
       result := pxpParser.evaluate(context);
-      FreeAndNil(context.temporaryVariables);
     end;
   end;
 end;

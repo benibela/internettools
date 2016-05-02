@@ -1961,7 +1961,7 @@ begin
   end;
   term := TXQueryEngineBreaker(context.staticContext.sender).parseTerm(args[0].toString, model);
   try
-    result := term.evaluate(context);
+    result := term.evaluate(PXQEvaluationContext(@context)^);
   finally
     term.free;
   end;
@@ -3544,7 +3544,7 @@ begin
   temp.name.namespacePrefix := qname.prefix;
   temp.name.localname := qname.local;
   try
-    result := temp.evaluate(context);
+    result := temp.evaluate(PXQEvaluationContext(@context)^);
   except
     on e: EXQEvaluationException do
       if e.errorCode = 'XPST0017' then result := xqvalue() //todo: do not use exceptions for control flow

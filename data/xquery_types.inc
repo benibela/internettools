@@ -341,11 +341,13 @@ end;
 function TXQValue.filter(const q: string): IXQValue;
 var
   term: TXQuery;
+  tempContext: TXQEvaluationContext;
 begin
   result := self;
   term := defaultQueryEngine.parseTerm(q, xqpmXQuery3, defaultQueryEngine.StaticContext);
   try
-    TXQueryEngine.filterSequence(result, term.getTerm, defaultQueryEngine.getEvaluationContext());
+    tempContext := defaultQueryEngine.getEvaluationContext();
+    TXQueryEngine.filterSequence(result, term.getTerm, tempContext);
   finally
     term.free;
   end;

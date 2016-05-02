@@ -2201,7 +2201,7 @@ begin
   temp.free;
 end;
 
-function patternMatcherMatch(template, data: TTreeNode; const context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
+function patternMatcherMatch(template, data: TTreeNode; var context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
 var temp: THtmlTemplateParser;
   oldEngine: TXQueryEngine;
   queryVarLog: TXQVariableChangeLog;

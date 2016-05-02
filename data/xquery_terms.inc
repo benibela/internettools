@@ -134,7 +134,7 @@ begin
   result := self;
 end;
 
-procedure TXQTermWithChildren.evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
+procedure TXQTermWithChildren.evaluateChildren(var context: TXQEvaluationContext; out results: TXQVArray);
 var
   i: Integer;
 begin
@@ -262,7 +262,7 @@ begin
   propname := apropname;
 end;
 
-function TXQTermReadObjectProperty.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermReadObjectProperty.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   obj, v: IXQValue;
   seq: TXQVList;
@@ -311,7 +311,7 @@ begin
   end;
 end;
 
-function TXQTermIf.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermIf.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   if length(children)<>3 then raiseEvaluationError('XPST0003', 'if must have 3 arguments');
   if children[0].evaluate(context).toBooleanEffective then result:=children[1].evaluate(context)
@@ -331,7 +331,7 @@ begin
   if filter <> nil then push(filter);
 end;
 
-function TXQTermFilterSequence.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermFilterSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   if length(children) <> 2 then raiseEvaluationError('XPST0003', 'Invalid [] sequence filter');
   if (children[0] is TXQTermNodeMatcher) and (TXQTermNodeMatcher(children[0]).select <> '.') then begin
@@ -403,7 +403,7 @@ begin
   if value <> nil then push(value);
 end;
 
-function TXQTermDefineVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermDefineVariable.evaluate(var context: TXQEvaluationContext): IXQValue;
 var varname: string;
     varnamespace: string;
     properties: TStringArray; //properties or array elements
@@ -532,7 +532,7 @@ begin
 end;
 
 //returns the value, if the definition is a standard xquery 'declare variable $ ...'
-function TXQTermDefineVariable.getClassicValue(const context: TXQEvaluationContext): IXQValue;
+function TXQTermDefineVariable.getClassicValue(var context: TXQEvaluationContext): IXQValue;
 var
   hasExpression, extern, hasTypeDeclaration: Boolean;
   name, nsu: string;
@@ -683,7 +683,7 @@ begin
 end;
 
 
-function TXQTermSequenceType.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermSequenceType.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   result := TXQValueFunction.create(self); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
@@ -974,7 +974,7 @@ end;
 
 { TXQTermSequence }
 
-function TXQTermSequence.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
   tempSeq: TXQValueSequence;
@@ -1015,7 +1015,7 @@ end;
 
 { TXQTermArray }
 
-function TXQTermJSONArray.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermJSONArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
   tempSeq: TXQValueJSONArray;
@@ -1042,7 +1042,7 @@ begin
   isEvery:=every;
 end;
 
-function TXQTermSomeEvery.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
 var tempContext:TXQEvaluationContext;
   function evaluateSomeEvery(pos:integer): boolean;
   var v: IXQValue;
@@ -1129,7 +1129,7 @@ begin
   result := xqtfcOrder;
 end;
 
-function TXQTermFlowerSubClause.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermFlowerSubClause.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   raiseEvaluationError('pxp:INTERNAL', 'A flower subclause cannot be evaluated');
@@ -1691,7 +1691,7 @@ begin
 end;
 
 
-function TXQTermFlower.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermFlower.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   tempContext: TXQEvaluationContext;
   sortingCache: TFPList;
@@ -2375,7 +2375,7 @@ begin
   inherited destroy;
 end;
 
-function TXQTermNamedFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermNamedFunction.evaluate(var context: TXQEvaluationContext): IXQValue;
 //{$define checkreturntypes}  there is no point in testing the return type for native functions. but it might spot internal inconsistencies
 var
   evilkids: TXQVArray;
@@ -2583,7 +2583,7 @@ begin
   end;
 end;
 
-function TXQTermDynamicFunctionCall.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermDynamicFunctionCall.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   func, v: IXQValue;
   index: IXQValue;
@@ -2680,7 +2680,7 @@ begin
   create('unary~hack' + aop, TXQTermConstant.create(xqvalue()), arg);
 end;
 
-function TXQTermBinaryOp.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
   function evaluateSimpleMap: IXQValue;
   var
     tempContext: TXQEvaluationContext;
@@ -2821,7 +2821,7 @@ begin
   select := aLocalPart;
 end;
 
-function TXQTermNodeMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue
   else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.TextNode<>nil) then
@@ -2832,7 +2832,7 @@ begin
   end else result := evaluateAttribute(context);
 end;
 
-function TXQTermNodeMatcher.evaluateAttribute(const context: TXQEvaluationContext): IXQValue;
+function TXQTermNodeMatcher.evaluateAttribute(var context: TXQEvaluationContext): IXQValue;
 var
   tempEl: TTreeNode;
   testValue: Boolean;
@@ -3004,7 +3004,7 @@ begin
   value := avalue;
 end;
 
-function TXQTermConstant.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermConstant.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   result := value;
@@ -3046,7 +3046,7 @@ begin
   inherited destroy;
 end;
 
-function TXQTermPatternMatcher.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermPatternMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
   raiseEvaluationError('pxp:INTERNAL', 'TXQTermPatternMatcher.evaluate');
@@ -3086,7 +3086,7 @@ begin
   result := (v.value = value) and equalNamespaces(namespace, v.namespace);
 end;
 
-function TXQTermVariable.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermVariable.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   result := context.getVariable(value, namespace);
 end;
@@ -3115,7 +3115,7 @@ end;
 
 
 
-function TXQTermVariableGlobal.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermVariableGlobal.evaluate(var context: TXQEvaluationContext): IXQValue;
 var temp: TXQValue;
 begin
   if (context.temporaryVariables <> nil) and context.temporaryVariables.hasVariable(definition.getVariable, @temp) then begin
@@ -3162,7 +3162,7 @@ begin
   context.temporaryVariables.parentLog.add(v, result);
 end;
 
-function TXQTermVariableGlobalImported.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermVariableGlobalImported.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
   temp: TXQValue;
@@ -3224,7 +3224,7 @@ begin
 
 end;
 
-function TXQTermTypeSwitch.TXQTermTypeSwitchClause.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermTypeSwitch.TXQTermTypeSwitchClause.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   raiseInternalError(1604301730);
 end;
@@ -3238,7 +3238,8 @@ begin
   TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).expr := expr;
 end;
 
-function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(const context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
+function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue
+  ): boolean;
   function evaluateWithChangedVariable(const value: IXQValue): IXQValue;
   var
     tempContext: TXQEvaluationContext;
@@ -3301,7 +3302,7 @@ end;
 
 
 
-function TXQTermTypeSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermTypeSwitch.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   v: IXQValue;
   i: Integer;
@@ -3324,7 +3325,7 @@ end;
 
 
 
-function TXQTermSwitch.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermSwitch.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   v: IXQValue;
   i, j: Integer;
@@ -3362,7 +3363,7 @@ begin
   nameValue := aname;
 end;
 
-function TXQTermConstructor.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   temp: Integer;
 begin
@@ -3370,7 +3371,7 @@ begin
   result := evaluate(context, nil, temp);
 end;
 
-function TXQTermConstructor.evaluate(const context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
+function TXQTermConstructor.evaluate(var context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
 var
   tree: TTreeNode;
   kid: TTreeNode;
@@ -3838,7 +3839,7 @@ end;
 
 { TXQTermJSONObjectConstructor }
 
-function TXQTermJSONObjectConstructor.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
   function transformValue(v: IXQValue): IXQValue;
   begin
     if not context.staticContext.objectsRestrictedToJSONTypes then
@@ -3968,7 +3969,7 @@ begin
   createReference(TNamespace.create(anamespaceUrl, 'prf'), aname, arity);
 end;                                                                                }
 
-function TXQTermDefineFunction.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermDefineFunction.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   temp: TXQValueFunction;
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
@@ -4026,7 +4027,7 @@ begin
   end;
 end;
 
-function TXQTermDefineFunction.define(const context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
+function TXQTermDefineFunction.define(var context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
 var
   i: Integer;
   v: TXQTermVariable;
@@ -4213,7 +4214,7 @@ begin
   initialized := true;
 end;
 
-function TXQTermDefineFunction.defineStaticPartialApplication(const context: TXQEvaluationContext): TXQValueFunction;
+function TXQTermDefineFunction.defineStaticPartialApplication(var context: TXQEvaluationContext): TXQValueFunction;
 var
   f: TXQTermNamedFunction;
   version: PXQFunctionParameterTypes;
@@ -4261,7 +4262,7 @@ begin
   result.context := context;
 end;
 
-function TXQTermDefineFunction.defineDynamicPartialApplication(const context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
+function TXQTermDefineFunction.defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
 var
   j: Integer;
   i: Integer;
@@ -4302,7 +4303,7 @@ begin
   body := abody;
 end;
 
-function TXQTermTryCatch.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermTryCatch.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
   ns: String;

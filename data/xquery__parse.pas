@@ -2791,7 +2791,7 @@ begin
   end;
 end;
 
-procedure initializeFunctions(module: TXQTermModule; const context: TXQEvaluationContext);
+procedure initializeFunctions(module: TXQTermModule; var context: TXQEvaluationContext);
 var
   i: Integer;
   functions: array of TXQValueFunction;
@@ -2954,6 +2954,7 @@ var
   hadPending: Boolean;
   shared: Boolean;
   tempTerm: TXQTerm;
+  tempContext: TXQEvaluationContext;
 begin
   pendings := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
   hadPending := pendings.Count > 0;
@@ -2967,7 +2968,8 @@ begin
     raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   end;
   if result is TXQTermModule then begin
-    initializeFunctions(result as TXQTermModule, staticContext.sender.getEvaluationContext(staticContext));
+    tempContext := staticContext.sender.getEvaluationContext(staticContext);
+    initializeFunctions(result as TXQTermModule, tempContext);
   end;
   if Assigned(resultquery) then TXQueryBreaker(resultquery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
 

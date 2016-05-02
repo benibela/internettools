@@ -1442,7 +1442,7 @@ type
   //**@abstract Internally used xpath term
 
   TXQTerm = class
-    function evaluate(const context: TXQEvaluationContext): IXQValue; virtual; abstract;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; virtual; abstract;
     function getContextDependencies: TXQContextDependencies; virtual; abstract;
     function debugTermToString: string; virtual;
   public
@@ -1470,7 +1470,7 @@ type
     procedure push(t: TXQTerm);
     function push(t: array of TXQTerm): TXQTerm;
   protected
-    procedure evaluateChildren(const context: TXQEvaluationContext; out results: TXQVArray);
+    procedure evaluateChildren(var context: TXQEvaluationContext; out results: TXQVArray);
     function getChildrenContextDependencies: TXQContextDependencies; virtual;
   public
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
@@ -1486,7 +1486,7 @@ type
     constructor createNumber(const avalue: string);
     constructor create(const avalue: string);
     constructor create(const avalue: IXQValue);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
   end;
@@ -1494,14 +1494,14 @@ type
   { TXQTermSequence }
 
   TXQTermSequence = class(TXQTermWithChildren)
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQTermArray }
 
   TXQTermJSONArray = class(TXQTermWithChildren)
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
@@ -1523,7 +1523,7 @@ type
     constructor create();
     constructor create(atomic: TXSType; aallowNone: boolean = false);
     destructor destroy; override;
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function serialize: string;
@@ -1553,7 +1553,7 @@ type
     constructor Create;
     constructor Create(const anamespaceurl, anamespaceprefix, alocalpart: string);
     function clone: TXQTerm; override;
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
   end;
@@ -1566,7 +1566,7 @@ type
     constructor create(const avalue: string; const anamespace: INamespace = nil);
     constructor create(const alocalname: string; const anamespace: string);
     function equalsVariable(v: TXQTermVariable): boolean;
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     function ToString: ansistring; override;
@@ -1574,7 +1574,7 @@ type
 
   TXQTermVariableGlobal = class(TXQTerm)
     definition: TXQTermDefineVariable;
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
     function ToString: ansistring; override;
@@ -1583,7 +1583,7 @@ type
   end;
   TXQTermVariableGlobalImported = class(TXQTermVariableGlobal)
     staticContext: TXQStaticContext;
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function clone: TXQTerm; override;
   end;
 
@@ -1592,8 +1592,8 @@ type
     annotations: TXQAnnotations;
     constructor create(avarname: string; anamespace: INamespace);
     constructor create(vari: TXQTerm; value: TXQTerm = nil);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function getClassicValue(const context: TXQEvaluationContext): IXQValue;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function getClassicValue(var context: TXQEvaluationContext): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -1616,8 +1616,8 @@ type
     annotations: TXQAnnotations;
     kind: TXQTermDefineFunctionKind;
     constructor createReference(const fun: TXQTermNamedFunction; arity: integer);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function define(const context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function define(var context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -1626,8 +1626,8 @@ type
     initialized: boolean;
     function findNamedFunctionVersion(const context: TXQEvaluationContext): PXQFunctionParameterTypes;
     procedure initNamedFunctionReference(const context: TXQEvaluationContext);
-    function defineStaticPartialApplication(const context: TXQEvaluationContext): TXQValueFunction;
-    function defineDynamicPartialApplication(const context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
+    function defineStaticPartialApplication(var context: TXQEvaluationContext): TXQValueFunction;
+    function defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
   end;
 
   { TXQTermNodeMatcher }
@@ -1638,8 +1638,8 @@ type
     constructor Create();
     constructor Create(const avalue: string; asfunction: boolean = false);
     constructor Create(const aaxis: string; const anamespaceMode: TXQNamespaceMode; const anamespaceUrlOrPrefix, aLocalPart: string);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function evaluateAttribute(const context: TXQEvaluationContext): IXQValue;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function evaluateAttribute(var context: TXQEvaluationContext): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
     function clone: TXQTerm; override;
@@ -1652,7 +1652,7 @@ type
 
   TXQTermFilterSequence = class(TXQTermWithChildren)
     constructor create(seq: TXQTerm; filter: TXQTerm = nil);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
 
     function toQueryCommand: TXQPathMatchingStep; override;
@@ -1671,7 +1671,7 @@ type
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     destructor destroy; override;
 
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
@@ -1688,7 +1688,7 @@ type
     constructor create(const anamespace, alocalname: string; arity: integer; const staticContext: TXQStaticContext = nil);
     constructor create(const anamespace, alocalname: string; args: array of TXQTerm; const staticContext: TXQStaticContext = nil);
     destructor destroy; override;
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     procedure assignWithoutChildren(source: TXQTermNamedFunction);
     function clone: TXQTerm; override;
@@ -1710,7 +1710,7 @@ type
 
   TXQTermDynamicFunctionCall = class (TXQTermWithChildren)
     constructor create(func: TXQTerm = nil; arg: TXQTerm = nil);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
@@ -1722,7 +1722,7 @@ type
     constructor create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
     constructor create(opinfo: TXQOperatorInfo);
     constructor createUnary(const aop: string; arg: TXQTerm);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function debugTermToString: string; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
@@ -1735,7 +1735,7 @@ type
   TXQTermFlowerSubClause = class(TXQTerm)
     class function kind: TXQTermFlowerSubClauseKind; virtual;
 
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
 
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
     procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); virtual;
@@ -1848,7 +1848,7 @@ type
   end;
 
   TXQTermFlower = class(TXQTermWithChildren)
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -1861,7 +1861,7 @@ type
   TXQTermSomeEvery = class(TXQTermWithChildren)
     isEvery: boolean;
     constructor create(every: boolean);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -1872,7 +1872,7 @@ type
   TXQTermIf = class(TXQTermWithChildren)
     constructor create;
     constructor createLogicOperation(const isOr: boolean; a, b: TXQTerm);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
@@ -1886,18 +1886,18 @@ type
       expr: TXQTerm;
       function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
       function getContextDependencies: TXQContextDependencies; override;
-      function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+      function evaluate(var context: TXQEvaluationContext): IXQValue; override;
       function clone: TXQTerm; override;
-      function matched(const context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
+      function matched(var context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
     end;
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
   end;
 
   { TXQTermSwitch }
 
   TXQTermSwitch = class(TXQTermWithChildren)
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
@@ -1906,7 +1906,7 @@ type
   TXQTermReadObjectProperty = class(TXQTermWithChildren)
     propname: string;
     constructor create(apropname: string);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
   end;
@@ -1918,8 +1918,8 @@ type
     nameValue: TXQTerm;
     implicitNamespaces: TNamespaceList;
     constructor create(atype: TTreeNodeType; aname: txqterm = nil);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
-    function evaluate(const context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function isNamespaceConstructor: boolean;
     function clone: TXQTerm; override;
@@ -1933,7 +1933,7 @@ type
   { TXQTermJSONObjectConstructor }
 
   TXQTermJSONObjectConstructor = class(TXQTermWithChildren)
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
@@ -1950,7 +1950,7 @@ type
     end;
 
     constructor create(abody: TXQTerm);
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
@@ -1960,13 +1960,13 @@ type
   { TXQTermModule }
 
   TXQTermModule = class(TXQTermWithChildren)
-    function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
 
   TXQInternalPatternMatcherParse = function (const context: TXQStaticContext;  data: string): TXQTermPatternMatcher;
-  TXQInternalPatternMatcherMatch = function (template, data: TTreeNode; const context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
+  TXQInternalPatternMatcherMatch = function (template, data: TTreeNode; var context: TXQEvaluationContext; throwExceptions: boolean = false): TXQVariableChangeLog;
   TXQInternalPatternMatcherVisit = function (const template: TXQTermPatternMatcher; visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 
 
@@ -1980,7 +1980,7 @@ type
   //** Reference counted. Call evaluate to evaluate it.
   IXQuery = interface
     function evaluate(const tree: TTreeNode = nil): IXQValue; //**< Evaluates the query with a certain root element (i.e. @code(/) will return tree)
-    function evaluate(const context: TXQEvaluationContext): IXQValue; //**< Evaluates the query with a certain evaluation context
+    function evaluate(var context: TXQEvaluationContext): IXQValue; //**< Evaluates the query with a certain evaluation context
     function evaluate(const contextItem: IXQValue): IXQValue; //**< Evaluates the query with (i.e. @code(.) will return contextItem. If it is a node @code(/) will return the root of it)
 
     function getTerm: TXQTerm;
@@ -1998,7 +1998,7 @@ type
   TXQuery = class(TInterfacedObject, IXQuery)
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeNode = nil): IXQValue;
-    function evaluate(const context: TXQEvaluationContext): IXQValue;
+    function evaluate(var context: TXQEvaluationContext): IXQValue;
     function evaluate(const contextItem: IXQValue): IXQValue;
 
     function clone: IXQuery;
@@ -2400,7 +2400,7 @@ type
     //** Parses a new expression and stores it in tokenized form.
     function parseQuery(s:string; model: TXQParsingModel; sharedContext: TXQStaticContext = nil): IXQuery;
 
-    function evaluate(const context: TXQEvaluationContext): IXQValue;
+    function evaluate(var context: TXQEvaluationContext): IXQValue;
     function evaluate(const contextItem: IXQValue): IXQValue; //**< Evaluates a previously parsed query and returns its value as IXQValue
     function evaluate(tree:TTreeNode = nil): IXQValue; //**< Evaluates a previously parsed query and returns its value as IXQValue
 
@@ -2456,7 +2456,8 @@ public
     FInternalDocuments: TFPList;
     FModules, FPendingModules: TInterfaceList; //internal used
     FParserVariableVisitor: TObject;
-    VariableChangelogUndefined: TXQVariableChangeLog;
+    VariableChangelogUndefined, FDefaultVariableStack, FDefaultVariableHeap: TXQVariableChangeLog;
+
     function GetNativeModules: TStringList;
     function isAWeirdGlobalVariable(const namespace, local: string): boolean;
     procedure addAWeirdGlobalVariable(const namespace, local: string);
@@ -2466,9 +2467,9 @@ public
     function parseXStringNullTerminated(str: string): TXQuery;
 
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
-    class procedure filterSequence(var result: IXQValue; const filter: TXQTerm; const context: TXQEvaluationContext);
+    class procedure filterSequence(var result: IXQValue; const filter: TXQTerm; var context: TXQEvaluationContext);
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
-    class procedure filterSequence(var result: IXQValue; const filter: array of TXQTerm; const context: TXQEvaluationContext);
+    class procedure filterSequence(var result: IXQValue; const filter: array of TXQTerm; var context: TXQEvaluationContext);
 
     class function nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean; static;
     //** Gets the next node matching a query step (ignoring [] filter)
@@ -2476,12 +2477,12 @@ public
     //** Gets the next node matching a query step (ignoring [] filter)
     class procedure unifyQuery(const contextNode: TTreeNode; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition); static;
     //** Performs a query step, given a (sequence) of parent nodes
-    class function expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; const context: TXQEvaluationContext): IXQValue;
+    class function expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext): IXQValue;
     //** Initialize a query by performing the first step
-    class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;const context: TXQEvaluationContext): IXQValue;
+    class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext): IXQValue;
 
     //** Evaluates a path expression, created from the given term in the given context.
-    class function evaluateAccessList(term: TXQTerm; const context: TXQEvaluationContext): IXQValue;
+    class function evaluateAccessList(term: TXQTerm; var context: TXQEvaluationContext): IXQValue;
 
   public
     DefaultParser: TTreeParser; //used by fn:doc if no context node is there (internally used)
@@ -3018,7 +3019,7 @@ begin
   TXQTermEQNameToken(result).localpart := localpart;
 end;
 
-function TXQTermEQNameToken.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermEQNameToken.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   raiseEvaluationError('pxp:internal','Internal error 160117');
 end;
@@ -4338,7 +4339,7 @@ end;
 { TXQTermModule }
 
 
-function TXQTermModule.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQTermModule.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   if context.staticContext.moduleNamespace <> nil then raiseEvaluationError('', 'A module cannot be evaluated');
   result := children[high(children)].evaluate(context);
@@ -4548,7 +4549,7 @@ begin
   result := evaluate(context);
 end;
 
-function TXQuery.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQuery.evaluate(var context: TXQEvaluationContext): IXQValue;
 var tempcontext: TXQEvaluationContext;
   i, j: Integer;
   tempcontext2: TXQEvaluationContext;
@@ -4561,6 +4562,12 @@ begin
 
   tempcontext:=context;
   tempcontext.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
+
+  if (tempcontext.temporaryVariables <> nil) then begin
+    tempcontext.temporaryVariables.clear;
+    if tempcontext.temporaryVariables.parentLog <> nil then
+      tempcontext.temporaryVariables.parentLog.clear; //declared global variables
+  end;
 
   if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
     for i := 0 to high(staticContext.moduleContextItemDeclarations) do
@@ -6070,7 +6077,7 @@ begin
   result := FLastQuery;
 end;
 
-function TXQueryEngine.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TXQueryEngine.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   if FLastQuery = nil then exit(xqvalue())
   else exit(FLastQuery.evaluate(context));
@@ -6096,6 +6103,7 @@ begin
   if staticContextOverride = nil then result.staticContext:=StaticContext
   else result.staticContext := staticContextOverride;
   result.SeqIndex:=-1;
+  result.temporaryVariables := FDefaultVariableStack;
 end;
 
 constructor TXQueryEngine.create;
@@ -6122,6 +6130,8 @@ begin
   StaticContext.stringEncoding:=eUTF8;
   StaticContext.useLocalNamespaces:=true;
   StaticContext.jsonPXPExtensions:=true;
+  FDefaultVariableStack := TXQVariableChangeLog.create();
+  FDefaultVariableHeap := TXQVariableChangeLog.create();
   FModules := TInterfaceList.Create;
   FPendingModules := TInterfaceList.Create;
 end;
@@ -6132,6 +6142,8 @@ var
 begin
   VariableChangelog.Free;
   VariableChangelogUndefined.free;
+  FDefaultVariableHeap.Free;
+  FDefaultVariableStack.Free;
   DefaultParser.Free;
   clear;
   if FInternalDocuments <> nil then begin;
@@ -6819,7 +6831,7 @@ end;
 end;}
 
 
-class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: TXQTerm; const context: TXQEvaluationContext);
+class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: TXQTerm; var context: TXQEvaluationContext);
 var
  tempContext: TXQEvaluationContext;
  v, previous: IXQValue;
@@ -6873,7 +6885,7 @@ begin
   end;
 end;
 
-class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: array of TXQTerm; const context: TXQEvaluationContext);
+class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: array of TXQTerm; var context: TXQEvaluationContext);
 var i:integer;
 begin
   for i:=0 to high(filter) do
@@ -6881,7 +6893,7 @@ begin
 end;
 
 
-class function TXQueryEngine.expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; const context: TXQEvaluationContext): IXQValue;
+class function TXQueryEngine.expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext): IXQValue;
 var oldnode,newnode: TTreeNode;
     newList: TXQVList;
     nodeCondition: TXQPathNodeCondition;
@@ -7072,7 +7084,7 @@ begin
   result := resultSeq;
 end;
 
-class function TXQueryEngine.evaluateSingleStepQuery(const query: TXQPathMatchingStep;const context: TXQEvaluationContext): IXQValue;
+class function TXQueryEngine.evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext): IXQValue;
 var
   n: TTreeNode;
 begin
@@ -7105,7 +7117,7 @@ end;
 //   a/b[x][y][z]/c
 //   =>  (  (/a)  /  ( b [:] x, y, z )  ) / c
 //   or:  (  (/a)  /  ( ( (b [:] x) [:] y) [:] z  )  ) / c
-class function TXQueryEngine.evaluateAccessList(term: TXQTerm; const context: TXQEvaluationContext): IXQValue;
+class function TXQueryEngine.evaluateAccessList(term: TXQTerm; var context: TXQEvaluationContext): IXQValue;
 var
   query: TXQPathMatching;
   i:integer;
@@ -7166,10 +7178,11 @@ end;
 procedure TXQueryEngine.addAWeirdGlobalVariable(const namespace, local: string);
 begin
   if isAWeirdGlobalVariable(namespace, local) then exit;
-  if VariableChangelogUndefined = nil then begin
+  if VariableChangelogUndefined = nil then
     VariableChangelogUndefined := TXQVariableChangeLog.create();
-    VariableChangelogUndefined.add(local, xqvalue(), namespace);
-  end else
+  if VariableChangelogUndefined.count = 0 then
+    VariableChangelogUndefined.add(local, xqvalue(), namespace)
+  else
     VariableChangelogUndefined.add(local, VariableChangelogUndefined.get(0), namespace  );
 end;
 
