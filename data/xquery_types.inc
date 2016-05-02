@@ -2084,34 +2084,30 @@ begin
   tempcontext := context;
   if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
-  tempcontext.beginSubContextWithVariables;
+  tempcontext.temporaryVariables.pushAll;
   try
     for j := 0 to high(parameters) do
       tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context, term));
     result := body.evaluate(tempcontext);
     result := TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);
   finally
-    tempcontext.endSubContextWithVariables(outerContext);
+    tempcontext.temporaryVariables.popAll();
   end;
 end;
 
-function TXQValueFunction.evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue;
+function TXQValueFunction.evaluateInContext(var inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue;
 var
-  tempcontext: TXQEvaluationContext;
   j: Integer;
 begin
-  tempcontext := inContext;
   if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
-  if tempcontext.temporaryVariables = nil then tempcontext.temporaryVariables := TXQVariableChangeLog.create()
-  else tempcontext.temporaryVariables.pushAll;
+  inContext.temporaryVariables.pushAll;
   try
     for j := 0 to high(parameters) do
-      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, inContext, term));
-    result := body.evaluate(tempcontext);
+      inContext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, inContext, term));
+    result := body.evaluate(inContext);
     result := TXQAbstractFunctionInfo.convertType(result, resulttype, inContext, term);
   finally
-    if inContext.temporaryVariables = nil then tempcontext.temporaryVariables.free
-    else tempcontext.temporaryVariables.popAll();
+    inContext.temporaryVariables.popAll();
   end;
 end;
 

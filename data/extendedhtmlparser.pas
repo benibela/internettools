@@ -1677,7 +1677,6 @@ begin
   FHTML.TargetEncoding := OutputEncoding;
   FHtmlTree := FHTML.parseTree(html, (uri), contenttype);
 
-  FQueryContext := FQueryEngine.getEvaluationContext(FQueryEngine.StaticContext);
   FQueryContext.RootElement := FHtmlTree;
   if FHtmlTree = nil then exit;
   if FHtmlTree.document is TTreeDocument then
@@ -1818,6 +1817,7 @@ begin
   //FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
   FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
+  FQueryContext := FQueryEngine.getEvaluationContext(FQueryEngine.StaticContext);
 
   FVariableLog := FQueryEngine.VariableChangelog;
   FVariableLog.parentLog := FOldVariableLog;

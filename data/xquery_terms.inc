@@ -3241,16 +3241,11 @@ end;
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue
   ): boolean;
   function evaluateWithChangedVariable(const value: IXQValue): IXQValue;
-  var
-    tempContext: TXQEvaluationContext;
   begin
-    tempContext := context;
-    if variable <> nil then begin
-      tempContext.beginSubContextWithVariables;
-      tempContext.temporaryVariables.add(variable, value);
-    end;
-    result := expr.evaluate(tempContext);
-    if variable <> nil then tempContext.endSubContextWithVariables(context);
+    if variable = nil then exit(expr.evaluate(context));
+    context.temporaryVariables.add(variable, value);
+    result := expr.evaluate(context);
+    context.temporaryVariables.removeLast;
   end;
   function evaluateWithChangedVariableLog(log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
   var

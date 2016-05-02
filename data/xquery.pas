@@ -244,9 +244,6 @@ type
     function getVariable(const name: string; const namespaceURL: string): IXQValue;
     function getVariable(const v: TXQTermVariable): IXQValue; inline;
 
-    procedure beginSubContextWithVariables;
-    procedure endSubContextWithVariables(const oldContext: TXQEvaluationContext);
-
     function parseDoc(const data, url, contenttype: string): TTreeNode; //for internal use
 
     function SeqValueAsString: string;
@@ -921,7 +918,7 @@ type
     function toBooleanEffective: boolean; override;
 
     function evaluate(const outerContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
-    function evaluateInContext(const inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    function evaluateInContext(var inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
@@ -4455,18 +4452,6 @@ begin
   result := getVariable(v.value, v.namespace);
 end;
 
-procedure TXQEvaluationContext.beginSubContextWithVariables;
-begin
-  if temporaryVariables = nil then temporaryVariables := TXQVariableChangeLog.create();
-  temporaryVariables.pushAll;
-end;
-
-procedure TXQEvaluationContext.endSubContextWithVariables(const oldContext: TXQEvaluationContext);
-begin
-  temporaryVariables.popAll();
-  if oldContext.temporaryVariables = nil then FreeAndNil(temporaryVariables);
-end;
-
 function TXQEvaluationContext.contextNode(mustExists: boolean): TTreeNode;
 begin
   if SeqValue <> nil then begin //tests pass without this branch. Why???
@@ -4550,55 +4535,51 @@ begin
 end;
 
 function TXQuery.evaluate(var context: TXQEvaluationContext): IXQValue;
-var tempcontext: TXQEvaluationContext;
-  i, j: Integer;
-  tempcontext2: TXQEvaluationContext;
-  curcontext: ^TXQEvaluationContext;
-  vari: TXQTermVariable;
+var i: Integer;
 begin
   if fterm = nil then exit(xqvalue());
   if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
     exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
 
-  tempcontext:=context;
-  tempcontext.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
+  context:=context;
+  context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
 
-  if (tempcontext.temporaryVariables <> nil) then begin
-    tempcontext.temporaryVariables.clear;
-    if tempcontext.temporaryVariables.parentLog <> nil then
-      tempcontext.temporaryVariables.parentLog.clear; //declared global variables
+  if (context.temporaryVariables <> nil) then begin
+    context.temporaryVariables.clear;
+    if context.temporaryVariables.parentLog <> nil then
+      context.temporaryVariables.parentLog.clear; //declared global variables
   end;
 
   if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
     for i := 0 to high(staticContext.moduleContextItemDeclarations) do
       if not staticContext.moduleContextItemDeclarations[i].isExternal then begin
-        tempcontext.setSingletonContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(tempcontext));
+        context.setSingletonContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
         break;
       end;
-    if tempcontext.SeqValue = nil then
-      if tempcontext.contextNode(false) <> nil then
-        tempcontext.setSingletonContextItem(xqvalue(tempcontext.contextNode()));
-    if tempcontext.SeqValue = nil then
+    if context.SeqValue = nil then
+      if context.contextNode(false) <> nil then
+        context.setSingletonContextItem(xqvalue(context.contextNode()));
+    if context.SeqValue = nil then
       for i := 0 to high(staticContext.moduleContextItemDeclarations) do
         if staticContext.moduleContextItemDeclarations[i].getExpression <> nil then begin
-          tempcontext.setSingletonContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(tempcontext));
+          context.setSingletonContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
           break;
        end;
-    if tempcontext.SeqValue = nil then begin
+    if context.SeqValue = nil then begin
       if assigned(staticContext.sender.OnDeclareExternalVariable) then
-        staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', tempcontext.SeqValue);
-      if tempcontext.SeqValue = nil then
+        staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', context.SeqValue);
+      if context.SeqValue = nil then
          raise EXQEvaluationException.create('XPTY0004', 'context item missing');
-       tempcontext.SeqLength := 1;
-       tempcontext.SeqIndex := 1;
+       context.SeqLength := 1;
+       context.SeqIndex := 1;
     end;
 
-    for j := 0 to high(staticContext.moduleContextItemDeclarations) do
-      if (staticContext.moduleContextItemDeclarations[j].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[j].getSequenceType.instanceOf(tempcontext.SeqValue) then
-        raiseXPTY0004TypeError(tempcontext.SeqValue, staticContext.moduleContextItemDeclarations[j].getSequenceType.debugTermToString);
+    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
+      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue) then
+        raiseXPTY0004TypeError(context.SeqValue, staticContext.moduleContextItemDeclarations[i].getSequenceType.debugTermToString);
   end;
 
-  result := fterm.evaluate(tempcontext);
+  result := fterm.evaluate(context);
 end;
 
 function TXQuery.evaluate(const contextItem: IXQValue): IXQValue;
