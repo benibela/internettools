@@ -1887,6 +1887,7 @@ type
       function getContextDependencies: TXQContextDependencies; override;
       function evaluate(var context: TXQEvaluationContext): IXQValue; override;
       function clone: TXQTerm; override;
+      destructor Destroy; override;
       function matched(var context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue): boolean;
     end;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
@@ -6129,6 +6130,7 @@ begin
   StaticContext.jsonPXPExtensions:=true;
   FDefaultVariableStack := TXQVariableChangeLog.create();
   FDefaultVariableHeap := TXQVariableChangeLog.create();
+  FDefaultVariableStack.parentLog := FDefaultVariableHeap;
   FModules := TInterfaceList.Create;
   FPendingModules := TInterfaceList.Create;
 end;
