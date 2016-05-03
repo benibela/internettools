@@ -181,6 +181,7 @@ begin
 
   t('x"$$;"',                   '$$;',                           '');
   t('x">$$;<"',                 '>$$;<',                         '');
+  t('concat($amp, $line-ending)',     '&' + LineEnding); //default variables
 
   f('x">{$unknown}<"', 'err:XPST0008');
   f('x"{$test}>{$unknown}<"', 'err:XPST0008');

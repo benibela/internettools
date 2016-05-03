@@ -255,8 +255,8 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     if TXQueryEngineBreaker(staticContext.sender).isAWeirdGlobalVariable(v.namespace, v.value) then exit;
     if (v.namespace = '') then
       case v.value of //some global default variables
-        'line-ending': replace(pt, TXQTermConstant.create(xqvalue(LineEnding) ));
-        'amp': replace(pt, TXQTermConstant.create(xqvalue('&') ))
+        'line-ending': begin replace(pt, TXQTermConstant.create(xqvalue(LineEnding) )); exit; end;
+        'amp': begin replace(pt, TXQTermConstant.create(xqvalue('&') )); exit; end;
       end;
     raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
   end;
