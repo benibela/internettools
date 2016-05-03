@@ -1043,42 +1043,32 @@ begin
 end;
 
 function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
-var tempContext:TXQEvaluationContext;
   function evaluateSomeEvery(pos:integer): boolean;
   var v: IXQValue;
       typeDelta: integer;
   begin
-    if pos = high(children) then exit(children[pos].evaluate(tempContext).toBooleanEffective);
+    if pos = high(children) then exit(children[pos].evaluate(context).toBooleanEffective);
     if not (children[pos] is TXQTermVariable) then raiseEvaluationError('err:XPST0003', 'Expected variable, but got '+children[pos].debugTermToString);
     if children[pos + 1] is TXQTermSequenceType then typeDelta:=1
     else typeDelta:=0;
 
     result := isEvery;
-    for v in children[pos+1+typeDelta].evaluate(tempContext) do begin
+    for v in children[pos+1+typeDelta].evaluate(context) do begin
       if typeDelta <> 0 then
         if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v, context) then
           raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
-      tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
-      if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then begin
-        tempContext.temporaryVariables.popAll;
-        result := not isEvery;
-        break;
-      end;
-      tempContext.temporaryVariables.popAll;
+      Context.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
+      if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then exit(not isEvery);
+      Context.temporaryVariables.removeLast;
     end;
   end;
 
 begin
-  tempContext:=context;
-  if context.temporaryVariables=nil then begin
-    tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-  end;
+  context.temporaryVariables.pushAll();
   try
     result:=xqvalue(evaluateSomeEvery(0));
-    xqvalueSeqSqueeze(result);
   finally
-    if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables); //iff context.temporaryVariables = nil, we created the change log here
+    context.temporaryVariables.popAll();
   end;
 end;
 
@@ -1693,7 +1683,6 @@ end;
 
 function TXQTermFlower.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  tempContext: TXQEvaluationContext;
   sortingCache: TFPList;
   finalResult: TXQValueSequence;
   currentTuple: TOrderedTuple;
@@ -1714,17 +1703,17 @@ var
       if (letclause.sequenceTyp <> nil) and not (letclause.sequenceTyp.instanceOf(v, context)) then
         raiseTypeError0004('Invalid variable type, expected: type '+letclause.sequenceTyp.serialize, v);
 
-      tempContext.temporaryVariables.pushAll;
-      tempContext.temporaryVariables.add(letclause.loopvar, v);
+      context.temporaryVariables.pushAll;
+      context.temporaryVariables.add(letclause.loopvar, v);
       if needFullTuple then
         currentTuple.vars[clauseIndex[pos]] := v;
       if (clausekind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then begin
-        tempContext.temporaryVariables.add(TXQTermFlowerFor(letclause).positionVar, xqvalue(index));
+        context.temporaryVariables.add(TXQTermFlowerFor(letclause).positionVar, xqvalue(index));
         if needFullTuple then
-          currentTuple.vars[clauseIndex[pos] + 1] := tempContext.temporaryVariables.vars[high(tempContext.temporaryVariables.vars)].value;
+          currentTuple.vars[clauseIndex[pos] + 1] := context.temporaryVariables.vars[high(context.temporaryVariables.vars)].value;
       end;
       evaluateForLoop(pos+1);
-      tempContext.temporaryVariables.popAll();
+      context.temporaryVariables.popAll();
     end;
 
     procedure addWindowVariableBinding();
@@ -1732,7 +1721,7 @@ var
       variableIndex: integer;
       procedure addVar(const v: TXQTermVariable; const value: IXQValue);
       begin
-        tempContext.temporaryVariables.add(v, value);
+        context.temporaryVariables.add(v, value);
         if needFullTuple and (variableIndex <> -1) then begin
          currentTuple.vars[variableIndex] := value;
          inc(variableIndex);
@@ -1765,16 +1754,16 @@ var
         oldIndex: Integer;
       begin
         oldIndex := variableIndex;
-        tempContext.temporaryVariables.pushAll;
+        context.temporaryVariables.pushAll;
         with condition do begin
           if Assigned(currentItem) then addVar(currentItem, binding.get(at));
           if Assigned(positionVar) then addVar(positionVar, xqvalue(at));
           if Assigned(previousItem) then addVar(previousItem, binding.get(at-1));
           if Assigned(nextItem) then addVar(nextItem, binding.get(at+1));
-          result := forceTrue or when.evaluate(tempContext).toBooleanEffective;
+          result := forceTrue or when.evaluate(context).toBooleanEffective;
         end;
         if not result then begin
-          tempContext.temporaryVariables.popAll();
+          context.temporaryVariables.popAll();
           variableIndex := oldIndex;
         end;
       end;
@@ -1786,7 +1775,7 @@ var
       start, endi: Integer;
     begin
       window := TXQTermFlowerWindow(children[pos]);
-      binding := window.expr.evaluate(tempContext);
+      binding := window.expr.evaluate(context);
       start := 1;
       endi := -1;
       length := binding.getSequenceCount;
@@ -1808,7 +1797,7 @@ var
              if endi = length then if not checkCondition(endi, window.startCondition ) then
                inc(endi);
              if endi <= length then
-               tempContext.temporaryVariables.popAll();
+               context.temporaryVariables.popAll();
              dec(endi); //it was next start, not end
              variableIndex := tempIndex;
            end;
@@ -1816,9 +1805,9 @@ var
              addVarAs(window.loopvar, window.sequenceTyp, subsequence(start, endi));
              evaluateForLoop(pos+1);
             if Assigned(window.endCondition.when) then
-              tempContext.temporaryVariables.popAll(); //end condition, only if matched
+              context.temporaryVariables.popAll(); //end condition, only if matched
            end;
-           tempContext.temporaryVariables.popAll(); //start condition
+           context.temporaryVariables.popAll(); //start condition
            if xqtfwSliding in window.flags then inc(start)
            else start := endi + 1;
            if needFullTuple then variableIndex := clauseIndex[pos];
@@ -1827,28 +1816,6 @@ var
     end;
 
     procedure addPatternVariableBinding(node: IXQValue);
-    var oldContextItem: IXQValue;
-        oldSeqIndex: Integer;
-        oldSeqLength: Integer;
-
-        procedure pushContextItem;
-        begin
-          oldContextItem := tempContext.SeqValue;
-          oldSeqIndex := tempContext.SeqIndex;
-          oldSeqLength := tempContext.SeqLength;
-        end;
-        procedure popContextItem;
-        begin
-          tempContext.SeqValue := oldContextItem;
-          tempContext.SeqIndex := oldSeqIndex;
-          tempContext.SeqLength:= oldSeqLength;
-        end;
-        procedure replaceContextItem(const newItem: IXQValue);
-        begin
-          tempContext.SeqValue := newItem;
-          tempContext.SeqIndex := 1;
-          tempContext.SeqLength:= 1;
-        end;
     var
         patternClause: TXQTermFlowerLetPattern;
         function hasStaticVariable(const name, url: string): integer;
@@ -1861,6 +1828,9 @@ var
           result := -1;
         end;
 
+    var oldContextItem: IXQValue;
+        oldSeqIndex: Integer;
+        oldSeqLength: Integer;
     var
         oldLog: TXQVariableChangeLog;
         i: Integer;
@@ -1886,28 +1856,28 @@ var
         hasContextItem := patternClause.pattern.hasDefaultVariable;
 
         if hasContextItem then begin
-          pushContextItem;
-          replaceContextItem(xqvalue());
+          context.getContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
+          context.setContextItem(xqvalue());
         end;
-        tempContext.temporaryVariables.pushAll;
+        context.temporaryVariables.pushAll;
         try
           if clausekind = xqtfcLetPattern then begin
             if hasContextItem and log.hasVariable('$', @value) then begin
               if value.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Only singletons can be assigned to .');
-              replaceContextItem(value);
+              context.setContextItem(value);
             end;
             for i := 0 to high(patternClause.pattern.vars) do
               if log.hasVariable(patternClause.pattern.vars[i], @value) then begin
-                tempContext.temporaryVariables.add(patternClause.pattern.vars[i], value);
+                context.temporaryVariables.add(patternClause.pattern.vars[i], value);
                 if needFullTuple then currentTuple.vars[clauseIndex[pos]+i] := value;
               end else begin
-                tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
+                context.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
                 if needFullTuple then currentTuple.vars[clauseIndex[pos]+i] := xqvalue();
               end;
             evaluateForLoop(pos+1);
           end else begin // for
             for i := 0 to high(patternClause.pattern.vars) do
-              tempContext.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
+              context.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
             if needFullTuple then
               for i := 0 to high(patternClause.pattern.vars) do
                 currentTuple.vars[clauseIndex[pos]+i] := xqvalue();
@@ -1915,26 +1885,26 @@ var
             for i := 0 to log.count - 1 do begin
               if log.getName(i) = '$' then begin
                 if hasContextItem then begin
-                  replaceContextItem(log[i]);
+                  context.setContextItem(log[i]);
                   evaluateForLoop(pos+1);
-                  replaceContextItem(xqvalue());
+                  context.setContextItem(xqvalue());
                 end;
               end else begin
                 varIndex := hasStaticVariable(log.getName(i), log.vars[i].namespaceURL);
                 if varIndex > -1 then begin
-                  tempContext.temporaryVariables.pushAll;
-                  tempContext.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
+                  context.temporaryVariables.pushAll;
+                  context.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
                   if needFullTuple then
                     currentTuple.vars[clauseIndex[pos]+varIndex] := log.get(i);
                   evaluateForLoop(pos+1);
-                  tempContext.temporaryVariables.popAll();
+                  context.temporaryVariables.popAll();
                 end;
               end;
             end;
           end;
         finally
-          tempContext.temporaryVariables.popAll;
-          if hasContextItem then popContextItem;
+          context.temporaryVariables.popAll;
+          if hasContextItem then context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
         end;
       finally
         log.free;
@@ -1949,12 +1919,12 @@ var
    begin
      if pos = high(children) then begin
        if currentTuple = nil then
-         finalResult.add(children[pos].evaluate(tempContext))
+         finalResult.add(children[pos].evaluate(context))
         else begin
          newTuple := TOrderedTuple.Create;
          newTuple.orders := currentTuple.orders;
          SetLength(newTuple.orders, length(newTuple.orders));
-         newTuple.result := children[pos].evaluate(tempContext);
+         newTuple.result := children[pos].evaluate(context);
          sortingCache.Add(newTuple);
         end;
         exit;
@@ -1963,9 +1933,9 @@ var
      clausekind := clause.kind;
      case clausekind of
        xqtfcLet:
-         addVariableBinding(TXQTermFlowerLet(clause).expr.evaluate(tempContext));
+         addVariableBinding(TXQTermFlowerLet(clause).expr.evaluate(context));
        xqtfcFor: begin
-         tempSeq := TXQTermFlowerFor(clause).expr.evaluate(tempContext);
+         tempSeq := TXQTermFlowerFor(clause).expr.evaluate(context);
          case tempSeq.getSequenceCount of
            0: if TXQTermFlowerFor(clause).allowingEmpty then addVariableBinding(xqvalue(), 0);
            1: addVariableBinding(tempSeq, 1);
@@ -1979,14 +1949,14 @@ var
          end;
        end;
        xqtfcWindow: addWindowVariableBinding();
-       xqtfcLetPattern: addPatternVariableBinding(TXQTermFlowerLetPattern(clause).expr.evaluate(tempContext));
+       xqtfcLetPattern: addPatternVariableBinding(TXQTermFlowerLetPattern(clause).expr.evaluate(context));
        xqtfcForPattern:
-         for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(tempContext) do
+         for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(context) do
            addPatternVariableBinding(tempv);
-       xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(tempContext).toBoolean then
+       xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(context).toBoolean then
          evaluateForLoop(pos + 1);
        xqtfcOrder: begin
-         currentTuple.orders[clauseIndex[pos]] := TXQTermFlowerOrder(clause).expr.evaluate(tempContext);
+         currentTuple.orders[clauseIndex[pos]] := TXQTermFlowerOrder(clause).expr.evaluate(context);
          evaluateForLoop(pos + 1);
        end;
        xqtfcCount: if needFullTuple then begin
@@ -1998,10 +1968,10 @@ var
          sortingCache.Add(newTuple);
        end else begin
          counts[clauseIndex[pos]] += 1;
-         tempContext.temporaryVariables.pushAll;
-         tempContext.temporaryVariables.add(TXQTermFlowerCount(clause).countvar, xqvalue(counts[clauseIndex[pos]]));
+         context.temporaryVariables.pushAll;
+         context.temporaryVariables.add(TXQTermFlowerCount(clause).countvar, xqvalue(counts[clauseIndex[pos]]));
          evaluateForLoop(pos + 1);
-         tempContext.temporaryVariables.popAll();
+         context.temporaryVariables.popAll();
        end;
        xqtfcGroup: begin
          newTuple := TOrderedTuple.Create;
@@ -2129,11 +2099,6 @@ var i: Integer;
   end;
 
 begin
-  tempContext:=context;
-  if context.temporaryVariables=nil then begin
-    tempContext.temporaryVariables:=TXQVariableChangeLog.create();
-  end;
-
   //oldVarCount := tempContext.temporaryVariables.count;
 
   finalResult := TXQValueSequence.create();
@@ -2190,7 +2155,7 @@ begin
         end;
       end;
     sortingData.orders := orders;
-    sortingData.context:=@tempContext;
+    sortingData.context:=@context;
     sortingData.minOrderIndex:=0;
     sortingData.maxOrderIndex:=-1;
     setlength(sortingData.collations, length(orders));
@@ -2281,13 +2246,13 @@ begin
         oldSortingCache := sortingCache;
         sortingCache := TFPList.Create;
         for j := 0 to oldSortingCache.Count-1 do begin
-          tempContext.temporaryVariables.pushAll;
+          context.temporaryVariables.pushAll;
           currentTuple.free;
           currentTuple := TOrderedTuple(oldSortingCache[j]);
           for k := 0 to joinVar do
-            tempContext.temporaryVariables.add(variables[k], currentTuple.vars[k]);
+            context.temporaryVariables.add(variables[k], currentTuple.vars[k]);
           evaluateForLoop(i+1);
-          tempContext.temporaryVariables.popAll();
+          context.temporaryVariables.popAll();
         end;
         oldSortingCache.free;
       end
@@ -2304,7 +2269,6 @@ begin
     end;
     xqvalueSeqSqueeze(result);
   finally
-    if context.temporaryVariables = nil then FreeAndNil(tempContext.temporaryVariables); //iff context.temporaryVariables = nil, we created the change log here
     FreeAndNil(sortingCache);
     FreeAndNil(currentTuple);
   end;
@@ -2683,25 +2647,32 @@ end;
 function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
   function evaluateSimpleMap: IXQValue;
   var
-    tempContext: TXQEvaluationContext;
-    seq: IXQValue;
+    seq, oldContextItem: IXQValue;
     list: TXQVList;
+    pe: TTreeNode;
+    oldSeqIndex, oldSeqLength: integer;
   begin
     seq := children[0].evaluate(context);
-    tempContext := context;
-    tempContext.ParentElement := nil;
-    tempContext.SeqIndex := 1;
-    tempContext.SeqLength := seq.getSequenceCount;
-    list := TXQVList.create(tempContext.SeqLength);
+    pe := context.ParentElement; //todo: this is irrelevant?
+    context.getContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
+    context.ParentElement := nil;
+    context.SeqIndex := 1;
+    context.SeqLength := seq.getSequenceCount;
+    list := TXQVList.create(context.SeqLength);
     try
-      for tempContext.SeqValue in seq do begin
-        list.add(children[1].evaluate(tempContext));
-        tempContext.SeqIndex += 1;
+      try
+        for context.SeqValue in seq do begin
+          list.add(children[1].evaluate(context));
+          context.SeqIndex += 1;
+        end;
+        result := xqvalueSeqSqueezed(list);
+      except
+        list.free;
+        raise;
       end;
-      result := xqvalueSeqSqueezed(list);
-    except
-      list.free;
-      raise;
+    finally
+      context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
+      context.ParentElement := pe;
     end;
   end;
 
@@ -3164,16 +3135,17 @@ end;
 
 function TXQTermVariableGlobalImported.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  tempcontext: TXQEvaluationContext;
   temp: TXQValue;
+  oldSC: TXQStaticContext;
 begin
   if (context.temporaryVariables <> nil) and context.temporaryVariables.hasVariable(definition.getVariable, @temp) then begin
     result := temp;
     exit();
   end;
-  tempcontext := context;
-  tempcontext.staticContext := staticContext;
-  Result:=evaluateInitial(tempcontext);
+  oldSC := context.staticContext;
+  context.staticContext := staticContext;
+  Result:=evaluateInitial(context);
+  context.staticContext := oldSC;
 end;
 
 function TXQTermVariableGlobalImported.clone: TXQTerm;
@@ -3249,30 +3221,29 @@ function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvalu
   end;
   function evaluateWithChangedVariableLog(log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
   var
-    tempContext: TXQEvaluationContext;
     value: TXQValue;
-    truecount: Integer;
     i: Integer;
+
+    oldContextItem: IXQValue;
+    oldSeqIndex: Integer;
+    oldSeqLength: Integer;
+    hasContextItem: Boolean;
   begin
-    tempContext := context;
-    tempContext.temporaryVariables := log.condensedCollected;
+    log := log.condensedCollected;
     try
-      truecount := tempContext.temporaryVariables.count;
-      if tempContext.temporaryVariables.hasVariable('$', @value) then begin
+      context.temporaryVariables.pushAll;
+      hasContextItem := log.hasVariable('$', @value); //todo should be statically?
+      if  hasContextItem then begin
         if value.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Can only assign singleton to context item');
-        tempContext.SeqIndex:=1;
-        tempContext.SeqLength:=1;
-        tempContext.SeqValue := value;
-        truecount -= 1;
+        context.getContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
+        context.setContextItem(value);
       end;
-      if truecount <> length(vars) then
-        for i := 0 to high(vars) do
-          if not tempContext.temporaryVariables.hasVariable(vars[i], nil) then
-            tempContext.temporaryVariables.add(vars[i], xqvalue());
-      tempContext.temporaryVariables.parentLog := context.temporaryVariables;
-      result := expr.evaluate(tempContext);
+      for i := 0 to high(vars) do
+         context.temporaryVariables.add(vars[i], log.get(vars[i].value, vars[i].namespace) );
+      result := expr.evaluate(context);
     finally
-      tempContext.temporaryVariables.Free;
+      context.temporaryVariables.popAll();
+      if hasContextItem then context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
       log.Free;
     end;
   end;
@@ -4300,7 +4271,6 @@ end;
 
 function TXQTermTryCatch.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  tempcontext: TXQEvaluationContext;
   ns: String;
   matches: Boolean;
   i: Integer;
@@ -4331,23 +4301,22 @@ begin
             break;
           end;
         if matches then begin
-         tempcontext := context;
-         if context.temporaryVariables = nil then tempcontext.temporaryVariables := TXQVariableChangeLog.create()
-         else tempcontext.temporaryVariables.pushAll;
+          context.temporaryVariables.pushAll;
 
-         tempcontext.temporaryVariables.add('code', TXQValueQName.create(ns, nsprefix, e.errorCode), XMLNamespaceURL_XQTErrors);
-         tempcontext.temporaryVariables.add('description', e.rawMessage, XMLNamespaceURL_XQTErrors);
-         tempcontext.temporaryVariables.add('value', e.value, XMLNamespaceURL_XQTErrors);
-         tempcontext.temporaryVariables.add('module', xqvalue(), XMLNamespaceURL_XQTErrors);
-         tempcontext.temporaryVariables.add('line-number', xqvalue(), XMLNamespaceURL_XQTErrors);
-         tempcontext.temporaryVariables.add('column-number', xqvalue(), XMLNamespaceURL_XQTErrors);
-         tempcontext.temporaryVariables.add('additional', xqvalue(), XMLNamespaceURL_XQTErrors);
+          context.temporaryVariables.add('code', TXQValueQName.create(ns, nsprefix, e.errorCode), XMLNamespaceURL_XQTErrors);
+          context.temporaryVariables.add('description', e.rawMessage, XMLNamespaceURL_XQTErrors);
+          context.temporaryVariables.add('value', e.value, XMLNamespaceURL_XQTErrors);
+          context.temporaryVariables.add('module', xqvalue(), XMLNamespaceURL_XQTErrors);
+          context.temporaryVariables.add('line-number', xqvalue(), XMLNamespaceURL_XQTErrors);
+          context.temporaryVariables.add('column-number', xqvalue(), XMLNamespaceURL_XQTErrors);
+          context.temporaryVariables.add('additional', xqvalue(), XMLNamespaceURL_XQTErrors);
 
-         result := catches[i].expr.evaluate(tempcontext);
-
-         if context.temporaryVariables = nil then tempcontext.temporaryVariables.free
-         else tempcontext.temporaryVariables.popAll();
-         exit;
+          try
+            result := catches[i].expr.evaluate(context);
+          finally
+            context.temporaryVariables.popAll();
+          end;
+          exit;
         end;
       end;
 

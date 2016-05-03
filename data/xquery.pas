@@ -250,7 +250,9 @@ type
     function contextNode(mustExists: boolean = true): TTreeNode;
     procedure raiseXPDY0002ContextItemAbsent;
   private
-    procedure setSingletonContextItem(const v: IXQValue);
+    procedure setContextItem(const v: IXQValue);
+    procedure setContextItem(const v: IXQValue; index, length: integer);
+    procedure getContextItem(out v: IXQValue; out index, length: integer);
   end;
   PXQEvaluationContext = ^TXQEvaluationContext;
 
@@ -3691,12 +3693,27 @@ begin
   raise EXQEvaluationException.create('XPDY0002', 'Context item (.) is not set');
 end;
 
-procedure TXQEvaluationContext.setSingletonContextItem(const v: IXQValue);
+procedure TXQEvaluationContext.setContextItem(const v: IXQValue);
 begin
   SeqValue := v;
   SeqIndex := 1;
   SeqLength := 1;
 end;
+
+procedure TXQEvaluationContext.setContextItem(const v: IXQValue; index, length: integer);
+begin
+  SeqValue := v;
+  SeqIndex := index;
+  SeqLength:= length;
+end;
+
+procedure TXQEvaluationContext.getContextItem(out v: IXQValue; out index, length: integer);
+begin
+  v := SeqValue;
+  index := SeqIndex;
+  length := SeqLength;
+end;
+
 
 procedure raiseFORG0001InvalidConversion(const v: IXQValue; const convTo: string);
 begin
@@ -4541,7 +4558,6 @@ begin
   if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
     exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
 
-  context:=context;
   context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
 
   if (context.temporaryVariables <> nil) then begin
@@ -4553,16 +4569,16 @@ begin
   if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
     for i := 0 to high(staticContext.moduleContextItemDeclarations) do
       if not staticContext.moduleContextItemDeclarations[i].isExternal then begin
-        context.setSingletonContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
+        context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
         break;
       end;
     if context.SeqValue = nil then
       if context.contextNode(false) <> nil then
-        context.setSingletonContextItem(xqvalue(context.contextNode()));
+        context.setContextItem(xqvalue(context.contextNode()));
     if context.SeqValue = nil then
       for i := 0 to high(staticContext.moduleContextItemDeclarations) do
         if staticContext.moduleContextItemDeclarations[i].getExpression <> nil then begin
-          context.setSingletonContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
+          context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
           break;
        end;
     if context.SeqValue = nil then begin
