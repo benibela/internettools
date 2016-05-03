@@ -3204,10 +3204,19 @@ end;
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.clone: TXQTerm;
 begin
   Result:=TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
-  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).pattern := pattern;
-  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).variable := variable;
-  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).typ := typ;
-  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).expr := expr;
+  if pattern <> nil then TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).pattern := TXQTermPatternMatcher(pattern.clone);
+  if variable <> nil then TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).variable := TXQTermVariable(variable.clone);
+  if typ <> nil then TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).typ := TXQTermSequenceType(typ.clone);
+  TXQTermTypeSwitch.TXQTermTypeSwitchClause(result).expr := expr.clone;
+end;
+
+destructor TXQTermTypeSwitch.TXQTermTypeSwitchClause.Destroy;
+begin
+  pattern.free;
+  variable.free;
+  typ.free;
+  expr.free;
+  inherited Destroy;
 end;
 
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvaluationContext; const v: IXQValue; out res: IXQValue
@@ -3228,7 +3237,9 @@ function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvalu
     oldSeqIndex: Integer;
     oldSeqLength: Integer;
     hasContextItem: Boolean;
+    oldlog: TXQVariableChangeLog;
   begin
+    oldlog := log;
     log := log.condensedCollected;
     try
       context.temporaryVariables.pushAll;
@@ -3244,6 +3255,7 @@ function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvalu
     finally
       context.temporaryVariables.popAll();
       if hasContextItem then context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
+      oldlog.free       ;
       log.Free;
     end;
   end;
