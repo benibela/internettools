@@ -2994,20 +2994,28 @@ end;
 
 procedure TXQParsingContext.parseQuery(aquery: TXQuery);
 var
-  oldPendingCount: Integer;
+  oldPendingCount, oldFunctionCount, i: Integer;
   pendingModules: TInterfaceList;
 begin
   thequery := aquery;
   pendingModules := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
   oldPendingCount := pendingModules.Count;
+  oldFunctionCount := length(staticContext.functions);
   try
     TXQueryBreaker(thequery).fterm := parseModule;
   except
+    //not sure if this is needed, but it seems reasonable
+    for i := oldFunctionCount to high(staticContext.functions) do
+      staticContext.functions[i].free;
+    SetLength(staticContext.functions, oldFunctionCount);
+
+    //free query
     TXQueryBreaker(thequery)._AddRef;
     if staticContext.sender.AutomaticallyRegisterParsedModules then
       pendingModules.Remove(IXQuery(thequery));
     while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
-    TXQueryBreaker(thequery)._Release;
+    TXQueryBreaker(thequery)._Release; //use addref/release to free it, so it is freed regardless if it is used as class or interface reference
+
     raise;
   end;
 end;
