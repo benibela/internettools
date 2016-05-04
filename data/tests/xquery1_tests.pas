@@ -1864,6 +1864,7 @@ begin
   //scd('data()', [xqcdFocusDocument]);??
   scd('foo / bar', [xqcdFocusDocument, xqcdContextCollation]);
   scd('/ bar', [xqcdFocusDocument, xqcdContextCollation]);
+  ps.VariableChangelog.add('var', 'foobar');
   scd('x"{1+2+3}{$var}"', [xqcdContextVariables]);
   scd('abc:=//title', [xqcdContextVariables,xqcdFocusDocument,xqcdContextCollation]);
 
@@ -1913,7 +1914,7 @@ begin
   equal(ps.evaluateXQuery1('declare function local:foobar3(){1000}; local:foobar() + local:foobar2()').toString, '579', 'interface test failed');
   equal(ps.evaluateXQuery1('declare function local:foobar(){111}; local:foobar() + local:foobar3()').toString, '1111', 'interface test foverride failed');
 
-  writeln('XQuery: ', count, ' completed');
+  writeln('XQuery 1.0: ', count, ' completed');
 
   helper.free;
   xml.free;
@@ -1927,13 +1928,13 @@ type
 
 { TTermExtension }
 
- TTermExtension = class(TXQTerm)
-  function evaluate(const context: TXQEvaluationContext): IXQValue; override;
+TTermExtension = class(TXQTerm)
+  function evaluate(var context: TXQEvaluationContext): IXQValue; override;
 end;
 
 { TTermExtension }
 
-function TTermExtension.evaluate(const context: TXQEvaluationContext): IXQValue;
+function TTermExtension.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   result := xqvalue('native!');
 end;
