@@ -1754,9 +1754,9 @@ begin
   m('import module namespace test4 = "pseudo://test-module3"; test4:double(10) + $test4:var', '37');
   ps.OnImportModule:=@helper.ImportModule;
 
-  ps.parseXQuery1('module namespace circle1 = "pseudo://circle1"; import module "pseudo://circle2"; declare function circle1:cf1 ($x) { if ($x <= 0) then 1 else $x * circle2:cf2($x - 1)};');
+  f('module namespace circle1 = "pseudo://circle1"; import module "pseudo://circle2"; declare function circle1:cf1 ($x) { if ($x <= 0) then 1 else $x * circle2:cf2($x - 1)};', 'XQST0093');
 
-  f('import module namespace circle1 = "pseudo://circle1"; import module namespace circle2 = "pseudo://circle2"; circle1:cf1(10)', 'XQST0093');
+  //f('import module namespace circle1 = "pseudo://circle1"; import module namespace circle2 = "pseudo://circle2"; circle1:cf1(10)', 'XQST0093');
 
 
 
@@ -1984,7 +1984,7 @@ begin
     'pseudo://circle2':
       ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ;');
     'http://www.w3.org/2005/xpath-functions', 'http://jsoniq.org/function-library': ;
-    else raise Exception.Create('Invalid namespace: '+namespace)
+    else raise Exception.Create('TestInternalException: Invalid namespace: '+namespace)
   end;
 end;
 

@@ -2832,8 +2832,7 @@ protected
 
  str: string;
  pos: pchar;
- resultquery: TXQuery;
- function parseModule(): TXQTerm; virtual; abstract;
+ procedure parseQuery(aquery: TXQuery); virtual; abstract;
  function parseXStringOnly(nullTerminatedString: boolean = false): TXQTerm; virtual; abstract;
  procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); virtual; abstract;
 
@@ -6370,31 +6369,14 @@ begin
   context.model := model;
   cxt.parsingModel:=model;
   cxt.engine := self;
-  oldFunctionCount := length(context.functions);
-  oldPendingCount := FPendingModules.Count;
   try
-    try
-      cxt.str := str;
-      cxt.pos := @cxt.str[1];
-      result := TXQuery.Create(cxt.staticContext);
-      result.staticContextShared := staticContextShared;
-      cxt.resultquery := result;
-      result.fterm := cxt.parseModule();
-
-    finally
-      cxt.free;
-    end;
-  except
-    //not sure if this is needed, but it seems reasonabl
-    for i := oldFunctionCount to high(context.functions) do
-      context.functions[i].free;
-    SetLength(context.functions, oldFunctionCount);
-
-
-    if result.RefCount > 0 then result._Release //when it is a module it has a positive ref count and must not be freed directly
-    else result.free;
-    while FPendingModules.Count > oldPendingCount do FPendingModules.Delete(FPendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
-    raise;
+    cxt.str := str;
+    cxt.pos := @cxt.str[1];
+    result := TXQuery.Create(cxt.staticContext);
+    result.staticContextShared := staticContextShared;
+    cxt.parseQuery(result);
+  finally
+    cxt.free;
   end;
 end;
 

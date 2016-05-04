@@ -59,6 +59,7 @@ type
 
 TXQParsingContext = class(TXQAbstractParsingContext)
 protected
+  thequery: TXQuery;
   procedure raiseParsingError(errcode, s: string);
   procedure raiseSyntaxError(s: string);
   procedure raiseInvalidModel(s: string);
@@ -130,7 +131,8 @@ protected
   function parseModuleInternal(): TXQTerm;
 
 
-  function parseModule: TXQTerm; override;
+  function parseModule(): TXQTerm;
+  procedure parseQuery(aquery: TXQuery); override;
   class procedure finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
   function parseXStringOnly(nullTerminatedString: boolean = false): TXQTerm; override;
   procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); override;
@@ -330,10 +332,8 @@ var oldContext: TXQStaticContext;
     oldContext := curcontext;
     if nc = curcontext then exit;
     curcontext := nc;
-    if moduleStack <> nil then begin
-      if moduleStack.IndexOf(curContext) >= 0 then raise EXQParsingException.create('XQST0093', 'Module import cycle');
-      moduleStack.Add(oldContext);
-    end;
+    if moduleStack.IndexOf(curContext) >= 0 then raise EXQParsingException.create('XQST0093', 'Module import cycle');
+    moduleStack.Add(oldContext);
   end;
 
   procedure goToOldContext;
@@ -341,8 +341,7 @@ var oldContext: TXQStaticContext;
     lastVariableIndex := oldLastVarIndex;
     if oldContext = curcontext then exit;
     curcontext := oldContext;
-    if moduleStack <> nil then
-      moduleStack.Delete(moduleStack.Count - 1);
+    moduleStack.Delete(moduleStack.Count - 1);
   end;
 
 var
@@ -425,7 +424,7 @@ begin
   try
     if start is TXQTermModule then begin
       cycler.mainmodule := TXQTermModule(start);
-      for i := 0 to high(cycler.mainmodule.children) - 1 do begin
+      for i := 0 to high(cycler.mainmodule.children) do begin
         if cycler.mainmodule.children[i] is TXQTermDefineVariable then cycler.lastVariableIndex := i
         else cycler.lastVariableIndex := MaxInt;
         //if cycler.mainmodule.children[i].);
@@ -2971,7 +2970,7 @@ begin
     tempContext := staticContext.sender.getEvaluationContext(staticContext);
     initializeFunctions(result as TXQTermModule, tempContext);
   end;
-  if Assigned(resultquery) then TXQueryBreaker(resultquery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
+  TXQueryBreaker(thequery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
 
   if hadPending then exit; //we cannot do anything, until the pending modules have been parsed
 
@@ -2982,18 +2981,35 @@ begin
     finalResolving(tempTerm, otherQuery.staticContext, options);
     finalizeFunctionsEvenMore(otherQuery.getTerm as TXQTermModule, otherQuery.staticContext, otherQuery.staticContextShared);
   end;
-  if resultquery <> nil then begin
-    finalResolving(TXQueryBreaker(resultquery).fterm, staticContext, options);
-    result := TXQueryBreaker(resultquery).fterm;
-  end else finalResolving(result, staticContext, options); //does this even ever happen?
-  if result is TXQTermModule then begin
-    shared := false; if resultquery <> nil then shared := TXQueryBreaker(resultquery).staticContextShared;
-    finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, shared);
-  end;
+  finalResolving(TXQueryBreaker(thequery).fterm, staticContext, options);
+  result := TXQueryBreaker(thequery).fterm;
+  if result is TXQTermModule then
+    finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, TXQueryBreaker(thequery).staticContextShared);
+
 
   for i := 0 to pendings.Count - 1 do
     TXQueryEngineBreaker(staticContext.sender).fmodules.Add(pendings[i]);
   pendings.Clear;
+end;
+
+procedure TXQParsingContext.parseQuery(aquery: TXQuery);
+var
+  oldPendingCount: Integer;
+  pendingModules: TInterfaceList;
+begin
+  thequery := aquery;
+  pendingModules := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
+  oldPendingCount := pendingModules.Count;
+  try
+    TXQueryBreaker(thequery).fterm := parseModule;
+  except
+    TXQueryBreaker(thequery)._AddRef;
+    if staticContext.sender.AutomaticallyRegisterParsedModules then
+      pendingModules.Remove(IXQuery(thequery));
+    while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
+    TXQueryBreaker(thequery)._Release;
+    raise;
+  end;
 end;
 
 class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
@@ -3384,9 +3400,10 @@ begin
           expect(';');
           token := nextToken(true);
           if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
-          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, resultquery); //every module import itself so it can lazy initialize its variables
-          if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then
-            TXQueryEngineBreaker(staticContext.sender).FPendingModules.Add(IXQuery(resultquery));
+          Assert(thequery <> nil);
+          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
+          if staticContext.sender.AutomaticallyRegisterParsedModules then
+            TXQueryEngineBreaker(staticContext.sender).FPendingModules.Add(IXQuery(thequery));
         end;
         else expect('namespace');
       end;
@@ -3590,14 +3607,9 @@ begin
 
     declarationDuplicateChecker.Free;
     result.free;
-    if staticContext.sender.AutomaticallyRegisterParsedModules and (resultquery <> nil) then begin
-      TXQueryBreaker(resultquery)._AddRef; //increase ref, so we can remove it from FModules without freeing. Cannot free it here, since the caller still has a reference to the object (but not the interface)
-      TXQueryEngineBreaker(staticContext.sender).FPendingModules.Remove(IXQuery(resultquery));
-    end;
     raise;
   end;
   if result = nil then exit;
-
 end;
 
 function TXQParsingContext.parseXStringOnly(nullTerminatedString: boolean): TXQTerm;
@@ -3607,8 +3619,11 @@ begin
     result.free;
     raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   end;
-  if Assigned(resultquery) then TXQueryBreaker(resultquery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
-  finalResolving(result, staticContext, options);
+  try
+    finalResolving(result, staticContext, options);
+  except
+    result.free;
+  end;
 end;
 
 procedure TXQParsingContext.parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string);
