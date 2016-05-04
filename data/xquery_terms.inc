@@ -3093,7 +3093,7 @@ begin
     result := temp;
     exit();
   end;
-  Result:=evaluateInitial(PXQEvaluationContext(@context)^);
+  Result:=evaluateInitial(context);
 end;
 
 function TXQTermVariableGlobal.getContextDependencies: TXQContextDependencies;

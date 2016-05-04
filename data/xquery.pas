@@ -1960,6 +1960,7 @@ type
   { TXQTermModule }
 
   TXQTermModule = class(TXQTermWithChildren)
+    allVariables: array of TXQTermDefineVariable;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -4354,8 +4355,50 @@ end;
 
 
 function TXQTermModule.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  i: Integer;
+  staticContext: TXQStaticContext;
 begin
-  if context.staticContext.moduleNamespace <> nil then raiseEvaluationError('', 'A module cannot be evaluated');
+  if (context.temporaryVariables <> nil) then begin
+    context.temporaryVariables.clear;
+    if context.temporaryVariables.parentLog <> nil then
+      context.temporaryVariables.parentLog.clear; //declared global variables
+  end;
+
+  staticContext := context.staticContext;
+  if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
+    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
+      if not staticContext.moduleContextItemDeclarations[i].isExternal then begin
+        context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
+        break;
+      end;
+    if context.SeqValue = nil then
+      if context.contextNode(false) <> nil then
+        context.setContextItem(xqvalue(context.contextNode()));
+    if context.SeqValue = nil then
+      for i := 0 to high(staticContext.moduleContextItemDeclarations) do
+        if staticContext.moduleContextItemDeclarations[i].getExpression <> nil then begin
+          context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
+          break;
+       end;
+    if context.SeqValue = nil then begin
+      if assigned(staticContext.sender.OnDeclareExternalVariable) then
+        staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', context.SeqValue);
+      if context.SeqValue = nil then
+         raise EXQEvaluationException.create('XPTY0004', 'context item missing');
+       context.SeqLength := 1;
+       context.SeqIndex := 1;
+    end;
+
+    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
+      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue) then
+        raiseXPTY0004TypeError(context.SeqValue, staticContext.moduleContextItemDeclarations[i].getSequenceType.debugTermToString);
+  end;
+  //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed
+  for i := 0 to high(allVariables) do
+    if not context.temporaryVariables.hasVariable(allVariables[i].getVariable) then
+      context.temporaryVariables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
+
   result := children[high(children)].evaluate(context);
 end;
 
@@ -4552,48 +4595,12 @@ begin
 end;
 
 function TXQuery.evaluate(var context: TXQEvaluationContext): IXQValue;
-var i: Integer;
 begin
   if fterm = nil then exit(xqvalue());
   if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
     exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
 
   context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
-
-  if (context.temporaryVariables <> nil) then begin
-    context.temporaryVariables.clear;
-    if context.temporaryVariables.parentLog <> nil then
-      context.temporaryVariables.parentLog.clear; //declared global variables
-  end;
-
-  if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
-    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-      if not staticContext.moduleContextItemDeclarations[i].isExternal then begin
-        context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
-        break;
-      end;
-    if context.SeqValue = nil then
-      if context.contextNode(false) <> nil then
-        context.setContextItem(xqvalue(context.contextNode()));
-    if context.SeqValue = nil then
-      for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-        if staticContext.moduleContextItemDeclarations[i].getExpression <> nil then begin
-          context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
-          break;
-       end;
-    if context.SeqValue = nil then begin
-      if assigned(staticContext.sender.OnDeclareExternalVariable) then
-        staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', context.SeqValue);
-      if context.SeqValue = nil then
-         raise EXQEvaluationException.create('XPTY0004', 'context item missing');
-       context.SeqLength := 1;
-       context.SeqIndex := 1;
-    end;
-
-    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue) then
-        raiseXPTY0004TypeError(context.SeqValue, staticContext.moduleContextItemDeclarations[i].getSequenceType.debugTermToString);
-  end;
 
   result := fterm.evaluate(context);
 end;

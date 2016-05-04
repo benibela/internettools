@@ -2993,6 +2993,52 @@ begin
 end;
 
 procedure TXQParsingContext.parseQuery(aquery: TXQuery);
+  procedure collectVariables(m: TXQTermModule);
+  var
+    l, r, truehigh, varcount, i, j: Integer;
+    temp: TXQTerm;
+    imp: TXQTermModule;
+  begin
+    l := 0;
+    truehigh := high(m.children);
+    if not staticContext.isLibraryModule then dec(truehigh);
+    r := truehigh;
+    while l < r do begin
+      while (l <= high(m.children)) and (m.children[l] is TXQTermDefineVariable) do inc(l);
+      while (r >= 0) and not (m.children[r] is TXQTermDefineVariable) do dec(r);
+      if l >= r then break;
+      temp := m.children[l];
+      m.children[l] := m.children[r];
+      m.children[r] := temp;
+    end;
+    while (l <= truehigh) and (m.children[l] is TXQTermDefineVariable) do inc(l);
+
+    assert( (l = 0) or (m.children[l - 1] is TXQTermDefineVariable) );
+    assert( (l = truehigh) or not (m.children[l] is TXQTermDefineVariable) );
+
+    varcount := l;
+    if staticContext.importedModules <> nil then
+      for i := 0 to staticContext.importedModules.Count - 1 do begin
+        imp := (TXQueryBreaker(staticContext.importedModules.Objects[i]).fTerm as TXQTermModule);
+        if imp = nil then continue; //seems to happen with cycles. let's hope the main module still gets all the variables. todo? perhaps this helps to prevent duplicated variables? but we get duplicates anyways from different import paths to the same module. damnit
+        varcount += length(imp.allVariables);
+      end;
+
+    l := 0;
+    SetLength(m.allVariables, varcount);
+    if staticContext.importedModules <> nil then
+      for i := 0 to staticContext.importedModules.Count - 1 do begin
+        imp := (TXQueryBreaker(staticContext.importedModules.Objects[i]).fTerm as TXQTermModule);
+        if imp = nil then continue;
+        for j := 0 to high(imp.allVariables) do begin
+          m.allVariables[l] := imp.allVariables[l];
+          inc(l);
+        end;
+      end;
+    for i := 0 to varcount - 1 do
+      m.allVariables[l + i] := TXQTermDefineVariable(m.children[i]);
+  end;
+
 var
   oldPendingCount, oldFunctionCount, i: Integer;
   pendingModules: TInterfaceList;
@@ -3003,6 +3049,8 @@ begin
   oldFunctionCount := length(staticContext.functions);
   try
     TXQueryBreaker(thequery).fterm := parseModule;
+    if TXQueryBreaker(thequery).fterm is TXQTermModule then
+      collectVariables(TXQTermModule(TXQueryBreaker(thequery).fterm));
   except
     //not sure if this is needed, but it seems reasonable
     for i := oldFunctionCount to high(staticContext.functions) do
