@@ -2797,21 +2797,19 @@ var
   functionCount: Integer;
   children: array of TXQTerm;
   staticContext: TXQStaticContext;
-  truechildrenhigh: integer;
   oldFunctionCount: Integer;
 begin
   children := module.children;
   functionCount := 0;
   staticContext := context.staticContext;
-  truechildrenhigh := high(children) -  ifthen(staticContext.moduleNamespace = nil, 1,0);
-  for i:=0 to truechildrenhigh do
+  for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineFunction then
       functionCount += 1;
   oldFunctionCount := length(staticContext.functions);
   setlength(staticContext.functions, oldFunctionCount + functionCount);
   functions := staticContext.functions;
   functionCount := oldFunctionCount;
-  for i:=0 to truechildrenhigh do
+  for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineFunction then begin
       functions[functionCount] := TXQTermDefineFunction(children[i]).define(context, true);
       if functions[functionCount].body = nil then begin
@@ -2889,7 +2887,6 @@ var
   children: array of TXQTerm;
   functionCount: Integer;
   overriden: Integer;
-  truechildrenhigh: integer;
   j: Integer;
   oldFunctionCount, k: Integer;
   otherModule: TXQTermModule;
@@ -2897,9 +2894,8 @@ var
 begin
   children := module.children;
 
-  truechildrenhigh := high(children) -  ifthen(sc.moduleNamespace = nil, 1,0);
   functionCount := 0;
-  for i:=truechildrenhigh downto 0 do
+  for i:=high(children) -  1 downto 0 do
     if children[i] is TXQTermDefineFunction then begin
       functionCount += 1;
     end else checkVariableOverride(((children[i] as TXQTermDefineVariable)));
@@ -2967,8 +2963,9 @@ begin
     raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   end;
   if result is TXQTermModule then begin
+    if staticContext.isLibraryModule then TXQTermModule(result).push(TXQTermSequence.Create);
     tempContext := staticContext.sender.getEvaluationContext(staticContext);
-    initializeFunctions(result as TXQTermModule, tempContext);
+    initializeFunctions(TXQTermModule(result), tempContext);
   end;
   TXQueryBreaker(thequery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
 
@@ -2992,19 +2989,20 @@ begin
   pendings.Clear;
 end;
 
+
+
 procedure TXQParsingContext.parseQuery(aquery: TXQuery);
   procedure collectVariables(m: TXQTermModule);
   var
-    l, r, truehigh, varcount, i, j: Integer;
+    l, r, truehigh, varcount, i, j, p: Integer;
     temp: TXQTerm;
     imp: TXQTermModule;
   begin
     l := 0;
-    truehigh := high(m.children);
-    if not staticContext.isLibraryModule then dec(truehigh);
+    truehigh := high(m.children) - 1;
     r := truehigh;
     while l < r do begin
-      while (l <= high(m.children)) and (m.children[l] is TXQTermDefineVariable) do inc(l);
+      while (l < high(m.children)) and (m.children[l] is TXQTermDefineVariable) do inc(l);
       while (r >= 0) and not (m.children[r] is TXQTermDefineVariable) do dec(r);
       if l >= r then break;
       temp := m.children[l];
@@ -3020,23 +3018,23 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery);
     if staticContext.importedModules <> nil then
       for i := 0 to staticContext.importedModules.Count - 1 do begin
         imp := (TXQueryBreaker(staticContext.importedModules.Objects[i]).fTerm as TXQTermModule);
-        if imp = nil then continue; //seems to happen with cycles. let's hope the main module still gets all the variables. todo? perhaps this helps to prevent duplicated variables? but we get duplicates anyways from different import paths to the same module. damnit
+        if (imp = nil) or (imp = m) then continue; //seems to happen with cycles. let's hope the main module still gets all the variables. todo? perhaps this helps to prevent duplicated variables? but we get duplicates anyways from different import paths to the same module. damnit
         varcount += length(imp.allVariables);
       end;
 
-    l := 0;
+    p := 0;
     SetLength(m.allVariables, varcount);
     if staticContext.importedModules <> nil then
       for i := 0 to staticContext.importedModules.Count - 1 do begin
         imp := (TXQueryBreaker(staticContext.importedModules.Objects[i]).fTerm as TXQTermModule);
-        if imp = nil then continue;
+        if (imp = nil) or (imp = m) then continue;
         for j := 0 to high(imp.allVariables) do begin
-          m.allVariables[l] := imp.allVariables[l];
-          inc(l);
+          m.allVariables[p] := imp.allVariables[j];
+          inc(p);
         end;
       end;
-    for i := 0 to varcount - 1 do
-      m.allVariables[l + i] := TXQTermDefineVariable(m.children[i]);
+    for i := 0 to l - 1 do
+      m.allVariables[p + i] := TXQTermDefineVariable(m.children[i]);
   end;
 
 var
@@ -3069,7 +3067,7 @@ begin
 end;
 
 class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
-var truechildrenhigh: integer;
+var
   visitor: TFinalNamespaceResolving;
   varvisitor: TFinalVariableResolving;
 
@@ -3084,8 +3082,7 @@ var truechildrenhigh: integer;
     module := result as TXQTermModule;
     children := module.children;
     p := high(sc.functions);
-    truechildrenhigh := high(TXQTermModule(result).children) -  ifthen(sc.moduleNamespace = nil, 1,0);
-    for i:=truechildrenhigh downto 0 do
+    for i:=high(TXQTermModule(result).children) - 1 downto 0 do
       if children[i] is TXQTermDefineFunction then begin
         f := TXQTermDefineFunction(children[i]);
         if (length(f.children) > f.parameterCount) and not (f.children[high(f.children)] is TXQTermSequenceType) then
@@ -4174,7 +4171,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   var
     v: TXQTermVariable;
   begin
-    if ((parent <> mainModule) or (mainModule = nil) or (not staticContext.isLibraryModule and (mainModule.children[high(mainModule.children)] = f)))
+    if ((parent <> mainModule) or (mainModule = nil) or (mainModule.children[high(mainModule.children)] = f))
        and not (parent is TXQTermDefineFunction) and (staticContext.sender <> nil) then begin
       v := f.getVariable;
       TXQueryEngineBreaker(staticContext.sender).addAWeirdGlobalVariable(v.namespace, v.value);

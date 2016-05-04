@@ -64,7 +64,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <CommandLineParams Value="--plain /home/benito/xxtest/cat/DefaultNamespaceProlog.xml"/>
+        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set ModuleImport --test-case modules-simple"/>
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
     </RunParams>
