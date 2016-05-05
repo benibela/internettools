@@ -1837,7 +1837,7 @@ var
         log: TXQVariableChangeLog;
         hasContextItem: Boolean;
         varIndex: integer;
-        value: TXQValue;
+        value: IXQValue;
     begin
       patternClause := TXQTermFlowerLetPattern(children[pos]);
       log := patternMatcherMatch(patternClause.pattern.node, node.toNode, context, true);
@@ -1862,12 +1862,12 @@ var
         context.temporaryVariables.pushAll;
         try
           if clausekind = xqtfcLetPattern then begin
-            if hasContextItem and log.hasVariable('$', @value) then begin
+            if hasContextItem and log.hasVariable('$', value) then begin
               if value.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Only singletons can be assigned to .');
               context.setContextItem(value);
             end;
             for i := 0 to high(patternClause.pattern.vars) do
-              if log.hasVariable(patternClause.pattern.vars[i], @value) then begin
+              if log.hasVariable(patternClause.pattern.vars[i], value) then begin
                 context.temporaryVariables.add(patternClause.pattern.vars[i], value);
                 if needFullTuple then currentTuple.vars[clauseIndex[pos]+i] := value;
               end else begin
@@ -3087,12 +3087,9 @@ end;
 
 
 function TXQTermVariableGlobal.evaluate(var context: TXQEvaluationContext): IXQValue;
-var temp: TXQValue;
 begin
-  if (context.temporaryVariables <> nil) and context.temporaryVariables.hasVariable(definition.getVariable, @temp) then begin
-    result := temp;
+  if context.temporaryVariables.hasVariable(definition.getVariable, result) then
     exit();
-  end;
   Result:=evaluateInitial(context);
 end;
 
@@ -3117,14 +3114,13 @@ var
   v: TXQTermVariable;
   pendingname: String;
 begin
-  if context.temporaryVariables = nil then context.temporaryVariables := TXQVariableChangeLog.create();
   if context.temporaryVariables.parentLog = nil then context.temporaryVariables.parentLog := TXQVariableChangeLog.create();
 
   v := definition.getVariable;
 
   if context.staticContext.model in PARSING_MODEL3 then begin
     pendingname := #0 + v.value;
-    if context.temporaryVariables.parentLog.hasVariable(pendingname, nil, v.namespace) then
+    if context.temporaryVariables.parentLog.hasVariable(pendingname, v.namespace) then
       raise EXQEvaluationException.create('XQDY0054', 'Dependancy cycle: ' + v.ToString );
     context.temporaryVariables.parentLog.add(pendingname, xqvalue(), v.namespace);
   end;
@@ -3135,13 +3131,10 @@ end;
 
 function TXQTermVariableGlobalImported.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  temp: TXQValue;
   oldSC: TXQStaticContext;
 begin
-  if (context.temporaryVariables <> nil) and context.temporaryVariables.hasVariable(definition.getVariable, @temp) then begin
-    result := temp;
-    exit();
-  end;
+  if context.temporaryVariables.hasVariable(definition.getVariable, result) then
+    exit;
   oldSC := context.staticContext;
   context.staticContext := staticContext;
   Result:=evaluateInitial(context);
@@ -3230,7 +3223,7 @@ function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvalu
   end;
   function evaluateWithChangedVariableLog(log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
   var
-    value: TXQValue;
+    value: IXQValue;
     i: Integer;
 
     oldContextItem: IXQValue;
@@ -3243,7 +3236,7 @@ function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvalu
     log := log.condensedCollected;
     try
       context.temporaryVariables.pushAll;
-      hasContextItem := log.hasVariable('$', @value); //todo should be statically?
+      hasContextItem := log.hasVariable('$', value); //todo should be statically?
       if  hasContextItem then begin
         if value.getSequenceCount <> 1 then raiseEvaluationError('pxp:PATTERN1', 'Can only assign singleton to context item');
         context.getContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
@@ -3890,11 +3883,11 @@ end;
 
 function TXQTerm_VisitorReplaceKnownVariables.visit(term: PXQTerm): TXQTerm_VisitAction;
 var
-  temp: TXQValue;
+  temp: IXQValue;
   //selfdefined: Boolean;
 begin
   if term^ is TXQTermVariable then begin
-    if not overridenVariables.hasVariable(TXQTermVariable(term^), @temp) then
+    if not overridenVariables.hasVariable(TXQTermVariable(term^), temp) then
       replace(term, TXQTermConstant.create(context^. getVariable(TXQTermVariable(term^))))
     else if length(patterns) > 0 then begin
       {not sure what to do with these
@@ -3904,7 +3897,7 @@ begin
           if vars[i].equalsVariable(TXQTermVariable(term^)) then
             selfdefined := true;}
       if uncertainVariables = nil then uncertainVariables := TXQVariableChangeLog.create();
-      if not uncertainVariables.hasVariable(TXQTermVariable(term^), @temp) then
+      if not uncertainVariables.hasVariable(TXQTermVariable(term^), temp) then
         uncertainVariables.add(TXQTermVariable(term^), tempValue);
     end;
   end else if term^ is TXQTermPatternMatcher then begin

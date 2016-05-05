@@ -239,7 +239,7 @@ type
 
     function getRootHighest: TTreeNode;
 
-    function hasVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
+    function hasVariable(const name: string; out value: IXQValue; const namespaceURL: string = ''): boolean;
     function hasVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
     function getVariable(const name: string; const namespaceURL: string): IXQValue;
     function getVariable(const v: TXQTermVariable): IXQValue; inline;
@@ -2613,9 +2613,14 @@ type
     function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
     function isPropertyChange(i: integer): boolean;
 
-    function hasVariable(const variable: string; value: PXQValue; const namespaceURL: string = ''): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
-    function hasVariable(const variable: TXQTermVariable; value: PXQValue = nil): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
-    //function hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace = nil): boolean; //**< like hasVariable. But if variable is an object, like foo.xyz, it returns, if foo exists (hasVariable returns if foo exists and has a property xyz). Still outputs the value of foo.xyz. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+    //** Returns if a variable with name @param(variable) exists
+    function hasVariable(const variable: TXQTermVariable): boolean;
+    //** Returns if a variable with name @param(variable) exists
+    function hasVariable(const variable: string; const namespaceURL: string = ''): boolean;
+    //** Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value).
+    function hasVariable(const variable: string; out value: IXQValue; const namespaceURL: string = ''): boolean;
+    //** Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value).
+    function hasVariable(const variable: TXQTermVariable; out value: IXQValue): boolean;
 
     property Values[name:string]:IXQValue read get write add; default;
     property ValuesString[name:string]:string read getString write add;
@@ -4473,23 +4478,11 @@ begin
 end;
 
 function TXQEvaluationContext.hasVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
-var
-  temp: TXQValue;
 begin
-  temp := nil;
-  value := nil;
-  if temporaryVariables <> nil then begin
-    result := temporaryVariables.hasVariable(name, @temp, namespaceURL);
-    value := temp;
-    if result then exit;
-  end;
-  if (staticContext.sender <> nil) and staticContext.sender.VariableChangelog.hasVariable(name, @temp, namespaceURL) then begin
-    result := true;
-    if temp <> nil then //safety check. todo: necessary?
-      value := temp;
-    exit;
-  end;
-  result := false;
+  result := temporaryVariables.hasVariable(name, value, namespaceURL);
+  if result then exit;
+  if staticContext.sender <> nil then
+    result := staticContext.sender.VariableChangelog.hasVariable(name, value, namespaceURL);
 end;
 
 function TXQEvaluationContext.hasVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
@@ -5527,8 +5520,7 @@ end;
 
 procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; properties: TStringArray);
 var
-  oldObj: TXQValue;
-  newValue: IXQValue;
+  oldObj, newValue: IXQValue;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
   if length(properties) = 0 then begin
@@ -5536,7 +5528,7 @@ begin
    exit;
   end;
 
-  if not hasVariable(variable, @oldObj, namespaceURL) then
+  if not hasVariable(variable, oldObj, namespaceURL) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(properties, '.')+')');
 
 
@@ -5857,7 +5849,7 @@ var
   found: Boolean;
   i,j: Integer;
   k: Integer;
-  temp: TXQValue;
+  temp: IXQValue;
 begin
   result := TXQVariableChangeLog.create();
   result.shared:=true;
@@ -5881,9 +5873,9 @@ begin
           break;
         end;
       if found then continue;
-      if not parentLog.hasVariable(vars[i].name, @temp, vars[i].namespaceURL) then
+      if not parentLog.hasVariable(vars[i].name, temp, vars[i].namespaceURL) then
         raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+vars[i].name+', but no variable of that name exists');
-      if not (temp is TXQValueObject) then
+      if temp.kind <> pvkObject then
         raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+vars[i].name+', but '+vars[i].name+'='+temp.debugAsStringWithTypeAnnotation()+' is not an object ');
     end;
     result.vars[p] := vars[i];
@@ -5892,48 +5884,37 @@ begin
   setlength(result.vars,p);
 end;
 
-function TXQVariableChangeLog.hasVariable(const variable: string; value: PXQValue; const namespaceURL: string): boolean;
+function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable): boolean;
+begin
+  result := hasVariable(variable.value, variable.namespace);
+end;
+
+function TXQVariableChangeLog.hasVariable(const variable: string; const namespaceURL: string = ''): boolean;
+begin
+  if indexOf(variable, namespaceURL) >= 0 then result := true
+  else if parentLog <> nil then result := parentLog.hasVariable(variable, namespaceURL)
+  else result := false;
+end;
+
+function TXQVariableChangeLog.hasVariable(const variable: string; out value: IXQValue; const namespaceURL: string): boolean;
 var
   i: Integer;
 begin
-  {if allowPropertyDotNotation then begin
-    if splitName(variable, base, varname) then begin
-      result := hasVariable(base, @temp, namespace);
-      if not result then exit;
-      if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
-      result := (temp as TXQValueObject).hasProperty(varname, value);
-      exit;
-    end;
-  end;}
   i := indexOf(variable, namespaceURL);
   if i = -1 then
     if parentLog <> nil then exit(parentLog.hasVariable(variable, value, namespaceURL))
     else exit(false);
-  if assigned(value) then value^ := vars[i].value as txqvalue;
+  value := vars[i].value;
   result := true;
 end;
 
-function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable; value: PXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable; out value: IXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
 begin
   result := hasVariable(variable.value, value, variable.namespace);
 end;
 
-{function TXQVariableChangeLog.hasVariableOrObject(const variable: string; value: PXQValue; const namespace: INamespace): boolean;
-var temp: txqvalue;
-  base: string;
-  varname: string;
-begin
-  if not allowPropertyDotNotation then
-    exit(hasVariable(variable, value, namespace));
-  if not splitName(variable, base, varname) then
-    exit(hasVariable(variable, value, namespace));
 
-  result := hasVariable(base, @temp, namespace);
-  if not result then exit;
-  if not (temp is  TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object, got :'+ temp.debugAsStringWithTypeAnnotation);
 
-  TXQValueObject(temp).hasProperty(varname, value);
-end;}
 
                        (*
 { TXQQueryIterator }
@@ -7157,9 +7138,9 @@ end;
 
 function TXQueryEngine.isAWeirdGlobalVariable(const namespace, local: string): boolean;
 begin
-  if VariableChangelog.hasVariable(local, nil, namespace) then exit(true);
+  if VariableChangelog.hasVariable(local, namespace) then exit(true);
   if VariableChangelogUndefined = nil then exit(false);
-  if VariableChangelogUndefined.hasVariable(local, nil, namespace) then exit(true);
+  if VariableChangelogUndefined.hasVariable(local, namespace) then exit(true);
   exit(false);
 end;
 
