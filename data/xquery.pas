@@ -3797,7 +3797,7 @@ begin
   if isLibraryModule then delta := 0
   else delta := 1;
   for mi := 0 to associatedModules.Count - 1 do begin
-    m := TXQTermModule(associatedModules[mi]);
+    m := TXQTermModule(TXQuery(associatedModules[mi]).FTerm);
     for i := 0 to high(m.children) - delta do begin
       if not (m.children[i] is TXQTermDefineVariable) then continue;
       w := TXQTermDefineVariable(m.children[i]).getVariable;
@@ -4644,7 +4644,7 @@ destructor TXQuery.Destroy;
 begin
   fterm.Free; //delete term first, since it might contain other queries that have a reference to staticContext (let's hope they all share it => requirement nested queries must share);
   if not staticContextShared then FreeAndNil(staticContext)
-  else if staticContext.associatedModules <> nil then staticContext.associatedModules.Remove(fterm);
+  else if staticContext.associatedModules <> nil then staticContext.associatedModules.Remove(self);
   inherited Destroy;
 end;
 

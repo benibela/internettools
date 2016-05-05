@@ -3080,6 +3080,8 @@ begin
     for i := oldFunctionCount to high(staticContext.functions) do
       staticContext.functions[i].free;
     SetLength(staticContext.functions, oldFunctionCount);
+    if staticContext.associatedModules <> nil then
+      staticContext.associatedModules.Remove(thequery);
 
     //free query
     TXQueryBreaker(thequery)._AddRef;
@@ -3120,11 +3122,7 @@ begin
   try
     try
       visitor := TFinalNamespaceResolving.Create();
-      if result is TXQTermModule then begin
-        visitor.mainModule := TXQTermModule(result);
-        if sc.associatedModules = nil then sc.associatedModules := TFPList.Create;
-        sc.associatedModules.Add(result);
-      end;
+      if result is TXQTermModule then visitor.mainModule := TXQTermModule(result);
       visitor.staticContext := sc;
       visitor.simpleTermVisit(@result, nil);
 
@@ -3135,7 +3133,6 @@ begin
       varvisitor.staticContext := visitor.staticContext;
       varvisitor.resolveVariables(@result);
     except
-      if result is TXQTermModule then sc.associatedModules.Remove(result);
       raise;
     end;
   finally
@@ -3180,6 +3177,8 @@ var declarationDuplicateChecker: TStringList;
     if result <> nil then exit;
     requireXQuery();
     result := TXQTermModule.Create;
+    if staticContext.associatedModules = nil then staticContext.associatedModules := TFPList.Create;
+    staticContext.associatedModules.Add(thequery);
   end;
 
   procedure importSchema; //has read import schema
@@ -3678,7 +3677,6 @@ begin
         tobject(staticContext.decimalNumberFormats[oldDecimalFormatCount]).Free;
         staticContext.decimalNumberFormats.Delete(oldDecimalFormatCount);
       end;
-
     declarationDuplicateChecker.Free;
     result.free;
     raise;
