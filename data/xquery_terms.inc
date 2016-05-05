@@ -1711,7 +1711,7 @@ var
       if (clausekind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then begin
         context.temporaryVariables.add(TXQTermFlowerFor(letclause).positionVar, xqvalue(index));
         if needFullTuple then
-          currentTuple.vars[clauseIndex[pos] + 1] := context.temporaryVariables.vars[high(context.temporaryVariables.vars)].value;
+          currentTuple.vars[clauseIndex[pos] + 1] := context.temporaryVariables.varstorage[context.temporaryVariables.count - 1].value;
       end;
       evaluateForLoop(pos+1);
       context.temporaryVariables.popAll();
@@ -1891,10 +1891,10 @@ var
                   context.setContextItem(xqvalue());
                 end;
               end else begin
-                varIndex := hasStaticVariable(log.getName(i), log.vars[i].namespaceURL);
+                varIndex := hasStaticVariable(log.getName(i), log.varstorage[i].namespaceURL);
                 if varIndex > -1 then begin
                   context.temporaryVariables.pushAll;
-                  context.temporaryVariables.add(log.getName(i), log.get(i), log.vars[i].namespaceURL);
+                  context.temporaryVariables.add(log.getName(i), log.get(i), log.varstorage[i].namespaceURL);
                   if needFullTuple then
                     currentTuple.vars[clauseIndex[pos]+varIndex] := log.get(i);
                   evaluateForLoop(pos+1);
@@ -3875,8 +3875,8 @@ end;
 
 procedure TXQTerm_VisitorTrackKnownVariables.undeclare(v: PXQTermVariable);
 begin
-  Assert((overridenVariables.vars[overridenVariables.count-1].name = v^.value) and
-         equalNamespaces(overridenVariables.vars[overridenVariables.count-1].namespaceURL, v^.namespace));
+  Assert((overridenVariables.varstorage[overridenVariables.count-1].name = v^.value) and
+         equalNamespaces(overridenVariables.varstorage[overridenVariables.count-1].namespaceURL, v^.namespace));
   overridenVariables.removeLast;
 end;
 
@@ -3985,7 +3985,7 @@ begin
       for i := 0 to tempVisitor.uncertainVariables.count - 1 do begin
         tempterm.children[i] := TXQTermFlowerLet.Create;
         with TXQTermFlowerLet(tempterm.children[i]) do begin
-          loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.vars[i].name, tempVisitor.uncertainVariables.vars[i].namespaceURL);
+          loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.varstorage[i].name, tempVisitor.uncertainVariables.varstorage[i].namespaceURL);
           expr := TXQTermConstant.Create(context.getVariable(loopvar));
         end;
       end;

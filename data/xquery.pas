@@ -2603,13 +2603,11 @@ type
     function get(const name: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
     function get(const name: string;  const namespaceURL: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
 
-    function count: integer; //**< Returns the number of stored values (>= count of variables)
-
     function get(i: integer): IXQValue; inline; //**< Value of the variable at index @code(i)  @br The returned interface points to the same instance as the interface in the internal variable storage
     function indexOf(const name: string; const namespaceURL: string = ''): integer; //**< Returns the last index of the variable @code(name) in the internal list. (Warning: doesn't support objects, yet??) It is recommended to use hasVariable instead, the index is an implementation detail
 
     function getName(i: integer): string; //**< Name of the variable at index @code(i)
-    function getAll(const name: string; const namespaceURL: string = ''): IXQValue; //**< Returns all values of the variable with name @name(name) as sequence
+    //function getAll(const name: string; const namespaceURL: string = ''): IXQValue; //**< Returns all values of the variable with name @name(name) as sequence
     function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
     function isPropertyChange(i: integer): boolean;
 
@@ -2651,14 +2649,19 @@ type
     //procedure defineVariable(sender: TObject; const variable: string; const value: IXQValue); //**< Sets @code(variable) to the @code(value)@br This is used as callback by the XQuery-Engine
 
     procedure addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; properties: TStringArray);
+
   private
     shared: boolean;
-    vars: array of TXQVariable;
-    history: array of integer;
+    varCount, historyCount: integer;
+    varstorage: array of TXQVariable;
+    histories: array of integer;
     procedure removeLast;
 
     procedure pushOpenArray(const vs: array of IXQValue);
     procedure pushOpenArray(const untypedStrings: array of string);
+    procedure reserve(newcap: integer);
+  public
+    property count: integer read varcount;
   end;
 
 
@@ -5517,11 +5520,14 @@ procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const na
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
 
-  SetLength(vars, length(vars)+1);
-  vars[high(vars)].namespaceURL := namespaceURL;
-  vars[high(vars)].name:=name;
-  vars[high(vars)].value:=value;
-//  vars[high(vars)].propertyChange:=false;
+  reserve(count + 1);
+
+  varstorage[count].namespaceURL := namespaceURL;
+  varstorage[count].name:=name;
+  varstorage[count].value:=value;
+  varstorage[count].propertyChange := false;
+
+  inc(varcount);
 end;
 
 procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; properties: TStringArray);
@@ -5543,12 +5549,14 @@ begin
     newValue := (oldObj as TXQValueJSONArray).setImmutable(properties, value);
   end else newValue := (oldObj as TXQValueObject).setImmutable(properties, value);
 
-  SetLength(vars, length(vars)+1);
-  vars[high(vars)].namespaceURL := namespaceURL;
-  vars[high(vars)].name:=variable;
-  vars[high(vars)].value:=newValue;
+  reserve(count + 1);
 
-  vars[high(vars)].propertyChange:=true;
+  varstorage[count].namespaceURL := namespaceURL;
+  varstorage[count].name:=variable;
+  varstorage[count].value:=newValue;
+  varstorage[count].propertyChange := true;
+
+  inc(varcount);
 end;
 
 procedure TXQVariableChangeLog.add(const name: string; const value: string);
@@ -5608,7 +5616,7 @@ begin
   if i = -1 then
     if parentLog <> nil then exit(parentLog.get(name, namespaceURL))
     else exit(xqvalue());
-  result := vars[i].value;
+  result := varstorage[i].value;
 end;
 
 
@@ -5619,114 +5627,100 @@ end;
 
 function TXQVariableChangeLog.isPropertyChange(i: integer): boolean;
 begin
-  result := vars[i].propertyChange;
+  result := varstorage[i].propertyChange;
 end;
 
 function TXQVariableChangeLog.indexOf(const name: string;  const namespaceURL: string): integer;
 var i:longint;
 begin
-  for i:=high(vars) downto 0 do
-    if (vars[i].name = name) and equalNamespaces(vars[i].namespaceURL, namespaceURL) then exit(i);
+  for i:=varCount - 1 downto 0 do
+    if (varstorage[i].name = name) and equalNamespaces(varstorage[i].namespaceURL, namespaceURL) then exit(i);
   exit(-1);
-end;
-
-{function TXQVariableChangeLog.evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
-var
-  temp: TXQValue;
-begin
-  ignore(sender);
-  temp := nil;
-  if not hasVariable(variable, @temp) then exit(false);
-  if temp <> nil then value := temp;
-  result := true;
-end;}
-
-{procedure TXQVariableChangeLog.defineVariable(sender: TObject; const variable: string; const value: IXQValue);
-begin
-  ignore(sender);
-  add(variable,value);
-end;}
-
-
-function TXQVariableChangeLog.count: integer;
-begin
-  result:=length(vars);
 end;
 
 function TXQVariableChangeLog.getName(i: integer): string;
 begin
   assert(i>=0); assert(i< count);
-  result := vars[i].name;
+  result := varstorage[i].name;
 end;
 
 function TXQVariableChangeLog.get(i: integer): IXQValue; inline;
 begin
-  result := vars[i].value;
+  result := varstorage[i].value;
 end;
 
-function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
+{function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
 var
   i: Integer;
   list: TXQVList;
 begin
   result := xqvalue();
   list := TXQVList.create();
-  for i:=0 to high(vars) do
+  for i:=0 to count - 1 do
     if (vars[i].name = name) and (equalNamespaces(vars[i].namespaceURL, namespaceURL)) then
       list.add(vars[i].value);
   result := xqvalueSeqSqueezed(list);
-end;
+end;            }
 
 procedure TXQVariableChangeLog.clear;
 begin
-  if shared then exit;
-  SetLength(history,1);
-  history[0] := 0;
-  popAll;
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
+  varCount := 0;
+  historyCount := 0;
+  if varCount > 16 then setlength(varstorage, 0);
+  if historyCount > 16 then setlength(histories, 0);
 end;
 
 function TXQVariableChangeLog.pushAll: integer;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
-  result := length(history);
-  arrayAdd(history, length(vars));
+  if historyCount = length(histories) then
+    if length(histories) < 2 then SetLength(histories, 2)
+    else SetLength(histories, length(histories) * 2);
+  histories[historyCount] := varCount;
+  result := historyCount;
+  inc(historyCount);
 end;
 
 procedure TXQVariableChangeLog.popAll(level: integer = -1);
-var s: integer;
- l: Integer;
+var targetCount, targetHistoryCount: Integer;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
-  if level > 0 then begin
-    level := level - length(history);
-    if level >= 0 then exit;
-  end;
-  for l := level + 1 to 0 do begin
-    s := arrayDelete(history, high(history));
-    setlength(vars,s);
-  end;
+  if level < 0 then targetHistoryCount := historyCount + level
+  else targetHistoryCount := level;
+
+  if targetHistoryCount >= historyCount then exit;
+  if targetHistoryCount < 0 then
+      raise EXQEvaluationException.Create('pxp:INTERNAL', 'Nothing to pop');
+
+  targetCount := histories[targetHistoryCount];
+  historyCount := targetHistoryCount;
+  if targetCount < varCount then
+    varCount := targetCount;
+  if varCount < length(varstorage) shr 2 then SetLength(varstorage, varCount); //shrink
 end;
 
 procedure TXQVariableChangeLog.stringifyNodes;
 var
   i: Integer;
   j: Integer;
+  seq: TXQValueSequence;
 begin
   for i:=0 to count-1 do
-    case vars[i].value.kind of
-      pvkNode: vars[i].value := xqvalue(vars[i].value.toString);
+    case varstorage[i].value.kind of
+      pvkNode: varstorage[i].value := xqvalue(varstorage[i].value.toString);
       pvkSequence: begin
-        for j := 0 to vars[i].value.getSequenceCount - 1 do
-          if (vars[i].value as TXQValueSequence).seq[j].kind = pvkNode then
-            (vars[i].value as TXQValueSequence).seq[j] := xqvalue((vars[i].value as TXQValueSequence).seq[j].toString);
+        seq := varstorage[i].value as TXQValueSequence;
+        for j := 0 to seq.getSequenceCount - 1 do
+          if seq.seq[j].kind = pvkNode then
+            seq.seq[j] := xqvalue(seq.seq[j].toString);
       end;
     end
 end;
 
 procedure TXQVariableChangeLog.removeLast;
 begin
-  SetLength(vars, high(vars));
-
+  dec(varCount);
 end;
 
 procedure TXQVariableChangeLog.pushOpenArray(const vs: array of IXQValue);
@@ -5747,27 +5741,19 @@ begin
     defaultQueryEngine.VariableChangelog.add('_'+IntToStr(i+1), TXQValueString.create(baseSchema.untypedAtomic, untypedStrings[i]));
 end;
 
-{class function TXQVariableChangeLog.splitName(const variable: string; out base, varname: string): boolean;
-var
-  i: SizeInt;
+procedure TXQVariableChangeLog.reserve(newcap: integer);
 begin
-  i := pos('.', variable);
-  result := i > 0;
-  if result then begin
-    base := copy(variable,1,i-1);
-    varname := strCopyFrom(variable,i+1);
-  end;
-end;}
+  if newcap <= length(varstorage) then exit;
+  if newcap > 2 * length(varstorage) then SetLength(varstorage, newcap)
+  else SetLength(varstorage, 2* length(varstorage));
+end;
 
 constructor TXQVariableChangeLog.create();
 begin
-  pushAll;
 end;
 
 destructor TXQVariableChangeLog.destroy();
 begin
-  readonly:=false;
-  clear;
   inherited destroy();
 end;
 
@@ -5776,21 +5762,24 @@ var i:longint;
 begin
   if count = 0 then exit('');
   result:=getName(0)+'='+get(0).debugAsStringWithTypeAnnotation();
-  for i:=1 to high(vars) do
+  for i:=1 to count - 1 do
     result+=LineEnding+getName(i)+'='+get(i).debugAsStringWithTypeAnnotation();
 end;
 
 function TXQVariableChangeLog.clone: TXQVariableChangeLog;
 begin
   result := TXQVariableChangeLog.create();
-  result.vars := vars;
-  setlength(result.vars, length(result.vars)); //detach
+  result.assign(self);
 end;
 
 procedure TXQVariableChangeLog.assign(from: TXQVariableChangeLog);
 begin
-  vars := from.vars;
-  setlength(vars, length(vars)); //detach
+  varstorage := from.varstorage;
+  setlength(varstorage, length(varstorage)); //detach
+  histories := from.histories;
+  setlength(histories, length(histories)); //detach
+  varCount := from.varCount;
+  historyCount := from.historyCount;
 end;
 
 function TXQVariableChangeLog.finalValues: TXQVariableChangeLog;
@@ -5815,15 +5804,15 @@ var i: integer;
   oldid: Integer;
 begin
   result := TXQVariableChangeLog.create();
-  for i := 0 to high(vars) do begin
-    oldid := result.indexOf(vars[i].name, vars[i].namespaceURL);
+  for i := 0 to count - 1 do begin
+    oldid := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
     if oldid < 0 then begin
-      setlength(result.Vars, length(result.vars) + 1);
-      result.vars[high(result.vars)] := vars[i];
-      if vars[i].value.kind = pvkSequence then
-        result.vars[high(result.vars)].value := TXQValueSequence.create(vars[i].value); //must not change vars[i].value later
+      if varstorage[i].value.kind <> pvkSequence then
+        result.add(varstorage[i].name, varstorage[i].value, varstorage[i].namespaceURL)
+       else
+        result.add(varstorage[i].name, TXQValueSequence.create(varstorage[i].value), varstorage[i].namespaceURL) //must not change vars[i].value later
     end else begin
-      xqvalueSeqAddMove(result.vars[oldid].value, vars[i].value);
+      xqvalueSeqAddMove(result.varstorage[oldid].value, varstorage[i].value);
     end;
   end;
 end;
@@ -5838,56 +5827,58 @@ begin
 end;
 
 procedure TXQVariableChangeLog.takeFrom(other: TXQVariableChangeLog);
-var l,i:Integer;
+var
+  i: Integer;
 begin
-  l := length(vars);
-  setlength(vars, l + length(other.vars));
+  reserve(varCount + other.count);
   for i:=0 to other.count-1 do
-    vars[l+i] := other.vars[i];
-  setlength(other.vars,0);
-  setlength(other.history,0);
-  other.pushAll;
+    varstorage[varCount+i] := other.varstorage[i];
+  inc(varCount, other.count);
+  other.clear;
+end;
+
+procedure deleteVar(self: TXQVariableChangeLog; i: integer);
+begin
+  with self do begin
+    varstorage[i].namespaceURL := ''; //free mem
+    varstorage[i].name := '';
+    varstorage[i].value := nil;
+    move(varstorage[i+1],varstorage[i], (varCount - 1 - i) * sizeof(varstorage[i]) );
+    FillChar(varstorage[varCount - 1], sizeof(varstorage[i]), 0);
+    dec(varCount);
+  end;
 end;
 
 function TXQVariableChangeLog.condensed: TXQVariableChangeLog;
+
 var
-  p: Integer;
-  found: Boolean;
-  i,j: Integer;
-  k: Integer;
   temp: IXQValue;
+  i, last: Integer;
 begin
   result := TXQVariableChangeLog.create();
   result.shared:=true;
-  p := 0;
-  SetLength(result.vars, length(vars));
-  for i:=0 to high(vars) do begin
-    if vars[i].propertyChange then begin
-      found := false;
-      for j:=p - 1 downto 0 do
-        if result.vars[j].name = vars[i].name then begin
-          found:=true;
-          //result.vars[j].value := vars[i].value;
-          {result.vars[j].value := nil;
-          move(result.vars[j + 1], result.vars[j], sizeof(result.vars[j]) * (p-j));
-          FillChar(result.vars[p-1], sizeof(result.vars[p-1]), 0);
-          result.vars[p-1] := vars[i];                            }
-          for k := j + 1 to p - 1 do result.vars[k-1] := result.vars[k];
-          result.vars[p-1] := vars[i];
-          result.vars[p-1].name := vars[i].name;
-          result.vars[p-1].propertyChange:=false;
-          break;
-        end;
-      if found then continue;
-      if not parentLog.hasVariable(vars[i].name, temp, vars[i].namespaceURL) then
-        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+vars[i].name+', but no variable of that name exists');
+  SetLength(result.varstorage, varCount);
+  for i:=0 to varCount - 1 do begin
+    if varstorage[i].propertyChange then begin
+      last := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
+      if last >= 0 then begin
+        deleteVar(result, last);
+
+        result.varstorage[result.varCount] := varstorage[i];
+        //result.varstorage[result.varCount].name := varstorage[i].name; ???
+        result.varstorage[result.varCount].propertyChange:=false;
+        result.varCount += 1;
+        continue;
+      end;
+
+      if not parentLog.hasVariable(varstorage[i].name, temp, varstorage[i].namespaceURL) then
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but no variable of that name exists');
       if temp.kind <> pvkObject then
-        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+vars[i].name+', but '+vars[i].name+'='+temp.debugAsStringWithTypeAnnotation()+' is not an object ');
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but '+varstorage[i].name+'='+temp.debugAsStringWithTypeAnnotation()+' is not an object ');
     end;
-    result.vars[p] := vars[i];
-    p+=1;
+    result.varstorage[result.varCount] := varstorage[i];
+    result.varCount += 1;
   end;
-  setlength(result.vars,p);
 end;
 
 function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable): boolean;
@@ -5910,7 +5901,7 @@ begin
   if i = -1 then
     if parentLog <> nil then exit(parentLog.hasVariable(variable, value, namespaceURL))
     else exit(false);
-  value := vars[i].value;
+  value := varstorage[i].value;
   result := true;
 end;
 
