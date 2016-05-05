@@ -3019,6 +3019,11 @@ end;
 
 procedure TXQParsingContext.parseQuery(aquery: TXQuery);
   procedure collectVariables(m: TXQTermModule);
+    function isTrueDefineVariable(v: TXQTerm): boolean;
+    begin
+      result := (v.ClassType = TXQTermDefineVariable) and (TXQTermDefineVariable(v).getVariable.value <> '$');
+    end;
+
   var
     l, r, truehigh, varcount, i, j, p: Integer;
     temp: TXQTerm;
@@ -3028,17 +3033,17 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery);
     truehigh := high(m.children) - 1;
     r := truehigh;
     while l < r do begin
-      while (l < high(m.children)) and (m.children[l] is TXQTermDefineVariable) do inc(l);
-      while (r >= 0) and not (m.children[r] is TXQTermDefineVariable) do dec(r);
+      while (l < high(m.children)) and isTrueDefineVariable(m.children[l]) do inc(l);
+      while (r >= 0) and not isTrueDefineVariable(m.children[r]) do dec(r);
       if l >= r then break;
       temp := m.children[l];
       m.children[l] := m.children[r];
       m.children[r] := temp;
     end;
-    while (l <= truehigh) and (m.children[l] is TXQTermDefineVariable) do inc(l);
+    while (l <= truehigh) and isTrueDefineVariable(m.children[l]) do inc(l);
 
-    assert( (l = 0) or (m.children[l - 1] is TXQTermDefineVariable) );
-    assert( (l = truehigh) or not (m.children[l] is TXQTermDefineVariable) );
+    assert( (l = 0) or isTrueDefineVariable(m.children[l - 1]) );
+    assert( (l = truehigh) or not isTrueDefineVariable(m.children[l]) );
 
     varcount := l;
     if staticContext.importedModules <> nil then

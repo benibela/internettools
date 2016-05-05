@@ -4385,7 +4385,7 @@ begin
       if assigned(staticContext.sender.OnDeclareExternalVariable) then
         staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', context.SeqValue);
       if context.SeqValue = nil then
-         raise EXQEvaluationException.create('XPTY0004', 'context item missing');
+         raise EXQEvaluationException.create('XPDY0002', 'context item missing');
        context.SeqLength := 1;
        context.SeqIndex := 1;
     end;
