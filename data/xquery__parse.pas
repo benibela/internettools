@@ -175,8 +175,10 @@ type
 
  TFinalVariableResolving = class(TXQTerm_VisitorTrackKnownVariables)
    staticContext: TXQStaticContext;
+   currentVariable: TXQTermVariable;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
+   procedure resolveVariables(t: PXQTerm);
  end;
 
  TVariableCycleDetectorXQ1 = class(TXQTerm_VisitorTrackKnownVariables)
@@ -232,6 +234,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     v := TXQTermVariable(pt^);
     if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) and (TXQTermDefineVariable(parent).getVariable = v) then exit;
     if overridenVariables.hasVariable(v) then exit;
+    if (currentVariable <> nil) and (currentVariable.equalsVariable(v)) then raise EXQParsingException.create('XPST0008', 'Self-Dependancy: '+v.ToString);
 
     q := staticContext.findModule(v.namespace);
     if q <> nil then begin
@@ -287,6 +290,29 @@ end;
 function TFinalVariableResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
 begin
   Result:=inherited leave(t);
+end;
+
+procedure TFinalVariableResolving.resolveVariables(t: PXQTerm);
+var
+  m: TXQTermModule;
+  i: Integer;
+begin
+  try
+    currentVariable := nil;
+    overridenVariables.pushAll();
+    if t^ is TXQTermModule then begin
+      m := TXQTermModule(t^);
+      for i := 0 to high(m.children) - 1 do begin
+        if m.children[i] is TXQTermDefineVariable then currentVariable := TXQTermDefineVariable(m.children[i]).getVariable
+        else currentVariable := nil;
+        simpleTermVisit(@m.children[i], t^);
+      end;
+      currentVariable := nil;
+      simpleTermVisit(@m.children[high(m.children)], t^);
+    end else simpleTermVisit(t, nil);
+  finally
+    overridenVariables.popAll();
+  end;
 end;
 
 const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
@@ -3106,13 +3132,8 @@ begin
       if TXQueryEngineBreaker(sc.sender).FParserVariableVisitor = nil then
         TXQueryEngineBreaker(sc.sender).FParserVariableVisitor := TFinalVariableResolving.create;
       varvisitor := TXQueryEngineBreaker(sc.sender).FParserVariableVisitor as TFinalVariableResolving;
-      try
-        varvisitor.overridenVariables.pushAll();
-        varvisitor.staticContext := visitor.staticContext;
-        varvisitor.simpleTermVisit(@result, nil);
-      finally
-        varvisitor.overridenVariables.popAll();
-      end;
+      varvisitor.staticContext := visitor.staticContext;
+      varvisitor.resolveVariables(@result);
     except
       if result is TXQTermModule then sc.associatedModules.Remove(result);
       raise;
