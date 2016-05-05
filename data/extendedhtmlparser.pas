@@ -2146,6 +2146,7 @@ begin
       temp.QueryEngine.StaticContext.Free;
       temp.QueryEngine.StaticContext := context.staticContext.clone();
       temp.QueryEngine.staticContext.sender := temp.QueryEngine;
+      temp.FQueryContext.staticContext := temp.QueryEngine.StaticContext;
       temp.KeepPreviousVariables:=kpvForget;
       temp.OutputEncoding:=context.staticContext.stringEncoding;
       for template in args[0] do begin
