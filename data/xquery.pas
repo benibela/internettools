@@ -5736,7 +5736,7 @@ var
 begin
   pushAll;
   for i := 0 to high(vs) do
-    defaultQueryEngine.VariableChangelog.add('_'+IntToStr(i+1), vs[i]);
+    add('_'+IntToStr(i+1), vs[i]);
 end;
 
 procedure TXQVariableChangeLog.pushOpenArray(const untypedStrings: array of string);
@@ -5745,7 +5745,7 @@ var
 begin
   pushAll;
   for i := 0 to high(untypedStrings) do
-    defaultQueryEngine.VariableChangelog.add('_'+IntToStr(i+1), TXQValueString.create(baseSchema.untypedAtomic, untypedStrings[i]));
+    add('_'+IntToStr(i+1), TXQValueString.create(baseSchema.untypedAtomic, untypedStrings[i]));
 end;
 
 procedure TXQVariableChangeLog.reserve(newcap: integer);
