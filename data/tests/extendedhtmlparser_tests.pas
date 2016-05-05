@@ -1222,6 +1222,8 @@ begin
 
   extParser.free;
   sl.Free;
+
+  writeln('pattern matcher tested');
 end;
 
 

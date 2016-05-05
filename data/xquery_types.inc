@@ -224,6 +224,7 @@ end;
 function TXQValue.getInternalDateTimeData: PXQValueDateTimeData;
 begin
   raiseXPTY0004TypeError(self, 'internal datetime');
+  result := nil;
 end;
 
 function TXQValue.GetEnumerator: TXQValueEnumerator;
@@ -2050,7 +2051,7 @@ end;
 
 destructor TXQValueFunction.Destroy;
 var
-  i, j: Integer;
+  i: Integer;
 begin
   if ownsTerms then begin
     body.free;

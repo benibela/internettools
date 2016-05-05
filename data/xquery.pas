@@ -3026,12 +3026,15 @@ end;
 
 function TXQTermEQNameToken.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
+  ignore(context);
   raiseEvaluationError('pxp:internal','Internal error 160117');
+  result := nil;
 end;
 
 function TXQTermEQNameToken.getContextDependencies: TXQContextDependencies;
 begin
   raiseEvaluationError('pxp:internal','Internal error 160117');
+  result := [];
 end;
 
 function TXQTermEQNameToken.debugTermToString: string;
@@ -3679,11 +3682,14 @@ function xqvalueOrPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQVa
 begin
   ignore(cxt); ignore(a); ignore(b);
   raise EXQEvaluationException.create('PXP:ORPL','Placeholder called');
+  result := nil;
 end;
 
 function xqvalueAndPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
+  ignore(cxt); ignore(a); ignore(b);
   raise EXQEvaluationException.create('PXP:ANDPL', 'Placeholder called');
+  result := nil;
 end;
 
 
@@ -6343,9 +6349,6 @@ end;
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
 var cxt: TXQParsingContext;
   staticContextShared: Boolean;
-  oldPendingCount: Integer;
-  oldFunctionCount: Integer;
-  i: Integer;
 begin
   if str = '' then raise EXQParsingException.create('XPST0003', 'No input');
   staticContextShared := context <> nil;
@@ -6722,7 +6725,6 @@ var pos: pchar;
   function simple_selector_sequence: TXQTerm;
   var axis: string;
       adjacent: boolean;
-      filters: array of TXQTerm;
       newMatch: TXQTerm;
       filter: TXQTerm;
       elementName: String;
@@ -6747,8 +6749,6 @@ var pos: pchar;
 
       if Result = nil then result := newMatch
       else result := newBinOp(result, '/', newMatch);
-
-      SetLength(filters, 0);
 
       while pos^ in HACPN do begin
         case pos^ of

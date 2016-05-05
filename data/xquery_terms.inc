@@ -1135,7 +1135,7 @@ end;
 
 procedure TXQTermFlowerSubClause.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
 begin
-
+  ignore(visitor);
 end;
 
 
@@ -1494,6 +1494,7 @@ end;
 function TXQTermFlowerCount.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   visitor.declare(@countvar, self);
+  result := xqtvaContinue;
 end;
 
 procedure TXQTermFlowerCount.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
@@ -2282,8 +2283,6 @@ end;
 function TXQTermFlower.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   i: Integer;
-  clause: TXQTermFlowerSubClause;
-  patternclause: TXQTermFlowerLetPattern;
 begin
   for i := 0 to high(children) - 1 do
     visitor.simpleTermVisit(@children[i], self);
@@ -3155,7 +3154,6 @@ end;
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   j: Integer;
-  seq: TXQTermSequence;
 begin
   if pattern = nil then begin
     if variable <> nil then visitor.declare(@variable, self);
@@ -3186,12 +3184,15 @@ end;
 
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.getContextDependencies: TXQContextDependencies;
 begin
-
+  if expr <> nil then result := expr.getContextDependencies
+  else result := []
 end;
 
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
+  ignore(context);
   raiseInternalError(1604301730);
+  result := nil;
 end;
 
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.clone: TXQTerm;
@@ -3409,7 +3410,6 @@ var
     n: TTreeNode;
     attrib: TTreeAttribute;
     i: Integer;
-    temps: TTreeAttribute;
     namespaceIndex: Integer;
   begin
     kid.parent := tree;
@@ -3608,7 +3608,6 @@ var
     procedure setTreeNodeNameFromValue(v: IXQValue; defkind: TXQDefaultNamespaceKind);
     var
       vname: TXQValueQName;
-      prefix: String;
     begin
       if (v is TXQValueSequence) and (v.getSequenceCount = 1) then v := v.get(1);
       if (v.instanceOf(baseSchema.QName))  then begin
