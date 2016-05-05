@@ -3926,11 +3926,13 @@ var
   i: Integer;
 begin
   parameterCount := arity;
+  SetLength(children, arity + 1);
+  SetLength(fun.children, arity);
   for i := 1 to arity do begin
-    push(TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew));
-    fun.push(TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew));
+    children[i-1] := TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew);
+    fun.children[i-1] := TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew);
   end;
-  push(fun);
+  children[high(children)] := fun;
   kind := xqtdfNamedReference;
 end;                                                                               {
 

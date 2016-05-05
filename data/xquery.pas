@@ -5663,12 +5663,16 @@ begin
 end;            }
 
 procedure TXQVariableChangeLog.clear;
+var
+  i: Integer;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
+  if varCount > 256 then setlength(varstorage, 0)
+  else for i := 0 to varCount - 1 do
+    varstorage[i].value := nil; //free value to reduce memory usage
+  if historyCount > 256 then setlength(histories, 0);
   varCount := 0;
   historyCount := 0;
-  if varCount > 16 then setlength(varstorage, 0);
-  if historyCount > 16 then setlength(histories, 0);
 end;
 
 function TXQVariableChangeLog.pushAll: integer;
@@ -5683,7 +5687,7 @@ begin
 end;
 
 procedure TXQVariableChangeLog.popAll(level: integer = -1);
-var targetCount, targetHistoryCount: Integer;
+var targetCount, targetHistoryCount, i: Integer;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
   if level < 0 then targetHistoryCount := historyCount + level
@@ -5695,8 +5699,10 @@ begin
 
   targetCount := histories[targetHistoryCount];
   historyCount := targetHistoryCount;
-  if targetCount < varCount then
+  if targetCount < varCount then begin
+    for i := targetCount to varCount - 1 do varstorage[i].value := nil;
     varCount := targetCount;
+  end;
   if varCount < length(varstorage) shr 2 then SetLength(varstorage, varCount); //shrink
 end;
 
@@ -5721,6 +5727,7 @@ end;
 procedure TXQVariableChangeLog.removeLast;
 begin
   dec(varCount);
+  varstorage[varCount].value := nil;
 end;
 
 procedure TXQVariableChangeLog.pushOpenArray(const vs: array of IXQValue);
