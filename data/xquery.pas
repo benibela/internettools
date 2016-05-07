@@ -2607,7 +2607,7 @@ type
     function indexOf(const name: string; const namespaceURL: string = ''): integer; //**< Returns the last index of the variable @code(name) in the internal list. (Warning: doesn't support objects, yet??) It is recommended to use hasVariable instead, the index is an implementation detail
 
     function getName(i: integer): string; //**< Name of the variable at index @code(i)
-    //function getAll(const name: string; const namespaceURL: string = ''): IXQValue; //**< Returns all values of the variable with name @name(name) as sequence
+    function getAll(const name: string; const namespaceURL: string = ''): IXQValue; //**< Returns all values of the variable with name @name(name) as sequence
     function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
     function isPropertyChange(i: integer): boolean;
 
@@ -5649,7 +5649,7 @@ begin
   result := varstorage[i].value;
 end;
 
-{function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
+function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
 var
   i: Integer;
   list: TXQVList;
@@ -5657,10 +5657,10 @@ begin
   result := xqvalue();
   list := TXQVList.create();
   for i:=0 to count - 1 do
-    if (vars[i].name = name) and (equalNamespaces(vars[i].namespaceURL, namespaceURL)) then
-      list.add(vars[i].value);
+    if (varstorage[i].name = name) and (equalNamespaces(varstorage[i].namespaceURL, namespaceURL)) then
+      list.add(varstorage[i].value);
   result := xqvalueSeqSqueezed(list);
-end;            }
+end;
 
 procedure TXQVariableChangeLog.clear;
 var

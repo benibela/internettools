@@ -889,7 +889,7 @@ var
   page: String;
   tempname: String;
   j: Integer;
-  tempvalue: TXQValue;
+  tempvalue: IXQValue;
   curmethod: String;
   tempvi: IXQValue;
   oldHeaders: String;
@@ -909,7 +909,7 @@ begin
   if cururl <> '' then begin
     if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
     else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
-      reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), @tempvalue) then begin
+      reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), tempvalue) then begin
       tempvi := reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1);
       if tempvi.kind = pvkObject then TXQValueObject.prepareInternetRequest(tempvi, curmethod, cururl, post, reader.internet)
       else cururl := tempvi.toString;
