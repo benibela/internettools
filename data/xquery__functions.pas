@@ -4709,12 +4709,16 @@ begin
               tempstrmin := tempstrmax;
               tempstrmax := '*'
             end else tempstrmin := strSplitGet('-', tempstrmax );
-            pictured[picturedlength].minwidth := parseWidth(tempstrmin,0);
-            pictured[picturedlength].maxwidth := parseWidth(tempstrmax,pictured[picturedlength].minwidth + 99);
+            with pictured[picturedlength] do begin
+              minwidth := parseWidth(tempstrmin,0);
+              maxwidth := parseWidth(tempstrmax, minwidth + 99);
+              if minwidth > maxwidth then
+                raiseInvalidPictureFOFD1340('min > max');
+            end;
           end else if pictured[picturedlength].format <> '' then begin
             with pictured[picturedlength] do begin
               minwidth := countDigits(format);
-              if minwidth > 0 then maxwidth:=minwidth;
+              if minwidth > 0 then maxwidth:=minwidth + strCount(format, '#');
             end;
           end;
           if length(pictured[picturedlength].format) > 1 then begin
@@ -4755,7 +4759,7 @@ begin
         end;
         'Y': begin
           number := dateTime^.year;
-          if pictured[i].maxwidth = 2 then number := number mod 100;
+          if (pictured[i].maxwidth > 1) and (pictured[i].maxwidth <= high(powersOf10)) then number := number mod powersOf10[pictured[i].maxwidth];
           if number < 0 then for j := 0 to picturedlength - 1 do
             if pictured[j].component = 'E' then number := abs(number);
         end;
