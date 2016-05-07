@@ -412,6 +412,7 @@ function namespaceGetURL(const n: INamespace): string; inline;
 type TInternetToolsFormat = (itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<- not used, might be used in future});
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
 
+function strEncodingFromContentType(const contenttype: string): TEncoding;
 
 implementation
 uses xquery;
@@ -2393,22 +2394,7 @@ begin
 end;
 
 function TTreeParser.parseTree(html: string; uri: string; contentType: string): TTreeDocument;
-  function encodingFromContentType(encoding: string): TEncoding;
-  begin
-    encoding := lowercase(encoding);
-    if pos('charset=utf-8', encoding) > 0 then exit(eUTF8);
-    if (pos('charset=windows-1252',encoding) > 0) or
-       (pos('charset=latin1',encoding) > 0) or
-       (pos('charset=iso-8859-1',encoding) > 0) then //also -15
-        exit(eWindows1252);
-    if (pos('charset=utf-16le',encoding) > 0) then exit(eUTF16LE);
-    if (pos('charset=utf-16be',encoding) > 0) then exit(eUTF16BE);
-    if (pos('charset=utf-16',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
-    if (pos('charset=utf-32le',encoding) > 0) then exit(eUTF32LE);
-    if (pos('charset=utf-32be',encoding) > 0) then exit(eUTF32BE);
-    if (pos('charset=utf-32',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF});
-    exit(eUnknown);
-  end;
+
 
 var
   el: TTreeNode;
@@ -2452,7 +2438,7 @@ begin
 
   encBOM := strEncodingFromBOMRemove(FCurrentFile);
   if encBOM = eUnknown then
-    encBOM := encodingFromContentType(contentType);
+    encBOM := strEncodingFromContentType(contentType);
   if not (encBOM in [eUTF8, eWindows1252, eUnknown]) then begin
     FCurrentFile := strConvertToUtf8(FCurrentFile, encBOM);
     encBOM := eUTF8;
@@ -2471,7 +2457,7 @@ begin
   if FAutoDetectHTMLEncoding  then begin
     FCurrentTree.FEncoding:=eUnknown;
     if (encBOM = eUnknown) and (parsingModel = pmHTML) then
-      encMeta := encodingFromContentType(TXQueryEngine.evaluateStaticXPath2('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree).toString)
+      encMeta := strEncodingFromContentType(TXQueryEngine.evaluateStaticXPath2('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree).toString)
      else
       encMeta := encBOM;
 
@@ -2702,6 +2688,26 @@ begin
     else
       result := itfXML;
 end;
+
+function strEncodingFromContentType(const contenttype: string): TEncoding;
+var
+  encoding: String;
+begin
+  encoding := lowercase(contenttype);
+  if pos('charset=utf-8', encoding) > 0 then exit(eUTF8);
+  if (pos('charset=windows-1252',encoding) > 0) or
+     (pos('charset=latin1',encoding) > 0) or
+     (pos('charset=iso-8859-1',encoding) > 0) then //also -15
+      exit(eWindows1252);
+  if (pos('charset=utf-16le',encoding) > 0) then exit(eUTF16LE);
+  if (pos('charset=utf-16be',encoding) > 0) then exit(eUTF16BE);
+  if (pos('charset=utf-16',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+  if (pos('charset=utf-32le',encoding) > 0) then exit(eUTF32LE);
+  if (pos('charset=utf-32be',encoding) > 0) then exit(eUTF32BE);
+  if (pos('charset=utf-32',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF});
+  exit(eUnknown);
+end;
+
 
 initialization
   XMLNamespace_XML := TNamespace.Create(XMLNamespaceUrl_XML, 'xml');

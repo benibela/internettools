@@ -1641,6 +1641,15 @@ begin
   end;
 end;
 
+function isValidXMLCharacter(const codepoint: integer): boolean; inline;
+begin
+  case codepoint of
+    $20..$D7FF, $E000..$FFFD, $10000..$10FFFF: result := true;
+    $1..$19: result := (codepoint in [$9,$A,$D]) or (baseSchema.version = xsd11);
+    else result := false;
+  end;
+end;
+
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
 var temp: string;
  v: IXQValue;
@@ -1651,12 +1660,7 @@ begin
   temp := '';
   for v in args[0] do begin
     ok := tryValueToInteger(v, codepoint);
-    if ok then
-      case codepoint of
-        $20..$D7FF, $E000..$FFFD, $10000..$10FFFF: ok := true;
-        $1..$19: ok := (codepoint in [$9,$A,$D]) or (baseSchema.version = xsd11);
-        else ok := false;
-      end;
+    if ok then ok := isValidXMLCharacter(codepoint);
     if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v.debugAsStringWithTypeAnnotation());
     temp += strGetUnicodeCharacter(v.toInt64);
   end;
@@ -3895,6 +3899,7 @@ var
   encoding: String;
   contenttype: string;
   enc: TEncoding;
+  pos: integer;
 begin
   requiredArgCount(args, 1, 2);
 
@@ -3904,14 +3909,29 @@ begin
   if strContains(url, '#') then raise EXQEvaluationException.create('FOUT1170', 'Fragment identifiers are not allowed');
 
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FOUT1170');
-  //todo: guess encoding
-  encoding := 'utf-8';
-  if length(args) = 2 then encoding := args[1].toString;
 
-  enc := strEncodingFromName(encoding);
-  if enc = eUnknown then raise EXQEvaluationException.create(IfThen(length(args) = 2,  'FOUT1190', 'FOUT1200'), 'Unknown encoding: '+encoding);
+  enc := strEncodingFromBOMRemove(data);
+  if enc = eUnknown then
+    enc := strEncodingFromContentType(contenttype);
+  if enc = eUnknown then begin
+    if length(args) = 2 then begin
+      encoding := args[1].toString;
+      enc := strEncodingFromName(encoding);
+      if enc = eUnknown then raise EXQEvaluationException.create('FOUT1190', 'Unknown encoding: '+encoding);
+    end else enc := eUTF8;
+  end else if length(args) = 2 then begin
+    encoding := args[1].toString;
+    enc := strEncodingFromName(encoding);
+    if enc = eUnknown then raise EXQEvaluationException.create('FOUT1190', 'Unknown encoding: '+encoding);
+  end;
 
   data := strConvertToUtf8(data, enc);
+  if data <> '' then begin
+    pos := 1;
+    while pos <= length(data) do
+      if not isValidXMLCharacter(strDecodeUTF8Character(data, pos)) then
+        raise EXQEvaluationException.create('FOUT1190', 'Invalid character around ' + copy(data, pos - 5, 10));
+  end;
 
   result := xqvalue(data);
 end;
