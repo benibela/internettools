@@ -4622,8 +4622,9 @@ var
   j: Integer;
   zerocp: Integer;
   allDigits: Boolean;
-  tz: Integer;
+  tz, tempcount: Integer;
   fallbackOccured: String;
+  tempcountopt: LongInt;
 
 
 begin
@@ -4714,6 +4715,15 @@ begin
               maxwidth := parseWidth(tempstrmax, minwidth + 99);
               if minwidth > maxwidth then
                 raiseInvalidPictureFOFD1340('min > max');
+
+              if minwidth > 1 then begin
+                tempcount := countDigits(format, @zerocp);
+                tempcountopt := strCount(format, '#');
+                if (tempcount + tempcountopt > 0) and (tempcount +tempcountopt < minwidth) then begin //actually presentation format
+                  format := StringReplace(format, '#', strGetUnicodeCharacter(zerocp), [rfReplaceAll]);
+                  format := strDup(strGetUnicodeCharacter(zerocp), minwidth - tempcount - tempcountopt) + format
+                end;
+              end;
             end;
           end else if pictured[picturedlength].format <> '' then begin
             with pictured[picturedlength] do begin
