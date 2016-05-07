@@ -1173,12 +1173,12 @@ end;
 
 function TXQTermFlowerLet.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
+  result := visitor.simpleTermVisit(@expr, self);
+  case result of xqtvaAbort: exit; end;
   if sequenceTyp <> nil then begin
     result := visitor.simpleTermVisit(@sequenceTyp, self);
     case result of xqtvaAbort: exit; end;
   end;
-  result := visitor.simpleTermVisit(@expr, self);
-  case result of xqtvaAbort: exit; end;
   //todo: visit loopvar, too?
   visitor.declare(@loopvar);
 end;
@@ -1294,6 +1294,10 @@ function TXQTermFlowerWindow.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Vi
 begin
   result := visitor.simpleTermVisit(@expr, self);
   case result of xqtvaAbort: exit; end;
+  if sequenceTyp <> nil then begin
+    result := visitor.simpleTermVisit(@sequenceTyp, self);
+    case result of xqtvaAbort: exit; end;
+  end;
 
   startCondition.visitchildren(visitor, self);
   endCondition.visitchildren(visitor, self);
