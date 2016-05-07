@@ -4784,11 +4784,18 @@ begin
           if format = '' then format := '01';
         end;
         'f': begin
-          if pictured[i].maxwidth < 6 then
-             number := (dateTime^.microsecs + powersOf10[6 - pictured[i].maxwidth] div 2) div powersOf10[6 - pictured[i].maxwidth]
-           else number := dateTime^.microsecs ;
-          if pictured[i].minwidth < 7 then
-            while ((number mod 10) = 0 ) and (number > powersOf10[pictured[i].minwidth]) do number := number div 10;
+          //canonical microseconds e.g. 123456 , 050000 , 000001
+          number := dateTime^.microsecs;
+          //round to max width
+          if pictured[i].maxwidth > 6 then pictured[i].maxwidth := 6
+          else if pictured[i].maxwidth < 6 then
+             number := (number + powersOf10[6 - pictured[i].maxwidth] div 2) div powersOf10[6 - pictured[i].maxwidth];
+          //cut off trailing zeros
+          while (pictured[i].minwidth < pictured[i].maxwidth) and (number mod 10 = 0) do begin
+            number := number div 10;
+            pictured[i].maxwidth -= 1;
+          end;
+          pictured[i].minwidth := pictured[i].maxwidth;
          end;
         'Z', 'z': begin
           if format = 'N' then format := '01:01';
@@ -4892,7 +4899,7 @@ begin
       if missingCharacterCount > 0 then begin
         j := 1;
         zerocp := charUnicodeZero(strDecodeUTF8Character(component, j));
-        if (zerocp > 0) and (pictured[i].component <> 'f') then
+        if (zerocp > 0) then
           component := strDup(strGetUnicodeCharacter(zerocp), missingCharacterCount) + component
         else begin
           if zerocp <= 0 then zerocp := ord(' ');
