@@ -3543,7 +3543,7 @@ begin
         end;
         'base-uri': begin
           checkForDuplicate('base-uri', 'XQST0032');
-          staticContext.baseUri := parseString;
+          staticContext.baseUri := strResolveURI(parseString, staticContext.baseURI);
         end;
         'construction': begin
           checkForDuplicate('construction', 'XQST0067');
