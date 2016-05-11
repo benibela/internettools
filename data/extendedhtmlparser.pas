@@ -1011,9 +1011,11 @@ begin
     cacheRegExpr('regex', '', '', false);
     if templateAttributes.IndexOfName('var') >= 0 then begin
       varname := parser.parseQuery('x"'+templateAttributes.Values['var']+'"');
-      temp := varname.evaluate(xqvalue('')).toString;
-      if strContains(temp, '.') then temp := strBefore(temp, '.');
-      TXQueryEngineBreaker(parser.QueryEngine).addAWeirdGlobalVariable('', temp);
+      if varname.Term is TXQTermConstant then begin
+        temp := varname.evaluate(xqvalue('')).toString;
+        if strContains(temp, '.') then temp := strBefore(temp, '.');
+        TXQueryEngineBreaker(parser.QueryEngine).addAWeirdGlobalVariable('', temp);
+      end;
     end;
   end;
 end;
