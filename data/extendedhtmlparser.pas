@@ -715,7 +715,7 @@ THtmlTemplateParser=class
     property TemplateParser: TTreeParser read FTemplate; //**< X/HTML parser used to read the templates (public so you can change the parsing behaviour, if you really need it)
     property HTMLParser: TTreeParser read FHTML; //**< X/HTML parser used to read the pages (public so you can change the parsing behaviour, if you really need it)
     property QueryEngine: TXQueryEngine read FQueryEngine; //**< XQuery engine used for evaluating query expressions contained in the template
-    property QueryContext: TXQEvaluationContext read FQueryContext; //**< Context used to evaluate XQuery expressions. For internal use.
+    property QueryContext: TXQEvaluationContext read FQueryContext write FQueryContext; //**< Context used to evaluate XQuery expressions. For internal use.
 
   end;
 
