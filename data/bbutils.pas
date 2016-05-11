@@ -4609,15 +4609,17 @@ end;
 
 
 function strResolveURI(rel, base: RawByteString): RawByteString;
-  function strIsRelative(const r: RawByteString): boolean; //this is weird, but the XQTS3 has "non-hierarchical uris" as test case for fn:resolve-uri
+  function strIsRelative(const r: RawByteString): boolean; //this is weird, but the XQTS3 has "non-hierarchical uris" as test case for fn:resolve-urih
   var
     i: Integer;
   begin
     result := true;
     for i := 1 to length(r) do
       case r[i] of
+        'a'..'z','A'..'Z','0'..'9': ; //keep going
         ':': begin result := false; exit; end;
-        '?': exit;
+        else exit;
+       // '?','/': exit;
       end;
   end;
 
