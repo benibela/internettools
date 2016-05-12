@@ -2597,8 +2597,12 @@ begin
   if not strContains(url, '://') or striBeginsWith(url, 'file:/') then exit(xqvalue(FileExists(strRemoveFileURLPrefix(url))));
   result := xqvalueFalse;
   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}
+  try
+    defaultInternet.request('HEAD',url,'');
+    result := xqvalueTrue
+  except
+  end;
   //if TXQValue_anyURI.canCreateFromstring(url) then
-    result := xqvalueTrue;
   {$endif}
 end;
 
