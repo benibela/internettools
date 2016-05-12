@@ -4178,6 +4178,7 @@ begin
   equal(ps.evaluateXPath2('2*.', xqvalue(7)).toString, '14', 'evaluateXPath2(ixqvalue) failed');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
   equal(TXQueryEngine.evaluateStaticXPath2('1 + 1 + 1').toString, '3', 'evaluateStaticXPath2 a failed');
+  equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{$abc}{0}b')).evaluate().toString, 'aalphabet0b', 'xstring0');
   equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{1+2+3}b')).evaluate().toString, 'a6b', 'xstring1');
   equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{concat("x","y","z")}b')).evaluate().toString, 'axyzb', 'xstring2');
 

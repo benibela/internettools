@@ -364,6 +364,8 @@ begin
   t('xs:float("NaN") mod 5', 'NaN', '');
   t('xs:float("5") mod xs:float("-INF")', '5', '');
 
+  t('join(xs:ENTITIES("foo bar"), "|")', 'foo|bar');
+
   //interface tests
   t('. + 1', '2', '<t>1</t>');
   equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
