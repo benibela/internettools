@@ -3844,7 +3844,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       flags := TXQSequenceTypeFlags(pending.data);
       schema := staticContext.findSchema(pending.resolveURI(staticContext, xqdnkType));
       if schema <> nil then st.atomicTypeInfo := schema.findType(pending.localpart)
-      else if pending.namespaceprefix <> '' then raiseParsingError('XPST0081', 'Unknown schema: '+pending.namespaceUrl)
+      else if pending.namespaceprefix <> '' then
+        raiseParsingError(ifthen(errCode <> '', errCode, 'XPST0081'), 'Unknown schema: '+pending.namespaceUrl)
       else st.atomicTypeInfo := nil;
       if (st.atomicTypeInfo = nil)
          or (not (xqstAllowValidationTypes in flags) and baseSchema.isValidationOnlyType(st.atomicTypeInfo)) then begin
@@ -3856,15 +3857,18 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       pending.free;
       SetLength(st.children, 0);
     end;
-    if st.kind = tikFunctionTest then
-      if st.atomicTypeInfo <> nil then begin
-        with TObject(st.atomicTypeInfo) as TXQAnnotationsInClass do begin
-          visitAnnotations(annotations, false);
-          freeAnnotations(annotations);
-          free;
-          st.atomicTypeInfo := nil;
+    case st.kind of
+      tikFunctionTest:
+        if st.atomicTypeInfo <> nil then begin
+          with TObject(st.atomicTypeInfo) as TXQAnnotationsInClass do begin
+            visitAnnotations(annotations, false);
+            freeAnnotations(annotations);
+            free;
+            st.atomicTypeInfo := nil;
+          end;
         end;
-      end;
+      tikElementTest: if st.nodeMatching.requiredType <> nil then visitSequenceType(st.nodeMatching.requiredType, 'XPST0008');
+    end;
   end;
 
   procedure lookupNamedFunction(f: TXQTermNamedFunction);
