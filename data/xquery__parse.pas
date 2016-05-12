@@ -3862,6 +3862,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           visitAnnotations(annotations, false);
           freeAnnotations(annotations);
           free;
+          st.atomicTypeInfo := nil;
         end;
       end;
   end;
