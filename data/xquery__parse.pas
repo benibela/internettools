@@ -69,6 +69,7 @@ protected
   procedure requireXQuery3(s: string = '');
   function isModel3: boolean;
   procedure refuseReservedFunctionName(const name: string);
+  procedure refuseForbiddenPrefix(const prefix: string);
 
   procedure skipWhitespace();
   procedure skipComment();
@@ -664,6 +665,13 @@ begin
     else reserved := false;
   end;
   if reserved then raiseSyntaxError('Reserved function name: ' + name);
+end;
+
+procedure TXQParsingContext.refuseForbiddenPrefix(const prefix: string);
+begin
+  case prefix of
+    'xml', 'xmlns': raiseParsingError('XQST0070', 'Invalid prefix');
+  end;
 end;
 
 procedure TXQParsingContext.skipWhitespace;
@@ -3223,22 +3231,26 @@ var declarationDuplicateChecker: TStringList;
       end;
       'namespace': begin
         prefix := nextTokenNCName();
+        refuseForbiddenPrefix(prefix);
         expect('=');
-        url := parseString();
+        url := parseNamespaceURI('', 'XQST0057');
       end
       else begin
         if (url = '') or not (url[1] in ['''', '"']) then raiseParsingError('XPST0003', 'Invalid schema import');
-        url := '';
+        url := copy(url, 2, length(url) - 2 );
         prefix:=':::'; //no prefix given
       end;
     end;
+    url := xmlStrWhitespaceCollapse(url);
     if staticContext.importedSchemas = nil then staticContext.importedSchemas := TNamespaceList.Create;
-    staticContext.importedSchemas.add(TNamespace.Create(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
     if nextToken(true) = 'at' then begin
+      expect('at');
       //discard schema addresses
       parseString;
       while nextToken(true) = ',' do begin expect(','); parseString(); end;
     end;
+    if (url <> XMLNamespaceURL_XMLSchema) then raiseParsingError('XQST0059', 'Unknown schema: ' + url);
+    staticContext.importedSchemas.add(TNamespace.Create(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
   end;
   procedure importModule; //has read import module
   var
@@ -3254,9 +3266,7 @@ var declarationDuplicateChecker: TStringList;
     moduleName := '';
     if pos^ = 'n' then begin
       expect('namespace'); moduleName:=nextTokenNCName(); expect('=');
-      case moduleName of
-        'xml', 'xmlns': raiseParsingError('XQST0070', 'Invalid module prefix');
-      end;
+      refuseForbiddenPrefix(moduleName);
     end;
     moduleURL := parseNamespaceURI('','XQST0088');
     at := nil;
