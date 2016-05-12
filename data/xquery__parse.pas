@@ -2415,7 +2415,10 @@ begin
             if axis = '' then
               case word of
                 'attribute', 'schema-attribute': axis := 'attribute';
-                'namespace-node': raiseParsingError('XQST0134', 'No namespace axis');
+                'namespace-node': begin
+                  expect(')');
+                  raiseParsingError('XQST0134', 'No namespace axis');
+                end;
               end;
             TXQTermNodeMatcher(result).axis:=axis;
             skipWhitespaceAndComment();
