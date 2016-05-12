@@ -462,9 +462,7 @@ begin
     if start is TXQTermModule then begin
       cycler.mainmodule := TXQTermModule(start);
       for i := 0 to high(cycler.mainmodule.children) do begin
-        if cycler.mainmodule.children[i] is TXQTermDefineVariable then cycler.lastVariableIndex := i
-        else cycler.lastVariableIndex := MaxInt;
-        //if cycler.mainmodule.children[i].);
+        cycler.lastVariableIndex := i;
         cycler.simpleTermVisit(@cycler.mainmodule.children[i], cycler.mainmodule);
       end;
     end else
