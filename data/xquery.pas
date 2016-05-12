@@ -1090,7 +1090,7 @@ type
 
   { TXSListType }
 
-  //** XML Schema list type (not used) todo
+  //** XML Schema list type
   TXSListType = class(TXSSimpleType)
     itemType: TXSSimpleType;
     constructor Create(aname: string; aparent: TXSType; aitemType: TXSSimpleType);
@@ -2865,6 +2865,7 @@ function xqFunctionConcat(const args: TXQVArray): IXQValue;
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+function xqvalueInstanceOf(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 function xqvalueOrPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 function xqvalueAndPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 
@@ -3679,6 +3680,11 @@ function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQVal
 begin
   ignore(cxt);
   result := xqvalue(xqgetTypeInfo(tb).castableAs(ta, cxt.staticContext));
+end;
+
+function xqvalueInstanceOf(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+begin
+  result := xqvalue(xqgetTypeInfo(tb).instanceOf(ta, cxt));
 end;
 
 function xqvalueOrPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
@@ -7689,9 +7695,6 @@ commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
 
 
-baseSchema.hide('NMTOKENS');
-baseSchema.hide('IDREFS');
-baseSchema.hide('ENTITIES');
 baseSchema.hide('node()');
 baseSchema.hide('sequence*');
 baseSchema.hide('function(*)');

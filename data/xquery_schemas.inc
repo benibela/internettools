@@ -433,7 +433,9 @@ end;
 
 function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 begin
-  Result:=xsceXPTY0004; //todo
+  if v.get(1).typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.node]) then
+    exit(tryCreateValue(v.toString, outv));
+  Result:=xsceXPTY0004;
 end;
 
 function TXSListType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;

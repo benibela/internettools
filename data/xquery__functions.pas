@@ -714,13 +714,6 @@ end;
 
 
 
-
-
-function xqvalueInstanceOf(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
-begin
-  result := xqvalue(xqgetTypeInfo(tb).instanceOf(ta, cxt));
-end;
-
 function xqvalueTreatAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   result := ta;

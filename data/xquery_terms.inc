@@ -4051,8 +4051,9 @@ function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType
 begin
   if t = nil then exit(nil);
   result := TXQTermSequenceType(t.clone);
-  if (t.kind = tikAtomic) and ((t.atomicTypeInfo = baseSchema.numericPseudoType)) then
-    result.atomicTypeInfo := baseSchema.anyAtomicType;
+  if (t.kind = tikAtomic) then
+    if ((t.atomicTypeInfo = baseSchema.numericPseudoType)) then
+      result.atomicTypeInfo := baseSchema.anyAtomicType;
 end;
 
 function isPseudoVariable(v: TXQTerm): boolean; inline;
@@ -4142,6 +4143,20 @@ begin
     raiseParsingError('XPST0017', 'Failed to find function (mismatch arg count?)');
 end;
 
+function functionReferenceGetResultType(f: TXQTermNamedFunction): TXQTermSequenceType;
+var
+  t: TXSType;
+begin
+  if f.kind = xqfkTypeConstructor then begin
+    t := TXSType(TObject(f.func));
+    result := TXQTermSequenceType.create(t, true);
+    if t is TXSListType then begin
+      result.atomicTypeInfo := TXSListType(t).itemType;
+      result.allowMultiple := true;
+    end;
+  end else result := nil;
+end;
+
 procedure TXQTermDefineFunction.initNamedFunctionReference(const context: TXQEvaluationContext);
 
 
@@ -4173,7 +4188,7 @@ begin
     end else if f.kind = xqfkTypeConstructor then begin
       for i := 0 to parameterCount - 1 do
         (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.anyAtomicType, true));
-      resulttype := TXQTermSequenceType.create(TXSType(TObject(f.func)), true);
+      resulttype := functionReferenceGetResultType(f);
     end;
 
     if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
@@ -4233,8 +4248,7 @@ begin
     result.resulttype := TXQTermSequenceType.create(baseSchema.string_)
   else if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (f.interpretedFunction.resulttype <> nil)  then
     result.resulttype := TXQTermSequenceType(f.interpretedFunction.resulttype.clone)
-  else if f.kind = xqfkTypeConstructor then
-    result.resulttype := TXQTermSequenceType.create(TXSType(TObject(f.func)), true);;
+  else result.resulttype := functionReferenceGetResultType(f);
   result.context := context;
 end;
 

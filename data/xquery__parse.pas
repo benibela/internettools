@@ -4063,6 +4063,12 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       else if (st.atomicTypeInfo is TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
         raiseParsingError('XQST0052', 'Expected simple type');
       result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs);
+    end else if b.op.func = @xqvalueInstanceOf then begin
+      st := b.children[1] as TXQTermSequenceType;
+      visitSequenceType(st);
+      if (st.kind = tikAtomic) and (st.atomicTypeInfo is TXSListType) then
+        raiseParsingError('XPST0051', 'No value is a list type');
+      result := b;
     end else if (b.op.func = @xqvalueOrPlaceholder) or (b.op.func = @xqvalueAndPlaceholder) then begin
       //A or B => if (A) then true() else B
       //A and B => if (A) then B else false()
