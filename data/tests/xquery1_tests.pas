@@ -1462,7 +1462,7 @@ begin
   m('declare base-uri "http://example.org"; empty(document-uri(element a {1} ))', 'true');
   m('declare base-uri "http://example.org"; document-uri(document { element a {1}, element b {1} }) instance of xs:string', 'false');
 
-  m('declare base-uri "abc"; static-base-uri()', 'abc');
+  m('declare base-uri "abc"; static-base-uri()', 'pseudo://test/abc');
   m('declare base-uri "   http://abc    def     "; static-base-uri()', 'http://abc def');
   m('declare base-uri "abc"; static-base-uri() instance of xs:string', 'false');
   m('declare base-uri "abc"; static-base-uri() instance of xs:anyURI', 'true');
