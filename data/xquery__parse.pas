@@ -132,9 +132,11 @@ protected
 
 
   function parseModule(): TXQTerm;
-  procedure parseQuery(aquery: TXQuery); override;
+
   class procedure finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
-  function parseXStringOnly(nullTerminatedString: boolean = false): TXQTerm; override;
+  procedure parseQuery(aquery: TXQuery; onlySpecialString: boolean);
+  procedure parseQuery(aquery: TXQuery); override;
+  procedure parseQueryXStringOnly(aquery: TXQuery); override;
   procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); override;
 end;
 
@@ -3025,7 +3027,7 @@ end;
 
 
 
-procedure TXQParsingContext.parseQuery(aquery: TXQuery);
+procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boolean);
   procedure collectVariables(m: TXQTermModule);
     function isTrueDefineVariable(v: TXQTerm): boolean;
     begin
@@ -3085,9 +3087,14 @@ begin
   oldPendingCount := pendingModules.Count;
   oldFunctionCount := length(staticContext.functions);
   try
-    TXQueryBreaker(thequery).fterm := parseModule;
-    if TXQueryBreaker(thequery).fterm is TXQTermModule then
-      collectVariables(TXQTermModule(TXQueryBreaker(thequery).fterm));
+    if not onlySpecialString then begin
+      TXQueryBreaker(thequery).fterm := parseModule;
+      if TXQueryBreaker(thequery).fterm is TXQTermModule then
+        collectVariables(TXQTermModule(TXQueryBreaker(thequery).fterm));
+    end else begin
+      TXQueryBreaker(thequery).fterm := parseXString(true);
+      finalResolving(TXQueryBreaker(thequery).fterm, staticContext, options);
+    end;
   except
     //not sure if this is needed, but it seems reasonable
     for i := oldFunctionCount to high(staticContext.functions) do
@@ -3105,6 +3112,11 @@ begin
 
     raise;
   end;
+end;
+
+procedure TXQParsingContext.parseQueryXStringOnly(aquery: TXQuery);
+begin
+  parseQuery(aquery, true);
 end;
 
 class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
@@ -3160,7 +3172,6 @@ begin
   if sc.model = xqpmXQuery1 then
     TVariableCycleDetectorXQ1.detectCycle(result, sc);
 end;
-
 
 function TXQParsingContext.parseModuleInternal(): TXQTerm;
 
@@ -3697,18 +3708,9 @@ begin
   if result = nil then exit;
 end;
 
-function TXQParsingContext.parseXStringOnly(nullTerminatedString: boolean): TXQTerm;
+procedure TXQParsingContext.parseQuery(aquery: TXQuery);
 begin
-  Result:=parseXString(nullTerminatedString);
-  if nextToken() <> '' then begin
-    result.free;
-    raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
-  end;
-  try
-    finalResolving(result, staticContext, options);
-  except
-    result.free;
-  end;
+  parseQuery(aquery, false);
 end;
 
 procedure TXQParsingContext.parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string);

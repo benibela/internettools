@@ -2842,7 +2842,7 @@ protected
  str: string;
  pos: pchar;
  procedure parseQuery(aquery: TXQuery); virtual; abstract;
- function parseXStringOnly(nullTerminatedString: boolean = false): TXQTerm; virtual; abstract;
+ procedure parseQueryXStringOnly(aquery: TXQuery); virtual; abstract;
  procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); virtual; abstract;
 
 end;
@@ -6386,17 +6386,12 @@ begin
   cxt.parsingModel:=xqpmXPath2;
   cxt.engine := self;
   try
-    try
-      cxt.str := str;
-      cxt.pos := @cxt.str[1];
-      result := TXQuery.Create(cxt.staticContext);
-      result.fterm := cxt.parseXStringOnly(true);
-    finally
-      cxt.free;
-    end;
-  except
-    result.free;
-    raise;
+    cxt.str := str;
+    cxt.pos := @cxt.str[1];
+    result := TXQuery.Create(cxt.staticContext);
+    cxt.parseQueryXStringOnly(result);
+  finally
+    cxt.free;
   end;
 end;
 
