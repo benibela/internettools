@@ -2477,10 +2477,11 @@ public
     class function getNextQueriedNode(prev: TTreeNode; var nodeCondition: TXQPathNodeCondition): TTreeNode; static;
     //** Gets the next node matching a query step (ignoring [] filter)
     class procedure unifyQuery(const contextNode: TTreeNode; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition); static;
+
     //** Performs a query step, given a (sequence) of parent nodes
-    class function expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext): IXQValue;
+    class function expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
     //** Initialize a query by performing the first step
-    class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext): IXQValue;
+    class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
 
     //** Evaluates a path expression, created from the given term in the given context.
     class function evaluateAccessList(term: TXQTerm; var context: TXQEvaluationContext): IXQValue;
@@ -6861,7 +6862,7 @@ begin
 end;
 
 
-class function TXQueryEngine.expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext): IXQValue;
+class function TXQueryEngine.expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue;
 var oldnode,newnode: TTreeNode;
     newList: TXQVList;
     nodeCondition: TXQPathNodeCondition;
@@ -6912,9 +6913,9 @@ var
 
   procedure add(const v: IXQValue); inline;
   begin
-    if resultSeq.seq.count = 0 then onlyNodes := v is TXQValueNode;
-    if onlyNodes <> (v is TXQValueNode) then
-      raise EXQEvaluationException.Create('XPTY0018', 'Nodes and non-node values must not be mixed in step expressions');;
+    if resultSeq.seq.count = 0 then onlyNodes := v.kind = pvkNode;
+    if onlyNodes <> (v.kind = pvkNode) then
+      raise EXQEvaluationException.Create(IfThen(lastExpansion, 'XPTY0018', 'XPTY0019'), 'Nodes and non-node values must not be mixed in step expressions');;
     if onlyNodes then resultSeq.addOrdered(v)
     else resultSeq.add(v);
   end;
@@ -7052,7 +7053,7 @@ begin
   result := resultSeq;
 end;
 
-class function TXQueryEngine.evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext): IXQValue;
+class function TXQueryEngine.evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue;
 var
   n: TTreeNode;
 begin
@@ -7072,7 +7073,7 @@ begin
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
       else if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'Context item is undefined')
       else raise EXQEvaluationException.Create('XPTY0020', 'Expected node as context item, got: '+context.SeqValue.debugAsStringWithTypeAnnotation());
-      result := expandSequence(result,query, context);
+      result := expandSequence(result,query, context, lastExpansion);
     end;
   end;
 end;
@@ -7093,9 +7094,9 @@ begin
   query := nil;
   term.addToQueryList(query);
 
-  result := evaluateSingleStepQuery(query[0],context);
+  result := evaluateSingleStepQuery(query[0],context, high(query) = 0);
   for i:=1 to high(query) do
-    result := expandSequence(result, query[i], context);
+    result := expandSequence(result, query[i], context, high(query) = i);
 
   xqvalueSeqSqueeze(result);
 end;

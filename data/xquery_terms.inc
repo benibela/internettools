@@ -2801,7 +2801,7 @@ begin
   else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.TextNode<>nil) then
     result := xqvalue(context.TextNode)
   else if axis <> 'attribute' then begin
-    result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context);
+    result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context, true);
     xqvalueSeqSqueeze(result);
   end else result := evaluateAttribute(context);
 end;
