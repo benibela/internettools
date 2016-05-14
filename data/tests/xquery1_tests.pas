@@ -617,7 +617,7 @@ begin
 
   m('declare variable $var := 123;  declare function wrapper($a as integer) { $var * $a }; wrapper(1) ', '123');
   m('declare variable $var := 123;  declare function wrapper($a as integer) { $var * $a }; wrapper(2) ', '246');
-  m('declare function wrapper($a as integer) { $var * $a }; declare variable $var := 123;  wrapper(3) ', '369'); //forward variable reference (if i read the standard correctly that is not allowed. But it is easier to implement this way and in Zorba it also works)
+  f('declare function wrapper($a as integer) { $var * $a }; declare variable $var := 123;  wrapper(3) ', 'XPST0008');
   m('declare function odd($a as integer) { if ($a = 0) then false() else even($a - 1)}; declare function even($a as integer) { if ($a = 0) then true() else odd($a - 1)}; string-join(for $i in 0 to 9 return odd($i), " ") ', 'false true false true false true false true false true');
   f('declare variable $foo := test(); declare function test() { test() + $foo }; 2', 'XQST0054');
 
@@ -741,11 +741,11 @@ begin
   m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of xs:integer', 'true');
   m('import schema namespace foobar="http://www.w3.org/2001/XMLSchema"; 5 instance of foobar:integer', 'true');
   m('xquery version "1.0"; import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of test:integer', 'true');
-  m('import schema namespace foobar="xyz"; 5 instance of foobar:integer', 'true'); //TODO: arbitrary schemas
+  f('import schema namespace foobar="xyz"; 5 instance of foobar:integer', 'XQST0059');
   m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of test:double', 'false');
   m('import schema namespace test="http://www.w3.org/2001/XMLSchema"; 5 instance of xs:double', 'false');
   m('import schema namespace foobar="http://www.w3.org/2001/XMLSchema"; 5 instance of foobar:double', 'false');
-  m('import schema namespace foobar="xyz"; 5 instance of foobar:double', 'false'); //TODO: arbitrary schemas
+  //m('import schema namespace foobar="xyz"; 5 instance of foobar:double', 'false'); //TODO: arbitrary schemas
 
   helper := THelper.Create;
   helper.ps := ps;
@@ -1034,12 +1034,6 @@ begin
   t('let $x as element(abc)+:= <abc/> return name($x)', 'abc');
   t('let $x as element(abc)*:= <abc/> return name($x)', 'abc');
   t('let $x as element(abc)?:= <abc/> return name($x)', 'abc');
-
-  m('import schema default element namespace "http://www.example.com/typedecl"; fn:concat(1,2,3)', '123');
-  m('import schema default element namespace "http://www.example.com/typedecl"; pxp:concat(1,2,3)', '123');
-  m('import schema default element namespace "http://www.example.com/typedecl"; concat(1,2,3)', '123');
-  m('import schema "http://www.example.com/typedecl"; concat(1,2,3)', '123');
-  m('import schema ''http://www.example.com/typedecl''; concat(1,2,3)', '123');
 
   m('declare function f($a as xs:anyAtomicType) { $a }; f(10) instance of xs:integer', 'true');
   m('declare function f($a as xs:anyAtomicType) { $a }; f(10) instance of xs:decimal', 'true');
