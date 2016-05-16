@@ -94,6 +94,8 @@ const
   UTF8PROC_BOUNDCLASS_T = 8;
   UTF8PROC_BOUNDCLASS_LV = 9;
   UTF8PROC_BOUNDCLASS_LVT = 10;
+  UTF8PROC_BOUNDCLASS_REGIONAL_INDICATOR = 11;
+  UTF8PROC_BOUNDCLASS_SPACINGMARK = 12;
 
   UTF8PROC_CATEGORY_LU = 1;
   UTF8PROC_CATEGORY_LL = 2;
@@ -145,6 +147,10 @@ const
   UTF8PROC_BIDI_CLASS_S = 17;
   UTF8PROC_BIDI_CLASS_WS = 18;
   UTF8PROC_BIDI_CLASS_ON = 19;
+  UTF8PROC_BIDI_CLASS_LRI = 20;
+  UTF8PROC_BIDI_CLASS_RLI = 21;
+  UTF8PROC_BIDI_CLASS_FSI = 22;
+  UTF8PROC_BIDI_CLASS_PDI = 23;
 
   UTF8PROC_DECOMP_TYPE_FONT = 1;
   UTF8PROC_DECOMP_TYPE_NOBREAK = 2;
@@ -440,17 +446,18 @@ type
     bidi_class: utf8proc_propval_t;
     decomp_type: utf8proc_propval_t;
     decomp_mapping: Plongint;
-    bidi_mirrored: boolean;
+    casefold_mapping: Plongint;
     uppercase_mapping: longint;
     lowercase_mapping: longint;
     titlecase_mapping: longint;
     comb1st_index: longint;
     comb2nd_index: longint;
+    bidi_mirrored: boolean;
     comp_exclusion: boolean;
     ignorable: boolean;
     control_boundary: boolean;
-    extend: boolean;
-    casefold_mapping: Plongint;
+    boundclass: integer;
+    charwidth: integer;
   end;
   putf8proc_property_t = ^utf8proc_property_t;
 
@@ -631,6 +638,23 @@ begin
   Result := @utf8proc_properties[utf8proc_stage2table[utf8proc_stage1table[uc shr 8] + (uc and $FF)]]
 end;
 
+
+// return whether there is a grapheme break between boundclasses lbc and tbc
+function grapheme_break(lbc, tbc: integer): boolean;
+begin
+  if lbc = UTF8PROC_BOUNDCLASS_START then exit(true);
+  if (lbc = UTF8PROC_BOUNDCLASS_CR) and (tbc = UTF8PROC_BOUNDCLASS_LF) then exit(false);
+  if (lbc >= UTF8PROC_BOUNDCLASS_CR) and (lbc <= UTF8PROC_BOUNDCLASS_CONTROL) then exit(true);
+  if (tbc >= UTF8PROC_BOUNDCLASS_CR) and (tbc <= UTF8PROC_BOUNDCLASS_CONTROL) then exit(true);
+  if (tbc = UTF8PROC_BOUNDCLASS_EXTEND) then exit(false);
+  if (lbc = UTF8PROC_BOUNDCLASS_L) and ((tbc = UTF8PROC_BOUNDCLASS_L) or (tbc = UTF8PROC_BOUNDCLASS_V) or (tbc = UTF8PROC_BOUNDCLASS_LV) or (tbc = UTF8PROC_BOUNDCLASS_LVT)) then exit(false);
+  if ((lbc = UTF8PROC_BOUNDCLASS_LV) or (lbc = UTF8PROC_BOUNDCLASS_V)) and ((tbc = UTF8PROC_BOUNDCLASS_V) or  (tbc = UTF8PROC_BOUNDCLASS_T)) then exit(false);
+  if ((lbc = UTF8PROC_BOUNDCLASS_LVT) or  (lbc = UTF8PROC_BOUNDCLASS_T)) and (tbc = UTF8PROC_BOUNDCLASS_T) then exit(false);
+  if (lbc = UTF8PROC_BOUNDCLASS_REGIONAL_INDICATOR) and  (tbc = UTF8PROC_BOUNDCLASS_REGIONAL_INDICATOR) then exit(false);
+  result := tbc <> UTF8PROC_BOUNDCLASS_SPACINGMARK;
+end;
+
+
 function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer; last_boundclass: pinteger): longint;
 var aproperty: putf8proc_property_t;
   casefold_entry: plongint;
@@ -767,42 +791,9 @@ begin
 
   if (options and UTF8PROC_CHARBOUND) <> 0 then
   begin
-    if (uc = $000D) then tbc := UTF8PROC_BOUNDCLASS_CR else
-      if (uc = $000A) then tbc := UTF8PROC_BOUNDCLASS_LF else
-        if (((category = UTF8PROC_CATEGORY_ZL) or (category = UTF8PROC_CATEGORY_ZP) or (category = UTF8PROC_CATEGORY_CC) or
-          (category = UTF8PROC_CATEGORY_CF)) and not ((uc = $200C) or (uc = $200D))) then tbc := UTF8PROC_BOUNDCLASS_CONTROL else
-          if aproperty^.extend then tbc := UTF8PROC_BOUNDCLASS_EXTEND else
-            if (((uc >= UTF8PROC_HANGUL_L_START) and (uc < UTF8PROC_HANGUL_L_END)) or (uc = UTF8PROC_HANGUL_L_FILLER)) then tbc := UTF8PROC_BOUNDCLASS_L else
-              if ((uc >= UTF8PROC_HANGUL_V_START) and (uc < UTF8PROC_HANGUL_V_END)) then tbc := UTF8PROC_BOUNDCLASS_V else
-                if ((uc >= UTF8PROC_HANGUL_T_START) and (uc < UTF8PROC_HANGUL_T_END)) then tbc := UTF8PROC_BOUNDCLASS_T else
-                  if ((uc >= UTF8PROC_HANGUL_S_START) and (uc < UTF8PROC_HANGUL_S_END)) then begin
-                    if ((uc - UTF8PROC_HANGUL_SBASE) mod UTF8PROC_HANGUL_TCOUNT = 0) then
-                      tbc := UTF8PROC_BOUNDCLASS_LV else tbc := UTF8PROC_BOUNDCLASS_LVT;
-                  end else tbc := UTF8PROC_BOUNDCLASS_OTHER;
-
-    lbc := last_boundclass^;
-
-    if tbc = UTF8PROC_BOUNDCLASS_EXTEND then boundary := false else
-      if lbc = UTF8PROC_BOUNDCLASS_START then boundary := true else
-        if (lbc = UTF8PROC_BOUNDCLASS_CR) and (tbc = UTF8PROC_BOUNDCLASS_LF) then boundary := false else
-          if lbc = UTF8PROC_BOUNDCLASS_CONTROL then boundary := true else
-            if tbc = UTF8PROC_BOUNDCLASS_CONTROL then boundary := true else
-              if (lbc = UTF8PROC_BOUNDCLASS_L) and
-                ((tbc = UTF8PROC_BOUNDCLASS_L) or
-                (tbc = UTF8PROC_BOUNDCLASS_V) or
-                (tbc = UTF8PROC_BOUNDCLASS_LV) or
-                (tbc = UTF8PROC_BOUNDCLASS_LVT)) then boundary := false else
-
-                if ((lbc = UTF8PROC_BOUNDCLASS_LV) or
-                  (lbc = UTF8PROC_BOUNDCLASS_V)) and
-                  ((tbc = UTF8PROC_BOUNDCLASS_V) or
-                  (tbc = UTF8PROC_BOUNDCLASS_T)) then boundary := false else
-
-                  if ((lbc = UTF8PROC_BOUNDCLASS_LVT) or
-                    (lbc = UTF8PROC_BOUNDCLASS_T)) and
-                    (tbc = UTF8PROC_BOUNDCLASS_T) then boundary := false else boundary := true;
-    last_boundclass^ := lbc;
-
+    tbc := aproperty^.boundclass;
+    boundary := grapheme_break(last_boundclass^, tbc);
+    last_boundclass^ := tbc;
     if boundary
       then
     begin
@@ -1156,30 +1147,5 @@ begin
   utf8proc_map(PByte(str), 0, @retval, UTF8PROC_NULLTERM or UTF8PROC_STABLE or UTF8PROC_COMPOSE or UTF8PROC_COMPAT);
   result := PChar(retval);
 end;
-
-{function utf8proc_getinfostring(pr: putf8proc_property_t; Chara: Longint = -1): string;
-var i: integer;
-begin
-  Result := '';
-  if Chara > -1 then
-  begin
-    for i := 0 to MaxUnicodeRanges do
-      if (Chara >= UnicodeRanges[i].S) and (Chara <= UnicodeRanges[i].E) then
-      begin
-        Result := Result + 'Range: ' + UnicodeRanges[i].PG + LineEnding;
-        break;
-      end;
-  end;
-  Result := Result + 'Category: ' + CategoryStrings[pr^.category] + LineEnding;
-  Result := Result + 'BIDI: ' + BIDIStrings[pr^.bidi_class] + LineEnding;
-  Result := Result + 'BIDI Mirrored: ' + BoolToStr(pr^.bidi_mirrored, true) + LineEnding;
-  Result := Result + 'Decomp Type: ' + DecompStrings[pr^.decomp_type];
-  if pr^.lowercase_mapping > -1 then
-    Result := Result + LineEnding + 'LowerCase: ' + UnicodeToUTF8(pr^.lowercase_mapping);
-  if pr^.uppercase_mapping > -1 then
-    Result := Result + LineEnding + 'UpperCase: ' + UnicodeToUTF8(pr^.uppercase_mapping);
-  if pr^.titlecase_mapping > -1 then
-    Result := Result + LineEnding + 'TitleCase: ' + UnicodeToUTF8(pr^.titlecase_mapping);
-end;}
 
 end.
