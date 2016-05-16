@@ -413,6 +413,7 @@ type TInternetToolsFormat = (itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<-
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
 
 function strEncodingFromContentType(const contenttype: string): TEncoding;
+function isInvalidUTF8(const s: string): boolean;
 
 implementation
 uses xquery;
