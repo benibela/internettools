@@ -45,8 +45,8 @@ type
     procedure addChildFromTree(t: TTreeNode);
     procedure performChildren(reader: TMultipageTemplateReader);
     function cloneChildren(theResult: TTemplateAction): TTemplateAction;
-    function parseQuery(reader: TMultipageTemplateReader; query: string): IXQuery;
-    function evaluateQuery(reader: TMultipageTemplateReader; query: string): IXQValue;
+    function parseQuery(reader: TMultipageTemplateReader; const query: string): IXQuery;
+    function evaluateQuery(reader: TMultipageTemplateReader; const query: string): IXQValue;
   public
     children: array of TTemplateAction;
     procedure initFromTree(t: TTreeNode); virtual;
@@ -268,11 +268,13 @@ type
     template:TMultiPageTemplate;
     lastData, lastContentType: string;
     dataLoaded: boolean;
+    queryCache: TXQMapStringObject;
     procedure needLoadedData;
     procedure setTemplate(atemplate: TMultiPageTemplate);
     procedure applyPattern(pattern, name: string); virtual;
     procedure setVariable(name: string; value: IXQValue; namespace: string = ''); virtual;
     procedure setVariable(name: string; value: string; namespace: string = '');
+    function parseQuery(const query: string): IXQuery;
     function evaluateQuery(const query: IXQuery): IXQValue; virtual;
   public
     //** Object used to send requests and download pages
@@ -772,7 +774,7 @@ var
 begin
   if list <> '' then begin
     if varname = '' then raise ETemplateReader.Create('A list attribute at a loop node requires a var attribute');
-    listx := evaluateQuery(reader, list); //TODO: parse only once
+    listx := evaluateQuery(reader, list);
   end else listx := nil;
   if test <> '' then begin
     reader.needLoadedData;
@@ -1120,12 +1122,12 @@ begin
     result.children[i] := children[i].clone;
 end;
 
-function TTemplateAction.parseQuery(reader: TMultipageTemplateReader; query: string): IXQuery;
+function TTemplateAction.parseQuery(reader: TMultipageTemplateReader; const query: string): IXQuery;
 begin
-  result := reader.parser.parseQuery(query);
+  result := reader.parseQuery(query);
 end;
 
-function TTemplateAction.evaluateQuery(reader: TMultipageTemplateReader; query: string): IXQValue;
+function TTemplateAction.evaluateQuery(reader: TMultipageTemplateReader; const query: string): IXQValue;
 begin
   reader.needLoadedData;
   //result := parseQuery(reader, query).evaluate(reader.parser.HTMLTree);
@@ -1355,6 +1357,26 @@ begin
   setVariable(name, xqvalue(value), namespace);
 end;
 
+type TXQueryBreaker = class(TXQuery);
+
+function TMultipageTemplateReader.parseQuery(const query: string): IXQuery;
+var
+  found: Integer;
+  q: IXQuery;
+  qb: TXQueryBreaker;
+begin
+  //cache all parsed queries
+  //this is not for performance reasons, but to ensure that the variables declared by "declare ..." are available in later queries.
+  //Once a query is freed, the variables declared there disappear
+  found := queryCache.IndexOf(query);
+  if found >= 0 then exit(TXQuery(queryCache.Objects[found]));
+  q := parser.parseQuery(query);
+  qb := TXQueryBreaker(q as TXQuery);
+  qb._AddRef;
+  queryCache.AddObject(query, qb);
+  result := q;
+end;
+
 function TMultipageTemplateReader.evaluateQuery(const query: IXQuery): IXQValue;
 begin
   result := query.evaluate(parser.HTMLTree);
@@ -1367,11 +1389,19 @@ begin
   parser.KeepPreviousVariables:=kpvKeepValues;
   setTemplate(atemplate);
   retryOnConnectionFailures := true;
+  queryCache := TXQMapStringObject.Create;
+  queryCache.OwnsObjects := false;
 end;
 
+
 destructor TMultipageTemplateReader.destroy();
+var
+  i: Integer;
 begin
   parser.free;
+  for i := 0 to queryCache.Count - 1 do
+    TXQueryBreaker(queryCache.Objects[i])._Release;
+  queryCache.Free;
   inherited destroy();
 end;
 
