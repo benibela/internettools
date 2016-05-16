@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   The class TMultiPageTemplate can be used to load a template script (and there is also the documentation of the template syntax/semantic).
 
   The class TMultipageTemplateReader can be used to run the template.
+
+  TMultipageTemplateReader does not modify the TMultipageTemplate, so a single TMultipageTemplate can be used by arbitrary many TMultipageTemplateReader, even if the readers are in different threads.
+
 *)
 unit multipagetemplate;
 

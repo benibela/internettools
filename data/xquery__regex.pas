@@ -42,7 +42,7 @@ uses
   Classes, SysUtils, xquery, bbutils
     {$IFDEF USE_SOROKINS_REGEX},regexpr{$ENDIF} //Sorokins's regex library. Contained in fpc nowadays, or
     {$IFDEF USE_SOROKINS_DREGEX},dregexpr{$ENDIF}    //supplied in this unit
-    {$IFDEF USE_FLRE},FLRE{$ENDIF} //FLRE from https://github.com/BeRo1985/flre
+    {$IFDEF USE_FLRE},FLRE{$ENDIF} //FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   ;
 {$IFDEF USE_SOROKINS_DREGEX}
 {$DEFINE USE_SOROKINS_REGEX}
