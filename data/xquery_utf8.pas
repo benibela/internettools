@@ -16,11 +16,30 @@ unit xquery_utf8;
 interface
 
 uses
-  Classes, SysUtils, xquery, LCLProc,
-  utf8scanner, unicodeinfo; //<- utf8tools, get them from http://wiki.lazarus.freepascal.org/Theodp
+  Classes, SysUtils;
 
 implementation
+uses xquery, bbunicodeinfo, bbutils;
 
+
+procedure strOffsetUTF8(const s: RawByteString; index: integer; var offset: integer);
+begin
+  while (index > 1) and (offset <= length(s)) do begin
+    dec(index);
+    strDecodeUTF8Character(s, offset);
+  end;
+end;
+
+function strCopyUTF8(const s: RawByteString; const from, len: integer): string;
+var
+  startOffset, endOffset: Integer;
+begin
+  startOffset := 1;
+  strOffsetUTF8(s, from, startOffset );
+  endOffset := startOffset;
+  strOffsetUTF8(s, len + 1, endOffset);
+  result := copy(s, startOffset, endOffset - startOffset);
+end;
 
 function xqFunctionString_length(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
@@ -32,46 +51,49 @@ begin
   else if context.ParentElement <> nil then temp := xqvalue(context.ParentElement).toString
   else raise EXQEvaluationException.create('XPDY0002', 'No context item');
 
-  result := xqvalue(UTF8Length(temp));
+  result := xqvalue(strLengthUtf8(temp));
 end;
 
 
 function xqFunctionSubstring(const args: TXQVArray): IXQValue;
 var s:string;
-var from, len: integer;
-
+    from, len: integer;
 begin
   requiredArgCount(args, 2,3);
   s:=args[0].toString;
   xpathRangeDefinition(args, length(s), from, len);
-  result := xqvalue(UTF8Copy(s,from,len));
+  result := xqvalue(strCopyUTF8(s,from,len));
 end;
 
 
 function xqFunctionTranslate(const args: TXQVArray): IXQValue;
 var
- i,pos: Integer;
-
- input, map, trans: TUTF8Scanner;
+ i,pos, cp: Integer;
  resstr: String;
+ mapIterator, transIterator: TStrIterator;
+ found: Boolean;
 begin
   requiredArgCount(args, 3);
 
-  input := TUTF8Scanner.Create(args[0].toString);
-  map := TUTF8Scanner.Create(args[1].toString);
-  map.FindChars:=map.UTF8String;
-  trans := TUTF8Scanner.Create(args[2].toString);
   resstr := '';
-
-  for i:= 1 to input.Length do begin
-    pos := map.FindIndex(input.UCS4Chars[i])+1;
-    if pos < 1 then resstr+=input.UTF8Chars[i]
-    else if pos <= trans.Length then resstr+=trans.UTF8Chars[pos];
+  mapIterator := strIterator(args[1].toString);
+  transIterator := strIterator(args[2].toString);
+  for cp in strIterator(args[0].toString) do begin
+    mapIterator.pos := 1;
+    found := false;
+    i := 1;
+    while mapIterator.MoveNext do
+      if mapIterator.Current = cp then begin
+        found := true;
+        break;
+      end else inc(i);
+    if found then begin
+      transIterator.pos := 1;
+      while (i > 0) and transIterator.MoveNext do
+        dec(i);
+      if i = 0 then resstr += strGetUnicodeCharacter(transIterator.Current);
+    end else resstr += strGetUnicodeCharacter(cp);
   end;
-
-  input.free;
-  map.free;
-  trans.free;
 
   result := xqvalue(resstr);
 end;
@@ -105,18 +127,15 @@ end;
 
 function xqFunctionString_to_codepoints(const args: TXQVArray): IXQValue;
 var temp: string;
- i: Integer;
+ i, cp: Integer;
  resseq: TXQValueSequence;
- scanner: TUTF8Scanner;
 begin
   requiredArgCount(args,1);
   temp := args[0].toString;
   if temp = '' then exit(xqvalue);
   resseq := TXQValueSequence.create(length(temp));
-  scanner := TUTF8Scanner.Create(temp);
-  for i := 1 to scanner.Length do
-    resseq.add(xqvalue(scanner.UCS4Chars[i]));
-  scanner.Free;
+  for cp in strIterator(temp) do
+    resseq.add(xqvalue(cp));
   result := resseq;
   xqvalueSeqSqueeze(result);
 end;

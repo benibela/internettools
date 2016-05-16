@@ -4283,31 +4283,6 @@ begin
   result := charUnicodeZero(strDecodeUTF8Character(picture, temp)) > 0;
 end;
 
-type TStrIterator = record
-  FCurrent: integer;
-
-  s: RawByteString;
-  pos: integer;
-  property Current: integer read FCurrent;
-  function MoveNext: Boolean;
-  function GetEnumerator: TStrIterator;
-end;
-function TStrIterator.MoveNext: Boolean;
-begin
-  result := pos <= length(s);
-  fcurrent := strDecodeUTF8Character(s, pos);
-end;
-
-function TStrIterator.GetEnumerator: TStrIterator;
-begin
-  result := self;
-end;
-
-function strIterator(const s: RawByteString): TStrIterator;
-begin
-  result.s := s;
-  result.pos := 1;
-end;
 
 function formatUnicodeInteger(arabic, primaryFormat: string; family: integer): string;
   var

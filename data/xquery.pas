@@ -2772,6 +2772,20 @@ end;
 
 //**Returns a "..." string for use in json (internally used)
 function jsonStrEscape(s: string):string;
+
+//** Str iterator for internal use. It will be moved to bbutils, once the interface has been decided upon
+type TStrIterator = record
+  FCurrent: integer;
+
+  s: RawByteString;
+  pos: integer;
+  property Current: integer read FCurrent;
+  function MoveNext: Boolean;
+  function GetEnumerator: TStrIterator;
+end;
+ //** Str iterator for internal use. It will be moved to bbutils, once the interface has been decided upon
+function strIterator(const s: RawByteString): TStrIterator;
+
 //**Escapes for an URL (internally used)
 function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
 //**Checks the length of the args array (internally used)
@@ -3439,6 +3453,23 @@ begin
     end;
   end;
   result += '"';
+end;
+
+function TStrIterator.MoveNext: Boolean;
+begin
+  result := pos <= length(s);
+  fcurrent := strDecodeUTF8Character(s, pos);
+end;
+
+function TStrIterator.GetEnumerator: TStrIterator;
+begin
+  result := self;
+end;
+
+function strIterator(const s: RawByteString): TStrIterator;
+begin
+  result.s := s;
+  result.pos := 1;
 end;
 
 
