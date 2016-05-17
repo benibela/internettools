@@ -460,6 +460,18 @@ procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar)
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromName(str:RawByteString):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 function strEncodingFromBOMRemove(var str:RawByteString):TEncoding; //**< Gets the encoding from an unicode bom and removes it
+
+//** This function converts codePoint to the corresponding uppercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
+//** It cannot be used to convert a character to uppercase, as SpecialCasing.txt is not a map from normal characters to their uppercase variants.
+//** It is a collection of special characters that do not have an ordinary uppercase variant and are converted to something else. (e.g. ß -> SS) @br
+//** The function signature is preliminary and likely to change.
+function strUpperCaseSpecialUTF8(codePoint: integer): string;
+//** This function converts codePoint to the corresponding lowercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
+//** It cannot be used to convert a character to lowercase, as SpecialCasing.txt is not a map from normal characters to their lowercase variants.
+//** It is a collection of special characters that do not have an ordinary lowercase variant and are converted to something else. @br
+//** The function signature is preliminary and likely to change.
+function strLowerCaseSpecialUTF8(codePoint: integer): string;
+
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
@@ -2264,6 +2276,158 @@ begin
     delete(str,1,4);
     result:=eUTF32LE;
   end else result := eUnknown;
+end;
+
+function strUpperCaseSpecialUTF8(codePoint: integer): string;
+const block: array[0..465] of byte = ( $53, $53, $46, $46, $46, $49, $46, $4C, $46, $46, $49, $46, $46, $4C, $53, $54, $53, $54, $D4, $B5, $D5, $92, $D5, $84, $D5, $86, $D5, $84, $D4, $B5, $D5, $84, $D4, $BB, $D5, $8E, $D5, $86, $D5, $84, $D4, $BD, $CA, $BC, $4E, $CE, $99, $CC, $88, $CC, $81, $CE, $A5, $CC, $88, $CC, $81, $4A, $CC, $8C, $48, $CC, $B1, $54, $CC, $88, $57, $CC, $8A, $59, $CC, $8A, $41, $CA, $BE, $CE, $A5, $CC, $93, $CE, $A5, $CC, $93, $CC, $80, $CE, $A5, $CC, $93, $CC, $81, $CE, $A5, $CC, $93, $CD, $82, $CE, $91, $CD, $82, $CE, $97, $CD, $82, $CE, $99, $CC, $88, $CC, $80, $CE, $99, $CC, $88, $CC, $81, $CE, $99, $CD, $82, $CE, $99, $CC, $88, $CD, $82, $CE, $A5, $CC, $88, $CC, $80, $CE, $A5, $CC, $88, $CC, $81, $CE, $A1, $CC, $93, $CE, $A5, $CD, $82, $CE, $A5, $CC, $88, $CD, $82, $CE, $A9, $CD, $82, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC, $8B, $CE, $99, $E1, $BC, $8C, $CE, $99, $E1, $BC, $8D, $CE, $99, $E1, $BC, $8E, $CE, $99, $E1, $BC, $8F, $CE, $99, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC, $8B, $CE, $99, $E1, $BC, $8C, $CE, $99, $E1, $BC, $8D, $CE, $99, $E1, $BC, $8E, $CE, $99, $E1, $BC, $8F, $CE, $99, $E1, $BC, $A8, $CE, $99, $E1, $BC, $A9, $CE, $99, $E1, $BC, $AA, $CE, $99, $E1, $BC, $AB, $CE, $99, $E1, $BC, $AC, $CE, $99, $E1, $BC, $AD, $CE, $99, $E1, $BC, $AE, $CE, $99, $E1, $BC, $AF, $CE, $99, $E1, $BC, $A8, $CE, $99, $E1, $BC, $A9, $CE, $99, $E1, $BC, $AA, $CE, $99, $E1, $BC, $AB, $CE, $99, $E1, $BC, $AC, $CE, $99, $E1, $BC, $AD, $CE, $99, $E1, $BC, $AE, $CE, $99, $E1, $BC, $AF, $CE, $99, $E1, $BD, $A8, $CE, $99, $E1, $BD, $A9, $CE, $99, $E1, $BD, $AA, $CE, $99, $E1, $BD, $AB, $CE, $99, $E1, $BD, $AC, $CE, $99, $E1, $BD, $AD, $CE, $99, $E1, $BD, $AE, $CE, $99, $E1, $BD, $AF, $CE, $99, $E1, $BD, $A8, $CE, $99, $E1, $BD, $A9, $CE, $99, $E1, $BD, $AA, $CE, $99, $E1, $BD, $AB, $CE, $99, $E1, $BD, $AC, $CE, $99, $E1, $BD, $AD, $CE, $99, $E1, $BD, $AE, $CE, $99, $E1, $BD, $AF, $CE, $99, $CE, $91, $CE, $99, $CE, $91, $CE, $99, $CE, $97, $CE, $99, $CE, $97, $CE, $99, $CE, $A9, $CE, $99, $CE, $A9, $CE, $99, $E1, $BE, $BA, $CE, $99, $CE, $86, $CE, $99, $E1, $BF, $8A, $CE, $99, $CE, $89, $CE, $99, $E1, $BF, $BA, $CE, $99, $CE, $8F, $CE, $99, $CE, $91, $CD, $82, $CE, $99, $CE, $97, $CD, $82, $CE, $99, $CE, $A9, $CD, $82, $CE, $99);
+var special: integer;
+begin
+  special := 0;
+  case codePoint of
+    $00DF: special := $00000002; //ß 00DF; 00DF; 0053 0073; 0053 0053;
+    $FB00: special := $00020002; //ﬀ FB00; FB00; 0046 0066; 0046 0046;
+    $FB01: special := $00040002; //ﬁ FB01; FB01; 0046 0069; 0046 0049;
+    $FB02: special := $00060002; //ﬂ FB02; FB02; 0046 006C; 0046 004C;
+    $FB03: special := $00080003; //ﬃ FB03; FB03; 0046 0066 0069; 0046 0046 0049;
+    $FB04: special := $000B0003; //ﬄ FB04; FB04; 0046 0066 006C; 0046 0046 004C;
+    $FB05: special := $000E0002; //ﬅ FB05; FB05; 0053 0074; 0053 0054;
+    $FB06: special := $00100002; //ﬆ FB06; FB06; 0053 0074; 0053 0054;
+    $0587: special := $00120004; //և 0587; 0587; 0535 0582; 0535 0552;
+    $FB13: special := $00160004; //ﬓ FB13; FB13; 0544 0576; 0544 0546;
+    $FB14: special := $001A0004; //ﬔ FB14; FB14; 0544 0565; 0544 0535;
+    $FB15: special := $001E0004; //ﬕ FB15; FB15; 0544 056B; 0544 053B;
+    $FB16: special := $00220004; //ﬖ FB16; FB16; 054E 0576; 054E 0546;
+    $FB17: special := $00260004; //ﬗ FB17; FB17; 0544 056D; 0544 053D;
+    $0149: special := $002A0003; //ŉ 0149; 0149; 02BC 004E; 02BC 004E;
+    $0390: special := $002D0006; //ΐ 0390; 0390; 0399 0308 0301; 0399 0308 0301;
+    $03B0: special := $00330006; //ΰ 03B0; 03B0; 03A5 0308 0301; 03A5 0308 0301;
+    $01F0: special := $00390003; //ǰ 01F0; 01F0; 004A 030C; 004A 030C;
+    $1E96: special := $003C0003; //ẖ 1E96; 1E96; 0048 0331; 0048 0331;
+    $1E97: special := $003F0003; //ẗ 1E97; 1E97; 0054 0308; 0054 0308;
+    $1E98: special := $00420003; //ẘ 1E98; 1E98; 0057 030A; 0057 030A;
+    $1E99: special := $00450003; //ẙ 1E99; 1E99; 0059 030A; 0059 030A;
+    $1E9A: special := $00480003; //ẚ 1E9A; 1E9A; 0041 02BE; 0041 02BE;
+    $1F50: special := $004B0004; //ὐ 1F50; 1F50; 03A5 0313; 03A5 0313;
+    $1F52: special := $004F0006; //ὒ 1F52; 1F52; 03A5 0313 0300; 03A5 0313 0300;
+    $1F54: special := $00550006; //ὔ 1F54; 1F54; 03A5 0313 0301; 03A5 0313 0301;
+    $1F56: special := $005B0006; //ὖ 1F56; 1F56; 03A5 0313 0342; 03A5 0313 0342;
+    $1FB6: special := $00610004; //ᾶ 1FB6; 1FB6; 0391 0342; 0391 0342;
+    $1FC6: special := $00650004; //ῆ 1FC6; 1FC6; 0397 0342; 0397 0342;
+    $1FD2: special := $00690006; //ῒ 1FD2; 1FD2; 0399 0308 0300; 0399 0308 0300;
+    $1FD3: special := $006F0006; //ΐ 1FD3; 1FD3; 0399 0308 0301; 0399 0308 0301;
+    $1FD6: special := $00750004; //ῖ 1FD6; 1FD6; 0399 0342; 0399 0342;
+    $1FD7: special := $00790006; //ῗ 1FD7; 1FD7; 0399 0308 0342; 0399 0308 0342;
+    $1FE2: special := $007F0006; //ῢ 1FE2; 1FE2; 03A5 0308 0300; 03A5 0308 0300;
+    $1FE3: special := $00850006; //ΰ 1FE3; 1FE3; 03A5 0308 0301; 03A5 0308 0301;
+    $1FE4: special := $008B0004; //ῤ 1FE4; 1FE4; 03A1 0313; 03A1 0313;
+    $1FE6: special := $008F0004; //ῦ 1FE6; 1FE6; 03A5 0342; 03A5 0342;
+    $1FE7: special := $00930006; //ῧ 1FE7; 1FE7; 03A5 0308 0342; 03A5 0308 0342;
+    $1FF6: special := $00990004; //ῶ 1FF6; 1FF6; 03A9 0342; 03A9 0342;
+    $1F80: special := $009D0005; //ᾀ 1F80; 1F80; 1F88; 1F08 0399;
+    $1F81: special := $00A20005; //ᾁ 1F81; 1F81; 1F89; 1F09 0399;
+    $1F82: special := $00A70005; //ᾂ 1F82; 1F82; 1F8A; 1F0A 0399;
+    $1F83: special := $00AC0005; //ᾃ 1F83; 1F83; 1F8B; 1F0B 0399;
+    $1F84: special := $00B10005; //ᾄ 1F84; 1F84; 1F8C; 1F0C 0399;
+    $1F85: special := $00B60005; //ᾅ 1F85; 1F85; 1F8D; 1F0D 0399;
+    $1F86: special := $00BB0005; //ᾆ 1F86; 1F86; 1F8E; 1F0E 0399;
+    $1F87: special := $00C00005; //ᾇ 1F87; 1F87; 1F8F; 1F0F 0399;
+    $1F88: special := $00C50005; //ᾈ 1F88; 1F80; 1F88; 1F08 0399;
+    $1F89: special := $00CA0005; //ᾉ 1F89; 1F81; 1F89; 1F09 0399;
+    $1F8A: special := $00CF0005; //ᾊ 1F8A; 1F82; 1F8A; 1F0A 0399;
+    $1F8B: special := $00D40005; //ᾋ 1F8B; 1F83; 1F8B; 1F0B 0399;
+    $1F8C: special := $00D90005; //ᾌ 1F8C; 1F84; 1F8C; 1F0C 0399;
+    $1F8D: special := $00DE0005; //ᾍ 1F8D; 1F85; 1F8D; 1F0D 0399;
+    $1F8E: special := $00E30005; //ᾎ 1F8E; 1F86; 1F8E; 1F0E 0399;
+    $1F8F: special := $00E80005; //ᾏ 1F8F; 1F87; 1F8F; 1F0F 0399;
+    $1F90: special := $00ED0005; //ᾐ 1F90; 1F90; 1F98; 1F28 0399;
+    $1F91: special := $00F20005; //ᾑ 1F91; 1F91; 1F99; 1F29 0399;
+    $1F92: special := $00F70005; //ᾒ 1F92; 1F92; 1F9A; 1F2A 0399;
+    $1F93: special := $00FC0005; //ᾓ 1F93; 1F93; 1F9B; 1F2B 0399;
+    $1F94: special := $01010005; //ᾔ 1F94; 1F94; 1F9C; 1F2C 0399;
+    $1F95: special := $01060005; //ᾕ 1F95; 1F95; 1F9D; 1F2D 0399;
+    $1F96: special := $010B0005; //ᾖ 1F96; 1F96; 1F9E; 1F2E 0399;
+    $1F97: special := $01100005; //ᾗ 1F97; 1F97; 1F9F; 1F2F 0399;
+    $1F98: special := $01150005; //ᾘ 1F98; 1F90; 1F98; 1F28 0399;
+    $1F99: special := $011A0005; //ᾙ 1F99; 1F91; 1F99; 1F29 0399;
+    $1F9A: special := $011F0005; //ᾚ 1F9A; 1F92; 1F9A; 1F2A 0399;
+    $1F9B: special := $01240005; //ᾛ 1F9B; 1F93; 1F9B; 1F2B 0399;
+    $1F9C: special := $01290005; //ᾜ 1F9C; 1F94; 1F9C; 1F2C 0399;
+    $1F9D: special := $012E0005; //ᾝ 1F9D; 1F95; 1F9D; 1F2D 0399;
+    $1F9E: special := $01330005; //ᾞ 1F9E; 1F96; 1F9E; 1F2E 0399;
+    $1F9F: special := $01380005; //ᾟ 1F9F; 1F97; 1F9F; 1F2F 0399;
+    $1FA0: special := $013D0005; //ᾠ 1FA0; 1FA0; 1FA8; 1F68 0399;
+    $1FA1: special := $01420005; //ᾡ 1FA1; 1FA1; 1FA9; 1F69 0399;
+    $1FA2: special := $01470005; //ᾢ 1FA2; 1FA2; 1FAA; 1F6A 0399;
+    $1FA3: special := $014C0005; //ᾣ 1FA3; 1FA3; 1FAB; 1F6B 0399;
+    $1FA4: special := $01510005; //ᾤ 1FA4; 1FA4; 1FAC; 1F6C 0399;
+    $1FA5: special := $01560005; //ᾥ 1FA5; 1FA5; 1FAD; 1F6D 0399;
+    $1FA6: special := $015B0005; //ᾦ 1FA6; 1FA6; 1FAE; 1F6E 0399;
+    $1FA7: special := $01600005; //ᾧ 1FA7; 1FA7; 1FAF; 1F6F 0399;
+    $1FA8: special := $01650005; //ᾨ 1FA8; 1FA0; 1FA8; 1F68 0399;
+    $1FA9: special := $016A0005; //ᾩ 1FA9; 1FA1; 1FA9; 1F69 0399;
+    $1FAA: special := $016F0005; //ᾪ 1FAA; 1FA2; 1FAA; 1F6A 0399;
+    $1FAB: special := $01740005; //ᾫ 1FAB; 1FA3; 1FAB; 1F6B 0399;
+    $1FAC: special := $01790005; //ᾬ 1FAC; 1FA4; 1FAC; 1F6C 0399;
+    $1FAD: special := $017E0005; //ᾭ 1FAD; 1FA5; 1FAD; 1F6D 0399;
+    $1FAE: special := $01830005; //ᾮ 1FAE; 1FA6; 1FAE; 1F6E 0399;
+    $1FAF: special := $01880005; //ᾯ 1FAF; 1FA7; 1FAF; 1F6F 0399;
+    $1FB3: special := $018D0004; //ᾳ 1FB3; 1FB3; 1FBC; 0391 0399;
+    $1FBC: special := $01910004; //ᾼ 1FBC; 1FB3; 1FBC; 0391 0399;
+    $1FC3: special := $01950004; //ῃ 1FC3; 1FC3; 1FCC; 0397 0399;
+    $1FCC: special := $01990004; //ῌ 1FCC; 1FC3; 1FCC; 0397 0399;
+    $1FF3: special := $019D0004; //ῳ 1FF3; 1FF3; 1FFC; 03A9 0399;
+    $1FFC: special := $01A10004; //ῼ 1FFC; 1FF3; 1FFC; 03A9 0399;
+    $1FB2: special := $01A50005; //ᾲ 1FB2; 1FB2; 1FBA 0345; 1FBA 0399;
+    $1FB4: special := $01AA0004; //ᾴ 1FB4; 1FB4; 0386 0345; 0386 0399;
+    $1FC2: special := $01AE0005; //ῂ 1FC2; 1FC2; 1FCA 0345; 1FCA 0399;
+    $1FC4: special := $01B30004; //ῄ 1FC4; 1FC4; 0389 0345; 0389 0399;
+    $1FF2: special := $01B70005; //ῲ 1FF2; 1FF2; 1FFA 0345; 1FFA 0399;
+    $1FF4: special := $01BC0004; //ῴ 1FF4; 1FF4; 038F 0345; 038F 0399;
+    $1FB7: special := $01C00006; //ᾷ 1FB7; 1FB7; 0391 0342 0345; 0391 0342 0399;
+    $1FC7: special := $01C60006; //ῇ 1FC7; 1FC7; 0397 0342 0345; 0397 0342 0399;
+    $1FF7: special := $01CC0006; //ῷ 1FF7; 1FF7; 03A9 0342 0345; 03A9 0342 0399;
+  end;
+  if special <> 0 then begin setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
+  else result := strGetUnicodeCharacter(CodePoint);
+end;
+
+function strLowerCaseSpecialUTF8(codePoint: integer): string;
+const block: array[0..83] of byte = ( $69, $CC, $87, $E1, $BE, $80, $E1, $BE, $81, $E1, $BE, $82, $E1, $BE, $83, $E1, $BE, $84, $E1, $BE, $85, $E1, $BE, $86, $E1, $BE, $87, $E1, $BE, $90, $E1, $BE, $91, $E1, $BE, $92, $E1, $BE, $93, $E1, $BE, $94, $E1, $BE, $95, $E1, $BE, $96, $E1, $BE, $97, $E1, $BE, $A0, $E1, $BE, $A1, $E1, $BE, $A2, $E1, $BE, $A3, $E1, $BE, $A4, $E1, $BE, $A5, $E1, $BE, $A6, $E1, $BE, $A7, $E1, $BE, $B3, $E1, $BF, $83, $E1, $BF, $B3);
+var special: integer;
+begin
+  special := 0;
+  case codePoint of
+    $0130: special := $00000003; //İ 0130; 0069 0307; 0130; 0130;
+    $1F88: special := $00030003; //ᾈ 1F88; 1F80; 1F88; 1F08 0399;
+    $1F89: special := $00060003; //ᾉ 1F89; 1F81; 1F89; 1F09 0399;
+    $1F8A: special := $00090003; //ᾊ 1F8A; 1F82; 1F8A; 1F0A 0399;
+    $1F8B: special := $000C0003; //ᾋ 1F8B; 1F83; 1F8B; 1F0B 0399;
+    $1F8C: special := $000F0003; //ᾌ 1F8C; 1F84; 1F8C; 1F0C 0399;
+    $1F8D: special := $00120003; //ᾍ 1F8D; 1F85; 1F8D; 1F0D 0399;
+    $1F8E: special := $00150003; //ᾎ 1F8E; 1F86; 1F8E; 1F0E 0399;
+    $1F8F: special := $00180003; //ᾏ 1F8F; 1F87; 1F8F; 1F0F 0399;
+    $1F98: special := $001B0003; //ᾘ 1F98; 1F90; 1F98; 1F28 0399;
+    $1F99: special := $001E0003; //ᾙ 1F99; 1F91; 1F99; 1F29 0399;
+    $1F9A: special := $00210003; //ᾚ 1F9A; 1F92; 1F9A; 1F2A 0399;
+    $1F9B: special := $00240003; //ᾛ 1F9B; 1F93; 1F9B; 1F2B 0399;
+    $1F9C: special := $00270003; //ᾜ 1F9C; 1F94; 1F9C; 1F2C 0399;
+    $1F9D: special := $002A0003; //ᾝ 1F9D; 1F95; 1F9D; 1F2D 0399;
+    $1F9E: special := $002D0003; //ᾞ 1F9E; 1F96; 1F9E; 1F2E 0399;
+    $1F9F: special := $00300003; //ᾟ 1F9F; 1F97; 1F9F; 1F2F 0399;
+    $1FA8: special := $00330003; //ᾨ 1FA8; 1FA0; 1FA8; 1F68 0399;
+    $1FA9: special := $00360003; //ᾩ 1FA9; 1FA1; 1FA9; 1F69 0399;
+    $1FAA: special := $00390003; //ᾪ 1FAA; 1FA2; 1FAA; 1F6A 0399;
+    $1FAB: special := $003C0003; //ᾫ 1FAB; 1FA3; 1FAB; 1F6B 0399;
+    $1FAC: special := $003F0003; //ᾬ 1FAC; 1FA4; 1FAC; 1F6C 0399;
+    $1FAD: special := $00420003; //ᾭ 1FAD; 1FA5; 1FAD; 1F6D 0399;
+    $1FAE: special := $00450003; //ᾮ 1FAE; 1FA6; 1FAE; 1F6E 0399;
+    $1FAF: special := $00480003; //ᾯ 1FAF; 1FA7; 1FAF; 1F6F 0399;
+    $1FBC: special := $004B0003; //ᾼ 1FBC; 1FB3; 1FBC; 0391 0399;
+    $1FCC: special := $004E0003; //ῌ 1FCC; 1FC3; 1FCC; 0397 0399;
+    $1FFC: special := $00510003; //ῼ 1FFC; 1FF3; 1FFC; 03A9 0399;
+  end;
+  if special <> 0 then begin setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
+  else result := strGetUnicodeCharacter(CodePoint);
 end;
 
 

@@ -41,6 +41,7 @@ begin
   result := copy(s, startOffset, endOffset - startOffset);
 end;
 
+
 function xqFunctionString_length(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   temp: String;
@@ -140,6 +141,44 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+function strUpperUtf8(const s: RawByteString): string;
+var
+  cpup: LongInt;
+  cp: Integer;
+begin
+  result := '';
+  for cp in strIterator(s) do begin
+    cpup := utf8proc_get_property(cp)^.uppercase_mapping;
+    if cpup = -1 then result += strUpperCaseSpecialUTF8(cp)
+    else result += strGetUnicodeCharacter(cpup);
+  end;
+end;
+
+function strLowerUtf8(const s: RawByteString): string;
+var
+  cplow: LongInt;
+  cp: Integer;
+begin
+  result := '';
+  for cp in strIterator(s) do begin
+    cplow := utf8proc_get_property(cp)^.lowercase_mapping;
+    if cplow = -1 then result += strLowerCaseSpecialUTF8(cp)
+    else result += strGetUnicodeCharacter(cplow);
+  end;
+end;
+
+function xqFunctionUpper_Case(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 1);
+  result := xqvalue(strUpperUtf8(args[0].toString));
+end;
+
+function xqFunctionLower_case(const args: TXQVArray): IXQValue;
+begin
+  requiredArgCount(args, 1);
+  result := xqvalue(strLowerUtf8(args[0].toString));
+end;
+
 var fn: TXQNativeModule;
 initialization
   fn := TXQueryEngine.findNativeModule(XMLNamespaceURL_XPathFunctions);
@@ -148,5 +187,7 @@ initialization
   fn.findBasicFunction('substring', 3, xqpmXPath2).func:=@xqFunctionSubstring;
   fn.findBasicFunction('string-to-codepoints', 1, xqpmXPath2).func:=@xqFunctionString_to_codepoints;
   fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode, ['($arg as xs:string?) as xs:string', '($arg as string?, $normalizationForm as xs:string) as xs:string']);
+  fn.findBasicFunction('upper-case', 1, xqpmXPath2).func:=@xqFunctionUpper_Case;
+  fn.findBasicFunction('lower-case', 1, xqpmXPath2).func:=@xqFunctionLower_case;
 end.
 
