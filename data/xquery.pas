@@ -4149,7 +4149,8 @@ var ak, bk: TXQValueKind;
         if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
            or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
           if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
-            result := 0;
+            result := 0
+          else result := -2;
       pvkNull: result := 0;
       pvkUndefined: result := -2;
       pvkNode, pvkString: result := compareCommonAsStrings;
@@ -4157,7 +4158,8 @@ var ak, bk: TXQValueKind;
         if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
         if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
         result := compareCommon(a.get(1) as TXQValue, b.get(1) as TXQValue, overrideCollation, castUnknownToString);
-      end
+      end;
+      pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
       else raisePXPInternalError;
     end;
   end;
@@ -4202,6 +4204,7 @@ begin
       exit(compareCommon(a.get(1) as TXQValue,b,overrideCollation,castUnknownToString));
     end;
     pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
+    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
   end;
   case bk of
     pvkUndefined: exit(-2);
@@ -4210,6 +4213,7 @@ begin
       exit(compareCommon(a,b.get(1) as TXQValue,overrideCollation,castUnknownToString));
     end;
     pvkNull: exit(1);
+    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
   end;
   if ak = pvkNull then exit(-1); //can only test this after checkin b's sequence state
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
