@@ -1958,7 +1958,7 @@ var
        xqtfcForPattern:
          for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(context) do
            addPatternVariableBinding(tempv);
-       xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(context).toBoolean then
+       xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(context).toBooleanEffective then
          evaluateForLoop(pos + 1);
        xqtfcOrder: begin
          currentTuple.orders[clauseIndex[pos]] := TXQTermFlowerOrder(clause).expr.evaluate(context);

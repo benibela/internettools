@@ -2072,7 +2072,7 @@ end;
 
 function TXQValueFunction.toBooleanEffective: boolean;
 begin
-  raise EXQEvaluationException.Create('FORG0006', 'A datetime cannot be used a boolean');
+  raise EXQEvaluationException.Create('FORG0006', 'A function cannot be used a boolean');
   result := false;
 end;
 
