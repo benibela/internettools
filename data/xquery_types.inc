@@ -1089,7 +1089,11 @@ begin
     usedFormat:=formats[i];
     result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone, [dtpfStrict]);
     if result = dtprSuccess then begin
-      if ( (not duration) and ((data^.year = 0) or (((abs(data^.year) < 10000) and strBeginsWith(usedFormat, 'y') and not strBeginsWith(s, strFromInt(data^.year, 4))  ))))
+      if ( (not duration) and (
+             ((data^.year = 0) and (baseSchema.version = xsd10))
+            or (((abs(data^.year) < 10000) and strBeginsWith(usedFormat, 'y')
+                  and not strBeginsWith(s, strFromInt(data^.year, 4))
+                  and not ((data^.year = 0) and strBeginsWith(s, '-0000'))  ))))
          or ((data^.hour = 24) and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs)))
          or ((data^.timezone <> high(Integer)) and ((data^.timezone < -14 * 60) or (data^.timezone > 14 * 60)))
          then
@@ -1108,7 +1112,7 @@ begin
     exit();
   if not duration then begin
     for i:=1 to 6 do
-      if (i <= 3) and (data^.values[i] = 0) then begin
+      if (i in [2,3]) and (data^.values[i] = 0) then begin
         if pos(componentChars[i], usedFormat) > 0 then exit(dtprFailure);
       end else begin
         compMax := componentMax[i];
