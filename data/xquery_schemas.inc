@@ -1100,7 +1100,7 @@ end;
 constructor TXSSchema.Create;
 
 begin
-  version := xsd10;
+  version := xsd11;
   typeList := TXQMapStringObject.Create;
   if baseSchema <> nil then begin
     anyType := baseSchema.anyType;
