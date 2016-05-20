@@ -90,7 +90,6 @@ type
 
   procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
   procedure RethrowJavaExceptionIfThereIsOne();
-  function ExceptionDescribe: string;
   function ExceptionDescribeAndClear: string;
   function ExceptionCheck: boolean;
 
@@ -728,7 +727,7 @@ begin
   RethrowJavaExceptionIfThereIsOne(EAndroidInterfaceException);
 end;
 
-function TJavaEnv.ExceptionDescribe: string;
+function TJavaEnv.ExceptionDescribeAndClear: string;
 var je: jthrowable;
     temp: jobject;
     message: String;
@@ -736,17 +735,12 @@ begin
   je := env^^.ExceptionOccurred(env);
   if je = nil then exit('');
   env^^.ExceptionDescribe(env);
+  env^^.ExceptionClear(env); //carefully, we need to clear before calling anything else
   temp:= env^^.CallObjectMethod(env, je, getmethod('java/lang/Object', 'getClass', '()Ljava/lang/Class;'));
   result := jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, getmethod('java/lang/Class', 'getName', '()Ljava/lang/String;'))) + ': '
           + jStringToStringAndDelete(env^^.CallObjectMethod(env, je, getmethod('java/lang/Throwable', 'getMessage', '()Ljava/lang/String;')));
   env^^.DeleteLocalRef(env, temp);
   env^^.DeleteLocalRef(env, je);
-end;
-
-function TJavaEnv.ExceptionDescribeAndClear: string;
-begin
-  result := ExceptionDescribe;
-  env^^.ExceptionClear(env);
 end;
 
 function TJavaEnv.ExceptionCheck: boolean;
