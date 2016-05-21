@@ -4,8 +4,6 @@
   If this unit is included in any uses clause it overrides the default string-length, substring, translate, string-to-codepoints XQuery functions
   with utf8-aware functions.
 
-  It depends on the utf8tools (http://wiki.lazarus.freepascal.org/Theodp). (You need to remove the uc >= $FDD0 checks from its unicodeinfo, if you want it to pass all XQuery test suite tests.)
-
   @author Benito van der Zander (http://www.benibela.de)
 *}
 
@@ -13,14 +11,31 @@ unit xquery_utf8;
 
 {$mode objfpc}{$H+}
 
+{$ifdef USE_FLRE}{$DEFINE USE_BBFLRE_UNICODE}{$endif}
+
+//Here you can choose which Unicode database to use
+{$if not defined(USE_THEO_UNICODE) and not defined(USE_BBFLRE_UNICODE) and not defined(USE_BBFULL_UNICODE) }
+//{$DEFINE USE_BBFLRE_UNICODE}  //FLRE's Unicode database together with normalization data required for XQuery. If FLRE is used anyways, this minimizes the file size
+{$DEFINE USE_BBFULL_UNICODE}    //My upgraded port of UTF8Proc. It is complete and self-contained, but quite large.
+//{$DEFINE USE_THEO_UNICODE}    //Theo's port of UTF8Proc: Utf8 Tools. If you are already using it elsewhere, you might want to use it to avoid duplicated Unicode tables
+{$endif}
+
+
 interface
 
 uses
   Classes, SysUtils;
 
-implementation
-uses xquery, bbunicodeinfo, bbutils;
 
+
+implementation
+uses xquery, bbutils,
+  {$IFDEF USE_FLREBB_UNICODE}FLREUnicode,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
+  {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
+  {$IFDEF USE_THEO_UNICODE}unicodeinfo{$ENDIF} //from http://wiki.lazarus.freepascal.org/Theodp
+  ;
+
+{$IF defined(USE_BBFULL_UNICODE) or defined(USE_THEO_UNICODE)}{$DEFINE HAS_UTF8PROC}{$ENDIF}
 
 procedure strOffsetUTF8(const s: RawByteString; index: integer; var offset: integer);
 begin
@@ -148,7 +163,9 @@ var
 begin
   result := '';
   for cp in strIterator(s) do begin
+    {$IFDEF HAS_UTF8PROC}
     cpup := utf8proc_get_property(cp)^.uppercase_mapping;
+    {$ENDIF}
     if cpup = -1 then result += strUpperCaseSpecialUTF8(cp)
     else result += strGetUnicodeCharacter(cpup);
   end;
@@ -161,7 +178,9 @@ var
 begin
   result := '';
   for cp in strIterator(s) do begin
+    {$IFDEF HAS_UTF8PROC}
     cplow := utf8proc_get_property(cp)^.lowercase_mapping;
+    {$ENDIF}
     if cplow = -1 then result += strLowerCaseSpecialUTF8(cp)
     else result += strGetUnicodeCharacter(cplow);
   end;
