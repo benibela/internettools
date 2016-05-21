@@ -131,13 +131,12 @@ type
 
   utf8proc_propval_t = Smallint;
   utf8proc_property_t = packed record
-    combining_class: utf8proc_propval_t;
+    combining_class: byte;
+    comp_exclusion: byte;
     decomp_type: byte;
     decomp_length: byte;
     decomp_mapping: word;
-    comb1st_index: Smallint;
-    comb2nd_index: Smallint;
-    comp_exclusion: boolean;
+    comb_index: word;
   end;
   putf8proc_property_t = ^utf8proc_property_t;
 
@@ -613,7 +612,7 @@ begin
             minindex += 2;
           end;
           if ((composition >= 0) and
-            ((0 = (options and UTF8PROC_STABLE)) or (not utf8proc_get_property(composition)^.comp_exclusion))) then
+            ((0 = (options and UTF8PROC_STABLE)) or (0 = utf8proc_get_property(composition)^.comp_exclusion))) then
           begin
             starter^ := composition;
             starter_property := nil;
