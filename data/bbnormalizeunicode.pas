@@ -500,7 +500,7 @@ var
   hangul_sindex: longint;
   hangul_vindex: longint;
   hangul_tindex: longint;
-  maxindex, minindex: SmallInt;
+  maxindex, minindex, tempindex: integer;
 begin
   starter_property := nil;
   if (options and (UTF8PROC_NLF2LS or UTF8PROC_NLF2PS or UTF8PROC_STRIPCC) <> 0) then
@@ -598,11 +598,13 @@ begin
         begin
           starter_property := utf8proc_get_property(starter^);
         end;
-        if (starter_property^.comb1st_index >= 0) and (current_property^.comb2nd_index >= 0) then
+        if (starter_property^.comb_index > 0) and (starter_property^.comb_index < $8000)
+            and (current_property^.comb_index >= $8000) then
         begin
           composition := 0;
-          minindex := current_property^.comb2nd_index shr 8 + utf8proc_combinations_starts[starter_property^.comb1st_index];
-          maxindex := current_property^.comb2nd_index and $FF + utf8proc_combinations_starts[starter_property^.comb1st_index];
+          tempindex := utf8proc_combinations_starts[starter_property^.comb_index];
+          minindex := ((current_property^.comb_index shr 8) and $7F) + tempindex;
+          maxindex := (current_property^.comb_index and $FF) + tempindex;
           while minindex <= maxindex do begin
             if utf8proc_combinations[minindex] = current_char then begin
               composition := utf8proc_combinations[minindex + 1];
