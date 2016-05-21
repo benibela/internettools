@@ -15,8 +15,8 @@ unit xquery_utf8;
 
 //Here you can choose which Unicode database to use
 {$if not defined(USE_THEO_UNICODE) and not defined(USE_BBFLRE_UNICODE) and not defined(USE_BBFULL_UNICODE) }
-//{$DEFINE USE_BBFLRE_UNICODE}  //FLRE's Unicode database together with normalization data required for XQuery. If FLRE is used anyways, this minimizes the file size
-{$DEFINE USE_BBFULL_UNICODE}    //My upgraded port of UTF8Proc. It is complete and self-contained, but quite large.
+{$DEFINE USE_BBFLRE_UNICODE}  //FLRE's Unicode database together with normalization data required for XQuery. If FLRE is used anyways, this minimizes the file size
+//{$DEFINE USE_BBFULL_UNICODE}    //My upgraded port of UTF8Proc. It is complete and self-contained, but quite large.
 //{$DEFINE USE_THEO_UNICODE}    //Theo's port of UTF8Proc: Utf8 Tools. If you are already using it elsewhere, you might want to use it to avoid duplicated Unicode tables
 {$endif}
 
@@ -30,12 +30,11 @@ uses
 
 implementation
 uses xquery, bbutils,
-  {$IFDEF USE_FLREBB_UNICODE}FLREUnicode,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
+  {$IFDEF USE_BBFLRE_UNICODE}FLREUnicode,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
   {$IFDEF USE_THEO_UNICODE}unicodeinfo{$ENDIF} //from http://wiki.lazarus.freepascal.org/Theodp
   ;
 
-{$IF defined(USE_BBFULL_UNICODE) or defined(USE_THEO_UNICODE)}{$DEFINE HAS_UTF8PROC}{$ENDIF}
 
 procedure strOffsetUTF8(const s: RawByteString; index: integer; var offset: integer);
 begin
@@ -156,6 +155,43 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+{$IFDEF USE_BBFLRE_UNICODE}
+function cpToUppercase(cp: integer): integer; inline;
+var
+  Value: LongInt;
+begin
+  result := cp;
+  if result<=$10ffff then begin
+    Value:=result shr FLREUnicodeUpperCaseDeltaArrayBlockBits;
+    result:=longword(longint(result+FLREUnicodeUpperCaseDeltaArrayBlockData[FLREUnicodeUpperCaseDeltaArrayIndexBlockData[FLREUnicodeUpperCaseDeltaArrayIndexIndexData[Value shr FLREUnicodeUpperCaseDeltaArrayIndexBlockBits],Value and FLREUnicodeUpperCaseDeltaArrayIndexBlockMask],result and FLREUnicodeUpperCaseDeltaArrayBlockMask]));
+   end;
+end;
+
+function cpToLowercase(cp: integer): integer; inline;
+var
+  Value: LongInt;
+begin
+  result := cp;
+  if result<=$10ffff then begin
+    Value:=result shr FLREUnicodeLowerCaseDeltaArrayBlockBits;
+    result:=longword(longint(result+FLREUnicodeLowerCaseDeltaArrayBlockData[FLREUnicodeLowerCaseDeltaArrayIndexBlockData[FLREUnicodeLowerCaseDeltaArrayIndexIndexData[Value shr FLREUnicodeLowerCaseDeltaArrayIndexBlockBits],Value and FLREUnicodeLowerCaseDeltaArrayIndexBlockMask],result and FLREUnicodeLowerCaseDeltaArrayBlockMask]));
+  end;
+end;
+{$ELSE}
+function cpToUppercase(cp: integer): integer; inline;
+begin
+  result := utf8proc_get_property(cp)^.uppercase_mapping;
+  if result = -1 then result := cp;
+end;
+
+function cpToLowercase(cp: integer): integer; inline;
+begin
+  result := utf8proc_get_property(cp)^.lowercase_mapping;
+  if result = -1 then result := cp;
+end;
+
+{$ENDIF}
+
 function strUpperUtf8(const s: RawByteString): string;
 var
   cpup: LongInt;
@@ -163,10 +199,8 @@ var
 begin
   result := '';
   for cp in strIterator(s) do begin
-    {$IFDEF HAS_UTF8PROC}
-    cpup := utf8proc_get_property(cp)^.uppercase_mapping;
-    {$ENDIF}
-    if cpup = -1 then result += strUpperCaseSpecialUTF8(cp)
+    cpup := cpToUppercase(cp);
+    if cpup = cp then result += strUpperCaseSpecialUTF8(cp)
     else result += strGetUnicodeCharacter(cpup);
   end;
 end;
@@ -178,10 +212,8 @@ var
 begin
   result := '';
   for cp in strIterator(s) do begin
-    {$IFDEF HAS_UTF8PROC}
-    cplow := utf8proc_get_property(cp)^.lowercase_mapping;
-    {$ENDIF}
-    if cplow = -1 then result += strLowerCaseSpecialUTF8(cp)
+    cplow := cpToLowercase(cp);
+    if cplow = cp then result += strLowerCaseSpecialUTF8(cp)
     else result += strGetUnicodeCharacter(cplow);
   end;
 end;

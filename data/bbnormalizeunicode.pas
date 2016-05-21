@@ -1,8 +1,7 @@
-unit bbunicodeinfo;
+unit bbnormalizeunicode;
 
 (* Upgraded to utf8proc v1.3.1 and simplified: 2016 Benito van der Zander
 *)
-
 
 (*
  * FreePascal translation of the utf8proc library plus some additions: 2008 Theo Lustenberger
@@ -57,16 +56,10 @@ const
   UTF8PROC_COMPAT = 1 shl 2;
   UTF8PROC_COMPOSE = 1 shl 3;
   UTF8PROC_DECOMPOSE = 1 shl 4;
-  UTF8PROC_IGNORE = 1 shl 5;
-  UTF8PROC_REJECTNA = 1 shl 6;
   UTF8PROC_NLF2LS = 1 shl 7;
   UTF8PROC_NLF2PS = 1 shl 8;
   UTF8PROC_NLF2LF = UTF8PROC_NLF2LS or UTF8PROC_NLF2PS;
   UTF8PROC_STRIPCC = 1 shl 9;
-  UTF8PROC_CASEFOLD = 1 shl 10;
-  UTF8PROC_CHARBOUND = 1 shl 11;
-  UTF8PROC_LUMP = 1 shl 12;
-  UTF8PROC_STRIPMARK = 1 shl 13;
 
   UTF8PROC_HANGUL_SBASE = $AC00;
   UTF8PROC_HANGUL_LBASE = $1100;
@@ -87,74 +80,6 @@ const
   UTF8PROC_HANGUL_S_START = $AC00;
   UTF8PROC_HANGUL_S_END = $D7A4;
 
-  UTF8PROC_BOUNDCLASS_START = 0;
-  UTF8PROC_BOUNDCLASS_OTHER = 1;
-  UTF8PROC_BOUNDCLASS_CR = 2;
-  UTF8PROC_BOUNDCLASS_LF = 3;
-  UTF8PROC_BOUNDCLASS_CONTROL = 4;
-  UTF8PROC_BOUNDCLASS_EXTEND = 5;
-  UTF8PROC_BOUNDCLASS_L = 6;
-  UTF8PROC_BOUNDCLASS_V = 7;
-  UTF8PROC_BOUNDCLASS_T = 8;
-  UTF8PROC_BOUNDCLASS_LV = 9;
-  UTF8PROC_BOUNDCLASS_LVT = 10;
-  UTF8PROC_BOUNDCLASS_REGIONAL_INDICATOR = 11;
-  UTF8PROC_BOUNDCLASS_SPACINGMARK = 12;
-
-  UTF8PROC_CATEGORY_LU = 1;
-  UTF8PROC_CATEGORY_LL = 2;
-  UTF8PROC_CATEGORY_LT = 3;
-  UTF8PROC_CATEGORY_LM = 4;
-  UTF8PROC_CATEGORY_LO = 5;
-  UTF8PROC_CATEGORY_MN = 6;
-  UTF8PROC_CATEGORY_MC = 7;
-  UTF8PROC_CATEGORY_ME = 8;
-  UTF8PROC_CATEGORY_ND = 9;
-  UTF8PROC_CATEGORY_NL = 10;
-  UTF8PROC_CATEGORY_NO = 11;
-  UTF8PROC_CATEGORY_PC = 12;
-  UTF8PROC_CATEGORY_PD = 13;
-  UTF8PROC_CATEGORY_PS = 14;
-  UTF8PROC_CATEGORY_PE = 15;
-  UTF8PROC_CATEGORY_PI = 16;
-  UTF8PROC_CATEGORY_PF = 17;
-  UTF8PROC_CATEGORY_PO = 18;
-  UTF8PROC_CATEGORY_SM = 19;
-  UTF8PROC_CATEGORY_SC = 20;
-  UTF8PROC_CATEGORY_SK = 21;
-  UTF8PROC_CATEGORY_SO = 22;
-  UTF8PROC_CATEGORY_ZS = 23;
-  UTF8PROC_CATEGORY_ZL = 24;
-  UTF8PROC_CATEGORY_ZP = 25;
-  UTF8PROC_CATEGORY_CC = 26;
-  UTF8PROC_CATEGORY_CF = 27;
-  UTF8PROC_CATEGORY_CS = 28;
-  UTF8PROC_CATEGORY_CO = 29;
-  UTF8PROC_CATEGORY_CN = 30;
-
-  UTF8PROC_BIDI_CLASS_L = 1;
-  UTF8PROC_BIDI_CLASS_LRE = 2;
-  UTF8PROC_BIDI_CLASS_LRO = 3;
-  UTF8PROC_BIDI_CLASS_R = 4;
-  UTF8PROC_BIDI_CLASS_AL = 5;
-  UTF8PROC_BIDI_CLASS_RLE = 6;
-  UTF8PROC_BIDI_CLASS_RLO = 7;
-  UTF8PROC_BIDI_CLASS_PDF = 8;
-  UTF8PROC_BIDI_CLASS_EN = 9;
-  UTF8PROC_BIDI_CLASS_ES = 10;
-  UTF8PROC_BIDI_CLASS_ET = 11;
-  UTF8PROC_BIDI_CLASS_AN = 12;
-  UTF8PROC_BIDI_CLASS_CS = 13;
-  UTF8PROC_BIDI_CLASS_NSM = 14;
-  UTF8PROC_BIDI_CLASS_BN = 15;
-  UTF8PROC_BIDI_CLASS_B = 16;
-  UTF8PROC_BIDI_CLASS_S = 17;
-  UTF8PROC_BIDI_CLASS_WS = 18;
-  UTF8PROC_BIDI_CLASS_ON = 19;
-  UTF8PROC_BIDI_CLASS_LRI = 20;
-  UTF8PROC_BIDI_CLASS_RLI = 21;
-  UTF8PROC_BIDI_CLASS_FSI = 22;
-  UTF8PROC_BIDI_CLASS_PDI = 23;
 
   UTF8PROC_DECOMP_TYPE_FONT = 1;
   UTF8PROC_DECOMP_TYPE_NOBREAK = 2;
@@ -179,80 +104,6 @@ const
   UTF8PROC_ERROR_NOTASSIGNED = -(4);
   UTF8PROC_ERROR_INVALIDOPTS = -(5);
 
-  CategoryStrings: array[1..30] of ShortString = (
-    ('Letter, Uppercase'),
-    ('Letter, Lowercase'),
-    ('Letter, Titlecase'),
-    ('Letter, Modifier'),
-    ('Letter, Other'),
-    ('Mark, Nonspacing'),
-    ('Mark, Spacing Combining'),
-    ('Mark, Enclosing'),
-    ('Number, Decimal Digit'),
-    ('Number, Letter'),
-    ('Number, Other'),
-    ('Punctuation, Connector'),
-    ('Punctuation, Dash'),
-    ('Punctuation, Open'),
-    ('Punctuation, Close'),
-    ('Punctuation, Initial quote (may behave like Ps or Pe depending on usage)'),
-    ('Punctuation, Final quote (may behave like Ps or Pe depending on usage)'),
-    ('Punctuation, Other'),
-    ('Symbol, Math'),
-    ('Symbol, Currency'),
-    ('Symbol, Modifier'),
-    ('Symbol, Other'),
-    ('Separator, Space'),
-    ('Separator, Line'),
-    ('Separator, Paragraph'),
-    ('Other, Control'),
-    ('Other, Format'),
-    ('Other, Surrogate'),
-    ('Other, Private Use'),
-    ('Other, Not Assigned (no characters in the file have this property)')
-    );
-
-  BIDIStrings: array[1..19] of ShortString = (
-    ('Left-to-Right'),
-    ('Left-to-Right Embedding'),
-    ('Left-to-Right Override'),
-    ('Right-to-Left'),
-    ('Right-to-Left Arabic'),
-    ('Right-to-Left Embedding'),
-    ('Right-to-Left Override'),
-    ('Pop Directional Format'),
-    ('European Number'),
-    ('European Number Separator'),
-    ('European Number Terminator'),
-    ('Arabic Number'),
-    ('Common Number Separator'),
-    ('Non-Spacing Mark'),
-    ('Boundary Neutral'),
-    ('Paragraph Separator'),
-    ('Segment Separator'),
-    ('Whitespace'),
-    ('Other Neutrals')
-    );
-
-  DecompStrings: array[1..16] of ShortString = (
-    ('A font variant (e.g. a blackletter form).'),
-    ('A no-break version of a space or hyphen.'),
-    ('An initial presentation form (Arabic).'),
-    ('A medial presentation form (Arabic).'),
-    ('A final presentation form (Arabic).'),
-    ('An isolated presentation form (Arabic).'),
-    ('An encircled form.'),
-    ('A superscript form.'),
-    ('A subscript form.'),
-    ('A vertical layout presentation form.'),
-    ('A wide (or zenkaku) compatibility character.'),
-    ('A narrow (or hankaku) compatibility character.'),
-    ('A small variant form (CNS compatibility).'),
-    ('A CJK squared font variant.'),
-    ('A vulgar fraction form.'),
-    ('Otherwise unspecified compatibility character.')
-    );
-
   SSIZE_MAX = (High(longword) - 1) div 2;
 
   utf8proc_utf8class: array[0..Pred(256)] of Shortint =
@@ -273,195 +124,19 @@ const
     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
     4, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0);
 
-type TUnicodeRange = record
-    S: longint;
-    E: longint;
-    PG: string[50];
-  end;
-
-const
-  MaxUnicodeRanges = 153;
-  UnicodeRanges: array[0..MaxUnicodeRanges] of TUnicodeRange = (
-
-    (S: $0000; E: $007F; PG: 'Basic Latin'),
-    (S: $0080; E: $00FF; PG: 'Latin-1 Supplement'),
-    (S: $0100; E: $017F; PG: 'Latin Extended-A'),
-    (S: $0180; E: $024F; PG: 'Latin Extended-B'),
-    (S: $0250; E: $02AF; PG: 'IPA Extensions'),
-    (S: $02B0; E: $02FF; PG: 'Spacing Modifier Letters'),
-    (S: $0300; E: $036F; PG: 'Combining Diacritical Marks'),
-    (S: $0370; E: $03FF; PG: 'Greek and Coptic'),
-    (S: $0400; E: $04FF; PG: 'Cyrillic'),
-    (S: $0500; E: $052F; PG: 'Cyrillic Supplement'),
-    (S: $0530; E: $058F; PG: 'Armenian'),
-    (S: $0590; E: $05FF; PG: 'Hebrew'),
-    (S: $0600; E: $06FF; PG: 'Arabic'),
-    (S: $0700; E: $074F; PG: 'Syriac'),
-    (S: $0750; E: $077F; PG: 'Arabic Supplement'),
-    (S: $0780; E: $07BF; PG: 'Thaana'),
-    (S: $07C0; E: $07FF; PG: 'NKo'),
-    (S: $0900; E: $097F; PG: 'Devanagari'),
-    (S: $0980; E: $09FF; PG: 'Bengali'),
-    (S: $0A00; E: $0A7F; PG: 'Gurmukhi'),
-    (S: $0A80; E: $0AFF; PG: 'Gujarati'),
-    (S: $0B00; E: $0B7F; PG: 'Oriya'),
-    (S: $0B80; E: $0BFF; PG: 'Tamil'),
-    (S: $0C00; E: $0C7F; PG: 'Telugu'),
-    (S: $0C80; E: $0CFF; PG: 'Kannada'),
-    (S: $0D00; E: $0D7F; PG: 'Malayalam'),
-    (S: $0D80; E: $0DFF; PG: 'Sinhala'),
-    (S: $0E00; E: $0E7F; PG: 'Thai'),
-    (S: $0E80; E: $0EFF; PG: 'Lao'),
-    (S: $0F00; E: $0FFF; PG: 'Tibetan'),
-    (S: $1000; E: $109F; PG: 'Myanmar'),
-    (S: $10A0; E: $10FF; PG: 'Georgian'),
-    (S: $1100; E: $11FF; PG: 'Hangul Jamo'),
-    (S: $1200; E: $137F; PG: 'Ethiopic'),
-    (S: $1380; E: $139F; PG: 'Ethiopic Supplement'),
-    (S: $13A0; E: $13FF; PG: 'Cherokee'),
-    (S: $1400; E: $167F; PG: 'Unified Canadian Aboriginal Syllabics'),
-    (S: $1680; E: $169F; PG: 'Ogham'),
-    (S: $16A0; E: $16FF; PG: 'Runic'),
-    (S: $1700; E: $171F; PG: 'Tagalog'),
-    (S: $1720; E: $173F; PG: 'Hanunoo'),
-    (S: $1740; E: $175F; PG: 'Buhid'),
-    (S: $1760; E: $177F; PG: 'Tagbanwa'),
-    (S: $1780; E: $17FF; PG: 'Khmer'),
-    (S: $1800; E: $18AF; PG: 'Mongolian'),
-    (S: $1900; E: $194F; PG: 'Limbu'),
-    (S: $1950; E: $197F; PG: 'Tai Le'),
-    (S: $1980; E: $19DF; PG: 'New Tai Lue'),
-    (S: $19E0; E: $19FF; PG: 'Khmer Symbols'),
-    (S: $1A00; E: $1A1F; PG: 'Buginese'),
-    (S: $1B00; E: $1B7F; PG: 'Balinese'),
-    (S: $1D00; E: $1D7F; PG: 'Phonetic Extensions'),
-    (S: $1D80; E: $1DBF; PG: 'Phonetic Extensions Supplement'),
-    (S: $1DC0; E: $1DFF; PG: 'Combining Diacritical Marks Supplement'),
-    (S: $1E00; E: $1EFF; PG: 'Latin Extended Additional'),
-    (S: $1F00; E: $1FFF; PG: 'Greek Extended'),
-    (S: $2000; E: $206F; PG: 'General Punctuation'),
-    (S: $2070; E: $209F; PG: 'Superscripts and Subscripts'),
-    (S: $20A0; E: $20CF; PG: 'Currency Symbols'),
-    (S: $20D0; E: $20FF; PG: 'Combining Diacritical Marks for Symbols'),
-    (S: $2100; E: $214F; PG: 'Letterlike Symbols'),
-    (S: $2150; E: $218F; PG: 'Number Forms'),
-    (S: $2190; E: $21FF; PG: 'Arrows'),
-    (S: $2200; E: $22FF; PG: 'Mathematical Operators'),
-    (S: $2300; E: $23FF; PG: 'Miscellaneous Technical'),
-    (S: $2400; E: $243F; PG: 'Control Pictures'),
-    (S: $2440; E: $245F; PG: 'Optical Character Recognition'),
-    (S: $2460; E: $24FF; PG: 'Enclosed Alphanumerics'),
-    (S: $2500; E: $257F; PG: 'Box Drawing'),
-    (S: $2580; E: $259F; PG: 'Block Elements'),
-    (S: $25A0; E: $25FF; PG: 'Geometric Shapes'),
-    (S: $2600; E: $26FF; PG: 'Miscellaneous Symbols'),
-    (S: $2700; E: $27BF; PG: 'Dingbats'),
-    (S: $27C0; E: $27EF; PG: 'Miscellaneous Mathematical Symbols-A'),
-    (S: $27F0; E: $27FF; PG: 'Supplemental Arrows-A'),
-    (S: $2800; E: $28FF; PG: 'Braille Patterns'),
-    (S: $2900; E: $297F; PG: 'Supplemental Arrows-B'),
-    (S: $2980; E: $29FF; PG: 'Miscellaneous Mathematical Symbols-B'),
-    (S: $2A00; E: $2AFF; PG: 'Supplemental Mathematical Operators'),
-    (S: $2B00; E: $2BFF; PG: 'Miscellaneous Symbols and Arrows'),
-    (S: $2C00; E: $2C5F; PG: 'Glagolitic'),
-    (S: $2C60; E: $2C7F; PG: 'Latin Extended-C'),
-    (S: $2C80; E: $2CFF; PG: 'Coptic'),
-    (S: $2D00; E: $2D2F; PG: 'Georgian Supplement'),
-    (S: $2D30; E: $2D7F; PG: 'Tifinagh'),
-    (S: $2D80; E: $2DDF; PG: 'Ethiopic Extended'),
-    (S: $2E00; E: $2E7F; PG: 'Supplemental Punctuation'),
-    (S: $2E80; E: $2EFF; PG: 'CJK Radicals Supplement'),
-    (S: $2F00; E: $2FDF; PG: 'Kangxi Radicals'),
-    (S: $2FF0; E: $2FFF; PG: 'Ideographic Description Characters'),
-    (S: $3000; E: $303F; PG: 'CJK Symbols and Punctuation'),
-    (S: $3040; E: $309F; PG: 'Hiragana'),
-    (S: $30A0; E: $30FF; PG: 'Katakana'),
-    (S: $3100; E: $312F; PG: 'Bopomofo'),
-    (S: $3130; E: $318F; PG: 'Hangul Compatibility Jamo'),
-    (S: $3190; E: $319F; PG: 'Kanbun'),
-    (S: $31A0; E: $31BF; PG: 'Bopomofo Extended'),
-    (S: $31C0; E: $31EF; PG: 'CJK Strokes'),
-    (S: $31F0; E: $31FF; PG: 'Katakana Phonetic Extensions'),
-    (S: $3200; E: $32FF; PG: 'Enclosed CJK Letters and Months'),
-    (S: $3300; E: $33FF; PG: 'CJK Compatibility'),
-    (S: $3400; E: $4DBF; PG: 'CJK Unified Ideographs Extension A'),
-    (S: $4DC0; E: $4DFF; PG: 'Yijing Hexagram Symbols'),
-    (S: $4E00; E: $9FFF; PG: 'CJK Unified Ideographs'),
-    (S: $A000; E: $A48F; PG: 'Yi Syllables'),
-    (S: $A490; E: $A4CF; PG: 'Yi Radicals'),
-    (S: $A700; E: $A71F; PG: 'Modifier Tone Letters'),
-    (S: $A720; E: $A7FF; PG: 'Latin Extended-D'),
-    (S: $A800; E: $A82F; PG: 'Syloti Nagri'),
-    (S: $A840; E: $A87F; PG: 'Phags-pa'),
-    (S: $AC00; E: $D7AF; PG: 'Hangul Syllables'),
-    (S: $D800; E: $DB7F; PG: 'High Surrogates'),
-    (S: $DB80; E: $DBFF; PG: 'High Private Use Surrogates'),
-    (S: $DC00; E: $DFFF; PG: 'Low Surrogates'),
-    (S: $E000; E: $F8FF; PG: 'Private Use Area'),
-    (S: $F900; E: $FAFF; PG: 'CJK Compatibility Ideographs'),
-    (S: $FB00; E: $FB4F; PG: 'Alphabetic Presentation Forms'),
-    (S: $FB50; E: $FDFF; PG: 'Arabic Presentation Forms-A'),
-    (S: $FE00; E: $FE0F; PG: 'Variation Selectors'),
-    (S: $FE10; E: $FE1F; PG: 'Vertical Forms'),
-    (S: $FE20; E: $FE2F; PG: 'Combining Half Marks'),
-    (S: $FE30; E: $FE4F; PG: 'CJK Compatibility Forms'),
-    (S: $FE50; E: $FE6F; PG: 'Small Form Variants'),
-    (S: $FE70; E: $FEFF; PG: 'Arabic Presentation Forms-B'),
-    (S: $FF00; E: $FFEF; PG: 'Halfwidth and Fullwidth Forms'),
-    (S: $FFF0; E: $FFFF; PG: 'Specials'),
-    (S: $10000; E: $1007F; PG: 'Linear B Syllabary'),
-    (S: $10080; E: $100FF; PG: 'Linear B Ideograms'),
-    (S: $10100; E: $1013F; PG: 'Aegean Numbers'),
-    (S: $10140; E: $1018F; PG: 'Ancient Greek Numbers'),
-    (S: $10300; E: $1032F; PG: 'Old Italic'),
-    (S: $10330; E: $1034F; PG: 'Gothic'),
-    (S: $10380; E: $1039F; PG: 'Ugaritic'),
-    (S: $103A0; E: $103DF; PG: 'Old Persian'),
-    (S: $10400; E: $1044F; PG: 'Deseret'),
-    (S: $10450; E: $1047F; PG: 'Shavian'),
-    (S: $10480; E: $104AF; PG: 'Osmanya'),
-    (S: $10800; E: $1083F; PG: 'Cypriot Syllabary'),
-    (S: $10900; E: $1091F; PG: 'Phoenician'),
-    (S: $10A00; E: $10A5F; PG: 'Kharoshthi'),
-    (S: $12000; E: $123FF; PG: 'Cuneiform'),
-    (S: $12400; E: $1247F; PG: 'Cuneiform Numbers and Punctuation'),
-    (S: $1D000; E: $1D0FF; PG: 'Byzantine Musical Symbols'),
-    (S: $1D100; E: $1D1FF; PG: 'Musical Symbols'),
-    (S: $1D200; E: $1D24F; PG: 'Ancient Greek Musical Notation'),
-    (S: $1D300; E: $1D35F; PG: 'Tai Xuan Jing Symbols'),
-    (S: $1D360; E: $1D37F; PG: 'Counting Rod Numerals'),
-    (S: $1D400; E: $1D7FF; PG: 'Mathematical Alphanumeric Symbols'),
-    (S: $20000; E: $2A6DF; PG: 'CJK Unified Ideographs Extension B'),
-    (S: $2F800; E: $2FA1F; PG: 'CJK Compatibility Ideographs Supplement'),
-    (S: $E0000; E: $E007F; PG: 'Tags'),
-    (S: $E0100; E: $E01EF; PG: 'Variation Selectors Supplement'),
-    (S: $F0000; E: $FFFFF; PG: 'Supplementary Private Use Area-A'),
-    (S: $100000; E: $10FFFF; PG: 'Supplementary Private Use Area-B')
-    );
 
 type
 
   PPByte = ^PByte;
 
   utf8proc_propval_t = Smallint;
-  utf8proc_property_t = record
-    category: utf8proc_propval_t;
+  utf8proc_property_t = packed record
     combining_class: utf8proc_propval_t;
-    bidi_class: utf8proc_propval_t;
     decomp_type: utf8proc_propval_t;
-    decomp_mapping: Plongint;
-    casefold_mapping: Plongint;
-    uppercase_mapping: longint;
-    lowercase_mapping: longint;
-    titlecase_mapping: longint;
+    decomp_mapping: utf8proc_propval_t;
     comb1st_index: longint;
     comb2nd_index: longint;
-    bidi_mirrored: boolean;
     comp_exclusion: boolean;
-    ignorable: boolean;
-    control_boundary: boolean;
-    boundclass: integer;
-    charwidth: integer;
   end;
   putf8proc_property_t = ^utf8proc_property_t;
 
@@ -473,7 +148,7 @@ function utf8proc_codepoint_valid(uc: longint): boolean;
 function utf8proc_iterate(str: PByte; strlen: longint; dst: pLongInt): longint;
 function utf8proc_encode_char(uc: longint; dst: PByte): longint;
 function utf8proc_get_property(uc: longint): putf8proc_property_t;
-function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer; last_boundclass: pinteger): longint;
+function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer): longint;
 function utf8proc_decomposer(str: PByte; strlen: longint; buffer: plongint; bufsize: longint; options: integer): longint;
 function utf8proc_map(str: PByte; strlen: longint; dstptr: PPByte; options: integer): longint;
 function utf8proc_reencode(buffer: plongint; length: longint; options: integer): longint;
@@ -481,7 +156,7 @@ function utf8proc_reencode(buffer: plongint; length: longint; options: integer):
 
 implementation
 
-{$I uniinfo_data.inc}
+{$I bbnormuniinfo_data.inc}
 
 function utf8proc_errmsg(errcode: longint): pchar;
 begin
@@ -643,27 +318,10 @@ begin
 end;
 
 
-// return whether there is a grapheme break between boundclasses lbc and tbc
-function grapheme_break(lbc, tbc: integer): boolean;
-begin
-  if lbc = UTF8PROC_BOUNDCLASS_START then exit(true);
-  if (lbc = UTF8PROC_BOUNDCLASS_CR) and (tbc = UTF8PROC_BOUNDCLASS_LF) then exit(false);
-  if (lbc >= UTF8PROC_BOUNDCLASS_CR) and (lbc <= UTF8PROC_BOUNDCLASS_CONTROL) then exit(true);
-  if (tbc >= UTF8PROC_BOUNDCLASS_CR) and (tbc <= UTF8PROC_BOUNDCLASS_CONTROL) then exit(true);
-  if (tbc = UTF8PROC_BOUNDCLASS_EXTEND) then exit(false);
-  if (lbc = UTF8PROC_BOUNDCLASS_L) and ((tbc = UTF8PROC_BOUNDCLASS_L) or (tbc = UTF8PROC_BOUNDCLASS_V) or (tbc = UTF8PROC_BOUNDCLASS_LV) or (tbc = UTF8PROC_BOUNDCLASS_LVT)) then exit(false);
-  if ((lbc = UTF8PROC_BOUNDCLASS_LV) or (lbc = UTF8PROC_BOUNDCLASS_V)) and ((tbc = UTF8PROC_BOUNDCLASS_V) or  (tbc = UTF8PROC_BOUNDCLASS_T)) then exit(false);
-  if ((lbc = UTF8PROC_BOUNDCLASS_LVT) or  (lbc = UTF8PROC_BOUNDCLASS_T)) and (tbc = UTF8PROC_BOUNDCLASS_T) then exit(false);
-  if (lbc = UTF8PROC_BOUNDCLASS_REGIONAL_INDICATOR) and  (tbc = UTF8PROC_BOUNDCLASS_REGIONAL_INDICATOR) then exit(false);
-  result := tbc <> UTF8PROC_BOUNDCLASS_SPACINGMARK;
-end;
-
-
-function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer; last_boundclass: pinteger): longint;
+function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer): longint;
 var aproperty: putf8proc_property_t;
   casefold_entry: plongint;
   decomp_entry: plongint;
-  category: utf8proc_propval_t;
   hangul_sindex: longint;
   hangul_tindex: longint;
   written: longint;
@@ -671,14 +329,8 @@ var aproperty: putf8proc_property_t;
   tbc, lbc: integer;
   boundary: boolean;
 
-  function utf8proc_decompose_lump(replacement_uc: integer): integer;
-  begin
-    result := utf8proc_decompose_char(replacement_uc, dst, bufsize, options, last_boundclass);
-  end;
-
 begin
   aproperty := utf8proc_get_property(uc);
-  category := aproperty^.category;
   hangul_sindex := uc - UTF8PROC_HANGUL_SBASE;
 
   if (options and (UTF8PROC_COMPOSE or UTF8PROC_DECOMPOSE)) <> 0 then
@@ -707,110 +359,22 @@ begin
     end;
   end;
 
-  if (options and UTF8PROC_REJECTNA) <> 0
-    then
-  begin
-    if category = 0 then
-    begin
-      result := UTF8PROC_ERROR_NOTASSIGNED;
-      exit;
-    end;
-  end;
-  if (options and UTF8PROC_IGNORE) <> 0
-    then
-  begin
-    if aproperty^.ignorable then
-    begin
-      result := 0;
-      exit;
-    end;
-  end;
-
-  if (options and UTF8PROC_LUMP) <> 0
-    then
-  begin
-    if category = UTF8PROC_CATEGORY_ZS then utf8proc_decompose_lump($0020);
-    if ((uc = $2018) or (uc = $2019) or (uc = $02BC) or (uc = $02C8)) then begin result := utf8proc_decompose_lump($0027); exit; end;
-    if ((category = UTF8PROC_CATEGORY_PD) or (uc = $2212)) then begin result := utf8proc_decompose_lump($002D); exit; end;
-    if (uc = $2044) or (uc = $2215) then begin result := utf8proc_decompose_lump($002F); exit; end;
-    if uc = $2236 then begin result := utf8proc_decompose_lump($003A); exit; end;
-    if ((uc = $2039) or (uc = $2329) or (uc = $3008)) then begin result := utf8proc_decompose_lump($003C); exit; end;
-    if ((uc = $203A) or (uc = $232A) or (uc = $3009)) then begin result := utf8proc_decompose_lump($003E); exit; end;
-    if uc = $2216 then begin result := utf8proc_decompose_lump($005C); exit; end;
-    if ((uc = $02C4) or (uc = $02C6) or (uc = $2038) or (uc = $2303)) then begin result := utf8proc_decompose_lump($005E); exit; end;
-    if ((category = UTF8PROC_CATEGORY_PC) or (uc = $02CD)) then begin result := utf8proc_decompose_lump($005F); exit; end;
-    if uc = $02CB then begin result := utf8proc_decompose_lump($0060); exit; end;
-    if uc = $2223 then begin result := utf8proc_decompose_lump($007C); exit; end;
-    if uc = $223C then begin result := utf8proc_decompose_lump($007E); exit; end;
-    if ((options and UTF8PROC_NLF2LS) and (options and UTF8PROC_NLF2PS)) <> 0 then
-    begin
-      if ((category = UTF8PROC_CATEGORY_ZL) or (category = UTF8PROC_CATEGORY_ZP)) then begin result := utf8proc_decompose_lump($000A); exit; end;
-    end;
-  end;
-
-  if (options and UTF8PROC_STRIPMARK) <> 0 then
-  begin
-    if ((category = UTF8PROC_CATEGORY_MN) or (category = UTF8PROC_CATEGORY_MC) or (category = UTF8PROC_CATEGORY_ME)) then
-    begin
-      result := 0;
-      exit;
-    end;
-  end;
-
-  if (options and UTF8PROC_CASEFOLD) <> 0 then
-  begin
-    if aproperty^.casefold_mapping <> nil then
-    begin
-      written := 0;
-      casefold_entry := aproperty^.casefold_mapping;
-      while casefold_entry^ >= 0 do
-      begin
-        if (bufsize > written) then temp := (bufsize - written) else temp := 0;
-        written := written + utf8proc_decompose_char(casefold_entry^, dst + written, temp, options, last_boundclass);
-        inc(casefold_entry);
-        if (written < 0) then begin result := UTF8PROC_ERROR_OVERFLOW; exit; end;
-      end;
-      Result := written;
-      exit;
-    end;
-  end;
 
   if (options and (UTF8PROC_COMPOSE or UTF8PROC_DECOMPOSE)) <> 0 then
   begin
-    if (aproperty^.decomp_mapping <> nil) and ((aproperty^.decomp_type = 0) or (options and UTF8PROC_COMPAT <> 0)) then
+    if (aproperty^.decomp_mapping >= 0) and ((aproperty^.decomp_type = 0) or (options and UTF8PROC_COMPAT <> 0)) then
     begin
       written := 0;
-      decomp_entry := aproperty^.decomp_mapping;
+      decomp_entry := @utf8proc_sequences[aproperty^.decomp_mapping];
       while decomp_entry^ >= 0 do
       begin
         if (bufsize > written) then temp := (bufsize - written) else temp := 0;
-        written := written + utf8proc_decompose_char(decomp_entry^, dst + written, temp, options, last_boundclass);
+        written := written + utf8proc_decompose_char(decomp_entry^, dst + written, temp, options);
         inc(decomp_entry);
         if (written < 0) then begin result := UTF8PROC_ERROR_OVERFLOW; exit; end;
       end;
       Result := written;
       exit;
-    end;
-  end;
-
-  if (options and UTF8PROC_CHARBOUND) <> 0 then
-  begin
-    tbc := aproperty^.boundclass;
-    boundary := grapheme_break(last_boundclass^, tbc);
-    last_boundclass^ := tbc;
-    if boundary
-      then
-    begin
-      if bufsize >= 1
-        then
-        dst[0] := $FFFF;
-      if bufsize >= 2
-        then
-        dst[1] := uc;
-      begin
-        result := 2;
-        exit;
-      end;
     end;
   end;
 
@@ -831,7 +395,6 @@ var
   uc: longint;
   rpos: longint;
   decomp_result: longint;
-  boundclass: integer;
   pos: longint;
   uc1: longint;
   uc2: longint;
@@ -844,7 +407,7 @@ begin
     result := UTF8PROC_ERROR_INVALIDOPTS;
     exit;
   end;
-  if (options and UTF8PROC_STRIPMARK <> 0) and (0 = (options and UTF8PROC_COMPOSE)) and (0 = (options and UTF8PROC_DECOMPOSE))
+  if (0 = (options and UTF8PROC_COMPOSE)) and (0 = (options and UTF8PROC_DECOMPOSE))
     then
   begin
     result := UTF8PROC_ERROR_INVALIDOPTS;
@@ -854,7 +417,6 @@ begin
 
     rpos := 0;
 
-    boundclass := UTF8PROC_BOUNDCLASS_START;
     while true do
     begin
       if (options and UTF8PROC_NULLTERM <> 0) then
@@ -883,7 +445,7 @@ begin
         end;
       end;
       if (bufsize > wpos) then temp := bufsize - wpos else temp := 0;
-      decomp_result := utf8proc_decompose_char(uc, buffer + wpos, temp, options, @boundclass);
+      decomp_result := utf8proc_decompose_char(uc, buffer + wpos, temp, options);
       if decomp_result < 0 then
       begin
         result := decomp_result;
