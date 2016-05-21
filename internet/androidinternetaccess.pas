@@ -272,7 +272,7 @@ begin
     with classInfos do begin
       args[0].l := j.stringToJString(name);
       args[1].l := j.stringToJString(value);
-      j.CallVoidMethod(jRequest,  jmHttpMessageAddHeader, @args[0]);;
+      j.callVoidMethodChecked(jRequest,  jmHttpMessageAddHeader, @args[0]);;
       j.DeleteLocalRef(args[0].l);
       j.DeleteLocalRef(args[1].l);
     end;
@@ -302,11 +302,11 @@ var stack: TLocalStackRecord;
         //entity.setContentType(..)
         if additionalHeaders.IndexOfName('Content-Type') < 0 then begin
           temp.l := j.NewStringUTF(ContentTypeForData);
-          j.CallVoidMethod(jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
+          j.callVoidMethodChecked(jentity.l,  jmAbstractHttpEntitySetContentType, @temp);;
           j.DeleteLocalRef(temp.l);
         end;
         //httprequest.setEntity(entity)
-        j.CallVoidMethod(jRequest,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
+        j.callVoidMethodChecked(jRequest,  jmHttpEntityEnclosingRequestBaseSetEntity, @jentity);;
 
         j.DeleteLocalRef(wrappedData);
         result := true;
@@ -366,21 +366,22 @@ begin
         try
           //process
           jResult := j.CallObjectMethod(jResponse,  jmHttpResponseGetEntity);
+          if ExceptionCheckAndClear then exit;
 
-          jStatusLine := j.CallObjectMethod(jResponse, jmHttpResponseGetStatusLine);
-          lastHTTPResultCode := j.CallIntMethod(jStatusLine, jmStatusLineGetStatusCode);
-          lastErrorDetails := j.jStringToStringAndDelete(j.CallObjectMethod(jStatusLine, jmStatusLineGetReasonPhrase));
+          jStatusLine := j.callObjectMethodChecked(jResponse, jmHttpResponseGetStatusLine);
+          lastHTTPResultCode := j.callIntMethodChecked(jStatusLine, jmStatusLineGetStatusCode);
+          lastErrorDetails := j.jStringToStringAndDelete(j.callObjectMethodChecked(jStatusLine, jmStatusLineGetReasonPhrase));
           j.DeleteLocalRef(jStatusLine);
 
           try
-            result := j.inputStreamToStringAndDelete(j.CallObjectMethod(jResult,  jmHttpEntityGetContent));
+            result := j.inputStreamToStringAndDelete(j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent));
 
             lastHTTPHeaders.Clear;
-            jHeaderIterator := j.CallObjectMethod(jResponse,  jmHttpMessageHeaderIterator);
+            jHeaderIterator := j.callObjectMethodChecked(jResponse,  jmHttpMessageHeaderIterator);
             while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
-              jHeader := j.CallObjectMethod(jHeaderIterator,  jmHeaderIteratorNextHeader);
-              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetName)) + ':'+
-                                  j.jStringToStringAndDelete(j.CallObjectMethod(jHeader, jmHeaderGetValue)));
+              jHeader := j.callObjectMethodChecked(jHeaderIterator,  jmHeaderIteratorNextHeader);
+              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetName)) + ':'+
+                                  j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetValue)));
               j.DeleteLocalRef(jHeader);
             end;
             j.DeleteLocalRef(jHeaderIterator);
