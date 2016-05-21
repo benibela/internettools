@@ -132,10 +132,11 @@ type
   utf8proc_propval_t = Smallint;
   utf8proc_property_t = packed record
     combining_class: utf8proc_propval_t;
-    decomp_type: utf8proc_propval_t;
-    decomp_mapping: utf8proc_propval_t;
-    comb1st_index: longint;
-    comb2nd_index: longint;
+    decomp_type: byte;
+    decomp_length: byte;
+    decomp_mapping: word;
+    comb1st_index: Smallint;
+    comb2nd_index: Smallint;
     comp_exclusion: boolean;
   end;
   putf8proc_property_t = ^utf8proc_property_t;
@@ -320,15 +321,12 @@ end;
 
 function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer): longint;
 var aproperty: putf8proc_property_t;
-  casefold_entry: plongint;
-  decomp_entry: plongint;
+  decomp_entry: PLongint;
   hangul_sindex: longint;
   hangul_tindex: longint;
   written: longint;
   temp: longint;
-  tbc, lbc: integer;
-  boundary: boolean;
-
+  i: Integer;
 begin
   aproperty := utf8proc_get_property(uc);
   hangul_sindex := uc - UTF8PROC_HANGUL_SBASE;
@@ -362,12 +360,11 @@ begin
 
   if (options and (UTF8PROC_COMPOSE or UTF8PROC_DECOMPOSE)) <> 0 then
   begin
-    if (aproperty^.decomp_mapping >= 0) and ((aproperty^.decomp_type = 0) or (options and UTF8PROC_COMPAT <> 0)) then
+    if (aproperty^.decomp_mapping > 0) and ((aproperty^.decomp_type = 0) or (options and UTF8PROC_COMPAT <> 0)) then
     begin
       written := 0;
       decomp_entry := @utf8proc_sequences[aproperty^.decomp_mapping];
-      while decomp_entry^ >= 0 do
-      begin
+      for i := 1 to aproperty^.decomp_length do begin
         if (bufsize > written) then temp := (bufsize - written) else temp := 0;
         written := written + utf8proc_decompose_char(decomp_entry^, dst + written, temp, options);
         inc(decomp_entry);
@@ -503,6 +500,7 @@ var
   hangul_sindex: longint;
   hangul_vindex: longint;
   hangul_tindex: longint;
+  maxindex, minindex: SmallInt;
 begin
   starter_property := nil;
   if (options and (UTF8PROC_NLF2LS or UTF8PROC_NLF2PS or UTF8PROC_STRIPCC) <> 0) then
@@ -602,7 +600,16 @@ begin
         end;
         if (starter_property^.comb1st_index >= 0) and (current_property^.comb2nd_index >= 0) then
         begin
-          composition := utf8proc_combinations[starter_property^.comb1st_index + current_property^.comb2nd_index];
+          composition := 0;
+          minindex := current_property^.comb2nd_index shr 8 + utf8proc_combinations_starts[starter_property^.comb1st_index];
+          maxindex := current_property^.comb2nd_index and $FF + utf8proc_combinations_starts[starter_property^.comb1st_index];
+          while minindex <= maxindex do begin
+            if utf8proc_combinations[minindex] = current_char then begin
+              composition := utf8proc_combinations[minindex + 1];
+              break;
+            end;
+            minindex += 2;
+          end;
           if ((composition >= 0) and
             ((0 = (options and UTF8PROC_STABLE)) or (not utf8proc_get_property(composition)^.comp_exclusion))) then
           begin
