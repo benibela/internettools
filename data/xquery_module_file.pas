@@ -20,9 +20,8 @@ unit xquery_module_file;
 interface
 
 uses
-  Classes, SysUtils, xquery, simplehtmltreeparser, FileUtil, LazUTF8, LazFileUtils, bbutils, strutils, bigdecimalmath, base64, math, Masks;
+  simplehtmltreeparser;
 
-type rawbytestring = string;
 
 //**Registers the module to the XQuery engine
 procedure registerModuleFile;
@@ -30,6 +29,320 @@ procedure registerModuleFile;
 const XMLNamespaceURL_Expath_File = 'http://expath.org/ns/file';
 var XMLNamespace_Expath_File: INamespace;
 implementation
+
+uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math, xquery__regex
+  {$ifdef unix},BaseUnix{$endif}
+  {$ifdef windows},windows{$endif}
+    ;
+
+//////////////////////////////
+//copied from the LCL to reduce dependancies
+type
+  TCopyFileFlag = (
+    cffOverwriteFile,
+    cffCreateDestDirectory,
+    cffPreserveTime
+    );
+  TCopyFileFlags = set of TCopyFileFlag;
+function CopyFile(const SrcFilename, DestFilename: String;
+                  Flags: TCopyFileFlags=[cffOverwriteFile]; ExceptionOnError: Boolean=False): Boolean;
+var
+  SrcHandle: THandle;
+  DestHandle: THandle;
+  Buffer: array[1..4096] of byte;
+  ReadCount, WriteCount, TryCount: LongInt;
+begin
+  Result := False;
+  // check overwrite
+  if (not (cffOverwriteFile in Flags)) and FileExists(DestFileName) then
+    exit;
+  // check directory
+  if (cffCreateDestDirectory in Flags)
+  and (not DirectoryExists(ExtractFilePath(DestFileName)))
+  and (not ForceDirectories(ExtractFilePath(DestFileName))) then
+    exit;
+  TryCount := 0;
+  While TryCount <> 3 Do Begin
+    SrcHandle := FileOpen(SrcFilename, fmOpenRead or fmShareDenyWrite);
+    if (THandle(SrcHandle)=feInvalidHandle) then Begin
+      Inc(TryCount);
+      Sleep(10);
+    End
+    Else Begin
+      TryCount := 0;
+      Break;
+    End;
+  End;
+  If TryCount > 0 Then
+  begin
+    if ExceptionOnError then
+      raise EFOpenError.CreateFmt({SFOpenError}'Unable to open file "%s"', [SrcFilename])
+    else
+      exit;
+  end;
+  try
+    DestHandle := FileCreate(DestFileName);
+    if (THandle(DestHandle)=feInvalidHandle) then
+    begin
+      if ExceptionOnError then
+        raise EFCreateError.CreateFmt({SFCreateError}'Unable to create file "%s"',[DestFileName])
+      else
+        Exit;
+    end;
+    try
+      repeat
+        ReadCount:=FileRead(SrcHandle,Buffer[1],High(Buffer));
+        if ReadCount<=0 then break;
+        WriteCount:=FileWrite(DestHandle,Buffer[1],ReadCount);
+        if WriteCount<ReadCount then
+        begin
+          if ExceptionOnError then
+            raise EWriteError.CreateFmt({SFCreateError}'Unable to write to file "%s"',[DestFileName])
+          else
+            Exit;
+        end;
+      until false;
+    finally
+      FileClose(DestHandle);
+    end;
+    if (cffPreserveTime in Flags) then
+      FileSetDate(DestFilename, FileGetDate(SrcHandle));
+    Result := True;
+  finally
+    FileClose(SrcHandle);
+  end;
+end;
+
+function CopyFile(const SrcFilename, DestFilename: string; PreserveTime: Boolean; ExceptionOnError: Boolean): boolean;
+// Flags parameter can be used for the same thing.
+var
+  Flags: TCopyFileFlags;
+begin
+  if PreserveTime then
+    Flags:=[cffPreserveTime, cffOverwriteFile]
+  else
+    Flags:=[cffOverwriteFile];
+  Result := CopyFile(SrcFilename, DestFilename, Flags, ExceptionOnError);
+end;
+
+
+
+function ResolveDots(const AFilename: string): string;
+//trim double path delims and expand special dirs like .. and .
+//on Windows change also '/' to '\' except for filenames starting with '\\?\'
+var SrcPos, DestPos, l, DirStart: integer;
+  c: char;
+  MacroPos: LongInt;
+begin
+  Result:=AFilename;
+  {$ifdef windows}
+  //Special case: everything is literal after this, even dots (this does not apply to '//?/')
+  if (Pos('\\?\', AFilename) = 1) then Exit;
+  {$endif}
+
+  l:=length(AFilename);
+  SrcPos:=1;
+  DestPos:=1;
+
+
+  // trim double path delimiters and special dirs . and ..
+  while (SrcPos<=l) do begin
+    c:=AFilename[SrcPos];
+    {$ifdef windows}
+    //change / to \. The WinApi accepts both, but it leads to strange effects in other places
+    if (c in AllowDirectorySeparators) then c := PathDelim;
+    {$endif}
+    // check for double path delims
+    if (c=PathDelim) then begin
+      inc(SrcPos);
+      {$IFDEF Windows}
+      if (DestPos>2)
+      {$ELSE}
+      if (DestPos>1)
+      {$ENDIF}
+      and (Result[DestPos-1]=PathDelim) then begin
+        // skip second PathDelim
+        continue;
+      end;
+      Result[DestPos]:=c;
+      inc(DestPos);
+      continue;
+    end;
+    // check for special dirs . and ..
+    if (c='.') then begin
+      if (SrcPos<l) then begin
+        if (AFilename[SrcPos+1]=PathDelim)
+        and ((DestPos=1) or (AFilename[SrcPos-1]=PathDelim)) then begin
+          // special dir ./
+          // -> skip
+          inc(SrcPos,2);
+          continue;
+        end else if (AFilename[SrcPos+1]='.')
+        and (SrcPos+1=l) or (AFilename[SrcPos+2]=PathDelim) then
+        begin
+          // special dir ..
+          //  1. ..      -> copy
+          //  2. /..     -> skip .., keep /
+          //  3. C:..    -> copy
+          //  4. C:\..   -> skip .., keep C:\
+          //  5. \\..    -> skip .., keep \\
+          //  6. xxx../..   -> copy
+          //  7. xxxdir/..  -> trim dir and skip ..
+          //  8. xxxdir/..  -> trim dir and skip ..
+          if DestPos=1 then begin
+            //  1. ..      -> copy
+          end else if (DestPos=2) and (Result[1]=PathDelim) then begin
+            //  2. /..     -> skip .., keep /
+            inc(SrcPos,2);
+            continue;
+          {$IFDEF Windows}
+          end else if (DestPos=3) and (Result[2]=':')
+          and (Result[1] in ['a'..'z','A'..'Z']) then begin
+            //  3. C:..    -> copy
+          end else if (DestPos=4) and (Result[2]=':') and (Result[3]=PathDelim)
+          and (Result[1] in ['a'..'z','A'..'Z']) then begin
+            //  4. C:\..   -> skip .., keep C:\
+            inc(SrcPos,2);
+            continue;
+          end else if (DestPos=3) and (Result[1]=PathDelim)
+          and (Result[2]=PathDelim) then begin
+            //  5. \\..    -> skip .., keep \\
+            inc(SrcPos,2);
+            continue;
+          {$ENDIF}
+          end else if (DestPos>1) and (Result[DestPos-1]=PathDelim) then begin
+            if (DestPos>3)
+            and (Result[DestPos-2]='.') and (Result[DestPos-3]='.')
+            and ((DestPos=4) or (Result[DestPos-4]=PathDelim)) then begin
+              //  6. ../..   -> copy
+            end else begin
+              //  7. xxxdir/..  -> trim dir and skip ..
+              DirStart:=DestPos-2;
+              while (DirStart>1) and (Result[DirStart-1]<>PathDelim) do
+                dec(DirStart);
+              MacroPos:=DirStart;
+              while MacroPos<DestPos do begin
+                if (Result[MacroPos]='$')
+                and (Result[MacroPos+1] in ['(','a'..'z','A'..'Z']) then begin
+                  // 8. directory contains a macro -> keep
+                  break;
+                end;
+                inc(MacroPos);
+              end;
+              if MacroPos=DestPos then begin
+                DestPos:=DirStart;
+                inc(SrcPos,2);
+                continue;
+              end;
+            end;
+          end;
+        end;
+      end else begin
+        // special dir . at end of filename
+        if DestPos=1 then begin
+          Result:='.';
+          exit;
+        end else begin
+          // skip
+          break;
+        end;
+      end;
+    end;
+    // copy directory
+    repeat
+      Result[DestPos]:=c;
+      inc(DestPos);
+      inc(SrcPos);
+      if (SrcPos>l) then break;
+      c:=AFilename[SrcPos];
+      {$ifdef windows}
+      //change / to \. The WinApi accepts both, but it leads to strange effects in other places
+      if (c in AllowDirectorySeparators) then c := PathDelim;
+      {$endif}
+      if c=PathDelim then break;
+    until false;
+  end;
+  // trim result
+  if DestPos<=length(AFilename) then
+    SetLength(Result,DestPos-1);
+end;
+
+//////////////////////////////
+
+function strAddPathSeparator(path: string): string;
+begin
+  if path = '' then path := '.' + DirectorySeparator;
+  if not (path[length(path)] in AllowDirectorySeparators) then path += DirectorySeparator;
+  result := path;
+end;
+
+type TFileLister = class
+  recurse: boolean;
+  constructor create;
+  procedure foundSomething(const dir, current: String; const search: TRawByteSearchRec); virtual;
+  procedure startSearch(path: string; prefixForOutput: string = ''); virtual;
+end;
+
+constructor TFileLister.create;
+begin
+  recurse := true;
+end;
+
+procedure TFileLister.foundSomething(const dir, current: String; const search: TRawByteSearchRec);
+  function isSymLink: boolean;
+  {$ifdef windows}
+  const
+    IO_REPARSE_TAG_MOUNT_POINT = $A0000003;
+    IO_REPARSE_TAG_SYMLINK     = $A000000C;
+  var
+    temp: LongInt;
+  {$endif}
+  begin
+    {$ifdef windows}
+    {$ifdef wince}
+    result := false;
+    {$else}
+    Result := (search.FindData.dwReserved0 = IO_REPARSE_TAG_SYMLINK) or (search.FindData.dwReserved0 = IO_REPARSE_TAG_MOUNT_POINT);
+    if result then begin
+      temp := FileGetAttr(current);
+      result := (temp <> -1) and (temp and FILE_ATTRIBUTE_REPARSE_POINT <> 0);
+    end;
+    {$endif}
+    {$else}
+    result := FpReadLink(current) <> '';
+    {$endif}
+  end;
+begin
+  if ((faDirectory and search.Attr) <> 0) and not isSymLink and recurse then
+    startSearch(dir + search.Name, current );
+end;
+
+procedure TFileLister.startSearch(path: string; prefixForOutput: string = '');
+var
+  search: TRawByteSearchRec;
+  current: string;
+
+
+begin
+  path := strAddPathSeparator(path);
+  if prefixForOutput <> '' then prefixForOutput := strAddPathSeparator(prefixForOutput);
+  if SysUtils.FindFirst(path + '*', faAnyFile, search) = 0 then begin
+    try
+      repeat
+        case search.Name of
+          '.', '..', '': continue;
+        end;
+        current := prefixForOutput + search.Name;
+        foundSomething(path, current, search);
+      until SysUtils.FindNext(search) <> 0;
+    finally
+      SysUtils.FindClose(search);
+    end;
+  end;
+
+
+end;
+
 
 const Error_NoDir = 'no-dir';
       Error_IsDir = 'is-dir';
@@ -75,7 +388,7 @@ begin
   if res < 0 then result := false;
 end;
 
-function normalizePath(const path: IXQValue): UTF8String;
+function normalizePath(const path: IXQValue): string;
 begin
   result := path.toString;
   if strBeginsWith(result, 'file:///') then begin
@@ -83,29 +396,25 @@ begin
   end;
 end;
 
-function normalizePathToSys(const path: IXQValue): UTF8String;
-begin
-  result := UTF8ToSys(normalizePath(path));
-end;
 
-function FileExistsAsTrueFileUTF8(const Filename: string): boolean;
+function FileExistsAsTrueFile(const Filename: string): boolean;
 begin
-  result := FileExistsUTF8(Filename) and not DirectoryExistsUTF8(Filename); //does this work?
+  result := FileExists(Filename) and not DirectoryExists(Filename); //does this work?
 end;
 
 function exists(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
-  result := xqvalue(FileExistsUTF8(normalizePath(args[0])));
+  result := xqvalue(FileExists(normalizePath(args[0])));
 end;
 
 function is_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
-  result := xqvalue(DirectoryExistsUTF8(normalizePath(args[0])));
+  result := xqvalue(DirectoryExists(normalizePath(args[0])));
 end;
 
 function is_file(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
-  result := xqvalue(FileExistsAsTrueFileUTF8(args[0].toString));
+  result := xqvalue(FileExistsAsTrueFile(args[0].toString));
 end;
 
 function last_modified(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -113,27 +422,32 @@ var
   temp: LongInt;
   dateTime: TDateTime;
 begin
-  temp := FileAgeUTF8(normalizePath(args[0]));
-  if temp < 0 then raiseFileError(ifthen(FileExistsUTF8(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
+  temp := FileAge(normalizePath(args[0]));
+  if temp < 0 then raiseFileError(ifthen(FileExists(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
   dateTime := FileDateToDateTime(temp); //todo: time zone?
   result := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
 end;
 
 function size(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  s: Int64;
   code: String;
-  path: UTF8String;
+  path: String;
+  f: file of byte;
 begin
+  {$IOCHECKS ON}
   path := normalizePath(args[0]);
-  if DirectoryExistsUTF8(path) then exit(xqvalue(0));
-  s := FileSizeUtf8(path);
-  if s < 0 then begin
-    if FileExistsUTF8(path) then code := Error_Io_Error
+  if DirectoryExists(path) then exit(xqvalue(0));
+
+  try
+    AssignFile(f, path);
+    reset(f);
+    result := xqvalue(system.FileSize(f));
+    CloseFile(f);
+  except
+    if FileExists(path) then code := Error_Io_Error
     else code := Error_Not_Found;
     raiseFileError(code, 'Failed to get size', args[0]);
   end;
-  result := xqvalue(s);
 end;
 
 function writeOrAppendSomething(const filename: IXQValue; append: boolean; data: rawbytestring; offset: int64 = -1): IXQValue;
@@ -142,8 +456,8 @@ var f: TFileStream;
     path: AnsiString;
     errcode: String;
 begin
-  path := normalizePathToSys(filename);
-  if append then if not FileExistsUTF8(path) then append := false;
+  path := normalizePath(filename);
+  if append then if not FileExists(path) then append := false;
   if append then mode := fmOpenReadWrite
   else mode := fmCreate;
   try
@@ -154,7 +468,7 @@ begin
       if DirectoryExists(path) then errcode := Error_IsDir
       else begin
         path := strBeforeLast(path, AllowDirectorySeparators);
-        if (path <> '') and  not DirectoryExistsUTF8(path) then errcode := Error_NoDir;      ;
+        if (path <> '') and  not DirectoryExists(path) then errcode := Error_NoDir;      ;
       end;
       raiseFileError(errcode, 'Failed to open file for writing/appending', filename);
     end;
@@ -242,38 +556,66 @@ begin
   result := writeOrAppendText(args, false, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
+
+type TDirCopier = class(TFileLister)
+  dest: string;
+  source: String;
+  procedure foundSomething(const dir, current: String; const search: TRawByteSearchRec); override;
+  class procedure checkResult(const res: boolean; const fn: string);
+end;
+procedure TDirCopier.foundSomething(const dir, current: String; const search: TRawByteSearchRec);
+begin
+  if search.Attr and faDirectory <> 0 then begin
+    checkResult(CreateDir(dest + current), current);
+  end else
+    checkResult(CopyFile(source + current, dest + current), current);
+  inherited;
+end;
+class procedure TDirCopier.checkResult(const res: boolean; const fn: string);
+begin
+  if not res then raiseFileError(Error_Io_Error, 'Failed to copy ' + fn);
+end;
+
+
+
 function copy(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  source: UTF8String;
-  dest: UTF8String;
-  ok: Boolean;
+  source, dest: String;
+  copier: TDirCopier;
 begin
   requiredArgCount(args,1,2);
   source := normalizePath(args[0]);
   dest := normalizePath(args[1]);
-  ok := false;
+  if source = dest then raiseFileError(Error_Io_Error, 'source = dest', args[0]);
   try
-    if DirectoryExistsUTF8(source) then begin
-      if FileExistsUTF8(dest) and not DirectoryExistsUTF8(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
-        ok := CopyDirTree(source, dest, [cffCreateDestDirectory, cffOverwriteFile]);
+    if DirectoryExists(source) then begin
+      if FileExists(dest) and not DirectoryExists(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
+      CreateDir(dest);
+      copier := TDirCopier.Create;
+      try
+        copier.source := strAddPathSeparator(source);
+        copier.dest := strAddPathSeparator(dest);
+        copier.startSearch(copier.source);
+      finally
+        copier.free;
+      end;
     end else begin
-      if not FileExistsUTF8(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
-      ok := CopyFile(source, dest);
+      if not FileExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
+      TDirCopier.checkResult(CopyFile(source, dest), dest);
     end;
   except
-    on EStreamError do ;
+    on EStreamError do TDirCopier.checkResult(false, dest);
   end;
-  if not ok then raiseFileError(Error_Io_Error, 'Copying failed', args[0]);
   result := xqvalue();
 end;
 
 function create_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  dir: UTF8String;
+  dir: String;
 begin
   dir := normalizePath(args[0]);
-  if not ForceDirectoriesUTF8(dir) then
-    raiseFileError( IfThen(FileExistsAsTrueFileUTF8(dir), Error_Exists, Error_Io_Error), 'Failed to create directories', args[0] );
+  if not ForceDirectories(dir) then
+    raiseFileError( IfThen(FileExistsAsTrueFile(dir), Error_Exists, Error_Io_Error), 'Failed to create directories', args[0] );
   result := xqvalue();
 end;
 
@@ -284,11 +626,11 @@ begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then begin
     dir := normalizePath(args[2]);
-    if not DirectoryExistsUTF8(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
+    if not DirectoryExists(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
   end
   else dir := GetTempDir();
   dir := dir + DirectorySeparator + args[0].toString + IntToHex(Random($FFFFFFFF),8) + args[1].toString;
-  if not ForceDirectoriesUTF8(dir) then raiseFileError(Error_Io_Error, 'Failed');
+  if not ForceDirectories(dir) then raiseFileError(Error_Io_Error, 'Failed');
   result := xqvalue(dir);
 end;
 
@@ -299,108 +641,132 @@ begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then begin
     dir := normalizePath(args[2]);
-    if not DirectoryExistsUTF8(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
+    if not DirectoryExists(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
   end
   else dir := GetTempDir();
   dir := dir + DirectorySeparator + args[0].toString + IntToHex(Random($FFFFFFFF),8) + args[1].toString;
-  if not ForceDirectoriesUTF8(strResolveURI('/', dir)) then raiseFileError(Error_Io_Error, 'Failed');
-  strSaveToFileUTF8(dir, '');
+  if not ForceDirectories(strResolveURI('/', dir)) then raiseFileError(Error_Io_Error, 'Failed');
+  strSaveToFile(dir, '');
   result := xqvalue(dir);
+end;
+
+
+
+type TDirDeleter = class(TFileLister)
+  dirs: tstringlist;
+  procedure foundSomething(const dir, current: String; const search: TRawByteSearchRec); override;
+  procedure startSearch(path: string; prefixForOutput: string=''); override;
+  class procedure checkResult(const res: boolean; const fn: string);
+end;
+
+procedure TDirDeleter.startSearch(path: string; prefixForOutput: string);
+begin
+  inherited startSearch(path,prefixForOutput);
+  dirs.Add(path);
+end;
+
+class procedure TDirDeleter.checkResult(const res: boolean; const fn: string);
+begin
+  if not res then raiseFileError(Error_Io_Error, 'Failed to delete ' + fn);
+end;
+
+procedure TDirDeleter.foundSomething(const dir, current: String; const search: TRawByteSearchRec);
+begin
+  inherited;
+  //writeln(search.Attr and faDirectory, dir, ' ',current);
+  if search.Attr and faDirectory <> 0 then
+    dirs.Add(current)
+  else
+    TDirDeleter.checkResult(SysUtils.DeleteFile(current), current);
 end;
 
 function delete(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  path: UTF8String;
+  path: String;
   recursive: Boolean;
-  ok: Boolean;
+  deleter: TDirDeleter;
+  i: Integer;
 begin
   path := normalizePath(args[0]);
   recursive := (length(args) = 2) and args[1].toBoolean;
-  if not FileExistsUTF8(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
-  if not DirectoryExistsUTF8(path) then begin
-    ok := DeleteFileUTF8(path);
-  end else if recursive then ok := DeleteDirectory(path, false)
-  else ok := RemoveDirUTF8(path); //todo: raise is-dir if not empty
-  if not ok then raiseFileError(Error_Io_Error, 'Failed to delete', args[0]);
+  if not FileExists(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
+  if not DirectoryExists(path) then begin
+    TDirDeleter.checkResult(SysUtils.DeleteFile(path), path)
+  end else if recursive then begin
+    deleter := TDirDeleter.Create;
+    deleter.dirs := TStringList.Create;
+    try
+      deleter.startSearch(path, path);
+      for i := 0 to Deleter.dirs.count - 1 do
+        RemoveDir(deleter.dirs[i]);  //for some weird reason this returns false, even when the file was removed
+      TDirDeleter.checkResult(not DirectoryExists(path), path);
+    finally
+      deleter.dirs.free;
+      deleter.free
+    end;
+  end
+  else  TDirDeleter.checkResult(RemoveDir(path), path);
   result := xqvalue();
 end;
 
-
-type TListFilesAndDirs = class(TFileSearcher)
-  res: TXQValueSequence;
-private
-  pathOffset: integer;
-  masks: tmasklist;
-protected
-  procedure DoFileFound; override;
-  procedure DoDirectoryFound; override;
-  procedure addIt;
+type TXQFileLister = class(TFileLister)
+  seq: TXQVList;
+  filter: TWrappedRegExpr;
+  procedure foundSomething(const dir, current: String; const search: TRawByteSearchRec); override;
 end;
 
-procedure TListFilesAndDirs.DoFileFound;
+procedure TXQFileLister.foundSomething(const dir, current: String; const search: TRawByteSearchRec);
 begin
-  addIt;
+  inherited;
+  if (filter = nil) or wregexprMatches(filter, current) then
+    seq.add(xqvalue(current));
 end;
 
-procedure TListFilesAndDirs.DoDirectoryFound;
-begin
-  addIt;
-end;
-
-procedure TListFilesAndDirs.addIt;
-var
-  l: Integer;
-  i: Integer;
-begin
-  if (masks <> nil) and not (masks.{$ifdef windows}MatchesWindowsMask{$else}Matches{$endif}(FileInfo.Name)) then exit;
-  if pathOffset = 0 then begin
-    l := level;
-    for i := length(Path) downto 1 do begin
-      if path[i] in AllowDirectorySeparators then begin
-        if l <= 0 then begin
-          pathOffset := i + 1;
-          break;
-        end;
-        dec(l);
-      end;
-    end;
-  end;
-  res.add(xqvalue(strCopyFrom(path, pathOffset) + FileInfo.Name));
-end;
 
 function myList(const path: IXQValue; relative, recurse: boolean; mask: string = '*'): IXQValue;
 var
-  dir: UTF8String;
-  lister: TListFilesAndDirs;
+  dir, transformedMask: String;
+  c: Char;
+  lister: TXQFileLister;
 begin
   dir := normalizePath(path);
 
-  lister := TListFilesAndDirs.Create;
-  if (mask <> '*') then begin
-    lister.masks := TMaskList.Create(mask, '|', {$ifdef windows}false{$else}true{$endif});
-    if lister.masks.Count = 0 then
-      FreeAndNil(lister.masks);
-  end;
-  lister.res := TXQValueSequence.create();
-  if not relative then lister.pathOffset := 1;
-  lister.Search(dir, '', recurse);
-  result := lister.res;
-  xqvalueSeqSqueeze(result);
-  FreeAndNil(lister.masks);
-  FreeAndNil(lister);
-  if result.Count = 0 then begin
-    if not DirectoryExistsUTF8(dir) then raiseFileError(Error_NoDir, 'Could not list', path); //todo: other errors?
+  lister := TXQFileLister.Create;
+  try
+    lister.recurse := recurse;
+    lister.seq := TXQVList.create();
+    if (mask <> '*') and (mask <> '') then begin
+      transformedMask := '';
+      for c in mask do
+        case c of
+          '.', '^', '$', '{', '}', '\': transformedMask += '\' + c;
+          '*': transformedMask += '.*';
+          '?': transformedMask += '.';
+          else transformedMask += c;
+        end;
+      transformedMask += '$';
+      lister.filter := wregexprParse(transformedMask, [{$ifdef windows}wrfIgnoreCase{$endif}]);
+    end;
+
+    lister.startSearch(dir, ifthen(relative, '', dir));
+    result := TXQValueSequence.create(lister.seq);
+    lister.seq := nil;
+    xqvalueSeqSqueeze(result);
+    if result.getSequenceCount = 0 then
+      if not DirectoryExists(dir) then
+        raiseFileError(Error_NoDir, 'Could not list', path);
+  finally
+    if lister.filter <> nil then wregexprFree(lister.filter);
+    lister.seq.free;
+    lister.free
   end;
 end;
 
 function list(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  dir, mask: UTF8String;
-  recurse: Boolean;
-  lister: TListFilesAndDirs;
+  mask: String;
 begin
   requiredArgCount(args,1,3);
-  dir := normalizePath(args[0]);
   if Length(args) >= 3 then mask := args[2].toString
   else mask := '*';
   result := myList(args[0], true, (length(args) >= 2) and args[1].toBoolean, mask)
@@ -408,18 +774,18 @@ end;
 
 function move(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  source: UTF8String;
-  dest: UTF8String;
+  source: String;
+  dest: String;
 begin
   requiredArgCount(args,1,2);
   source := normalizePath(args[0]);
   dest := normalizePath(args[1]);
 
-  if DirectoryExistsUTF8(source) then begin
-    if FileExistsUTF8(dest) and not DirectoryExistsUTF8(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
-  end else if not FileExistsUTF8(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
+  if DirectoryExists(source) then begin
+    if FileExists(dest) and not DirectoryExists(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
+  end else if not FileExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
 
-  if not RenameFileUTF8(source, dest) then raiseFileError(Error_Io_Error, 'Moving failed', args[0]);
+  if not RenameFile(source, dest) then raiseFileError(Error_Io_Error, 'Moving failed', args[0]);
   result := xqvalue();
 end;
 
@@ -430,7 +796,7 @@ var
   errcode: String;
 begin
   try
-    stream := TFileStream.Create(UTF8ToSys(fn), fmOpenRead);
+    stream := TFileStream.Create(fn, fmOpenRead);
     try
       if from < 0 then raiseFileError(Error_Out_Of_Range, IntToStr(from) + ' < 0');
       if length = -1 then length := stream.Size - from;
@@ -445,14 +811,14 @@ begin
   except
     on e: EStreamError do begin
       errcode := Error_Io_Error;
-      if DirectoryExistsUTF8(fn) then errcode := Error_IsDir
-      else if not FileExistsUTF8(fn) then errcode := Error_Not_Found;
+      if DirectoryExists(fn) then errcode := Error_IsDir
+      else if not FileExists(fn) then errcode := Error_Not_Found;
       raiseFileError(errcode, 'Failed to open file for reading', xqvalue(fn));
     end;
     on e: EOutOfMemory do begin //raised for a directory,wtf??
       errcode := Error_Io_Error;
-      if DirectoryExistsUTF8(fn) then errcode := Error_IsDir
-      else if not FileExistsUTF8(fn) then errcode := Error_Not_Found;
+      if DirectoryExists(fn) then errcode := Error_IsDir
+      else if not FileExists(fn) then errcode := Error_Not_Found;
       raiseFileError(errcode, 'Failed to open file for reading', xqvalue(fn));
     end;
   end;
@@ -491,7 +857,7 @@ end;
 
 function name(const args: TXQVArray): IXQValue;
 var
-  path: UTF8String;
+  path: String;
   lastSep: LongInt;
 begin
   path := normalizePath(args[0]);
@@ -512,8 +878,7 @@ end;
 
 function parent(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  path: UTF8String;
-  lastSep: LongInt;
+  path: String;
 begin
   path := strBeforeLast(resolve_path(context,args).toString, AllowDirectorySeparators);
   result := xqvalue(path);
@@ -529,8 +894,8 @@ var
   dir: String;
 begin
   dir := ResolveDots(fileNameExpand(normalizePath(args[0])));
-  if not strEndsWith(dir, DirectorySeparator) and DirectoryExistsUTF8(dir) then dir += DirectorySeparator;
-  if not FileExistsUTF8(dir) then raiseFileError(Error_Not_Found, 'Path does not exists: ', args[0]);
+  if not strEndsWith(dir, DirectorySeparator) and DirectoryExists(dir) then dir += DirectorySeparator;
+  if not FileExists(dir) then raiseFileError(Error_Not_Found, 'Path does not exists: ', args[0]);
   result := xqvalue(dir);
 end;
 
@@ -609,6 +974,7 @@ begin
 
   TXQueryEngine.registerNativeModule(module);
 end;
+
 
 
 initialization
