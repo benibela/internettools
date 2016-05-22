@@ -4170,8 +4170,6 @@ function germanfy(const n: string; modifiers: TXQFormatIntegerModifiers): string
   end;
 
   function germanfybelow1000(lowest: integer): string;
-  var
-    hundreds: String;
   begin
     result := germanfybelow100(lowest);
     if (lowest >= 3) and (n[lowest-2] > '0') then
@@ -4212,10 +4210,8 @@ function germanfy(const n: string; modifiers: TXQFormatIntegerModifiers): string
   end;
 
 var
-  temp: String;
   blockStart: Integer;
   i: Integer;
-  temp2: String;
   illion: String;
   illiarde: String;
 begin
@@ -4600,7 +4596,6 @@ var
   picturedlength: Integer;
   commapos: SizeInt;
   tempstrmin: RawByteString;
-  tempstr: RawByteString;
   tempstrmax: RawByteString;
   last: Integer;
   i: Integer;
@@ -4637,6 +4632,7 @@ begin
       end;
 
     place := args[4].toString;
+    ignore(place); //no idea what to do with this
   end else if length(args) = 2 then begin
     lang := '';
     calendar := '';
