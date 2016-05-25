@@ -320,12 +320,13 @@ end;
 
 function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer): longint;
 var aproperty: putf8proc_property_t;
-  decomp_entry: PLongint;
+  decomp_entry: PWord;
   hangul_sindex: longint;
   hangul_tindex: longint;
   written: longint;
   temp: longint;
   i: Integer;
+  decomp_cp: integer;
 begin
   aproperty := utf8proc_get_property(uc);
   hangul_sindex := uc - UTF8PROC_HANGUL_SBASE;
@@ -363,10 +364,19 @@ begin
     begin
       written := 0;
       decomp_entry := @utf8proc_sequences[aproperty^.decomp_mapping];
-      for i := 1 to aproperty^.decomp_length do begin
+      i := aproperty^.decomp_length;
+      while i >= 1 do begin
+        decomp_cp := decomp_entry^;
+        if decomp_cp and %1111100000000000 = %1101100000000000 then begin
+          inc(decomp_entry);
+          dec(i);
+          decomp_cp := ((decomp_cp and %0000001111111111) shl 10) or (decomp_entry^ and %0000001111111111);
+          decomp_cp += $10000;
+        end;
         if (bufsize > written) then temp := (bufsize - written) else temp := 0;
-        written := written + utf8proc_decompose_char(decomp_entry^, dst + written, temp, options);
+        written := written + utf8proc_decompose_char(decomp_cp, dst + written, temp, options);
         inc(decomp_entry);
+        dec(i);
         if (written < 0) then begin result := UTF8PROC_ERROR_OVERFLOW; exit; end;
       end;
       Result := written;
