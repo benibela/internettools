@@ -1924,7 +1924,7 @@ begin
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
       tempVar := parseDefineVariable;
-      //since functions can only be defined in the module declarations, all static namespaces are known here
+      //since functions can only be defined in the module declarations, all static namespaces are known here todo: this is nonsense for anonymous
       if not (tempVar.variable is TXQTermVariable) then
         tempVar.variable := (tempVar.variable as TXQTermPendingEQNameToken).resolveAndFree(staticContext) as TXQTermVariable;
       result.push(tempVar);
@@ -1954,6 +1954,8 @@ begin
       if result.name is TXQEQNameUnresolved then
         result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
       if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
+      if staticContext.isLibraryModule and (result.name.namespaceURL <> namespaceGetURL(staticContext.moduleNamespace)) then
+        raiseParsingError('XQST0048', 'Expected module namespace url');
       if (result.name.namespacePrefix = '') and isModel3 then refuseReservedFunctionName(result.name.localname);
       case result.name.namespaceURL of
         XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
