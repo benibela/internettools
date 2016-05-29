@@ -3046,10 +3046,15 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
     end;
 
   var
-    l, r, truehigh, varcount, i, j, p: Integer;
+    truehigh, i, j, ownvarcount, p, varcount: integer;
+    //l, r, varcount, i, j, p: Integer;
     temp: TXQTerm;
     imp: TXQTermModule;
   begin
+    {sort children to (all variables, all functions, body term)
+    works on it own, but does not work here, because it changes the order of the functions
+    which breaks initializeFunctionsAfterResolving which assumes that the order has not been changed since initializeFunctions
+
     l := 0;
     truehigh := high(m.children) - 1;
     r := truehigh;
@@ -3064,9 +3069,14 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
     while (l <= truehigh) and isTrueDefineVariable(m.children[l]) do inc(l);
 
     assert( (l = 0) or isTrueDefineVariable(m.children[l - 1]) );
-    assert( (l = truehigh) or not isTrueDefineVariable(m.children[l]) );
+    assert( (l = truehigh) or not isTrueDefineVariable(m.children[l]) );}
 
-    varcount := l;
+    ownvarcount := 0;
+    truehigh := high(m.children) - 1;
+    for i := 0 to truehigh do
+      if isTrueDefineVariable(m.children[i]) then
+        ownvarcount += 1;
+    varcount := ownvarcount;
     if staticContext.importedModules <> nil then
       for i := 0 to staticContext.importedModules.Count - 1 do begin
         imp := (TXQueryBreaker(staticContext.importedModules.Objects[i]).fTerm as TXQTermModule);
@@ -3085,8 +3095,11 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
           inc(p);
         end;
       end;
-    for i := 0 to l - 1 do
-      m.allVariables[p + i] := TXQTermDefineVariable(m.children[i]);
+    for i := 0 to truehigh do
+      if isTrueDefineVariable(m.children[i]) then begin
+        m.allVariables[p] := TXQTermDefineVariable(m.children[i]);
+        inc(p);
+      end;
   end;
 
 var
