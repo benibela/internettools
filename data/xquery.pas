@@ -2669,27 +2669,20 @@ type
 
 { TXQCollation }
 
-TXQCollationIntFunction = function (const a,b: string): integer;
-TXQCollationBoolFunction = function (const a,b: string): boolean;
-TXQCollationPointerIntFunction = function (a,b: pchar; len: longword): integer;
-
 //** Class to perform string comparisons, so they different comparison rules can be used in different languages
 TXQCollation = class
   id: string;
-  constructor create(const aid: string; const acompare, aindexOf: TXQCollationIntFunction;
-                     const astartsWith, aEndsWith: TXQCollationBoolFunction;
-                     const aContains: TXQCollationBoolFunction = nil; const aEqual: TXQCollationBoolFunction = nil);
-  constructor create(const aid: string; const acompare: TXQCollationIntFunction; const aPointerCompare: TXQCollationPointerIntFunction);
-  function compare(const a, b: string): integer; inline;
-  function equal(const a, b: string): boolean; inline;
-  function indexOf(const strToBeExaminated, searched: string): integer; inline;
-  function contains(const strToBeExaminated, searched: string): boolean; inline;
-  function startsWith(const strToBeExaminated, expectedStart: string): boolean;
-  function endsWith(const strToBeExaminated, expectedEnd: string): boolean;
-private
-  fcompare, findexof: TXQCollationIntFunction;
-  fpointercompare: TXQCollationPointerIntFunction;
-  fequal, fcontains, fstartsWith, fendsWith: TXQCollationBoolFunction;
+  constructor Create(const aid: string);
+  function compare(const a, b: string): integer;
+  function equal(const a, b: string): boolean; virtual;
+  function indexOf(const strToBeExaminated, searched: string): SizeInt; virtual;
+  function contains(const strToBeExaminated, searched: string): boolean; virtual;
+  function startsWith(const strToBeExaminated, expectedStart: string): boolean; virtual;
+  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; virtual;
+protected
+ function compare(a,b: pansichar; len: SizeInt): integer;
+ function doCompare(a,b: pansichar; len: SizeInt): integer; virtual;
+ function doCompare(const a, b: string): integer; virtual;
 end;
 
 TXQDecimalFormatProperty = (xqdfpDecimalSeparator, xqdfpGroupingSeparator, xqdfpMinusSign, xqdfpPercent, xqdfpPerMille, xqdfpZeroDigit, xqdfpDigit, xqdfpPatternSeparator, xqdfpExponentSeparator);
@@ -5178,76 +5171,79 @@ end;
 
 { TXQCollation }
 
-constructor TXQCollation.create(const aid: string; const acompare, aindexOf: TXQCollationIntFunction; const astartsWith,
-  aEndsWith: TXQCollationBoolFunction; const aContains: TXQCollationBoolFunction; const aEqual: TXQCollationBoolFunction);
+constructor TXQCollation.Create(const aid: string);
 begin
   id := aid;
-  fcompare := acompare;
-  findexof := aindexOf;
-  fstartsWith:= astartsWith;
-  fendsWith:=aEndsWith;
-  fcontains:=aContains;
-  fequal:=aEqual;
-  if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then
-    id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
-end;
-
-constructor TXQCollation.create(const aid: string; const acompare: TXQCollationIntFunction;
-  const aPointerCompare: TXQCollationPointerIntFunction);
-begin
-  id := aid;
-  fcompare:=acompare;
-  fpointercompare:=aPointerCompare;
   if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
 end;
 
 function TXQCollation.compare(const a, b: string): integer;
 begin
-  Assert(fcompare <> nil);
-  result := fcompare(a,b);
-  if result < 0 then result := -1
-  else if result > 0 then result := 1
+  result := docompare(a,b);
+  if result <> 0 then
+    if result < 0 then result := -1
+    else result := 1;
+end;
+
+function TXQCollation.compare(a, b: pansichar; len: SizeInt): integer;
+begin
+  result := docompare(a,b,len);
+  if result <> 0 then
+    if result < 0 then result := -1
+    else result := 1;
+end;
+
+function TXQCollation.doCompare(a, b: pansichar; len: SizeInt): integer;
+var
+  i: Integer;
+begin
+  for i := 1 to len do begin
+    if a^ <> b^ then begin
+      if a^ < b^ then exit(-1)
+      else exit(1);
+    end;
+    inc(a);
+    inc(b);
+  end;
+end;
+
+function TXQCollation.doCompare(const a, b: string): integer;
+begin
+  if length(a) = length(b) then
+    result := compare(pchar(a), pchar(b), length(a))
+  else
+    result := length(a) - length(b);
 end;
 
 function TXQCollation.equal(const a, b: string): boolean;
 begin
-  if fequal = nil then result := compare(a,b) = 0
-  else result := fequal(a,b);
+  result := compare(a,b) = 0;
 end;
 
-function TXQCollation.indexOf(const strToBeExaminated, searched: string): integer;
+function TXQCollation.indexOf(const strToBeExaminated, searched: string): SizeInt;
 var
   i: Integer;
 begin
-  if findexof <> nil then exit(findexof(strToBeExaminated, searched));
-  assert(fpointercompare <> nil);
   for i:=1 to length(strToBeExaminated) - length(searched) + 1 do
-    if fpointercompare(@strToBeExaminated[i], @searched[1], length(searched)) = 0 then exit(i);
+    if compare(@strToBeExaminated[i], @searched[1], length(searched)) = 0 then exit(i);
   exit(0);
 end;
 
 function TXQCollation.contains(const strToBeExaminated, searched: string): boolean;
 begin
-  if fcontains <> nil then exit(fcontains(strToBeExaminated, searched));
   result := indexOf(strToBeExaminated, searched) >= 0
 end;
 
 function TXQCollation.startsWith(const strToBeExaminated, expectedStart: string): boolean;
 begin
-  if fstartsWith <> nil then
-    exit(fstartsWith(strToBeExaminated, expectedStart));
-  if fpointercompare <> nil then
-    exit((length(expectedStart) <= length(strToBeExaminated)) and (fpointercompare(@strToBeExaminated[1], @expectedStart[1], length(expectedStart)) = 0));
-  assert(false);
+  result := (length(expectedStart) <= length(strToBeExaminated))
+           and (compare(@strToBeExaminated[1], @expectedStart[1], length(expectedStart)) = 0);
 end;
 
 function TXQCollation.endsWith(const strToBeExaminated, expectedEnd: string): boolean;
 begin
-  if fendsWith <> nil then
-    exit(fendsWith(strToBeExaminated, expectedEnd));
-  if fpointercompare <> nil then
-    exit((length(expectedEnd) <= length(strToBeExaminated)) and (fpointercompare(@strToBeExaminated[length(strToBeExaminated) - length(expectedEnd) + 1], @expectedEnd[1], length(expectedEnd)) = 0));
-  assert(false);
+  result := (length(expectedEnd) <= length(strToBeExaminated))
+            and (compare(@strToBeExaminated[length(strToBeExaminated) - length(expectedEnd) + 1], @expectedEnd[1], length(expectedEnd)) = 0);
 end;
 
 
@@ -7675,7 +7671,173 @@ begin
 end;
 
 
+type
+TXQCollationCodepoint = class(TXQCollation)
+ constructor Create();
+ function doCompare(const a, b: string): integer; override;
+ function equal(const a, b: string): boolean; override;
+ function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
+ function contains(const strToBeExaminated, searched: string): boolean; override;
+ function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
+ function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
+end;
+TXQCollationCodepointClever = class(TXQCollationCodepoint)
+ constructor Create();
+ function doCompare(const a, b: string): integer; override;
+end;
+TXQCollationCodepointInsensitive = class(TXQCollation)
+ constructor Create();
+ function doCompare(const a, b: string): integer; override;
+ function equal(const a, b: string): boolean; override;
+ function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
+ function contains(const strToBeExaminated, searched: string): boolean; override;
+ function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
+ function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
+end;
+TXQCollationCodepointInsensitiveClever = class(TXQCollationCodepointInsensitive)
+ constructor Create();
+ function doCompare(const a, b: string): integer; override;
+end;
+TXQCollationCodepointLocalized = class(TXQCollation)
+ constructor Create();
+ function doCompare(const a, b: string): integer; override;
+ function doCompare(a, b: pansichar; len: SizeInt): integer; override;
+end;
+TXQCollationCodepointLocalizedInsensitive = class(TXQCollation)
+ constructor Create();
+ function doCompare(const a, b: string): integer; override;
+ function doCompare(a, b: pansichar; len: SizeInt): integer; override;
+end;
+
+constructor TXQCollationCodepoint.Create;
+begin
+  id := 'http://www.w3.org/2005/xpath-functions/collation/codepoint';
+end;
+
+function TXQCollationCodepoint.doCompare(const a, b: string): integer;
+begin
+  result := CompareStr(a,b);
+end;
+
+function TXQCollationCodepoint.equal(const a, b: string): boolean;
+begin
+  result := strEqual(a,b);
+end;
+
+function TXQCollationCodepoint.indexOf(const strToBeExaminated, searched: string): SizeInt;
+begin
+  result := strIndexOf(strToBeExaminated, searched);
+end;
+
+function TXQCollationCodepoint.contains(const strToBeExaminated, searched: string): boolean;
+begin
+  result := strContains(strToBeExaminated, searched);
+end;
+
+function TXQCollationCodepoint.startsWith(const strToBeExaminated, expectedStart: string): boolean;
+begin
+  result := strBeginsWith(strToBeExaminated, expectedStart);
+end;
+
+function TXQCollationCodepoint.endsWith(const strToBeExaminated, expectedEnd: string): boolean;
+begin
+  result := strEndsWith(strToBeExaminated, expectedEnd);
+end;
+
+constructor TXQCollationCodepointClever.Create;
+begin
+  id := {MY_NAMESPACE_PREFIX_URL+}'case-sensitive-clever';
+end;
+
+function TXQCollationCodepointClever.doCompare(const a, b: string): integer;
+begin
+  result := strCompareClever(a,b);
+end;
+
+constructor TXQCollationCodepointInsensitive.Create;
+begin
+  id := 'http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive'
+end;
+
+function TXQCollationCodepointInsensitive.doCompare(const a, b: string): integer;
+begin
+  result := CompareText(a,b);
+end;
+
+function TXQCollationCodepointInsensitive.equal(const a, b: string): boolean;
+begin
+  result := striEqual(a,b);
+end;
+
+function TXQCollationCodepointInsensitive.indexOf(const strToBeExaminated, searched: string): SizeInt;
+begin
+  result := striIndexOf(strToBeExaminated, searched);
+end;
+
+function TXQCollationCodepointInsensitive.contains(const strToBeExaminated, searched: string): boolean;
+begin
+  result := striContains(strToBeExaminated, searched);
+end;
+
+function TXQCollationCodepointInsensitive.startsWith(const strToBeExaminated, expectedStart: string): boolean;
+begin
+  result := striBeginsWith(strToBeExaminated, expectedStart);
+end;
+
+function TXQCollationCodepointInsensitive.endsWith(const strToBeExaminated, expectedEnd: string): boolean;
+begin
+  result := striEndsWith(strToBeExaminated, expectedEnd);
+end;
+
+constructor TXQCollationCodepointInsensitiveClever.Create;
+begin
+  id := //registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+
+     'case-insensitive-clever';
+end;
+
+function TXQCollationCodepointInsensitiveClever.doCompare(const a, b: string): integer;
+begin
+  result := striCompareClever(a,b);
+end;
+
+constructor TXQCollationCodepointLocalizedInsensitive.Create;
+begin
+  id := {MY_NAMESPACE_PREFIX_URL+}'fpc-localized-case-insensitive'
+
+end;
+
+function TXQCollationCodepointLocalizedInsensitive.doCompare(const a, b: string): integer;
+begin
+  Result:= AnsiCompareText(a,b);
+end;
+
+function TXQCollationCodepointLocalizedInsensitive.doCompare(a, b: pansichar; len: SizeInt): integer;
+begin
+  Result:= AnsiStrLIComp(a,b,len);
+end;
+
+constructor TXQCollationCodepointLocalized.Create;
+begin
+  id := {MY_NAMESPACE_PREFIX_URL+}'fpc-localized-case-sensitive'
+end;
+
+function TXQCollationCodepointLocalized.doCompare(const a, b: string): integer;
+begin
+  result := AnsiCompareStr(a,b);
+end;
+
+function TXQCollationCodepointLocalized.doCompare(a, b: pansichar; len: SizeInt): integer;
+begin
+  result := AnsiStrLComp(a,b,len);
+end;
+
+
+
+
+
+
 var xs: TXQNativeModule;
+
 initialization
 collations:=TStringList.Create;
 collations.OwnsObjects:=true;
@@ -7695,12 +7857,13 @@ XMLNamespace_MyExtensionsNew:=TNamespace.create(XMLNamespaceURL_MyExtensionsNew,
 XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
 XMLNamespace_XQuery := TNamespace.create(XMLNamespaceURL_XQuery, '');
 
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-insensitive-clever', @striCompareClever, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'case-sensitive-clever', @strCompareClever, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
-TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/codepoint', @CompareStr, @strIndexOf, @strBeginsWith, @strEndsWith, @strContains, @strEqual));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-insensitive', @AnsiCompareText, @AnsiStrLIComp));
-TXQueryEngine.registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+'fpc-localized-case-sensitive', @AnsiCompareStr, @AnsiStrLComp));
-TXQueryEngine.registerCollation(TXQCollation.create('http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive', @CompareText, @striIndexOf, @striBeginsWith, @striEndsWith, @striContains, @striEqual));
+
+TXQueryEngine.registerCollation(TXQCollationCodepointInsensitiveClever.Create()); //first is default
+TXQueryEngine.registerCollation(TXQCollationCodepoint.Create());
+TXQueryEngine.registerCollation(TXQCollationCodepointClever.Create());
+TXQueryEngine.registerCollation(TXQCollationCodepointInsensitive.Create());
+TXQueryEngine.registerCollation(TXQCollationCodepointLocalized.Create());
+TXQueryEngine.registerCollation(TXQCollationCodepointLocalizedInsensitive.Create());
 
 
 

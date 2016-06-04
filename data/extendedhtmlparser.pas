@@ -1205,6 +1205,8 @@ begin
   result := true;
 end;}
 
+type TXQCollationStrBoolFunction = function (const a,b: RawByteString): boolean;
+
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeNode;
   template: TTemplateElement): Boolean;
 var
@@ -1218,7 +1220,7 @@ var
   regexp: TWrappedRegExpr;
   caseSensitive: Boolean;
 
-  function fi(cs, csi: TXQCollationBoolFunction): TXQCollationBoolFunction;inline;
+  function fi(cs, csi: TXQCollationStrBoolFunction): TXQCollationStrBoolFunction;inline;
   begin
     if caseSensitive then result := cs
     else result := csi;
