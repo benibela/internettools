@@ -105,7 +105,7 @@ var flreCache: TFLRECacheHashMap;
 //procedure debugLogMatch(regexpr: TWrappedRegExpr; input: string);
 //writeln(stderr, '#####>', regexpr.RegularExpressionSource, ' on ',input, '<#####');
 
-procedure strAddFast(var result: RawByteString; var reslen: integer; const s: RawByteString);
+procedure strAddFast(var result: string; var reslen: integer; const s: RawByteString);
 begin
   if s <> '' then begin
     if reslen + length(s) > length(result) then SetLength(result, max(length(result)*2, reslen + length(s)));
@@ -527,7 +527,7 @@ end;
 {$ENDIF}
 
 
-function wregexprParse(pattern: RawByteString; flags: TWrappedRegExprFlags): TWrappedRegExpr;
+function wregexprParse(pattern: string; flags: TWrappedRegExprFlags): TWrappedRegExpr;
 var
   temp: RawByteString;
   c: Char;

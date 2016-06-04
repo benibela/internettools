@@ -4595,8 +4595,7 @@ var
   end;
   picturedlength: Integer;
   commapos: SizeInt;
-  tempstrmin: RawByteString;
-  tempstrmax: RawByteString;
+  tempstrmin, tempstrmax: string;
   last: Integer;
   i: Integer;
   calendarNamespace: string;

@@ -393,12 +393,12 @@ function strAppendIfMissing(const s: RawByteString; const expectedEnd: RawByteSt
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first part is returned as function result, the second one is again assign to remainingPart
 //**(If remainingPart does not contain separator, it returns remainingPart and sets remainingPart := '')
-function strSplitGet(const separator: RawByteString; var remainingPart: RawByteString):RawByteString;overload;
+function strSplitGet(const separator: RawByteString; var remainingPart: string):string;overload;
 //**Splits the string remainingPart into two parts at the first position of separator, the
 //**first is assign to firstPart, the second one is again assign to remainingPart
-procedure strSplit(out firstPart: RawByteString; const separator: RawByteString; var remainingPart: RawByteString);overload;
+procedure strSplit(out firstPart: string; const separator: RawByteString; var remainingPart: string);overload;
 //**Splits the string s into the array splitted at every occurrence of sep
-procedure strSplit(out splitted: TStringArray;s:RawByteString;sep:RawByteString=',';includeEmpty:boolean=true);overload;
+procedure strSplit(out splitted: TStringArray;s: RawByteString; sep:RawByteString=',';includeEmpty:boolean=true);overload;
 //**Splits the string s into the array splitted at every occurrence of sep
 function strSplit(s:RawByteString;sep:RawByteString=',';includeEmpty:boolean=true):TStringArray;overload;
 
@@ -477,7 +477,7 @@ procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar)
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromName(str:RawByteString):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
-function strEncodingFromBOMRemove(var str:RawByteString):TEncoding; //**< Gets the encoding from an unicode bom and removes it
+function strEncodingFromBOMRemove(var str:string):TEncoding; //**< Gets the encoding from an unicode bom and removes it
 
 //** This function converts codePoint to the corresponding uppercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
 //** It cannot be used to convert a character to uppercase, as SpecialCasing.txt is not a map from normal characters to their uppercase variants.
@@ -1800,14 +1800,13 @@ begin
   else result := s + expectedEnd;
 end;
 
-function strSplitGet(const separator: RawByteString; var remainingPart: RawByteString): RawByteString;
+function strSplitGet(const separator: RawByteString; var remainingPart: string): string;
 begin
   strsplit(result,separator,remainingPart);
 end;
 
-procedure strSplit(out firstPart: RawByteString; const separator: RawByteString;
-  var remainingPart: RawByteString);
-var p:longint;
+procedure strSplit(out firstPart: string; const separator: RawByteString; var remainingPart: string);
+var p:SizeInt;
 begin
   p:=pos(separator,remainingPart);
   if p<=0 then begin
@@ -2495,7 +2494,7 @@ begin
   end;
 end;
 
-function strEncodingFromBOMRemove(var str: RawByteString): TEncoding;
+function strEncodingFromBOMRemove(var str: string): TEncoding;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
     delete(str,1,3);
