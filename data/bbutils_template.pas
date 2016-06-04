@@ -84,7 +84,7 @@ uses
 
 type
 {$IFDEF FPC}
-     RawByteString = AnsiString;
+     {$ifndef FPC_HAS_CPSTRING} RawByteString = AnsiString;{$endif}
 {$ifdef FPC_HAS_TYPE_Extended}float = extended;
 {$else} {$ifdef FPC_HAS_TYPE_Double}float = double;
 {$else} {$ifdef FPC_HAS_TYPE_Single}float = single;
@@ -112,6 +112,18 @@ const
 
 {$endif}
 
+{$ifndef FPC_HAS_CPSTRING}
+type TSystemCodePage     = Word;
+const
+  CP_UTF16   = 1200;
+  CP_UTF16BE = 1201;
+  CP_UTF8    = 65001;
+{$endif}
+const CP_UTF32 = 12000;
+      CP_UTF32BE = 12001;
+      CP_WINDOWS1252 = 1252;
+      CP_LATIN1 = 28591;
+
 type
   TStringArray=array of string;
   TLongintArray =array of longint;
@@ -126,6 +138,7 @@ type
 type T__ArrayType__ = TStringArray;
      T__ElementType__ = string;
      T__INT__NUMBER__ = integer;
+     T_Ignore = integer;
 
 const __ELEMENT__DEFAULT__: T__ElementType__ = '';
 
@@ -454,10 +467,15 @@ function strLengthUtf8(str: RawByteString): longint;
 function strConvertToUtf8(str: RawByteString; from: TEncoding): RawByteString; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
 function strConvertFromUtf8(str: RawByteString; toe: TEncoding): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
 function strChangeEncoding(const str: RawByteString; from,toe: TEncoding):RawByteString; //**< Changes the string encoding from @code(from) to @code(toe)
+function strDecodeUTF16Character(var source: PUnicodeChar): integer;
+procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
+procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
+
 function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
+function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromName(str:RawByteString):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 function strEncodingFromBOMRemove(var str:RawByteString):TEncoding; //**< Gets the encoding from an unicode bom and removes it
 
@@ -475,11 +493,11 @@ function strLowerCaseSpecialUTF8(codePoint: integer): string;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TEncoding; strict: boolean = false):RawByteString; overload;
+function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TEncoding; strict: boolean = false):string; overload;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(s:RawByteString;encoding:TEncoding; strict: boolean = false):RawByteString; overload;
+function strDecodeHTMLEntities(s:RawByteString;encoding:TEncoding; strict: boolean = false):string; overload;
 //**Replace all occurences of x \in toEscape with escapeChar + x
 function strEscape(s:RawByteString; const toEscape: TCharSet; escapeChar: ansichar = '\'): RawByteString;
 //**Replace all occurences of x \in toEscape with escape + hex(ord(x))
@@ -794,6 +812,12 @@ begin
   end;
 end;
 
+{%REPEAT}
+{$MACRO ON}
+{$DEFINE __safemove__:=move}
+{$define str_CASESENSITIVEMODIFIER_IndexOf := strIndexOf}
+{$define str_CASESENSITIVEMODIFIER__LASTMODIFIER_IndexOf := strIndexOf}
+{%END-REPEAT}
 
 {%REPEAT (T__ArrayType__, T__ElementType__, __ELEMENT__DEFAULT__, __safemove__),
          [(TStringArray, string, '', strMoveRef),
@@ -916,8 +940,10 @@ begin
   oldlen := len;
   if i >= length(a) then arrayReserveFast(a, len, i+1)
   else if length(a) < oldlen + 1 then arrayReserveFast(a, len, len + 1);
-  if i + 1 <= oldlen then
-    {%COMPARE T__ElementType__ = string }strMoveRef{%END-COMPARE}{%COMPARE T__ElementType__ <> string }move{%END-COMPARE}(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );
+  if i + 1 <= oldlen then begin
+    {%COMPARE T__ElementType__ = string }strMoveRef(a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );{%END-COMPARE}
+    {%COMPARE T__ElementType__ <> string }move     (a[i], a[i+1], (oldlen - i) * sizeof(a[0]) );{%END-COMPARE}
+  end;
   a[i] := e;
   len := len + 1;
 end;
@@ -1027,7 +1053,7 @@ end;
 {%END-REPEAT}
 
 //=========================Conditional additions======================
-{%REPEAT T__ElementType__, [integer, cardinal, string, int64]}
+{%REPEAT T__ElementType__, [integer, cardinal, RawByteString, int64]}
 function unequal(const a, b: T__ElementType__): boolean;
 begin
   result := a <> b;
@@ -1964,16 +1990,30 @@ begin
   end;
 end;
 
+procedure strSwapEndianWord(str: PWord; countofword: SizeInt);
+begin
+  while countofword > 0 do begin
+    PWord(str)^ := SwapEndian(PWord(str)^);
+    inc(str);
+    dec(countofword);
+  end;
+end;
+
 procedure strSwapEndianWord(var str: RawByteString);
 var
   i: Integer;
 begin
   UniqueString(str);
   assert(length(str) and 1 = 0);
-  i := 1;
-  while i < length(str) do begin
-    PWord(@str[i])^ := SwapEndian(PWord(@str[i])^);
-    inc(i, 2);
+  strSwapEndianWord(pointer(str), length(str) div 2);
+end;
+
+procedure strSwapEndianDWord(str: PDWord; countofdword: SizeInt);
+begin
+  while countofdword > 0 do begin
+    PDWord(str)^ := SwapEndian(PDWord(str)^);
+    inc(str);
+    dec(countofdword);
   end;
 end;
 
@@ -1982,12 +2022,8 @@ var
   i: Integer;
 begin
   UniqueString(str);
-  assert(length(str) and 1 = 0);
-  i := 1;
-  while i < length(str) do begin
-    PDWord(@str[i])^ := SwapEndian(PDWord(@str[i])^);
-    inc(i, 4);
-  end;
+  assert(length(str) and 3 = 0);
+  strSwapEndianDWord(pointer(str), length(str) div 4);
 end;
 
 
@@ -2158,6 +2194,207 @@ begin
    - utf-8 can store all unicode pages (unlike the often used ucs-2)
   }
 end;
+
+function strDecodeUTF16Character(var source: PUnicodeChar): integer;
+begin
+  result := Ord(source^);
+  inc(source);
+  if result and %1111100000000000 = %1101100000000000 then begin
+    //this might return nonsense, if the string ends with an incomplete surrogate
+    //However, as the string should be 0-terminated, this should be safe
+    result := ((result and %0000001111111111) shl 10) or (ord(source^) and %0000001111111111);
+    inc(source);
+    inc(result, $10000);
+  end;
+end;
+
+function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer;
+begin
+  if remainingLength <= 0 then begin result := -2; exit; end;
+  case ord(source^) of
+    $00..$7F: begin
+      result:=ord(source^);
+      inc(source);
+      dec(remainingLength);
+    end;
+    $80..$BF: begin //in multibyte character (should never appear)
+      result:=-1;
+      inc(source);
+      dec(remainingLength);
+    end;
+    $C0..$C1: begin //invalid (two bytes used for single byte)
+      result:=-1;
+      inc(source, 2);
+      dec(remainingLength, 2);
+    end;
+    $C2..$DF: begin
+      if  remainingLength >= 2 then
+        result := ((ord(source^) and not $C0) shl 6) or (ord(source[1]) and not $80)
+      else
+        result := -2;
+      inc(source, 2);
+      dec(remainingLength, 2);
+    end;
+    $E0..$EF: begin
+      if  remainingLength >= 3 then
+        result := ((ord(source^) and not $E0) shl 12) or ((ord(source[1]) and not $80) shl 6) or (ord(source[2]) and not $80)
+      else
+        result := -2;
+       inc(source, 3);
+      dec(remainingLength, 3);
+    end;
+    $F0..$F4: begin
+      if  remainingLength >= 4 then
+        result := ((ord(source^) and not $F0) shl 18) or ((ord(source[1]) and not $80) shl 12) or ((ord(source[2]) and not $80) shl 6) or (ord(source[3]) and not $80)
+       else
+        result := -2;
+      inc(source, 4);
+      dec(remainingLength, 4);
+    end;
+    else begin
+      result:=-1;
+      inc(source);
+      dec(remainingLength);
+    end;
+    (* $F5..$F7: i := i + 4;  //not allowed after rfc3629
+    $F8..$FB: i := i + 5;  //"
+    $FC..$FD: i := i + 6;  //"
+    $FE..$FF: inc(i); //invalid*)
+  end;
+end;
+
+
+procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
+var
+  destptr: PInteger;
+  byteptr: PAnsiChar;
+  temp, charlen: Integer;
+  last: Pointer;
+begin
+  if len = 0 then begin
+    dest := '';
+    exit;
+  end;
+  case cp of
+    CP_UTF16, CP_UTF16BE: begin
+      SetLength(dest, 2*len);
+      move(source^, dest[1], 2 * len);
+      if cp <> {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF} then strSwapEndianWord(dest);
+    end;
+    CP_UTF32, CP_UTF32BE: begin
+      SetLength(dest, 4*len);
+      last := source + len;
+      destptr := PInteger(@dest[1]);
+      len := 0;
+      while source < last do begin
+        destptr^ := strDecodeUTF16Character(source);
+        inc(destptr);
+        inc(len);
+      end;
+      if 4 * len <> length(dest) then SetLength(dest, 4*len);
+      if cp <> {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF} then strSwapEndianDWord(dest);
+    end;
+    CP_WINDOWS1252, CP_LATIN1: begin
+      SetLength(dest, len);
+      last := source + len;
+      byteptr := @dest[1];
+      len := 0;
+      while source < last do begin
+        temp := strDecodeUTF16Character(source);
+        if temp > 255 then byteptr^ := '?'
+        else byteptr^ := chr(temp);
+        inc(byteptr);
+        inc(len);
+      end;
+      if len <> length(dest) then SetLength(dest, len);
+     end
+    else begin//default utf8
+      SetLength(dest, len);
+      last := source + len;
+      byteptr := @dest[1];
+      len := 0;
+      while source < last do begin
+        temp := strDecodeUTF16Character(source);
+        charlen := strGetUnicodeCharacterUTFLength(temp);
+        if len + charlen > length(dest) then begin
+          SetLength(dest, max(charlen, 2 * length(dest)));
+          byteptr := @dest[len+1];
+        end;
+        strGetUnicodeCharacterUTF(temp, byteptr);
+        inc(byteptr, charlen);
+        inc(len, charlen);
+      end;
+      if len <> length(dest) then SetLength(dest, len);
+     end
+  end;
+  {$ifdef FPC_HAS_CPSTRING}SetCodePage(dest, cp, false);{$endif}
+end;
+
+procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);
+var
+  outlen: SizeInt;
+
+  procedure writeCodepoint(codepoint: integer);
+  begin
+    inc(outlen);
+    if outlen > length(dest) then SetLength(dest, 2*length(dest));
+    if codepoint <= $FFFF then dest[outlen] := WideChar(codepoint)
+    else begin
+       dec(codepoint, $10000);
+       dest[outlen] := WideChar((codepoint shr 10) or %1101100000000000);
+       inc(outlen);
+       if outlen > length(dest) then SetLength(dest, 2*length(dest));
+       dest[outlen] := WideChar((codepoint and %0000001111111111) or %1101110000000000);
+    end;
+  end;
+
+var
+  i: SizeInt;
+begin
+  dest := '';
+  if len = 0 then exit;
+  case cp of
+    CP_UTF16, CP_UTF16BE: begin
+      len := len - len and 1;
+      if len = 0 then exit;
+      SetLength(dest, len div 2);
+      move(source^, dest[1], len);
+      if cp <> {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF} then strSwapEndianWord(pointer(dest), length(dest));
+    end;
+    CP_UTF32, CP_UTF32BE: begin
+      len := len - len and 3;
+      if len = 0 then exit;
+      SetLength(dest, len div 4);
+      outlen := 0;
+      if cp = {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF} then begin
+        for i := 1 to length(dest) do begin
+          writeCodepoint(PInteger(source)^);
+          inc(source, 4);
+        end;
+      end else begin
+        for i := 1 to length(dest) do begin
+          writeCodepoint(SwapEndian(PInteger(source)^));
+          inc(source, 4);
+        end;
+      end;
+      if outlen <> length(dest) then SetLength(dest, outlen);
+
+    end;
+    CP_UTF8: begin
+      SetLength(dest, len);
+      outlen := 0;
+      while len > 0 do
+         writeCodepoint(strDecodeUTF8Character(source, len));
+      if outlen <> length(dest) then SetLength(dest, outlen);
+     end
+     else begin
+       SetLength(dest, len);
+       for i := 0 to len - 1 do
+         dest[i+1] := widechar(source[i]);
+     end;
+  end;
+end;
+
 
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 begin
@@ -2530,8 +2767,7 @@ begin
   result := strEscape(s, ['(','|', '.', '*', '?', '^', '$', '-', '[', '{', '}', ']', ')', '\'], '\');
 end;
 
-function strDecodeHTMLEntities(s: RawByteString; encoding: TEncoding; strict: boolean
-  ): RawByteString;
+function strDecodeHTMLEntities(s: RawByteString; encoding: TEncoding; strict: boolean): string;
 begin
   result:=strDecodeHTMLEntities(pansichar(s), length(s), encoding, strict);
 end;
@@ -2783,8 +3019,8 @@ begin
   strSaveToFile(utf8toSys(filename),str);
 end;
 
-function strFromSize(size: int64): RawByteString;
-const iec: RawByteString='KMGTPEZY';
+function strFromSize(size: int64): string;
+const iec: string='KMGTPEZY';
 var res: int64;
     i:longint;
 begin
