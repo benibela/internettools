@@ -340,6 +340,7 @@ begin
 
   writeln('<!doctype html><html><head><title>XQuery Test Suite Evaluation</title>');
   writeln('<link rel="stylesheet" type="text/css" href="xqts.css">');
+  writeln('<style>.restable tr {background-color: #AAFFAA} .restable tr.S {background-color: white;}</style>');
   writeln('</head><body>');
 
   writeln('<h1>XQuery/XPath Test Suite Evaluation</h1>');
