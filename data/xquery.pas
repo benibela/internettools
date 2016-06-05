@@ -2684,6 +2684,36 @@ protected
  function doCompare(a,b: pansichar; len: SizeInt): integer; virtual;
  function doCompare(const a, b: string): integer; virtual;
 end;
+TXQCollationCodepoint = class(TXQCollation)
+ function doCompare(const a, b: string): integer; override;
+ function equal(const a, b: string): boolean; override;
+ function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
+ function contains(const strToBeExaminated, searched: string): boolean; override;
+ function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
+ function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
+end;
+TXQCollationCodepointClever = class(TXQCollationCodepoint)
+ function doCompare(const a, b: string): integer; override;
+end;
+TXQCollationCodepointInsensitive = class(TXQCollation)
+ function doCompare(const a, b: string): integer; override;
+ function equal(const a, b: string): boolean; override;
+ function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
+ function contains(const strToBeExaminated, searched: string): boolean; override;
+ function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
+ function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
+end;
+TXQCollationCodepointInsensitiveClever = class(TXQCollationCodepointInsensitive)
+ function doCompare(const a, b: string): integer; override;
+end;
+TXQCollationCodepointLocalized = class(TXQCollation)
+ function doCompare(const a, b: string): integer; override;
+ function doCompare(a, b: pansichar; len: SizeInt): integer; override;
+end;
+TXQCollationCodepointLocalizedInsensitive = class(TXQCollation)
+ function doCompare(const a, b: string): integer; override;
+ function doCompare(a, b: pansichar; len: SizeInt): integer; override;
+end;
 
 TXQDecimalFormatProperty = (xqdfpDecimalSeparator, xqdfpGroupingSeparator, xqdfpMinusSign, xqdfpPercent, xqdfpPerMille, xqdfpZeroDigit, xqdfpDigit, xqdfpPatternSeparator, xqdfpExponentSeparator);
 TXQDecimalFormatPropertyData = record
@@ -7671,48 +7701,6 @@ begin
 end;
 
 
-type
-TXQCollationCodepoint = class(TXQCollation)
- constructor Create();
- function doCompare(const a, b: string): integer; override;
- function equal(const a, b: string): boolean; override;
- function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
- function contains(const strToBeExaminated, searched: string): boolean; override;
- function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
- function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
-end;
-TXQCollationCodepointClever = class(TXQCollationCodepoint)
- constructor Create();
- function doCompare(const a, b: string): integer; override;
-end;
-TXQCollationCodepointInsensitive = class(TXQCollation)
- constructor Create();
- function doCompare(const a, b: string): integer; override;
- function equal(const a, b: string): boolean; override;
- function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
- function contains(const strToBeExaminated, searched: string): boolean; override;
- function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
- function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
-end;
-TXQCollationCodepointInsensitiveClever = class(TXQCollationCodepointInsensitive)
- constructor Create();
- function doCompare(const a, b: string): integer; override;
-end;
-TXQCollationCodepointLocalized = class(TXQCollation)
- constructor Create();
- function doCompare(const a, b: string): integer; override;
- function doCompare(a, b: pansichar; len: SizeInt): integer; override;
-end;
-TXQCollationCodepointLocalizedInsensitive = class(TXQCollation)
- constructor Create();
- function doCompare(const a, b: string): integer; override;
- function doCompare(a, b: pansichar; len: SizeInt): integer; override;
-end;
-
-constructor TXQCollationCodepoint.Create;
-begin
-  id := 'http://www.w3.org/2005/xpath-functions/collation/codepoint';
-end;
 
 function TXQCollationCodepoint.doCompare(const a, b: string): integer;
 begin
@@ -7744,19 +7732,9 @@ begin
   result := strEndsWith(strToBeExaminated, expectedEnd);
 end;
 
-constructor TXQCollationCodepointClever.Create;
-begin
-  id := {MY_NAMESPACE_PREFIX_URL+}'case-sensitive-clever';
-end;
-
 function TXQCollationCodepointClever.doCompare(const a, b: string): integer;
 begin
   result := strCompareClever(a,b);
-end;
-
-constructor TXQCollationCodepointInsensitive.Create;
-begin
-  id := 'http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive'
 end;
 
 function TXQCollationCodepointInsensitive.doCompare(const a, b: string): integer;
@@ -7789,21 +7767,9 @@ begin
   result := striEndsWith(strToBeExaminated, expectedEnd);
 end;
 
-constructor TXQCollationCodepointInsensitiveClever.Create;
-begin
-  id := //registerCollation(TXQCollation.create(MY_NAMESPACE_PREFIX_URL+
-     'case-insensitive-clever';
-end;
-
 function TXQCollationCodepointInsensitiveClever.doCompare(const a, b: string): integer;
 begin
   result := striCompareClever(a,b);
-end;
-
-constructor TXQCollationCodepointLocalizedInsensitive.Create;
-begin
-  id := {MY_NAMESPACE_PREFIX_URL+}'fpc-localized-case-insensitive'
-
 end;
 
 function TXQCollationCodepointLocalizedInsensitive.doCompare(const a, b: string): integer;
@@ -7814,11 +7780,6 @@ end;
 function TXQCollationCodepointLocalizedInsensitive.doCompare(a, b: pansichar; len: SizeInt): integer;
 begin
   Result:= AnsiStrLIComp(a,b,len);
-end;
-
-constructor TXQCollationCodepointLocalized.Create;
-begin
-  id := {MY_NAMESPACE_PREFIX_URL+}'fpc-localized-case-sensitive'
 end;
 
 function TXQCollationCodepointLocalized.doCompare(const a, b: string): integer;
@@ -7858,12 +7819,12 @@ XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtension
 XMLNamespace_XQuery := TNamespace.create(XMLNamespaceURL_XQuery, '');
 
 
-TXQueryEngine.registerCollation(TXQCollationCodepointInsensitiveClever.Create()); //first is default
-TXQueryEngine.registerCollation(TXQCollationCodepoint.Create());
-TXQueryEngine.registerCollation(TXQCollationCodepointClever.Create());
-TXQueryEngine.registerCollation(TXQCollationCodepointInsensitive.Create());
-TXQueryEngine.registerCollation(TXQCollationCodepointLocalized.Create());
-TXQueryEngine.registerCollation(TXQCollationCodepointLocalizedInsensitive.Create());
+TXQueryEngine.registerCollation(TXQCollationCodepointInsensitiveClever.Create('case-insensitive-clever')); //first is default
+TXQueryEngine.registerCollation(TXQCollationCodepoint.Create('http://www.w3.org/2005/xpath-functions/collation/codepoint'));
+TXQueryEngine.registerCollation(TXQCollationCodepointClever.Create('case-sensitive-clever'));
+TXQueryEngine.registerCollation(TXQCollationCodepointInsensitive.Create('http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive'));
+TXQueryEngine.registerCollation(TXQCollationCodepointLocalized.Create('fpc-localized-case-sensitive'));
+TXQueryEngine.registerCollation(TXQCollationCodepointLocalizedInsensitive.Create('fpc-localized-case-insensitive'));
 
 
 
