@@ -350,8 +350,8 @@ begin
     write(paramstr(i)+ ' ');;
   writeln('<br>');
   writeln('<br><br>');
-  writeln('<table>');
-  writeln('<tr><th>Name</th><th>Passed</th><th>Failed</th><th>Wrong error</th><th>N/A</th><th>Skipped</th></tr>');
+  writeln('<table class="restable">');
+  writeln('<tr class="S"><th>Name</th><th>Passed</th><th>Failed</th><th>Wrong error</th><th>N/A</th><th>Skipped</th></tr>');
 end;
 
 destructor THTMLLogger.Destroy;
@@ -416,7 +416,7 @@ var
   color: String;
 begin
   color := '';
-  if (not colorize) or (r[tcrPass]+r[tcrFail]+r[tcrWrongError] = 0) then color := ''
+  if (not colorize) or (r[tcrPass]+r[tcrFail]+r[tcrWrongError] = 0) then color := ' class="S"'
   else begin
     if r[tcrFail]+r[tcrWrongError] = 0 then color := 'AAFFAA'
     else if r[tcrFail]+r[tcrWrongError] <= r[tcrPass] then  begin
@@ -426,10 +426,11 @@ begin
       color := IntToHex(($FF - $88) * (r[tcrFail]+r[tcrWrongError]) div (r[tcrPass]+r[tcrFail]+r[tcrWrongError])  + $88 , 2);
       color := color+'5500'; //'FF'+color+color;
     end;
-    color := 'style="background-color:#'+color+'"';
+    if color <> 'AAFFAA' then color := ' style="background-color: #'+color+'"'
+    else color := '';
   end;
 
-  result := '<tr '+color+'><td>'+caption+'</td><td>'+inttostr( r[tcrPass])+ '</td><td>'+ inttostr(r[tcrFail])+ '</td><td>'+ inttostr(r[tcrWrongError])+ '</td><td>'+ inttostr(r[tcrNA])+ '</td><td>'+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'</td></tr>';
+  result := '<tr'+color+'><td>'+caption+'</td><td>'+inttostr( r[tcrPass])+ '</td><td>'+ inttostr(r[tcrFail])+ '</td><td>'+ inttostr(r[tcrWrongError])+ '</td><td>'+ inttostr(r[tcrNA])+ '</td><td>'+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'</td></tr>';
 end;
 
 procedure THTMLLogger.endTestSet(ts: TTestSet; const r: TResultSet);
@@ -453,12 +454,12 @@ procedure THTMLLogger.endXQTS(const result: TResultSet);
 var i: integer;
 begin
   inherited endXQTS(result);
-  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
+  writeln('<tr class="S"><td colspan=7>&nbsp;</td></tr>');
   writeln(formatResultHTML('Total', result, false));
-  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
-  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
+  writeln('<tr class="S"><td colspan=7>&nbsp;</td></tr>');
+  writeln('<tr class="S"><td colspan=7>&nbsp;</td></tr>');
   for i := 0 to bufferOverview.Count - 1 do writeln(bufferOverview[i]);
-  writeln('<tr><td colspan=7>&nbsp;</td></tr>');
+  writeln('<tr class="S"><td colspan=7>&nbsp;</td></tr>');
   writeln('</table>');
   for i := 0 to bufferBody.Count - 1 do writeln(bufferBody[i]);
 end;
