@@ -8,7 +8,7 @@ uses
   Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 
   simplehtmltreeparser, xquery, xquery_utf8, internetaccess_tests, xpath3_tests, xquery3_tests, bigdecimal_tests, parsertests, simpleinternet_tests,
-commontestutils, extendedhtmlparser, utf8tools;
+commontestutils, extendedhtmlparser;
 
 var
   start: TDateTime;
