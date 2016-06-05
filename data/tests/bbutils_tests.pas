@@ -544,6 +544,42 @@ begin
   test(strJoin(stableSort(strSplit('a|b|c|aa','|')), '|'), 'a|aa|b|c');
   test(strJoin(stableSort(strSplit('a|b|c|a20|aa|A20|A3','|')), '|'), 'a|A3|a20|A20|aa|b|c');
   test(strJoin(stableSort(strSplit('a|b|c|a20|aa|A20|A3','|'),@stringCompareReverseFunction), '|'), 'c|b|aa|A3|a20|A20|a');
+
+
+ (* procedure roundtrip(cp: TSystemCodePage);
+var
+  dest: RawByteString;
+  destus: unicodestring;
+begin
+  strUnicode2AnsiMoveProc(@intest[1], dest, cp, length(intest));
+  strAnsi2UnicodeMoveProc(@dest[1], cp, destus, length(dest));
+  writeln(cp, ' ', destus = intest);
+  if destus <> intest then begin
+    writeln(length(intest), intest);
+    writeln(length(dest), dest);
+    writeln(length(destus), destus);
+  end;
+end;
+
+begin
+  SetLength(intestcp, $BFFF);
+  for i:= 0 to high(intestcp) do
+    intestcp[i] :=  i+ $100000;
+  {SetLength(intestcp, 5);
+  for i:= 0 to high(intestcp) do
+    intestcp[i] :=  65;}
+  intest := UCS4StringToUnicodeString(intestCP);
+
+  roundtrip(CP_UTF8);
+  roundtrip(CP_UTF16);
+  roundtrip(CP_UTF16BE);
+  roundtrip(CP_UTF32);
+  roundtrip(CP_UTF32BE);
+
+  SetLength(intest, 255);
+  for i := 1 to high(intest) do intest[i] := chr(i);
+  roundtrip(CP_LATIN1);
+  roundtrip(CP_WINDOWS1252);                 *)
 end;
 
 procedure unitTests();

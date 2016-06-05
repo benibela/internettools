@@ -75,7 +75,7 @@ type
 
   { TMultiPageTemplate }
 
-  type TLoadTemplateFile = function(name: string): string;
+  type TLoadTemplateFile = function(name: RawByteString): RawByteString;
 
   (***@abstract(A multi page template, which defines which and how pages are processed. @br )
 
