@@ -222,6 +222,7 @@ begin
       lastQueryWasPXP := true;
       pxpParser := defaultQueryEngine;
       pxpparser.StaticContext.baseURI:=dataFileName;
+      TXQueryEngineBreaker(pxpParser).addAWeirdGlobalVariable('', 'json');
       case querykind of
         ekXQuery1, ekXQuery3: begin
           pxpParser.ParsingOptions.StringEntities := xqseResolveLikeXQuery;
@@ -235,7 +236,6 @@ begin
         else raise Exception.Create('internal error 21412466');
       end;
       context := pxpParser.getEvaluationContext();
-      TXQueryEngineBreaker(pxpParser).addAWeirdGlobalVariable('', 'json');
 
       if format <> itfJSON then begin
         if tree = nil then begin
