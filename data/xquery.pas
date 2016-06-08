@@ -376,6 +376,7 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat;
   end;
 
+  PIXQValue = ^IXQValue;
 
 
   { TXQValue }
@@ -1322,7 +1323,7 @@ type
     class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm): IXQValue; static;
     //used for native functions (which should be robust enough to handle different types on the Pascal side)
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
-    function checkOrConvertTypes(var values: TXQVArray; const context:TXQEvaluationContext; term: TXQTerm): integer;
+    function checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm): integer;
     destructor Destroy; override;
   private
     procedure guessArgCount;
@@ -5093,25 +5094,26 @@ begin
 end;
 
 
-function TXQAbstractFunctionInfo.checkOrConvertTypes(var values: TXQVArray; const context: TXQEvaluationContext; term: TXQTerm): integer;
+function TXQAbstractFunctionInfo.checkOrConvertTypes(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm): integer;
 var
-  i, j, countMatch: Integer;
+  i, j, countMatch, valueHigh: Integer;
   matches: Boolean;
   errCode: String;
   errMessage: String;
 begin
   if length(versions) = 0 then exit(-1);
+  valueHigh := count - 1;
   countMatch := -1;
   for i:= 0 to high(versions) do begin
-    if length(values) <> length(versions[i].types) then continue;
+    if count <> length(versions[i].types) then continue;
     matches := true;
-    for j := 0 to high(values) do
+    for j := 0 to valueHigh do
       if (versions[i].types[j].kind <> tikFunctionTest) and not checkType(values[j], versions[i].types[j], context) then begin
        matches := false;
        break;
       end;
     if matches then begin
-     for j := 0 to high(values) do
+     for j := 0 to valueHigh do
        if versions[i].types[j].kind = tikFunctionTest then
          values[j] := convertType(values[j], versions[i].types[j], context, term);
       result := i;
@@ -5124,7 +5126,7 @@ begin
   if countMatch = -1 then
     term.raiseEvaluationError('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
   errCode := 'XPTY0004';
-  for i := 0 to high(values) do
+  for i := 0 to valueHigh do
     if not (versions[countMatch].types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
      errCode := 'FOTY0013'; //wtf?
      break;
@@ -5134,14 +5136,14 @@ begin
     end;
   errMessage := 'Invalid types for function '+versions[0].name+'.'+LineEnding;
   errMessage += 'Got: ';
-  for i := 0 to high(values) do begin
+  for i := 0 to valueHigh do begin
     if i <> 0 then errMessage += ', ';
     errMessage += values[i].debugAsStringWithTypeAnnotation();
   end;
   errMessage += LineEnding;
   errMessage += 'Expected: ';
   for i := countMatch to high(versions) do begin
-    if length(versions[i].types) <> length(values) then continue;
+    if length(versions[i].types) <> count then continue;
     if i <> countMatch then errMessage += LineEnding + 'or ';
     errMessage += '(';
     for j := 0 to high(versions[i].types) do begin

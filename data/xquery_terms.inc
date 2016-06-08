@@ -2354,7 +2354,7 @@ begin
 
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
   if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
-    {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(evilkids, context, self)
+    {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(@evilkids[0], length(evilkids), context, self)
    {$ifdef checkreturntypes}
    else
     version := -1{$endif};
@@ -2679,11 +2679,11 @@ function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
     end;
   end;
 
-var evilkids: TXQVArray;
+var evilkids: array[0..1] of IXQValue;
   i: Integer;
 begin
-  if length(children)<2 then raiseEvaluationError('XPST0003', 'Not enough subterms');
-  if length(children)>2 then raiseEvaluationError('XPST0003', 'Too many subterms');
+  //if length(children)<2 then raiseEvaluationError('XPST0003', 'Not enough subterms');
+  //if length(children)>2 then raiseEvaluationError('XPST0003', 'Too many subterms');
 
 
   case op.name of
@@ -2692,12 +2692,10 @@ begin
   end;
 
 
-
-  if not context.staticContext.strictTypeChecking  then
-    result := op.func(context, children[0].evaluate(context), children[1].evaluate(context))
-  else begin
-    evaluateChildren(context, evilkids);
-    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
+  evilkids[0] := children[0].evaluate(context);
+  evilkids[1] := children[1].evaluate(context);
+  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
+  if context.staticContext.strictTypeChecking  then begin
     if xqofCastUntypedToString in op.flags then begin
       for i := 0 to high(evilkids) do
         case evilkids[i].kind of
@@ -2709,10 +2707,10 @@ begin
         case evilkids[i].kind of
           pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toFloatChecked(context.staticContext) );
         end;
-    op.checkOrConvertTypes(evilkids, context, self);
-    result := op.func(context, evilkids[0], evilkids[1]);
-    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
+    op.checkOrConvertTypes(@evilkids[0], 2, context, self);
   end;
+  result := op.func(context, evilkids[0], evilkids[1]);
+  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
 end;
 
 function TXQTermBinaryOp.debugTermToString: string;
