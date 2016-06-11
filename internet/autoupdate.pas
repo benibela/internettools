@@ -188,9 +188,40 @@ public
   property installerCmd: string read getInstallerCommand;
   property downloadedFileName: string read GetInstallerDownloadedFileName;
 end;
+resourcestring
+  rsChanges = '==Changes==';
+  rsChangelogFail = 'The changelog appears to be invalid. Version %s not found, only %s.';
+  rsAdditions = '==Additions==';
+  rsBugFixes = '==Bug fixes==';
+  rsUseFallbackSite = 'Could not find a file to download.%sCheck the homepage at %s or try again later.';
+  rsTemporaryDirFail = 'Failed to create temporary directory %s.';
+  rsPleaseWait = 'Please wait while the update to %s is downloaded:';
+  rsGeneralFail = 'Failed to download update:%s%s:%s';
+  rsInstallFail = 'Sorry, I can''t install the update automatically.%sPlease start the file %s yourself.';
+  rsCanTStartInstaller = 'Can''t start installer';
+  rsCouldNotStartInstall = 'Could not start installer';
+
+  { German:
+resourcestring
+  rsChanges = '==Änderungen==';
+  rsChangelogFail = 'Die Informationen im ChangeLog sind anscheinend ungültig. Version %s nicht gefunden, nur %s.';
+  rsAdditions = '==Hinzufügungen==';
+  rsBugFixes = '==Gelöste Fehler==';
+  rsUseFallbackSite = 'Die Internetadresse des Updates konnte leider nicht ermittelt werden.%sBitte laden Sie es manuell von %s herunter, oder versuchen es später nochmal.';
+  rsTemporaryDirFail = 'Temporäres Verzeichnis %s konnte nicht erstellt werden';
+  rsPleaseWait = 'Bitte warten Sie während das Update auf Version %s geladen wird:';
+  rsGeneralFail = 'Das Update konnte nicht heruntergeladen werden:%s%s:%s';
+  rsInstallFail = 'Sorry, I can''t install the update automatically.%sPlease start the file %s yourself.';
+  rsCanTStartInstaller = 'Can''t start installer';
+  rsCouldNotStartInstall = 'Could not start installer';
+   }
+
 implementation
 
 uses FileUtil,process{$IFDEF FPC_HAS_CPSTRING},LazFileUtils,LCLIntf{$ENDIF}{$IFDEF UNIX},BaseUnix{$ENDIF}{$IFDEF WINDOWS},windows,ShellApi{$endif};
+
+
+
 function isOurPlatform(p: string):boolean;
 begin
   p:=UpperCase(p);
@@ -342,7 +373,7 @@ begin
   fupdatebuildversion:=0;
   parseXML(changelogXML,@needBuildInfoEnterTag,nil,@needBuildInfoTextRead,eUTF8);
   if fupdatebuildversion<>fnewversion then
-    raise Exception.Create('Die Informationen im ChangeLog sind anscheinend ungültig. Version '+fnewversionstr+' nicht gefunden, nur '+IntToStr(fupdatebuildversion)+'.');
+    raise Exception.Create(Format(rsChangelogFail, [fnewversionstr, IntToStr(fupdatebuildversion)]));
 end;
 
 
@@ -383,9 +414,9 @@ function TAutoUpdater.listChanges: string;
 begin
   needBuildInfo();
   Result:='';
-  if fallChanges<>'' then result+=#13#10'==Änderungen=='#13#10+fallChanges;
-  if fallAdds<>'' then result+=#13#10'==Hinzufügungen=='#13#10+fallAdds;
-  if fallFixes<>'' then result+=#13#10'==Gelöste Fehler=='#13#10+fallFixes;
+  if fallChanges<>'' then result+=LineEnding + rsChanges  + LineEnding + fallChanges;
+  if fallAdds<>'' then result+=LineEnding+rsAdditions+LineEnding+fallAdds;
+  if fallFixes<>'' then result+=LineEnding+rsBugFixes+LineEnding+fallFixes;
 end;
 
 procedure TAutoUpdater.downloadUpdate(tempDir: string);
@@ -395,8 +426,7 @@ var updateUrl:string;
 begin
   needBuildInfo();
   if finstallerurl='' then
-    raise exception.Create('Die Internetadresse des Updates konnte leider nicht ermittelt werden.'#13#10+
-                           'Bitte laden Sie es manuell von '+homepageAlternative+' herunter, oder versuchen es später nochmal.');
+    raise exception.Create(Format(rsUseFallbackSite, [LineEnding, homepageAlternative]));
 
   updateUrl:=finstallerurl;
 
@@ -410,11 +440,11 @@ begin
     ForceDirectory(copy(ftempDir,1,length(ftempdir)-1));
   except
     if not DirectoryExists(copy(ftempDir,1,length(ftempdir)-1)) then
-      raise exception.create('Temporäres Verzeichnis '+ftempDir+' konnte nicht erstellt werden');
+      raise exception.create(Format(rsTemporaryDirFail, [ftempDir]));
   end;
 
   {$IFDEF showProgress}
-    progress:=TProgressBarDialog.create('Update','Bitte warten Sie während das Update auf Version '+fnewversionstr+' geladen wird:');
+    progress:=TProgressBarDialog.create('Update', Format(rsPleaseWait, [fnewversionstr]));
   {$ENDIF}
   try
     update:=TFileStream.Create(ftempDir+finstallerBaseName,fmCreate);
@@ -427,7 +457,7 @@ begin
         finternet.OnProgress:=nil;
         if update.Size=0 then Abort;
       except on e: Exception do
-        raise EXCEPTION.Create('Das Update konnte nicht heruntergeladen werden:'#13#10+e.ClassName+':'+ e.Message);
+        raise EXCEPTION.Create(Format(rsGeneralFail, [LineEnding, e.ClassName, e.Message]));
       end;
     finally
       update.free;
@@ -474,8 +504,8 @@ var realParameter: string;
     p:tprocess;
 begin
   if finstallerParameters='' then begin
-    ShowMessage('Sorry, I can''t install the update automatically.'#13#10'Please start the file '+downloadedFileName+' yourself.');
-    raise Exception.Create('Can''t start installer');
+    ShowMessage(Format(rsInstallFail, [#13#10, downloadedFileName]));
+    raise Exception.Create(rsCanTStartInstaller);
   end;
   if hasDirectoryWriteAccess then begin
     {$ifdef windows}
@@ -500,7 +530,7 @@ begin
   end;
   {$ENDIF}
 
-  raise Exception.Create('Could not start installer');
+  raise Exception.Create(rsCouldNotStartInstall);
 end;
 
 procedure TAutoUpdater.openFileBrowser;
