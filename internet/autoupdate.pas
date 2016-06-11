@@ -178,7 +178,9 @@ public
   procedure downloadUpdate(tempDir:string='');
   {** call installer }
   procedure installUpdate;
-  
+  {** opens the file browser for the directory the update was saved (in case it cannot be run as installer)  }
+  procedure openFileBrowser;
+
   destructor destroy;override;
   
   property newestVersion: TVersionNumber read fnewversion;
@@ -494,6 +496,15 @@ begin
   {$ENDIF}
 
   raise Exception.Create('Could not start installer');
+end;
+
+procedure TAutoUpdater.openFileBrowser;
+begin
+  {$ifdef windows}
+  ShellExecuteW(0, 'open', 'explorer', PWideChar(UnicodeString('/select,"' +downloadedFileName+'"')), nil, SW_SHOWNORMAL);
+  {$else}
+  OpenDocument(ExtractFilePath(downloadedFileName));
+  {$endif}
 end;
 
 destructor TAutoUpdater.destroy;
