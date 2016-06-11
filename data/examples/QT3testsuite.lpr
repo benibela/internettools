@@ -1709,7 +1709,7 @@ begin
   clr.declareFlag('skip-negative', 'Ignore tests expecting only an error');
   clr.declareString('test-set', 'Only runs certain test set(s)');
   clr.declareString('test-case', 'Only runs certain test case(s)');
-  clr.declareString('exclude-test-case', 'Do not run certain test case(s)', 'modules-collide-var-001,modules-collide-fn-001,XQST0093a,K2-InternalVariablesWithout-6a,K2-InternalVariablesWithout-7a,K2-InternalVariablesWithout-8a'); //see #29589 and #29590
+  clr.declareString('exclude-test-case', 'Do not run certain test case(s)', 'modules-collide-var-001,modules-collide-fn-001,XQST0093a'); //see #29589
   clr.declareString('print-test-cases', 'Which test case results to print (n: not run, f: failed, p: passed, e: wrong error, d: disputed, s: skipped, b: too big, o: dbs)', 'penfdsb');
   clr.declareFlag('print-failed-inputs', 'Print failed inputs');
   clr.declareString('format', 'html or text output','text');
