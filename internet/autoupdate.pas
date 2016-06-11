@@ -190,7 +190,7 @@ public
 end;
 implementation
 
-uses FileUtil,process{$IFDEF FPC_HAS_CPSTRING},LazFileUtils{$ENDIF}{$IFDEF UNIX},BaseUnix{$ENDIF}{$IFDEF WINDOWS},windows,ShellApi{$endif};
+uses FileUtil,process{$IFDEF FPC_HAS_CPSTRING},LazFileUtils,LCLIntf{$ENDIF}{$IFDEF UNIX},BaseUnix{$ENDIF}{$IFDEF WINDOWS},windows,ShellApi{$endif};
 function isOurPlatform(p: string):boolean;
 begin
   p:=UpperCase(p);
@@ -454,7 +454,7 @@ end;
 
 procedure TAutoUpdater.installUpdate;
   {$IFDEF WINDOWS}
-    procedure runAsAdmin(cmdline: string);
+    function run(verb, cmdline: string): boolean;
     var
       prog: String;
     begin
@@ -467,7 +467,7 @@ procedure TAutoUpdater.installUpdate;
         delete(cmdline, 1, 1);
         prog := strSplitGet('''', cmdline)
       end else if cmdline[1] <> '"' then prog := strSplitGet(' ', cmdline);
-      ShellExecute(0, 'runas', pchar(prog), pchar(cmdline), pchar(finstallDir), SW_SHOWNORMAL);
+      result := ShellExecute(0, pchar(verb), pchar(prog), pchar(cmdline), pchar(finstallDir), SW_SHOWNORMAL) > 32;
     end;
   {$ENDIF}
 var realParameter: string;
@@ -478,6 +478,10 @@ begin
     raise Exception.Create('Can''t start installer');
   end;
   if hasDirectoryWriteAccess then begin
+    {$ifdef windows}
+    if run('open', getInstallerCommand) then
+      exit; //the command might require admin access, so do no assume it worked
+    {$else}
     p:=TProcess.Create(nil);
     try
       p.CommandLine:=getInstallerCommand;
@@ -486,11 +490,12 @@ begin
       p.free;
     end;
     exit;
+    {$endif}
   end;
 
   {$IFDEF WINDOWS}
   if Win32MajorVersion >= 6 then begin
-    runAsAdmin(getInstallerCommand);
+    run('runas' {as admin}, getInstallerCommand);
     exit;
   end;
   {$ENDIF}
