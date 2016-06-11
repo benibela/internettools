@@ -430,7 +430,7 @@ begin
     {$IFDEF UNIX}
     if finstallerParameters<>'' then begin
       //set file permissions             f
-      FpChmod(Utf8ToAnsi(ftempDir+finstallerBaseName), S_IRWXU or S_IRGRP or S_IXGRP or S_IROTH or S_IXOTH);
+      FpChmod({$IfNDef FPC_HAS_CPSTRING} Utf8ToAnsi{$endif}(ftempDir+finstallerBaseName), S_IRWXU or S_IRGRP or S_IXGRP or S_IROTH or S_IXOTH);
     end;
     {$ENDIF}
   finally
