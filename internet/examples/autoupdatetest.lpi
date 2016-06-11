@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
     <Version Value="9"/>
@@ -16,9 +16,6 @@
     <BuildModes Count="2">
       <Item1 Name="default" Default="True"/>
       <Item2 Name="win32">
-        <MacroValues Count="1">
-          <Macro1 Name="LCLWidgetType" Value="win32"/>
-        </MacroValues>
         <CompilerOptions>
           <Version Value="11"/>
           <PathDelim Value="\"/>
@@ -35,10 +32,6 @@
             <TargetCPU Value="i386"/>
             <TargetOS Value="win32"/>
           </CodeGeneration>
-          <Other>
-            <CompilerPath Value="$(CompPath)"/>
-          </Other>
-          <LCLWidgetType Value="win32"/>
         </CompilerOptions>
       </Item2>
     </BuildModes>
@@ -63,7 +56,6 @@
       <Unit0>
         <Filename Value="autoupdatetest.lpr"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="autoupdatetest"/>
       </Unit0>
       <Unit1>
         <Filename Value="autoupdateexu.pas"/>
@@ -71,7 +63,6 @@
         <ComponentName Value="Form1"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
-        <UnitName Value="autoupdateexu"/>
       </Unit1>
     </Units>
   </ProjectOptions>
@@ -87,8 +78,5 @@
         <UseAnsiStrings Value="False"/>
       </SyntaxOptions>
     </Parsing>
-    <Other>
-      <CompilerPath Value="$(CompPath)"/>
-    </Other>
   </CompilerOptions>
 </CONFIG>
