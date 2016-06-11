@@ -417,15 +417,18 @@ begin
   try
     update:=TFileStream.Create(ftempDir+finstallerBaseName,fmCreate);
     try
-      {$IFDEF showProgress}
-      finternet.OnProgress:=@progress.progressEvent;
-      {$ENDIF}
-      finternet.get(updateUrl,update);
-      finternet.OnProgress:=nil;
-      if update.Size=0 then Abort;
+      try
+        {$IFDEF showProgress}
+        finternet.OnProgress:=@progress.progressEvent;
+        {$ENDIF}
+        finternet.get(updateUrl,update);
+        finternet.OnProgress:=nil;
+        if update.Size=0 then Abort;
+      except on e: Exception do
+        raise EXCEPTION.Create('Das Update konnte nicht heruntergeladen werden:'#13#10+e.ClassName+':'+ e.Message);
+      end;
+    finally
       update.free;
-    except on e: Exception do
-      raise EXCEPTION.Create('Das Update konnte nicht heruntergeladen werden:'#13#10+e.ClassName+':'+ e.Message);
     end;
     {$IFDEF UNIX}
     if finstallerParameters<>'' then begin
