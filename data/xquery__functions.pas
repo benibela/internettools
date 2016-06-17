@@ -281,21 +281,22 @@ begin
   if isLongint(f) and isLongint(t) then begin
     fsmall := BigDecimalToLongint(f);
     for idx := 0 to BigDecimalToLongint(len) - 1 do
-      resseqseq.list[idx] := TXQValueInt64.Create(baseSchema.integer, idx+fsmall);
+      resseqseq.fbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+fsmall);
   end else if isInt64(f) and isInt64(t) then begin
     i64 := BigDecimalToInt64(f);
     for idx := 0 to BigDecimalToLongint(len) - 1 do
-      resseqseq.list[idx] := TXQValueInt64.Create(baseSchema.integer, idx+i64);
+      resseqseq.fbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+i64);
   end else begin
     idx := 0;
     i := f;
     typ := baseSchema.integer;
     while i < t do begin
-      resseqseq.list[idx] := typ.createValue(i);
+      resseqseq.fbuffer[idx] := typ.createValue(i);
       i += 1;
       idx+=1;
     end;
-    resseqseq.list[idx] := typ.createValue(t);
+    resseqseq.fbuffer[idx] := typ.createValue(t);
+    assert(idx + 1 = len);
   end;
   result := resseq;
 end;
@@ -2804,7 +2805,7 @@ begin
   resseqseq := resseq.seq;
   TXQVListBreaker(resseqseq).setCount(len);
   for i := from to from + len - 1 do
-    TXQVListBreaker(resseqseq).list[i - from] := oldseqseq[i];
+    TXQVListBreaker(resseqseq).fbuffer[i - from] := oldseqseq[i];
   result := resseq;
 end;
 

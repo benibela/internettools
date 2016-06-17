@@ -3,7 +3,7 @@ program tests;
 {$mode objfpc}{$H+}
 
 uses
-  //bbheaptrc,
+  bbheaptrc,
   //heaptrc,
   Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 

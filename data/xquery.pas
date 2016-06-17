@@ -1246,18 +1246,20 @@ type
   (*** @abstract(List of TXQValue-s) *)
   TXQVList = class
   protected
-    fcount: integer; // count
-    list: TXQVArray; // Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
-                     // Can have higher capaacity than count. for i >= count, list[i] must be nil
+    fcount, fcapacity: integer; // count
+    fbuffer: PIXQValue; // Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
+                        // Can have higher capaacity than count.
     function everyIsNodeOrNot(checkForNode: boolean): boolean; //**< checks: every $n in (self) satisfies (($n is node) = checkForNode)
     procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
     procedure checkIndex(i: integer); inline; //**< Range check
     procedure reserve(cap: integer); //**< Allocates new memory with list if necessary
     procedure compress; //**< Deallocates memory by shorting list
     procedure setCount(c: integer); //**< Forces a count
+    procedure setBufferSize(c: integer); inline;
     procedure insertSingle(i: integer; child: IXQValue); //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
   public
     constructor create(capacity: integer = 0);
+    destructor Destroy; override;
     procedure insert(i: integer; value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addOrdered(const node: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
@@ -5284,7 +5286,7 @@ end;
 procedure TXQVList.put(i: integer; const AValue: IXQValue); inline;
 begin
   checkIndex(i);
-  list[i] := AValue;
+  fbuffer[i] := AValue;
 end;
 
 
@@ -5318,8 +5320,8 @@ begin
         other := (value as TXQValueSequence).seq;
         if other.fcount = 0 then exit;
         reserve(fcount + other.fcount);
-        for i := 0 to other.fcount - 1 do other.list[i]._AddRef;
-        Move(other.list[0], list[fcount], sizeof(other.list[0]) * other.fcount); //assume list is initialized to nil
+        for i := 0 to other.fcount - 1 do other.fbuffer[i]._AddRef;
+        Move(other.fbuffer[0], fbuffer[fcount], sizeof(other.fbuffer[0]) * other.fcount); //assume list is initialized to nil
         inc(fcount, other.fcount);
       end else for v in value do
         Add(v);
@@ -5327,7 +5329,7 @@ begin
     pvkUndefined: ;
     else begin
       reserve(fcount + 1);
-      list[fcount] := value;
+      fbuffer[fcount] := value;
       fcount += 1;
     end;
   end;
@@ -5388,34 +5390,38 @@ var
 begin
   checkIndex(i);
   for j := i to fcount - 2 do //todo: optimize
-    list[j] := list[j+1];
+    fbuffer[j] := fbuffer[j+1];
   fcount -= 1;
-  list[fcount] := nil;
+  fbuffer[fcount] := nil;
   compress;
 end;
 
 function TXQVList.get(i: integer): IXQValue;
 begin
   checkIndex(i);
-  result := list[i];
+  result := fbuffer[i];
 end;
 
 function TXQVList.last: IXQValue;
 begin
   checkIndex(0);
-  result := list[fcount-1];
+  result := fbuffer[fcount-1];
 end;
 
 function TXQVList.first: IXQValue;
 begin
   checkIndex(0);
-  result := list[0];
+  result := fbuffer[0];
 end;
 
 procedure TXQVList.clear;
+var
+  i: Integer;
 begin
+  for i := 0 to fcount - 1 do
+    fbuffer[i]._Release;
   fcount:=0;
-  setlength(list, 0);
+  setBufferSize(0);
 end;
 
 function TXQVList.everyIsNodeOrNot(checkForNode: boolean): boolean;
@@ -5442,7 +5448,7 @@ end;
 procedure TXQVList.sortInDocumentOrderUnchecked;
 begin
   if fcount < 2 then exit;
-  stableSort(@list[0], @list[fcount-1], sizeof(pointer), @compareXQInDocumentOrder);
+  stableSort(@fbuffer[0], @fbuffer[fcount-1], sizeof(IXQValue), @compareXQInDocumentOrder);
 end;
 
 procedure TXQVList.checkIndex(i: integer);
@@ -5451,32 +5457,56 @@ begin
 end;
 
 procedure TXQVList.reserve(cap: integer);
+var
+  oldcap: Integer;
 begin
-  if cap <= length(list) then exit;
+  if cap <= fcapacity then exit;
 
-  if cap < 4 then setlength(list, 4)
-  else if (cap < 1024) and (cap <= length(list) * 2) then setlength(list, length(list) * 2)
-  else if (cap < 1024) then setlength(list, cap)
-  else if cap <= length(list) + 1024 then setlength(list, length(list) + 1024)
-  else setlength(list, cap);
+  oldcap := fcapacity;
+  if cap < 4 then setBufferSize(4)
+  else if (cap < 1024) and (cap <= fcapacity * 2) then setBufferSize(fcapacity * 2)
+  else if (cap < 1024) then setBufferSize(cap)
+  else if cap <= fcapacity + 1024 then setBufferSize(fcapacity + 1024)
+  else setBufferSize(cap);
+
+  FillChar(fbuffer[oldcap], sizeof(IXQValue) * (fcapacity - oldcap), 0);
 end;
 
 procedure TXQVList.compress;
 begin
-  if fcount <= length(list) div 2 then setlength(list, length(list) div 2)
-  else if fcount <= length(list) - 1024 then setlength(list, length(list) - 1024);
+  if fcount <= fcapacity div 2 then setBufferSize(fcapacity div 2)
+  else if fcount <= fcapacity - 1024 then setBufferSize(fcapacity - 1024);
 end;
 
 procedure TXQVList.setCount(c: integer);
+var
+  i: Integer;
 begin
   reserve(c);
+  if c < fcount then begin
+    for i := c to fcount - 1 do
+      fbuffer[i]._Release;
+    FillChar(fbuffer[c], (fcount - c) * sizeof(IXQValue), 0);
+  end;
   fcount:=c;
+end;
+
+procedure TXQVList.setBufferSize(c: integer);
+begin
+  ReAllocMem(fbuffer, c * sizeof(IXQValue));
+  fcapacity := c;
 end;
 
 constructor TXQVList.create(capacity: integer);
 begin
-  setlength(list, capacity);
+  reserve(capacity);
   fcount := 0;
+end;
+
+destructor TXQVList.Destroy;
+begin
+  clear;
+  inherited Destroy;
 end;
 
 procedure TXQVList.insertSingle(i: integer; child: IXQValue);
@@ -5486,8 +5516,8 @@ begin
   if i <> fcount then checkIndex(i);
   reserve(fcount + 1); //TODO: optimize;
   for j := fcount downto i + 1 do
-    list[j] := list[j-1];
-  list[i] := child;
+    fbuffer[j] := fbuffer[j-1];
+  fbuffer[i] := child;
   fcount+=1;
 end;
 
@@ -5499,13 +5529,13 @@ begin
   if count=0 then exit;
   h :=count-1;
   for i:=0 to count div 2 - 1 do //carefully here. xqswap(a,a) causes a memory leak
-    xqswap(list[i], list[h-i]);
+    xqswap(fbuffer[i], fbuffer[h-i]);
 end;
 
 procedure TXQVList.sort(cmp: TPointerCompareFunction; data: TObject);
 begin
   if count <= 1 then exit;
-  stableSort(@list[0], @list[count-1], sizeof(list[0]), cmp, data);
+  stableSort(@fbuffer[0], @fbuffer[count-1], sizeof(fbuffer[0]), cmp, data);
 end;
 
 function TXQVList.getPromotedType: TXQValueKind;
