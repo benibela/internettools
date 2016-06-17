@@ -2353,7 +2353,7 @@ begin
   assert((kind = xqfkUnknown) or (func <> nil));
 
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
-  if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) then
+  if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) and (length(evilkids) > 0) then
     {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(@evilkids[0], length(evilkids), context, self)
    {$ifdef checkreturntypes}
    else
