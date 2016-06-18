@@ -154,7 +154,7 @@ function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TD
                                          );
    if data <> '' then begin
      WriteStrToStream(connection.Document, data);
-     connection.MimeType := ContentTypeForData;
+     connection.MimeType := ContentTypeForData; //this pointless as addHeader overrides it. But it does not hurt either
    end;
    connection.Protocol:='1.1';
    //fallback to TLS 1 for servers where auto detection fails
