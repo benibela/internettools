@@ -87,16 +87,25 @@ type
   float = record end;
   xqfloat = double;
 
-  { TXQValueEnumerator }
-  //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
-  TXQValueEnumerator = record
+  //** @abstract(Iterator over PIXQValue.) Faster version of TXQValueEnumerator
+  TXQValueEnumeratorPtr = record
   private
     fguardian: IXQValue;
     fcurrent, flast: PIXQValue;
-    function GetCurrent: IXQValue;
+    class procedure clear(out enum: TXQValueEnumeratorPtr); static;
+  public
+    function MoveNext: Boolean; inline;
+    property Current: PIXQValue read FCurrent;
+    function GetEnumerator: TXQValueEnumeratorPtr;
+  end;
+  //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
+  TXQValueEnumerator = record
+  private
+    ptr: TXQValueEnumeratorPtr;
+    function GetCurrent: IXQValue; inline;
     class procedure clear(out enum: TXQValueEnumerator); static;
   public
-    function MoveNext: Boolean;
+    function MoveNext: Boolean; inline;
     property Current: IXQValue read GetCurrent;
     function GetEnumerator: TXQValueEnumerator;
   end;
@@ -354,6 +363,7 @@ type
 
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
     function GetEnumerator: TXQValueEnumerator; //**< Returns an enumerator for @code(for var in value). For a sequence the enumerator runs over all values contained in the sequence, for other values it will do one iteration over the value of that value. The iterated values have the IXQValue interface type
+    function GetEnumeratorPtr: TXQValueEnumeratorPtr;
 
     function query(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(query) whereby self is stored in $_. Use this to do an operation on all values of a sequence, e.g. @code(sum($_))
     function query(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like query, sets the additional arguments as variables $_1, $_2, ...
@@ -433,11 +443,12 @@ type
     function filter(const q: string; const vs: array of string): IXQValue; virtual; //**< Like filter, sets the additional arguments as variables $_1, $_2, ...
     function order(const q: string): IXQValue; virtual; //**< Orders the sequence, equivalent to query @code(for $_ in self order by (....) return $_) . The current value is in $_. Kind of slow
     function retrieve(): IXQValue; //**< Retrieves referenced resources. This is primarily used for HTTP requests, but can also retrieve files. It will parse the resource as HTML/XML/JSON if possible. It will retrieve each value in a sequence individually
+
+    function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (Only use with IXQValue references, not TXQValue)@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtr. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
+    function GetEnumeratorPtr: TXQValueEnumeratorPtr;virtual; //**< Implements a faster version of GetEnumerator.
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
-  private
-    function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (private because it wraps the object instance in a IXQValue. which may free it, if there is not another interface variable pointing to it )
   end;
 
   { TXQValueUndefined }
@@ -459,8 +470,8 @@ type
     function filter(const q: string): IXQValue; override;
     function filter(const q: string; const vs: array of ixqvalue): IXQValue; override;
     function filter(const q: string; const vs: array of string): IXQValue; override;
-  private
-    function GetEnumerator: TXQValueEnumerator;override;
+
+    function GetEnumeratorPtr: TXQValueEnumeratorPtr;override;
   end;
 
   { TXQValueBoolean }
@@ -693,7 +704,7 @@ type
 
     function getSequenceCount: integer; override;
     function get(i: integer): IXQValue; override;
-    function GetEnumerator: TXQValueEnumerator; override;
+    function GetEnumeratorPtr: TXQValueEnumeratorPtr; override;
     function map(const q: string): IXQValue; override;
     function order(const q: string): IXQValue; override;
 
@@ -839,6 +850,7 @@ type
     function isUndefined: boolean; override;
 
     function GetEnumeratorMembers: TXQValueEnumerator;
+    function GetEnumeratorMembersPtr: TXQValueEnumeratorPtr;
 
     function toBooleanEffective: boolean; override;
 
@@ -3559,7 +3571,7 @@ end;
 
 
 function xqvalueAtomize(const v: IXQValue): IXQValue;
-var x: IXQValue;
+var x: PIXQValue;
   isAlreadyAtomized: Boolean;
   seqResult: TXQValueSequence;
   t: TXSType;
@@ -3567,14 +3579,14 @@ begin
   if v.getSequenceCount = 0 then exit(v);
   if v is TXQValueSequence then begin
     isAlreadyAtomized := true;
-    for x in v do
-      if not x.instanceOf(baseSchema.AnyAtomicType) then begin
+    for x in v.GetEnumeratorPtr do
+      if not x^.instanceOf(baseSchema.AnyAtomicType) then begin
         isAlreadyAtomized := false;
         break;
       end;
     if isAlreadyAtomized then exit(v);
     seqResult := TXQValueSequence.create(v.getSequenceCount);
-    for x in v do seqResult.seq.add(xqvalueAtomize(x));
+    for x in v.GetEnumeratorPtr do seqResult.seq.add(xqvalueAtomize(x^));
     result := seqResult;
     exit
   end;
@@ -3594,27 +3606,27 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
   end;
 
 var i:integer;
-    enum1, enum2: TXQValueEnumerator;
+    enum1, enum2: TXQValueEnumeratorPtr;
 begin
   if a.getSequenceCount <> b.getSequenceCount then
     exit(false);
 
-  enum1 := a.GetEnumerator; enum1.MoveNext;
-  enum2 := b.GetEnumerator; enum2.MoveNext;
+  enum1 := a.GetEnumeratorPtr; enum1.MoveNext;
+  enum2 := b.GetEnumeratorPtr; enum2.MoveNext;
   for i := 0 to a.getSequenceCount - 1 do begin
-    if enum2.Current.kind = pvkFunction then raiseFOTY0015(enum2.Current);
+    if enum2.Current^.kind = pvkFunction then raiseFOTY0015(enum2.Current^);
 
-    if enum1.Current.instanceOf(baseSchema.AnyAtomicType) then begin
-      if not (enum2.Current.instanceOf(baseSchema.anyAtomicType))
-         or not context.staticContext.equalDeepAtomic(enum1.Current, enum2.Current, collation) then
+    if enum1.Current^.instanceOf(baseSchema.AnyAtomicType) then begin
+      if not (enum2.Current^.instanceOf(baseSchema.anyAtomicType))
+         or not context.staticContext.equalDeepAtomic(enum1.Current^, enum2.Current^, collation) then
         exit(false);
     end else begin
-      if enum1.Current.kind = pvkFunction then raiseFOTY0015(enum1.Current);
+      if enum1.Current^.kind = pvkFunction then raiseFOTY0015(enum1.Current^);
       if collation = nil then
         collation := context.staticContext.nodeCollation;
-      if (enum2.Current.instanceOf(baseSchema.anyAtomicType)) or
-         (((enum1.Current is TXQValueNode) or (enum2.Current is TXQValueNode))
-            and not enum1.Current.toNode.isDeepEqual(enum2.Current.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
+      if (enum2.Current^.instanceOf(baseSchema.anyAtomicType)) or
+         (((enum1.Current^ is TXQValueNode) or (enum2.Current^ is TXQValueNode))
+            and not enum1.Current^.toNode.isDeepEqual(enum2.Current^.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
         exit(false);
     end;
     enum1.MoveNext;
@@ -4491,19 +4503,14 @@ end;
 
 { TXQValueEnumerator }
 
-function TXQValueEnumerator.GetCurrent: IXQValue;
-begin
-  result := fcurrent^;
-end;
-
-class procedure TXQValueEnumerator.clear(out enum: TXQValueEnumerator);
+class procedure TXQValueEnumeratorPtr.clear(out enum: TXQValueEnumeratorPtr);
 begin
   enum.fcurrent := nil;
   enum.fguardian := nil;
   enum.flast := nil;
 end;
 
-function TXQValueEnumerator.MoveNext: Boolean;
+function TXQValueEnumeratorPtr.MoveNext: Boolean;
 begin
   result := fcurrent < flast;
   if result then begin
@@ -4515,6 +4522,26 @@ begin
     flast := @fguardian;
     exit(true);
   end;
+end;
+
+function TXQValueEnumeratorPtr.GetEnumerator: TXQValueEnumeratorPtr;
+begin
+  result := self;
+end;
+
+function TXQValueEnumerator.GetCurrent: IXQValue;
+begin
+  result := ptr.current^;
+end;
+
+class procedure TXQValueEnumerator.clear(out enum: TXQValueEnumerator);
+begin
+  TXQValueEnumeratorPtr.clear(enum.ptr);
+end;
+
+function TXQValueEnumerator.MoveNext: Boolean;
+begin
+  result := ptr.MoveNext;
 end;
 
 function TXQValueEnumerator.GetEnumerator: TXQValueEnumerator;
@@ -5301,13 +5328,13 @@ end;
 
 procedure TXQVList.insert(i: integer; value: IXQValue);
 var
- v: IXQValue;
+ v: PIXQValue;
 begin
   assert(value <> nil);
   case value.kind of
     pvkSequence: begin
-      for v in value do begin
-        insertSingle(i, v);
+      for v in value.GetEnumeratorPtr do begin
+        insertSingle(i, v^);
         i+=1;
       end;
     end;
@@ -5318,7 +5345,7 @@ end;
 
 procedure TXQVList.add(const value: IXQValue);
 var
- v: IXQValue;
+ v: PIXQValue;
  other: TXQVList;
  i: Integer;
 begin
@@ -5332,8 +5359,8 @@ begin
         for i := 0 to other.fcount - 1 do other.fbuffer[i]._AddRef;
         Move(other.fbuffer[0], fbuffer[fcount], sizeof(other.fbuffer[0]) * other.fcount); //assume fbuffer is initialized to nil
         inc(fcount, other.fcount);
-      end else for v in value do
-        Add(v);
+      end else for v in value.GetEnumeratorPtr do
+        Add(v^);
     end;
     pvkUndefined: ;
     else begin
@@ -5347,7 +5374,7 @@ end;
 procedure TXQVList.addOrdered(const node: IXQValue);
 var
  a,b,m, cmp: Integer;
- s: IXQValue;
+ s: PIXQValue;
  childnode: TTreeNode;
 begin
   case node.kind of
@@ -5387,15 +5414,13 @@ begin
     end;
     pvkUndefined: ;
     pvkSequence:
-      for s in node do
-        addOrdered(s); //TODO: optimize
+      for s in node.GetEnumeratorPtr do
+        addOrdered(s^); //TODO: optimize
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
   end;
 end;
 
 procedure TXQVList.delete(i: integer);
-var
-  j: Integer;
 begin
   checkIndex(i);
   fbuffer[i] := nil;
@@ -5521,8 +5546,6 @@ begin
 end;
 
 procedure TXQVList.insertSingle(i: integer; child: IXQValue);
-var
-  j: Integer;
 begin
   reserve(fcount + 1);
   if i <> fcount then begin
@@ -6909,7 +6932,8 @@ end;}
 class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: TXQTerm; var context: TXQEvaluationContext);
 var
  tempContext: TXQEvaluationContext;
- v, previous: IXQValue;
+ previous: IXQValue;
+ v: PIXQValue;
  i: Integer;
  value: IXQValue;
  list: TXQVList;
@@ -6944,13 +6968,13 @@ begin
   list := TXQVList.create(tempContext.SeqLength);
   try
     i := 1;
-    for v in previous do begin
-      tempContext.SeqValue:=v;
+    for v in previous.GetEnumeratorPtr do begin
+      tempContext.SeqValue:=v^;
       tempContext.SeqIndex:=i;
-      if v is TXQValueNode then tempContext.ParentElement:=v.toNode
+      if v^.kind = pvkNode then tempContext.ParentElement:=v^.toNode
       else tempContext.ParentElement := context.ParentElement;
       if sequenceFilterConditionSatisfied(filter.evaluate(tempContext), i) then
-        list.add(v);
+        list.add(v^);
       i+=1;
     end;
     result := xqvalueSeqSqueezed(list);
@@ -6979,7 +7003,7 @@ var
   obj: TXQValueObject;
   temp: TXQValue;
   tempprop: TXQProperty;
-  tempvi: IXQValue;
+  tempvi: PIXQValue;
   i: Integer;
 begin
   case node.kind of
@@ -6998,8 +7022,8 @@ begin
         jsoniqDescendants(tempprop.Value, searchedProperty);
     end;
     pvkSequence:
-      for tempvi in node do
-        jsoniqDescendants(tempvi, searchedProperty)
+      for tempvi in node.GetEnumeratorPtr do
+        jsoniqDescendants(tempvi^, searchedProperty)
     else ;//we must ignore non structured item, otherwise it would be useless for any object (like a string<->string map) containing them
   end;
 end;
@@ -7016,6 +7040,7 @@ var
   namespaceMatching: TXQNamespaceMode;
   tempSeq: IXQValue;
   tempList: TXQVList;
+  pv: PIXQValue;
 
   procedure add(const v: IXQValue); inline;
   begin
@@ -7102,16 +7127,16 @@ begin
                 if qmValue in command.matching then begin //read named property
                   //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
                   if tempKind = pvkObject then newList.add(n.getProperty(command.value))
-                  else for tempSeq in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
-                    if tempSeq.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+tempSeq.debugAsStringWithTypeAnnotation()+'"');
-                    newList.add(tempSeq.getProperty(command.value));
+                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtr do begin
+                    if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
+                    newList.add(pv^.getProperty(command.value));
                   end;
                 end else begin
                   //get all properties
                   if tempKind = pvkObject then newList.add((n as TXQValueObject).enumerateValues())
-                  else for tempSeq in (n as TXQValueJSONArray).GetEnumeratorMembers do begin
-                    if tempSeq.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+tempSeq.debugAsStringWithTypeAnnotation()+'"');
-                    newList.add((tempSeq as TXQValueObject).enumerateValues());
+                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtr do begin
+                    if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
+                    newList.add((pv^ as TXQValueObject).enumerateValues());
                   end;
                 end;
               end;

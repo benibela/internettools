@@ -648,7 +648,7 @@ end;
 function xqvalueToNormalizedNodeSeq(v: IXQValue): TXQValueSequence;
 var
  i: Integer;
- x: IXQValue;
+ x: PIXQValue;
 begin
   case v.kind of
     pvkUndefined: result:=TXQValueSequence.create(0);
@@ -657,10 +657,10 @@ begin
       else raise EXQEvaluationException.Create('pxp:INTERNAL', 'nil node');
     pvkSequence: begin
       result := TXQValueSequence.create(v.getSequenceCount);
-      for x in v do begin
-        if (x.kind <> pvkNode) or (x.toNode = nil) then
+      for x in v.GetEnumeratorPtr do begin
+        if (x^.kind <> pvkNode) or (x^.toNode = nil) then
           raise EXQEvaluationException.Create('XPTY0004', 'invalid node');
-        result.add(x);
+        result.add(x^);
       end;
       TXQVListBreaker(result.seq).sortInDocumentOrderUnchecked;
       for i:=result.seq.Count-1 downto 1 do
@@ -1199,7 +1199,8 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
     end;
   end;
 
-var v, temp: IXQValue;
+var temp: IXQValue;
+  v: PIXQValue;
   tempobj: TXQValueObject;
   i: Integer;
   sname: string;
@@ -1209,10 +1210,10 @@ begin
   setlength(values, 0);
   SetLength(specialNames, 0);
   SetLength(specialValues, 0);
-  for v in value do
-    if v is TXQValueObject then begin
-      if (v as TXQValueObject).prototype = nil then temp := v
-      else temp := v.clone;
+  for v in value.GetEnumeratorPtr do
+    if v^ is TXQValueObject then begin
+      if (v^ as TXQValueObject).prototype = nil then temp := v^
+      else temp := v^.clone;
       tempobj := temp as TXQValueObject;
       for i:=0 to tempobj.values.count-1 do begin
         if tempobj.values.Values[i].kind <> pvkObject then
@@ -1223,10 +1224,10 @@ begin
            specialValues[high(specialValues)] := tempobj.values.Values[i];
          end;
       end;
-    end else if v is TXQValueNode then begin
-      if nodeToFormData(v.toNode, cmp, true, sname, svalue) then
+    end else if v^.kind = pvkNode then begin
+      if nodeToFormData(v^.toNode, cmp, true, sname, svalue) then
         addPair(sname, svalue);
-    end else add(v.toString)
+    end else add(v^.toString)
 end;
 
 procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValueObject; defaultValue: string = '');
@@ -1366,7 +1367,7 @@ var replaceNames, replaceValues: TStringArray;
       (result as TXQValueObject).setMutable('url', value);
     end;
 
-var v: IXQValue;
+var v: PIXQValue;
 begin
   requiredArgCount(args, 1, 2);
 
@@ -1380,8 +1381,8 @@ begin
 
 
   result := nil;
-  for v in args[0] do
-    xqvalueSeqAddMove(result, encodeForm(v.toNode));
+  for v in args[0].GetEnumeratorPtr do
+    xqvalueSeqAddMove(result, encodeForm(v^.toNode));
   if result = nil then result := xqvalue;
 
 end;
@@ -1428,7 +1429,8 @@ end;
 function xqFunctionForm_combine(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var temp: TXQVArray;
   propName: String;
-  h, headers: IXQValue;
+  headers: IXQValue;
+  h: PIXQValue;
   multipart: String;
   mime: TMIMEMultipartData;
   obj: TXQValueObject;
@@ -1468,8 +1470,8 @@ begin
 
   multipart := '';
   headers := args[0].getProperty('headers');
-  for h in headers do begin
-    propName := h.toString;
+  for h in headers.GetEnumeratorPtr do begin
+    propName := h^.toString;
     if striBeginsWith(propName, 'Content-Type') and striContains(propName, ContentTypeMultipart) then begin
       multipart:=propName;
       break;
@@ -1498,10 +1500,10 @@ begin
     if propName <> multipart then begin
       tempSeq := TXQValueSequence.create(headers.getSequenceCount);
       tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(propName)));
-      for h in headers do begin
-        propName := h.toString;
+      for h in headers.GetEnumeratorPtr do begin
+        propName := h^.toString;
         if not striBeginsWith(propName, 'Content-Type') then
-          tempSeq.add(h);
+          tempSeq.add(h^);
       end;
       obj := obj.setImmutable('headers', tempSeq);
     end;
@@ -1519,19 +1521,19 @@ var res: IXQValue;
   end;
 
   procedure resolve(const seq: IXQValue);
-  var iv: IXQValue;
+  var iv: PIXQValue;
     n: TTreeNode;
     tempv: IXQValue;
     resolvedUri: RawByteString;
     tempobj: TXQValueObject;
   begin
-    for iv in seq do
-      case iv.kind of
+    for iv in seq.GetEnumeratorPtr do
+      case iv^.kind of
         pvkUndefined: ;
         pvkNode: begin
-          n := iv.toNode;
+          n := iv^.toNode;
           if n = nil then continue;
-          if n.typ <> tetOpen then addString(iv.toString())
+          if n.typ <> tetOpen then addString(iv^.toString())
           else case LowerCase(n.value) of
             'a', 'area', 'link':
                addString(n['href']);
@@ -1559,23 +1561,23 @@ var res: IXQValue;
             'object':
               addString(n['data']);
             'form':
-              resolve(xqFunctionForm(context, xqvalueArray([iv])))
+              resolve(xqFunctionForm(context, xqvalueArray([iv^])))
             else addString(n.deepNodeText());
           end;
         end;
         pvkObject: begin
-          tempv := iv.getProperty('url');
+          tempv := iv^.getProperty('url');
           if not tempv.isUndefined then begin
             resolvedUri := strResolveURI(tempv.toString, baseUri);
             if resolvedUri <> tempv.toString then begin
               tempobj := TXQValueObject.create();
-              tempobj.prototype := iv;
+              tempobj.prototype := iv^;
               tempobj.values.add('url', resolvedUri);
               xqvalueSeqAddMove(res, tempobj);
-            end else xqvalueSeqAddMove(res, iv);
-          end else xqvalueSeqAddMove(res, iv);
+            end else xqvalueSeqAddMove(res, iv^);
+          end else xqvalueSeqAddMove(res, iv^);
         end;
-        else addString(iv.toString);
+        else addString(iv^.toString);
       end;
 
   end;
@@ -1647,17 +1649,17 @@ end;
 
 function xqFunctionCodepoints_to_string(const args: TXQVArray): IXQValue;
 var temp: string;
- v: IXQValue;
+ v: PIXQValue;
  codepoint: integer;
  ok: Boolean;
 begin
   requiredArgCount(args,1);
   temp := '';
-  for v in args[0] do begin
-    ok := tryValueToInteger(v, codepoint);
+  for v in args[0].GetEnumeratorPtr do begin
+    ok := tryValueToInteger(v^, codepoint);
     if ok then ok := isValidXMLCharacter(codepoint);
-    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v.debugAsStringWithTypeAnnotation());
-    temp += strGetUnicodeCharacter(v.toInt64);
+    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.debugAsStringWithTypeAnnotation());
+    temp += strGetUnicodeCharacter(v^.toInt64);
   end;
   result := xqvalue(temp);
 end;
@@ -2651,7 +2653,7 @@ var
   end;
 
 var  i: Integer;
-     v: IXQValue;
+     v: PIXQValue;
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collationOverride := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
@@ -2662,9 +2664,9 @@ begin
   end else begin
     i := 0;
     result := nil;
-    for v in args[0] do begin
+    for v in args[0].GetEnumeratorPtr do begin
       i += 1;
-      if equal(v, args[1]) then
+      if equal(v^, args[1]) then
         xqvalueSeqAddMove(result, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
@@ -2697,7 +2699,7 @@ end;
 function xqFunctionDistinct_values(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
  i: Integer;
- v: IXQValue;
+ v: PIXQValue;
  resseq: TXQValueSequence;
  collation: TXQCollation;
  found: Boolean;
@@ -2710,14 +2712,14 @@ begin
   if atom.kind <> pvkSequence then
     exit(xqvalueAtomize(atom));
   resseq := TXQValueSequence.create(atom.getSequenceCount);
-  for v in atom do begin
+  for v in atom.GetEnumeratorPtr do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if context.staticContext.equalDeepAtomic(resseq.seq[i], v, collation) then begin
+      if context.staticContext.equalDeepAtomic(resseq.seq[i], v^, collation) then begin
         found := true;
         break;
       end;
-    if not found then resseq.seq.add(v);
+    if not found then resseq.seq.add(v^);
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);
@@ -2726,7 +2728,7 @@ end;
 function xqFunctionInsert_before(const args: TXQVArray): IXQValue;
 var
  index: Integer;
- a: IXQValue;
+ a: PIXQValue;
  resseq: TXQValueSequence;
 begin
   requiredArgCount(args,3);
@@ -2736,10 +2738,10 @@ begin
 
   if index < 1 then index := 1;
 
-  for a in args[0] do begin
+  for a in args[0].GetEnumeratorPtr do begin
     index -= 1;
     if index = 0 then resseq.seq.add(args[2]);
-    resseq.seq.add(a);
+    resseq.seq.add(a^);
   end;
   if index > 0 then resseq.seq.add(args[2]);
   result := resseq;
@@ -2857,13 +2859,13 @@ begin
 end;
 
 function castUntypedToDouble(const v: IXQValue): IXQValue;
-var x: IXQValue;
+var x: PIXQValue;
   found: Boolean;
   resseq: TXQVList;
 begin
   found := false;
-  for x in v do begin
-    if (x.instanceOf(baseSchema.untypedAtomic)) or (x is TXQValueNode) or (x.instanceOf(baseSchema.untyped)) then begin
+  for x in v.GetEnumeratorPtr do begin
+    if (x^.instanceOf(baseSchema.untypedAtomic)) or (x^.kind = pvkNode) or (x^.instanceOf(baseSchema.untyped)) then begin
       found := true;
       break;
     end;
@@ -2872,23 +2874,23 @@ begin
 
   result := TXQValueSequence.create(v.getSequenceCount);
   resseq := (result as TXQValueSequence).seq;;
-  for x in v do
-    if (x.instanceOf(baseSchema.untypedAtomic)) or (x is TXQValueNode) or (x.instanceOf(baseSchema.untyped)) then
-      resseq.add(baseSchema.double.createValue(x))
+  for x in v.GetEnumeratorPtr do
+    if (x^.instanceOf(baseSchema.untypedAtomic)) or (x^.kind = pvkNode) or (x^.instanceOf(baseSchema.untyped)) then
+      resseq.add(baseSchema.double.createValue(x^))
      else
-      resseq.add(x);
+      resseq.add(x^);
 end;
 
 function xqFunctionProduct(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
-  v: IXQValue;
+  v: PIXQValue;
 begin
   requiredArgCount(args,1);
   if args[0].isUndefined then exit(args[0]);
   result := nil;
-  for v in args[0] do
-    if result = nil then result := v
-    else result := xqvalueMultiply(context, result, v);
+  for v in args[0].GetEnumeratorPtr do
+    if result = nil then result := v^
+    else result := xqvalueMultiply(context, result, v^);
 end;
 
 function xqFunctionSum(const args: TXQVArray): IXQValue;
@@ -3584,7 +3586,7 @@ var
   func: TXQValueFunction;
   newargs: TXQVArray;
   count: Integer;
-  v: IXQValue;
+  v: PIXQValue;
   i: Integer;
 begin
   requiredArgCount(args, 3);
@@ -3595,8 +3597,8 @@ begin
   if left then begin
     //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
     newargs[0] := args[1];
-    for v in args[0] do begin
-      newargs[1] := v;
+    for v in args[0].GetEnumeratorPtr do begin
+      newargs[1] := v^;
       newargs[0] := func.evaluate(context, newargs, nil);
     end;
     result := newargs[0];
@@ -3784,7 +3786,8 @@ end;
 
 function xqFunctionSerialize(const args: TXQVArray): IXQValue;
 var
-  v, arg: IXQValue;
+  v: PIXQValue;
+  arg: IXQValue;
   params: TSerializationParams;
   strres: String;
   wasNodeOrFirst: Boolean;
@@ -3809,8 +3812,8 @@ begin
   if length(args) = 2 then params.setFromNode(args[1].toNode);
 
   firstElement := nil;
-  for v in arg do with params do begin
-    n := v.toNode;
+  for v in arg.GetEnumeratorPtr do with params do begin
+    n := v^.toNode;
     if n = nil then continue;
     if n.typ = tetDocument then n := n.getFirstChild();
     if n.typ = tetAttribute then break; //fail later
@@ -3865,27 +3868,27 @@ begin
 
   hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
   wasNodeOrFirst := true;
-  for v in arg do with params do begin
+  for v in arg.GetEnumeratorPtr do with params do begin
     if hasItemSeparator then begin
       if not wasNodeOrFirst then strres += params.itemSeparator;
       wasNodeOrFirst := false;
     end;
-    case v.kind of
+    case v^.kind of
       pvkNode: begin
         //this might be incomplete
-        n := v.toNode;
+        n := v^.toNode;
         if n.typ in [tetAttribute] then raise EXQEvaluationException.create('SENR0001', 'Cannot serialize attribute');
         case method of
           'xml': strres += n.outerXML();
          // 'xhtml':;
           'html': strres += n.outerHTML();
-          'text': strres += v.toString;
+          'text': strres += v^.toString;
         end;
         if not hasItemSeparator then wasNodeOrFirst := true;
       end;
-      pvkObject, pvkArray, pvkNull: raiseXPTY0004TypeError(v, 'serialization');
+      pvkObject, pvkArray, pvkNull: raiseXPTY0004TypeError(v^, 'serialization');
       pvkFunction: raise EXQEvaluationException.create('SENR0001', 'Cannot serialize function');
-      else addAtomicString(v.toString);
+      else addAtomicString(v^.toString);
     end;
   end;
   result := xqvalue(strres);

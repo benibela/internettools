@@ -28,9 +28,9 @@ begin
   result := xqvalue();
 end;
 
-function TXQValueUndefined.GetEnumerator: TXQValueEnumerator;
+function TXQValueUndefined.GetEnumeratorPtr: TXQValueEnumeratorPtr;
 begin
-  TXQValueEnumerator.clear(result);
+  TXQValueEnumeratorPtr.clear(result);
 end;
 
 function TXQValueUndefined.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
@@ -225,7 +225,7 @@ begin
   result := nil;
 end;
 
-function TXQValue.GetEnumerator: TXQValueEnumerator;
+function TXQValue.GetEnumeratorPtr: TXQValueEnumeratorPtr;
 begin
   result.fguardian := self;
   result.fcurrent := nil;
@@ -430,6 +430,11 @@ begin
     if v.kind = pvkNode then handle(resolveHTMLCallback(tempContext, xqvalueArray([v])))
     else handle(v);
   end;
+end;
+
+function TXQValue.GetEnumerator: TXQValueEnumerator;
+begin
+  result.ptr := GetEnumeratorPtr;
 end;
 
 { TXQValueBoolean }
@@ -1428,14 +1433,14 @@ begin
   exit(seq[i-1]);
 end;
 
-function TXQValueSequence.GetEnumerator: TXQValueEnumerator;
+function TXQValueSequence.GetEnumeratorPtr: TXQValueEnumeratorPtr;
 begin
   if seq.Count > 0 then begin
     result.fcurrent:=@seq.fbuffer[0];
     dec(result.fcurrent);
     result.flast := @seq.fbuffer[seq.Count-1];
     result.fguardian:=self;
-  end else TXQValueEnumerator.clear(result);
+  end else TXQValueEnumeratorPtr.clear(result);
 end;
 
 function TXQValueSequence.map(const q: string): IXQValue;
@@ -1924,13 +1929,18 @@ end;
 
 function TXQValueJSONArray.GetEnumeratorMembers: TXQValueEnumerator;
 begin
+  result.ptr := GetEnumeratorMembersPtr;
+end;
+
+function TXQValueJSONArray.GetEnumeratorMembersPtr: TXQValueEnumeratorPtr;
+begin
   if self.RefCount > 0 then
     result.fguardian := self;
   if seq.Count > 0 then begin
     result.fcurrent:=@seq.fbuffer[0];
     dec(result.fcurrent);
     result.flast := @seq.fbuffer[seq.Count-1];
-  end else TXQValueEnumerator.clear(result);
+  end else TXQValueEnumeratorPtr.clear(result);
 end;
 
 function TXQValueJSONArray.toBooleanEffective: boolean;
