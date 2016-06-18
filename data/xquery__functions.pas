@@ -672,7 +672,8 @@ begin
 end;
 
 function xqvalueUnion(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
-var a, b: TXQValueSequence;
+var a: TXQValueSequence;
+    b: ixqvalue;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then

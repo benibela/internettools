@@ -67,6 +67,7 @@ type
   TXSSchema = class;
   TXQVList=class;
   IXQValue=interface;
+  PIXQValue = ^IXQValue;
   TXQVArray = array of IXQValue;
   TXQValueFunction = class;
   TXQCollation=class;
@@ -90,16 +91,15 @@ type
   //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
   TXQValueEnumerator = record
   private
-    fcurrentidx: integer;
-    fcurrent, fguardian: IXQValue;
-    flist: TXQVList;
+    fguardian: IXQValue;
+    fcurrent, flast: PIXQValue;
+    function GetCurrent: IXQValue;
+    class procedure clear(out enum: TXQValueEnumerator); static;
   public
     function MoveNext: Boolean;
-    property Current: IXQValue read FCurrent;
-    function CurrentIndex: Integer;
+    property Current: IXQValue read GetCurrent;
     function GetEnumerator: TXQValueEnumerator;
   end;
-
 
   //**Type of xqvalue (see TXQValue)
   TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
@@ -376,7 +376,6 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat;
   end;
 
-  PIXQValue = ^IXQValue;
 
 
   { TXQValue }
@@ -4492,20 +4491,30 @@ end;
 
 { TXQValueEnumerator }
 
-function TXQValueEnumerator.MoveNext: Boolean;
+function TXQValueEnumerator.GetCurrent: IXQValue;
 begin
-  fcurrentidx += 1;
-  if flist = nil then begin
-    result := fcurrentidx = 0;
-  end else begin
-    result := fcurrentidx < flist.Count;
-    if result then fcurrent := flist[fcurrentidx];
-  end;
+  result := fcurrent^;
 end;
 
-function TXQValueEnumerator.CurrentIndex: Integer;
+class procedure TXQValueEnumerator.clear(out enum: TXQValueEnumerator);
 begin
-  result := fcurrentidx;
+  enum.fcurrent := nil;
+  enum.fguardian := nil;
+  enum.flast := nil;
+end;
+
+function TXQValueEnumerator.MoveNext: Boolean;
+begin
+  result := fcurrent < flast;
+  if result then begin
+    inc(fcurrent);
+    exit;
+  end;
+  if (fguardian <> nil) and (fcurrent = nil) then begin
+    fcurrent := @fguardian; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
+    flast := @fguardian;
+    exit(true);
+  end;
 end;
 
 function TXQValueEnumerator.GetEnumerator: TXQValueEnumerator;

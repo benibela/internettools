@@ -30,9 +30,7 @@ end;
 
 function TXQValueUndefined.GetEnumerator: TXQValueEnumerator;
 begin
-  result.FCurrent:=nil;
-  result.fcurrentidx:=0;
-  result.flist:=nil;
+  TXQValueEnumerator.clear(result);
 end;
 
 function TXQValueUndefined.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
@@ -229,9 +227,9 @@ end;
 
 function TXQValue.GetEnumerator: TXQValueEnumerator;
 begin
-  result.FCurrent := self;
-  result.fcurrentidx := -1;
-  result.flist := nil;
+  result.fguardian := self;
+  result.fcurrent := nil;
+  result.flast := nil;
 end;
 
 function TXQValue.toFloatChecked(scontext: TXQStaticContext): xqfloat;
@@ -1432,9 +1430,12 @@ end;
 
 function TXQValueSequence.GetEnumerator: TXQValueEnumerator;
 begin
-  result.fcurrentidx:=-1;
-  result.fguardian := self;
-  result.flist:=seq;
+  if seq.Count > 0 then begin
+    result.fcurrent:=@seq.fbuffer[0];
+    dec(result.fcurrent);
+    result.flast := @seq.fbuffer[seq.Count-1];
+    result.fguardian:=self;
+  end else TXQValueEnumerator.clear(result);
 end;
 
 function TXQValueSequence.map(const q: string): IXQValue;
@@ -1925,8 +1926,11 @@ function TXQValueJSONArray.GetEnumeratorMembers: TXQValueEnumerator;
 begin
   if self.RefCount > 0 then
     result.fguardian := self;
-  result.fcurrentidx:=-1;
-  result.flist:=seq;
+  if seq.Count > 0 then begin
+    result.fcurrent:=@seq.fbuffer[0];
+    dec(result.fcurrent);
+    result.flast := @seq.fbuffer[seq.Count-1];
+  end else TXQValueEnumerator.clear(result);
 end;
 
 function TXQValueJSONArray.toBooleanEffective: boolean;
