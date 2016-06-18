@@ -5321,7 +5321,7 @@ begin
         if other.fcount = 0 then exit;
         reserve(fcount + other.fcount);
         for i := 0 to other.fcount - 1 do other.fbuffer[i]._AddRef;
-        Move(other.fbuffer[0], fbuffer[fcount], sizeof(other.fbuffer[0]) * other.fcount); //assume list is initialized to nil
+        Move(other.fbuffer[0], fbuffer[fcount], sizeof(other.fbuffer[0]) * other.fcount); //assume fbuffer is initialized to nil
         inc(fcount, other.fcount);
       end else for v in value do
         Add(v);
@@ -5389,10 +5389,12 @@ var
   j: Integer;
 begin
   checkIndex(i);
-  for j := i to fcount - 2 do //todo: optimize
-    fbuffer[j] := fbuffer[j+1];
+  fbuffer[i] := nil;
+  if i <> fcount - 1 then begin
+    move(fbuffer[i+1], fbuffer[i], (fcount - i - 1) * sizeof(IXQValue));
+    FillChar(fbuffer[fcount-1], sizeof(fbuffer[fcount-1]), 0);
+  end;
   fcount -= 1;
-  fbuffer[fcount] := nil;
   compress;
 end;
 
@@ -5513,10 +5515,12 @@ procedure TXQVList.insertSingle(i: integer; child: IXQValue);
 var
   j: Integer;
 begin
-  if i <> fcount then checkIndex(i);
-  reserve(fcount + 1); //TODO: optimize;
-  for j := fcount downto i + 1 do
-    fbuffer[j] := fbuffer[j-1];
+  reserve(fcount + 1);
+  if i <> fcount then begin
+    checkIndex(i);
+    move(fbuffer[i], fbuffer[i+1], (fcount - i) * sizeof(fbuffer[i]));
+    fillchar(fbuffer[i],sizeof(fbuffer[i]),0);
+  end;
   fbuffer[i] := child;
   fcount+=1;
 end;
