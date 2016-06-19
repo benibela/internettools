@@ -431,6 +431,10 @@ type
     function checkError(reader: TMultipageTemplateReader; const namespace, prefix, code: string): boolean;
   end;
 
+resourcestring
+  rsActionNotFound = 'Action %s not found.';
+
+
 procedure TTemplateActionTry.initFromTree(t: TTreeNode);
 var
   hadCatch: Boolean;
@@ -1414,7 +1418,7 @@ procedure TMultipageTemplateReader.callAction(action: string);
 var act: TTemplateAction;
 begin
   act:=findAction(action);
-  if act=nil then raise ETemplateReader.Create('Aktion '+action+' konnte nicht ausgeführt werden, da sie nicht gefunden wurde.');
+  if act=nil then raise ETemplateReader.Create(Format(rsActionNotFound, [action]));
   callAction(act);
 end;
 
