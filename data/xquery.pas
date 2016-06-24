@@ -6973,15 +6973,13 @@ begin
     //optimization for a single number
     if value.kind in [pvkBigDecimal, pvkInt64, pvkFloat] then begin
       if ((value.kind = pvkFloat) and (frac(value.toFloat) <> 0)) or
-         ((value.kind = pvkBigDecimal) and (not isIntegral(value.toDecimal) )) then begin
+         ((value.kind = pvkBigDecimal) and (not isInt64(value.toDecimal) )) then begin
         result := xqvalue();
         exit();
       end;
       i64 := value.toInt64;
-      if result is TXQValueSequence then begin
-        if (i64 < 1) or (i64 > result.getSequenceCount) then result := xqvalue()
-        else result := (result as TXQValueSequence).seq[i64 - 1];
-      end else if i64 <> 1 then result := xqvalue();
+      if (i64 < 1) or (i64 > result.getSequenceCount) then result := xqvalue()
+      else result := result.get(i64);
     end else if not value.toBooleanEffective then
       result := xqvalue();
     exit;
