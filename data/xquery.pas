@@ -3209,40 +3209,54 @@ end;
 
 { TXQInterpretedFunctionInfo }
 var GlobalInterpretedNativeFunctionStaticContext: TXQStaticContext;
-    CurrentInitialization: TXQInterpretedFunctionInfo = nil;
+    CurrentInitializations: array of TXQInterpretedFunctionInfo;
 
 procedure TXQInterpretedFunctionInfo.initialize();
 var
   temp: TXQueryEngine;
   tempQuery: TXQuery;
+  i: Integer;
+  needNewEngine: Boolean;
 begin
   if definition <> nil then exit;
   if definition = nil then begin
    EnterCriticalsection(interpretedFunctionSynchronization);
-   if CurrentInitialization <> nil then
-     if CurrentInitialization.versions[0].name = self.versions[0].name then exit
-     else raise EXQEvaluationException.create('PXP', 'Internal recursion 1601161646');
-   CurrentInitialization := self;
    try
-     temp := TXQueryEngine.create;
+     if definition <> nil then exit;
+     if length(CurrentInitializations) > 0 then begin
+       for i := 0 to high(CurrentInitializations) do
+         if CurrentInitializations[i].versions[0].name = self.versions[0].name then exit;
+       if length(CurrentInitializations) > 100 then raise EXQEvaluationException.create('PXP', 'Internal recursion 1601161646');
+     end;
+     setlength(CurrentInitializations, length(CurrentInitializations) + 1);
+     CurrentInitializations[high(CurrentInitializations)] := self;
      try
-       if namespace <> nil then temp.GlobalNamespaces.add(namespace);
-       temp.StaticContext.free;
-       GlobalInterpretedNativeFunctionStaticContext.sender := temp;
-       temp.StaticContext := GlobalInterpretedNativeFunctionStaticContext;
-       tempQuery := temp.parseTerm(source, xqpmXQuery3, temp.StaticContext);
-       definition := tempQuery.fterm as TXQTermDefineFunction;
-       func := tempQuery.evaluate() as TXQValueFunction;
-       func._AddRef;
-       tempQuery.fTerm := nil;
-       tempQuery.Free;
-       temp.StaticContext := nil;
-       GlobalInterpretedNativeFunctionStaticContext.sender := nil;
+       needNewEngine := length(CurrentInitializations) = 1;
+       if needNewEngine then begin
+         temp := TXQueryEngine.create;
+         temp.StaticContext.free;
+       end else temp := GlobalInterpretedNativeFunctionStaticContext.sender;
+       try
+         if namespace <> nil then temp.GlobalNamespaces.add(namespace);
+         GlobalInterpretedNativeFunctionStaticContext.sender := temp;
+         temp.StaticContext := GlobalInterpretedNativeFunctionStaticContext;
+         tempQuery := temp.parseTerm(source, xqpmXQuery3, temp.StaticContext);
+         definition := tempQuery.fterm as TXQTermDefineFunction;
+         func := tempQuery.evaluate() as TXQValueFunction;
+         func._AddRef;
+         tempQuery.fTerm := nil;
+         tempQuery.Free;
+       finally
+         if needNewEngine then begin
+            temp.StaticContext := nil;
+            GlobalInterpretedNativeFunctionStaticContext.sender := nil;
+            temp.free;
+         end;
+       end;
      finally
-       temp.free;
+       SetLength(CurrentInitializations, high(CurrentInitializations));
      end;
    finally
-     CurrentInitialization := nil;
      LeaveCriticalsection(interpretedFunctionSynchronization);
    end;
   end;
