@@ -1853,14 +1853,14 @@ begin
   m('import module namespace rename = "http://www.w3.org/2005/xpath-functions"; rename:concat(1,2,3)', '123');
 
   scd('1+2+3', []);
-  scd('.', [xqcdFocusDocument, xqcdContextCollation]); //too much
-  scd('string()', [xqcdFocusDocument]);
-  //scd('data()', [xqcdFocusDocument]);??
-  scd('foo / bar', [xqcdFocusDocument, xqcdContextCollation]);
-  scd('/ bar', [xqcdFocusDocument, xqcdContextCollation]);
+  scd('.', [xqcdFocusItem, xqcdContextCollation]); //too much
+  scd('string()', [xqcdFocusItem]);
+  //scd('data()', [xqcdFocusItem]);??
+  scd('foo / bar', [xqcdFocusItem, xqcdContextCollation]);
+  scd('/ bar', [xqcdFocusItem, xqcdContextCollation]);
   ps.VariableChangelog.add('var', 'foobar');
   scd('x"{1+2+3}{$var}"', [xqcdContextVariables]);
-  scd('abc:=//title', [xqcdContextVariables,xqcdFocusDocument,xqcdContextCollation]);
+  scd('abc:=//title', [xqcdContextVariables,xqcdFocusItem,xqcdContextCollation]);
 
   //error tests
   //ps.ParentElement := nil;
