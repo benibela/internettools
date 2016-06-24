@@ -1691,11 +1691,6 @@ var
   sortingCache: TFPList;
   finalResult: TXQValueSequence;
   currentTuple: TOrderedTuple;
-  orders: array of TXQTermFlowerOrder;
-  variables: array of TXQTermVariable;
-  counts: array of integer;
-  clauseIndex: array of integer; //how many clauses of a similar kind occur before that one. (three kinds: assignments, order, count)
-  needFullTuple: Boolean;
 
 
   procedure evaluateForLoop(const pos: Integer);
@@ -2072,93 +2067,21 @@ var
 
 var i: Integer;
     sortingData: TFlowerSortingData;
-    orderCount: Integer;
-    varCount: Integer;
-    countCount: Integer;
     j: Integer;
     oldSortingCache: TFPList;
     isJoinClause: Boolean;
     joinVar: LongInt;
     k: Integer;
 
-  procedure initialAddVariable(v: TXQTermVariable);
-  begin
-    variables[varCount] := v;
-    inc(varCount);
-  end;
-  procedure initialAddWindowVariables(w: TXQTermFlowerWindow);
-    procedure addCondition(const condition: TXQTermFlowerWindowVarsAndCondition);
-    begin
-      with condition do begin
-        if not Assigned(when) then exit;
-        if Assigned(currentItem) then initialAddVariable(currentItem);
-        if Assigned(positionVar) then initialAddVariable(positionVar);
-        if Assigned(previousItem) then initialAddVariable(previousItem);
-        if Assigned(nextItem) then initialAddVariable(nextItem);
-      end;
-    end;
-  begin
-    addCondition(w.startCondition);
-    addCondition(w.endCondition);
-    initialAddVariable(w.loopvar);
-  end;
 
 begin
-  //oldVarCount := tempContext.temporaryVariables.count;
-
+  //see precompute
   finalResult := TXQValueSequence.create();
   result := finalResult;
   oldSortingCache := nil;
-  orderCount := 0;
-  varCount := 0;
-  countCount := 0;
-  needFullTuple := false;
-  { There are three different strategies used to evaluate a Flower expressions, depending on its complexity.
-    In any case every sub clause is evaluated and the variable values of the previous clauses are kept on a stack.
-    Then it does one of these:
-
-    1. Slightly optimized version: Just add the returned value to finalResult
-    2. With ordering:    Put the value of every order clause in a TOrderedTuple together with the returned value,
-       (orderCount>0)    and add this tuple to sortingCache. In the end sortingCache is sorted and the items moved to finalResult.
-    3. Full tuple stream: Put the value of every order clause and every variable assignment in a TOrderedTuple and add it to sortingCache.
-       (needFullTuple)    Interrupt the stack based evaluation at certain clauses and sort the complete sortingCache.
-                          Then resume the evaluation for each tuple by copying the variables from the tuple back on the stack.
-  }
-  for i := 0 to high(children) - 1 do
-    case TXQTermFlowerSubClause(children[i]).kind of
-      xqtfcLet: inc(varCount);
-      xqtfcFor: begin
-        inc(varCount);
-        if assigned(TXQTermFlowerFor(children[i]).positionVar) then inc(varCount);
-      end;
-      xqtfcWindow: inc(varCount, TXQTermFlowerWindow(children[i]).variableCount);
-      xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
-        inc(varCount, length(vars));
-        if hasDefaultVariable then inc(varCount);
-      end;
-      xqtfcWhere: ;
-      xqtfcOrder: inc(orderCount);
-      xqtfcCount: begin
-        if orderCount > 0 then needFullTuple := true;
-        inc(varCount);
-        inc(countCount);
-      end;
-      xqtfcGroup: needFullTuple := true;
-    end;
-
   currentTuple := nil;
-  if needFullTuple or (orderCount > 0) or (countCount > 0) then SetLength(clauseIndex, length(children) - 1);
+
   if needFullTuple or (orderCount > 0) then begin
-    SetLength(orders, orderCount);
-    orderCount := 0;
-    for i := 0 to high(children) - 1 do
-      case TXQTermFlowerSubClause(children[i]).kind of
-        xqtfcOrder: begin
-          orders[orderCount] := TXQTermFlowerOrder(children[i]);
-          clauseIndex[i] := orderCount;
-          inc(orderCount);
-        end;
-      end;
     sortingData.orders := orders;
     sortingData.context:=@context;
     sortingData.minOrderIndex:=0;
@@ -2169,59 +2092,12 @@ begin
     sortingCache := tfplist.Create;
     currentTuple := TOrderedTuple.Create;
     SetLength(currentTuple.orders, orderCount);
+    if needFullTuple then begin
+      if currentTuple = nil then currentTuple := TOrderedTuple.Create;
+      SetLength(currentTuple.vars, varCount);
+    end;
   end else sortingCache := nil;
-  if needFullTuple then begin
-    SetLength(variables, varCount);
-    varCount := 0;
-    for i := 0 to high(children) - 1 do
-      case TXQTermFlowerSubClause(children[i]).kind of
-        xqtfcLet: begin
-          clauseIndex[i] := varCount;
-          initialAddVariable(TXQTermFlowerLet(children[i]).loopvar);
-        end;
-        xqtfcFor: begin
-          clauseIndex[i] := varCount;
-          initialAddVariable(TXQTermFlowerLet(children[i]).loopvar);
-          if assigned(TXQTermFlowerFor(children[i]).positionVar) then
-            initialAddVariable(TXQTermFlowerFor(children[i]).positionVar);
-        end;
-        xqtfcWindow: initialAddWindowVariables(TXQTermFlowerWindow(children[i]));
-        xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
-          clauseIndex[i] := varCount;
-          if hasDefaultVariable then raiseEvaluationError('XQTS0003', 'Too complex flowr expression for pattern changing .');
-          for j := 0 to high(vars) do
-            variables[varCount + j] := vars[j];
-          inc(varCount, length(vars));
-        end;
-        //xqtfcWhere: ;
-        //xqtfcOrder: inc(orderCount);
-        xqtfcCount: begin
-          clauseIndex[i] := varCount;
-          initialAddVariable(TXQTermFlowerCount(children[i]).countvar);
-        end;
-        xqtfcGroup: clauseIndex[i] := varCount;
-      end;
-    if currentTuple = nil then currentTuple := TOrderedTuple.Create;
-    SetLength(currentTuple.vars, varCount);
-  end else if countCount > 0 then begin
-    SetLength(counts, countCount);
-    countCount := 0;
-    for i := 0 to high(children) - 1 do
-      case TXQTermFlowerSubClause(children[i]).kind of
-        xqtfcCount: begin
-          clauseIndex[i] := countCount;
-          inc(countCount);
-        end;
-      end;
-  end;
 
-
-  {oldlen := length(tempContext.temporaryVariables.vars);
-  for i := 0 to high(vars) do begin
-    tempContext.temporaryVariables.add(vars[i].varname, xqvalue(), vars[i].namespace);
-    if vars[i].positionVarname <> '' then
-      tempContext.temporaryVariables.add(vars[i].positionVarname, xqvalue(), vars[i].positionVarNamespace)
-  end;}
   try
     evaluateForLoop(0);
     if needFullTuple then
@@ -2279,6 +2155,134 @@ begin
   end;
 end;
 
+procedure TXQTermFlower.precompute;
+
+var
+  countCount, i, j: Integer;
+
+  procedure initialAddVariable(v: TXQTermVariable);
+  begin
+    variables[varCount] := v;
+    inc(varCount);
+  end;
+  procedure initialAddWindowVariables(w: TXQTermFlowerWindow);
+    procedure addCondition(const condition: TXQTermFlowerWindowVarsAndCondition);
+    begin
+      with condition do begin
+        if not Assigned(when) then exit;
+        if Assigned(currentItem) then initialAddVariable(currentItem);
+        if Assigned(positionVar) then initialAddVariable(positionVar);
+        if Assigned(previousItem) then initialAddVariable(previousItem);
+        if Assigned(nextItem) then initialAddVariable(nextItem);
+      end;
+    end;
+  begin
+    addCondition(w.startCondition);
+    addCondition(w.endCondition);
+    initialAddVariable(w.loopvar);
+  end;
+
+begin
+  orderCount := 0;
+  varCount := 0;
+  countCount := 0;
+  needFullTuple := false;
+  orders := nil;
+  variables := nil;
+  counts := nil;
+  clauseIndex := nil;
+
+
+  { There are three different strategies used to evaluate a Flower expressions, depending on its complexity.
+    In any case every sub clause is evaluated and the variable values of the previous clauses are kept on a stack.
+    Then it does one of these:
+
+    1. Slightly optimized version: Just add the returned value to finalResult
+    2. With ordering:    Put the value of every order clause in a TOrderedTuple together with the returned value,
+       (orderCount>0)    and add this tuple to sortingCache. In the end sortingCache is sorted and the items moved to finalResult.
+    3. Full tuple stream: Put the value of every order clause and every variable assignment in a TOrderedTuple and add it to sortingCache.
+       (needFullTuple)    Interrupt the stack based evaluation at certain clauses and sort the complete sortingCache.
+                          Then resume the evaluation for each tuple by copying the variables from the tuple back on the stack.
+  }
+  for i := 0 to high(children) - 1 do
+    case TXQTermFlowerSubClause(children[i]).kind of
+      xqtfcLet: inc(varCount);
+      xqtfcFor: begin
+        inc(varCount);
+        if assigned(TXQTermFlowerFor(children[i]).positionVar) then inc(varCount);
+      end;
+      xqtfcWindow: inc(varCount, TXQTermFlowerWindow(children[i]).variableCount);
+      xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
+        inc(varCount, length(vars));
+        if hasDefaultVariable then inc(varCount);
+      end;
+      xqtfcWhere: ;
+      xqtfcOrder: inc(orderCount);
+      xqtfcCount: begin
+        if orderCount > 0 then needFullTuple := true;
+        inc(varCount);
+        inc(countCount);
+      end;
+      xqtfcGroup: needFullTuple := true;
+    end;
+
+  if needFullTuple or (orderCount > 0) or (countCount > 0) then SetLength(clauseIndex, length(children) - 1);
+  if needFullTuple or (orderCount > 0) then begin
+    SetLength(orders, orderCount);
+    orderCount := 0;
+    for i := 0 to high(children) - 1 do
+      case TXQTermFlowerSubClause(children[i]).kind of
+        xqtfcOrder: begin
+          orders[orderCount] := TXQTermFlowerOrder(children[i]);
+          clauseIndex[i] := orderCount;
+          inc(orderCount);
+        end;
+      end;
+  end;
+  if needFullTuple then begin
+    SetLength(variables, varCount);
+    varCount := 0;
+    for i := 0 to high(children) - 1 do
+      case TXQTermFlowerSubClause(children[i]).kind of
+        xqtfcLet: begin
+          clauseIndex[i] := varCount;
+          initialAddVariable(TXQTermFlowerLet(children[i]).loopvar);
+        end;
+        xqtfcFor: begin
+          clauseIndex[i] := varCount;
+          initialAddVariable(TXQTermFlowerLet(children[i]).loopvar);
+          if assigned(TXQTermFlowerFor(children[i]).positionVar) then
+            initialAddVariable(TXQTermFlowerFor(children[i]).positionVar);
+        end;
+        xqtfcWindow: initialAddWindowVariables(TXQTermFlowerWindow(children[i]));
+        xqtfcForPattern, xqtfcLetPattern: with TXQTermFlowerLetPattern(children[i]).pattern do begin
+          clauseIndex[i] := varCount;
+          if hasDefaultVariable then raiseEvaluationError('XQTS0003', 'Too complex flowr expression for pattern changing .');
+          for j := 0 to high(vars) do
+            variables[varCount + j] := vars[j];
+          inc(varCount, length(vars));
+        end;
+        //xqtfcWhere: ;
+        //xqtfcOrder: inc(orderCount);
+        xqtfcCount: begin
+          clauseIndex[i] := varCount;
+          initialAddVariable(TXQTermFlowerCount(children[i]).countvar);
+        end;
+        xqtfcGroup: clauseIndex[i] := varCount;
+      end;
+  end else if countCount > 0 then begin
+    SetLength(counts, countCount);
+    countCount := 0;
+    for i := 0 to high(children) - 1 do
+      case TXQTermFlowerSubClause(children[i]).kind of
+        xqtfcCount: begin
+          clauseIndex[i] := countCount;
+          inc(countCount);
+        end;
+      end;
+  end;
+end;
+
 function TXQTermFlower.getContextDependencies: TXQContextDependencies;
 begin
   result := getChildrenContextDependencies;
@@ -2302,6 +2306,7 @@ end;
 function TXQTermFlower.clone: TXQTerm;
 begin
   Result:=inherited clone;
+  TXQTermFlower(result).precompute;
 end;
 
 destructor TXQTermFlower.destroy;

@@ -300,6 +300,7 @@ end;
 
 function TFinalVariableResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
 begin
+  if t^.ClassType = TXQTermFlower then TXQTermFlower(t^).precompute;
   Result:=inherited leave(t);
 end;
 

@@ -1861,12 +1861,20 @@ type
     destructor destroy; override;
   end;
 
-  TXQTermFlower = class(TXQTermWithChildren)
+  TXQTermFlower = class sealed (TXQTermWithChildren)
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    procedure precompute;
     function getContextDependencies: TXQContextDependencies; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
     destructor destroy; override;
+  private
+    orders: array of TXQTermFlowerOrder;
+    variables: array of TXQTermVariable;
+    counts: array of integer;
+    clauseIndex: array of integer; //how many clauses of a similar kind occur before that one. (three kinds: assignments, order, count)
+    varCount, orderCount: Integer;
+    needFullTuple: Boolean;
   end;
 
 
