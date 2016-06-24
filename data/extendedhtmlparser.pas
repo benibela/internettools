@@ -2200,7 +2200,7 @@ begin
   result := TXQTermPatternMatcher.Create;
   result.node := temp.TemplateTree;
   temp.GetTemplateRealVariableDefinitions(result.vars, result.hasDefaultVariable);
-  result.contextDependancies := temp.GetTemplateContextDependencies - [xqcdFocusDocument,xqcdFocusOther]{<-focus is the matched document, not the outside document};
+  result.contextDependancies := temp.GetTemplateContextDependencies - [xqcdFocusItem,xqcdFocusPosition,xqcdFocusLast]{<-focus is the matched document, not the outside document};
   temp.FTemplate.OwnedTrees.Clear;
   temp.FQueryEngine := nil;
   temp.free;

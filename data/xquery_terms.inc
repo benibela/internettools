@@ -352,7 +352,7 @@ begin
   if length(children) = 0 then exit;
   result := children[0].getContextDependencies;
   for i := 1 to high(children) do
-    result += children[i].getContextDependencies - [xqcdFocusDocument, xqcdFocusOther]; //since the focus are the sequence values there are no dependancies on the old focus
+    result += children[i].getContextDependencies - ALL_CONTEXT_DEPENDENCIES_FOCUS; //since the focus are the sequence values there are no dependancies on the old focus
 end;
 
 function TXQTermFilterSequence.toQueryCommand: TXQPathMatchingStep;
@@ -2865,7 +2865,7 @@ end;
 
 function TXQTermNodeMatcher.getContextDependencies: TXQContextDependencies;
 begin
-  result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusOther, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+  result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusPosition, xqcdFocusLast, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
 end;
 
 function TXQTermNodeMatcher.debugTermToString: string;
@@ -4042,7 +4042,7 @@ end;
 
 function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;
 begin
-  result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusDocument, xqcdFocusOther];
+  result := ALL_CONTEXT_DEPENDENCIES - ALL_CONTEXT_DEPENDENCIES_FOCUS;
 end;
 
 function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;

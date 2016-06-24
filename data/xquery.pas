@@ -1321,10 +1321,11 @@ type
   PXQFunctionParameterTypes = ^TXQFunctionParameterTypes;
 
   //**The dynamic/static context values a query depends on (internal used for optimizations)
-  //**xqcdFocusDocument: context item/node
-  //**xqcdFocusOther: context position/size
+  //**xqcdFocusItem: context item/node (e.g. .)
+  //**xqcdFocusPosition: index (e.g. position())
+  //**xqcdFocusLast: size (e.g. last())
   //**xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther: context, obvious
-  TXQContextDependency = (xqcdFocusDocument,  xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther);
+  TXQContextDependency = (xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther);
   TXQContextDependencies = set of TXQContextDependency;
 
   { TXQAbstractFunctionInfo }
@@ -2978,7 +2979,8 @@ var
   );
   interpretedFunctionSynchronization: TRTLCriticalSection;
 
-  const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusDocument, xqcdFocusOther, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+  const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+  const ALL_CONTEXT_DEPENDENCIES_FOCUS = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast];
 
   PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
 
@@ -6948,16 +6950,26 @@ var
  tempContext: TXQEvaluationContext;
  previous: IXQValue;
  v: PIXQValue;
- i: Integer;
+ i, j: Integer;
  value: IXQValue;
  list: TXQVList;
  i64: Int64;
+ depends: TXQContextDependencies;
 begin
   if (result = nil) or (result.getSequenceCount = 0) then exit;
 
-
-  if [xqcdFocusDocument, xqcdFocusOther] * filter.getContextDependencies = [] then begin
-    value := filter.evaluate(context);
+  depends := filter.getContextDependencies; //todo: optimize
+  if [xqcdFocusItem, xqcdFocusPosition] * depends = [] then begin
+    if not (xqcdFocusLast in depends) then value := filter.evaluate(context)
+    else begin
+      try
+        context.getContextItem(previous, i, j);
+        context.setContextItem(result.get(1), 1, result.getSequenceCount);
+        value := filter.evaluate(context)
+      finally
+        context.setContextItem(previous, i, j);
+      end;
+    end;
     //optimization for a single number
     if value.kind in [pvkBigDecimal, pvkInt64, pvkFloat] then begin
       if ((value.kind = pvkFloat) and (frac(value.toFloat) <> 0)) or
