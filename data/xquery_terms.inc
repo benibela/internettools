@@ -3968,6 +3968,18 @@ end;
 
 { TXQTermDefineFunction }
 
+
+
+function makeNumberedVariable(i: integer): TXQTermVariable;
+var temp: string;
+begin
+  SetLength(temp, sizeof(i)+1);
+  temp[1] := '0';
+  move(i, temp[2], sizeof(i));
+  result := TXQTermVariable.create(temp, XMLNamespaceURL_MyExtensionOperators);
+  result.index := i;
+end;
+
 constructor TXQTermDefineFunction.createReference(const fun: TXQTermNamedFunction; arity: integer);
 var
   i: Integer;
@@ -3976,8 +3988,8 @@ begin
   SetLength(children, arity + 1);
   SetLength(fun.children, arity);
   for i := 1 to arity do begin
-    children[i-1] := TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew);
-    fun.children[i-1] := TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew);
+    children[i-1] := TXQTermDefineVariable.create(makeNumberedVariable(i));
+    fun.children[i-1] := makeNumberedVariable(i);
     TXQTermVariable(fun.children[i-1]).index := arity - i;
   end;
   children[high(children)] := fun;
@@ -4101,15 +4113,6 @@ end;
 function isPseudoVariable(v: TXQTerm): boolean; inline;
 begin
   result := (v.ClassType = TXQTermPlaceholderVariable);
-end;
-
-function makeNumberedVariable(i: integer): TXQTermVariable;
-var temp: string;
-begin
-  SetLength(temp, sizeof(i));
-  move(i, temp[1], sizeof(i));
-  result := TXQTermVariable.create(temp, XMLNamespaceURL_MyExtensionOperators);
-  result.index := i;
 end;
 
 function TXQTermDefineFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;

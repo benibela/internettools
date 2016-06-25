@@ -237,6 +237,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     v := TXQTermVariable(pt^);
     if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) and (TXQTermDefineVariable(parent).getVariable = v) then exit;
+    if (v.value[1] = '0') and (v.namespace = XMLNamespaceURL_MyExtensionOperators)  then exit; //special case for xqts test hof-25, do not check variables inserted during partial application
     v.index := overridenVariables.indexOf(v.value,v.namespace);
     if v.index >= 0 then begin
       v.index := overridenVariables.count - v.index - 1;
