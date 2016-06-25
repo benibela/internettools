@@ -72,6 +72,7 @@ type
   TXQValueFunction = class;
   TXQCollation=class;
   TXQVariableChangeLog=class;
+  TXQEvaluationStack=class;
   TXQTerm=class;
   TXQTermWithChildren=class;
   TXQTermArray = array of TXQTerm;
@@ -237,7 +238,7 @@ type
     SeqValue: IXQValue; //**<Context item / value of @code( . ),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
 
-    temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
+    temporaryVariables: TXQEvaluationStack; //**< List of variables defined in the outside scope (e.g. for/same/every)
     globallyDeclaredVariables: TXQVariableChangeLog; //**< List of variables declared variables (e.g. declare variable $foo...) (might be nil)
     namespaces: TNamespaceList;               //**< Namespace declared in the outside scope (only changed by xmlns attributes of constructed nodes)
 
@@ -1576,6 +1577,7 @@ type
   TXQTermVariable = class(TXQTerm)
     namespace: string;
     value: string; //this is the name, not the value
+    index: integer;
 
 //    constructor create(const avalue: string; staticContext: TXQStaticContext);
     constructor create(const avalue: string; const anamespace: INamespace = nil);
@@ -2483,7 +2485,8 @@ public
     FInternalDocuments: TFPList;
     FModules, FPendingModules: TInterfaceList; //internal used
     FParserVariableVisitor: TObject;
-    VariableChangelogUndefined, FDefaultVariableStack, FDefaultVariableHeap: TXQVariableChangeLog;
+    VariableChangelogUndefined, FDefaultVariableHeap: TXQVariableChangeLog;
+    FDefaultVariableStack: TXQEvaluationStack;
 
     function GetNativeModules: TStringList;
     function isAWeirdGlobalVariable(const namespace, local: string): boolean;
@@ -2691,6 +2694,9 @@ type
     property count: integer read varcount;
   end;
 
+  TXQEvaluationStack = class(TXQVariableChangeLog)
+    function top(i: integer = 0): IXQValue;
+  end;
 
 
 { TXQCollation }
@@ -2998,7 +3004,6 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
-
 
 
 constructor TXQMapStringObject.Create;
@@ -6086,6 +6091,13 @@ end;
 
 
 
+function TXQEvaluationStack.top(i: integer): IXQValue;
+begin
+  result := varstorage[count - i - 1].value;
+end;
+
+
+
 
                        (*
 { TXQQueryIterator }
@@ -6287,7 +6299,7 @@ begin
   StaticContext.stringEncoding:=eUTF8;
   StaticContext.useLocalNamespaces:=true;
   StaticContext.jsonPXPExtensions:=true;
-  FDefaultVariableStack := TXQVariableChangeLog.create();
+  FDefaultVariableStack := TXQEvaluationStack.create();
   FDefaultVariableHeap := TXQVariableChangeLog.create();
   FModules := TInterfaceList.Create;
   FPendingModules := TInterfaceList.Create;

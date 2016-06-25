@@ -1811,10 +1811,11 @@ var
            if endi <= length then begin
              addVarAs(window.loopvar, window.sequenceTyp, subsequence(start, endi));
              evaluateForLoop(pos+1);
-            if Assigned(window.endCondition.when) then
-              context.temporaryVariables.popAll(); //end condition, only if matched
+             if Assigned(window.endCondition.when) then
+               context.temporaryVariables.popAll(); //end condition, only if matched
            end;
-           context.temporaryVariables.popAll(); //start condition
+           //if Assigned(window.endCondition.when) then
+             context.temporaryVariables.popAll(); //end condition, only if matched; or start as end condition
            if xqtfwSliding in window.flags then inc(start)
            else start := endi + 1;
            if needFullTuple then variableIndex := clauseIndex[pos];
@@ -1843,8 +1844,8 @@ var
         i: Integer;
         log: TXQVariableChangeLog;
         hasContextItem: Boolean;
-        varIndex: integer;
-        value: IXQValue;
+        varIndex, curcount: integer;
+        value, empty: IXQValue;
     begin
       patternClause := TXQTermFlowerLetPattern(children[pos]);
       log := patternMatcherMatch(patternClause.pattern.node, node.toNode, context, true);
@@ -1883,11 +1884,13 @@ var
               end;
             evaluateForLoop(pos+1);
           end else begin // for
+            curcount := context.temporaryVariables.count;
+            empty := xqvalue();
             for i := 0 to high(patternClause.pattern.vars) do
-              context.temporaryVariables.add(patternClause.pattern.vars[i], xqvalue());
+              context.temporaryVariables.add(patternClause.pattern.vars[i], empty);
             if needFullTuple then
               for i := 0 to high(patternClause.pattern.vars) do
-                currentTuple.vars[clauseIndex[pos]+i] := xqvalue();
+                currentTuple.vars[clauseIndex[pos]+i] := empty;
 
             for i := 0 to log.count - 1 do begin
               if log.getName(i) = '$' then begin
@@ -1899,12 +1902,11 @@ var
               end else begin
                 varIndex := hasStaticVariable(log.getName(i), log.varstorage[i].namespaceURL);
                 if varIndex > -1 then begin
-                  context.temporaryVariables.pushAll;
-                  context.temporaryVariables.add(log.getName(i), log.get(i), log.varstorage[i].namespaceURL);
+                  context.temporaryVariables.varstorage[curcount + varIndex].value := log.get(i);
                   if needFullTuple then
                     currentTuple.vars[clauseIndex[pos]+varIndex] := log.get(i);
                   evaluateForLoop(pos+1);
-                  context.temporaryVariables.popAll();
+                  context.temporaryVariables.varstorage[curcount + varIndex].value := empty;
                 end;
               end;
             end;
@@ -3055,12 +3057,14 @@ constructor TXQTermVariable.create(const avalue: string; const anamespace: IName
 begin
   value := avalue;
   namespace := namespaceGetURL(anamespace);
+  index := -1;
 end;
 
 constructor TXQTermVariable.create(const alocalname: string; const anamespace: string);
 begin
   value := alocalname;
   namespace:= anamespace;
+  index := -1;
 end;
 
 function TXQTermVariable.equalsVariable(v: TXQTermVariable): boolean;
@@ -3069,7 +3073,21 @@ begin
 end;
 
 function TXQTermVariable.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  err: String;
+  i: Integer;
 begin
+  if index >= 0 then begin
+    result := context.temporaryVariables.top(index);
+    if context.temporaryVariables.varstorage[context.temporaryVariables.count - 1 - index].name <> value then begin
+      err := 'Var mismatch: '+value+'('+IntToStr(index)+')' + ' <> '+context.temporaryVariables.varstorage[context.temporaryVariables.count - 1 - index].name + LineEnding;
+      err += 'Vars on stack: ';
+      for i := 0 to context.temporaryVariables.count - 1 do
+        err += context.temporaryVariables.varstorage[i].name + ' ';
+
+      raise EXQEvaluationException.create('PXP:INTERNAL',err);
+    end;
+  end;
   result := context.getVariable(value, namespace);
 end;
 
@@ -3086,6 +3104,7 @@ begin
   other := TXQTermVariable(result);
   other.namespace := namespace;
   other.value := value;
+  other.index := index;
 end;
 
 function TXQTermVariable.ToString: ansistring;

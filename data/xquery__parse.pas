@@ -237,7 +237,11 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     v := TXQTermVariable(pt^);
     if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) and (TXQTermDefineVariable(parent).getVariable = v) then exit;
-    if overridenVariables.hasVariable(v) then exit;
+    v.index := overridenVariables.indexOf(v.value,v.namespace);
+    if v.index >= 0 then begin
+      v.index := overridenVariables.count - v.index - 1;
+      exit;
+    end;
     if (currentVariable <> nil) and (currentVariable.equalsVariable(v)) then raise EXQParsingException.create('XPST0008', 'Self-Dependancy: '+v.ToString);
 
     q := staticContext.findModule(v.namespace);
