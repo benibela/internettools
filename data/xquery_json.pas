@@ -384,7 +384,14 @@ initialization
   XMLNamespace_JSONiqLibraryFunctions:=TNamespace.create('http://jsoniq.org/function-library', 'libjn');
   libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
 //new function from 1.0.1 not working libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', '{| for $key in jn:keys($seq) return { $key : $seq($key) }  |}');
-  {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', 'jn:object( let $o := for $p in $seq return if ($p instance of object()) then $p else (), $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
+  {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()',
+    'jn:object( ' +
+      ' let $o := for $p in $seq '+
+                  'return if ($p instance of object()) then $p else ()'+
+         ', $all-keys := for $object in $o return jn:keys($object)' +
+       'for $distinct-key in distinct-values($all-keys) '+
+       'let $values := $o($distinct-key) '+
+       'return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
   //old accumulate function: libjn.registerInterpretedFunction('accumulate', '($o as object()*) as object()', 'jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
 
   libjn.registerInterpretedFunction('descendant-arrays', '($seq as item()*) as array()*',
