@@ -265,7 +265,10 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       exit;
     end;
 
-    if TXQueryEngineBreaker(staticContext.sender).isAWeirdGlobalVariable(v.namespace, v.value) then exit;
+    if TXQueryEngineBreaker(staticContext.sender).isAWeirdGlobalVariable(v.namespace, v.value) then begin
+      v.index := -2;
+      exit;
+    end;
     if (v.namespace = '') then
       case v.value of //some global default variables
         'line-ending': begin replace(pt, TXQTermConstant.create(xqvalue(LineEnding) )); exit; end;

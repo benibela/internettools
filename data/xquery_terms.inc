@@ -490,7 +490,7 @@ begin
   case assignmentMode of
     amOverride: value := Result;
     amArrayOverride, amArrayInsert: begin
-      if not context.hasVariable(varname, value, varnamespace) then value := xqvalue;
+      if not context.hasGlobalVariable(varname, value, varnamespace) then value := xqvalue;
       applyProperties;
       if (arrayIndex = 1) and (value.getSequenceCount <= 1) then value := result
       else if arrayIndex > value.getSequenceCount then begin
@@ -515,7 +515,7 @@ begin
       end;
     end;
     amArrayAppend:
-      if not context.hasVariable(varname, value, varnamespace) then
+      if not context.hasGlobalVariable(varname, value, varnamespace) then
         value := Result
       else begin
        applyProperties;
@@ -917,6 +917,7 @@ var
   f: TXQValueFunction;
   i: Integer;
   fresult: TXQValueFunction;
+  tempvar: TXQTermVariable;
 begin
   //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
   //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.debugAsStringWithTypeAnnotation());
@@ -946,7 +947,9 @@ begin
   fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
   setlength(fresult.parameters, length(arguments) - 1);
   for i := 0 to high(f.parameters) do begin
-    TXQTermDynamicFunctionCall(fresult.body).push(TXQTermVariable.create(IntToStr(i)+'.'));
+    tempvar := TXQTermVariable.create(IntToStr(i)+'.');
+    tempvar.index := high(f.parameters) - i;
+    TXQTermDynamicFunctionCall(fresult.body).push(tempvar);
     fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);
     fresult.parameters[i].seqtype := TXQTermSequenceType(arguments[i].clone);
   end;
@@ -3059,15 +3062,6 @@ end;
 
 { TXQTermVariable }
 
-{constructor TXQTermVariable.create(const avalue: string; staticContext: TXQStaticContext);
-begin
-  value := avalue;
-  if value = '' then raiseEvaluationError('XPST0003', 'variable with empty name');
-  //if value[1] = '$' then raiseEvaluationError('variable name starts with a double $:  ' + value);
-  if value[length(value)] = ';' then delete(value, length(value), 1);
-  if staticContext <> nil then staticContext.splitRawQName(namespaceURL, value, xqdnkUnknown);
-end;}
-
 constructor TXQTermVariable.create(const avalue: string; const anamespace: INamespace);
 begin
   value := avalue;
@@ -3102,8 +3096,11 @@ begin
 
       raise EXQEvaluationException.create('PXP:INTERNAL',err);
     end;
+    exit;
   end;
-  result := context.getVariable(value, namespace);
+  if index = -2 then
+    exit(context.getGlobalVariable(value, namespace));
+  raise EXQEvaluationException.create('pxp:INTERNAL', 'Variable without index: ' + value);
 end;
 
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;
@@ -3930,12 +3927,15 @@ end;
 function TXQTerm_VisitorReplaceKnownVariables.visit(term: PXQTerm): TXQTerm_VisitAction;
 var
   temp: IXQValue;
+  v: TXQTermVariable;
   //selfdefined: Boolean;
 begin
   if term^ is TXQTermVariable then begin
-    if not overridenVariables.hasVariable(TXQTermVariable(term^), temp) then
-      replace(term, TXQTermConstant.create(context^. getVariable(TXQTermVariable(term^))))
-    else if length(patterns) > 0 then begin
+    if not overridenVariables.hasVariable(TXQTermVariable(term^), temp) then begin
+      v := TXQTermVariable(term^);
+      assert(v.index >= 0);
+      replace(term, TXQTermConstant.create(context^.temporaryVariables.top(v.index-overridenVariables.count)))
+    end else if length(patterns) > 0 then begin
       {not sure what to do with these
       selfdefined := false;
       with patterns[high(patterns)] do
@@ -3978,15 +3978,11 @@ begin
   for i := 1 to arity do begin
     children[i-1] := TXQTermDefineVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew);
     fun.children[i-1] := TXQTermVariable.create(inttostr(i)+'.', XMLNamespace_MyExtensionsNew);
+    TXQTermVariable(fun.children[i-1]).index := arity - i;
   end;
   children[high(children)] := fun;
   kind := xqtdfNamedReference;
-end;                                                                               {
-
-constructor TXQTermDefineFunction.createReference(anamespaceUrl: string; aname: string; arity: integer);
-begin
-  createReference(TNamespace.create(anamespaceUrl, 'prf'), aname, arity);
-end;                                                                                }
+end;
 
 function TXQTermDefineFunction.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
@@ -3994,7 +3990,7 @@ var
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
   i: Integer;
   tempterm: TXQTermFlower;
-  dfv: IXQValue;
+  dfv, tempv: IXQValue;
 begin
 
   case kind of
@@ -4035,7 +4031,10 @@ begin
         tempterm.children[i] := TXQTermFlowerLet.Create;
         with TXQTermFlowerLet(tempterm.children[i]) do begin
           loopvar := TXQTermVariable.create(tempVisitor.uncertainVariables.varstorage[i].name, tempVisitor.uncertainVariables.varstorage[i].namespaceURL);
-          expr := TXQTermConstant.Create(context.getVariable(loopvar));
+          if not context.temporaryVariables.hasVariable(loopvar, tempv) then  //todo, statically?
+            if not context.hasGlobalVariable(loopvar, tempv) then  //todo, statically?
+              tempv := xqvalue();
+          expr := TXQTermConstant.Create(tempv);
         end;
       end;
       tempterm.children[high(tempterm.children)] := temp.body;

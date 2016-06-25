@@ -250,10 +250,10 @@ type
 
     function getRootHighest: TTreeNode;
 
-    function hasVariable(const name: string; out value: IXQValue; const namespaceURL: string = ''): boolean;
-    function hasVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
-    function getVariable(const name: string; const namespaceURL: string): IXQValue;
-    function getVariable(const v: TXQTermVariable): IXQValue; inline;
+    function hasGlobalVariable(const name: string; out value: IXQValue; const namespaceURL: string = ''): boolean;
+    function hasGlobalVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
+    function getGlobalVariable(const name: string; const namespaceURL: string): IXQValue;
+    function getGlobalVariable(const v: TXQTermVariable): IXQValue; inline;
 
     function parseDoc(const data, url, contenttype: string): TTreeNode; //for internal use
 
@@ -4621,37 +4621,32 @@ begin
   else raise EXQEvaluationException.Create('XPDY0002', 'no root element');
 end;
 
-function TXQEvaluationContext.hasVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
+function TXQEvaluationContext.hasGlobalVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
 begin
-  result := temporaryVariables.hasVariable(name, value, namespaceURL);
-  if result then exit;
-  if globallyDeclaredVariables <> nil then begin
-     //should not be needed
-    result := globallyDeclaredVariables.hasVariable(name, value, namespaceURL);
-    if result then exit;
-  end;
-  if staticContext.sender <> nil then
-    result := staticContext.sender.VariableChangelog.hasVariable(name, value, namespaceURL);
+  result := true;
+  if globallyDeclaredVariables.hasVariable(name, value, namespaceURL) then exit;
+  if (staticContext.sender <> nil) and (staticContext.sender.VariableChangelog.hasVariable(name, value, namespaceURL)) then exit;
+  result := false;
 end;
 
-function TXQEvaluationContext.hasVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
+function TXQEvaluationContext.hasGlobalVariable(const v: TXQTermVariable; out value: IXQValue): boolean;
 begin
-  result := hasVariable(v.value, value, v.namespace);
+  result := hasGlobalVariable(v.value, value, v.namespace);
 end;
 
-function TXQEvaluationContext.getVariable(const name: string; const namespaceURL: string): IXQValue;
+function TXQEvaluationContext.getGlobalVariable(const name: string; const namespaceURL: string): IXQValue;
 var
   found: boolean;
 begin
-  found := hasVariable(name, result, namespaceURL);
+  found := hasGlobalVariable(name, result, namespaceURL);
   if not found then
     raise EXQEvaluationException.Create('XPST0008', 'Variable Q{'+namespaceURL+'}'+name+' not found');
   if result = nil then result := xqvalue();
 end;
 
-function TXQEvaluationContext.getVariable(const v: TXQTermVariable): IXQValue;
+function TXQEvaluationContext.getGlobalVariable(const v: TXQTermVariable): IXQValue;
 begin
-  result := getVariable(v.value, v.namespace);
+  result := getGlobalVariable(v.value, v.namespace);
 end;
 
 function TXQEvaluationContext.contextNode(mustExists: boolean): TTreeNode;
@@ -6093,6 +6088,7 @@ end;
 
 function TXQEvaluationStack.top(i: integer): IXQValue;
 begin
+  assert((i >= 0) and (count - i - 1 >= 0));
   result := varstorage[count - i - 1].value;
 end;
 
@@ -6762,6 +6758,8 @@ var pos: pchar;
 
     function allOfSameType(axis: string): TXQTerm;
     var axisTerm: TXQterm;
+      tempv: TXQTermVariable;
+
     begin
       if elementName <> '*' then begin
         if axis <> '' then result := TXQTermNodeMatcher.Create(axis + '::'+elementName)
@@ -6776,9 +6774,11 @@ var pos: pchar;
           //TXQTermFlower(result).vars[0].sequenceTyp := nil;
           expr := newFunction('name', [TXQTermNodeMatcher.Create('.')]);
         end;
+        tempv := TXQTermVariable.Create('__csstemp');
+        tempv.index := 0;
         TXQTermFlower(result).push(TXQTermFilterSequence.create(
           axisTerm,
-          newBinOp(newFunction('name', [TXQTermNodeMatcher.Create('.')]), '=', TXQTermVariable.Create('__csstemp'))
+          newBinOp(newFunction('name', [TXQTermNodeMatcher.Create('.')]), '=', tempv)
         ));
       end;
     end;

@@ -1978,9 +1978,9 @@ end;
 function xqFunctionGet(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1, 2);
-  if not context.hasVariable(args[0].toString, result, context.findNamespaceURL('', xqdnkUnknown)) then
-    if length(args) = 2 then exit(args[1])
-    else exit(xqvalue());
+  if context.hasGlobalVariable(args[0].toString, result, context.findNamespaceURL('', xqdnkUnknown)) then exit;
+  if length(args) = 2 then exit(args[1])
+  else exit(xqvalue());
 end;
 
 function xqFunctionIs_Nth(const args: TXQVArray): IXQValue;
