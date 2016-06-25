@@ -4373,6 +4373,7 @@ begin
 
           context.temporaryVariables.add('code', TXQValueQName.create(ns, nsprefix, e.errorCode), XMLNamespaceURL_XQTErrors);
           context.temporaryVariables.add('description', e.rawMessage, XMLNamespaceURL_XQTErrors);
+          if e.value = nil then e.value := xqvalue();
           context.temporaryVariables.add('value', e.value, XMLNamespaceURL_XQTErrors);
           context.temporaryVariables.add('module', xqvalue(), XMLNamespaceURL_XQTErrors);
           context.temporaryVariables.add('line-number', xqvalue(), XMLNamespaceURL_XQTErrors);
