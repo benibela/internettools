@@ -3119,19 +3119,19 @@ var
   v: TXQTermVariable;
   pendingname: String;
 begin
-  if context.temporaryVariables.parentLog = nil then context.temporaryVariables.parentLog := TXQVariableChangeLog.create();
+  if context.globallyDeclaredVariables = nil then context.globallyDeclaredVariables := TXQVariableChangeLog.create();
 
   v := definition.getVariable;
 
   if context.staticContext.model in PARSING_MODEL3 then begin
     pendingname := #0 + v.value;
-    if context.temporaryVariables.parentLog.hasVariable(pendingname, v.namespace) then
+    if context.globallyDeclaredVariables.hasVariable(pendingname, v.namespace) then
       raise EXQEvaluationException.create('XQDY0054', 'Dependancy cycle: ' + v.ToString );
-    context.temporaryVariables.parentLog.add(pendingname, xqvalue(), v.namespace);
+    context.globallyDeclaredVariables.add(pendingname, xqvalue(), v.namespace);
   end;
 
   result := definition.getClassicValue(context);
-  context.temporaryVariables.parentLog.add(v, result);
+  context.globallyDeclaredVariables.add(v, result);
 end;
 
 function TXQTermVariableGlobalImported.evaluate(var context: TXQEvaluationContext): IXQValue;

@@ -2103,6 +2103,7 @@ begin
   tempcontext := context;
   if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
+  tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
   tempcontext.temporaryVariables.pushAll;
   try
     for j := 0 to high(parameters) do

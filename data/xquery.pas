@@ -238,6 +238,7 @@ type
     SeqIndex, SeqLength: integer; //**<Position in the sequence, if there is one
 
     temporaryVariables: TXQVariableChangeLog; //**< List of variables defined in the outside scope (e.g. for/same/every)
+    globallyDeclaredVariables: TXQVariableChangeLog; //**< List of variables declared variables (e.g. declare variable $foo...) (might be nil)
     namespaces: TNamespaceList;               //**< Namespace declared in the outside scope (only changed by xmlns attributes of constructed nodes)
 
     staticContext: TXQStaticContext;
@@ -4475,11 +4476,10 @@ var
   i: Integer;
   staticContext: TXQStaticContext;
 begin
-  if (context.temporaryVariables <> nil) then begin
+  if (context.temporaryVariables <> nil) then
     context.temporaryVariables.clear;
-    if context.temporaryVariables.parentLog <> nil then
-      context.temporaryVariables.parentLog.clear; //declared global variables
-  end;
+  if context.globallyDeclaredVariables <> nil then
+    context.globallyDeclaredVariables.clear; //declared global variables
 
   staticContext := context.staticContext;
   if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
@@ -4617,6 +4617,11 @@ function TXQEvaluationContext.hasVariable(const name: string; out value: IXQValu
 begin
   result := temporaryVariables.hasVariable(name, value, namespaceURL);
   if result then exit;
+  if globallyDeclaredVariables <> nil then begin
+     //should not be needed
+    result := globallyDeclaredVariables.hasVariable(name, value, namespaceURL);
+    if result then exit;
+  end;
   if staticContext.sender <> nil then
     result := staticContext.sender.VariableChangelog.hasVariable(name, value, namespaceURL);
 end;
@@ -6252,6 +6257,7 @@ begin
   else result.staticContext := staticContextOverride;
   result.SeqIndex:=-1;
   result.temporaryVariables := FDefaultVariableStack;
+  result.globallyDeclaredVariables := FDefaultVariableHeap;
 end;
 
 constructor TXQueryEngine.create;
@@ -6280,7 +6286,6 @@ begin
   StaticContext.jsonPXPExtensions:=true;
   FDefaultVariableStack := TXQVariableChangeLog.create();
   FDefaultVariableHeap := TXQVariableChangeLog.create();
-  FDefaultVariableStack.parentLog := FDefaultVariableHeap;
   FModules := TInterfaceList.Create;
   FPendingModules := TInterfaceList.Create;
 end;
