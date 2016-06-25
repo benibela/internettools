@@ -1775,11 +1775,24 @@ var
         end;
       end;
 
+      var start, endi, length: Integer;
+          window: TXQTermFlowerWindow;
+
+      procedure nextStep;
+      begin
+        if endi <= length then begin
+         addVarAs(window.loopvar, window.sequenceTyp, subsequence(start, endi));
+         evaluateForLoop(pos+1);
+         context.temporaryVariables.popAll();
+        end;
+        if needFullTuple then variableIndex := clauseIndex[pos];
+      end;
+
     var
-      window: TXQTermFlowerWindow;
-      length: Integer;
+
       tempIndex: Integer;
-      start, endi: Integer;
+      matchIdxList: array of integer;
+      matchIdxListLength, i: integer;
     begin
       window := TXQTermFlowerWindow(children[pos]);
       binding := window.expr.evaluate(context);
@@ -1789,37 +1802,39 @@ var
       if needFullTuple then
         variableIndex := clauseIndex[pos];
 
-      while start <= length do begin
-        if checkCondition(start, window.startCondition, (not Assigned(window.endCondition.when)) and (start = endi + 1) and (start < length)  ) then begin
-           endi := start;
-          if Assigned(window.endCondition.when) then begin
+
+      if Assigned(window.endCondition.when) then begin
+        while start <= length do begin
+          if checkCondition(start, window.startCondition ) then begin
+             endi := start;
+
              while (endi < length) and not checkCondition(endi, window.endCondition) do inc(endi);
              if endi = length then if not checkCondition(endi, window.endCondition, not (xqtfwEndOnlyWhen in window.flags) ) then
                inc(endi);
-           end else begin
-             inc(endi);
-             tempIndex := variableIndex;
-             variableIndex := -1;
-             while (endi < length) and not checkCondition(endi, window.startCondition)  do inc(endi);
-             if endi = length then if not checkCondition(endi, window.startCondition ) then
-               inc(endi);
-             if endi <= length then
-               context.temporaryVariables.popAll();
-             dec(endi); //it was next start, not end
-             variableIndex := tempIndex;
-           end;
-           if endi <= length then begin
-             addVarAs(window.loopvar, window.sequenceTyp, subsequence(start, endi));
-             evaluateForLoop(pos+1);
-             if Assigned(window.endCondition.when) then
-               context.temporaryVariables.popAll(); //end condition, only if matched
-           end;
-           //if Assigned(window.endCondition.when) then
-             context.temporaryVariables.popAll(); //end condition, only if matched; or start as end condition
-           if xqtfwSliding in window.flags then inc(start)
-           else start := endi + 1;
-           if needFullTuple then variableIndex := clauseIndex[pos];
-        end else inc(start);
+
+             nextStep;
+             context.temporaryVariables.popAll();
+             if xqtfwSliding in window.flags then inc(start)
+             else start := endi + 1;
+          end else inc(start);
+        end
+      end else begin
+        matchIdxListLength := 0;
+        matchIdxList := nil;
+        for start := 1 to length do
+          if checkCondition(start, window.startCondition) then begin
+            arrayAddFast(matchIdxList, matchIdxListLength, start);
+            context.temporaryVariables.popAll();
+          end;
+        if matchIdxListLength > 0 then begin
+          arrayAddFast(matchIdxList, matchIdxListLength, length + 1);
+          for i := 0 to matchIdxListLength - 2 do begin
+            start := matchIdxList[i];
+            checkCondition(start, window.startCondition, true);
+            endi := matchIdxList[i+1] - 1;
+            nextStep;
+          end;
+        end;
       end;
     end;
 
