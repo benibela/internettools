@@ -281,7 +281,6 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   var
     pattern: String;
     patternMatcher: TXQTermPatternMatcher;
-    i: Integer;
   begin
     //this is extraordinary hacky
     //here we know the variables, so the pattern can access the outer variables. but we do not know the namespaces anymore, so it does not inherit them
@@ -289,8 +288,6 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     patternMatcher := patternMatcherParse(staticContext, pattern);
     if patternMatcher = nil then raise EXQParsingException.create('pxp:PATTERN', 'Invalid pattern: ' + pattern);
     replace(pt, patternMatcher);
-    for i := 0 to high(patternMatcher.vars) do
-      declare(@patternMatcher.vars[i]);
   end;
 begin
   if t^ is TXQTermVariable then visitVariable(t)

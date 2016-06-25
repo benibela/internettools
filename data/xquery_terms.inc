@@ -1397,11 +1397,11 @@ begin
     case result of xqtvaAbort: exit; end;
   end;
 
-  for j := 0 to high(pattern.vars) do
-    visitor.declare(@pattern.vars[j]);
-
   result := visitor.simpleTermVisit(@pattern, self);
   case result of xqtvaAbort: exit; end;
+
+  for j := 0 to high(pattern.vars) do
+    visitor.declare(@pattern.vars[j]);
 end;
 
 procedure TXQTermFlowerLetPattern.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
@@ -1535,7 +1535,7 @@ var
   i: Integer;
 begin
   for i := 0 to high(vars) do
-    visitor.declare(@vars[i], self);
+    visitor.simpleTermVisit(@vars[i], self);
   for i := 0 to high(seqtypes) do
     if seqtypes[i]<> nil then
       visitor.simpleTermVisit(@seqtypes[i], self);
@@ -1544,12 +1544,7 @@ begin
 end;
 
 procedure TXQTermFlowerGroup.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
-var
-  i: Integer;
 begin
-  visitor.parent := self;
-  for i := high(vars) downto 0 do
-    visitor.undeclare(@vars[i], self);
 end;
 
 function TXQTermFlowerGroup.getContextDependencies: TXQContextDependencies;
@@ -3171,13 +3166,14 @@ begin
     case result of xqtvaAbort: exit; end;
     if variable <> nil then visitor.undeclare(@variable, self);
   end else begin
+    result := visitor.simpleTermVisit(@pattern, self);
+    case result of xqtvaAbort: exit; end;
+
     visitor.parent := self;
     with pattern do
       for j := 0 to high(vars) do
         visitor.declare(@vars[j]);
 
-    result := visitor.simpleTermVisit(@pattern, self);
-    case result of xqtvaAbort: exit; end;
     result := visitor.simpleTermVisit(@expr, self);
     case result of xqtvaAbort: exit; end;
 
