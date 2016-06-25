@@ -4512,8 +4512,8 @@ begin
   end;
   //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed
   for i := 0 to high(allVariables) do
-    if not context.temporaryVariables.hasVariable(allVariables[i].getVariable) then
-      context.temporaryVariables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
+    if not context.globallyDeclaredVariables.hasVariable(allVariables[i].getVariable) then
+      context.globallyDeclaredVariables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
 
   result := children[high(children)].evaluate(context);
 end;

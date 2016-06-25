@@ -3093,7 +3093,7 @@ end;
 
 function TXQTermVariableGlobal.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if context.temporaryVariables.hasVariable(definition.getVariable, result) then
+  if context.globallyDeclaredVariables.hasVariable(definition.getVariable, result) then
     exit();
   Result:=evaluateInitial(context);
 end;
@@ -3138,7 +3138,7 @@ function TXQTermVariableGlobalImported.evaluate(var context: TXQEvaluationContex
 var
   oldSC: TXQStaticContext;
 begin
-  if context.temporaryVariables.hasVariable(definition.getVariable, result) then
+  if context.globallyDeclaredVariables.hasVariable(definition.getVariable, result) then
     exit;
   oldSC := context.staticContext;
   context.staticContext := staticContext;
