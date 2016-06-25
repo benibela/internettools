@@ -1871,9 +1871,8 @@ type
   private
     orders: array of TXQTermFlowerOrder;
     variables: array of TXQTermVariable;
-    counts: array of integer;
     clauseIndex: array of integer; //how many clauses of a similar kind occur before that one. (three kinds: assignments, order, count)
-    varCount, orderCount: Integer;
+    varCount, orderCount, countCount: Integer;
     needFullTuple: Boolean;
   end;
 

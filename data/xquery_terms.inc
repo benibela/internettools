@@ -1691,6 +1691,7 @@ var
   sortingCache: TFPList;
   finalResult: TXQValueSequence;
   currentTuple: TOrderedTuple;
+  counts: array of integer;
 
 
   procedure evaluateForLoop(const pos: Integer);
@@ -2092,11 +2093,11 @@ begin
     sortingCache := tfplist.Create;
     currentTuple := TOrderedTuple.Create;
     SetLength(currentTuple.orders, orderCount);
-    if needFullTuple then begin
-      if currentTuple = nil then currentTuple := TOrderedTuple.Create;
-      SetLength(currentTuple.vars, varCount);
-    end;
   end else sortingCache := nil;
+  if needFullTuple then begin
+    if currentTuple = nil then currentTuple := TOrderedTuple.Create;
+    SetLength(currentTuple.vars, varCount);
+  end else SetLength(counts, countCount);
 
   try
     evaluateForLoop(0);
@@ -2158,7 +2159,7 @@ end;
 procedure TXQTermFlower.precompute;
 
 var
-  countCount, i, j: Integer;
+  i, j: Integer;
 
   procedure initialAddVariable(v: TXQTermVariable);
   begin
@@ -2189,7 +2190,6 @@ begin
   needFullTuple := false;
   orders := nil;
   variables := nil;
-  counts := nil;
   clauseIndex := nil;
 
 
@@ -2271,7 +2271,6 @@ begin
         xqtfcGroup: clauseIndex[i] := varCount;
       end;
   end else if countCount > 0 then begin
-    SetLength(counts, countCount);
     countCount := 0;
     for i := 0 to high(children) - 1 do
       case TXQTermFlowerSubClause(children[i]).kind of
