@@ -1457,8 +1457,8 @@ type
   //**@abstract Internally used xpath term
 
   TXQTerm = class
-    function evaluate(var context: TXQEvaluationContext): IXQValue; virtual; abstract;
-    function getContextDependencies: TXQContextDependencies; virtual; abstract;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; virtual;
+    function getContextDependencies: TXQContextDependencies; virtual;
     function debugTermToString: string; virtual;
   public
     //for internal use
@@ -1643,6 +1643,9 @@ type
     procedure initNamedFunctionReference(const context: TXQEvaluationContext);
     function defineStaticPartialApplication(var context: TXQEvaluationContext): TXQValueFunction;
     function defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
+  end;
+
+  TXQTermPlaceholderVariable = class sealed(TXQTerm)
   end;
 
   { TXQTermNodeMatcher }

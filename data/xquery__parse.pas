@@ -227,12 +227,6 @@ begin
 end;
 
 
-function isSpecialBullshitVariable(v: TXQTermVariable): boolean; inline;
-begin
-  //check if the variable is used for partial function application (we create these vars, so we know they are correct)
-  result := (v.namespace = XMLNamespaceURL_MyExtensionsNew) and (v.value[1]in ['0'..'9']);
-end;
-
 function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitVariable(pt: PXQTerm);
   var v: TXQTermVariable;
@@ -242,7 +236,6 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     declaration: TXQTermDefineVariable;
   begin
     v := TXQTermVariable(pt^);
-    if isSpecialBullshitVariable(v) then exit; //this is only for the XQTS test hof-025. Exiting here and it succeeds in a few milliseconds. Without this condition, it takes 10 minutes
     if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) and (TXQTermDefineVariable(parent).getVariable = v) then exit;
     if overridenVariables.hasVariable(v) then exit;
     if (currentVariable <> nil) and (currentVariable.equalsVariable(v)) then raise EXQParsingException.create('XPST0008', 'Self-Dependancy: '+v.ToString);
@@ -895,7 +888,7 @@ var partialApplications: integer;
       if pos^ = '?' then begin
         inc(pos);
         inc(partialApplications);
-        result.push(TXQTermVariable.create(inttostr(partialApplications)+'.', XMLNamespace_MyExtensionsNew));
+        result.push(TXQTermPlaceholderVariable.Create);
         exit;
       end;
     end;

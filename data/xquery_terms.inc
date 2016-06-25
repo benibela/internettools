@@ -47,6 +47,17 @@ begin
 
 end;
 
+function TXQTerm.evaluate(var context: TXQEvaluationContext): IXQValue;
+begin
+  ignore(context);
+  raise EXQEvaluationException.create('pxp:INTERNAL', debugTermToString + ' cannot be evaluated');
+end;
+
+function TXQTerm.getContextDependencies: TXQContextDependencies;
+begin
+  result := [];
+end;
+
 function TXQTerm.debugTermToString: string;
 begin
   result := '(' + ClassName + ')';
@@ -4056,7 +4067,16 @@ end;
 
 function isPseudoVariable(v: TXQTerm): boolean; inline;
 begin
-  result := (v is TXQTermVariable) and (TXQTermVariable(v).value[1] in ['0'..'9']);
+  result := (v.ClassType = TXQTermPlaceholderVariable);
+end;
+
+function makeNumberedVariable(i: integer): TXQTermVariable;
+var temp: string;
+begin
+  SetLength(temp, sizeof(i));
+  move(i, temp[1], sizeof(i));
+  result := TXQTermVariable.create(temp, XMLNamespaceURL_MyExtensionOperators);
+  result.index := i;
 end;
 
 function TXQTermDefineFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
@@ -4084,15 +4104,7 @@ begin
         visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
     end;
     xqtdfStaticPartialApplication, xqtdfDynamicPartialApplication: begin
-      subchildren := (children[0] as TXQTermWithChildren).children;
-      for i := 0 to high(subchildren) do
-        if isPseudoVariable(subchildren[i]) then
-          visitor.declare(@subchildren[i]);
-      result := visitor.simpleTermVisit(@children[0], self);
-      visitor.parent := self;
-      for i := high(subchildren) downto 0 do
-        if isPseudoVariable(subchildren[i]) then
-          visitor.undeclare(@subchildren[i]);
+      visitor.simpleTermVisit(@children[0], self);
     end;
   end;
 
@@ -4223,8 +4235,8 @@ begin
   j := 0;
   for i := 0 to high(f.children) do
     if isPseudoVariable(f.children[i]) then begin
-      TXQTermNamedFunction(result.body).push(f.children[i].clone);
-      result.parameters[j].variable := TXQTermVariable(f.children[i].clone);
+      TXQTermNamedFunction(result.body).push(makeNumberedVariable(parameterCount - j - 1));
+      result.parameters[j].variable := makeNumberedVariable(parameterCount - j - 1);
       if version <> nil then
         result.parameters[j].seqtype := nativeMetaTypeToActualType(version^.types[i])
        else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
@@ -4265,8 +4277,8 @@ begin
   j := 0;
   for i := 0 to high(f.parameters) do begin
     if isPseudoVariable(ch[i+1]) then begin
-      TXQTermDynamicFunctionCall(result.body).push(ch[i+1].clone);
-      result.parameters[j].variable := TXQTermVariable(ch[i+1].clone); //TXQTermDynamicFunctionCall(result.body).children[i+1] as TXQTermVariable;
+      TXQTermDynamicFunctionCall(result.body).push(makeNumberedVariable(parameterCount - j - 1));
+      result.parameters[j].variable := TXQTermVariable(makeNumberedVariable(parameterCount - j - 1));
       if f.parameters[i].seqtype <> nil then
         result.parameters[j].seqtype := TXQTermSequenceType(f.parameters[i].seqtype.clone);
       inc(j);
