@@ -1276,6 +1276,8 @@ type
     procedure insert(i: integer; value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addOrdered(const node: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure add(list: TXQVList);
+    procedure addOrdered(list: TXQVList);
     procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
     function get(i: integer): IXQValue; inline; //**< Gets a PXQValue from the list.
     procedure put(i: integer; const AValue: IXQValue); inline; //**< Puts a IXQValue to a node sequence
@@ -2497,7 +2499,7 @@ public
     function parseXStringNullTerminated(str: string): TXQuery;
 
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
-    class procedure filterSequence(var result: IXQValue; const filter: TXQTerm; var context: TXQEvaluationContext);
+    class procedure filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQTerm; termDependencies: TXQContextDependencies; var context: TXQEvaluationContext);
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: array of TXQTerm; var context: TXQEvaluationContext);
 
@@ -2508,7 +2510,7 @@ public
     class procedure unifyQuery(const contextNode: TTreeNode; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition); static;
 
     //** Performs a query step, given a (sequence) of parent nodes
-    class function expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
+    class function expandSequence(const previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
     //** Initialize a query by performing the first step
     class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
 
@@ -5236,6 +5238,7 @@ class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: T
 
 var
 i: Integer;
+w: PIXQValue;
 begin
   if typ = nil then exit(true);
   if typ.instanceOf(v, context) then exit(true);
@@ -5245,8 +5248,8 @@ begin
       exit(checkSingle(v));
     if ((not typ.allowMultiple) and (v.getSequenceCount > 1)) then exit(false);
     if ((not typ.allowNone) and (v.getSequenceCount = 0)) then exit(false);
-    for i := 0 to v.getSequenceCount - 1 do
-      if not checkSingle((v as TXQValueSequence).seq[i]) then exit(false);
+    for w in v.GetEnumeratorPtrUnsafe do
+      if not checkSingle(w^) then exit(false);
     result := true;
   end;
 end;
@@ -5465,7 +5468,7 @@ end;
 
 procedure TXQVList.add(const value: IXQValue);
 var
- i, othercount: Integer;
+ othercount: Integer;
  enumerator: TXQValueEnumeratorPtrUnsafe;
 begin
   assert(value <> nil);
@@ -5535,6 +5538,23 @@ begin
         addOrdered(s^); //TODO: optimize
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
   end;
+end;
+
+procedure TXQVList.add(list: TXQVList);
+var
+  i: Integer;
+begin
+  for i := 0 to list.Count - 1 do list.fbuffer[i]._AddRef;
+  reserve(count + list.Count);
+  move(list.fbuffer[0], fbuffer[count], list.Count * sizeof(IXQValue));
+  fcount += list.Count;
+end;
+
+procedure TXQVList.addOrdered(list: TXQVList);
+var
+  i: Integer;
+begin
+  for i := 0 to list.Count - 1 do addOrdered(list.fbuffer[i]);
 end;
 
 procedure TXQVList.delete(i: integer);
@@ -7068,78 +7088,91 @@ end;
 end;}
 
 
-class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: TXQTerm; var context: TXQEvaluationContext);
+class procedure TXQueryEngine.filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQTerm; termDependencies: TXQContextDependencies; var context: TXQEvaluationContext);
 var
- tempContext: TXQEvaluationContext;
- previous: IXQValue;
  v: PIXQValue;
- i, j: Integer;
- value: IXQValue;
+ i, j, backupA, backupB: Integer;
+ value, backupItem: IXQValue;
  list: TXQVList;
  i64: Int64;
  depends: TXQContextDependencies;
+ oldParent: TTreeNode;
 begin
-  if (result = nil) or (result.getSequenceCount = 0) then exit;
+  outList.Count := 0;
+  if (sequence = nil) or (sequence.getSequenceCount = 0) then exit;
 
-  depends := filter.getContextDependencies; //todo: optimize
-  if [xqcdFocusItem, xqcdFocusPosition] * depends = [] then begin
-    if not (xqcdFocusLast in depends) then value := filter.evaluate(context)
+
+  if [xqcdFocusItem, xqcdFocusPosition] * termDependencies = [] then begin
+    if not (xqcdFocusLast in termDependencies) then value := filter.evaluate(context)
     else begin
       try
-        context.getContextItem(previous, i, j);
-        context.setContextItem(result.get(1), 1, result.getSequenceCount);
+        context.getContextItem(backupItem, backupA, backupB);
+        context.setContextItem(sequence.get(1), 1, sequence.getSequenceCount);
         value := filter.evaluate(context)
       finally
-        context.setContextItem(previous, i, j);
+        context.setContextItem(backupItem, backupA, backupB);
       end;
     end;
     //optimization for a single number
     if value.kind in [pvkBigDecimal, pvkInt64, pvkFloat] then begin
       if ((value.kind = pvkFloat) and (frac(value.toFloat) <> 0)) or
-         ((value.kind = pvkBigDecimal) and (not isInt64(value.toDecimal) )) then begin
-        result := xqvalue();
-        exit();
-      end;
+         ((value.kind = pvkBigDecimal) and (not isInt64(value.toDecimal) )) then exit;
       i64 := value.toInt64;
-      if (i64 < 1) or (i64 > result.getSequenceCount) then result := xqvalue()
-      else result := result.get(i64);
-    end else if not value.toBooleanEffective then
-      result := xqvalue();
+      if (i64 >= 1) and (i64 <= sequence.getSequenceCount) then outList.add(sequence.get(i64));
+    end else if value.toBooleanEffective then outList.add(sequence);
     exit;
   end; //end optimization
 
-  tempContext:=context;
-  previous := result;
-  tempContext.SeqLength:=previous.getSequenceCount;
-
-  list := TXQVList.create(tempContext.SeqLength);
   try
+    oldParent := context.ParentElement;
+    context.getContextItem(backupItem, backupA, backupB);
+    context.SeqLength:=sequence.getSequenceCount;
+
+    outList.reserve(context.SeqLength);
     i := 1;
-    for v in previous.GetEnumeratorPtrUnsafe do begin
-      tempContext.SeqValue:=v^;
-      tempContext.SeqIndex:=i;
-      if v^.kind = pvkNode then tempContext.ParentElement:=v^.toNode
-      else tempContext.ParentElement := context.ParentElement;
-      if sequenceFilterConditionSatisfied(filter.evaluate(tempContext), i) then
-        list.add(v^);
+    for v in sequence.GetEnumeratorPtrUnsafe do begin
+      context.SeqValue:=v^;
+      context.SeqIndex:=i;
+      if v^.kind = pvkNode then context.ParentElement:=v^.toNode  //remove this?
+      else context.ParentElement := oldParent;
+      if sequenceFilterConditionSatisfied(filter.evaluate(context), i) then
+        outList.add(v^);
       i+=1;
     end;
-    result := xqvalueSeqSqueezed(list);
-  except
-    list.free;
-    raise;
+  finally
+    context.ParentElement := oldParent;
+    context.setContextItem(backupItem, backupA, backupB);
   end;
 end;
 
 class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: array of TXQTerm; var context: TXQEvaluationContext);
 var i:integer;
+  list1, list2, temp: TXQVList;
+  seq1, seq2: IXQValue;
 begin
-  for i:=0 to high(filter) do
-    filterSequence(result, filter[i], context);
+  case length(filter) of
+    0: exit;
+    1: ;
+    else begin
+      list2 := TXQVList.create();
+      seq2 := TXQValueSequence.create(list2);
+    end;
+  end;
+  list1 := TXQVList.create();
+  seq1 := TXQValueSequence.create(list1);
+
+  filterSequence(result, list1, filter[0], filter[0].getContextDependencies, context);
+  for i:=1 to high(filter) do begin
+    xqswap(seq1, seq2);
+    temp := list1; list1 := list2; list1 := temp;
+    filterSequence(seq2, list1, filter[i], filter[i].getContextDependencies, context);
+  end;
+  result := seq1;
+  xqvalueSeqSqueeze(result);
 end;
 
 
-class function TXQueryEngine.expandSequence(previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue;
+class function TXQueryEngine.expandSequence(const previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue;
 var oldnode,newnode: TTreeNode;
     newList: TXQVList;
     nodeCondition: TXQPathNodeCondition;
@@ -7175,12 +7208,51 @@ begin
   end;
 end;
 
+var filterDependencies: array of TXQContextDependencies;
+    newList2: TXQVList;
+    newListSeq, newListSeq2: IXQValue;
+
+  function filter(const v: IXQValue): TXQVList;
+  var
+    i, lastfilter: Integer;
+    temp: TXQVList;
+  begin
+    //filtering is done with a swap list approach
+    //first v is filtered and the output written in list 1
+    //then list 1 is filtered and written list 2
+    //then it swaps and list 2 filtered is again written in list 1
+    //etc.
+    filterSequence(v, newList2, command.filters[0], filterDependencies[0], context);
+    if length(command.filters) > 1 then begin
+      i := 1;
+      lastfilter := high(command.filters);
+      lastfilter := lastfilter - lastfilter and 1;
+      while i <= lastfilter do begin
+        //technically this does not swap. It can considered to be the loop of the swap approach unrolled, so that it behaves as if it was swapping
+        filterSequence(newListSeq2, newList, command.filters[i], filterDependencies[i], context);
+        inc(i);
+        filterSequence(newListSeq, newList2, command.filters[i], filterDependencies[i], context);
+        inc(i);
+      end;
+      if length(command.filters) and 1 = 0 then begin
+        filterSequence(newListSeq2, newList, command.filters[high(command.filters)], filterDependencies[high(command.filters)], context);
+        xqswap(newListSeq, newListSeq2);
+        temp := newList;
+        newList := newList2;
+        newList2 := temp;
+      end;
+    end;
+    result := newList2;
+  end;
+
+
 var
-  j: Integer;
+  j, i: Integer;
   tempContext: TXQEvaluationContext;
   onlyNodes: boolean;
-  n: IXQValue;
+  n: PIXQValue;
   resultSeq: TXQValueSequence;
+
   tempNamespace: INamespace;
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
@@ -7189,17 +7261,14 @@ var
   tempList: TXQVList;
   pv: PIXQValue;
 
-  procedure add(const v: IXQValue); inline;
-  begin
-    if resultSeq.seq.count = 0 then onlyNodes := v.kind = pvkNode;
-    if onlyNodes <> (v.kind = pvkNode) then
-      raise EXQEvaluationException.Create(IfThen(lastExpansion, 'XPTY0018', 'XPTY0019'), 'Nodes and non-node values must not be mixed in step expressions');;
-    if onlyNodes then resultSeq.addOrdered(v)
-    else resultSeq.add(v);
-  end;
+
+
 
 begin
   if (previous = nil) or (previous.getSequenceCount = 0) then exit(previous);
+
+  SetLength(filterDependencies, length(command.filters));
+  for i := 0 to high(filterDependencies) do filterDependencies[i] := command.filters[i].getContextDependencies;
 
   resultSeq:=TXQValueSequence.create(previous.getSequenceCount);
   try
@@ -7224,23 +7293,30 @@ begin
     end else namespaceMatching := xqnmNone;
 
     newList := TXQVList.create();
+    newListSeq := TXQValueSequence.create(newList);
+    if length(command.filters) > 0 then begin
+      newList2 := TXQVList.create();
+      newListSeq2 := TXQValueSequence.create(newList2);
+    end else
+      tempList := newList; //no filter, no need to copy lists
+
     nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
     onlyNodes := false;
-    for n in previous do begin
+    for n in previous.GetEnumeratorPtrUnsafe do begin
       if command.typ = qcFunctionSpecialCase then begin
-        if not (n.kind in [pvkNode, pvkObject, pvkArray]) then
-          raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
+        if not (n^.kind in [pvkNode, pvkObject, pvkArray]) then
+          raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
         newList.clear;
         tempContext.SeqIndex += 1;
-        tempContext.SeqValue := n;
-        if n is TXQValueNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
+        tempContext.SeqValue := n^;
+        if n^.kind = pvkNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
         newList.add(command.specialCase.evaluate(tempContext));
       end else begin
-        tempKind := n.kind;
+        tempKind := n^.kind;
         case tempKind of
           pvkNode: begin
-            assert(n.toNode <> nil);
-            oldnode := n.toNode;
+            assert(n^.toNode <> nil);
+            oldnode := n^.toNode;
             unifyQuery(oldnode, command, nodeCondition);
             if namespaceMatching = xqnmURL then begin
               nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
@@ -7273,60 +7349,55 @@ begin
               qcDirectChild: begin
                 if qmValue in command.matching then begin //read named property
                   //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
-                  if tempKind = pvkObject then newList.add(n.getProperty(command.value))
-                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
+                  if tempKind = pvkObject then newList.add(n^.getProperty(command.value))
+                  else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
                     if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
                     newList.add(pv^.getProperty(command.value));
                   end;
                 end else begin
                   //get all properties
-                  if tempKind = pvkObject then newList.add((n as TXQValueObject).enumerateValues())
-                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
+                  if tempKind = pvkObject then newList.add((n^ as TXQValueObject).enumerateValues())
+                  else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
                     if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
                     newList.add((pv^ as TXQValueObject).enumerateValues());
                   end;
                 end;
               end;
               qcDescendant:
-                jsoniqDescendants(n as TXQValue, command.value);
+                jsoniqDescendants(n^ as TXQValue, command.value);
               qcSameNode:
-                newList.add(n);
+                newList.add(n^);
             end;
 
           end;
-          else raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n.debugAsStringWithTypeAnnotation()); //continue;
+          else raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
         end;
       end;
 
-      case newList.Count of
-        0: continue;
-        1: tempSeq := newList[0];
-        else begin
-          tempSeq := TXQValueSequence.create(newList);
-          newList := TXQVList.create();
+
+      if length(command.filters) > 0 then begin
+        case newList.Count of
+          0: continue;
+          1: tempList := filter(newList[0]);
+          else tempList := filter(newListSeq);
         end;
       end;
-      filterSequence(tempSeq, command.filters, context);
 
-      if (tempSeq.getSequenceCount = 0) then
-        continue;
+      if tempList.Count = 0 then continue;
+      if command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling] then tempList.revert;
 
-      if tempSeq is TXQValueSequence then begin
-        tempList := (tempSeq as TXQValueSequence).seq;
-        if (command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling]) then
-          tempList.revert;
-
-        for j := 0 to tempList.Count-1 do
-          add(tempList[j]);
-      end else add(tempSeq);
+      if resultSeq.seq.Count = 0 then onlyNodes := tempList[0].kind = pvkNode;
+      for i := 0 to tempList.Count - 1 do
+        if (tempList.fbuffer[i].kind = pvkNode) <> onlyNodes then
+          raise EXQEvaluationException.Create(IfThen(lastExpansion, 'XPTY0018', 'XPTY0019'), 'Nodes and non-node values must not be mixed in step expressions');
+      if onlyNodes then resultSeq.seq.addOrdered(tempList)
+      else resultSeq.seq.add(tempList);
     end;
 
   except
     resultSeq.free;
-    newList.Free;
     raise;
   end;
-  newList.Free;
 
   result := resultSeq;
 end;

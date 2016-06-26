@@ -750,24 +750,31 @@ end;
 
 function TXQTermSequenceType.castableAsBase(v: IXQValue; staticContext: TXQStaticContext): boolean;
 begin
-  if v.isUndefined then result := allowNone
-  else if v.getSequenceCount > 1 then result := false
-  else begin
-    if v is TXQValueSequence then v := (v as TXQValueSequence).seq[0];
-    if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.tryCreateValue(v) = xsceNoError
-    else result := (atomicTypeInfo as TXSQNameType).castable(v, staticContext);
+  case v.getSequenceCount of
+    0: result := allowNone;
+    1: begin
+      if v.kind = pvkSequence then v := v.get(1);  //does this matter?
+      if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.tryCreateValue(v) = xsceNoError
+      else result := (atomicTypeInfo as TXSQNameType).castable(v, staticContext);
+    end;
+    else result := false;
   end;
 end;
 
 function TXQTermSequenceType.castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
 begin
   v := xqvalueAtomize(v);
-  if (v.isUndefined and not allowNone) or (v.getSequenceCount > 1) then
-    raiseEvaluationError('XPTY0004', 'impossible cast as');
-  if v.isUndefined then exit(xqvalue);
-  if v is TXQValueSequence then v := (v as TXQValueSequence).seq[0]; //does this matter?
-  if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
-  else result := (atomicTypeInfo as TXSQNameType).cast(v, context);
+  case v.getSequenceCount of
+    0: begin
+      if not allowNone then raiseXPTY0004TypeError(v, debugTermToString);
+      result := xqvalue();
+    end;
+    1: begin
+      if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
+      else result := (atomicTypeInfo as TXSQNameType).cast(v, context);
+    end;
+    else raiseXPTY0004TypeError(v, debugTermToString);
+  end;
 end;
 
 function TXQTermSequenceType.castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
@@ -1792,8 +1799,6 @@ var
       end;
 
     var
-
-      tempIndex: Integer;
       matchIdxList: array of integer;
       matchIdxListLength, i: integer;
     begin
@@ -2022,17 +2027,35 @@ var
     k: LongInt;
     oldSortingCache: TFPList;
     lastTuple: TOrderedTuple;
+    //Grouping collects for all tuples that have the same value in the grouping vars all values of the nonGroupingVars
+    //We put these values for each nonGroupingVars in a tempList
+    tempLists: array of TXQVList;
     nonGroupingVars: array of integer;
 
-    procedure newGroupedTuple;
-    var j,k: integer;
+    procedure closeGroupedTuple;
+    var k: integer;
     begin
-      if lastTuple <> nil then for k in nonGroupingVars do xqvalueSeqSqueeze(lastTuple.vars[k]);
+      for k in nonGroupingVars do
+        case tempLists[k].Count of
+          0: lastTuple.vars[k] := xqvalue();
+          1: lastTuple.vars[k] := tempLists[k][0];
+          else begin
+            lastTuple.vars[k] := TXQValueSequence.create(tempLists[k]);
+            tempLists[k] := nil;
+          end;
+        end;
+    end;
+
+    procedure newGroupedTuple;
+    var k: integer;
+    begin
+      if lastTuple <> nil then closeGroupedTuple;
       sortingCache.Add(oldSortingCache[i]);
       lastTuple := TOrderedTuple(oldSortingCache[i]);
-      for j := 0 to high(nonGroupingVars) do begin
-        k := nonGroupingVars[j];
-        lastTuple.vars[k] := TXQValueSequence.create(lastTuple.vars[k]); //need to create new sequences as the old ones are immutable
+      for k in nonGroupingVars do begin
+        if tempLists[k] = nil then tempLists[k] := TXQVList.create(1)
+        else tempLists[k].clear;
+        tempLists[k].add(lastTuple.vars[k]);
       end;
     end;
 
@@ -2071,6 +2094,8 @@ var
 
       stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleGroupCompareFunction, TObject(@data));
 
+      if length(nonGroupingVars) > 0 then
+        SetLength(tempLists, nonGroupingVars[high(nonGroupingVars)] + 1);
 
       oldSortingCache := sortingCache;
       sortingCache := TFPList.Create;
@@ -2081,12 +2106,13 @@ var
       while i < oldSortingCache.Count do begin
         if data.compareTuples(lastTuple, TOrderedTuple(oldSortingCache[i])) = 0 then begin
           for k in nonGroupingVars do
-            (lastTuple.vars[k] as TXQValueSequence).add(TOrderedTuple(oldSortingCache[i]).vars[k]);
+            tempLists[k].add(TOrderedTuple(oldSortingCache[i]).vars[k]);
           tobject(oldSortingCache[i]).free;
         end else newGroupedTuple;
         inc(i);
       end;
-      for k in nonGroupingVars do xqvalueSeqSqueeze(lastTuple.vars[k]);
+      closeGroupedTuple;
+      for k in nonGroupingVars do tempLists[k].free;
       oldSortingCache.free;
     end;
 
@@ -4121,7 +4147,6 @@ end;
 function TXQTermDefineFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   i: Integer;
-  subchildren: array of txqterm;
   varDef: TXQTermDefineVariable;
 begin
   visitor.parent := self;
